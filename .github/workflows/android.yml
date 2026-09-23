@@ -34,12 +34,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Release keystore
         if: env.KEYSTORE_B64 != ''
@@ -86,7 +86,7 @@ jobs:
       # with the key kept outside the repository (docs/android.md).
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v') && env.KEYSTORE_B64 != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             ${{ steps.apk.outputs.path }}
