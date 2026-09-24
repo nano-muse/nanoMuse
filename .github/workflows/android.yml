@@ -47,12 +47,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Build and test
         run: ./gradlew --no-daemon assembleConnectDebug testConnectDebugUnitTest lintConnectDebug
@@ -85,19 +85,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.runtime.outputs.rootfs_artifact }}
           path: android/app/src/local/assets
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.runtime.outputs.proot_artifact }}
           path: android/app/src/local/jniLibs
@@ -174,7 +174,7 @@ jobs:
       # built with the key kept outside the repository (docs/android.md).
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v') && env.KEYSTORE_B64 != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             android/nanomuse-${{ steps.apk.outputs.version }}.apk
