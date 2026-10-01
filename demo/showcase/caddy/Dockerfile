@@ -7,7 +7,7 @@
 # Build context is the repository root (see docker-compose.yml), so the nanoMuse app module can
 # be copied straight from demo/mobilegym/apps/nanoMuse, and the page from demo/showcase/site.
 
-FROM node:22-bookworm-slim AS site
+FROM node:26-bookworm-slim AS site
 ARG MOBILEGYM_REPO=https://github.com/Purewhiter/mobilegym.git
 ARG MOBILEGYM_REF=main
 ARG NANOMUSE_DEMO=/api/demo
