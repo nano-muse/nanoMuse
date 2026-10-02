@@ -301,6 +301,17 @@ export const api = {
   removeCalendarFeed: (name: string) =>
     request<ConnectionsData["calendar"]>(`/api/connections/calendar/feeds/${encodeURIComponent(name)}`, { method: "DELETE" }),
   testCalendar: () => request<TestResult>("/api/connections/calendar/test", { method: "POST" }),
+  /** Google Calendar over OAuth: the client, the sign-in, and which calendars to read. */
+  googleCalendar: () => request<ConnectionsData["calendar"]["google"]>("/api/connections/calendar/google"),
+  setGoogleCalendar: (body: Record<string, unknown>) =>
+    request<ConnectionsData["calendar"]["google"]>("/api/connections/calendar/google", { method: "PUT", body: JSON.stringify(body) }),
+  /** the consent URL to open in the system browser; `write` also asks for the write scope */
+  connectGoogleCalendar: (write: boolean) =>
+    request<{ url: string }>("/api/connections/calendar/google/connect", json({ write })),
+  setGoogleCalendars: (body: { calendar_ids?: string[]; default_calendar?: string }) =>
+    request<ConnectionsData["calendar"]["google"]>("/api/connections/calendar/google/calendars", json(body)),
+  disconnectGoogleCalendar: () =>
+    request<ConnectionsData["calendar"]["google"]>("/api/connections/calendar/google/disconnect", { method: "POST" }),
   contacts: (q = "", limit = 8) =>
     request<{ count: number; people: Contact[] }>(`/api/contacts?q=${encodeURIComponent(q)}&limit=${limit}`),
   setContacts: (body: Record<string, unknown>) =>

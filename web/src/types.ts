@@ -794,6 +794,8 @@ export interface ConnectionsData {
     day_start: string;
     day_end: string;
     feeds: CalendarFeed[];
+    /** Google Calendar over OAuth: sign in with Google, read and write the real calendar. */
+    google: GoogleCalendarConnection;
   };
   contacts: {
     enabled: boolean;
@@ -867,6 +869,35 @@ export interface CalendarEvent {
   location: string;
   description: string;
   calendar: string;
+}
+
+/** A Google calendar the signed-in account can see. */
+export interface GoogleCalendar {
+  id: string;
+  name: string;
+  primary: boolean;
+  timezone: string;
+  access_role: string;
+  writable: boolean;
+}
+
+/** The Google Calendar side of the calendar card: OAuth client + connection state. */
+export interface GoogleCalendarConnection {
+  configured: boolean;
+  connected: boolean;
+  account: string;
+  scopes: string[];
+  can_write: boolean;
+  enabled: boolean;
+  client_id: string;
+  redirect_uri: string;
+  default_calendar: string;
+  calendar_ids: string[];
+  write: boolean;
+  has_secret: boolean;
+  /** only on GET …/google, when connected: every calendar on the account */
+  calendars?: GoogleCalendar[];
+  error?: string;
 }
 
 /** GET /api/calendar: today's and tomorrow's events with the feeds' status. */

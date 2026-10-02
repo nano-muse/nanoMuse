@@ -245,7 +245,7 @@ class NanoMuseApp:
                 ReadEmails(settings=s.connectors.email, vault=self.vault),
                 SendEmail(settings=s.connectors.email, vault=self.vault, book=self.contacts),
             )
-        if s.connectors.calendar.enabled:
+        if s.connectors.calendar.enabled or s.connectors.calendar.google.enabled:
             tools.add(Calendar(feeds=self.calendar, workspace=ws))
         if s.connectors.contacts.enabled:
             tools.add(Contacts(book=self.contacts))
@@ -358,7 +358,10 @@ class NanoMuseApp:
         s = self.settings
         return {
             "mail": bool(s.connectors.email.enabled and s.connectors.email.imap_host),
-            "event": bool(s.connectors.calendar.enabled and s.connectors.calendar.feeds),
+            "event": bool(
+                (s.connectors.calendar.enabled and s.connectors.calendar.feeds)
+                or s.connectors.calendar.google.enabled
+            ),
             "hook": True,
         }
 

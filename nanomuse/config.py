@@ -184,6 +184,28 @@ class CalendarFeedSettings(BaseModel):
     url: str
 
 
+class GoogleCalendarSettings(BaseModel):
+    """Google Calendar over OAuth (the Calendar API), beside the ``.ics`` feeds.
+
+    ``client_secret`` is a ``{{vault:GOOGLE_CALENDAR_SECRET}}`` placeholder — the app puts
+    the real secret in the vault. ``redirect_uri`` must be registered on the OAuth client;
+    for a desktop app it is the loopback callback into this same server.
+    """
+
+    enabled: bool = False
+    client_id: str = ""
+    client_secret: str = ""
+    redirect_uri: str = "http://localhost:8787/api/google/callback"
+    # The calendar the agent writes to when none is named ("" → the primary one).
+    default_calendar: str = ""
+    # Which calendars to read. Empty → every calendar the account can see.
+    calendar_ids: list[str] = Field(default_factory=list)
+    # Allow the agent to create / change / delete events (needs the write scope).
+    write: bool = True
+    # An IANA zone used for all-day events and event bodies ("" → the machine's).
+    timezone: str = ""
+
+
 class CalendarSettings(BaseModel):
     enabled: bool = False
     feeds: list[CalendarFeedSettings] = Field(default_factory=list)
@@ -191,6 +213,8 @@ class CalendarSettings(BaseModel):
     # Working hours, for "when am I free" — local time.
     day_start: str = "09:00"
     day_end: str = "18:00"
+    # Google Calendar over OAuth, read + write (docs/calendar.md).
+    google: GoogleCalendarSettings = Field(default_factory=GoogleCalendarSettings)
 
 
 class ContactSourceSettings(BaseModel):
@@ -719,6 +743,22 @@ def apply_app_settings(settings: Settings, data: dict[str, Any]) -> None:
             # feeds added in the app come after the ones in config.toml; same name → app wins
             names = {f.name for f in feeds}
             cal.feeds = [f for f in cal.feeds if f.name not in names] + feeds
+        if isinstance(calendar.get("google"), dict):
+            g = calendar["google"]
+            for key in ("enabled", "write"):
+                if key in g and g[key] is not None:
+                    setattr(cal.google, key, bool(g[key]))
+            for key in (
+                "client_id",
+                "client_secret",
+                "redirect_uri",
+                "default_calendar",
+                "timezone",
+            ):
+                if key in g and g[key] is not None:
+                    setattr(cal.google, key, str(g[key]).strip())
+            if isinstance(g.get("calendar_ids"), list):
+                cal.google.calendar_ids = [str(x) for x in g["calendar_ids"] if str(x).strip()]
     if contacts := data.get("contacts"):
         book = settings.connectors.contacts
         if "enabled" in contacts and contacts["enabled"] is not None:
@@ -807,6 +847,7 @@ __all__ = [
     "ConnectorSettings",
     "DEFAULT_DATA_DIR",
     "EmailSettings",
+    "GoogleCalendarSettings",
     "HandsSettings",
     "HubSettings",
     "LLMSettings",

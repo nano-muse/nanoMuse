@@ -12,13 +12,14 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass, field, replace
-from datetime import UTC, date, datetime, timedelta, tzinfo
+from datetime import date, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from nanomuse.calendar.ics import Event, Occurrence, day_bounds, expand, parse_ics
+from nanomuse.calendar.google import GoogleCalendarClient, GoogleError
+from nanomuse.calendar.ics import Event, Occurrence, day_bounds, expand, local_tz, parse_ics
 from nanomuse.logger import logger
 
 if TYPE_CHECKING:
@@ -69,8 +70,11 @@ class CalendarFeeds:
         self.settings = settings
         self.vault = vault
         self.cache_file = cache_file
-        self.tz: tzinfo = tz or datetime.now().astimezone().tzinfo or UTC
+        self.tz: tzinfo = tz or local_tz()
         self.states: dict[str, FeedState] = {}
+        # Google Calendar over the API: its own states, keyed by calendar id.
+        self.google_states: dict[str, FeedState] = {}
+        self.google = GoogleCalendarClient(settings.google, vault=vault, tz=self.tz)
         self._lock = asyncio.Lock()
         self._load_cache()
 
@@ -113,12 +117,20 @@ class CalendarFeeds:
 
     # ------------------------------------------------------------------ fetching
     @property
+    def google_enabled(self) -> bool:
+        return bool(self.settings.google.enabled and self.google.configured)
+
+    @property
     def configured(self) -> bool:
-        return self.settings.enabled and bool(self.settings.feeds)
+        return (self.settings.enabled and bool(self.settings.feeds)) or self.google.connected
 
     @property
     def fetched_at(self) -> float:
-        return max((s.fetched_at for s in self.states.values()), default=0.0)
+        return max(
+            [s.fetched_at for s in self.states.values()]
+            + [s.fetched_at for s in self.google_states.values()],
+            default=0.0,
+        )
 
     def stale(self) -> bool:
         return time.time() - self.fetched_at > self.settings.refresh_minutes * 60
@@ -155,38 +167,71 @@ class CalendarFeeds:
 
     async def refresh(self, force: bool = False) -> dict[str, Any]:
         """Fetch every feed (if stale or ``force``); each feed fails on its own."""
-        if not self.settings.enabled:
-            return self.status()
         async with self._lock:
             if not force and not self.stale():
                 return self.status()
-            wanted = {f.name for f in self.settings.feeds}
-            for name in list(self.states):
-                if name not in wanted:
-                    del self.states[name]
-            texts: dict[str, str] = {}
-            for feed in self.settings.feeds:
-                state = self.states.setdefault(feed.name, FeedState(feed.name))
-                try:
-                    text = await self._read(self._url(feed.url))
-                    if "BEGIN:VCALENDAR" not in text[:2000]:
-                        raise ValueError("not an iCalendar file (no BEGIN:VCALENDAR)")
-                    state.events = parse_ics(text, self.tz, calendar=feed.name)
-                    state.error = ""
-                    texts[feed.name] = text
-                except (httpx.HTTPError, OSError, ValueError) as exc:
-                    state.error = f"{type(exc).__name__}: {exc}"[:200]
-                    logger.warning("calendar feed '{}' failed: {}", feed.name, state.error)
-                state.fetched_at = time.time()
-            self._save_cache(texts)
+            if self.settings.enabled:
+                await self._refresh_feeds()
+            if self.google_enabled:
+                await self._refresh_google()
             return self.status()
 
+    async def _refresh_feeds(self) -> None:
+        wanted = {f.name for f in self.settings.feeds}
+        for name in list(self.states):
+            if name not in wanted:
+                del self.states[name]
+        texts: dict[str, str] = {}
+        for feed in self.settings.feeds:
+            state = self.states.setdefault(feed.name, FeedState(feed.name))
+            try:
+                text = await self._read(self._url(feed.url))
+                if "BEGIN:VCALENDAR" not in text[:2000]:
+                    raise ValueError("not an iCalendar file (no BEGIN:VCALENDAR)")
+                state.events = parse_ics(text, self.tz, calendar=feed.name)
+                state.error = ""
+                texts[feed.name] = text
+            except (httpx.HTTPError, OSError, ValueError) as exc:
+                state.error = f"{type(exc).__name__}: {exc}"[:200]
+                logger.warning("calendar feed '{}' failed: {}", feed.name, state.error)
+            state.fetched_at = time.time()
+        self._save_cache(texts)
+
+    async def _refresh_google(self) -> None:
+        """Read every selected Google calendar over the API into ``google_states``."""
+        g = self.settings.google
+        try:
+            calendars = await self.google.list_calendars()
+        except GoogleError as exc:
+            logger.warning("google calendar list failed: {}", exc)
+            return
+        wanted = [c for c in calendars if not g.calendar_ids or c.id in g.calendar_ids]
+        # cover the whole search window (past 90 / next 180 days) so search never misses
+        start = datetime.now(self.tz) - timedelta(days=90)
+        end = datetime.now(self.tz) + timedelta(days=186)
+        keep = {c.id for c in wanted}
+        for cid in list(self.google_states):
+            if cid not in keep:
+                del self.google_states[cid]
+        for calendar in wanted:
+            state = self.google_states.setdefault(calendar.id, FeedState(calendar.name))
+            state.name = calendar.name
+            try:
+                state.events = await self.google.list_events(calendar.id, start, end)
+                state.error = ""
+            except GoogleError as exc:
+                state.error = str(exc)[:200]
+                logger.warning("google calendar '{}' failed: {}", calendar.name, state.error)
+            state.fetched_at = time.time()
+
     def status(self) -> dict[str, Any]:
+        feeds = [self.states.get(f.name, FeedState(f.name)).to_dict() for f in self.settings.feeds]
+        google = [s.to_dict() for s in self.google_states.values()]
         return {
-            "enabled": self.settings.enabled,
-            "feeds": [
-                self.states.get(f.name, FeedState(f.name)).to_dict() for f in self.settings.feeds
-            ],
+            "enabled": self.settings.enabled or self.settings.google.enabled,
+            "feeds": feeds + google,
+            "ics_feeds": feeds,
+            "google": {**self.google.status(), "calendars": google},
             "fetched_at": datetime.fromtimestamp(self.fetched_at)
             .astimezone()
             .isoformat(timespec="seconds")
@@ -197,18 +242,45 @@ class CalendarFeeds:
 
     # ------------------------------------------------------------------ reading
     def events(self, start: datetime, end: datetime) -> list[Occurrence]:
-        """Occurrences overlapping [start, end) across every feed, sorted."""
+        """Occurrences overlapping [start, end) across every feed and Google calendar."""
         all_events: list[Event] = []
         for state in self.states.values():
             all_events.extend(state.events)
+        for state in self.google_states.values():
+            all_events.extend(state.events)
         # in the user's zone, so the app and the model read the same clock as the user
         # (a Google feed hands out UTC; an all-day occurrence has no zone to convert)
-        return [
+        occurrences = [
             o
             if o.all_day
             else replace(o, start=o.start.astimezone(self.tz), end=o.end.astimezone(self.tz))
             for o in expand(all_events, start, end)
         ]
+        return self._dedupe(occurrences)
+
+    def _dedupe(self, items: list[Occurrence]) -> list[Occurrence]:
+        """Drop one event that arrives twice, e.g. its private ``.ics`` link and the API.
+
+        A Google event's ``.ics`` UID is ``<id>@google.com`` and the API id is ``<id>``, so
+        normalising the UID catches the same event from both sources without touching two
+        genuinely distinct events (they have distinct ids). With no UID, fall back to the
+        exact shape. The Google-sourced copy wins, because only it carries a usable
+        ``event_id`` for ``update`` / ``delete``.
+        """
+        order: list[tuple[Any, ...]] = []
+        by_key: dict[tuple[Any, ...], Occurrence] = {}
+        for o in items:
+            if o.uid:
+                key: tuple[Any, ...] = ("uid", o.uid.split("@")[0].lower(), o.start.isoformat())
+            else:
+                key = ("shape", o.summary.lower(), o.start.isoformat(), o.end.isoformat())
+            existing = by_key.get(key)
+            if existing is None:
+                order.append(key)
+                by_key[key] = o
+            elif o.calendar in self.google_states and existing.calendar not in self.google_states:
+                by_key[key] = o
+        return [by_key[k] for k in order]
 
     def agenda(self, day: date, days: int = 1) -> list[Occurrence]:
         start, _ = day_bounds(day, self.tz)
@@ -253,10 +325,15 @@ class CalendarFeeds:
         return slots
 
     def render(self, items: list[Occurrence], today: date | None = None) -> str:
-        """The agenda as the model (and the CLI) read it: grouped by day, local times."""
+        """The agenda as the model (and the CLI) read it: grouped by day, local times.
+
+        A Google occurrence also carries its event id, because ``update`` and ``delete``
+        address an event by id and this is the only place the model can learn one.
+        """
         if not items:
             return "(no events)"
         today = today or datetime.now(self.tz).date()
+        google_ids = {ev.uid for state in self.google_states.values() for ev in state.events}
         out: list[str] = []
         current: date | None = None
         for o in items:
@@ -287,10 +364,36 @@ class CalendarFeeds:
             bits = [f"  {span:<14} {o.summary}"]
             if o.location:
                 bits.append(f"@ {o.location}")
-            if o.calendar and len(self.settings.feeds) > 1:
+            if o.calendar and self._many_sources():
                 bits.append(f"[{o.calendar}]")
+            if o.uid in google_ids and o.uid:
+                bits.append(f"(id: {o.uid})")
             out.append(" ".join(bits))
         return "\n".join(out)
+
+    def _many_sources(self) -> bool:
+        return (len(self.settings.feeds) + len(self.google_states)) > 1
+
+    # ------------------------------------------------------------------ writing
+    async def write_calendars(self) -> list[dict[str, Any]]:
+        """The Google calendars the account can write to (for the app and the model)."""
+        if not self.google.connected:
+            return []
+        try:
+            calendars = await self.google.list_calendars()
+        except GoogleError as exc:
+            raise GoogleError(str(exc)) from exc
+        return [c.to_dict() for c in calendars if c.writable]
+
+    async def create_event(self, **kwargs: Any) -> dict[str, Any]:
+        """Create an event on a Google calendar; the caller passes the event fields."""
+        return await self.google.create_event(**kwargs)
+
+    async def update_event(self, **kwargs: Any) -> dict[str, Any]:
+        return await self.google.update_event(**kwargs)
+
+    async def delete_event(self, **kwargs: Any) -> None:
+        await self.google.delete_event(**kwargs)
 
 
 __all__ = ["CalendarFeeds", "FeedState", "Slot"]

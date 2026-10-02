@@ -9,9 +9,11 @@ What is not: VTODO, VJOURNAL, alarms, attendees.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta, tzinfo
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
+from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil.rrule import rruleset, rrulestr
@@ -401,11 +403,38 @@ def day_bounds(day: date, tz: tzinfo) -> tuple[datetime, datetime]:
     return start, start + timedelta(days=1)
 
 
+def local_tz() -> tzinfo:
+    """The machine's zone as a real ``ZoneInfo`` when possible.
+
+    ``datetime.now().astimezone().tzinfo`` is a *fixed-offset* ``timezone`` (``PDT -07:00``):
+    it cannot tell summer from winter, so an event created for another season lands an hour
+    off and a Google ``timeZone`` field gets an offset that contradicts the ``dateTime``.
+    Resolve the IANA zone from ``$TZ`` or ``/etc/localtime`` and fall back to the fixed
+    offset only when neither names a zone.
+    """
+    name = os.environ.get("TZ", "").strip()
+    if not name:
+        try:
+            target = Path("/etc/localtime").resolve()
+            parts = target.parts
+            if "zoneinfo" in parts:
+                name = "/".join(parts[parts.index("zoneinfo") + 1 :])
+        except OSError:
+            name = ""
+    if name:
+        try:
+            return ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    return datetime.now().astimezone().tzinfo or UTC
+
+
 __all__ = [
     "Event",
     "Occurrence",
     "day_bounds",
     "expand",
+    "local_tz",
     "make_ics",
     "parse_dt",
     "parse_duration",

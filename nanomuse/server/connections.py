@@ -52,6 +52,7 @@ SEARCH_KEY = "SEARCH_API_KEY"
 GUI_KEY = "GUI_API_KEY"
 EMAIL_ADDRESS = "EMAIL_ADDRESS"
 EMAIL_PASSWORD = "EMAIL_PASSWORD"
+GOOGLE_CALENDAR_SECRET = "GOOGLE_CALENDAR_SECRET"
 
 # The provider presets the app offers. `models` is the fallback catalogue for when the
 # endpoint's own /models cannot be reached (see `llm_models`); names move fast, the live list
@@ -395,9 +396,10 @@ class Connections:
         cal = self.settings.connectors.calendar
         status = {f["name"]: f for f in self.svc.app.calendar.status()["feeds"]}
         app_names = {f.get("name") for f in self._calendar_data().get("feeds") or []}
+        google = self.svc.app.calendar.status()["google"]
         return {
             "enabled": cal.enabled,
-            "configured": cal.enabled and bool(cal.feeds),
+            "configured": self.svc.app.calendar.configured,
             "refresh_minutes": cal.refresh_minutes,
             "day_start": cal.day_start,
             "day_end": cal.day_end,
@@ -411,6 +413,16 @@ class Connections:
                 }
                 for f in cal.feeds
             ],
+            "google": {
+                **google,
+                "enabled": cal.google.enabled,
+                "client_id": cal.google.client_id,
+                "redirect_uri": cal.google.redirect_uri,
+                "default_calendar": cal.google.default_calendar,
+                "calendar_ids": list(cal.google.calendar_ids),
+                "write": cal.google.write,
+                "has_secret": bool(self.vault.get(GOOGLE_CALENDAR_SECRET)),
+            },
         }
 
     def _contacts_view(self) -> dict[str, Any]:
@@ -863,7 +875,27 @@ class Connections:
         app_feeds = [CalendarFeedSettings.model_validate(f) for f in calendar.get("feeds") or []]
         app_names = {f.name for f in app_feeds}
         settings.feeds = [f for f in self._toml_feeds if f.name not in app_names] + app_feeds
-        settings.enabled = bool(calendar.get("enabled", bool(settings.feeds)))
+        google = calendar.get("google")
+        if isinstance(google, dict):
+            for key in ("enabled", "write"):
+                if google.get(key) is not None:
+                    setattr(settings.google, key, bool(google[key]))
+            for key in (
+                "client_id",
+                "client_secret",
+                "redirect_uri",
+                "default_calendar",
+                "timezone",
+            ):
+                if google.get(key) is not None:
+                    setattr(settings.google, key, str(google[key]).strip())
+            if isinstance(google.get("calendar_ids"), list):
+                settings.google.calendar_ids = [
+                    str(x) for x in google["calendar_ids"] if str(x).strip()
+                ]
+        settings.enabled = bool(
+            calendar.get("enabled", bool(settings.feeds) or settings.google.enabled)
+        )
         for key in ("refresh_minutes", "day_start", "day_end"):
             if calendar.get(key) not in (None, ""):
                 setattr(settings, key, calendar[key])
@@ -872,7 +904,8 @@ class Connections:
 
     def _sync_calendar_tool(self) -> None:
         tools = self.svc.app.tools
-        enabled = self.settings.connectors.calendar.enabled
+        cal = self.settings.connectors.calendar
+        enabled = cal.enabled or cal.google.enabled or self.svc.app.calendar.google.connected
         if enabled and "calendar" not in tools:
             tools.add(
                 Calendar(feeds=self.svc.app.calendar, workspace=self.settings.agent.workspace)
@@ -951,6 +984,105 @@ class Connections:
             "events": sum(f["events"] for f in status["feeds"]),
             "feeds": len(status["feeds"]),
         }
+
+    # ------------------------------------------------------------------ google calendar
+    def _google_settings(self):  # noqa: ANN202
+        return self.settings.connectors.calendar.google
+
+    def set_google_calendar(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Store the OAuth client (id in settings, secret in the vault) and the preferences."""
+        google = dict(self._calendar_data().get("google") or {})
+        client_id = str(body.get("client_id") or "").strip()
+        secret = str(body.get("client_secret") or "").strip()
+        if client_id:
+            google["client_id"] = client_id
+        if secret:
+            self.vault.set(GOOGLE_CALENDAR_SECRET, secret)
+            google["client_secret"] = f"{{{{vault:{GOOGLE_CALENDAR_SECRET}}}}}"
+        if body.get("redirect_uri"):
+            google["redirect_uri"] = str(body["redirect_uri"]).strip()
+        if body.get("timezone") is not None:
+            google["timezone"] = str(body["timezone"]).strip()
+        if body.get("default_calendar") is not None:
+            google["default_calendar"] = str(body["default_calendar"]).strip()
+        if body.get("write") is not None:
+            google["write"] = bool(body["write"])
+        if body.get("enabled") is not None:
+            google["enabled"] = bool(body["enabled"])
+        if isinstance(body.get("calendar_ids"), list):
+            google["calendar_ids"] = [str(x) for x in body["calendar_ids"] if str(x).strip()]
+        calendar = self._calendar_data()
+        calendar["google"] = google
+        if google.get("enabled") or client_id or secret:
+            calendar["enabled"] = True
+        self._apply_calendar(calendar)
+        return self._calendar_view()["google"]
+
+    def google_connect(self, write: bool = True) -> dict[str, Any]:
+        """The URL to open for consent; the browser returns to ``/api/google/callback``."""
+        google = self._google_settings()
+        if not self.svc.app.calendar.google.configured:
+            raise ValueError(
+                "Add the Google client id and secret first (from the downloaded client JSON)."
+            )
+        google.write = bool(write)
+        google.enabled = True
+        calendar = self._calendar_data()
+        calendar.setdefault("google", {})["write"] = bool(write)
+        calendar["google"]["enabled"] = True
+        calendar["enabled"] = True
+        self._apply_calendar(calendar)
+        return {"url": self.svc.app.calendar.google.authorize_url(write=write)}
+
+    async def google_callback(self, state: str, code: str) -> dict[str, Any]:
+        """Finish sign-in; called by the browser Google redirects, not by the app."""
+        status = await self.svc.app.calendar.google.exchange(state, code)
+        calendar = self._calendar_data()
+        calendar.setdefault("google", {})["enabled"] = True
+        calendar["enabled"] = True
+        self._apply_calendar(calendar)
+        try:
+            await self.svc.app.calendar.refresh(force=True)
+        except Exception as exc:  # a first read must not fail the sign-in
+            logger.warning("first google calendar read failed: {}", exc)
+        self.svc.bus.publish({"kind": "calendar", "calendar": self.svc.calendar_view()})
+        return status
+
+    async def google_status(self) -> dict[str, Any]:
+        view = self._calendar_view()["google"]
+        if view.get("connected"):
+            if not view.get("account"):
+                view["account"] = await self.svc.app.calendar.google.ensure_account()
+            try:
+                calendars = await self.svc.app.calendar.google.list_calendars()
+                view["calendars"] = [c.to_dict() for c in calendars]
+            except Exception as exc:
+                view["error"] = str(exc)[:200]
+        return view
+
+    async def google_disconnect(self) -> dict[str, Any]:
+        await self.svc.app.calendar.google.disconnect()
+        self.svc.app.calendar.google_states.clear()
+        calendar = self._calendar_data()
+        if isinstance(calendar.get("google"), dict):
+            calendar["google"]["enabled"] = False
+        self._apply_calendar(calendar)
+        self.svc.bus.publish({"kind": "calendar", "calendar": self.svc.calendar_view()})
+        return self._calendar_view()["google"]
+
+    async def set_google_calendars(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Which Google calendars to read, and which one to write to by default."""
+        calendar = self._calendar_data()
+        google = dict(calendar.get("google") or {})
+        if isinstance(body.get("calendar_ids"), list):
+            google["calendar_ids"] = [str(x) for x in body["calendar_ids"] if str(x).strip()]
+        if body.get("default_calendar") is not None:
+            google["default_calendar"] = str(body["default_calendar"]).strip()
+        calendar["google"] = google
+        self._apply_calendar(calendar)
+        await self.svc.app.calendar.refresh(force=True)
+        self.svc.bus.publish({"kind": "calendar", "calendar": self.svc.calendar_view()})
+        return self._calendar_view()["google"]
 
     # ------------------------------------------------------------------ contacts
     def _contacts_data(self) -> dict[str, Any]:

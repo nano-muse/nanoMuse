@@ -32,10 +32,15 @@ import { api } from "../api";
 import { takePresetHint } from "../components/AllowanceWays";
 import { PageBar } from "../components/BackBar";
 import { CloudCard } from "../components/CloudCard";
-import { Card, inputCls, primaryBtn, secondaryBtn } from "../components/Form";
+import { Card, inputCls, primaryBtn, secondaryBtn, Toggle } from "../components/Form";
 import { useT } from "../i18n";
 import { useStore } from "../store";
-import type { Contact, ConnectionsData, TestResult } from "../types";
+import type {
+  Contact,
+  ConnectionsData,
+  GoogleCalendar,
+  TestResult,
+} from "../types";
 import { cx, relativeTime } from "../util";
 
 /**
@@ -1522,11 +1527,41 @@ export function CalendarCard({
   const [dayEnd, setDayEnd] = useState(c.day_end);
   const [busy, setBusy] = useState<string | null>(null);
   const [test, setTest] = useState<TestResult | null>(null);
+  // Google Calendar over OAuth
+  const [gcals, setGcals] = useState<GoogleCalendar[] | null>(null);
+  const [gClient, setGClient] = useState(c.google.client_id);
+  const [gSecret, setGSecret] = useState("");
+  const [gWrite, setGWrite] = useState(c.google.write);
 
   useEffect(() => {
     setDayStart(c.day_start);
     setDayEnd(c.day_end);
   }, [c.day_start, c.day_end]);
+
+  useEffect(() => {
+    setGClient(c.google.client_id);
+    setGWrite(c.google.write);
+  }, [c.google.client_id, c.google.write]);
+
+  // once signed in, ask Google which calendars the account can see
+  useEffect(() => {
+    if (!c.google.connected) {
+      setGcals(null);
+      return;
+    }
+    let live = true;
+    void (async () => {
+      try {
+        const view = await api.googleCalendar();
+        if (live) setGcals(view.calendars ?? []);
+      } catch {
+        if (live) setGcals([]);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [c.google.connected]);
 
   const add = async () => {
     setBusy("add");
@@ -1589,25 +1624,113 @@ export function CalendarCard({
     }
   };
 
+  // ---------------------------------------------------------------- google
+  const saveGoogleClient = async () => {
+    setBusy("gsave");
+    try {
+      await api.setGoogleCalendar({
+        client_id: gClient.trim(),
+        client_secret: gSecret.trim() || undefined,
+        write: gWrite,
+        enabled: true,
+      });
+      setGSecret("");
+      toast(t("Saved"));
+      onChange();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const connectGoogle = async () => {
+    setBusy("gconnect");
+    try {
+      const { url } = await api.connectGoogleCalendar(gWrite);
+      // a desktop app hands this to the system browser, which comes back to /api/google/callback
+      window.open(url, "_blank", "noopener");
+      toast(t("Finish signing in with Google in the window that opened."));
+      onChange();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const disconnectGoogle = async () => {
+    setBusy("gdisconnect");
+    try {
+      await api.disconnectGoogleCalendar();
+      setGcals(null);
+      toast(t("Disconnected"));
+      onChange();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const pickCalendar = async (id: string) => {
+    setBusy("gpick");
+    try {
+      await api.setGoogleCalendars({ default_calendar: id, calendar_ids: [id] });
+      onChange();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const setGoogleWrite = async (on: boolean) => {
+    setGWrite(on);
+    setBusy("gwrite");
+    try {
+      await api.setGoogleCalendar({ write: on });
+      onChange();
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const total = c.feeds.reduce((n, f) => n + f.events, 0);
   const broken = c.feeds.filter((f) => f.error).length;
+  const g = c.google;
   const evs = (n: number) => (n === 1 ? t("1 event") : t("{n} events", { n }));
-  const status = c.configured
-    ? broken
-      ? { text: t("{n} not reading", { n: broken }), tone: "warn" }
-      : { text: t("Connected"), tone: "ok" }
-    : { text: t("Not connected"), tone: "off" };
+  const status = g.connected
+    ? { text: g.can_write ? t("Connected") : t("Read-only"), tone: "ok" }
+    : g.configured
+      ? { text: t("Sign in needed"), tone: "warn" }
+      : c.configured
+        ? broken
+          ? { text: t("{n} not reading", { n: broken }), tone: "warn" }
+          : { text: t("Connected"), tone: "ok" }
+        : { text: t("Not connected"), tone: "off" };
+  const summary = g.connected
+    ? `${g.account || t("Google Calendar")} · ${
+        g.can_write ? t("read + write") : t("read-only")
+      }`
+    : !c.configured
+      ? t("Your agenda, free time, and events it can draft")
+      : c.feeds.length === 1
+        ? `${c.feeds[0].name} · ${evs(total)}`
+        : `${t("{n} calendars", { n: c.feeds.length })} · ${evs(total)}`;
 
   return (
     <Card
       icon={<CalendarDays size={19} />}
       title={t("Calendar")}
       summary={
-        !c.configured
-          ? t("Your agenda, free time, and events it can draft")
-          : c.feeds.length === 1
-            ? `${c.feeds[0].name} · ${evs(total)}`
-            : `${t("{n} calendars", { n: c.feeds.length })} · ${evs(total)}`
+        g.connected
+          ? summary
+          : !c.configured
+            ? t("Your agenda, free time, and events it can draft")
+            : summary
       }
       status={status}
       open={open}
@@ -1618,6 +1741,179 @@ export function CalendarCard({
           "Reads your calendar from its private .ics link — the link stays in the vault. It never changes your calendar; an event it proposes comes as a file you add with a tap.",
         )}
       </p>
+
+      {/* Google Calendar over OAuth — read and write the real calendar */}
+      <div className="space-y-2.5 rounded-2xl border border-border/70 p-3">
+        <div className="flex items-center gap-2">
+          <span
+            className={cx(
+              "h-2 w-2 rounded-full",
+              g.connected
+                ? "bg-emerald-500"
+                : g.configured
+                  ? "bg-amber-500"
+                  : "bg-surface-2 border border-border",
+            )}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13.5px] font-medium">
+              {t("Google Calendar")}
+            </div>
+            <div className="text-[11.5px] text-muted truncate">
+              {g.connected
+                ? `${g.account || t("Signed in")} · ${
+                    g.can_write ? t("read + write") : t("read-only")
+                  }`
+                : g.configured
+                  ? t("Client set — sign in with Google")
+                  : t("Paste your Google OAuth client id and secret")}
+            </div>
+          </div>
+          {g.connected ? (
+            <button
+              type="button"
+              aria-label={t("Disconnect")}
+              disabled={busy === "gdisconnect"}
+              onClick={() => void disconnectGoogle()}
+              className="p-1.5 rounded-full text-muted hover:bg-surface-2"
+            >
+              {busy === "gdisconnect" ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Unplug size={15} />
+              )}
+            </button>
+          ) : null}
+        </div>
+
+        {!g.connected && (
+          <>
+            <Field
+              label={t("Client ID")}
+              hint={t(
+                "From the OAuth client you downloaded in Google Cloud Console.",
+              )}
+            >
+              <input
+                value={gClient}
+                onChange={(e) => setGClient(e.target.value)}
+                className={inputCls}
+                placeholder="…apps.googleusercontent.com"
+                autoComplete="off"
+              />
+            </Field>
+            <Field
+              label={t("Client secret")}
+              hint={
+                g.has_secret
+                  ? t("A secret is saved. Type a new one only to replace it.")
+                  : t("Stored encrypted in the vault as GOOGLE_CALENDAR_SECRET.")
+              }
+            >
+              <input
+                type="password"
+                value={gSecret}
+                onChange={(e) => setGSecret(e.target.value)}
+                className={inputCls}
+                placeholder={g.has_secret ? "••••••••" : "GOCSPX-…"}
+                autoComplete="off"
+              />
+            </Field>
+            <Field
+              label={t("Callback URL")}
+              hint={t(
+                "Register this exact URL on the OAuth client as an authorized redirect URI.",
+              )}
+            >
+              <input
+                value={g.redirect_uri}
+                readOnly
+                className={cx(inputCls, "text-muted")}
+              />
+            </Field>
+            <Toggle
+              label={t("Let the agent create and change events")}
+              hint={t("Off: read-only, the agent can look but not touch.")}
+              checked={gWrite}
+              onChange={(on) => setGWrite(on)}
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy === "gsave"}
+                onClick={() => void saveGoogleClient()}
+                className={secondaryBtn}
+              >
+                {busy === "gsave" ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Check size={16} />
+                )}{" "}
+                {t("Save client")}
+              </button>
+              <button
+                type="button"
+                disabled={busy === "gconnect" || !g.configured}
+                onClick={() => void connectGoogle()}
+                className={primaryBtn}
+              >
+                {busy === "gconnect" ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <ExternalLink size={16} />
+                )}{" "}
+                {t("Sign in with Google")}
+              </button>
+            </div>
+          </>
+        )}
+
+        {g.connected && (
+          <>
+            <Toggle
+              label={t("Let the agent create and change events")}
+              hint={t("Off: read-only, the agent can look but not touch.")}
+              checked={gWrite}
+              onChange={(on) => void setGoogleWrite(on)}
+            />
+            {gcals && gcals.length > 0 && (
+              <Field
+                label={t("Calendar to read and write")}
+                hint={t("Events the agent reads and creates land here.")}
+              >
+                <div className="flex flex-wrap gap-1.5">
+                  {gcals.map((cal) => {
+                    const active =
+                      (g.default_calendar || g.calendar_ids[0] || "") ===
+                      cal.id;
+                    return (
+                      <button
+                        key={cal.id}
+                        type="button"
+                        disabled={busy === "gpick"}
+                        onClick={() => void pickCalendar(cal.id)}
+                        className={cx(
+                          "rounded-full px-3 py-1.5 text-[13px] border",
+                          active
+                            ? "border-accent bg-accent/10 text-accent font-medium"
+                            : "border-border text-muted",
+                        )}
+                      >
+                        {cal.primary ? t("{name} (primary)", { name: cal.name }) : cal.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
+            {g.error && (
+              <div className="rounded-2xl bg-rose-500/12 px-3 py-2 text-[12.5px] text-rose-700 dark:text-rose-300">
+                {g.error}
+              </div>
+            )}
+          </>
+        )}
+      </div>
       {c.feeds.length > 0 && (
         <ul className="space-y-1.5">
           {c.feeds.map((f) => (

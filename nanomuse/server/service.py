@@ -1973,7 +1973,8 @@ class MuseService:
             },
             "connectors": {
                 "email": s.connectors.email.enabled,
-                "calendar": s.connectors.calendar.enabled and bool(s.connectors.calendar.feeds),
+                "calendar": s.connectors.calendar.enabled
+                and (bool(s.connectors.calendar.feeds) or s.connectors.calendar.google.enabled),
                 "contacts": s.connectors.contacts.enabled and self.app.contacts.configured,
                 "browser": s.browser.enabled,
                 "gui": s.gui.enabled,

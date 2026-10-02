@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import mimetypes
 import secrets
 import uuid
@@ -57,7 +58,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from nanomuse.avatar.studio import StudioError
@@ -72,6 +73,25 @@ from nanomuse.server.service import MuseService, goal_to_dict
 from nanomuse.server.update import UpdateCheck
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _google_page(title: str, message: str, *, ok: bool) -> HTMLResponse:
+    """The little page Google's redirect lands on, after the OAuth sign-in finishes."""
+    color = "#1a7f37" if ok else "#b42318"
+    page = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>nanoMuse — {html.escape(title)}</title>
+<style>
+ body {{ margin:0; height:100vh; display:grid; place-items:center; background:#0b0d12;
+        color:#e6e8ee; font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }}
+ .card {{ max-width:26rem; padding:2rem; text-align:center; }}
+ h1 {{ font-size:1.25rem; margin:0 0 .5rem; color:{color}; }}
+ p {{ margin:0; color:#a9afbd; }}
+</style></head>
+<body><div class="card"><h1>{html.escape(title)}</h1><p>{message}</p></div>
+<script>setTimeout(function(){{ if ({str(ok).lower()}) {{ window.close(); }} }}, 1500);</script>
+</body></html>"""
+    return HTMLResponse(page)
 
 
 # ----------------------------------------------------------------------------- request models
@@ -224,6 +244,28 @@ class CalendarBody(BaseModel):
     refresh_minutes: int | None = Field(default=None, ge=5, le=1440)
     day_start: str | None = None
     day_end: str | None = None
+
+
+class GoogleCalendarBody(BaseModel):
+    """The OAuth client and preferences for Google Calendar. The secret goes to the vault."""
+
+    enabled: bool | None = None
+    client_id: str | None = Field(default=None, max_length=300)
+    client_secret: str | None = Field(default=None, max_length=300)
+    redirect_uri: str | None = Field(default=None, max_length=500)
+    default_calendar: str | None = Field(default=None, max_length=300)
+    calendar_ids: list[str] | None = None
+    write: bool | None = None
+    timezone: str | None = Field(default=None, max_length=100)
+
+
+class GoogleCalendarPickBody(BaseModel):
+    calendar_ids: list[str] | None = None
+    default_calendar: str | None = Field(default=None, max_length=300)
+
+
+class GoogleConnectBody(BaseModel):
+    write: bool = True
 
 
 class MCPBody(BaseModel):
@@ -1228,6 +1270,55 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     @app.post("/api/connections/calendar/test", dependencies=dep)
     async def test_calendar() -> dict[str, Any]:
         return await conn.test_calendar()
+
+    # ------------------------------------------------------------------ google calendar
+    @app.get("/api/connections/calendar/google", dependencies=dep)
+    async def google_calendar_status() -> dict[str, Any]:
+        return await conn.google_status()
+
+    @app.put("/api/connections/calendar/google", dependencies=dep)
+    async def put_google_calendar(body: GoogleCalendarBody) -> dict[str, Any]:
+        try:
+            return conn.set_google_calendar(body.model_dump(exclude_none=True))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/connections/calendar/google/connect", dependencies=dep)
+    async def google_connect(body: GoogleConnectBody) -> dict[str, Any]:
+        try:
+            return conn.google_connect(write=body.write)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/connections/calendar/google/calendars", dependencies=dep)
+    async def google_calendars() -> dict[str, Any]:
+        return await conn.google_status()
+
+    @app.post("/api/connections/calendar/google/calendars", dependencies=dep)
+    async def pick_google_calendars(body: GoogleCalendarPickBody) -> dict[str, Any]:
+        return await conn.set_google_calendars(body.model_dump(exclude_none=True))
+
+    @app.post("/api/connections/calendar/google/disconnect", dependencies=dep)
+    async def google_disconnect() -> dict[str, Any]:
+        return await conn.google_disconnect()
+
+    @app.get("/api/google/callback")
+    async def google_callback(
+        state: str = Query(""), code: str = Query(""), error: str = Query("")
+    ) -> HTMLResponse:
+        """Google redirects the user's browser here; no bearer token, so ``state`` is the key."""
+        if error:
+            return _google_page(
+                "Sign-in cancelled", f"Google returned: {html.escape(error)}", ok=False
+            )
+        try:
+            status = await conn.google_callback(state=state, code=code)
+        except Exception as exc:  # noqa: BLE001 - shown to the user, never raised
+            return _google_page("Could not connect", html.escape(str(exc))[:300], ok=False)
+        account = status.get("account") or "your Google account"
+        return _google_page(
+            "Connected", f"Signed in as {html.escape(account)}. You can close this tab.", ok=True
+        )
 
     @app.get("/api/calendar", dependencies=dep)
     async def calendar(days: int = Query(2, ge=1, le=31), refresh: int = 0) -> dict[str, Any]:
