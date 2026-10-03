@@ -528,6 +528,11 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-pf-top { padding-t
 .nm-swatch { width: 22px; height: 22px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
 .nm-swatch.nm-on { box-shadow: 0 0 0 2px var(--nm-base), 0 0 0 4px var(--dsw-alias-label-primary); }
 .nm-kbd { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--nm-hover); color: var(--dsw-alias-label-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; flex: none; }
+.nm-hotkey { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; max-width: 60%; }
+.nm-hotkey-row { display: flex; align-items: center; gap: 6px; }
+.nm-hotkey-recording { border: 1px dashed var(--dsw-alias-label-primary); background: transparent; color: var(--dsw-alias-label-primary); cursor: default; font-family: inherit; }
+.nm-hotkey-recording:focus-visible { outline: 2px solid var(--dsw-alias-label-primary); outline-offset: 1px; }
+.nm-hotkey-hint { font-size: 12px; color: var(--dsw-alias-label-secondary); text-align: right; white-space: normal; line-height: 1.4; }
 .nm-harness-rows > [data-slot] > * { border-bottom: 1px solid var(--nm-divider); }
 .nm-harness-rows > [data-slot] > :last-child { border-bottom: 0; }
 /* Connectors, Muse's shape: a search, connected / available rows with a trailing Connect, a detail per connector */
@@ -555,6 +560,34 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-pf-top { padding-t
 .nm-cn-command pre { margin: 0; padding: 10px 40px 10px 12px; border-radius: 10px; background: var(--nm-card); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
 .nm-cn-copy { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--dsw-alias-label-secondary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .nm-cn-copy:hover { background: var(--nm-hover); color: var(--dsw-alias-label-primary); }
+.nm-cn-chips { margin: 2px 0 6px; }
+.nm-chip-on, .nm-chip-on:hover { background: var(--dsw-alias-label-primary); color: var(--dsw-alias-bg-layer-1, #fff); }
+.nm-cn-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08); }
+.nm-cn-mark svg { display: block; }
+.nm-cn-mark-letter { color: #fff; font-weight: 700; letter-spacing: 0; box-shadow: none; }
+.nm-cn-builtin-mark { flex: none; }
+.nm-cn-static { cursor: default; }
+.nm-cn-static:hover .nm-row-title { color: inherit; }
+.nm-cn-sub-warn { color: #c2410c; }
+.nm-cn-warn { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: #c2410c; }
+.nm-cn-hero-mark { flex: none; display: inline-flex; }
+.nm-cn-hero-mark .nm-cn-mark { border-radius: 14px; }
+.nm-cn-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nm-cn-pill { min-height: 34px; padding: 0 14px; font-size: 13px; }
+.nm-cn-pill-danger, .nm-cn-pill-danger:hover:not(:disabled) { background: #c2410c; color: #fff; box-shadow: none; }
+.nm-cn-pill-spin { border-color: rgba(255, 255, 255, 0.35); border-top-color: #fff; }
+.nm-cn-tools-lead { margin: 10px 0 -4px; white-space: normal; line-height: 1.5; }
+.nm-cn-tool-off .nm-row-main { opacity: 0.55; }
+.nm-cn-url code { font-size: 11.5px; word-break: break-all; }
+.nm-cn-registry { margin-top: 4px; }
+.nm-cn-registry-note { margin: 10px 0; }
+.nm-cn-wait { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; background: var(--nm-card); font-size: 13.5px; line-height: 1.5; }
+.nm-cn-wait-failed { flex-direction: column; align-items: flex-start; gap: 2px; }
+.nm-cn-wait-failed strong { color: #c2410c; }
+.nm-cn-key-where { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
+.nm-cn-key, .nm-cn-field { margin-bottom: 10px; font-size: 14px; }
+.nm-cn-custom-lead { margin: 0 0 12px; }
+.nm-cn-more { border: 0; background: none; color: var(--nm-blue); font: inherit; font-size: 13px; padding: 0 0 10px; cursor: pointer; }
 .nm-sheet-body .nm-fine { margin-top: 14px; }
 
 .nm-close { width: 30px; height: 30px; border: 0; padding: 0; border-radius: 50%; background: var(--nm-hover); color: var(--dsw-alias-label-secondary); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
@@ -861,6 +894,17 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-lib-col-top { heig
 .nm-stage:hover .nm-stage-picture.nm-dim img { filter: brightness(0.95); }
 .nm-stage-cursor { position: absolute; width: 0; height: 0; pointer-events: none; }
 .nm-stage-face { position: absolute; left: -13px; top: -13px; box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(0,0,0,0.45); }
+/* the agent's face: a round frame; a clip or a still inside, or an emoji on its colour */
+.nm-avatar { display: block; flex: 0 0 auto; border-radius: 50%; overflow: hidden; background: var(--dsw-alias-surface-sunken, #f1efe9); will-change: transform; transform-origin: 50% 60%; }
+.nm-avatar > img, .nm-avatar > video { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.nm-avatar-emoji { display: block; width: 100%; height: 100%; text-align: center; user-select: none; }
+@keyframes nm-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes nm-sway { 0%, 100% { transform: rotate(-4deg) translateY(0); } 25% { transform: rotate(0deg) translateY(-2%); } 50% { transform: rotate(4deg) translateY(0); } 75% { transform: rotate(0deg) translateY(-2%); } }
+@keyframes nm-hop { 0%, 70%, 100% { transform: translateY(0) scale(1); } 78% { transform: translateY(-9%) scale(1.04, 0.97); } 86% { transform: translateY(0) scale(0.98, 1.03); } 92% { transform: translateY(-3%) scale(1); } }
+.nm-avatar-idle { animation: nm-breathe 4.5s ease-in-out infinite; }
+.nm-avatar-working { animation: nm-sway 2.6s ease-in-out infinite; }
+.nm-avatar-waiting { animation: nm-hop 3.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .nm-avatar-idle, .nm-avatar-working, .nm-avatar-waiting { animation: none; } }
 .nm-stage-ripple { position: absolute; left: -18px; top: -18px; width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.9); animation: nm-ripple 900ms ease-out forwards; }
 @keyframes nm-ripple { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
 .nm-stage-btn { position: absolute; top: 10px; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(0,0,0,0.55); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 150ms, background 150ms; backdrop-filter: blur(6px); }

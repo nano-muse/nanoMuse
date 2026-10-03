@@ -36,7 +36,7 @@ const bridge = {
   /** App behaviour (open at login, menu bar icon, quick-chat key): the values, the key's name, what this platform can do. */
   prefs: (): Promise<DesktopPrefs> => ipcRenderer.invoke("nanomuse:prefs"),
   /** Change some of it; the shell applies it at once and answers with the whole. */
-  setPrefs: (patch: Partial<Pick<DesktopPrefs, "openAtLogin" | "menuBar" | "quickChat">>): Promise<DesktopPrefs> => ipcRenderer.invoke("nanomuse:prefs:set", patch),
+  setPrefs: (patch: Partial<Pick<DesktopPrefs, "openAtLogin" | "menuBar" | "quickChat" | "quickChatKey">>): Promise<DesktopPrefs> => ipcRenderer.invoke("nanomuse:prefs:set", patch),
   /** A screenshot of the window to Downloads and the issue page with the build's facts filled in. */
   reportBug: (): Promise<{ screenshot: string; url: string }> => ipcRenderer.invoke("nanomuse:report-bug"),
   /** Show a file in the system's file manager. */
@@ -53,7 +53,11 @@ export interface DesktopPrefs {
   openAtLogin: boolean;
   menuBar: boolean;
   quickChat: boolean;
+  /** The combination in force, an Electron accelerator (`Alt+Space`); set it to change, to "" for the default. */
   quickChatKey: string;
+  quickChatDefault: string;
+  /** Another app holds the combination, so nanoMuse did not get it. */
+  quickChatTaken: boolean;
   supports: { openAtLogin: boolean; menuBar: boolean; quickChat: boolean };
 }
 

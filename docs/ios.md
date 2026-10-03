@@ -5,12 +5,12 @@ Mac runner and handed to TestFlight. This page says what is in the tree, how it 
 the TestFlight pipeline needs, and what is still to be ported from the Android app.
 
 **Status.** The tree, the branding, the nanoMuse Cloud sign-in, the hub client and the pipeline
-were written on a Linux machine. The app **compiles** — the *iOS · build check* workflow below
-builds it unsigned for a device on a Mac runner, and is green as of the trial branch — but it has
-not run on an iPhone yet, so the sign-in flow, the Devices section and notifications from other
-devices are untested at runtime. The TestFlight pipeline is set up end to end (*Where it stands*
-below); the first archive taught it that automatic signing wants a registered device, which is
-why it signs manually now.
+were written on a Linux machine. The app **builds, signs and is on TestFlight**: build 0.1.31 (2)
+went through the *iOS · TestFlight* workflow on 2026-10-03, was processed by App Store Connect
+and is with the internal testers (*Where it stands* below). It has not been run on an iPhone by
+the maintainers themselves, so the sign-in flow, the Devices section and notifications from other
+devices are untested at runtime until the first tester reports. The first archive taught the
+pipeline that automatic signing wants a registered device, which is why it signs manually now.
 
 ## Where it lives
 
@@ -116,8 +116,19 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
 - the internal TestFlight group *nanoMuse Core* with automatic distribution, so every processed
   build reaches its testers by itself; the device list is empty on purpose (nothing here needs
   one);
-- not done: an external group and the test information for it, Apple's beta review, and anything
-  towards the App Store (the app is not going there).
+- **the first build**: 0.1.31 (2), archived and uploaded by the workflow on 2026-10-03, processed
+  by App Store Connect (`VALID`, export compliance answered by the Info.plist key) and in beta
+  testing with the internal group — the first thing that can be installed from TestFlight;
+- the test information an external group needs, in English and Simplified Chinese: the beta app
+  description, the feedback address, the marketing and privacy-policy links, and *What to Test*
+  on build 2 (none of it names other products); and the external group *nanoMuse Beta*, created
+  **without** a public link and without a build;
+- not done: the beta-review contact (name, phone) and the demo-account decision in *Beta App
+  Review Information*, which are the account holder's to fill, then adding build 2 to the external
+  group — that is the step that submits it to Apple's beta review; a public link once the review
+  has passed; and anything towards the App Store (the app is not going there). The app has not
+  run on a physical iPhone from the maintainers' side yet: the smoke test is the internal
+  testers' first job.
 
 ### Once, in App Store Connect
 

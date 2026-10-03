@@ -467,12 +467,28 @@ interface Prefs {
   openAtLogin: boolean;
   menuBar: boolean;
   quickChat: boolean;
+  /** The person's own quick-chat combination (an Electron accelerator); absent means the platform's default. */
+  quickChatKey?: string;
 }
 const PREFS_DEFAULT: Prefs = { openAtLogin: false, menuBar: true, quickChat: true };
 /** ⌥ Space on macOS as in Muse; Ctrl+Alt+Space where Alt+Space is the window menu. */
-const QUICK_CHAT_KEY = process.platform === "darwin" ? "Alt+Space" : "Ctrl+Alt+Space";
+const QUICK_CHAT_DEFAULT = process.platform === "darwin" ? "Alt+Space" : "Ctrl+Alt+Space";
+/** One or more modifiers and a key, in Electron's accelerator words; a function key may stand alone. */
+const ACCELERATOR = /^((?:(?:CommandOrControl|CmdOrCtrl|Command|Cmd|Control|Ctrl|Alt|Option|Shift|Super|Meta)\+)*)(Space|Tab|Backspace|Delete|Insert|Return|Enter|Up|Down|Left|Right|Home|End|PageUp|PageDown|F(?:[1-9]|1[0-9]|2[0-4])|[A-Z0-9]|[`\-=\[\]\\;',.\/])$/;
 let prefs: Prefs = PREFS_DEFAULT;
 let tray: Tray | null = null;
+/** Whether the last registration failed because another app holds the combination. */
+let quickChatTaken = false;
+
+function validAccelerator(text: string): boolean {
+  const m = ACCELERATOR.exec(text);
+  return Boolean(m) && (Boolean(m?.[1]) || /^F\d+$/.test(m?.[2] ?? ""));
+}
+
+/** The combination in force: the person's, when it parses, else the platform's default. */
+function quickChatKey(): string {
+  return prefs.quickChatKey && validAccelerator(prefs.quickChatKey) ? prefs.quickChatKey : QUICK_CHAT_DEFAULT;
+}
 
 function prefsPath(): string {
   return join(harnessHome(), "desktop.json");
@@ -522,9 +538,17 @@ function quickChat(): void {
 
 function applyQuickChat(): void {
   globalShortcut.unregisterAll();
+  quickChatTaken = false;
   if (!prefs.quickChat) return;
-  const ok = globalShortcut.register(QUICK_CHAT_KEY, quickChat);
-  if (!ok) log(`quick chat: ${QUICK_CHAT_KEY} is taken by another app`);
+  const key = quickChatKey();
+  let ok = false;
+  try {
+    ok = globalShortcut.register(key, quickChat);
+  } catch (exc) {
+    log(`quick chat: ${key}: ${String(exc)}`);
+  }
+  quickChatTaken = !ok;
+  if (!ok) log(`quick chat: ${key} is taken by another app`);
 }
 
 function applyMenuBar(): void {
@@ -546,7 +570,7 @@ function applyMenuBar(): void {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: T.open, click: () => void showWindow() },
-      { label: T.newChat, accelerator: prefs.quickChat ? QUICK_CHAT_KEY : undefined, click: () => showWindow()?.webContents.send("nanomuse:quick-chat") },
+      { label: T.newChat, accelerator: prefs.quickChat ? quickChatKey() : undefined, click: () => showWindow()?.webContents.send("nanomuse:quick-chat") },
       { type: "separator" },
       { label: T.quit, click: () => app.quit() },
     ]),
@@ -580,9 +604,9 @@ function applyPrefs(): void {
   applyOpenAtLogin();
 }
 
-/** What the General page shows: the values, the key's name, and which of the three this platform can do. */
-function prefsView(): Prefs & { quickChatKey: string; supports: Record<keyof Prefs, boolean> } {
-  return { ...prefs, quickChatKey: QUICK_CHAT_KEY, supports: { openAtLogin: process.platform !== "linux" || Boolean(process.env.APPIMAGE) || app.isPackaged, menuBar: true, quickChat: true } };
+/** What the General page shows: the values, the key in force and the default, whether another app holds it, and which of the three this platform can do. */
+function prefsView(): Prefs & { quickChatKey: string; quickChatDefault: string; quickChatTaken: boolean; supports: { openAtLogin: boolean; menuBar: boolean; quickChat: boolean } } {
+  return { ...prefs, quickChatKey: quickChatKey(), quickChatDefault: QUICK_CHAT_DEFAULT, quickChatTaken, supports: { openAtLogin: process.platform !== "linux" || Boolean(process.env.APPIMAGE) || app.isPackaged, menuBar: true, quickChat: true } };
 }
 
 /**
@@ -666,6 +690,12 @@ function registerBridge(): void {
   ipcMain.handle("nanomuse:prefs:set", (_e, patch: Partial<Prefs>) => {
     if (patch && typeof patch === "object") {
       for (const key of ["openAtLogin", "menuBar", "quickChat"] as const) if (typeof patch[key] === "boolean") prefs = { ...prefs, [key]: patch[key] };
+      if (typeof patch.quickChatKey === "string") {
+        // the person's combination; an empty string or the default puts the default back
+        const key = patch.quickChatKey.trim();
+        const { quickChatKey: _drop, ...rest } = prefs;
+        prefs = !key || key === QUICK_CHAT_DEFAULT ? rest : validAccelerator(key) ? { ...rest, quickChatKey: key } : prefs;
+      }
       writePrefs();
       applyPrefs();
     }

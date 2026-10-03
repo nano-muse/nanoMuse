@@ -13,7 +13,12 @@ export interface DesktopPrefs {
   openAtLogin: boolean
   menuBar: boolean
   quickChat: boolean
+  /** The combination in force, an Electron accelerator (`Alt+Space`). */
   quickChatKey: string
+  // since 0.1.32 — absent in older shells, which take no key of the person's
+  quickChatDefault?: string
+  /** Another app holds the combination, so nanoMuse did not get it. */
+  quickChatTaken?: boolean
   supports: { openAtLogin: boolean; menuBar: boolean; quickChat: boolean }
 }
 
@@ -28,7 +33,7 @@ export interface HarnessBridge {
   setTheme(theme: 'light' | 'dark'): Promise<void>
   // since 0.1.30 — absent in older shells
   prefs?(): Promise<DesktopPrefs>
-  setPrefs?(patch: Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat'>>): Promise<DesktopPrefs>
+  setPrefs?(patch: Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat' | 'quickChatKey'>>): Promise<DesktopPrefs>
   reportBug?(): Promise<{ screenshot: string; url: string }>
   reveal?(path: string): Promise<void>
   onQuickChat?(listener: () => void): () => void
@@ -49,6 +54,24 @@ export function openLink(url: string): void {
   const b = bridge()
   if (b) void b.openExternal(url)
   else window.open(url, '_blank', 'noopener')
+}
+
+/**
+ * The Electron accelerator a key press stands for, or nothing when it cannot be one: a
+ * modifier alone, a key without a modifier (function keys excepted), a key we do not name.
+ */
+export function acceleratorOf(e: { code: string; key: string; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; metaKey: boolean }, platform = bridge()?.platform ?? ''): string | undefined {
+  const mods: string[] = []
+  if (e.ctrlKey) mods.push('Ctrl')
+  if (e.altKey) mods.push('Alt')
+  if (e.shiftKey) mods.push('Shift')
+  if (e.metaKey) mods.push(platform === 'darwin' ? 'Cmd' : 'Super')
+  const named: Record<string, string> = { Space: 'Space', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Enter: 'Return', NumpadEnter: 'Return', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'", BracketLeft: '[', BracketRight: ']', Backslash: '\\', Minus: '-', Equal: '=', Backquote: '`' }
+  const code = e.code
+  const key = /^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit[0-9]$/.test(code) ? code.slice(5) : /^F([1-9]|1[0-9]|2[0-4])$/.test(code) ? code : named[code]
+  if (!key) return undefined
+  if (!mods.length && !/^F\d+$/.test(key)) return undefined
+  return [...mods, key].join('+')
 }
 
 /** `⌥ Space`-style words for an Electron accelerator. */

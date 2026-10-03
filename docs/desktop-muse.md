@@ -145,6 +145,16 @@ runtime's, so a face drawn on the phone or here comes out alike. Asked in a chat
 ("change your avatar to an orange cat with a scarf"), the agent opens the studio with
 the words (`draw_new_look`) rather than drawing by itself.
 
+**The face moves.** Muse's avatar is animated per state; here the dragon's four states
+(idle, working, waiting, happy) are the phone app's short clips
+(`assets/dragon-<state>.mp4`), played silently in a loop wherever the face is 44 px or
+larger — the header, the profile panel, the stage's cursor marker — with the still as
+the poster, and the still alone below that size, when the system asks for reduced
+motion, or where a list wants a quiet picture. A drawn face has stills only (the relay
+keeps WebP, not video), so it and an emoji move the way CSS can: a slow breath while
+idle, a sway while the agent works, a small hop when it waits for you. The faces route
+(`/face/<id>/<state>.webp|mp4`) serves a clip when a profile ever brings one.
+
 ## Computer use
 
 **Muse.** The controlled screen is shown inside the window as a dimmed live stage: an ×
@@ -203,8 +213,9 @@ stock General plugin switched off in the bundle layer:
   menu bar* / *system tray* (an icon with *Open nanoMuse*, *New chat*, *Quit*), *Quick
   chat with ⌥ Space* (Ctrl+Alt+Space elsewhere: the window comes up with a fresh chat
   and the composer focused; pressed while it is in front, it steps aside) — kept in
-  `desktop.json` under the app's home; **Shortcuts** (*Quick Chat* and the keyboard
-  reference); **About** (nanoMuse, built on DeepSeek Harness, the bundle's version, the
+  `desktop.json` under the app's home; **Shortcuts** (*Quick Chat* with its combination —
+  *Change* records the next one you press, Esc cancels, *Default* puts the platform's back,
+  and a line says so when another app already holds it — and the keyboard reference); **About** (nanoMuse, built on DeepSeek Harness, the bundle's version, the
   licence, *Check for updates* → the releases page); and *Developer*: *Show DeepSeek
   Harness controls* (the model picker, the modes, the workspace browser in place of the
   chats column). The harness's other rows (permission presets, font size, link opening,
@@ -212,22 +223,57 @@ stock General plugin switched off in the bundle layer:
 - **Account** (under *Advanced*) — the nanoMuse account: sign in or the masked
   identifier, the allowance, the look, the models, *Open Devices*.
 - **Models**, **Agents** — the harness's pages, unchanged, under *Advanced*.
-- **Connectors** — Muse's catalogue shape: a search field, **Connected** and
-  **Available** rows with *Connect* at the end, a detail per connector (what it can do —
-  its tools as the server describes them — and what gates it: the permission preset,
-  the Sentinel for the hands and the mailbox, its own settings page). The inventory is
-  what the agent can really reach: *Hands — this computer* (on when the runtime
-  answered, with the reason when it did not), *Mailbox*, *Calendar*, *Address book*
-  (the runtime's connectors, on when their tools arrive through `nanomuse mcp`), *Reach
-  — your other devices*, *Web*, *Files*, *Terminal*, the rooms, *Schedule*, and every
-  **MCP server** in the preset. *Connect* on the mailbox, the calendar or the address
-  book opens a **consent sheet** in Muse's manner — what the agent gets, who decides,
-  where the credentials live — followed by the steps (`nanomuse vault set …`, the
-  `config.toml` lines, restart) with copy buttons and *Open the runtime folder*; there
-  is no sign-in button on purpose, the credentials stay in your own vault. *Add a
-  connector* opens the agent preset, where an MCP server is one row of
-  `@deepseek-ai/dsh-mcp-client`. Muse's OAuth catalogue of fifty-odd services and its
-  per-action permission dropdowns have no counterpart here.
+- **Connectors** — Muse's catalogue shape: a search field, category chips (*All*,
+  *Built in*, *Work*, *Talk*, *Files*, *Developer*, *Data*, *Design*, *Money*,
+  *Search*, *Infrastructure*…), **Connected** rows first and then the catalogue, each row
+  with the service's brand mark on a white tile (the marks are
+  [simple-icons](https://simpleicons.org/), CC0, written into
+  `src/client/brand-marks.ts` by `scripts/brand-marks.mjs`; a letter tile where there is
+  none) and *Connect* at the
+  end; a detail per connector with what it can do — its tools as the server describes
+  them, **one switch per tool** — what gates it (the permission preset, the Sentinel for
+  the hands and the mailbox), the vendor's documentation, and *Disconnect* (asked
+  twice). Three kinds of row:
+  - **Built in** is what the agent can really reach: *Hands — this computer* (on when
+    the runtime answered, with the reason when it did not), *Mailbox*, *Calendar*,
+    *Address book* (the runtime's connectors, on when their tools arrive through
+    `nanomuse mcp`), *Reach — your other devices*, *Web*, *Files*, *Terminal*, the
+    rooms, *Schedule*. *Connect* on the mailbox, the calendar or the address book opens a
+    **consent sheet** in Muse's manner — what the agent gets, who decides, where the
+    credentials live — followed by the steps (`nanomuse vault set …`, the `config.toml`
+    lines, restart) with copy buttons; there is no sign-in button on purpose, the
+    credentials stay in your own vault.
+  - **Services** — the catalogue (`src/connectors-catalogue.ts`, about seventy remote
+    MCP servers: Notion, Linear, Atlassian, Asana, GitHub, Sentry, Vercel, Cloudflare,
+    Supabase, Stripe, PayPal, Figma, Canva, Dropbox, Box, Hugging Face, DeepWiki…), each
+    with its address and how it lets a client in. *Connect* asks the server itself
+    (`initialize`): an **open** server is connected at once; a server that speaks **MCP
+    authorization** opens the sign-in page in the system browser — protected-resource
+    and authorization-server metadata, dynamic client registration (RFC 7591), PKCE,
+    `resource` (RFC 8707), the loopback callback at `127.0.0.1:38417/oauth/callback`,
+    refresh before expiry — and the sheet waits with *Open again*, *Try again* and
+    *Start over* (a fresh registration, for a server that forgot ours); a server that
+    wants a **key** asks for it in a sheet that says where the vendor hands it out. The
+    rows under the search field also search the public **MCP Registry**
+    (`registry.modelcontextprotocol.io`) once two characters are typed, and **Connect by
+    address** takes any Streamable HTTP URL, with a key or a pre-registered OAuth client
+    under *More options*. Credentials live in `$DSH_HOME/nanomuse/connectors.json`,
+    this computer only, and never reach the model: the agent's `dsh-mcp-client` is
+    pointed at a **loopback proxy** (`/c/<id>/mcp`, guarded by a secret header) that
+    adds the token or key, refreshes it, filters `tools/list` to the switched-on tools
+    and refuses `tools/call` on the rest; the tools appear as `mcp__<service>__<tool>`
+    and the preset row `nanomuse-connectors-tools` mounts one client per connection and
+    follows the page (connect, switch, disconnect — no restart). A connection whose
+    refresh is refused turns to *Needs sign-in* with *Sign in again*; a key is replaced
+    in place.
+  - **Preset** — every MCP server configured in the agent preset by hand
+    (`@deepseek-ai/dsh-mcp-client` rows), read-only here, with *Add a connector*
+    opening the preset.
+
+  What Muse has and this does not: the per-action permission dropdowns (ours is the
+  permission preset plus the tool switches), and services whose MCP server wants a
+  client registered with the vendor beforehand (Zapier, Heroku…) — those are in the
+  catalogue as *key* or *address* rows, not as a sign-in.
 - **Computer use** — the system permissions (macOS), keep awake, the risk note.
 - **File system access** — the folders the agent uses (home, the Library, Downloads,
   nanoMuse's own files; each opens in the file manager), the rules (reading anything you

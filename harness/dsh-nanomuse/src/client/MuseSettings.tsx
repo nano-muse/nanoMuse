@@ -15,13 +15,13 @@ import { createElement as h, Fragment, useCallback, useEffect, useId, useRef, us
 import { createPortal } from 'react-dom'
 import { call, type CloudStatus, type Translate } from './api.ts'
 import { Avatar } from './Avatar.tsx'
-import { bridge, openLink } from './bridge.ts'
+import { openLink } from './bridge.ts'
 import { settingsBus } from './bus.ts'
 import { IconArchive, IconChevronRight, IconClose, IconCpu, IconDatabase, IconDevices, IconFolder, IconHand, IconHelp, IconKey, IconLink, IconLogOut, IconMessage, IconMic, IconPuzzle, IconScale, IconSettings, IconShield, IconSliders, IconSparkle, IconUser, IconWallet } from './icons.tsx'
 import { openShortcutsReference } from './keys.ts'
 import { useLive } from './live.ts'
 import type { RenderSlot } from './MuseSidebar.tsx'
-import { AppBehaviorRows, DeveloperRows } from './Sections.tsx'
+import { AppBehaviorRows, DeveloperRows, HotkeyField } from './Sections.tsx'
 
 const SITE_URL = 'https://nanomuse.cn/'
 const RELEASES_URL = 'https://github.com/nano-muse/nanoMuse/releases'
@@ -271,8 +271,6 @@ export function makeGeneralSection(t: Translate, version: string) {
     }, [live.cloud.signedIn])
     const account = status?.account
     const used = account && !account.tokens.unlimited && account.tokens.granted > 0 ? Math.min(100, Math.round((account.tokens.used / account.tokens.granted) * 100)) : 0
-    const b = bridge()
-    const quickChat = b?.platform === 'darwin' ? '⌥ Space' : 'Alt+Space'
     const color = live.profile.color
     const pick = (next: string) => { void call('profile', { color: next }).catch(() => undefined) }
     const checkUpdates = () => {
@@ -328,7 +326,7 @@ export function makeGeneralSection(t: Translate, version: string) {
           h('div', { className: 'nm-row-main' },
             h('span', { className: 'nm-row-title' }, t('gnQuickChat')),
             h('span', { className: 'nm-row-sub' }, t('gnQuickChatSub'))),
-          h('span', { className: 'nm-kbd' }, quickChat)),
+          h(HotkeyField, { t })),
         h('button', { type: 'button', className: 'nm-row nm-row-button', onClick: () => openShortcutsReference() },
           h('div', { className: 'nm-row-main' }, h('span', { className: 'nm-row-title' }, t('menuShortcuts'))),
           h('span', { className: 'nm-row-chevron' }, h(IconChevronRight, { size: 16 })))),

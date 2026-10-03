@@ -8,7 +8,7 @@
  */
 import { createElement as h, Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { Translate } from './api.ts'
-import { bridge, gatedPermissions, keyLabel, openLink, type DesktopPrefs, type PermissionKind, type PermissionState } from './bridge.ts'
+import { acceleratorOf, bridge, gatedPermissions, keyLabel, openLink, type DesktopPrefs, type PermissionKind, type PermissionState } from './bridge.ts'
 import { settingsBus } from './bus.ts'
 import { IconBug, IconCheck, IconChevronRight, IconFile, IconLink, IconPlay, IconScale, IconShield } from './icons.tsx'
 import { useLive } from './live.ts'
@@ -136,18 +136,69 @@ export function DeveloperRows({ t }: { t: Translate }): ReactNode {
       h(Switch, { checked: prefs.showHarness, label: t('stShowHarness'), onChange: (next) => setPrefs({ showHarness: next }) })))
 }
 
+/** The shell's app-behaviour values, shared by every row that shows them; nothing outside the shell. */
+let desktopPrefsCache: DesktopPrefs | undefined
+const desktopPrefsListeners = new Set<(p: DesktopPrefs) => void>()
+function publishDesktopPrefs(p: DesktopPrefs): void {
+  desktopPrefsCache = p
+  for (const l of desktopPrefsListeners) l(p)
+}
+export function useDesktopPrefs(): { prefs: DesktopPrefs | undefined; set: (patch: Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat' | 'quickChatKey'>>) => void } {
+  const b = bridge()
+  const [prefs, setLocal] = useState<DesktopPrefs | undefined>(desktopPrefsCache)
+  useEffect(() => {
+    desktopPrefsListeners.add(setLocal)
+    void b?.prefs?.().then(publishDesktopPrefs).catch(() => undefined)
+    return () => { desktopPrefsListeners.delete(setLocal) }
+  }, [b])
+  const set = useCallback((patch: Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat' | 'quickChatKey'>>) => {
+    if (desktopPrefsCache) publishDesktopPrefs({ ...desktopPrefsCache, ...patch })
+    void b?.setPrefs?.(patch).then(publishDesktopPrefs).catch(() => undefined)
+  }, [b])
+  return { prefs: b?.prefs ? prefs : undefined, set }
+}
+
+/**
+ * The quick-chat combination, as Muse's Shortcuts page has it: the keys, *Change* (press the
+ * new combination, Esc to cancel), *Default* when it is the person's own, and a word when
+ * another app holds it. Outside the shell, the platform's default as plain text.
+ */
+export function HotkeyField({ t }: { t: Translate }): ReactNode {
+  const b = bridge()
+  const { prefs, set } = useDesktopPrefs()
+  const [recording, setRecording] = useState(false)
+  const [hint, setHint] = useState<string | undefined>()
+  const platform = b?.platform ?? ''
+  const fallback = platform === 'darwin' ? 'Alt+Space' : 'Ctrl+Alt+Space'
+  const key = prefs?.quickChatKey ?? fallback
+  const canChange = Boolean(prefs && prefs.quickChatDefault !== undefined)
+  const onKeyDown = (e: { code: string; key: string; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; metaKey: boolean; preventDefault(): void; stopPropagation(): void }) => {
+    if (!recording) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.key === 'Escape') { setRecording(false); setHint(undefined); return }
+    if (['Control', 'Alt', 'Shift', 'Meta', 'AltGraph', 'OS'].includes(e.key)) return
+    const next = acceleratorOf(e, platform)
+    if (!next) { setHint(t('gnHotkeyNeedsModifier')); return }
+    set({ quickChatKey: next })
+    setRecording(false)
+    setHint(undefined)
+  }
+  return h('div', { className: 'nm-hotkey' },
+    h('div', { className: 'nm-hotkey-row' },
+      recording
+        ? h('button', { type: 'button', className: 'nm-kbd nm-hotkey-recording', autoFocus: true, onKeyDown, onBlur: () => { setRecording(false); setHint(undefined) }, 'aria-live': 'polite' }, t('gnHotkeyRecording'))
+        : h('span', { className: 'nm-kbd' }, keyLabel(key, platform)),
+      canChange && !recording ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => setRecording(true) }, t('gnHotkeyChange')) : null,
+      canChange && !recording && prefs && prefs.quickChatDefault && key !== prefs.quickChatDefault ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => set({ quickChatKey: '' }) }, t('gnHotkeyReset')) : null),
+    hint ? h('span', { className: 'nm-hotkey-hint' }, hint) : prefs?.quickChatTaken && prefs.quickChat ? h('span', { className: 'nm-hotkey-hint nm-cn-warn' }, t('gnHotkeyTaken')) : null)
+}
+
 /** Muse's App behavior: open at login, the menu bar icon, the quick-chat key — the shell's switches, when there is a shell. */
 export function AppBehaviorRows({ t }: { t: Translate }): ReactNode {
   const b = bridge()
-  const [prefs, setDesktopPrefs] = useState<DesktopPrefs | undefined>()
-  useEffect(() => {
-    void b?.prefs?.().then(setDesktopPrefs).catch(() => undefined)
-  }, [b])
+  const { prefs, set } = useDesktopPrefs()
   if (!b?.prefs || !prefs) return null
-  const set = (patch: Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat'>>) => {
-    setDesktopPrefs({ ...prefs, ...patch })
-    void b.setPrefs?.(patch).then(setDesktopPrefs).catch(() => undefined)
-  }
   const row = (key: 'openAtLogin' | 'menuBar' | 'quickChat', title: string, sub: string) =>
     prefs.supports[key]
       ? h('div', { key, className: 'nm-row' },

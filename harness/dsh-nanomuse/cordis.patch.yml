@@ -70,3 +70,12 @@
     # `nanomuse-rooms-tools` (presets/nanomuse.patch.yml).
     - id: nanomuse-rooms
       name: dsh-nanomuse/rooms
+
+    # Connectors: third-party services over their remote MCP servers (OAuth
+    # where the server speaks the MCP authorization flow, a key where it wants
+    # one), connected from Settings → Connectors. Credentials in
+    # $DSH_HOME/nanomuse/connectors.json; a loopback proxy of this row carries
+    # them, and the preset row `nanomuse-connectors-tools` mounts one MCP
+    # client per connection in every chat.
+    - id: nanomuse-connectors
+      name: dsh-nanomuse/connectors

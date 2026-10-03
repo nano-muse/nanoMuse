@@ -59,10 +59,10 @@ export class ProfileStore {
     return () => this.listeners.delete(listener)
   }
 
-  /** Where a still of the worn face is on disk, or nothing for the dragon and the emoji. */
-  stillPath(faceId: string, mood: string): string | undefined {
+  /** Where a still (or a clip, if a face ever has them) of the worn face is on disk, or nothing for the dragon and the emoji. */
+  stillPath(faceId: string, mood: string, ext: 'webp' | 'mp4' = 'webp'): string | undefined {
     if (!FACE_ID.test(faceId) || !(MOODS as readonly string[]).includes(mood)) return undefined
-    return join(this.dir, 'faces', faceId, `${mood}.webp`)
+    return join(this.dir, 'faces', faceId, `${mood}.${ext}`)
   }
 
   async load(): Promise<void> {
