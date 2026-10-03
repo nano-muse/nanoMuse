@@ -358,7 +358,7 @@ fun CloudSignInScreen(
                 OutlinedTextField(
                     value = baseOverride,
                     onValueChange = { baseOverride = it },
-                    label = { Text(stringResource(R.string.nm_cloud_debug_base)) },
+                    label = { Text(stringResource(R.string.nm_cloud_relay_server)) },
                     singleLine = true,
                     enabled = !verifying,
                     shape = RoundedCornerShape(14.dp),

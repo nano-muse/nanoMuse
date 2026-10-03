@@ -85,19 +85,13 @@ enum NanoMuseCloud {
 
     // MARK: - State
 
-    /// Debug builds may talk to another relay (a laptop on the same Wi-Fi).
-    static var canOverrideBase: Bool {
-        #if DEBUG
-        return true
-        #else
-        return false
-        #endif
-    }
+    /// The person may point the app at another relay (a self-hosted one, or a
+    /// laptop on the same Wi-Fi); the default stays the hosted one when unset.
+    static var canOverrideBase: Bool { true }
 
     /// The relay this build talks to.
     static var baseURL: String {
-        if canOverrideBase,
-           let custom = UserDefaults.standard.string(forKey: Keys.base)?.trimmingCharacters(in: .whitespacesAndNewlines),
+        if let custom = UserDefaults.standard.string(forKey: Keys.base)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !custom.isEmpty {
             return trimSlash(custom)
         }

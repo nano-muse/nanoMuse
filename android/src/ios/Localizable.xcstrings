@@ -14172,6 +14172,28 @@
         }
       }
     },
+    "Another relay to sign in against, for example one running on a laptop on the same Wi-Fi. Empty means the default." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another relay to sign in against, for example one running on a laptop on the same Wi-Fi. Empty means the default."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一个可登录的中转服务器，例如同一 Wi-Fi 下笔记本电脑上运行的。留空表示使用默认。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一個可登入的中繼伺服器，例如同一 Wi-Fi 下筆記型電腦上執行的。留空表示使用預設。"
+          }
+        }
+      }
+    },
     "Anthropic / Compatible API" : {
       "localizations" : {
         "de" : {
@@ -70310,6 +70332,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部拒絕"
+          }
+        }
+      }
+    },
+    "Relay server" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relay server"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中转服务器"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中繼伺服器"
           }
         }
       }

@@ -588,7 +588,7 @@
     <string name="nm_cloud_resend">Send again</string>
     <string name="nm_cloud_resend_in">Send again in %1$ds</string>
     <string name="nm_cloud_verify">Sign in</string>
-    <string name="nm_cloud_debug_base">Relay (debug build)</string>
+    <string name="nm_cloud_relay_server">Relay server</string>
     <string name="nm_cloud_fine_print">The relay keeps an account id, a masked identifier, usage counts and your agent\'s name and look; what else, and what is yours to switch off, is in the privacy policy.</string>
     <string name="nm_cloud_not_signed_in">Not signed in</string>
     <string name="nm_cloud_not_signed_in_sub">Sign in with a phone number or an e-mail for a free allowance. Your own providers stay as they are.</string>

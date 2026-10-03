@@ -67,7 +67,7 @@ Ours, in `NanoMuse/`:
   provider in the app, with a model group of its own that becomes the default when there is none.
   Same wire format and the same rules as the Android client (`io.github.nanomuse.cloud`): one
   instance per relay, nothing of the user's own replaced, a 401 on refresh removes the provider.
-  Debug builds can point at another relay.
+  A *Relay server* field points the app at another relay.
 
 ## Building on a Mac
 

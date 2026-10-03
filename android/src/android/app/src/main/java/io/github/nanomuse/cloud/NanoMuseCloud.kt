@@ -30,8 +30,8 @@ import org.json.JSONObject
 /**
  * nanoMuse Cloud: the "start now" path. An e-mail address, a code, and the
  * app has a provider with a starter allowance — no key of one's own needed. The server is the
- * relay in `cloud/` of the repository; anyone can run one, and a debug build can be pointed at
- * a different one.
+ * relay in `cloud/` of the repository; anyone can run one, and the sign-in screen lets the
+ * person point the app at their own relay.
  *
  * To the rest of the app the relay is an ordinary OpenAI-compatible provider: an API-key
  * [ProviderInstance] on the relay's base URL, whose key is the `nm_…` token the relay issued.
@@ -224,9 +224,12 @@ object NanoMuseCloud {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    /** The relay this build talks to. Debug builds may override it (a laptop on the same Wi-Fi). */
+    /**
+     * The relay this build talks to. The person may point it at their own relay (a self-hosted
+     * one, or a laptop on the same Wi-Fi); the default stays the hosted one when unset.
+     */
     fun baseUrl(context: Context): String =
-        prefs(context).getString(KEY_BASE, null)?.takeIf { BuildConfig.DEBUG && it.isNotBlank() }?.trimEnd('/')
+        prefs(context).getString(KEY_BASE, null)?.takeIf { it.isNotBlank() }?.trimEnd('/')
             ?: DEFAULT_BASE
 
     fun setBaseUrl(context: Context, url: String?) {
@@ -235,7 +238,7 @@ object NanoMuseCloud {
         }.apply()
     }
 
-    fun canOverrideBase(): Boolean = BuildConfig.DEBUG
+    fun canOverrideBase(): Boolean = true
 
     /** The provider instance the relay is signed in as, if it still exists. */
     fun instance(context: Context): ProviderInstance? {

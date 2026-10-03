@@ -28,7 +28,7 @@ struct NanoMuseCloudView: View {
             } else {
                 signInSections
             }
-            if NanoMuseCloud.canOverrideBase {
+            if NanoMuseCloud.canOverrideBase, !signedIn {
                 relaySection
             }
         }
@@ -199,7 +199,7 @@ struct NanoMuseCloudView: View {
         }
     }
 
-    // MARK: - Debug
+    // MARK: - Relay
 
     private var relaySection: some View {
         Section {
@@ -210,9 +210,9 @@ struct NanoMuseCloudView: View {
                 .onSubmit { NanoMuseCloud.setBaseURL(relayBase) }
                 .onChange(of: relayBase) { newValue in NanoMuseCloud.setBaseURL(newValue) }
         } header: {
-            Text("Relay (debug builds only)")
+            Text(AppLocalized("Relay server"))
         } footer: {
-            Text("Another relay to sign in against, for example one running on a laptop on the same Wi-Fi. Empty means the default.")
+            Text(AppLocalized("Another relay to sign in against, for example one running on a laptop on the same Wi-Fi. Empty means the default."))
         }
     }
 

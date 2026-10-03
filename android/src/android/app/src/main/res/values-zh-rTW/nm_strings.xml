@@ -581,7 +581,7 @@
     <string name="nm_cloud_resend">重新發送</string>
     <string name="nm_cloud_resend_in">%1$d 秒後可重發</string>
     <string name="nm_cloud_verify">登入</string>
-    <string name="nm_cloud_debug_base">中繼伺服器（偵錯版）</string>
+    <string name="nm_cloud_relay_server">中繼伺服器</string>
     <string name="nm_cloud_fine_print">伺服器保存帳號 id、打碼後的手機號或信箱、用量，以及你的智慧體的名字和形象；其餘保存什麼、哪些由你決定，見隱私政策。</string>
     <string name="nm_cloud_not_signed_in">尚未登入</string>
     <string name="nm_cloud_not_signed_in_sub">用手機號或信箱登入，送一份免費額度。你自己新增的服務商不受影響。</string>
