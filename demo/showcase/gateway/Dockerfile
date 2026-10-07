@@ -1,6 +1,6 @@
 # The showcase gateway. Needs the Docker socket (it starts one container per visitor) and the
 # docker CLI, taken from the official CLI image so nothing else comes along.
-FROM docker:28-cli AS docker
+FROM docker:29-cli AS docker
 
 FROM python:3.12-slim
 
