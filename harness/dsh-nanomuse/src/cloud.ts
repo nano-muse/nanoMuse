@@ -79,8 +79,10 @@ export const LLM_ROW = 'llm-pi-ai'
 export const IMAGE_BUDGET = { maxRequestImageBytes: 5 * 1024 * 1024, requestImagePixelBudget: 2 * 1024 * 1024 } as const
 /** Where the browser half talks to us. */
 export const API_PREFIX = '/nanomuse/cloud'
+/** The bundle's version alone, `0.1.41`: what the update check compares with the latest release. */
+export const BUNDLE_VERSION = process.env.NANOMUSE_VERSION ?? '0.0.0'
 /** What this device reports as its software. */
-export const VERSION = `dsh-nanomuse ${process.env.NANOMUSE_VERSION ?? '0.0.0'}`
+export const VERSION = `dsh-nanomuse ${BUNDLE_VERSION}`
 /** The hub actions this computer answers whatever the remote-control switch says (`docs/hub.md`). */
 export const ACTIONS = ['info', 'notify']
 /** Incoming actions worth a toast — the ones that act or look, not a folder listing. */
@@ -884,7 +886,9 @@ export default class NanomuseCloud extends Service {
     const cached = this.state.update
     if (!force && cached && Date.now() - cached.checkedAt < UPDATE_EVERY_MS) return Promise.resolve(cached)
     if (this.updateCheck) return this.updateCheck
-    this.updateCheck = checkForUpdate(VERSION)
+    // the bare number: 0.1.40 compared the labelled `VERSION` ("dsh-nanomuse 0.1.40"), which
+    // parsed as 0, so every release read as newer and the installed one was offered again
+    this.updateCheck = checkForUpdate(BUNDLE_VERSION)
       .then(async (info) => {
         this.state = { ...this.state, update: info }
         await this.writeState().catch(() => undefined)

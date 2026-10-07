@@ -2,6 +2,7 @@
 // update check, what the other devices see of the connectors, the model rules.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { BUNDLE_VERSION } from '../lib/cloud.js'
 import { ApprovalDesk, HoldDesk, checkForUpdate, compareVersions, pickAsset, pickChatModel, pickHandsModel, readSharedConnectors, sharedConnectors, takesImages } from '../lib/desk.js'
 
 const req = (callId, sessionId = 's1') => ({ agent: { id: 'a1', session: { id: sessionId } }, toolName: 'bash', callId, reason: 'rm -rf build', displayReason: { en: 'Remove the build folder', zh: '删除 build 目录' } })
@@ -103,6 +104,24 @@ test('versions compare numerically, with pre-releases below the release', () => 
   assert.equal(compareVersions('0.1.9', '0.1.10'), -1)
   assert.equal(compareVersions('0.2.0-rc.2', '0.2.0'), -1)
   assert.equal(compareVersions('0.1.34', '0.1.34-rc.1'), 1)
+  // a labelled version reads as its number: 0.1.40 compared "dsh-nanomuse 0.1.40" as 0 and
+  // offered the installed release as an update
+  assert.equal(compareVersions('0.1.40', 'dsh-nanomuse 0.1.40'), 0)
+  assert.equal(compareVersions('dsh-nanomuse 0.1.41', 'v0.1.40'), 1)
+  assert.equal(compareVersions('nanoMuse-Desktop-0.1.40', '0.1.41'), -1)
+})
+
+test('the update check compares the bare bundle version, so the installed release is not offered again', async () => {
+  const mirror = { repo: 'nano-muse/nanoMuse', releases: [{ tag: 'v0.1.40', assets: [] }] }
+  const fetchMirror = async () => ({ ok: true, status: 200, json: async () => mirror })
+  const same = await checkForUpdate(BUNDLE_VERSION, fetchMirror)
+  assert.equal(same.current, BUNDLE_VERSION)
+  assert.match(BUNDLE_VERSION, /^\d+\.\d+\.\d+/)
+  assert.equal(same.newer, compareVersions('0.1.40', BUNDLE_VERSION) > 0)
+  const installed = await checkForUpdate('0.1.40', fetchMirror)
+  assert.equal(installed.newer, false)
+  const labelled = await checkForUpdate('dsh-nanomuse 0.1.40', fetchMirror)
+  assert.equal(labelled.newer, false)
 })
 
 test('the installer for this computer is picked from the release', () => {

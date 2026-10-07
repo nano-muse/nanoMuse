@@ -392,10 +392,14 @@ export interface UpdateInfo {
   error?: string
 }
 
-/** `-1`, `0` or `1` for `a` against `b`; `v` prefixes and pre-release tags (`-rc.1`) are read. */
+/**
+ * `-1`, `0` or `1` for `a` against `b`; `v` prefixes and pre-release tags (`-rc.1`) are read,
+ * and so is a label in front of the number (`dsh-nanomuse 0.1.41`, `nanoMuse Desktop 0.1.41`):
+ * the first dotted number in the string is the version.
+ */
 export function compareVersions(a: string, b: string): number {
   const parse = (v: string) => {
-    const m = /^v?(\d+(?:\.\d+)*)(?:-([0-9A-Za-z.-]+))?/.exec(v.trim())
+    const m = /(?:^|[^\d.])v?(\d+(?:\.\d+)*)(?:-([0-9A-Za-z.-]+))?/.exec(v.trim())
     return { nums: (m?.[1] ?? '0').split('.').map((n) => Number(n) || 0), pre: m?.[2] ?? '' }
   }
   const x = parse(a)

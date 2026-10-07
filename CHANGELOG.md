@@ -12,6 +12,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **The installed release is no longer offered as an update.** The daily check compared the latest release with the bundle's labelled version string (`dsh-nanomuse 0.1.40`), which read as 0, so every release counted as newer: About said *0.1.40 is out* on a 0.1.40 install and *Update* downloaded the same build. The check compares the bare number now, and a labelled version is read as its number should one reach the comparison again.
+
 ### Android
 
 ### iOS
