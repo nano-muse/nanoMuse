@@ -512,7 +512,8 @@ class MuseAgent:
     # ------------------------------------------------------------------ session persistence
     def reset(self) -> None:
         self.messages.clear()
-        self.sentinel.tainted = False
+        # only this conversation: the taint of the chats running beside this one is theirs
+        self.sentinel.untaint(self.conversation_id or "")
         self.state = AgentState.IDLE
 
     def _save_session(self) -> None:

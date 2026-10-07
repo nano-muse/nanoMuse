@@ -64,7 +64,7 @@ For each call, the first matching step decides:
 
 6. **Warnings**: a call that carries a warning (`rm -rf`, `sudo`, `curl | sh`, code that reads the environment or deletes files) is never waved through by the mode or by `always_allow_tools`; it asks. Only an explicit `allow` rule can override this.
 
-`auto` still honours `deny_tools`, deny rules and step 6. It is what `nanomuse daemon`, `--auto` and the app's "Hands-off" setting use — and background goal passes, which is why a dangerous command in an unattended run turns into a card in the Feed instead of just running. `nanomuse daemon` has nobody at the keyboard: a step that still asks there is declined with a note, and the model goes on with what it can.
+`auto` still honours `deny_tools`, deny rules, the taint rule and step 6: private data read in the conversation reaching an unlisted host asks there too, rather than leaving hands-off mode as the one way to skip the check that exists to catch exactly that. It is what `nanomuse daemon`, `--auto` and the app's "Hands-off" setting use — and background goal passes, which is why a dangerous command in an unattended run turns into a card in the Feed instead of just running. `nanomuse daemon` has nobody at the keyboard: a step that still asks there is declined with a note, and the model goes on with what it can.
 
 ## Approvals
 

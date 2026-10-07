@@ -66,8 +66,40 @@ class Sentinel:
         self.audit = audit
         self.ui = ui
         self.vault = vault
-        self.tainted = False
+        # private data was read in these conversations; per conversation, because one agent
+        # loop per thread shares this Sentinel and clearing a side chat must not forget
+        # what another conversation read
+        self._tainted: set[str] = set()
         self.grants = GrantStore(persistent_approvals_file)
+
+    # ------------------------------------------------------------------ taint
+    @staticmethod
+    def _taint_key() -> str:
+        """The conversation the running call belongs to; a run outside any conversation
+        stands in for one itself, as in :attr:`TaskContext.conversation_id`."""
+        task = _current_task.get()
+        return task.conversation_id if task else ""
+
+    @property
+    def tainted(self) -> bool:
+        """Whether private data was read in the conversation of the call being assessed."""
+        return self.tainted_for(self._taint_key())
+
+    def tainted_for(self, conversation: str | None) -> bool:
+        return (conversation or "") in self._tainted
+
+    def tainted_any(self) -> bool:
+        """For a status view that is not answering for one conversation."""
+        return bool(self._tainted)
+
+    def taint(self, conversation: str | None = None) -> None:
+        cid = self._taint_key() if conversation is None else conversation
+        if cid not in self._tainted:
+            logger.debug("conversation {} is now tainted (read private data)", cid or "itself")
+        self._tainted.add(cid)
+
+    def untaint(self, conversation: str | None = None) -> None:
+        self._tainted.discard(self._taint_key() if conversation is None else conversation)
 
     # ------------------------------------------------------------------ task scope
     def begin_task(
@@ -91,8 +123,10 @@ class Sentinel:
         _current_task.reset(token)
 
     def end_conversation(self, conversation_id: str) -> None:
-        """A conversation was deleted or cleared: the approvals given for it go with it."""
+        """A conversation was deleted or cleared: the approvals given for it go with it,
+        and so does the memory that it read private data."""
         self.grants.end_conversation(conversation_id)
+        self._tainted.discard(conversation_id or "")
 
     # ------------------------------------------------------------------ grants
     def forget_approvals(self) -> None:
@@ -196,10 +230,13 @@ class Sentinel:
                 if assessment.warnings
                 else self.grants.match(key, task.conversation_id if task else None)
             )
-            # auto mode skips the question, except for a call that carries a warning:
-            # step 6 of the policy keeps that one an ASK whatever the mode, and the
-            # gate honours it (docs/sentinel.md), so an unattended pass asks or stops
-            if self.settings.mode == "auto" and not assessment.warnings:
+            # auto mode skips the question, except for a call that carries a warning or
+            # one that would send data private to this conversation out to a host nobody
+            # allowlisted: steps 6 and 5 of the policy keep those an ASK whatever the
+            # mode, and the gate honours it (docs/sentinel.md), so an unattended pass asks
+            # or stops rather than reading a file and mailing it somewhere
+            waved_through = assessment.warnings or result_policy.tainted_ask
+            if self.settings.mode == "auto" and not waved_through:
                 decision = Decision.ALLOW
                 reasons.append("auto mode: approval skipped")
             elif grant is not None:
@@ -323,9 +360,7 @@ class Sentinel:
                 result.error = self.vault.redact(result.error)
 
         if assessment.reads_private_data and result.ok and self.settings.taint_tracking:
-            if not self.tainted:
-                logger.debug("session is now tainted (read private data via {})", tool.name)
-            self.tainted = True
+            self.taint()
 
         self.audit.record(
             "tool_call",

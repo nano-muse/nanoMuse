@@ -166,7 +166,13 @@ class ConversationSync:
 
     def _save(self) -> None:
         try:
-            self.path.write_text(json.dumps(self.state, ensure_ascii=False, indent=1), "utf-8")
+            # written aside and moved on, like every other state file here: a device losing
+            # power mid-write would otherwise leave half a JSON file, and `_load` reads that
+            # as no state at all — the cursor, the thread↔cid map and the hidden main chats
+            # gone, so the next pull starts from nothing
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.state, ensure_ascii=False, indent=1), "utf-8")
+            tmp.replace(self.path)
         except OSError as exc:  # pragma: no cover
             logger.warning("could not save sync state: {}", exc)
 

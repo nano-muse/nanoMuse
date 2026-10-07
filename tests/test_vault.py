@@ -41,6 +41,21 @@ def test_resolve_and_redact(tmp_path: Path):
     assert vault.resolve("{{vault:MISSING}}", strict=False) == "{{vault:MISSING}}"
 
 
+def test_redact_covers_short_secrets(tmp_path: Path):
+    """A four-digit PIN is a secret too: the length floor let it through into the model's
+    context and the audit log. Redacting a short one must not eat ordinary words either."""
+    vault = CredentialVault(tmp_path / "v.enc", tmp_path / "v.key")
+    vault.set("PIN", "1234")
+    vault.set("HI", "hi")
+    vault.set("SESSION", "abc123456")
+    assert vault.redact("the pin is 1234 now") == "the pin is [REDACTED:PIN] now"
+    # a short secret only goes as a whole token, so the text around it survives
+    assert vault.redact("this hashing is fine") == "this hashing is fine"
+    assert vault.redact("say hi") == "say [REDACTED:HI]"
+    # the longer secret wins where one contains the other
+    assert vault.redact("abc123456 and 1234") == "[REDACTED:SESSION] and [REDACTED:PIN]"
+
+
 def test_wrong_key_is_reported(tmp_path: Path):
     vault = CredentialVault(tmp_path / "v.enc", tmp_path / "k1.key")
     vault.set("A", "value-123456")

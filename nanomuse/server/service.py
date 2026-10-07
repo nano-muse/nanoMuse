@@ -182,6 +182,12 @@ COMMUNICATION: dict[str, str] = {
 # how the configured interval stretches or shrinks per level
 _INTERVAL_FACTOR = {"low": 2.0, "default": 1.0, "high": 0.5}
 _QUIET_HOURS_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)-([01]?\d|2[0-3]):([0-5]\d)$")
+# A thread id arrives over the WebSocket and names a file in the threads folder, so it
+# carries no separator: the same rule as channels' thread_id_for, whose longest id is
+# "channel-" plus an 80-character chat id.
+_THREAD_ID_RE = re.compile(r"[A-Za-z0-9_.-]{1,128}")
+# how long `stop()` lets a cancelled worker take to settle before closing over its work
+_SHUTDOWN_GRACE_S = 5.0
 
 
 @dataclass
@@ -494,10 +500,34 @@ class MuseService:
     async def stop(self) -> None:
         if self._scheduler:
             self._scheduler.cancel()
+        loop = asyncio.get_running_loop()
+        workers: list[asyncio.Task[None]] = []
         for t in self.threads.values():
-            if t.worker:
-                t.worker.cancel()
-        await asyncio.sleep(0)
+            work = t.worker
+            if work is None or work.done() or work.get_loop() is not loop:
+                # nothing to wait for, or a task of a loop that is already closed (an app
+                # built twice in one process, as a test does): cancelling it means nothing
+                # and waiting on it would raise across the loops
+                continue
+            work.cancel()
+            workers.append(work)
+        if workers:
+            # cancelled is not finished: a worker still runs its own settling once the
+            # CancelledError lands — the stopped notice, the timeline, the store — and doing
+            # that after the flushes and the closes below is the "Exception ignored ... during
+            # shutdown" of the log. Wait, but only so long: a worker wedged in a provider
+            # response must not hold the exit.
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*workers, return_exceptions=True),
+                    _SHUTDOWN_GRACE_S,
+                )
+            except TimeoutError:
+                logger.warning(
+                    "shutdown: {} worker(s) were still running after {:.0f}s; closing over their work",
+                    len(workers),
+                    _SHUTDOWN_GRACE_S,
+                )
         for t in self.threads.values():
             t.timeline.flush()
         await self.chatgpt.close()
@@ -731,8 +761,13 @@ class MuseService:
         if not any(m.get("id") == MAIN_THREAD for m in metas):
             metas.insert(0, {"id": MAIN_THREAD, "title": "Main chat", "created_at": now_iso()})
         for m in metas:
+            tid = str(m.get("id") or "")
+            if not _THREAD_ID_RE.fullmatch(tid):
+                # an id the app would refuse now: drop the line rather than refuse to start
+                logger.warning("threads index: ignoring the entry with the id {!r}", tid)
+                continue
             thread = self._make_thread(
-                m["id"], m.get("title", m["id"]), m.get("created_at"), m.get("updated_at")
+                tid, m.get("title", tid), m.get("created_at"), m.get("updated_at")
             )
             if m.get("device"):
                 thread.device = str(m["device"])
@@ -770,6 +805,16 @@ class MuseService:
             json.dumps(metas, ensure_ascii=False, indent=1), "utf-8"
         )
 
+    def _thread_file(self, thread_id: str, suffix: str) -> Path:
+        """The file a thread id names: checked, not escaped, because the id is something a
+        client sends and it would otherwise choose where the thread's data lives."""
+        if not _THREAD_ID_RE.fullmatch(str(thread_id)):
+            raise ValueError(f"invalid thread id: {thread_id}")
+        path = (self.threads_dir / f"{thread_id}{suffix}").resolve()
+        if path.parent != self.threads_dir.resolve():
+            raise ValueError(f"invalid thread id: {thread_id}")
+        return path
+
     def _make_thread(
         self,
         thread_id: str,
@@ -777,7 +822,7 @@ class MuseService:
         created_at: str | None = None,
         updated_at: str | None = None,
     ) -> Thread:
-        timeline = Timeline(thread_id, self.threads_dir / f"{thread_id}.json")
+        timeline = Timeline(thread_id, self._thread_file(thread_id, ".json"))
         # Cards that were waiting for an answer when the server stopped can't be answered
         # any more: the agent run behind them is gone.
         stale = [
@@ -800,7 +845,7 @@ class MuseService:
             # a hold lives in memory: after a restart nothing waits on it any more
             if ev.get("type") == "hold" and ev.get("status") == "on":
                 timeline.update(ev["id"], status="off", stale=True)
-        session_file = self.threads_dir / f"{thread_id}.session.json"
+        session_file = self._thread_file(thread_id, ".session.json")
         agent = MuseAgent(
             settings=self.settings,
             llm=self.app.llm,
@@ -914,8 +959,8 @@ class MuseService:
         self.app.holds.clear_thread(thread.id)
         self.app.sentinel.end_conversation(thread.id)
         pairs = (
-            (thread.timeline.path, self.threads_dir / f"{new_id}.json"),
-            (thread.agent.session_file, self.threads_dir / f"{new_id}.session.json"),
+            (thread.timeline.path, self._thread_file(new_id, ".json")),
+            (thread.agent.session_file, self._thread_file(new_id, ".session.json")),
         )
         # a write still on its way to disk lands under the new id, not the old one
         thread.timeline.path = pairs[0][1]
@@ -1619,7 +1664,7 @@ class MuseService:
         if item.kind != "hook":
             # the mail or the event is the user's private data: from here on, sending
             # anything to a host that is not allowlisted is an approval
-            self.app.sentinel.tainted = True
+            self.app.sentinel.taint(thread)
         self.send(
             thread,
             prompts.TRIGGER_PROMPT.format(
@@ -2390,7 +2435,7 @@ class MuseService:
         return {
             "audit": self.app.audit.tail(n),
             "grants": [g.to_dict() for g in s.active_grants()],
-            "tainted": s.tainted,
+            "tainted": s.tainted_any(),
         }
 
     def settings_view(self) -> dict[str, Any]:
