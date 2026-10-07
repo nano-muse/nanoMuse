@@ -309,34 +309,46 @@ export function title(text: string, limit = 80): string {
   return line.length <= limit ? line : `${line.slice(0, limit - 1)}…`
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return existsSync(path) && statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 /**
  * `ssd-code-appagent-openmuse` → `/ssd/code/appagent/openmuse` when such a directory exists;
  * hyphenated names are tried as one component when the split does not exist. Falls back to
  * the slug itself.
+ *
+ * On Windows the slug starts with the drive: Cursor drops the colon (`C:\Users\me\app` →
+ * `C-Users-me-app`), Claude Code turns it into a dash too (`C--Users-me-app`), and either
+ * may lower-case the letter. Both read back as `C:\Users\me\app`.
  */
-export function slugToPath(slug: string): string {
+export function slugToPath(slug: string, platform: NodeJS.Platform = process.platform, isDir: (path: string) => boolean = isDirectory): string {
   const parts = slug.split('-')
+  const sep = platform === 'win32' ? '\\' : '/'
   let path = ''
   let i = 0
+  if (platform === 'win32' && /^[A-Za-z]$/.test(parts[0] ?? '') && parts.length > 1) {
+    path = `${parts[0]!.toUpperCase()}:`
+    i = parts[1] === '' ? 2 : 1
+  }
+  const start = i
   while (i < parts.length) {
     let chosen: [string, number] | undefined
     for (let j = parts.length; j > i; j--) {
-      const candidate = `${path}/${parts.slice(i, j).join('-')}`
-      let dir = false
-      try {
-        dir = existsSync(candidate) && statSync(candidate).isDirectory()
-      } catch {
-        dir = false
-      }
-      if (dir) {
+      const candidate = `${path}${sep}${parts.slice(i, j).join('-')}`
+      if (isDir(candidate)) {
         chosen = [candidate, j]
         break
       }
     }
-    if (!chosen) return path ? `${path}/${parts.slice(i).join('-')}` : slug
+    if (!chosen) return i > start ? `${path}${sep}${parts.slice(i).join('-')}` : slug
     ;[path, i] = chosen
   }
-  return path || slug
+  return i > start ? path : slug
 }
 
 function status(updatedAt: number, openTurn: boolean, now = Date.now() / 1000): CodingSession['status'] {

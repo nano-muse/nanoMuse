@@ -14,6 +14,11 @@ import { CODING_ACTIONS, CodingService, codingBrief, GATED_CODING_ACTIONS } from
 
 const posix = process.platform !== 'win32'
 
+/** The agents' slug of a workspace on this OS: `/` as `-` on Unix; Cursor's `C-Users-…` on Windows. */
+function slugOf(ws) {
+  return posix ? ws.slice(1).replace(/\//g, '-') : ws.replace(/^([A-Za-z]):\\/, '$1-').replace(/\\/g, '-')
+}
+
 async function scratch(work) {
   const dir = await mkdtemp(join(tmpdir(), 'nanomuse-coding-'))
   try {
@@ -32,7 +37,7 @@ async function write(path, lines) {
 async function fixtureHome(home) {
   const ws = join(home, 'work', 'api')
   await mkdir(ws, { recursive: true })
-  const slug = ws.slice(1).replace(/\//g, '-')
+  const slug = slugOf(ws)
   // Cursor: an IDE chat (no CLI meta) and a CLI chat (meta.json with the cwd)
   await write(join(home, '.cursor', 'projects', slug, 'agent-transcripts', 'ide-1', 'ide-1.jsonl'), [
     { role: 'user', message: { content: [{ type: 'text', text: '<user_query>Fix the parser</user_query><attached_files>x</attached_files>' }] } },
@@ -182,11 +187,30 @@ test('readers: clean, title and slugToPath', async () => {
   assert.equal(title('x'.repeat(100)).length, 80)
   assert.ok(title('x'.repeat(100)).endsWith('…'))
   await scratch(async (dir) => {
+    // the slug the way the agents make it on this OS: `/` (or the drive's `:\` and `\`) as `-`
     await mkdir(join(dir, 'my-project', 'sub'), { recursive: true })
-    const slug = `${dir.slice(1).replace(/\//g, '-')}-my-project-sub`
-    assert.equal(slugToPath(slug), join(dir, 'my-project', 'sub'))
+    const want = join(dir, 'my-project', 'sub')
+    const slug = slugOf(want)
+    const same = (a, b) => assert.equal(posix ? a : a.toLowerCase(), posix ? b : b.toLowerCase())
+    same(slugToPath(slug), want)
+    if (!posix) same(slugToPath(slug.replace(/^([A-Za-z])-/, '$1--')), want) // Claude Code's shape
     assert.equal(slugToPath('no-such-root-anywhere-xyz'), 'no-such-root-anywhere-xyz')
   })
+  // both OSes' shapes, on every OS, against a pretend disk
+  const unix = new Set(['/ssd', '/ssd/code', '/ssd/code/my-app', '/ssd/code/my-app/sub'])
+  const isUnix = (p) => unix.has(p)
+  assert.equal(slugToPath('ssd-code-my-app-sub', 'linux', isUnix), '/ssd/code/my-app/sub')
+  assert.equal(slugToPath('ssd-code-my-app-gone', 'linux', isUnix), '/ssd/code/my-app/gone')
+  assert.equal(slugToPath('nope-code', 'linux', isUnix), 'nope-code')
+  assert.equal(slugToPath('c-Users-me', 'linux', isUnix), 'c-Users-me') // no drives on Unix
+  const win = new Set(['C:\\Users', 'C:\\Users\\me', 'C:\\Users\\me\\my-app', 'D:\\work'])
+  const isWin = (p) => win.has(p)
+  assert.equal(slugToPath('C-Users-me-my-app', 'win32', isWin), 'C:\\Users\\me\\my-app') // Cursor
+  assert.equal(slugToPath('C--Users-me-my-app', 'win32', isWin), 'C:\\Users\\me\\my-app') // Claude Code
+  assert.equal(slugToPath('c--Users-me-my-app', 'win32', isWin), 'C:\\Users\\me\\my-app')
+  assert.equal(slugToPath('d-work-gone', 'win32', isWin), 'D:\\work\\gone')
+  assert.equal(slugToPath('Z-nothing-here', 'win32', isWin), 'Z-nothing-here')
+  assert.equal(slugToPath('Users-me', 'win32', isWin), 'Users-me')
 })
 
 test('processes: ps and tasklist parsers, and the count by agent', () => {
