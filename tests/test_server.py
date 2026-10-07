@@ -253,6 +253,34 @@ def test_stop_ends_the_run_and_closes_the_pending_card(server):
     assert card["id"] not in [a["id"] for a in client.get("/api/state").json()["pending_approvals"]]
 
 
+def test_shutdown_waits_for_a_worker_to_finish_its_own_settling(server):
+    """`stop()` cancels a worker, and cancelling is not finishing: the settling a cancelled
+    run still does — the stopped notice, the session write, the timeline — has to happen
+    before the flushes and the closes, which is why the log's
+    "Exception ignored ... during shutdown" was the symptom."""
+    client, service, _ = server
+    settled: list[str] = []
+
+    async def worker() -> None:
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            await asyncio.sleep(0.05)  # settling reaches the store; it is not instantaneous
+            settled.append("main")
+            raise
+
+    thread = service.threads["main"]
+
+    async def run_then_stop() -> None:
+        thread.worker = asyncio.create_task(worker())
+        await asyncio.sleep(0)  # let it get to its await
+        await service.stop()
+
+    client.portal.call(run_then_stop)
+    assert settled == ["main"]
+    assert thread.worker.done()
+
+
 def test_feed_posts_written_for_the_user(server):
     """The Feed: instructions from the user, a batch of posts written from what the agent
     knows, newest first; a post can be removed; a bad model answer leaves the feed as it was."""
@@ -526,6 +554,38 @@ def test_side_chats_are_isolated(server):
     assert client.delete("/api/threads/main").status_code == 400
     assert client.delete(f"/api/threads/{t['id']}").status_code == 200
     assert client.get(f"/api/threads/{t['id']}/events").status_code == 404
+
+
+def test_a_thread_id_cannot_reach_outside_the_threads_folder(server):
+    """A client sends the thread id, and that id names the file the conversation is written
+    to: an id that walks out of the folder is refused, not obeyed."""
+    client, service, _ = server
+    escaped = service.threads_dir.parent / "escaped"
+    for bad in (
+        "../escaped",
+        "..\\escaped",
+        "../../escaped",
+        "/absolute/path/escaped",
+        str(escaped),
+        "a" * 129,
+    ):
+        with pytest.raises(ValueError, match="invalid thread id"):
+            service.send(bad, "hello")
+        with pytest.raises(ValueError, match="invalid thread id"):
+            service.timeline(bad)
+        assert not (service.threads_dir.parent / "escaped.json").exists()
+        assert not (service.threads_dir.parent / "escaped.session.json").exists()
+    # the socket answers with an error frame rather than running the agent
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"kind": "auth", "token": "secret-token"})
+        assert ws.receive_json()["kind"] == "hello"
+        ws.send_json({"kind": "send", "thread": "../escaped", "text": "hello"})
+        error = ws.receive_json()
+        assert error["kind"] == "error" and "invalid thread id" in error["error"]
+    # the ids the app itself mints stay acceptable
+    for good in ("main", "t_1a2b3c4d", "channel-telegram-1234567890"):
+        service.timeline(good)
+    assert set(service.threads) >= {"main", "t_1a2b3c4d", "channel-telegram-1234567890"}
 
 
 # ----------------------------------------------------------------------------- goals / memory / settings / files
@@ -1959,7 +2019,7 @@ def test_triggers_start_work_from_mail_events_and_webhooks(
     client.portal.call(service._run_event_triggers)
     wait_idle(service, "main")
     assert client.get("/api/triggers").json()["items"][2]["fired"] == 1
-    assert service.app.sentinel.tainted is True  # calendar data entered the session
+    assert service.app.sentinel.tainted_for("main") is True  # calendar data entered the chat
     # an all-day event "starts" with the working day, not at midnight: with the working day
     # beginning 23 h 50 min from now, a day's lead fires now and a 30-minute lead waits
     anchor = now - timedelta(minutes=10)
