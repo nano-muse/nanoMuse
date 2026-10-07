@@ -938,7 +938,9 @@ def create_app(
         spec = cloud.model_for(model, "image", caller)
         if n != 1:
             raise CloudError(400, "bad_request", "nanoMuse Cloud draws one picture per request")
-        data = await image.read()
+        # read one byte past the cap rather than the whole picture first: larger than the
+        # limit is refused, so nothing beyond it is ever held
+        data = await image.read(settings.max_request_bytes + 1)
         if len(data) > settings.max_request_bytes:
             raise CloudError(413, "too_large", "The picture is too large")
         mime = image.content_type or "image/png"
@@ -1590,22 +1592,42 @@ def create_app(
 
     # -- helpers ------------------------------------------------------------------------------------
 
-    async def _json(request: Request) -> dict:
+    async def _body(request: Request) -> bytes:
+        """The request body, read no further than the cap. A body is not held in memory
+        first and measured afterwards: `Content-Length` over the limit is refused before a
+        byte is taken, and one that grows past it is stopped on the way in, because these
+        endpoints answer anonymous callers and a caller can send as much as it likes."""
+        limit = settings.max_request_bytes
+
+        def _too_big(size: int) -> CloudError:
+            # a dozen screenshots in one chat request got here (0.19): name the two sizes
+            # so the person, or the log, can tell at once which side has to give
+            return CloudError(
+                413,
+                "too_large",
+                f"Request body is {size / 1048576:.1f} MB; this relay accepts up to {limit / 1048576:.0f} MB",
+            )
+
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            raise _too_big(int(declared))
+        chunks: list[bytes] = []
+        size = 0
         try:
-            raw = await request.body()
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > limit:
+                    raise _too_big(size)
+                chunks.append(chunk)
         except ClientDisconnect as e:
             # the caller went away while its body was still arriving (a phone changing
             # networks, a tab closed mid-request): nobody is there to answer, and it is not
             # a server error worth a traceback in the log
             raise CloudError(400, "client_disconnected", "The request ended before its body") from e
-        if len(raw) > settings.max_request_bytes:
-            # a dozen screenshots in one chat request got here (0.19): name the two sizes so
-            # the person, or the log, can tell at once which side has to give
-            raise CloudError(
-                413,
-                "too_large",
-                f"Request body is {len(raw) / 1048576:.1f} MB; this relay accepts up to {settings.max_request_bytes / 1048576:.0f} MB",
-            )
+        return b"".join(chunks)
+
+    async def _json(request: Request) -> dict:
+        raw = await _body(request)
         try:
             obj = json.loads(raw or b"{}")
         except ValueError as e:

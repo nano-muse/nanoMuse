@@ -38,7 +38,7 @@ from .nudges import merge as nudges_merge
 from .nudges import validate as nudges_validate
 from .providers import exhausted_key_line, guidance
 from .providers import provider as catalogue_provider
-from .senders import CodeSender, SendError, make_sender
+from .senders import CodeSender, LogSender, SendError, make_sender
 
 log = logging.getLogger("nanomuse_cloud")
 
@@ -283,6 +283,16 @@ def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 
+def _code_hash(key: bytes, code: str) -> str:
+    """A sign-in code is six digits, so hashing it plainly is a lookup table: whoever can read
+    the database tries all 1,000,000 values in a moment and gets a live code back. Keying the
+    hash with the relay's own secret (the same trick as an identifier hash) makes that need the
+    secret too. An API key stays a plain hash: 240 random bits are nobody's lookup table.
+    A code stored by an older relay does not verify, so one that was in the air when the relay
+    updated has to be asked for again."""
+    return hmac.new(key, code.encode(), hashlib.sha256).hexdigest()
+
+
 class InFlight:
     """The requests an account has under way: how many (at most `limit`), and what each is
     expected to cost. The allowance check counts these reservations as spent, so several
@@ -358,6 +368,13 @@ class Cloud:
         settings = self.s
         self.in_flight = InFlight(settings.max_in_flight, ttl_s=settings.upstream_timeout_s + 120)
         self.sender = sender or make_sender(settings)
+        if settings.dev_mode and not isinstance(self.sender, LogSender):
+            # `hmac_key` falls back to a published development constant when CLOUD_SECRET is
+            # absent, which is only safe while codes stay in the log: with a sender that really
+            # sends, every identifier would be hashable — the member list readable, a live code
+            # recoverable — by whoever holds the database alone. `__main__` exits on this for the
+            # command line; a relay built here is refused for every other way of starting one.
+            raise RuntimeError("CLOUD_SECRET is not set; a relay that sends codes (CODE_SENDER != log) must have one")
         self.crypto = IdentifierCrypto(settings.identifier_key)
         # 0.22: the operator's switches and thresholds (settings table, applied at once)
         self.controls = Controls(self.db, settings)
@@ -687,7 +704,7 @@ class Cloud:
         # The reviewer's code is the fixed one and goes nowhere: the row is written like
         # anyone's, so the lifetime, the attempt limit and the rate limits are the same.
         code = self.s.review_code.strip() if review else f"{secrets.randbelow(1_000_000):06d}"
-        self.db.insert_code(ident.hash(self.s.hmac_key), _sha256(code), ip, self.s.code_ttl_s)
+        self.db.insert_code(ident.hash(self.s.hmac_key), _code_hash(self.s.hmac_key, code), ip, self.s.code_ttl_s)
         if review:
             log.info("review sign-in: a code request for the reviewer's address; nothing sent")
             return
@@ -709,7 +726,7 @@ class Cloud:
         if attempts > self.s.code_max_attempts:
             self.db.consume_code(int(row["id"]))
             raise CloudError(400, "code_expired", "Too many tries; ask for a new code")
-        if not secrets.compare_digest(str(row["code_hash"]).encode(), _sha256(code.strip()).encode()):
+        if not secrets.compare_digest(str(row["code_hash"]).encode(), _code_hash(self.s.hmac_key, code.strip()).encode()):
             raise CloudError(400, "code_wrong", "That code is not right")
         self.db.consume_code(int(row["id"]))
         return self.sign_in(ident, device, "code", invite)

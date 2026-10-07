@@ -550,6 +550,34 @@ async def test_a_body_over_the_limit_names_both_sizes():
     assert RelaySettings(database=":memory:", secret="s").max_request_bytes == 16 * 1024 * 1024
 
 
+async def test_a_body_too_large_is_refused_while_it_is_still_arriving():
+    """Sign-up endpoints are open to anybody, and the whole body used to be held in memory
+    before it was measured: the caller decided how much of the relay was spent first. The
+    limit is now applied on the way in, declared or not."""
+    app, client, sender, up, cloud, settings = make(max_request_bytes=1024)
+    # a declared length over the limit answers 413 without reading the body at all
+    r = await client.post(
+        "/v1/auth/code",
+        content='{"identifier": "' + "x" * 4096 + '"}',
+        headers={"content-type": "application/json"},
+    )
+    assert r.status_code == 413 and r.json()["error"]["code"] == "too_large"
+    # a chunked body declares nothing: it is stopped as it grows past the limit
+    chunks = [b"x" * 512 for _ in range(8)]
+
+    async def streamed():
+        for chunk in chunks:
+            yield chunk
+
+    r = await client.post(
+        "/v1/auth/code", content=streamed(), headers={"content-type": "application/json"}
+    )
+    assert r.status_code == 413 and r.json()["error"]["code"] == "too_large"
+    # a body under the limit still gets through and is parsed as before
+    r = await client.post("/v1/auth/code", json={"identifier": "garbage"})
+    assert r.status_code == 400 and r.json()["error"]["code"] == "bad_identifier"
+
+
 async def test_deleting_the_account_purges_everything_and_the_next_sign_in_starts_empty():
     """The phone's "Delete account": nothing of the account stays on the relay — not its
     synced conversations, not its cursor, not its devices or profile, not the presence kept
