@@ -86,7 +86,7 @@ The database schema migrates forward on start. Read the release notes before a j
 
 ### Backing up
 
-Everything the relay keeps is `cloud/data/cloud.db` (SQLite) plus `CLOUD_SECRET` in `cloud/.env`. The database is useless without the secret — the identifiers are hashed and encrypted with it — and the secret is useless without the database; back them up together, and never rotate the secret unless you mean to start over:
+Everything the relay keeps is `cloud/data/cloud.db` (SQLite) plus `CLOUD_SECRET` in `cloud/.env`. The database is useless without the secret — the identifiers are hashed and encrypted with it, and so is a sign-in code still waiting, which is only six digits — and the secret is useless without the database; back them up together, and never rotate the secret unless you mean to start over:
 
 ```bash
 cd cloud && docker compose exec relay sqlite3 /srv/nanomuse-cloud/data/cloud.db ".backup /srv/nanomuse-cloud/data/backup.db" \
