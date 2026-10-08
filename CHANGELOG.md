@@ -18,6 +18,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
+- `docs/ios.md` says build 16 is the 1.0.0 build on TestFlight; the *New Contributors* and *Contributors* lines a release generates no longer carry a dash.
+
 ## [1.0.0] - 2026-10-09 · Keel
 
 Keel: the first stable version. What has been a preview since 2026-09-25 is now the set we stand behind: a phone app for Android and for the iPhone, a desktop app for the Mac, Windows and Linux, the web console, and the open-source relay (nanoMuse Cloud) that signs people in and lets their devices talk, all GPL-3.0-or-later and non-profit. One account across every device, Hands on the phone and on the computer, a key of your own for any of eighteen providers or the free allowance. Since 0.1.41: nanoMuse Cloud can be switched off as a model source without signing out, and a phone or a console with a key of its own works signed out; the main chat follows the chat model you pick; the model pickers fold long lists and can be searched; a thinking level for a key of your own on the desktop; the star card has *I already starred*; the desktop waits for a slow Windows start instead of giving up; the reply follows the language of the app; the Sentinel's `auto` mode asks before a tainted send and on a warning; the hub and the relay were hardened (bounded send queues, a sign-in code keyed to the relay, the allowance counted the way the provider bills); and no sentence a person reads carries a dash as punctuation.
