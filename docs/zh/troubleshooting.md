@@ -26,7 +26,7 @@
 
 **Playwright 装不上 Chromium。** 较旧的发行版不被新版 Playwright 支持。用 Docker 镜像，或者保持 `browser.enabled = false`；`web_fetch` 能应付大多数阅读类任务。
 
-**nanoMuse 桌面版显示「nanoMuse 没能启动」或「nanoMuse 的后台停止了」。** 外壳把 dsh Host 作为子进程启动，自己的和 Host 的日志都写在 `~/.nanomuse/desktop/desktop.log`（`NANOMUSE_DESKTOP_HOME` 可以换位置）。对话框会引用错误；「复制详情」把版本号、日志末尾和 Host 最后的输出放进剪贴板，发 issue 时贴上；「打开日志文件夹」打开这个文件。Host 后来停了会被重启一次，再出的对话框里有「重新启动」。Windows 上更新之后最常见的原因是配置里的插件链接还指向旧的安装目录（`EEXIST: file already exists, symlink …`；0.1.40 修了，会把链接重建，仍然失败时消息会写出要手动删掉的路径）。更新不会自己装上：托盘菜单的「下载页（检查新版本）」打开发布页。细节见 [desktop.md](desktop.md#config-and-data)。（0.1.29 之前的桌面版是另一个程序，Electron 外壳里的 Python 运行时，日志在 `~/.nanomuse/desktop-app.log`；下面两条来自那个时期。）
+**nanoMuse 桌面版显示「nanoMuse 没能启动」或「nanoMuse 的后台停止了」。** 外壳把 dsh Host 作为子进程启动，自己的和 Host 的日志都写在 `~/.nanomuse/desktop/desktop.log`（`NANOMUSE_DESKTOP_HOME` 可以换位置）。对话框会引用错误；「复制详情」把版本号、日志末尾和 Host 最后的输出放进剪贴板，发 issue 时贴上；「打开日志文件夹」打开这个文件。Host 后来停了会被重启一次，再出的对话框里有「重新启动」。Windows 上更新之后最常见的原因是配置里的插件链接还指向旧的安装目录（`EEXIST: file already exists, symlink …`；0.1.40 修了，会把链接重建，仍然失败时消息会写出要手动删掉的路径）。第一次启动要花几分钟（Windows 上尤其）不是故障：Host 要加载两万来个文件，实时防护会逐个检查一遍，0.1.41 及之前外壳等 120 秒就放弃了，而 Host 其实还在加载；现在只要进程还在就一直等，两分钟后显示「还在启动」和 Host 最近几行输出，十分钟后问是否继续等。更新不会自己装上：托盘菜单的「下载页（检查新版本）」打开发布页。细节见 [desktop.md](desktop.md#config-and-data)。（0.1.29 之前的桌面版是另一个程序，Electron 外壳里的 Python 运行时，日志在 `~/.nanomuse/desktop-app.log`；下面两条来自那个时期。）
 
 **刚装好就提示「The data folder … is not writable」/「cannot write to the data directory」（Windows，0.1.20–0.1.21）。** 运行时把 `workspace` 文件夹建在了启动器启动它时所在的位置——安装程序打开 App 时是 `C:\Windows\System32`——失败后就停了。从 0.1.22 起工作区默认在 `<data dir>\workspace`，外壳也改在数据文件夹里启动运行时；更新即可，旧版本可以设 `NANOMUSE_WORKSPACE`。
 

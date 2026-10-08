@@ -238,6 +238,20 @@ over it (`EEXIST: file already exists, symlink …` in `desktop.log`). Since 0.1
 link is removed as a link and remade; should that still fail, the message names the path to
 remove by hand.
 
+A first start can be slow, on Windows in particular. The Host prints its address only once
+every plugin of the profile has been loaded, and a fresh install has some 20 000 files under
+`resources/dsh/node_modules` that the system reads for the first time; Windows Defender's
+real-time protection checks each of them on that first read, and a slow or external disk
+adds to it, so the first start can take several minutes. Up to 0.1.41 the shell gave up
+after 120 seconds with "the host did not announce its address within 120 s" while the Host
+was still loading (in one report it printed its address six seconds later). The shell now
+waits as long as the Host process runs: after two minutes the loading page says *Still
+starting*, with one sentence on why and the Host's last lines; after ten minutes a dialog
+asks whether to keep waiting or quit, and quitting is the only thing that stops a Host that
+is still starting. `desktop.log` carries `host: ready after N min` when a start took longer
+than half a minute. A second start is quicker, since the files have been checked once;
+should every start stay slow, excluding the install folder from real-time scanning helps.
+
 ## macOS permissions
 
 The hands need two things from macOS: *Screen Recording* for the screenshots and
