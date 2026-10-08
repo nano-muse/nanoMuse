@@ -32,6 +32,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - The *News* list of the README and its nine translations is newest first again (1.0.0, then the paper, then the first release); the Chinese READMEs and the docs home pages say the TestFlight link is public once Apple's review passes, and the docs home install tables no longer carry a dash. The release recipe in CONTRIBUTING.md says the latest-version line moves to the top.
 - The release-notes template, `THIRD_PARTY_NOTICES.md` and `SECURITY.md` read without a dash as punctuation; the template's *Community* paragraph says non-profit and no longer calls the version a preview, and its download note no longer says GitHub is the fastest source. The issue forms give `1.0.0 (43)` and `desktop 1.0.0` as version examples.
 - `CONTRIBUTING.md` and `AGENTS.md` read without a dash as punctuation, and the codename list in the release recipe runs to Keel.
+- `scripts/release-docs.py` now edits the *News* lists of the ten READMEs itself: the line that names the latest version is rewritten for the new one and moved to the top, the other milestones keep their order, and `--dry-run` shows the result without writing (a test covers it). The 1.0.0 release notes say GitHub's downloads are quick from China in our measurements instead of the fastest.
 
 ## [1.0.0] - 2026-10-09 · Keel
 
