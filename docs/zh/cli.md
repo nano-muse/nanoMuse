@@ -23,7 +23,7 @@ nanomuse chat [--resume] [--show-thinking] [--auto]
 | `/memory`、`/goals` | 列出记忆 / 目标 |
 | `/audit [n]` | 最近的审计记录 |
 | `/tools` | 智能体此刻能用的工具 |
-| `/tainted` | 本次会话有没有读过私密数据 |
+| `/tainted` | 这段对话有没有读过私密数据 |
 | `/permissions` | 你授予的长期权限（键和有效期） |
 | `/revoke <key>` | 收回一项，例如 `/revoke shell:git` |
 

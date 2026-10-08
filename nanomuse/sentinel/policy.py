@@ -133,7 +133,7 @@ class Policy:
             decision = Decision.ASK
             tainted_ask = True
             reasons.append(
-                f"private data was read earlier in this session and '{tool}' can send data to "
+                f"private data was read earlier in this conversation and '{tool}' can send data to "
                 f"{target}, which is not on sentinel.egress_allowlist"
             )
 

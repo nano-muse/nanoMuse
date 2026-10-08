@@ -19,7 +19,7 @@ agent ◄── redact(result)   ◄── taint bookkeeping ◄─────�
 | `moderate` | 触及外部或改变状态 | `web_fetch`、`python_execute`、`read_emails`、`browser`、`forget`、`phone_act` |
 | `sensitive` | 难以撤销或外部可见 | `shell`、`send_email`、`skills`（保存、删除——技能是模型以后会照着做的长期指令，所以写一个技能总是会问） |
 
-工具可以在 `assess()` 里为某一次调用提高级别：`shell` 遇到 `rm -rf`、`sudo`、`curl | sh` 这类模式会附上一条警告；`python_execute` 对纯计算和工作区内的文件是 `moderate`——前提是沙箱在工作；没有沙箱时（macOS、Windows、没装 bubblewrap 的 Linux 机器）每个脚本都是 `sensitive`，因为静态检查是仅剩的一道墙——而当代码访问网络、启动其他程序、读环境变量、删文件或触及工作区之外的路径时是 `sensitive`，原因写在卡片上；`web_fetch` 直接拒绝私有地址和回环地址，每一跳重定向都查；`phone_act` 在一次点击的 `label`——操作器对手指下面是什么的描述——含有 确认支付、转账、提交订单、发送、删除 或 `[gui] sensitive_words` 里的另一个词时，或者一步同时输入并提交时，是带警告的 `sensitive`；没有 label 的点击自带一条警告（[gui.md](gui.md)）。工具还声明 `reads_private_data`（污染会话）和 `egress`，可选带 `egress_target`（这次调用把数据发往的主机；`shell` 和 `python_execute` 未知；手机上是 App 的 id），供污点追踪使用。
+工具可以在 `assess()` 里为某一次调用提高级别：`shell` 遇到 `rm -rf`、`sudo`、`curl | sh` 这类模式会附上一条警告；`python_execute` 对纯计算和工作区内的文件是 `moderate`——前提是沙箱在工作；没有沙箱时（macOS、Windows、没装 bubblewrap 的 Linux 机器）每个脚本都是 `sensitive`，因为静态检查是仅剩的一道墙——而当代码访问网络、启动其他程序、读环境变量、删文件或触及工作区之外的路径时是 `sensitive`，原因写在卡片上；`web_fetch` 直接拒绝私有地址和回环地址，每一跳重定向都查；`phone_act` 在一次点击的 `label`——操作器对手指下面是什么的描述——含有 确认支付、转账、提交订单、发送、删除 或 `[gui] sensitive_words` 里的另一个词时，或者一步同时输入并提交时，是带警告的 `sensitive`；没有 label 的点击自带一条警告（[gui.md](gui.md)）。工具还声明 `reads_private_data`（污染这段对话）和 `egress`，可选带 `egress_target`（这次调用把数据发往的主机；`shell` 和 `python_execute` 未知；手机上是 App 的 id），供污点追踪使用。
 
 `shell` 和 `python_execute` 启动的子进程拿到的是清洗过的环境：名字像凭据的变量（`*KEY*`、`*TOKEN*`、`*SECRET*`、`*PASSW*`、`*CREDENTIAL*`、`*AUTH*`、`*COOKIE*`、`*SESSION*`）、所有 `NANOMUSE_`、`AWS_`、`AZURE_`、`GOOGLE_`、`GH_`、`GITHUB_`、`NPM_` 开头的，再加 `SSH_AUTH_SOCK`，都在子进程启动前移除，所以模型写的代码读不到模型自己的 API key，也读不到 `os.environ` 里的保险库密钥。这两个工具都不接受 `{{vault:NAME}}` 占位符——带占位符的命令会被拒绝并说明原因，而不是拿字面文本去跑；保险库里的值只送达用它们配置的连接器。编程 CLI（`coding_tool`：Codex、Claude Code、Cursor）拿到同样清洗过的环境，再加上它们各自的账号变量（`OPENAI_*`/`CODEX_*`、`ANTHROPIC_*`/`CLAUDE_*`——当 `CLAUDE_CODE_USE_BEDROCK`/`_VERTEX` 这么要求时还有云凭据——`CURSOR_*`），运行时的其他东西一概没有。
 
@@ -53,7 +53,7 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 1. **`deny_tools`** → 拒绝。
 2. **`[[sentinel.rules]]`**：`tool`（glob，`*` 表示任意）加 `match`，一个参数名 → glob 模式的映射，拿 `str(value)` 来匹配。第一条匹配的规则生效，给出它的 `action`。
 3. **`always_allow_tools` / `always_ask_tools`**。
-4. **污点**：会话已被污染，**而且**这次调用外发到不在 `egress_allowlist` 里的主机（或目的地未知）→ 询问。目的地已知时审批卡片会显示它。
+4. **污点**：这段对话已被污染，**而且**这次调用外发到不在 `egress_allowlist` 里的主机（或目的地未知）→ 询问。目的地已知时审批卡片会显示它。
 5. **风险 × 模式**：
 
 | 模式 | `safe` | `moderate` | `sensitive` |
@@ -64,7 +64,7 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 
 6. **警告**：带警告的调用（`rm -rf`、`sudo`、`curl | sh`、读环境变量或删文件的代码）绝不会被模式或 `always_allow_tools` 放行；它会问。只有一条明确的 `allow` 规则能覆盖这一点。
 
-`auto` 仍然遵守 `deny_tools`、deny 规则和第 6 步。`nanomuse daemon`、`--auto` 和 App 里的「放手」设置用的就是它——后台的目标检查也是，所以无人值守的运行里出现危险命令时，它变成动态里的一张卡片，而不是直接跑掉。`nanomuse daemon` 旁边没有人：仍需要审批的那一步会被拒绝并留下说明，模型继续做它能做的。
+`auto` 仍然遵守 `deny_tools`、deny 规则、第 4 步和第 6 步。污点规则在每种模式下都成立：一段对话读过邮件、日历、联系人或其他私密来源之后，要把数据发往 `egress_allowlist` 之外主机的调用会询问，`auto` 不会把这个问题改成放行。`nanomuse daemon`、`--auto` 和 App 里的「放手」设置用的就是它，后台的目标检查也是，所以无人值守的运行里出现危险命令或读过私密数据后的外发时，它变成动态里的一张卡片，而不是直接跑掉。`nanomuse daemon` 旁边没有人：仍需要审批的那一步会被拒绝并留下说明，模型继续做它能做的。
 
 ## 审批 {#approvals}
 
@@ -87,9 +87,9 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 
 ## 污点追踪 {#taint-tracking}
 
-读取私密数据（`read_emails`、`recall`、`contacts`、工作区之外的文件、标记了 `reads_private_data` 的 MCP 服务器）会把会话标记为已污染。从那以后，任何把数据发往 `egress_allowlist` 之外主机的调用都需要审批，不论它的风险级别。这是对提示注入的实际防线：一个网页没法指使智能体把你的收件箱发到某处，而你事先看不到目的地。
+读取私密数据（`read_emails`、`recall`、`contacts`、工作区之外的文件、标记了 `reads_private_data` 的 MCP 服务器）会把这段对话标记为已污染。从那以后，这段对话里任何把数据发往 `egress_allowlist` 之外主机的调用都需要审批，不论它的风险级别，也不论模式，`auto` 也一样。污点按对话记录：一个读过你邮件的侧边聊天不会让旁边的聊天跟着询问，清空或删除一段对话只会去掉它自己的污点。污点只放在内存里，重启后不保留，也不会跟着通过记忆或工作区文件跨过对话的数据走。这是对提示注入的实际防线：一个网页没法指使智能体把你的收件箱发到某处，而你事先看不到目的地。
 
-`nanomuse chat` 用 `/tainted` 显示状态；`/reset` 随对话一起清掉它。默认白名单覆盖搜索、维基百科、GitHub 和 PyPI；按你自己的连接器改 `egress_allowlist`。你自己在设置里定下的目的地——`[connectors.search]` 下的搜索服务商，不管是哪家——和白名单同等对待：模型没法改它的指向，所以读过私密数据之后的搜索照样通过，和用 DuckDuckGo 时一样。
+`nanomuse chat` 用 `/tainted` 显示状态；`/reset` 随对话一起清掉它，其他对话保持原样。默认白名单覆盖搜索、维基百科、GitHub 和 PyPI；按你自己的连接器改 `egress_allowlist`。你自己在设置里定下的目的地——`[connectors.search]` 下的搜索服务商，不管是哪家——和白名单同等对待：模型没法改它的指向，所以读过私密数据之后的搜索照样通过，和用 DuckDuckGo 时一样。
 
 ## 凭据保险库 {#credential-vault}
 
