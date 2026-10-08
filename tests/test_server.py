@@ -516,6 +516,63 @@ def test_use_cloud_this_time_runs_one_turn_on_the_account(server, settings: Sett
     assert service.threads["main"].agent.llm is llm
 
 
+class _GatedLLM(MockLLM):
+    """A MockLLM whose answer waits for ``gate`` (a threading.Event the test sets), so a
+    turn can be caught in flight; ``closed`` says whether ``close()`` was called."""
+
+    def __init__(self, script: list[Any], gate: threading.Event):
+        super().__init__(script)
+        self.gate = gate
+        self.closed = False
+        self.asking = False
+
+    async def ask(self, messages, tools=None, tool_choice="auto", on_delta=None, max_tokens=None):  # type: ignore[override]  # noqa: ANN001
+        self.asking = True
+        while not self.gate.is_set():
+            await asyncio.sleep(0.01)
+        return await super().ask(messages, tools, tool_choice, on_delta, max_tokens)
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def test_a_model_switch_mid_turn_lets_the_turn_finish_on_its_client(server, monkeypatch):
+    """*Use as model* or a saved key while a turn runs (`_swap_llm`): the turn in flight
+    keeps the client it started on and ends with its reply, not "Cannot send a request, as
+    the client has been closed"; the old client is closed when that run ends, and the next
+    turn is on the new client. Idle threads move at once."""
+    client, service, _ = server
+    gate = threading.Event()
+    old = _GatedLLM([LLMResponse(content="finished on the old client")], gate)
+    service.app.llm = old
+    for t in service.threads.values():
+        t.agent.llm = old
+    new = MockLLM([LLMResponse(content="on the new client")])
+    monkeypatch.setattr(service.app, "make_llm", lambda: new)
+    # a side chat, idle, to see it move at once
+    side = client.post("/api/threads", json={"title": "side"}).json()["id"]
+    client.post("/api/threads/main/send", json={"text": "slow one"})
+    wait_for(lambda: service.threads["main"].busy and old.asking)
+    # the switch, mid-turn
+    r = client.put("/api/connections/llm", json={"model": "another-model"})
+    assert r.status_code == 200
+    assert service.app.llm is new and service.threads[side].agent.llm is new
+    assert service.threads["main"].agent.llm is old and old.closed is False
+    gate.set()
+    wait_idle(service)
+    replies = events_of(client, kind="assistant")
+    assert replies[-1]["text"] == "finished on the old client"
+    assert [e for e in events_of(client, kind="notice") if e.get("level") == "error"] == []
+    # the run ended: the main chat is on the new client and the old one is closed
+    assert service.threads["main"].agent.llm is new
+    wait_for(lambda: old.closed)
+    client.post("/api/threads/main/send", json={"text": "next"})
+    wait_for(
+        lambda: [e for e in events_of(client, kind="assistant") if e["text"] == "on the new client"]
+    )
+    assert len(old.calls) == 1 and len(new.calls) == 1
+
+
 def test_stream_that_was_not_a_reply_is_discarded(server):
     """MockLLM streams the whole content; when the reply is a prompt-mode tool call the
     parser removes, the phone must drop the bubble it was filling."""

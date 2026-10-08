@@ -589,12 +589,20 @@ class Connections:
         return self.view()["llm"]
 
     def _swap_llm(self) -> None:
+        """The model changed: a new client for the app and for every idle thread. A thread in
+        the middle of a turn keeps the client it started on and finishes the turn there (a
+        request in flight on a closed client is a RuntimeError in the person's face); its
+        worker moves it to the new client and closes the old one when the run ends
+        (``MuseService._release_llm``). The old client is closed here only when no turn
+        holds it."""
         old = self.svc.app.llm
         new = self.svc.app.make_llm()
         self.svc.app.llm = new
         for t in self.svc.threads.values():
-            t.agent.llm = new
-        keep_task(asyncio.get_running_loop().create_task(old.close()))
+            if not t.busy:
+                t.agent.llm = new
+        if not any(t.busy and t.agent.llm is old for t in self.svc.threads.values()):
+            keep_task(asyncio.get_running_loop().create_task(old.close()))
         logger.info(
             "model switched to {} @ {}", self.settings.llm.model, self.settings.llm.base_url
         )
