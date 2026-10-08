@@ -24,6 +24,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - `scripts/self-host.sh` and the self-hosting page name the SMS sender the relay actually uses (Alibaba Cloud's 号码认证服务 by default, 短信服务 with a template of your own); the script's sentences no longer carry a dash.
 - `docs/ios.md` says build 16 is the 1.0.0 build on TestFlight; the *New Contributors* and *Contributors* lines a release generates no longer carry a dash.
 - The *News* list of the README and its nine translations is newest first again (1.0.0, then the paper, then the first release); the Chinese READMEs and the docs home pages say the TestFlight link is public once Apple's review passes, and the docs home install tables no longer carry a dash. The release recipe in CONTRIBUTING.md says the latest-version line moves to the top.
+- The release-notes template, `THIRD_PARTY_NOTICES.md` and `SECURITY.md` read without a dash as punctuation; the template's *Community* paragraph says non-profit and no longer calls the version a preview, and its download note no longer says GitHub is the fastest source. The issue forms give `1.0.0 (43)` and `desktop 1.0.0` as version examples.
 
 ## [1.0.0] - 2026-10-09 · Keel
 

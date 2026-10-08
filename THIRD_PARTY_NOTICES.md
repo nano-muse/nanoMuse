@@ -4,7 +4,7 @@ nanoMuse is licensed under the GNU General Public License, version 3 or later ([
 
 ## The phone apps (`android/`: Android and iOS)
 
-### OpenMinis — GPL-3.0
+### OpenMinis (GPL-3.0)
 
 The app is a modified copy of [OpenMinis](https://github.com/OpenMinis/OpenMinis) 1.13 (tag `1.13`, commit `4ef2900`), Copyright (C) the OpenMinis authors, imported with `git subtree` so that its history is in ours. Modifications since 2026-09-24 are recorded in `git log -- android/`, and every edit inside an upstream file carries a `// nanoMuse:` comment. The OpenMinis name and logo are theirs and are not used for this application. Both phone apps come from that subtree: the Android app in `android/src/android`, the iOS app in `android/src/ios`. What follows is OpenMinis's own third-party list for the parts this tree builds; upstream's full inventory with versions is [android/THIRD_PARTY_LICENSES.md](android/THIRD_PARTY_LICENSES.md).
 
@@ -12,7 +12,7 @@ The app is a modified copy of [OpenMinis](https://github.com/OpenMinis/OpenMinis
 
 | Component | Source | License | Notes |
 |---|---|---|---|
-| [proot](https://github.com/nano-muse/proot) | git submodule `android/deps/proot` — our fork of [OpenMinis/proot](https://github.com/OpenMinis/proot), itself a fork of [termux/proot](https://github.com/termux/proot) | **GPL-2.0** | The Linux sandbox. Runs as a separate program (`assets/proot-aarch64`; also shipped as `lib/arm64-v8a/libproot.so` and the two loaders so the installer places them where Android lets them execute). Built by `android/deps/build_proot.sh`. |
+| [proot](https://github.com/nano-muse/proot) | git submodule `android/deps/proot`, our fork of [OpenMinis/proot](https://github.com/OpenMinis/proot), itself a fork of [termux/proot](https://github.com/termux/proot) | **GPL-2.0** | The Linux sandbox. Runs as a separate program (`assets/proot-aarch64`; also shipped as `lib/arm64-v8a/libproot.so` and the two loaders so the installer places them where Android lets them execute). Built by `android/deps/build_proot.sh`. |
 | [talloc](https://talloc.samba.org) (Samba) | vendored at `android/deps/talloc` | **LGPL-3.0-or-later** | Memory allocator proot is statically linked against |
 | [cppjieba](https://github.com/yanyiwu/cppjieba) | vendored in `jieba_jni` | **MIT** | Chinese word segmentation (header-only + dictionaries) |
 | [rclone](https://github.com/rclone/rclone) | `android/deps/rclone-mobile`, built into `rclone.aar` by `android/deps/build_rclone_android.sh` with [gomobile](https://pkg.go.dev/golang.org/x/mobile) (BSD-3-Clause) | **MIT** | Remote destinations for backup (SMB / WebDAV / SFTP / S3 / FTP) |
@@ -27,7 +27,7 @@ The app is a modified copy of [OpenMinis](https://github.com/OpenMinis/OpenMinis
 | kotlinx-serialization-json | 1.7.3 | **Apache-2.0** |
 | kotlinx-coroutines-android | 1.9.0 | **Apache-2.0** |
 | Coil (coil-compose) | 2.7.0 | **Apache-2.0** |
-| multiplatform-markdown-renderer (+ m3) — mikepenz | 0.33.0 | **Apache-2.0** |
+| multiplatform-markdown-renderer (+ m3), mikepenz | 0.33.0 | **Apache-2.0** |
 | Reorderable (sh.calvin.reorderable) | 2.4.0 | **Apache-2.0** |
 | ACRA (acra-core) | 5.12.0 | **Apache-2.0** |
 | Shizuku API + provider (dev.rikka.shizuku) | 13.1.5 | **MIT** |
@@ -54,7 +54,7 @@ Test-only: JUnit 4.13.2 (**EPL-1.0**), MockWebServer 4.12.0 (**Apache-2.0**), ko
 | [cppjieba](https://github.com/yanyiwu/cppjieba) and its dictionaries | `android/src/ios/Vendor/cppjieba`, `Resources/jieba.dict.utf8`, `Resources/hmm_model.utf8` | **MIT** | Chinese word segmentation |
 | `cl100k_base` vocabulary (OpenAI [tiktoken](https://github.com/openai/tiktoken)) | `android/src/ios/Shared/cl100k_base.tiktoken`, read by `BPETokenizer.swift` | **MIT** | Token counting |
 | models.dev registry snapshot | `android/src/ios/Resources/models-dev-api.json` | **MIT** ([models.dev](https://models.dev)) | |
-| Swift packages — SwiftAnthropic (**MIT**), swift-cmark (**BSD-2-Clause**), SwiftMath (**MIT**), RealTimeCutVADLibrary (**MIT**) and the Apache-2.0 Swift Server packages they pull in | `Minis.xcodeproj`, pinned in `Package.resolved` | as listed | Versions in upstream's inventory |
+| Swift packages: SwiftAnthropic (**MIT**), swift-cmark (**BSD-2-Clause**), SwiftMath (**MIT**), RealTimeCutVADLibrary (**MIT**) and the Apache-2.0 Swift Server packages they pull in | `Minis.xcodeproj`, pinned in `Package.resolved` | as listed | Versions in upstream's inventory |
 
 ### The nanoMuse mark
 
@@ -64,7 +64,7 @@ The name nanoMuse and the mark in `assets/brand/` are the project's own. Use the
 
 Our own code, GPL-3.0-or-later like the rest. Third-party code inside it keeps its own licence and notice; the ports named below say where they come from.
 
-### MemGUI-Bench — MIT
+### MemGUI-Bench (MIT)
 
 The phone operator (`nanomuse/phone/operator.py`) is a port of the `mobile_use` operator in [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench) (`src/mobile_world/agents/implementations/qwen3vl.py` and its prompt): the tool schema, the system prompt's wording, the `Thought` / `Action` / `<tool_call>` reply shape, the 999-grid coordinates and the step history. Rewritten in nanoMuse's own structure, with rules added (passwords, payments, `ask_user`), Sentinel labels and traces.
 
@@ -92,36 +92,36 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### MobileGym — Apache-2.0 (code), CC BY-NC 4.0 (data)
+### MobileGym (Apache-2.0 code, CC BY-NC 4.0 data)
 
-[MobileGym](https://github.com/Purewhiter/mobilegym) is the simulated Android phone the showcase runs on. `demo/mobilegym/apps/nanoMuse/` is an app module written for it; `demo/mobilegym/install.sh` copies the module into a MobileGym checkout and the showcase image (`demo/showcase/caddy/Dockerfile`) builds MobileGym with it. MobileGym's code is Apache-2.0; its default app data (`mobilegym-data`: synthetic and sanitised content, icons) is [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), **non-commercial use only** — the hosted showcase serves it as a free demonstration and nothing else. The finger overlay in `gui.ts` follows MobileGym's own touch-feedback timing.
+[MobileGym](https://github.com/Purewhiter/mobilegym) is the simulated Android phone the showcase runs on. `demo/mobilegym/apps/nanoMuse/` is an app module written for it; `demo/mobilegym/install.sh` copies the module into a MobileGym checkout and the showcase image (`demo/showcase/caddy/Dockerfile`) builds MobileGym with it. MobileGym's code is Apache-2.0; its default app data (`mobilegym-data`: synthetic and sanitised content, icons) is [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), **non-commercial use only**; the hosted showcase serves it as a free demonstration and nothing else. The finger overlay in `gui.ts` follows MobileGym's own touch-feedback timing.
 
-### modern-screenshot — MIT
+### modern-screenshot (MIT)
 
 The showcase's in-page screenshots use [modern-screenshot](https://github.com/qq15725/modern-screenshot) (Copyright (c) 2021-present wxm), pulled in at build time by `install.sh`.
 
-### Caddy modules — Apache-2.0
+### Caddy modules (Apache-2.0)
 
 The showcase's Caddy is built with [caddy-dns/cloudflare](https://github.com/caddy-dns/cloudflare) (DNS-01 certificates) and [WeidiDeng/caddy-cloudflare-ip](https://github.com/WeidiDeng/caddy-cloudflare-ip) (trusted proxy ranges), both Apache-2.0, like [Caddy](https://github.com/caddyserver/caddy) itself.
 
-### Figtree — SIL Open Font License 1.1
+### Figtree (SIL Open Font License 1.1)
 
 The web app's typeface, [Figtree](https://github.com/erikdkennedy/figtree) by Erik Kennedy, ships in `web/public/fonts/` under the OFL (`web/public/fonts/OFL.txt`).
 
-### nanobot — MIT
+### nanobot (MIT)
 
 The Feishu channel's WebSocket runner (`nanomuse/channels/feishu.py`, class `_Runner`) follows the shape of `FeishuWsRunner` in [nanobot](https://github.com/HKUDS/nanobot) (Copyright (c) 2025 HKUDS): the SDK's client on a thread with its own event loop, swapping the module-level loop and calling its private `_connect` / `_disconnect` / `_ping_loop`. Rewritten for nanoMuse's channel base; the arrangement is theirs.
 
-### UI-TARS-desktop — Apache-2.0
+### UI-TARS-desktop (Apache-2.0)
 
 The desktop app's hands on the computer are ported from [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (Copyright (c) 2025 Bytedance, Inc. and its affiliates), Apache-2.0:
 
-- `harness/desktop/src/operator.ts` — the operator (`NutJSOperator` in `packages/ui-tars/operators/nut-js/src/index.ts`, `NutJSElectronOperator` in `apps/ui-tars/src/main/agent/operator.ts`, `getScreenSize` in `apps/ui-tars/src/main/utils/screen.ts`): the screenshot through Electron's `desktopCapturer` at the display's size with the libnut fallback, the action switch (move straight to the point, a 100 ms rest, then the click; drag; scroll; type through the clipboard; the hotkey table with `ctrl` as ⌘ on a Mac), the screen size as logical size × scale factor (1 on macOS), the mouse speed.
-- `harness/desktop/resources/glow.html` — the prediction marker (`apps/ui-tars/src/main/shared/setOfMarks.ts`, `apps/ui-tars/src/main/window/ScreenMarker.ts`): the turning dashed ring with a dot at the point and the action's name beside it; the edge flow was already after their "screen water flow".
-- `nanomuse/computer/coords.py` — `smart_resize` and the picture-size rules (`smartResizeForV15` in `packages/ui-tars/action-parser/src/actionParser.ts`, `parseBoxToScreenCoords` in `packages/ui-tars/sdk/src/utils.ts`: factor 28, the pixel bounds, the 1000-grid conversion).
-- `harness/desktop/src/mac-permissions.ts` — the macOS permission arrangement (`apps/ui-tars/src/main/utils/systemPermissions.ts`): the two native modules below, `getAuthStatus` for Screen Recording and Accessibility, the system's own prompts at launch and the Screen Recording pane opened when it is missing; and the Chromium `disable-features` switch for ScreenCaptureKit thumbnails (electron/electron#44504) in `main.ts`.
+- `harness/desktop/src/operator.ts`: the operator (`NutJSOperator` in `packages/ui-tars/operators/nut-js/src/index.ts`, `NutJSElectronOperator` in `apps/ui-tars/src/main/agent/operator.ts`, `getScreenSize` in `apps/ui-tars/src/main/utils/screen.ts`): the screenshot through Electron's `desktopCapturer` at the display's size with the libnut fallback, the action switch (move straight to the point, a 100 ms rest, then the click; drag; scroll; type through the clipboard; the hotkey table with `ctrl` as ⌘ on a Mac), the screen size as logical size × scale factor (1 on macOS), the mouse speed.
+- `harness/desktop/resources/glow.html`: the prediction marker (`apps/ui-tars/src/main/shared/setOfMarks.ts`, `apps/ui-tars/src/main/window/ScreenMarker.ts`): the turning dashed ring with a dot at the point and the action's name beside it; the edge flow was already after their "screen water flow".
+- `nanomuse/computer/coords.py`: `smart_resize` and the picture-size rules (`smartResizeForV15` in `packages/ui-tars/action-parser/src/actionParser.ts`, `parseBoxToScreenCoords` in `packages/ui-tars/sdk/src/utils.ts`: factor 28, the pixel bounds, the 1000-grid conversion).
+- `harness/desktop/src/mac-permissions.ts`: the macOS permission arrangement (`apps/ui-tars/src/main/utils/systemPermissions.ts`): the two native modules below, `getAuthStatus` for Screen Recording and Accessibility, the system's own prompts at launch and the Screen Recording pane opened when it is missing; and the Chromium `disable-features` switch for ScreenCaptureKit thumbnails (electron/electron#44504) in `main.ts`.
 
-Each file carries the attribution line; rewritten in nanoMuse's structure (the operator answers the runtime over loopback HTTP rather than running the model loop itself). The dependency `@computer-use/nut-js` (`harness/desktop/package.json`) is their fork of nut.js, Apache-2.0, with libnut's prebuilt addon per platform. Two more of their packages are optional dependencies of the desktop app, macOS only, both **MIT**: `@computer-use/node-mac-permissions` 2.2.2 (nut-tree's fork of Shelley Vohr's [node-mac-permissions](https://github.com/codebytere/node-mac-permissions); a prebuilt universal `permissions.node` — TCC status and the system prompts) and `@computer-use/mac-screen-capture-permissions` 1.0.2 (a fork of George Karagkiaouris's [mac-screen-capture-permissions](https://github.com/karaggeorge/mac-screen-capture-permissions); `CGPreflightScreenCaptureAccess` through a small N-API addon built at install time on a Mac, with `electron-util`, `execa` and `macos-version`, all MIT, beneath it).
+Each file carries the attribution line; rewritten in nanoMuse's structure (the operator answers the runtime over loopback HTTP rather than running the model loop itself). The dependency `@computer-use/nut-js` (`harness/desktop/package.json`) is their fork of nut.js, Apache-2.0, with libnut's prebuilt addon per platform. Two more of their packages are optional dependencies of the desktop app, macOS only, both **MIT**: `@computer-use/node-mac-permissions` 2.2.2 (nut-tree's fork of Shelley Vohr's [node-mac-permissions](https://github.com/codebytere/node-mac-permissions); a prebuilt universal `permissions.node` for TCC status and the system prompts) and `@computer-use/mac-screen-capture-permissions` 1.0.2 (a fork of George Karagkiaouris's [mac-screen-capture-permissions](https://github.com/karaggeorge/mac-screen-capture-permissions); `CGPreflightScreenCaptureAccess` through a small N-API addon built at install time on a Mac, with `electron-util`, `execa` and `macos-version`, all MIT, beneath it).
 
 ### Python and JavaScript dependencies
 
@@ -133,8 +133,8 @@ Installed from PyPI and npm, not vendored; each carries its own license: openai,
 
 ## Learned from, no code taken
 
-- **Meta Muse** — the product shape: one agent with a name and a face, a feed, goals, "asks before anything you could not undo". nanoMuse is an independent project, not affiliated with or endorsed by Meta Platforms, Inc.; nothing of the Muse app was decompiled or copied.
-- **[PhoneHarness](https://github.com/PhoneHarness/PhoneHarness)** — deterministic-first routing (a tool that does the thing exactly beats the GUI) and a JSONL trace per run rendered to HTML. Ideas only: the repository carries no license.
-- **[CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse)** (MIT) — product designs we follow rather than code: durable tasks with a take-control hand-off, watches, ideas with evidence, a follow-up queue, "content is evidence, not permission", background-update preferences.
-- **[Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM)** (Apache-2.0) and **[ClawGUI](https://github.com/ZJU-REAL/ClawGUI)** (Apache-2.0) — reference points for operating a phone through its screen (package tables, Shizuku, a built-in IME, a floating bar). When code from either lands, it will be listed above.
-- **[browser-use](https://github.com/browser-use/browser-use)** (MIT) — the element-annotation idea behind the browser tool.
+- **Meta Muse**: the product shape, one agent with a name and a look of its own, a feed, goals, "asks before anything you could not undo". nanoMuse is an independent project, not affiliated with or endorsed by Meta Platforms, Inc.; nothing of the Muse app was decompiled or copied.
+- **[PhoneHarness](https://github.com/PhoneHarness/PhoneHarness)**: deterministic-first routing (a tool that does the thing exactly beats the GUI) and a JSONL trace per run rendered to HTML. Ideas only: the repository carries no license.
+- **[CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse)** (MIT): product designs we follow rather than code: durable tasks with a take-control hand-off, watches, ideas with evidence, a follow-up queue, "content is evidence, not permission", background-update preferences.
+- **[Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM)** (Apache-2.0) and **[ClawGUI](https://github.com/ZJU-REAL/ClawGUI)** (Apache-2.0): reference points for operating a phone through its screen (package tables, Shizuku, a built-in IME, a floating bar). When code from either lands, it will be listed above.
+- **[browser-use](https://github.com/browser-use/browser-use)** (MIT): the element-annotation idea behind the browser tool.

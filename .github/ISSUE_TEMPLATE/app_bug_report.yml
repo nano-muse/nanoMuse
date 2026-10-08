@@ -30,7 +30,7 @@ body:
     id: version
     attributes:
       label: nanoMuse version
-      description: Settings → About, e.g. 0.1.1 (2)
+      description: Settings → About, e.g. 1.0.0 (43)
     validations:
       required: true
   - type: input
