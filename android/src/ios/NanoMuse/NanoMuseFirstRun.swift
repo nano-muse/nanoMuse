@@ -140,6 +140,11 @@ struct NanoMuseFirstRunView: View {
         }
         .background(NanoMuseTones.surface.ignoresSafeArea())
         .sheet(isPresented: $showSignIn) { NavigationStack { NanoMuseCloudView() } }
+        // Signed in: the sheet has done its job and goes, so the next page (the password, the
+        // source) is in view at once instead of behind the account page.
+        .nmOnChange(of: signedIn) { now in
+            if now, showSignIn { showSignIn = false }
+        }
         .sheet(isPresented: $showOwnKey) { NanoMuseOwnKeySheet { _ in } }
         .sheet(isPresented: $showGroups) { NavigationStack { ModelGroupsView() } }
         .onReceive(NotificationCenter.default.publisher(for: .soulMdChanged)) { _ in
