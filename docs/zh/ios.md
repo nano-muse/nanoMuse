@@ -385,6 +385,12 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   填入一份目录里的模型列表，表单像 key 正确一样关闭。订阅的 429 带的 `Retry-After` 现在会传到
   可达性卡片，ChatGPT 或 Claude 订阅也能看到*……后重置*。动态详情的几行是一个 `Grid`，标签列
   按最长的标签取宽；形象大小改成菜单，不再是五段分段控件。
+- **第三轮审计：版本行（1.0.x）**（`NanoMuseUpdateCheck.swift`、
+  `MinisTests/NanoMuseLogicTests.swift`）：`nanomuse.cn/dl/index.json` 的形状是
+  `{"releases": [{"tag": "v1.0.0", …}, …]}`，最新的在前，版本行现在就读这个，和 Android 的
+  `UpdateCheck.parseIndex` 一样；之前它找的 `ios.version`、`latest` 从来没有写进过索引，所以
+  连不上 GitHub 的手机上这一行永远是*没查到*。从索引查到的版本点开去 `nanomuse.cn/dl/`，从
+  GitHub 查到的去它的发布页。`parseIndex` 和 `parseGitHubLatest` 是纯函数，有测试。
 
 ## 在 Mac 上构建 {#building-on-a-mac}
 
