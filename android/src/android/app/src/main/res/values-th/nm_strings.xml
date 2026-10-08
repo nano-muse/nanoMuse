@@ -616,7 +616,7 @@
     <string name="nm_welcome_feat_hands">มือ: มันใช้โทรศัพท์ของคุณ</string>
     <string name="nm_welcome_feat_hands_sub">จองรถไฟ สั่งอาหาร ค้นหาบางอย่างในแอป คุณดูอยู่ และหยุดได้ทุกเมื่อ</string>
     <string name="nm_welcome_feat_reach">สั่งงานคอมพิวเตอร์ของคุณจากที่นี่</string>
-    <string name="nm_welcome_feat_reach_sub">จับคู่เครื่อง Mac, Windows หรือ Linux แล้วมอบงานให้จากโทรศัพท์</string>
+    <string name="nm_welcome_feat_reach_sub">ติดตั้ง nanoMuse Desktop บนเครื่อง Mac, Windows หรือ Linux ลงชื่อเข้าใช้ด้วยบัญชีเดียวกัน แล้วมอบงานให้จากโทรศัพท์</string>
     <string name="nm_welcome_notice">nanoMuse เป็นโครงการชุมชนโอเพนซอร์สที่ไม่แสวงหากำไร ฟรีตลอดไป โมเดลมาพร้อมโควตาฟรีที่ผู้พัฒนาออกค่าใช้จ่ายให้ หลังจากนั้นใช้คีย์ของคุณเอง ไม่มีการขายอะไร สิ่งที่รีเลย์เก็บไว้ระบุในนโยบายความเป็นส่วนตัว และ การตั้งค่า → การควบคุมข้อมูล เป็นของคุณ</string>
     <string name="nm_welcome_hands_title">ให้มันใช้โทรศัพท์ของคุณ</string>
     <string name="nm_welcome_hands_sub">ด้วยสิทธิ์สองอย่าง มันจะเปิดแอป แตะ และพิมพ์แทนคุณได้ แคปซูลที่แสดงแต่ละขั้นตอนพร้อมปุ่มหยุดจะอยู่บนหน้าจอ การล็อกอิน รหัสผ่าน และรหัสยืนยันเป็นของคุณเสมอ</string>

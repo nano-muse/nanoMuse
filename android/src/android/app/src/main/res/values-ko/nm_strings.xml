@@ -616,7 +616,7 @@
     <string name="nm_welcome_feat_hands">손: 휴대전화를 직접 씁니다</string>
     <string name="nm_welcome_feat_hands_sub">기차표를 예매하고, 식사를 주문하고, 앱에서 무언가를 찾아봅니다. 지켜보다가 언제든 멈출 수 있습니다</string>
     <string name="nm_welcome_feat_reach">원격: 내 컴퓨터를 여기서</string>
-    <string name="nm_welcome_feat_reach_sub">Mac, Windows, Linux 컴퓨터를 연결하고 휴대전화에서 일을 맡기세요</string>
+    <string name="nm_welcome_feat_reach_sub">Mac, Windows, Linux 컴퓨터에 nanoMuse Desktop을 설치하고 같은 계정으로 로그인하면 휴대전화에서 일을 맡길 수 있습니다</string>
     <string name="nm_welcome_notice">nanoMuse는 비영리 오픈 소스 커뮤니티 프로젝트입니다: 영원히 무료. 모델에는 개발자가 부담하는 무료 사용량이 딸려 있고, 그다음은 내 키입니다. 아무것도 팔지 않습니다. 릴레이가 보관하는 것은 개인정보 처리방침에 있고, 설정 → 데이터 관리는 내 것입니다.</string>
     <string name="nm_welcome_hands_title">휴대전화를 쓰게 허용</string>
     <string name="nm_welcome_hands_sub">권한 두 개만 있으면 앱을 열고, 탭하고, 대신 입력할 수 있습니다. 각 단계와 중지 버튼이 있는 캡슐이 화면에 머뭅니다. 로그인, 비밀번호, 인증 코드는 항상 직접 합니다.</string>

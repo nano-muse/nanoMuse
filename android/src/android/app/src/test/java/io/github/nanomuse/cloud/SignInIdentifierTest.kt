@@ -41,4 +41,29 @@ class SignInIdentifierTest {
         assertFalse(SignInIdentifier.phoneOutsideMainland("someone@example.org"))
         assertFalse(SignInIdentifier.phoneOutsideMainland(""))
     }
+
+    @Test fun `a mainland number on its way to eleven digits is not called abroad`() {
+        // seven to ten digits that can still become 1xx xxxx xxxx: no sentence yet
+        assertFalse(SignInIdentifier.phoneOutsideMainland("1380000"))
+        assertFalse(SignInIdentifier.phoneOutsideMainland("138 0000 000"))
+        assertFalse(SignInIdentifier.phoneOutsideMainland("+86 138 0000 000"))
+        assertFalse(SignInIdentifier.phoneOutsideMainland("0086 138 0000 00"))
+        assertFalse(SignInIdentifier.phoneOutsideMainland("86 138 0000 000"))
+        // a verdict once it cannot be one any more
+        assertTrue(SignInIdentifier.phoneOutsideMainland("23800000")) // a mainland mobile starts with 1
+        assertTrue(SignInIdentifier.phoneOutsideMainland("138000000000")) // twelve digits
+        assertTrue(SignInIdentifier.phoneOutsideMainland("+86 238 0000 000"))
+        assertTrue(SignInIdentifier.phoneOutsideMainland("+1 415 555")) // another country code, seven digits
+    }
+
+    @Test fun `what could still become a mainland number`() {
+        assertTrue(SignInIdentifier.couldBecomeMainland("1"))
+        assertTrue(SignInIdentifier.couldBecomeMainland("1380000000"))
+        assertTrue(SignInIdentifier.couldBecomeMainland("+861380000"))
+        assertTrue(SignInIdentifier.couldBecomeMainland("861380000"))
+        assertFalse(SignInIdentifier.couldBecomeMainland("13800000000")) // complete: a verdict of its own
+        assertFalse(SignInIdentifier.couldBecomeMainland("+1415"))
+        assertFalse(SignInIdentifier.couldBecomeMainland("2380"))
+        assertFalse(SignInIdentifier.couldBecomeMainland(""))
+    }
 }

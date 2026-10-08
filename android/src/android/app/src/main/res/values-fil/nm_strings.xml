@@ -619,7 +619,7 @@
     <string name="nm_welcome_feat_hands">Mga kamay: ginagamit nito ang telepono mo</string>
     <string name="nm_welcome_feat_hands_sub">Nagbu-book ng tren, umoorder ng pagkain, naghahanap ng isang bagay sa isang app; nanonood ka, at maaari mo itong itigil anumang oras</string>
     <string name="nm_welcome_feat_reach">Abot: ang mga computer mo, mula rito</string>
-    <string name="nm_welcome_feat_reach_sub">Ipares ang isang Mac, Windows o Linux machine at bigyan ito ng trabaho mula sa telepono</string>
+    <string name="nm_welcome_feat_reach_sub">I-install ang nanoMuse Desktop sa isang Mac, Windows o Linux machine, mag-sign in gamit ang parehong account, at bigyan ito ng trabaho mula sa telepono</string>
     <string name="nm_welcome_notice">Ang nanoMuse ay isang non-profit na open-source na proyekto ng komunidad: libre, habang-buhay. May kasamang libreng allowance ang modelo na binabayaran ng developer; pagkatapos niyon, ang sarili mong key. Walang ibinebenta; nasa patakaran sa privacy kung ano ang itinatago ng relay, at sa iyo ang Mga setting → Mga kontrol sa data.</string>
     <string name="nm_welcome_hands_title">Hayaan itong gamitin ang telepono mo</string>
     <string name="nm_welcome_hands_sub">Sa dalawang pahintulot, kaya nitong magbukas ng mga app, mag-tap at mag-type para sa iyo. Nananatili sa screen ang isang capsule na may bawat hakbang at isang button na Itigil; laging sa iyo ang mga login, password at code.</string>

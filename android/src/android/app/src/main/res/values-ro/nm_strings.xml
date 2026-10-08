@@ -622,7 +622,7 @@
     <string name="nm_welcome_feat_hands">Mâini: îți folosește telefonul</string>
     <string name="nm_welcome_feat_hands_sub">Rezervă trenul, comandă masa, caută ceva într-o aplicație; tu privești și îl poți opri oricând</string>
     <string name="nm_welcome_feat_reach">Acces: computerele tale, de aici</string>
-    <string name="nm_welcome_feat_reach_sub">Împerechează un Mac, un Windows sau un Linux și dă-i de lucru de pe telefon</string>
+    <string name="nm_welcome_feat_reach_sub">Instalează nanoMuse Desktop pe un Mac, un Windows sau un Linux, conectează-te cu același cont și dă-i de lucru de pe telefon</string>
     <string name="nm_welcome_notice">nanoMuse este un proiect comunitar open source, nonprofit: gratuit, pentru totdeauna. Modelul vine cu un credit gratuit plătit de dezvoltator; după aceea, propria ta cheie. Nimic nu se vinde; ce păstrează relay-ul e în politica de confidențialitate, iar Setări → Controlul datelor e al tău.</string>
     <string name="nm_welcome_hands_title">Lasă-l să-ți folosească telefonul</string>
     <string name="nm_welcome_hands_sub">Cu două permisiuni poate deschide aplicații, atinge și tasta pentru tine. O capsulă cu fiecare pas și un buton Stop rămâne pe ecran; autentificările, parolele și codurile sunt întotdeauna ale tale.</string>
