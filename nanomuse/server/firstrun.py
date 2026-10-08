@@ -108,7 +108,7 @@ def intro_lines(lang: str) -> list[str]:
             "- 我就在这台电脑上工作，能跑命令、打开网页、填表单。\n"
             "- 你指给我的文件和文件夹，我能读、能整理；提醒和定时任务也可以交给我。\n"
             "- 关键的一步之前，我会先问你。\n"
-            "- 一切都在这台电脑上跑，对话只发给你自己配置的模型。",
+            "- 一切都在这台电脑上跑。对话发给你自己配置的模型；登录 nanoMuse Cloud 后，这段对话也会同步到你的其他设备，可以在「数据控制」里关掉。",
             "开始之前，我该怎么称呼你？",
         ]
     return [
@@ -119,7 +119,9 @@ def intro_lines(lang: str) -> list[str]:
         "- I can read and organise the files and folders you point me to, and take care of "
         "reminders and scheduled tasks.\n"
         "- Before any step that matters, I ask you first.\n"
-        "- Everything runs on this computer; your messages go only to the model you configured.",
+        "- Everything runs on this computer. Your messages go to the model you configured; "
+        "signed in to nanoMuse Cloud, this conversation also follows you to your other devices; "
+        "Data controls switches that off.",
         "Before we start, what should I call you?",
     ]
 

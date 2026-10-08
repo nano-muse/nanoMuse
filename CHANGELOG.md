@@ -8,6 +8,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **A task another device asked for and then stopped now fails with `cancelled`**, as the hub protocol says, instead of being answered `ok` with the conversation's previous reply; the stop button on this computer ends it the same way. Only the device that asked can stop its task: another device's `stop` gets `{stopped: false}` and the run goes on.
+- **The first feed day is written in the language of your screens.** With the reply language on *Auto*, a batch follows the language the main chat last heard from a client, or the language *Start* was pressed in; the first batch used to come out in English after a first conversation held in Chinese, since it is written the moment the setup ends, before the model has read a word from you.
+- **A failed model test says what went wrong in plain words.** *Test* under Connections showed the provider's raw error (`AuthenticationError: Error code: 401 ...`); it now shows the sentence a chat turn would show for the same error (the key was refused, the host could not be reached, the model is unknown), translated, with the provider's words one tap away under *Details*.
+- The first conversation's opening says where your messages go the way the phones do: to the model you configured, and, signed in to nanoMuse Cloud, the conversation also follows you to your other devices; Data controls switches that off. It used to say they go only to the model.
+- `docs/sentinel.md` describes the decision order the code has: the taint check and the warnings run after a decision is made and can only turn an allow into an ask, a rule's or an always-allow's included. `docs/hub.md` says what the runtime does after `4001`/`4002` (one try a minute, the hub shown as refused); `docs/web.md` names the first conversation's three lines and the block's keys as they are.
+
 ### Web
 
 ### Desktop

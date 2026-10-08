@@ -334,6 +334,31 @@ def test_feed_posts_written_for_the_user(server):
     ]
 
 
+def test_feed_is_written_in_the_language_of_the_persons_screens(server):
+    """With the reply language on `auto`, a batch follows the language the main chat last
+    heard from a client; before any message, the language Start was pressed in; a language
+    set under Settings wins over both. The first batch is written the moment the setup ends,
+    when the person has not said a word yet, so the context alone cannot carry it."""
+    client, service, llm = server
+    client.put("/api/feed/instructions", json={"instructions": "Short."})
+    assert "the same language as the context" in service.feed_language()
+
+    client.post("/api/firstrun/start", json={"lang": "zh"})
+    assert service.feed_language() == "Chinese (Simplified)"
+    llm.script.append(LLMResponse(content='[{"title": "第一天", "body": "一个小计划。"}]'))
+    client.post("/api/feed/posts/refresh")
+    assert (
+        "Write in the user's language (Chinese (Simplified))"
+        in llm.calls[-1]["messages"][-1].content
+    )
+
+    service.threads["main"].agent.ui_language = "en-US"
+    assert service.feed_language() == "English"
+
+    client.put("/api/settings", json={"language": "French"})
+    assert service.feed_language() == "French"
+
+
 def test_ask_user_question_is_answered_by_next_message(server):
     client, _, llm = server
     llm.script.extend(
@@ -981,6 +1006,23 @@ def test_connections_model_key_goes_to_the_vault(server, settings: Settings):
     service.app.llm.script.append(LLMResponse(content="OK"))
     result = client.post("/api/connections/llm/test").json()
     assert result["ok"] is True and result["reply"] == "OK"
+    # a failed test says what a chat turn would say for that error, the provider's own
+    # words one tap away; not "AuthenticationError: Error code: 401 - {...}" in the person's face
+    import httpx
+    import openai
+
+    def refused(_: object) -> LLMResponse:
+        raise openai.AuthenticationError(
+            "Incorrect API key provided",
+            response=httpx.Response(401, request=httpx.Request("POST", "https://x/v1")),
+            body=None,
+        )
+
+    service.app.llm.script.append(refused)
+    result = client.post("/api/connections/llm/test").json()
+    assert result["ok"] is False and result["code"] == "key"
+    assert result["error"] == "The model provider refused the API key. Check it under Connections."
+    assert result["detail"].startswith("AuthenticationError: ")
 
     r = client.put(
         "/api/connections/llm",
