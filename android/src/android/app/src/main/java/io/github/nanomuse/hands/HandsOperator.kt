@@ -143,6 +143,9 @@ class HandsOperator(private val context: Context) {
             var formatErrors = 0
             var blackScreens = 0
             var modelErrors = 0
+            // the same action on an unchanged screen: a note at the third, a stop at the sixth
+            val watch = HandsLoopWatch()
+            var loopNote: String? = null
 
             // The app the caller named comes first, before the model looks.
             opts.appHint?.takeIf { it.isNotBlank() }?.let { hint ->
@@ -213,6 +216,21 @@ class HandsOperator(private val context: Context) {
                 val action = parsed.action
                 capsule.working(steps, parsed.thought.ifBlank { action.describe() }.take(140))
                 log += "step $steps: ${action.describe()}" + (parsed.thought.takeIf { it.isNotBlank() }?.let { " — ${it.take(100)}" } ?: "")
+
+                // ── the same thing again on the same screen? ──
+                when (watch.step(jpeg.print, action)) {
+                    HandsLoopWatch.Verdict.STOP -> {
+                        val why = HandsLoopWatch.stopReason(action)
+                        log += "step $steps: $why"
+                        trace(traceDir, steps, parsed.thought, reply, why, lastScreen)
+                        return finish(Outcome.Infeasible(why), steps, runId, lastScreen, traceDir, log, model.label)
+                    }
+                    HandsLoopWatch.Verdict.NOTE -> {
+                        log += "step $steps: the same action on an unchanged screen, ${watch.streak} times running"
+                        loopNote = HandsLoopWatch.NOTE
+                    }
+                    HandsLoopWatch.Verdict.FINE -> loopNote = null
+                }
 
                 // ── act ──
                 when (action) {
@@ -338,6 +356,7 @@ class HandsOperator(private val context: Context) {
                         lastResult = "waited ${action.seconds}s."
                     }
                 }
+                loopNote?.let { note -> lastResult = listOfNotNull(lastResult, note).joinToString(" ") }
                 trace(traceDir, steps, parsed.thought, reply, lastResult ?: "", lastScreen)
             }
             return finish(Outcome.Infeasible("the step limit (${opts.maxSteps}) was reached before the task was done"), steps, runId, lastScreen, traceDir, log, model.label)
@@ -523,23 +542,24 @@ class HandsOperator(private val context: Context) {
         }
     }
 
-    private class Jpeg(val bytes: ByteArray, val black: Boolean)
+    /** [print]: the grey level of each sampled cell, the fingerprint [HandsLoopWatch] compares. */
+    private class Jpeg(val bytes: ByteArray, val black: Boolean, val print: IntArray)
 
     /** Down to [SHOT_WIDTH] px wide (the grid is relative, so nothing is lost for tapping) and JPEG. */
     private fun encode(shot: Bitmap): Jpeg {
         val scale = SHOT_WIDTH.toFloat() / shot.width
         val scaled = if (scale < 1f) Bitmap.createScaledBitmap(shot, SHOT_WIDTH, (shot.height * scale).toInt().coerceAtLeast(1), true) else shot
-        val black = looksBlack(scaled)
+        val print = sample(scaled)
+        val black = looksBlack(print)
         val out = ByteArrayOutputStream()
         scaled.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
         if (scaled !== shot) scaled.recycle()
-        return Jpeg(out.toByteArray(), black)
+        return Jpeg(out.toByteArray(), black, print)
     }
 
-    /** A FLAG_SECURE page comes back as a black frame; sample a grid of pixels. */
-    private fun looksBlack(b: Bitmap): Boolean {
-        var dark = 0
-        var n = 0
+    /** A grid of 12 × 20 pixels, each as a grey level 0–255: enough to tell a black frame and an unchanged screen. */
+    private fun sample(b: Bitmap): IntArray {
+        val out = ArrayList<Int>(240)
         val stepX = (b.width / 12).coerceAtLeast(1)
         val stepY = (b.height / 20).coerceAtLeast(1)
         var y = stepY / 2
@@ -547,13 +567,19 @@ class HandsOperator(private val context: Context) {
             var x = stepX / 2
             while (x < b.width) {
                 val c = b.getPixel(x, y)
-                if (Color.red(c) < 12 && Color.green(c) < 12 && Color.blue(c) < 12) dark++
-                n++
+                out += (Color.red(c) * 299 + Color.green(c) * 587 + Color.blue(c) * 114) / 1000
                 x += stepX
             }
             y += stepY
         }
-        return n > 0 && dark * 100 / n >= 98
+        return out.toIntArray()
+    }
+
+    /** A FLAG_SECURE page comes back as a black frame: nearly every sampled cell is dark. */
+    private fun looksBlack(print: IntArray): Boolean {
+        if (print.isEmpty()) return false
+        val dark = print.count { it < 12 }
+        return dark * 100 / print.size >= 98
     }
 
     private fun buildMessages(turns: List<Turn>, currentText: String, current: ByteArray): List<LLMMessage> {
