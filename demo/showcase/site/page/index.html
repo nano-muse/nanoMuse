@@ -82,85 +82,91 @@
 
         <!--@mobilegym:state-drawer-->
 
+        <!-- the panel: two columns beside the phone (the words, then the lines to try), one
+             under the other on a phone; the whole of it is in view, nothing scrolls (page.css) -->
         <aside class="side">
-          <p class="status" id="status" aria-live="polite"><i class="en">Starting the phone…</i><i class="zh">手机启动中…</i></p>
-          <h1>
-            <i class="en">A phone in your browser, with a nanoMuse of your own on it.</i>
-            <i class="zh">浏览器里的一台手机，装着一个属于你的 nanoMuse。</i>
-          </h1>
-          <div class="notice" role="note">
-            <p>
-              <i class="en"><b>A demo in a simulator.</b> The phone and its apps are MobileGym's re-creations, and this nanoMuse is the lite web app. The apps for your own devices do far more; install one of them.</i>
-              <i class="zh"><b>这是模拟器里的演示。</b>手机和应用是 MobileGym 重做的，这个 nanoMuse 是精简版网页应用。装在你自己设备上的 App 能做的多得多，请安装一个。</i>
-            </p>
-            <!-- every platform the project ships; the links go to GitHub's "latest" release and to
-                 the docs, never to one version's own files, so they do not go stale -->
-            <p class="platforms">
+          <div class="intro">
+            <p class="status" id="status" aria-live="polite"><i class="en">Starting the phone…</i><i class="zh">手机启动中…</i></p>
+            <h1>
+              <i class="en">A phone in your browser, with a nanoMuse of your own on it.</i>
+              <i class="zh">浏览器里的一台手机，装着一个属于你的 nanoMuse。</i>
+            </h1>
+            <div class="notice" role="note">
+              <p>
+                <i class="en"><b>A demo in a simulator.</b> The phone and its apps are MobileGym's re-creations, and this nanoMuse is the lite web app. The apps for your own devices do far more; install one of them.</i>
+                <i class="zh"><b>这是模拟器里的演示。</b>手机和应用是 MobileGym 重做的，这个 nanoMuse 是精简版网页应用。装在你自己设备上的 App 能做的多得多，请安装一个。</i>
+              </p>
+              <!-- every platform the project ships; the links go to GitHub's "latest" release and to
+                   the docs, never to one version's own files, so they do not go stale -->
+              <p class="platforms">
+                <i class="en">
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Android (APK)</a> ·
+                  iPhone and iPad (TestFlight; the public link is not open yet, <a href="https://nanomuse.cn/docs/ios">the iOS page of the docs</a> says where it stands) ·
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">macOS (Apple Silicon and Intel)</a> ·
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Windows</a> ·
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Linux</a> ·
+                  <a href="https://github.com/nano-muse/nanoMuse/pkgs/container/nanomuse">Docker image</a> with the web console, for a server of yours (<a href="https://nanomuse.cn/docs/self-hosting">self-hosting</a>)
+                </i>
+                <i class="zh">
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Android（APK）</a> ·
+                  iPhone 和 iPad（TestFlight，公开链接还没有开放，进展见<a href="https://nanomuse.cn/docs/zh/ios">文档的 iOS 一页</a>） ·
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">macOS（Apple Silicon 和 Intel）</a> ·
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Windows</a> ·
+                  <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Linux</a> ·
+                  <a href="https://github.com/nano-muse/nanoMuse/pkgs/container/nanomuse">Docker 镜像</a>，带网页控制台，跑在你自己的服务器上（<a href="https://nanomuse.cn/docs/zh/self-hosting">自部署</a>）
+                </i>
+              </p>
+              <div class="notice-actions">
+                <a class="btn primary" href="https://nanomuse.cn/#download"><i class="en">All downloads</i><i class="zh">全部下载</i></a>
+                <a class="btn" href="https://github.com/nano-muse/nanoMuse/releases/latest"><i class="en">Latest release</i><i class="zh">最新版本</i></a>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn" id="open" type="button"><i class="en">Show nanoMuse</i><i class="zh">打开 nanoMuse</i></button>
+              <button class="btn" id="reset" type="button"><i class="en">Start over</i><i class="zh">重新开始</i></button>
+              <a class="how" href="https://github.com/nano-muse/nanoMuse/blob/main/demo/showcase/README.md"><i class="en">How this runs</i><i class="zh">这是怎么跑起来的</i></a>
+            </div>
+
+            <p class="fine">
               <i class="en">
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Android (APK)</a> ·
-                iPhone and iPad (TestFlight; the public link is not open yet, <a href="https://nanomuse.cn/docs/ios">the iOS page of the docs</a> says where it stands) ·
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">macOS (Apple Silicon and Intel)</a> ·
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Windows</a> ·
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Linux</a> ·
-                <a href="https://github.com/nano-muse/nanoMuse/pkgs/container/nanomuse">Docker image</a> with the web console, for a server of yours (<a href="https://nanomuse.cn/docs/self-hosting">self-hosting</a>)
+                nanoMuse is a non-profit community project, free software under GPL-3.0-or-later. The phone, the gesture keys and the State
+                Builder are <a href="https://github.com/Purewhiter/mobilegym">MobileGym</a>'s (Apache-2.0; its optional companion data CC BY-NC 4.0); the
+                apps on it are re-creations for an agent to practise on, not the real services, and no trademark holder is affiliated.
+                Muse is a trademark of Meta Platforms, Inc.; nanoMuse is not affiliated with or endorsed by Meta.
               </i>
               <i class="zh">
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Android（APK）</a> ·
-                iPhone 和 iPad（TestFlight，公开链接还没有开放，进展见<a href="https://nanomuse.cn/docs/zh/ios">文档的 iOS 一页</a>） ·
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">macOS（Apple Silicon 和 Intel）</a> ·
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Windows</a> ·
-                <a href="https://github.com/nano-muse/nanoMuse/releases/latest">Linux</a> ·
-                <a href="https://github.com/nano-muse/nanoMuse/pkgs/container/nanomuse">Docker 镜像</a>，带网页控制台，跑在你自己的服务器上（<a href="https://nanomuse.cn/docs/zh/self-hosting">自部署</a>）
+                nanoMuse 是非营利的社区项目，自由软件，许可证 GPL-3.0-or-later。这台手机、手势键和 State Builder 来自
+                <a href="https://github.com/Purewhiter/mobilegym">MobileGym</a>（Apache-2.0；其可选的配套数据为 CC BY-NC 4.0），手机里的应用是为了让智能体练习而重做的，不是真实服务，与各商标持有者无关。
+                Muse 是 Meta Platforms, Inc. 的商标；nanoMuse 与 Meta 无关，也未获其认可。
               </i>
             </p>
-            <div class="notice-actions">
-              <a class="btn primary" href="https://nanomuse.cn/#download"><i class="en">All downloads</i><i class="zh">全部下载</i></a>
-              <a class="btn" href="https://github.com/nano-muse/nanoMuse/releases/latest"><i class="en">Latest release</i><i class="zh">最新版本</i></a>
+          </div>
+
+          <div class="groups">
+            <div class="group" id="group-look">
+              <h2><i class="en">A new look</i><i class="zh">换个形象</i></h2>
+              <p class="why hidden" id="look-why"></p>
+              <button class="chip" type="button" data-en="Change your look to an orange cat with round glasses" data-zh="换个形象：一只戴圆框眼镜的橘猫"><i class="en">Change your look to an orange cat with round glasses</i><i class="zh">换个形象：一只戴圆框眼镜的橘猫</i></button>
+              <button class="chip" type="button" data-en="Become a little robot made of blue clay" data-zh="变成一个蓝色黏土做的小机器人"><i class="en">Become a little robot made of blue clay</i><i class="zh">变成一个蓝色黏土做的小机器人</i></button>
+            </div>
+
+            <div class="group">
+              <h2><i class="en">Let it use the phone</i><i class="zh">让它操作这台手机</i></h2>
+              <button class="chip" type="button" data-en="Open WeChat and tell me what Zhang Wei's latest message says" data-zh="打开微信，看看张伟最新发来的消息说了什么"><i class="en">Open WeChat and tell me what Zhang Wei's latest message says</i><i class="zh">打开微信，看看张伟最新发来的消息说了什么</i></button>
+              <button class="chip" type="button" data-en="Reply to Zhang Wei on WeChat: sure, what time?" data-zh="在微信里回复张伟：好啊，几点？"><i class="en">Reply to Zhang Wei on WeChat: sure, what time?</i><i class="zh">在微信里回复张伟：好啊，几点？</i></button>
+              <button class="chip" type="button" data-en="Use 12306 to find the earliest train from Shanghai to Nanjing tomorrow" data-zh="用 12306 查一下明天上海到南京最早的车次"><i class="en">Use 12306 to find the earliest train from Shanghai to Nanjing tomorrow</i><i class="zh">用 12306 查一下明天上海到南京最早的车次</i></button>
+              <button class="chip" type="button" data-en="Open the Weather app: will it rain in Beijing tomorrow?" data-zh="打开天气，看看北京明天会不会下雨"><i class="en">Open the Weather app: will it rain in Beijing tomorrow?</i><i class="zh">打开天气，看看北京明天会不会下雨</i></button>
+              <button class="chip" type="button" data-en="Make a note on this phone: meeting Friday at 3 pm" data-zh="在手机的笔记里新建一条：周五下午三点开会"><i class="en">Make a note on this phone: meeting Friday at 3 pm</i><i class="zh">在手机的笔记里新建一条：周五下午三点开会</i></button>
+            </div>
+
+            <div class="group">
+              <h2><i class="en">Remember, remind</i><i class="zh">记住、提醒</i></h2>
+              <button class="chip" type="button" data-en="Remember: I have an iced americano every morning" data-zh="记住：我每天早上要喝一杯冰美式"><i class="en">Remember: I have an iced americano every morning</i><i class="zh">记住：我每天早上要喝一杯冰美式</i></button>
+              <button class="chip" type="button" data-en="What do I usually drink in the morning?" data-zh="我早上一般喝什么？"><i class="en">What do I usually drink in the morning?</i><i class="zh">我早上一般喝什么？</i></button>
+              <button class="chip" type="button" data-en="Remind me in 2 minutes to stand up and stretch" data-zh="2 分钟后提醒我站起来活动一下"><i class="en">Remind me in 2 minutes to stand up and stretch</i><i class="zh">2 分钟后提醒我站起来活动一下</i></button>
             </div>
           </div>
-
-          <div class="group" id="group-look">
-            <h2><i class="en">A new look</i><i class="zh">换个形象</i></h2>
-            <p class="why hidden" id="look-why"></p>
-            <button class="chip" type="button" data-en="Change your look to an orange cat with round glasses" data-zh="换个形象：一只戴圆框眼镜的橘猫"><i class="en">Change your look to an orange cat with round glasses</i><i class="zh">换个形象：一只戴圆框眼镜的橘猫</i></button>
-            <button class="chip" type="button" data-en="Become a little robot made of blue clay" data-zh="变成一个蓝色黏土做的小机器人"><i class="en">Become a little robot made of blue clay</i><i class="zh">变成一个蓝色黏土做的小机器人</i></button>
-          </div>
-
-          <div class="group">
-            <h2><i class="en">Let it use the phone</i><i class="zh">让它操作这台手机</i></h2>
-            <button class="chip" type="button" data-en="Open WeChat and tell me what Zhang Wei's latest message says" data-zh="打开微信，看看张伟最新发来的消息说了什么"><i class="en">Open WeChat and tell me what Zhang Wei's latest message says</i><i class="zh">打开微信，看看张伟最新发来的消息说了什么</i></button>
-            <button class="chip" type="button" data-en="Reply to Zhang Wei on WeChat: sure, what time?" data-zh="在微信里回复张伟：好啊，几点？"><i class="en">Reply to Zhang Wei on WeChat: sure, what time?</i><i class="zh">在微信里回复张伟：好啊，几点？</i></button>
-            <button class="chip" type="button" data-en="Use 12306 to find the earliest train from Shanghai to Nanjing tomorrow" data-zh="用 12306 查一下明天上海到南京最早的车次"><i class="en">Use 12306 to find the earliest train from Shanghai to Nanjing tomorrow</i><i class="zh">用 12306 查一下明天上海到南京最早的车次</i></button>
-            <button class="chip" type="button" data-en="Open the Weather app: will it rain in Beijing tomorrow?" data-zh="打开天气，看看北京明天会不会下雨"><i class="en">Open the Weather app: will it rain in Beijing tomorrow?</i><i class="zh">打开天气，看看北京明天会不会下雨</i></button>
-            <button class="chip" type="button" data-en="Make a note on this phone: meeting Friday at 3 pm" data-zh="在手机的笔记里新建一条：周五下午三点开会"><i class="en">Make a note on this phone: meeting Friday at 3 pm</i><i class="zh">在手机的笔记里新建一条：周五下午三点开会</i></button>
-          </div>
-
-          <div class="group">
-            <h2><i class="en">Remember, remind</i><i class="zh">记住、提醒</i></h2>
-            <button class="chip" type="button" data-en="Remember: I have an iced americano every morning" data-zh="记住：我每天早上要喝一杯冰美式"><i class="en">Remember: I have an iced americano every morning</i><i class="zh">记住：我每天早上要喝一杯冰美式</i></button>
-            <button class="chip" type="button" data-en="What do I usually drink in the morning?" data-zh="我早上一般喝什么？"><i class="en">What do I usually drink in the morning?</i><i class="zh">我早上一般喝什么？</i></button>
-            <button class="chip" type="button" data-en="Remind me in 2 minutes to stand up and stretch" data-zh="2 分钟后提醒我站起来活动一下"><i class="en">Remind me in 2 minutes to stand up and stretch</i><i class="zh">2 分钟后提醒我站起来活动一下</i></button>
-          </div>
-
-          <div class="actions">
-            <button class="btn" id="open" type="button"><i class="en">Show nanoMuse</i><i class="zh">打开 nanoMuse</i></button>
-            <button class="btn" id="reset" type="button"><i class="en">Start over</i><i class="zh">重新开始</i></button>
-            <a class="how" href="https://github.com/nano-muse/nanoMuse/blob/main/demo/showcase/README.md"><i class="en">How this runs</i><i class="zh">这是怎么跑起来的</i></a>
-          </div>
-
-          <p class="fine">
-            <i class="en">
-              nanoMuse is a non-profit community project, free software under GPL-3.0-or-later. The phone, the gesture keys and the State
-              Builder are <a href="https://github.com/Purewhiter/mobilegym">MobileGym</a>'s (Apache-2.0; its optional companion data CC BY-NC 4.0); the
-              apps on it are re-creations for an agent to practise on, not the real services, and no trademark holder is affiliated.
-              Muse is a trademark of Meta Platforms, Inc.; nanoMuse is not affiliated with or endorsed by Meta.
-            </i>
-            <i class="zh">
-              nanoMuse 是非营利的社区项目，自由软件，许可证 GPL-3.0-or-later。这台手机、手势键和 State Builder 来自
-              <a href="https://github.com/Purewhiter/mobilegym">MobileGym</a>（Apache-2.0；其可选的配套数据为 CC BY-NC 4.0），手机里的应用是为了让智能体练习而重做的，不是真实服务，与各商标持有者无关。
-              Muse 是 Meta Platforms, Inc. 的商标；nanoMuse 与 Meta 无关，也未获其认可。
-            </i>
-          </p>
         </aside>
       </div>
     </section>

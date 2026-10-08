@@ -33,9 +33,13 @@ checkout's `web/index.html` at build time and takes its `styles.css`, `state-bui
 dock, first in it: nanoMuse's launcher icon, a shortcut — a tap brings the app to the front
 (or turns the phone on), and it is lit while nanoMuse is the app on the screen; it carries no
 State Builder tab, so their script leaves it alone (`page.js` handles it, reading `front` from
-`window.__NANOMUSE__.state()`). Our column — the lines to try, the status, *Show nanoMuse* /
-*Start over* — sits beside the phone; below 1280px their chrome folds under the phone and the
-column follows.
+`window.__NANOMUSE__.state()`). Our panel sits beside the phone, two columns wide: the words
+(the status, the headline, the notice with the downloads, *Show nanoMuse* / *Start over*, the
+fine print) and the lines to try. The phone is scaled to the window's height and the panel is
+no taller than the stage, so the whole page is in view at once and nothing in it scrolls (only
+in a window shorter than about 600px do the lines scroll inside their column); below 1280px
+their chrome folds under the phone, and below 1000px everything is one column, the phone at
+its own size, and the page itself scrolls.
 
 **The phone turns itself on, and the Muse starts when a person is looking.** On this page and
 in the frame alike the phone boots as soon as the page is there and nanoMuse comes to the
@@ -61,12 +65,11 @@ exception rather than the rule.
 own (the site's bar is above it). The site passes its language and theme on the first load
 (`&lang=zh`, `&theme=dark`) and afterwards over `postMessage` (`{type: "nanomuse:lang", lang}`,
 `{type: "nanomuse:theme", theme}`; only from the project site's origins), and links out of the
-page open in the top window, not inside the frame. A wheel turned over a part of this page that
-has nothing to scroll under the pointer (the stage, the keys, the column at its end) is handed
-up to the site as `{type: "nanomuse:wheel", deltaX, deltaY}` (pixels), so the homepage scrolls
-with the pointer over the frame; over the phone's screen the phone keeps it. Dark is the page's
-own surfaces in the site's dark tokens, the stage and MobileGym's guide and dock cards going
-dark with them.
+page open in the top window, not inside the frame. The page lays itself out in the frame's
+height and nothing in it scrolls, so a wheel turned over the frame moves the homepage (the
+browser hands a scroll on to the parent when the frame has nowhere to go); over the phone's
+screen the phone keeps it. Dark is the page's own surfaces in the site's dark tokens, the stage
+and MobileGym's guide and dock cards going dark with them.
 
 Nothing about the phone runs on the server. MobileGym is a React app: the whole simulated
 phone lives in the visitor's tab (~400 MB of *their* memory). The server runs three things:

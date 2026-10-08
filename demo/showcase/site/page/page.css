@@ -159,7 +159,9 @@ html[data-theme="dark"] .nm-dock-app[aria-pressed="true"] { background: #e8e8e8;
   padding: 0;
   transition: none;
 }
-.hero-demo .demo-layout > .side { flex: 0 1 460px; min-width: 300px; }
+/* the panel takes the width the phone leaves (page.js reads its min-width when it scales the
+   phone), two columns wide and never past 880px */
+.hero-demo .demo-layout > .side { flex: 1 1 760px; min-width: 600px; max-width: 880px; }
 
 /* Power off, top right of the stage (their .hero-demo-actions, without their brand links) */
 .rig-actions { position: absolute; top: 8px; right: 18px; z-index: 3; }
@@ -248,20 +250,26 @@ html[data-theme="dark"] .nm-dock-app[aria-pressed="true"] { background: #e8e8e8;
    position (their stylesheet assumes the phone is centred in the row, which it is not here) */
 .state-drawer { max-height: calc(100svh - var(--top-h) - 2 * var(--stage-pad)); }
 
-/* ---- the panel beside the phone: fits the stage's height; scrolls inside itself only when the
-   window is shorter than that */
+/* ---- the panel beside the phone: two columns, the words (status, headline, the notice with
+   the downloads, the buttons, the fine print) and the lines to try, no taller than the stage,
+   so the whole of it is in view at once and nothing in it scrolls. Only when a window is
+   shorter than the lines need (under about 600px of stage) do the lines scroll inside their
+   column; the words stay. */
 .side {
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100svh - var(--top-h) - 2 * var(--stage-pad));
-  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 11fr) minmax(0, 12fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 18px;
+  max-height: 100%;
   opacity: 0;
   transition: opacity 540ms cubic-bezier(0.4, 0, 0.2, 1) 320ms;
 }
 .hero-demo.is-booted .side { opacity: 1; }
-/* the column is taller than the screen on most laptops: a fade along its lower edge says there
-   is more, and goes at the end (page.js sets the class) */
-.side.more::after {
+.intro { display: flex; flex-direction: column; min-height: 0; }
+.groups { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* the fade along the lower edge of the lines' column while there is more of it below, in a
+   window too short for all of them (page.js sets the class) */
+.groups.more::after {
   content: "";
   position: sticky;
   bottom: 0;
@@ -306,12 +314,14 @@ html[data-theme="dark"] .nm-dock-app[aria-pressed="true"] { background: #e8e8e8;
 .btn.primary { color: #fff; background: var(--action); border-color: var(--action); }
 .btn.primary:hover { filter: brightness(1.06); }
 .group {
+  flex: none;
   padding: 10px 12px 10px;
   margin-bottom: 10px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--card);
 }
+.group:last-child { margin-bottom: 0; }
 .group h2 { margin: 0 0 4px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
 .group .why { margin: 0 0 6px; color: var(--fg-2); font-size: 12.5px; }
 .group.off { opacity: 0.55; }
@@ -378,15 +388,22 @@ html[data-theme="dark"] .nm-dock-app[aria-pressed="true"] { background: #e8e8e8;
   .hero-demo .phone-rig .gesture-guide { top: calc(100% + 24px); }
   .hero-demo .phone-rig .state-dock { top: calc(100% + 86px); left: 50%; }
   .hero-demo .phone-rig .state-dock-hint { left: 50%; top: calc(100% + 148px); }
-  .hero-demo .demo-layout > .side { flex: 0 1 420px; min-width: 280px; }
+  .hero-demo .demo-layout > .side { flex: 1 1 640px; min-width: 560px; }
+  .side { gap: 14px; }
   .state-drawer { position: absolute; left: 0; top: 0; width: min(420px, 100%); max-height: 100%; height: auto; transform: none; }
 }
-/* ---- phones and small windows: a column that scrolls — phone, its pills, the drawer, the panel */
+/* ---- phones and small windows: one column, the phone at its own size over its pills, the
+   drawer, then the panel (its words, then its lines). Taller than the window on a phone, so
+   the page itself scrolls; nothing inside it does. */
 @media (max-width: 999px) {
   body { height: auto; min-height: 100%; overflow: auto; }
   .hero-demo { padding: var(--stage-pad) 12px 24px; }
   .hero-demo .demo-layout { flex-direction: column; align-items: center; gap: 20px; height: auto; }
-  .hero-demo .demo-layout > .side { flex: none; width: min(560px, 100%); max-height: none; overflow: visible; }
+  .hero-demo .demo-layout > .side { flex: none; width: min(560px, 100%); min-width: 0; max-width: none; }
+  .side { display: flex; flex-direction: column; gap: 0; max-height: none; }
+  .intro { display: contents; } /* the words, then the lines, then the fine print */
+  .groups { overflow: visible; }
+  .fine { order: 1; margin-top: 12px; }
   .state-drawer { position: relative; width: min(420px, calc(100vw - 32px)); max-height: 70svh; }
   .where { display: none; }
   /* the phone fills the width here: Power off takes a row of its own above it, not the status bar */
