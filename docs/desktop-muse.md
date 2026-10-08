@@ -350,7 +350,10 @@ control and browser automation, blocked apps) · File system access · Dictation
 import memory, download your data, reset) · Help · Legal · Sign out.
 
 **nanoMuse on dsh.** The same shape, from the harness's `sidebar.settings` seat with its
-stock General plugin switched off in the bundle layer:
+stock General plugin switched off in the bundle layer. A link on one page that opens
+another (*Add a provider* on Models opens Account's ways on; the account card on General
+opens Account; *The sandbox* on Files opens Agents) leaves the way back at the top of the
+page it opened, named for the page you came from; a pick in the sidebar starts fresh.
 
 - **General** — in Muse's order: the **account card** (the masked identifier or *Sign
   in*, opening the Account page), **Usage** (the plan and its bar — *Member* /
@@ -485,9 +488,15 @@ stock General plugin switched off in the bundle layer:
   catalogue as *key* or *address* rows, not as a sign-in.
 - **Computer use** — the system permissions (macOS), keep awake, the risk note.
 - **File system access** — the folders the agent uses (home, the Library, Downloads,
-  nanoMuse's own files; each opens in the file manager), the rules (reading anything you
-  name; writing under the chat's permission preset, asking outside its folder; the
-  sandbox), and *Full Disk Access* on macOS.
+  nanoMuse's own files; each opens in the file manager, the page grants nothing), the
+  rules (reading anything you name; writing under the chat's permission preset, which is
+  *workspace-write* unless the Agents page says otherwise: the chat's folder freely, the
+  main chat's being `~/nanoMuse`, and outside it a change is refused unless the agent asks
+  you for it and you allow it once; *read-only* asks before every change, *full access*
+  asks nothing; the sandbox), and *Full Disk Access* on macOS, which is only about reading
+  Desktop, Documents and Downloads. The home folder, Downloads and the app's own files are
+  outside the main chat's folder on purpose; a chat opened from the Library or on a folder
+  of your own writes there.
 - **Dictation** — the harness's own voice input (local SenseVoice; switched on in
   Plugins, a microphone appears beside Send, audio stays on the computer), the microphone
   permission on macOS, and how to use the system's dictation into the composer.
