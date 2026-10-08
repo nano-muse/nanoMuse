@@ -1,5 +1,5 @@
 [Unit]
-Description=nanoMuse Cloud: self-check (public door, relay health aggregates, disk)
+Description=nanoMuse Cloud: self-check (public door, relay health aggregates, disk, backup age)
 After=docker.service
 Requires=docker.service
 

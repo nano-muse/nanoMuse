@@ -1,27 +1,35 @@
 #!/bin/sh
 # The relay's self-check, every ten minutes (nanomuse-relay-selfcheck.timer; harmless by
-# hand). Reads two things and writes one line to the journal:
+# hand). Reads a few things and writes one line to the journal:
 #
 #   GET https://cloud.nanomuse.cn/healthz              the public door answers
 #   GET http://nanomuse-relay:8787/v1/admin/health     aggregates only (api.py admin_health):
 #                                                      requests under way, the hub's counters,
 #                                                      the last hour's refusals and upstream
-#                                                      errors, the database — never an account
+#                                                      errors, the database; never an account
+#   df on the relay's volume                           free disk
+#   the newest cloud-*.db.gz under BACKUP_DIR          backup.sh ran lately
 #
-# When the public door is down, the relay says `ok: false`, or the box is short of disk, the
-# line is a warning and, with ALERT_URL in .env (any webhook that takes a JSON {"text": …}
-# — a Feishu/Slack-style incoming hook), the same line is posted there — at most once an
-# hour for the same problem (state in /run/nanomuse-selfcheck).
+# When the public door is down, the relay says `ok: false`, the box is short of disk, or the
+# latest backup is older than BACKUP_MAX_H hours (or there is none), the line is a warning
+# and, with ALERT_URL in .env (any webhook that takes a JSON {"text": …}, a Feishu/Slack-style
+# incoming hook), the same line is posted there, at most once an hour for the same problem
+# (state in STATE_DIR).
 #
-#   RELAY_DIR    where .env lives (default /opt/nanomuse/relay)
-#   PUBLIC_BASE  the public name (default https://cloud.nanomuse.cn)
-#   DISK_MIN_MB  warn below this much free on the relay's volume (default 2048)
+#   RELAY_DIR     where .env lives (default /opt/nanomuse/relay)
+#   PUBLIC_BASE   the public name (default https://cloud.nanomuse.cn)
+#   DISK_MIN_MB   warn below this much free on the relay's volume (default 2048)
+#   BACKUP_DIR    where backup.sh writes (default /opt/nanomuse/backups, as in backup.sh)
+#   BACKUP_MAX_H  warn when the newest backup is older than this many hours (default 48)
+#   STATE_DIR     where the once-an-hour state lives (default /run/nanomuse-selfcheck)
 set -eu
 
 relay=${RELAY_DIR:-/opt/nanomuse/relay}
 public=${PUBLIC_BASE:-https://cloud.nanomuse.cn}
 disk_min=${DISK_MIN_MB:-2048}
-state=/run/nanomuse-selfcheck
+backups=${BACKUP_DIR:-/opt/nanomuse/backups}
+backup_max_h=${BACKUP_MAX_H:-48}
+state=${STATE_DIR:-/run/nanomuse-selfcheck}
 mkdir -p "$state"
 
 tok=$(grep '^CLOUD_ADMIN_TOKEN=' "$relay/.env" 2>/dev/null | cut -d= -f2- || true)
@@ -69,13 +77,22 @@ if [ "${free_mb:-0}" -lt "$disk_min" ]; then
 	add "only ${free_mb} MB free under $relay"
 fi
 
+# 4. the backups: backup.sh writes cloud-YYYYMMDD-HHMMSS.db.gz once a day; the newest one
+# must be younger than BACKUP_MAX_H hours (two missed nights), and there must be one at all
+newest=$(ls -t "$backups"/cloud-*.db.gz 2>/dev/null | head -n 1 || true)
+if [ -z "$newest" ]; then
+	add "no backup yet under $backups"
+elif [ -n "$(find "$newest" -mmin +$((backup_max_h * 60)) 2>/dev/null)" ]; then
+	add "latest backup $(basename "$newest") is older than ${backup_max_h} hours"
+fi
+
 if [ -z "$problems" ]; then
 	logger -t nanomuse-selfcheck -p user.info "ok: $summary"
 	rm -f "$state/last-problem"
 	exit 0
 fi
 
-line="nanoMuse Cloud self-check: $problems — $summary"
+line="nanoMuse Cloud self-check: $problems. $summary"
 logger -t nanomuse-selfcheck -p user.warning "$line"
 if [ -n "$alert" ]; then
 	# the same problem is posted at most once an hour

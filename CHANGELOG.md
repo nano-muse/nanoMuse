@@ -9,6 +9,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Fixed a relay without an upstream key holding a place in the account's in-flight count for every chat or clip request it refused with `upstream_unconfigured`: after four such requests the account was answered `too_many_in_flight` until the holds timed out. The key is checked before anything is held.
 - The `allowance_exhausted` sentence older apps print as it is says "Three ways on", which is what follows (a key of your own, a plan you already pay for, an invitation); it said two.
 - A clip whose task the app never polled to an end (the app was closed, the phone slept) is now charged all the same: the relay asks the provider itself shortly before the hour's hold on the allowance lapses and once more before the task row is dropped, charges a finished clip once at the price fixed at submission, and lets a failed one go. A poll from the app after that charges nothing more. A handful of tasks a minute, inside the relay process; nothing to configure.
+- The production relay's self-check (`cloud/deploy/nanomuse-hk/selfcheck.sh`) now also reports a backup problem: no `cloud-*.db.gz` under the backup directory, or the newest one older than 48 hours (`BACKUP_MAX_H`); the directory, the hour limit and the state directory can be set from the environment. The alert line and the deploy script's messages carry no dash.
 
 ### Runtime
 
