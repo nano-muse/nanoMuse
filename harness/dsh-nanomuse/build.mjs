@@ -47,6 +47,11 @@ await build({
   chunkNames: 'chunks/[name]-[hash]',
   sourcemap: true,
   packages: 'external',
+  // The bundle's own version, baked in: `BUNDLE_VERSION` (cloud.ts) is what the update check
+  // compares with the latest release and what the device tells the hub. Left to the
+  // environment, nothing set it in the packaged app and every install ran as 0.0.0, so every
+  // release read as newer (0.1.41).
+  define: { 'process.env.NANOMUSE_VERSION': JSON.stringify(pkg.version) },
   logLevel: 'warning',
 })
 

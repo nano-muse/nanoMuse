@@ -411,7 +411,33 @@ export function compareVersions(a: string, b: string): number {
   if (x.pre === y.pre) return 0
   if (!x.pre) return 1
   if (!y.pre) return -1
-  return x.pre < y.pre ? -1 : 1
+  return comparePre(x.pre, y.pre)
+}
+
+/**
+ * Pre-release tags identifier by identifier (SemVer 11.4): numbers as numbers, so `rc.10`
+ * is after `rc.9`; a number before a word; the shorter tag first when they agree so far.
+ */
+function comparePre(a: string, b: string): number {
+  const xs = a.split('.')
+  const ys = b.split('.')
+  for (let i = 0; i < Math.max(xs.length, ys.length); i++) {
+    const x = xs[i]
+    const y = ys[i]
+    if (x === undefined) return -1
+    if (y === undefined) return 1
+    const xn = /^\d+$/.test(x)
+    const yn = /^\d+$/.test(y)
+    if (xn && yn) {
+      const d = Number(x) - Number(y)
+      if (d !== 0) return d < 0 ? -1 : 1
+    } else if (xn !== yn) {
+      return xn ? -1 : 1
+    } else if (x !== y) {
+      return x < y ? -1 : 1
+    }
+  }
+  return 0
 }
 
 /** The desktop installer for this computer, when the release has one. */

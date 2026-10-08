@@ -13,6 +13,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Desktop
 
 - **The installed release is no longer offered as an update.** The daily check compared the latest release with the bundle's labelled version string (`dsh-nanomuse 0.1.40`), which read as 0, so every release counted as newer: About said *0.1.40 is out* on a 0.1.40 install and *Update* downloaded the same build. The check compares the bare number now, and a labelled version is read as its number should one reach the comparison again.
+- **The installed app knows its own version.** The bundle read its version from the environment at run time, which nothing set in the packaged app, so every install ran as `0.0.0`: the daily update check saw every release as newer (the dot on Settings and the *Update to 0.1.x* row never went away, and *Update* offered the build already installed), and the device told the hub it was `dsh-nanomuse 0.0.0`. The version is baked into the bundle at build time now; a test checks it against the package's. Pre-release tags compare identifier by identifier (`rc.10` after `rc.9`) and build metadata (`+sha`) is ignored, as SemVer says.
 
 ### Android
 

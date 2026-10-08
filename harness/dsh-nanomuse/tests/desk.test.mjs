@@ -1,6 +1,7 @@
 // The stage's desk: approvals raced against the chat card, holds of the hands, the
 // update check, what the other devices see of the connectors, the model rules.
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { BUNDLE_VERSION } from '../lib/cloud.js'
 import { ApprovalDesk, HoldDesk, checkForUpdate, compareVersions, pickAsset, pickChatModel, pickHandsModel, readSharedConnectors, sharedConnectors, takesImages } from '../lib/desk.js'
@@ -104,6 +105,14 @@ test('versions compare numerically, with pre-releases below the release', () => 
   assert.equal(compareVersions('0.1.9', '0.1.10'), -1)
   assert.equal(compareVersions('0.2.0-rc.2', '0.2.0'), -1)
   assert.equal(compareVersions('0.1.34', '0.1.34-rc.1'), 1)
+  // pre-release identifiers: numbers as numbers (rc.10 after rc.9), a number before a word,
+  // the shorter tag first; build metadata (+sha) is not part of the order
+  assert.equal(compareVersions('0.2.0-rc.10', '0.2.0-rc.9'), 1)
+  assert.equal(compareVersions('0.2.0-rc.1', '0.2.0-rc.1.1'), -1)
+  assert.equal(compareVersions('0.2.0-1', '0.2.0-alpha'), -1)
+  assert.equal(compareVersions('0.2.0-alpha', '0.2.0-beta'), -1)
+  assert.equal(compareVersions('0.2.0+build.7', '0.2.0'), 0)
+  assert.equal(compareVersions('0.2.0-rc.1+build.7', '0.2.0-rc.1'), 0)
   // a labelled version reads as its number: 0.1.40 compared "dsh-nanomuse 0.1.40" as 0 and
   // offered the installed release as an update
   assert.equal(compareVersions('0.1.40', 'dsh-nanomuse 0.1.40'), 0)
@@ -116,7 +125,11 @@ test('the update check compares the bare bundle version, so the installed releas
   const fetchMirror = async () => ({ ok: true, status: 200, json: async () => mirror })
   const same = await checkForUpdate(BUNDLE_VERSION, fetchMirror)
   assert.equal(same.current, BUNDLE_VERSION)
-  assert.match(BUNDLE_VERSION, /^\d+\.\d+\.\d+/)
+  // the host bundle carries package.json's version: it read the environment until 0.1.41,
+  // which nothing set in the packaged app, so every install ran as 0.0.0 and saw every
+  // release as newer
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.equal(BUNDLE_VERSION, pkg.version)
   assert.equal(same.newer, compareVersions('0.1.40', BUNDLE_VERSION) > 0)
   const installed = await checkForUpdate('0.1.40', fetchMirror)
   assert.equal(installed.newer, false)
