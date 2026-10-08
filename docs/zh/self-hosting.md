@@ -86,7 +86,7 @@ bash scripts/self-host.sh        # Enter through the questions; secrets and acco
 
 ### 备份 {#backing-up}
 
-中继保存的一切就是 `cloud/data/cloud.db`（SQLite）加上 `cloud/.env` 里的 `CLOUD_SECRET`。没有这个密钥，数据库就没用——标识符是用它哈希和加密的——没有数据库，密钥也没用；两样一起备份，而且除非你打算从头来过，否则绝不要更换密钥：
+中继保存的一切就是 `cloud/data/cloud.db`（SQLite）加上 `cloud/.env` 里的 `CLOUD_SECRET`。没有这个密钥，数据库就没用（标识符是用它哈希和加密的，还在等待使用的登录验证码也是，那只有六位数字），没有数据库，密钥也没用；两样一起备份，而且除非你打算从头来过，否则绝不要更换密钥：
 
 ```bash
 cd cloud && docker compose exec relay sqlite3 /srv/nanomuse-cloud/data/cloud.db ".backup /srv/nanomuse-cloud/data/backup.db" \

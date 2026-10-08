@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import dataclasses
+import hashlib
 import json
 
 import httpx
@@ -289,6 +290,33 @@ async def test_wrong_code_and_expiry_rules(stack):
         assert (await client.post("/v1/auth/code", json={"identifier": "a@mail.example"})).status_code == 204
     r = await client.post("/v1/auth/code", json={"identifier": "a@mail.example"})
     assert r.status_code == 429 and r.json()["error"]["code"] == "code_too_often"
+
+
+async def test_a_stored_code_cannot_be_read_back_from_the_database(stack):
+    """Six digits are a lookup table. Hashed plainly, a code is recoverable by anyone who can
+    read the database — a backup, a stolen file — so the relay's own secret must be part of it.
+    A plain `sha256(code)` row fails this test; the fix is the keyed hash in `service`."""
+    app, client, sender, up, cloud = stack
+    await client.post("/v1/auth/code", json={"identifier": "a@mail.example"})
+    _, code = sender.sent[-1]
+    stored = str(cloud.db.live_code(parse("a@mail.example").hash(cloud.s.hmac_key))["code_hash"])
+    assert stored != hashlib.sha256(code.encode()).hexdigest()
+    # the person's own try still works, so the keyed form is checked the same way
+    r = await client.post("/v1/auth/verify", json={"identifier": "a@mail.example", "code": code})
+    assert r.status_code == 200, r.text
+
+
+def test_a_relay_that_sends_codes_refuses_to_start_without_a_secret():
+    """`CODE_SENDER=smtp` with no `CLOUD_SECRET` would hash every identifier with the published
+    development key, so whoever holds the database alone reads the member list and any live
+    code. The command line exits on this; a relay built any other way is refused as well."""
+    sending = Settings(database=":memory:", sender="smtp", smtp_host="smtp.test", smtp_from="nanoMuse <no-reply@test>")
+    assert sending.dev_mode
+    with pytest.raises(RuntimeError, match="CLOUD_SECRET"):
+        Cloud(sending, Database(":memory:"))
+    # the same relay with a secret starts, and a relay whose codes only reach the log may not
+    Cloud(dataclasses.replace(sending, secret="s"), Database(":memory:"))
+    Cloud(dataclasses.replace(sending, sender="log"), Database(":memory:"))
 
 
 async def test_chat_is_relayed_and_charged(stack):

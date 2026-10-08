@@ -395,6 +395,26 @@ async def test_gate_auto_mode_still_asks_on_warnings(tmp_path: Path):
     assert asks(ui) == 2 and not result.ok
 
 
+async def test_gate_auto_mode_still_asks_on_tainted_egress(tmp_path: Path):
+    """Policy step 5 keeps an egress to an unlisted host an ASK once this conversation read
+    private data. The gate turned every ASK into ALLOW in auto mode, so the hands-off mode
+    that background passes run in was the one way to walk straight through the taint rule:
+    read a private file, then send it out, with nothing asked."""
+    ui = ScopedUI(scope="once")
+    gate = Sentinel(SentinelSettings(mode="auto"), AuditLog(tmp_path / "a.jsonl"), ui)
+    # nothing private was read yet, so a moderate call to an unknown host just runs
+    await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 0
+    # after private data entered the conversation, the same destination asks
+    await gate.guard(call("reader"), Reader())
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 1 and result.ok
+    # declined, it does not run
+    ui.approve = False
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 2 and not result.ok
+
+
 def test_grant_options_follow_muse_rules():
     sensitive_known = CallAssessment(risk=RiskLevel.SENSITIVE, egress=True, egress_target="x")
     assert Sentinel.grant_options(sensitive_known, "x") == [
@@ -469,6 +489,34 @@ async def test_gate_taint_then_egress_asks(tmp_path: Path):
     assert blocked.error and "not on sentinel.egress_allowlist" in blocked.error
     allowed = await gate.guard(call("sender", host="api.github.com"), Sender())
     assert allowed.ok
+
+
+async def test_taint_is_one_conversation_and_not_the_chat_beside_it(tmp_path: Path):
+    """One Sentinel serves every thread of the app: what one chat read must not taint
+    another, and clearing one chat must not un-taint the chat running beside it."""
+    ui = HeadlessUI(approve=False)
+    gate = Sentinel(SentinelSettings(), AuditLog(tmp_path / "a.jsonl"), ui)
+
+    first = gate.begin_task("chat a", conversation="a")
+    await gate.guard(call("reader"), Reader())
+    assert gate.tainted
+    gate.end_task(first)
+
+    # a second conversation that never read anything private is not asked
+    second = gate.begin_task("chat b", conversation="b")
+    assert not gate.tainted
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert result.ok
+    gate.end_task(second)
+
+    # ending a conversation drops its own taint and keeps the other's
+    third = gate.begin_task("chat c", conversation="c")
+    await gate.guard(call("reader"), Reader())
+    gate.end_task(third)
+    assert gate.tainted_for("a") and gate.tainted_for("c")
+    gate.end_conversation("c")
+    assert not gate.tainted_for("c")
+    assert gate.tainted_for("a")
 
 
 async def test_gate_resolves_secrets_and_redacts(tmp_path: Path):

@@ -41,6 +41,36 @@ def test_resolve_and_redact(tmp_path: Path):
     assert vault.resolve("{{vault:MISSING}}", strict=False) == "{{vault:MISSING}}"
 
 
+def test_redact_covers_short_secrets(tmp_path: Path):
+    """A four-digit PIN is a secret too: the length floor let it through into the model's
+    context and the audit log. Redacting a short one must not eat ordinary words either."""
+    vault = CredentialVault(tmp_path / "v.enc", tmp_path / "v.key")
+    vault.set("PIN", "1234")
+    vault.set("CODE", "ok1")
+    vault.set("SESSION", "abc123456")
+    assert vault.redact("the pin is 1234 now") == "the pin is [REDACTED:PIN] now"
+    # a short secret only goes as a whole token, so the text around it survives
+    assert vault.redact("this hashing is fine") == "this hashing is fine"
+    assert vault.redact("say ok1") == "say [REDACTED:CODE]"
+    assert vault.redact("ok1.ok1-ok1 ok12") == "ok1.ok1-ok1 ok12"
+    # the longer secret wins where one contains the other
+    assert vault.redact("abc123456 and 1234") == "[REDACTED:SESSION] and [REDACTED:PIN]"
+
+
+def test_redact_leaves_one_and_two_letter_values_alone(tmp_path: Path):
+    """A value of one or two characters is a label stored by mistake, not a secret;
+    masking it would blank every `a` or `ok` in every tool result the model sees."""
+    vault = CredentialVault(tmp_path / "v.enc", tmp_path / "v.key")
+    vault.set("A", "a")
+    vault.set("OK", "ok")
+    vault.set("EMPTY", "")
+    text = "a reply that is ok, and a second one"
+    assert vault.redact(text) == text
+    # three characters is where redaction starts
+    vault.set("PIN", "123")
+    assert vault.redact("code 123 sent") == "code [REDACTED:PIN] sent"
+
+
 def test_wrong_key_is_reported(tmp_path: Path):
     vault = CredentialVault(tmp_path / "v.enc", tmp_path / "k1.key")
     vault.set("A", "value-123456")

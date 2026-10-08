@@ -938,7 +938,9 @@ def create_app(
         spec = cloud.model_for(model, "image", caller)
         if n != 1:
             raise CloudError(400, "bad_request", "nanoMuse Cloud draws one picture per request")
-        data = await image.read()
+        # read one byte past the cap rather than the whole picture first: larger than the
+        # limit is refused, so nothing beyond it is ever held
+        data = await image.read(settings.max_request_bytes + 1)
         if len(data) > settings.max_request_bytes:
             raise CloudError(413, "too_large", "The picture is too large")
         mime = image.content_type or "image/png"

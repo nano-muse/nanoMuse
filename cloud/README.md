@@ -35,7 +35,9 @@ its base URL.
   `CLOUD_SECRET` so the operator's page can tell accounts apart; the database
   file on its own reveals none of them. Message content is forwarded, never
   written to disk. The database holds: hashed and encrypted identifier, key
-  hashes, token counts per request, video task ids, and the profile below.
+  hashes, the keyed hash of a code still waiting to be used (six digits, so
+  hashing it plainly would be a table an attacker could work through), video
+  task ids, token counts per request, and the profile below.
 - **One look on every device.** `GET` / `PUT` / `DELETE /v1/me/profile` keep
   the agent's name and face for the account — the dragon, an emoji on a colour,
   or a face drawn in the avatar studio with its five small stills (WebP, 200 KB
@@ -733,6 +735,11 @@ report can be matched to a ledger row without any content being logged.
 - `both` routes by identifier type. Non-mainland numbers are accepted as
   identifiers but the Aliyun sender only covers `+86`; use e-mail for the rest
   or plug in another sender in `senders.py`.
+
+Any sender but `log` needs `CLOUD_SECRET`: without a secret the relay would
+hash every identifier with the published development key while real codes go
+out to real people, so it refuses to start (`CODE_SENDER=log` on your own
+machine is the one case where the development key is fine).
 
 ### For App Store review
 

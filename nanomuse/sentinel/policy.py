@@ -32,6 +32,9 @@ class Decision(str, Enum):
 class PolicyResult:
     decision: Decision
     reasons: list[str] = field(default_factory=list)
+    # the ASK came from private data read earlier in this conversation: a mode that skips
+    # questions must not wave it through, any more than it waves a warning through
+    tainted_ask: bool = False
 
 
 def _match_any(name: str, patterns: list[str]) -> bool:
@@ -85,6 +88,7 @@ class Policy:
 
         decision: Decision | None = None
         from_rule = False
+        tainted_ask = False
 
         # 2. explicit rules
         for rule in s.rules:
@@ -127,8 +131,9 @@ class Policy:
         ):
             target = assessment.egress_target or "an unknown destination"
             decision = Decision.ASK
+            tainted_ask = True
             reasons.append(
-                f"private data was read earlier in this session and '{tool}' can send data to "
+                f"private data was read earlier in this conversation and '{tool}' can send data to "
                 f"{target}, which is not on sentinel.egress_allowlist"
             )
 
@@ -140,7 +145,7 @@ class Policy:
             if decision == Decision.ALLOW and not from_rule:
                 decision = Decision.ASK
             reasons.extend(assessment.warnings)
-        return PolicyResult(decision, reasons)
+        return PolicyResult(decision, reasons, tainted_ask)
 
 
 __all__ = ["Decision", "Policy", "PolicyResult", "host_allowed"]
