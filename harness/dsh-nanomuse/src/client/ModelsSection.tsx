@@ -10,7 +10,7 @@
  */
 import { createElement as h, Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { ProviderEntry } from '../catalogue.ts'
-import { call, errorStyle, muted, type Translate, failureText } from './api.ts'
+import { call, errorCode, errorStyle, muted, type Translate, failureText } from './api.ts'
 import { settingsBus } from './bus.ts'
 import { IconHand, IconImage, IconMessage, IconVideo } from './icons.tsx'
 import { useLive } from './live.ts'
@@ -152,13 +152,18 @@ export function makeModelsSection(t: Translate) {
     const [said, setSaid] = useState<Partial<Record<Slot, string>>>({})
     const [failed, setFailed] = useState<string | undefined>()
     const [switching, setSwitching] = useState(false)
+    // the host refused the switch (`409 chat_on_cloud`: the chat slot is the account's and nothing of
+    // one's own could answer); one sentence under the switch, which stays on
+    const [switchNote, setSwitchNote] = useState<string | undefined>()
     // Signed in: the one switch for the account as a model source. Off, nanoMuse Cloud leaves every
     // row's list and order and no side call runs on it; the sign-in stays (sync, the devices).
     const setCloudModels = (on: boolean) => {
       setSwitching(true)
       setFailed(undefined)
+      setSwitchNote(undefined)
       call<ModelsView>('cloud-models', { on })
         .then((next) => { setView(next); setSaid({}); reload() })
+        .catch((err: unknown) => { if (errorCode(err) !== 'chat_on_cloud') throw err; setSwitchNote(t('mlChatOnCloud')) })
         .catch((err: unknown) => setFailed(failureText(t, err)))
         .finally(() => setSwitching(false))
     }
@@ -205,7 +210,8 @@ export function makeModelsSection(t: Translate) {
           h('div', { className: 'nm-row', 'data-testid': 'nm-ml-cloud-row' },
             h('div', { className: 'nm-row-main' },
               h('span', { className: 'nm-row-title' }, t('mlCloudModels')),
-              h('span', { className: 'nm-row-sub nm-wrap' }, view.cloudModels ? t('mlCloudModelsOn') : t('mlCloudModelsOff'))),
+              h('span', { className: 'nm-row-sub nm-wrap' }, view.cloudModels ? t('mlCloudModelsOn') : t('mlCloudModelsOff')),
+              switchNote ? h('span', { className: 'nm-row-sub nm-wrap', role: 'alert', style: errorStyle, 'data-testid': 'nm-ml-cloud-note' }, switchNote) : null),
             h('button', { type: 'button', role: 'switch', className: 'nm-switch', 'aria-checked': view.cloudModels, 'aria-label': t('mlCloudModels'), 'data-testid': 'nm-ml-cloud-switch', disabled: switching || busy !== null, onClick: () => setCloudModels(!view.cloudModels) })))
       : null
     return h('div', { className: 'nm-section', 'data-testid': 'nm-models-section' },

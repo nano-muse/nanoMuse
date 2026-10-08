@@ -233,6 +233,9 @@ chat's title, a compaction) run on the chat row's own model instead, and a chat 
 sits on a Cloud model is not sent: a card says so and offers another model, a new chat, or
 *Use nanoMuse Cloud this time*, the only thing that spends the allowance while the switch
 is off. You stay signed in; sync, your devices and Settings → nanoMuse Cloud keep working.
+Switching off while the chat row is the account's moves that row to your own chat model
+when you have one; when you have none, the switch is refused with one sentence under it and
+stays on, since nothing else could answer (the same rule on every client).
 
 The profile's `node_modules/dsh-nanomuse` is a link (a junction on Windows) to the plugin
 inside the installed app, rewritten at every launch whose install folder differs from the

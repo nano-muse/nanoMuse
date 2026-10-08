@@ -3,7 +3,8 @@
 // that still sits on a Cloud model with a card of its own, sends the harness's side calls (a
 // title, a compaction) to the chat slot's own model, and lets a session under *Use nanoMuse
 // Cloud this time* through. The same in-memory context as cloud-models.test.mjs, plus an
-// `inject` that keeps the hook so the test can call it.
+// `inject` that keeps the hook so the test can call it. The switch itself is refused (`409
+// chat_on_cloud`) while the chat slot is the account's and no own chat model could take it.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
@@ -12,7 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { Service } from '@deepseek-ai/cordis'
-import NanomuseCloud, { API_PREFIX, LLM_ROW, PROVIDER_ID, TOKEN_REF } from '../lib/cloud.js'
+import NanomuseCloud, { API_PREFIX, CHAT_ON_CLOUD_MESSAGE, LLM_ROW, PROVIDER_ID, TOKEN_REF } from '../lib/cloud.js'
 import { cloudOffFailure, refusalCard, refusalKindOf } from '../lib/refusals.js'
 
 process.env.NANOMUSE_PY = join(tmpdir(), 'nanomuse-runtime-that-does-not-exist')
@@ -151,6 +152,49 @@ test('the switch: off, the account leaves every slot and the chat default moves 
     assert.ok(view.slots.chat.options.some((o) => o.provider === PROVIDER_ID))
     // the chat default is not moved back by itself: the person's choice stands
     assert.deepEqual(out.selection.current, { provider: 'bailian', model: 'deepseek-v4.1-flash' })
+  } finally {
+    await server.close()
+    await out.done()
+  }
+})
+
+test('the switch is refused while the chat slot is the account’s and nothing of one’s own could answer: 409 chat_on_cloud, nothing changes', async () => {
+  const out = await cloud({ defaultModel: { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' } })
+  try {
+    const res = await out.api('POST', '/cloud-models', { on: false })
+    assert.equal(res.status, 409)
+    assert.equal(res.body.error.code, 'chat_on_cloud')
+    assert.equal(res.body.error.message, CHAT_ON_CLOUD_MESSAGE)
+    assert.doesNotMatch(res.body.error.message, /[—–!]/, 'one plain sentence')
+    // the state did not move: the switch is still on, the account answers, the chat slot is where it was
+    assert.equal((await out.state()).cloudModelsOff, undefined)
+    assert.equal(out.svc.cloudModels(), true)
+    const view = (await out.api('GET', '/models')).body
+    assert.equal(view.cloudModels, true)
+    assert.ok(view.slots.chat.options.some((o) => o.provider === PROVIDER_ID))
+    assert.deepEqual(out.selection.current, { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' })
+    // off → on is never refused
+    assert.equal((await out.api('POST', '/cloud-models', { on: true })).status, 200)
+  } finally {
+    await out.done()
+  }
+})
+
+test('the switch goes off when an own chat model exists: the chat slot moves there; a chat slot already on an own row is left alone', async () => {
+  const out = await cloud({ defaultModel: { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' } })
+  const server = await modelsServer(BAILIAN_MODELS)
+  try {
+    await out.api('POST', '/providers/save', { id: 'bailian', apiKey: 'sk-test', baseURL: server.url })
+    const res = await out.api('POST', '/cloud-models', { on: false })
+    assert.equal(res.status, 200)
+    assert.equal(res.body.cloudModels, false)
+    assert.equal((await out.state()).cloudModelsOff, true)
+    assert.deepEqual(out.selection.current, { provider: 'bailian', model: 'deepseek-v4.1-flash' })
+    // on again, then the person picks an own model for chat: switching off touches nothing
+    await out.api('POST', '/cloud-models', { on: true })
+    out.selection.current = { provider: 'bailian', model: 'qwen3.8-27b' }
+    assert.equal((await out.api('POST', '/cloud-models', { on: false })).status, 200)
+    assert.deepEqual(out.selection.current, { provider: 'bailian', model: 'qwen3.8-27b' })
   } finally {
     await server.close()
     await out.done()

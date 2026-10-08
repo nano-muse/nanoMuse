@@ -70,6 +70,8 @@ export const TOKEN_REF = 'NANOMUSE_CLOUD_TOKEN'
 export const PROVIDER_ID = 'nanomuse'
 /** The profile row the Models page edits too. */
 export const LLM_ROW = 'llm-pi-ai'
+/** The `409 chat_on_cloud` body's sentence (the web client shows its own words for the code). */
+export const CHAT_ON_CLOUD_MESSAGE = 'Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer.'
 /** dsh-base's stock chat default (its `agent-default-model` row): what `adoptOwnDefault` and `adoptDefaultModel` read as "nothing chosen yet". */
 export const STOCK_DEFAULT_MODEL = { provider: 'deepseek-official', model: 'deepseek-flash' } as const
 /**
@@ -983,16 +985,17 @@ export default class NanomuseCloud extends Service {
   /**
    * Switch the account's models on or off as a source (the phones' *Use nanoMuse Cloud models*).
    * Off while new chats answer through the account: the chat slot moves to the first own chat
-   * model, when there is one; the hands' environment follows.
+   * model, when there is one; the hands' environment follows. With no own chat model the
+   * switch is refused (`409 chat_on_cloud`, the same rule on every client): nothing else
+   * could answer, so the state does not change and the switch stays on.
    */
   async setCloudModels(on: boolean): Promise<void> {
     if (on === !this.state.cloudModelsOff) return
+    const own = !on && this.chatChoice().provider === PROVIDER_ID ? this.ownChatChoice() : undefined
+    if (!on && this.chatChoice().provider === PROVIDER_ID && !own) throw new RelayError(409, 'chat_on_cloud', CHAT_ON_CLOUD_MESSAGE)
     const { cloudModelsOff: _off, ...rest } = this.state
     this.state = on ? rest : { ...rest, cloudModelsOff: true }
-    if (!on && this.chatChoice().provider === PROVIDER_ID) {
-      const own = this.ownChatChoice()
-      if (own) await this.defaultModelService()?.saveSelection(own).catch((error: unknown) => this.ctx.logger.warn('nanomuse cloud: chat slot not moved off the account: %s', message(error)))
-    }
+    if (own) await this.defaultModelService()?.saveSelection(own).catch((error: unknown) => this.ctx.logger.warn('nanomuse cloud: chat slot not moved off the account: %s', message(error)))
     await this.writeState()
     await this.writeHands().catch((error: unknown) => this.ctx.logger.warn('nanomuse cloud: hands model not written: %s', message(error)))
     this.broadcast()
