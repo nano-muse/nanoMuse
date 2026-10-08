@@ -22,6 +22,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - The sign-in page no longer calls a mainland-China number "outside the mainland" while it is still being typed: seven to ten digits that can still become `1xx xxxx xxxx` (with or without `+86`) show no sentence and keep *Send* on; the sentence comes once the number cannot be a mainland one any more.
 - The welcome page's *Reach* line says how a computer joins today: install nanoMuse Desktop and sign in with the same account (it said "pair", which left in 0.1.24); the Chinese line under the nanoMuse Cloud provider says 服务商 like every other.
+- The hands notice when they go round in circles: the same action a third time on a screen that did not change gets a line in the history so the model changes tack, and a sixth ends the run as *infeasible* with the action named. Before, a model repeating one tap kept calling the screen model, a screenshot each time, until the thirty-minute limit or *Stop*.
 
 ### iOS
 
