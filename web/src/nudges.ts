@@ -246,7 +246,7 @@ export function recordAsk(kv: KV, id: string, now: number): Ledger {
   return l;
 }
 
-/** Off to GitHub: no more asks from any moment. */
+/** Off to GitHub, or "I already starred": no more asks from any moment, whatever the cooldown and the asks left. */
 export function recordStarred(kv: KV): void {
   const l = readLedger(kv);
   l.starred = true;

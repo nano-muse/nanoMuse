@@ -122,6 +122,12 @@ test('max_asks is a lifetime cap and "Not now" counts', () => {
 test('starring ends every ask; enabled:false asks nothing', () => {
   const starred = recordStarred(empty())
   assert.equal(dueAsk(DEFAULT_NUDGES, starred, 'signed_in', undefined, T0), null)
+  // "I already starred" with no ask ever shown: no cooldown, every ask left, still nothing
+  const generous = mergeNudges({ star: { cooldown_days: 0, max_asks: 50 } })
+  for (const [moment, n] of [['signed_in'], ['tasks', 3], ['new_look'], ['exhausted'], ['days_used', 7], ['goal_done']]) {
+    assert.equal(dueAsk(generous, starred, moment, n, T0 + 365 * DAY), null, moment)
+  }
+  assert.equal(recordStarred(starred), starred, 'saying it twice changes nothing')
   assert.equal(dueAsk(mergeNudges({ star: { enabled: false } }), empty(), 'signed_in', undefined, T0), null)
   // a moment switched off
   assert.equal(dueAsk(mergeNudges({ star: { moments: { new_look: false } } }), empty(), 'new_look', undefined, T0), null)

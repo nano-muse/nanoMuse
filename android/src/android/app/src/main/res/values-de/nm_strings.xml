@@ -21,6 +21,7 @@
     <string name="nm_star_title">Ein Stern auf GitHub hilft</string>
     <string name="nm_star_action">Auf GitHub bewerten</string>
     <string name="nm_star_later">Jetzt nicht</string>
+    <string name="nm_star_done">Stern schon gegeben</string>
     <string name="nm_star_signed_in">Willkommen. nanoMuse ist kostenlos, quelloffen und gemeinnützig: ein persönlicher Agent für alle, die ihn ausführen. Wenn dir das etwas wert ist, hilft ein Stern auf GitHub der nächsten Person, es zu finden.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">Eine Aufgabe erledigt. Wenn nanoMuse geholfen hat, zeigt ein Stern auf GitHub den Leuten, die daran bauen, dass es das getan hat.</item>

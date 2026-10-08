@@ -248,7 +248,7 @@ struct NanoMuseStarAsk: Equatable, Identifiable {
 /// 10th / 30th task that ran to its end, a face just drawn, the allowance used up, the 7th and
 /// 30th day with the app, a goal reached — as the relay's policy says (NanoMuseNudges), with a
 /// cooldown between asks and a lifetime cap. Remembered on the phone under `nm.star.*`;
-/// "Star on GitHub" ends every ask for good. Never a dialog: `pending` is a card where the
+/// "Star on GitHub" or "I already starred" ends every ask for good. Never a dialog: `pending` is a card where the
 /// shell puts it, `signedIn()` a row on the account page. Android: community/StarPrompt.kt.
 @MainActor
 final class NanoMuseStar: ObservableObject {
@@ -347,11 +347,17 @@ final class NanoMuseStar: ObservableObject {
         return true
     }
 
-    /// Off to GitHub, and no more asking anywhere.
-    func open() {
+    /// The star is done: the person went to GitHub from any "Star on GitHub" or said "I already
+    /// starred". No ask comes back on this phone, whatever the cooldown and the asks left.
+    func markStarred() {
         ledger.starred = true
         pending = nil
         save()
+    }
+
+    /// Off to GitHub, and no more asking anywhere.
+    func open() {
+        markStarred()
         UIApplication.shared.open(URL(string: policy.url) ?? Self.repoURL)
     }
 
@@ -469,4 +475,5 @@ final class NanoMuseStar: ObservableObject {
     static func due(_ moment: Moment) -> Bool { shared.due(convert(moment)) }
     static func shown(_ moment: Moment) { shared.markShown(convert(moment)) }
     static func open() { shared.open() }
+    static func markStarred() { shared.markStarred() }
 }

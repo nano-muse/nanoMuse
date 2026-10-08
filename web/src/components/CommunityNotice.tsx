@@ -1,6 +1,7 @@
 import { Bug, ExternalLink, Github, HeartHandshake } from "lucide-react";
 import { useT } from "../i18n";
 import { cx } from "../util";
+import { markStarred } from "./StarNudge";
 
 export const REPO_URL = "https://github.com/nano-muse/nanoMuse";
 export const ISSUES_URL = "https://github.com/nano-muse/nanoMuse/issues/new/choose";
@@ -31,7 +32,8 @@ export function CommunityNotice({ compact = false, className }: { compact?: bool
         {t("This is a preview; the people building it use it every day. Report a bug, ask for a feature, send a pull request: that is what moves the project. A star on GitHub helps others find it.")}
       </p>
       <div className="mt-3 flex flex-wrap gap-2 text-[12.5px] font-medium">
-        <a href={REPO_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-fg px-3 py-1.5 text-bg hover:opacity-90">
+        {/* going to GitHub from here counts as the star being done: the asks stop (C1) */}
+        <a href={REPO_URL} target="_blank" rel="noreferrer" onClick={markStarred} className="inline-flex items-center gap-1.5 rounded-full bg-fg px-3 py-1.5 text-bg hover:opacity-90">
           <Github size={13} /> {t("Star on GitHub")}
         </a>
         <a href={ISSUES_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-fg hover:bg-surface-2">

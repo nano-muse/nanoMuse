@@ -21,6 +21,7 @@
     <string name="nm_star_title">GitHub’da bir yıldız yardımcı olur</string>
     <string name="nm_star_action">GitHub’da yıldızla</string>
     <string name="nm_star_later">Şimdi değil</string>
+    <string name="nm_star_done">Zaten yıldız verdim</string>
     <string name="nm_star_signed_in">Hoş geldin. nanoMuse ücretsiz, açık kaynak ve kâr amacı gütmeyen bir proje: çalıştıran herkes için kişisel bir ajan. Senin için bir değeri varsa, GitHub’da bir yıldız bir sonraki kişinin onu bulmasını sağlar.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">Bir görev tamamlandı. nanoMuse yardımcı olduysa, GitHub’da bir yıldız onu geliştirenlere bunu söyler.</item>

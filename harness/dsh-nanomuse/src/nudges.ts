@@ -14,7 +14,8 @@
  *   once on the Account page; `new_look` after a face was drawn; `exhausted` in the
  *   allowance card.
  * - `cooldown_days` between any two asks; `max_asks` is a lifetime cap — showing a card is an
- *   ask, "Not now" included; going to GitHub from any card sets `starred` and ends them all.
+ *   ask, "Not now" included; going to GitHub from any card or Settings row, or "I already
+ *   starred" on a card, sets `starred` and ends them all, whatever the cooldown and the asks left.
  * - `text` and `text_zh` (optional, ≤ 200 characters each, empty by default): the
  *   card's body sentence, when the relay wants to say it in its own words. Trimmed; a value
  *   over the cap is dropped. A Chinese UI takes `text_zh`, else `text`, else the app's own
@@ -231,7 +232,7 @@ export function recordDay(ledger: NudgeLedger, now = Date.now()): { ledger: Nudg
   return { ledger: { ...ledger, days: [...ledger.days, key].slice(-DAYS_KEEP) }, newDay: true }
 }
 
-/** The person went to GitHub: the end of all asks. */
+/** The person went to GitHub, or said they already starred: the end of all asks. */
 export function recordStarred(ledger: NudgeLedger): NudgeLedger {
   return ledger.starred ? ledger : { ...ledger, starred: true }
 }

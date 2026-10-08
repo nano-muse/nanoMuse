@@ -994,6 +994,7 @@ const zhCN: Record<string, string> = {
   "At least 8 characters": "至少 8 个字符",
   "Set the password": "设置密码",
   "Not now": "以后再说",
+  "I already starred": "已经点过了",
   // -- the allowance and the two ways on (relay 0.5 / 0.9) --
   "Free allowance": "免费额度",
   "left of ¥{grant}": "剩余 / 共 ¥{grant}",

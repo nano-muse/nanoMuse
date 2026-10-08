@@ -409,6 +409,7 @@ export const en = {
   sgRemoteControlSub: 'Remote control is on · no device asks first',
   starAction: 'Star on GitHub',
   starLater: 'Not now',
+  starDone: 'I already starred',
   starSignedIn: 'Welcome. nanoMuse is free, open source and non-profit: a personal agent for anyone who runs it. If that is worth something to you, a star on GitHub is how the next person finds it.',
   starNewLook: 'A new face, drawn for you. If you like where nanoMuse is going, a star on GitHub helps more people find it.',
   // ---- the invite code at sign-in, and the free amount on the welcome
@@ -1814,6 +1815,7 @@ export const zh: typeof en = {
   sgRemoteControlSub: '远程控制已打开 · 任何设备都不用先问',
   starAction: '去 GitHub 点亮 Star',
   starLater: '以后再说',
+  starDone: '已经点过了',
   starSignedIn: '欢迎。nanoMuse 免费、开源、非营利，做的是一个属于每个人的个人智能体。如果你认同，GitHub 上的一颗 Star 能让下一个人也找到这里。',
   starNewLook: '一张为你画的新面孔。如果你喜欢 nanoMuse 现在的样子，到 GitHub 点一颗 Star，更多人就能遇见它。',
   // ---- 登录时的邀请码，欢迎页上的免费额度

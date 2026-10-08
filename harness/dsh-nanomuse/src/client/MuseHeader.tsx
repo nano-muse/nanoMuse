@@ -8,7 +8,7 @@
  * enlarges it; clicking opens the profile. Occupies `conversation.header.leading`.
  */
 import { createElement as h, Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
-import { dismissStar, nudgeText, openStar } from './AccountPage.tsx'
+import { dismissStar, markStarred, nudgeText, openStar } from './AccountPage.tsx'
 import type { Translate } from './api.ts'
 import { Avatar, motionStatus, type Mood } from './Avatar.tsx'
 import { describeCall } from './Capsule.tsx'
@@ -151,7 +151,8 @@ export function MuseHeader({ t, openProfile, useSessionStatus }: MuseHeaderProps
         : starAsk
           ? h('div', { className: 'nm-header-status nm-header-star' }, h(IconHeart, { size: 13 }), h('span', { className: 'nm-header-line' }, nudgeText(t, starAsk)),
               h('button', { type: 'button', className: 'nm-ob-link nm-inline', onClick: () => openStar() }, t('starAction')),
-              h('button', { type: 'button', className: 'nm-ob-link nm-inline', onClick: () => dismissStar() }, t('starLater')))
+              h('button', { type: 'button', className: 'nm-ob-link nm-inline', onClick: () => dismissStar() }, t('starLater')),
+              h('button', { type: 'button', className: 'nm-ob-link nm-inline', onClick: () => markStarred() }, t('starDone')))
         : line
           ? h('div', { className: `nm-header-status ${tone}`.trim() }, running || waiting ? h(IconSpinner, { size: 13 }) : null, h('span', { className: 'nm-header-line' }, line))
           : null))

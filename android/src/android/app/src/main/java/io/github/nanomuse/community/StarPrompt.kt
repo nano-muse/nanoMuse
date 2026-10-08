@@ -2,7 +2,10 @@ package io.github.nanomuse.community
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,7 +50,8 @@ import java.util.Locale
  * month of use, a goal reached. Which moments ask, at which counts, how far apart and how many
  * times in all is the relay's [Nudges.Policy]; everything else — what was asked and when, the
  * task and day counters, whether the person went — is the ledger in this phone's prefs.
- * Each ask is a card where the moment is, never a dialog; tapping through to GitHub ends them all.
+ * Each ask is a card where the moment is, never a dialog; tapping through to GitHub, or
+ * "I already starred", ends them all.
  */
 object StarPrompt {
     /** The repository the star goes to (the policy may point elsewhere; see [url]). */
@@ -184,9 +188,18 @@ object StarPrompt {
 
     fun markShown(context: Context, moment: Moment) = markShown(context, Ask(moment))
 
+    /**
+     * The star is done: the person went to GitHub from any "Star on GitHub" or said "I already
+     * starred". No ask comes back on this phone, whatever the cooldown and the asks left.
+     */
+    fun markStarred(context: Context) {
+        prefs(context).edit().putBoolean(KEY_STARRED, true).apply()
+        _pending.value = null
+    }
+
     /** Off to GitHub, and no more asking anywhere. */
     fun open(context: Context) {
-        prefs(context).edit().putBoolean(KEY_STARRED, true).apply()
+        markStarred(context)
         openExternalUrl(context, url(context))
     }
 
@@ -267,9 +280,11 @@ object StarPrompt {
 private val StarAmber = Color(0xFFF5A623)
 
 /**
- * One card: the star, a line or two saying why, "Star on GitHub" and "Not now". [text] is the
- * line for the moment; [onDone] runs after either button so the caller can drop the card.
+ * One card: the star, a line or two saying why, "Star on GitHub", "Not now" and "I already
+ * starred". [text] is the line for the moment; [onDone] runs after any button so the caller can
+ * drop the card.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StarNudgeCard(
     text: String,
@@ -304,8 +319,8 @@ fun StarNudgeCard(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.width(30.dp))
+            // three actions do not always fit one line in every language
+            FlowRow(verticalArrangement = Arrangement.Center, modifier = Modifier.padding(start = 30.dp)) {
                 Button(
                     onClick = { StarPrompt.open(context); onDone() },
                     shape = CircleShape,
@@ -315,6 +330,9 @@ fun StarNudgeCard(
                 Spacer(Modifier.width(6.dp))
                 TextButton(onClick = onDone) {
                     Text(stringResource(R.string.nm_star_later), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = { StarPrompt.markStarred(context); onDone() }) {
+                    Text(stringResource(R.string.nm_star_done), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

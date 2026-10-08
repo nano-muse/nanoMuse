@@ -21,6 +21,7 @@
     <string name="nm_star_title">GitHub のスターが助けになります</string>
     <string name="nm_star_action">GitHub でスターを付ける</string>
     <string name="nm_star_later">今はしない</string>
+    <string name="nm_star_done">もうスターしました</string>
     <string name="nm_star_signed_in">ようこそ。nanoMuse は無料でオープンソース、非営利のプロジェクトです：使う人すべてのためのパーソナルエージェントです。もし価値を感じていただけたら、GitHub のスターが次の人がこれを見つける手がかりになります。</string>
     <plurals name="nm_star_tasks">
         <item quantity="other">%1$d 件のタスクが完了しました。nanoMuse が役に立っているなら、GitHub のスターが次の人がこれを見つける助けになります。</item>

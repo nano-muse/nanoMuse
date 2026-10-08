@@ -115,8 +115,12 @@ struct NanoMuseAccountSections: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(NanoMuseStar.words(for: .exhausted))
                             .font(.caption).foregroundStyle(.secondary)
-                        Button(AppLocalized("Star on GitHub")) { NanoMuseStar.open() }
-                            .font(.caption.weight(.medium))
+                        HStack(spacing: 12) {
+                            Button(AppLocalized("Star on GitHub")) { NanoMuseStar.open() }
+                                .font(.caption.weight(.medium))
+                            Button(AppLocalized("I already starred")) { NanoMuseStar.markStarred(); exhaustedAsk = false }
+                                .font(.caption.weight(.medium))
+                        }
                     }
                 } icon: { Image(systemName: "star") }
             }
@@ -359,7 +363,7 @@ struct NanoMuseAccountSections: View {
     }
 }
 
-/// One card asking for a star: the reason, "Star on GitHub", "Not now".
+/// One card asking for a star: the reason, "Star on GitHub", "Not now", "I already starred".
 struct NanoMuseStarCard: View {
     var text: String
     var onDone: () -> Void
@@ -379,6 +383,9 @@ struct NanoMuseStarCard: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                 Button(AppLocalized("Not now")) { onDone() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                Button(AppLocalized("I already starred")) { NanoMuseStar.markStarred(); onDone() }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }

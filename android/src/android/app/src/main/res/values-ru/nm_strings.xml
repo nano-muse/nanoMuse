@@ -21,6 +21,7 @@
     <string name="nm_star_title">Звезда на GitHub помогает</string>
     <string name="nm_star_action">Поставить звезду на GitHub</string>
     <string name="nm_star_later">Не сейчас</string>
+    <string name="nm_star_done">Звезда уже стоит</string>
     <string name="nm_star_signed_in">Добро пожаловать. nanoMuse бесплатен, открыт и некоммерческий: личный агент для каждого, кто его запустит. Если для вас это что-то значит, звезда на GitHub поможет следующему человеку его найти.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">%1$d задача выполнена. Если nanoMuse помог, звезда на GitHub скажет об этом тем, кто его делает.</item>

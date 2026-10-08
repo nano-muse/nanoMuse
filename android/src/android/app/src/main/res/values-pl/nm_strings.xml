@@ -21,6 +21,7 @@
     <string name="nm_star_title">Gwiazdka na GitHub pomaga</string>
     <string name="nm_star_action">Daj gwiazdkę na GitHub</string>
     <string name="nm_star_later">Nie teraz</string>
+    <string name="nm_star_done">Gwiazdka już jest</string>
     <string name="nm_star_signed_in">Witaj. nanoMuse jest darmowe, otwarte i niekomercyjne: osobisty agent dla każdego, kto je uruchomi. Jeśli to coś dla ciebie znaczy, gwiazdka na GitHub pomoże następnej osobie je znaleźć.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">Jedno zadanie wykonane. Jeśli nanoMuse pomogło, gwiazdka na GitHub mówi o tym osobom, które je tworzą.</item>

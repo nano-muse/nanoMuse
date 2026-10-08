@@ -54,7 +54,7 @@ Legend: **✓** done · **◐** partial (what is missing is in the note) · **�
 | Status line says what it is on, never "Thinking" | ✓ | ✓ 0.1.32 *"is on it"* | ✓ | ✓ |
 | Status line = the step's own words (`step`: *打开携程网站*), never the raw command | ✓ 0.1.33 | ✓ 0.1.33 | ✓ 0.1.33 | ✓ 0.1.33 |
 | "Show the agent's steps", on by default since 0.1.37 (a stored off stays off) | ✓ 0.1.37 (`nm.show_steps`) | ✓ 0.1.37 (`nanomuse.show_steps`) *(2)* | ✓ 0.1.37 | ✓ 0.1.37 |
-| Star asks at the relay's moments (`/v1/nudges`: sign-in · 3rd / 10th / 30th task · 7th / 30th day · a goal reached · a new look · allowance spent; 7 days apart, 4 per device; never in the first conversation) | ✓ 0.1.35 | ✓ 0.1.35 *(3)* | ✓ 0.1.35 | ✓ 0.1.35 |
+| Star asks at the relay's moments (`/v1/nudges`: sign-in · 3rd / 10th / 30th task · 7th / 30th day · a goal reached · a new look · allowance spent; 7 days apart, 4 per device; never in the first conversation). Every card has *I already starred* next to *Star on GitHub*; either ends the asks on that device for good | ✓ 0.1.35 | ✓ 0.1.35 *(3)* | ✓ 0.1.35 | ✓ 0.1.35 |
 | First conversation: the app speaks first, asks what to call you, the model's `nanomuse-naming` fence becomes the naming card | ✓ | ✓ 0.1.34 | ✓ 0.1.35 *(25)* | ✓ *(39)* |
 | First run: "Sign in — free" before anything else | ✓ | ✓ 0.1.32 *(4)* | ✓ | ✓ |
 | Approval cards, three tiers, remembered grants; a Permissions page listing the remembered grants by risk tier, with Revoke | ✓ | upstream's | ✓ Settings → Permissions → *Standing grants*: the remote-control switch, the trusted devices and the hands' per-app grants under the phone's three tiers | ✓ |
@@ -371,7 +371,11 @@ notes above; a settled item keeps its number and says how it went.
   `docs/cloud.md`), with the same defaults built into every client: a *task* is a turn the person
   started that got a reply, never the first conversation, a routine, a feed post or a goal
   check-in; once per moment, `cooldown_days` apart, `max_asks` per device, never again after
-  *Star on GitHub* (`nm.star.*` / `nanomuse.star.*`). Clients: `nanomuse/nudges.py`,
+  *Star on GitHub* (`nm.star.*` / `nanomuse.star.*`). Every card also offers *I already starred*;
+  it sets the same flag, so no ask comes back on that device whatever the cooldown and the asks
+  left, and any *Star on GitHub* row in Settings or About counts as done too. The flag is per
+  device: the account has no place for small settings to sync, so another device still asks
+  until it is told once. Clients: `nanomuse/nudges.py`,
   `harness/dsh-nanomuse/src/nudges.ts`, `web/src/nudges.ts`, `io.github.nanomuse.community.Nudges`,
   `NanoMuse/NanoMuseNudges.swift`.
 - The release check reads the same two sources in the same order on every client:

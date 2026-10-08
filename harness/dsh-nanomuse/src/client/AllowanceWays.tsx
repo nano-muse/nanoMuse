@@ -10,7 +10,7 @@
  */
 import { createElement as h, Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { keyUrlFor, type Capability } from '../catalogue.ts'
-import { mainland, openStar, type AccountSheet } from './AccountPage.tsx'
+import { mainland, markStarred, openStar, type AccountSheet } from './AccountPage.tsx'
 import { call, muted, row, type Translate } from './api.ts'
 import { openLink } from './bridge.ts'
 import { settingsBus } from './bus.ts'
@@ -202,6 +202,8 @@ export function AllowanceWays({ t, info, sheet, exhausted, lead, inSettings = fa
           h('span', { className: 'nm-way-icon' }, h(IconHeart, { size: 15 })),
           h('div', { className: 'nm-way-main' },
             h('div', { className: 'nm-way-title' }, t('acWayStar')),
-            h('div', { style: row }, h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => { openStar(); setStar(false) } }, t('starAction')))))
+            h('div', { style: row },
+              h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => { openStar(); setStar(false) } }, t('starAction')),
+              h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => { markStarred(); setStar(false) } }, t('starDone')))))
       : null)
 }

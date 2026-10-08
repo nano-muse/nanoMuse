@@ -80,9 +80,17 @@ function momentText(t: Translate, ask: NudgeAsk): string {
 export function nudgeText(t: Translate, ask: NudgeAsk): string {
   return starText(peekRooms().nudges.policy, t('langTag') === 'zh', momentText(t, ask))
 }
+/**
+ * The star is done: the person went to GitHub from any "Star on GitHub" (a card or a Settings
+ * row) or said "I already starred". The host writes `starred` and drops the current ask; no
+ * ask comes back on this computer, whatever the cooldown and the asks left.
+ */
+export function markStarred(): void {
+  void roomsCall('nudges/starred', {}).catch(() => undefined)
+}
 /** Off to GitHub (the policy's page), and no more asking anywhere. */
 export function openStar(url?: string): void {
-  void roomsCall('nudges/starred', {}).catch(() => undefined)
+  markStarred()
   openLink(url || peekRooms().nudges.policy.star.url || REPO_URL)
 }
 /** "Not now": the host forgets the current ask. */
@@ -90,7 +98,7 @@ export function dismissStar(): void {
   void roomsCall('nudges/dismiss', {}).catch(() => undefined)
 }
 
-/** One card: the star, a line saying why, "Star on GitHub" and "Not now". */
+/** One card: the star, a line saying why, "Star on GitHub", "Not now" and "I already starred". */
 export function StarNudge({ t, text, onDone }: { t: Translate; text: string; onDone(): void }): ReactNode {
   return h('div', { className: 'nm-star-card', role: 'note' },
     h('div', { className: 'nm-star-head' },
@@ -100,7 +108,8 @@ export function StarNudge({ t, text, onDone }: { t: Translate; text: string; onD
         h('div', { className: 'nm-star-text' }, text))),
     h('div', { className: 'nm-star-actions' },
       h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => { openStar(); onDone() } }, t('starAction')),
-      h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => { dismissStar(); onDone() } }, t('starLater'))))
+      h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => { dismissStar(); onDone() } }, t('starLater')),
+      h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => { markStarred(); onDone() } }, t('starDone'))))
 }
 
 /** The card for a moment, when the host grants the ask; asked once per mount, while `due`. */
