@@ -83,7 +83,7 @@ export function apply(ctx: Context): void {
       ctx.tools.register(
         defineTool({
           name: 'library_add',
-          description: "Put a file into the person's Library (their 构件 room): a document, a web page, an image, a video or audio you made or found for them. `present` does this too for files you deliver at the end of a task; use this for files you want listed without delivering them.",
+          description: "Put a file into the person's Library (their 资源库 room): a document, a web page, an image, a video or audio you made or found for them. `present` does this too for files you deliver at the end of a task; use this for files you want listed without delivering them.",
           parameters: {
             path: { type: 'string', required: true, description: 'Absolute path, or relative to the working directory.' },
             description: { type: 'string', description: 'What it is, in a few words.' },

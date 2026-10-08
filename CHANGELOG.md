@@ -22,6 +22,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - The avatar studio's estimate, when it is more than the day's allowance, points to a key of your own instead of to "adding credit"; nothing is sold.
 - The train-ticket idea no longer speaks of "the phone's Linux sandbox" on a computer (the same list ships on the phones).
 - A failed call on the Models page is told in plain words, like everywhere else.
+- The Library room is 资源库 in Chinese, as on the phone, in the docs and in the ideas it shows; the things in it stay 构件, and the folder under `~/nanoMuse` keeps its name.
 
 ### Android
 
