@@ -21,6 +21,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
+- `scripts/self-host.sh` and the self-hosting page name the SMS sender the relay actually uses (Alibaba Cloud's 号码认证服务 by default, 短信服务 with a template of your own); the script's sentences no longer carry a dash.
 - `docs/ios.md` says build 16 is the 1.0.0 build on TestFlight; the *New Contributors* and *Contributors* lines a release generates no longer carry a dash.
 
 ## [1.0.0] - 2026-10-09 · Keel
