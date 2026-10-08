@@ -560,6 +560,7 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-pf-top { padding-t
 .nm-settings-foot { margin-top: auto; padding-top: 10px; }
 .nm-settings-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .nm-settings-head { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 12px 14px 0; min-height: 36px; }
+.nm-settings-back { margin: 0 auto 0 14px; }
 .nm-settings-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 28px 28px; }
 .nm-settings-body > * { max-width: 560px; }
 .nm-settings-body .nm-page { padding: 0; height: auto; overflow: visible; }

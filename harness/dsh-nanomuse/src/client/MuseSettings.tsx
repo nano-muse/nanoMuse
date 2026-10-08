@@ -19,7 +19,7 @@ import { call, type CloudStatus, type Translate, failureText } from './api.ts'
 import { Avatar } from './Avatar.tsx'
 import { openLink } from './bridge.ts'
 import { settingsBus } from './bus.ts'
-import { IconArchive, IconChevronRight, IconClose, IconCpu, IconDatabase, IconDevices, IconFolder, IconHand, IconHelp, IconImage, IconKey, IconLink, IconLogOut, IconMessage, IconMic, IconPuzzle, IconScale, IconSettings, IconShield, IconSliders, IconSparkle, IconUser, IconVideo, IconWallet } from './icons.tsx'
+import { IconArchive, IconChevronLeft, IconChevronRight, IconClose, IconCpu, IconDatabase, IconDevices, IconFolder, IconHand, IconHelp, IconImage, IconKey, IconLink, IconLogOut, IconMessage, IconMic, IconPuzzle, IconScale, IconSettings, IconShield, IconSliders, IconSparkle, IconUser, IconVideo, IconWallet } from './icons.tsx'
 import { openShortcutsReference } from './keys.ts'
 import { useLive } from './live.ts'
 import type { RenderSlot } from './MuseSidebar.tsx'
@@ -51,26 +51,8 @@ export interface OnboardingStep {
   order: number
 }
 
-/** Shell state: whether the dialog is open and which page shows. */
-export interface ShellState {
-  open: boolean
-  activeId: string | undefined
-}
-export function createShellStore() {
-  let state: ShellState = { open: false, activeId: undefined }
-  const listeners = new Set<() => void>()
-  const set = (next: ShellState) => { state = next; for (const l of listeners) l() }
-  return {
-    getSnapshot: () => state,
-    subscribe: (l: () => void) => { listeners.add(l); return () => { listeners.delete(l) } },
-    open: () => set({ ...state, open: true }),
-    close: () => set({ open: false, activeId: undefined }),
-    select: (id: string) => set({ ...state, activeId: id }),
-    openSection: (id: string) => set({ open: true, activeId: id }),
-    toggle: () => (state.open ? set({ open: false, activeId: undefined }) : set({ ...state, open: true })),
-  }
-}
-export type ShellStore = ReturnType<typeof createShellStore>
+import { type ShellStore } from './settings-shell.ts'
+export { createShellStore, type ShellState, type ShellStore } from './settings-shell.ts'
 
 /** The id our onboarding step is registered under (the shipped one, so the coordinator shows ours in that turn). */
 const ONBOARDING_STEP = 'deepseek-official'
@@ -114,6 +96,9 @@ function navIcon(id: string): ReactNode {
 }
 
 interface PanelProps {
+  /** The page the current one was opened from, when a link on it brought us here. */
+  from: string | undefined
+  onBack: () => void
   t: Translate
   rows: readonly SectionRow[]
   renderSlot: RenderSlot
@@ -122,7 +107,7 @@ interface PanelProps {
   onClose(): void
 }
 
-function SettingsPanel({ t, rows, renderSlot, activeId, onSelect, onClose }: PanelProps): ReactNode {
+function SettingsPanel({ t, rows, renderSlot, activeId, from, onSelect, onBack, onClose }: PanelProps): ReactNode {
   const live = useLive()
   const [signingOut, setSigningOut] = useState(false)
   const titleId = useId()
@@ -132,6 +117,9 @@ function SettingsPanel({ t, rows, renderSlot, activeId, onSelect, onClose }: Pan
   const active = rows.find((r) => r.id === activeId)?.id ?? rows[0]?.id
   const primary = PRIMARY.map((id) => rows.find((r) => r.id === id)).filter((r): r is SectionRow => r !== undefined)
   const advanced = rows.filter((r) => !PRIMARY.includes(r.id))
+  // the page a link brought us from, named so the way back is one click (a jump into
+  // Advanced from Models or General otherwise leaves the person to find the page again)
+  const fromRow = from !== undefined && from !== active ? rows.find((r) => r.id === from) : undefined
 
   const cell = (row: SectionRow) => h('button', {
     key: row.id,
@@ -169,6 +157,9 @@ function SettingsPanel({ t, rows, renderSlot, activeId, onSelect, onClose }: Pan
             : null),
         h('div', { className: 'nm-settings-content' },
           h('div', { className: 'nm-settings-head' },
+            fromRow
+              ? h('button', { type: 'button', className: 'nm-cn-back nm-settings-back', 'data-testid': 'nm-settings-back', 'aria-label': t('navBackTo', { page: fromRow.label }), onClick: onBack }, h(IconChevronLeft, { size: 16 }), fromRow.label)
+              : null,
             renderSlot('settings.action', {}),
             h('button', { type: 'button', className: 'nm-close', onClick: onClose },
               h(IconClose, { size: 14 }),
@@ -180,7 +171,7 @@ function SettingsPanel({ t, rows, renderSlot, activeId, onSelect, onClose }: Pan
 
 export function MuseSettings(props: MuseSettingsProps): ReactNode {
   const { t, store, renderSlot, useSections, useOnboardingSteps, useSessions } = props
-  const { open, activeId } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const { open, activeId, from } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const rows = useSections((s) => s)
   const steps = useOnboardingSteps((s) => s)
   const [requested, setRequested] = useState<string | undefined>()
@@ -250,7 +241,7 @@ export function MuseSettings(props: MuseSettingsProps): ReactNode {
       openSettings: () => store.open(),
       openOnboarding: (id: string) => { store.close(); setRequested(id) },
     }, { fallback: null }),
-    open ? h(SettingsPanel, { t, rows, renderSlot, activeId, onSelect: (id) => store.select(id), onClose: () => store.close() }) : null,
+    open ? h(SettingsPanel, { t, rows, renderSlot, activeId, from, onSelect: (id) => store.select(id), onBack: () => store.back(), onClose: () => store.close() }) : null,
     step !== undefined
       ? renderSlot('settings.onboarding', {
           stepId: step.id,
