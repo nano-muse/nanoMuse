@@ -20,6 +20,8 @@ final class NanoMuseUpdateCheck: ObservableObject {
     nonisolated static let indexURL = "https://nanomuse.cn/dl/index.json"
     nonisolated static let githubURL = "https://api.github.com/repos/nano-muse/nanoMuse/releases/latest"
     nonisolated static let fallbackReleasePage = "https://github.com/nano-muse/nanoMuse/releases/latest"
+    /// The download page on nanomuse.cn, where a release found through the index leads (Android's `DOWNLOAD_URL`).
+    nonisolated static let downloadPage = "https://nanomuse.cn/dl/"
 
     private enum Keys {
         static let latest = "nm.update.latest"
@@ -108,29 +110,46 @@ final class NanoMuseUpdateCheck: ObservableObject {
         Task { @MainActor [self] in await checkNow() }
     }
 
-    private struct Found: Sendable {
+    struct Found: Sendable, Equatable {
         var version: String
         var page: String?
     }
 
     /// The download index first, GitHub second. Nil when neither answered usefully.
     private static func fetchLatest() async -> Found? {
-        if let json = await fetchJSON(indexURL) {
-            // {"ios": {"version": "1.4.0", "url": "…"}, "latest": "1.4.0", "page": "…"}
-            let ios = json["ios"] as? [String: Any]
-            let version = (ios?["version"] as? String) ?? (json["latest"] as? String) ?? (json["version"] as? String)
-            if let version, !version.isEmpty {
-                let page = (ios?["page"] as? String) ?? (ios?["url"] as? String) ?? (json["page"] as? String)
-                return Found(version: version, page: page)
-            }
+        if let json = await fetchJSON(indexURL), let found = parseIndex(json) {
+            return found
         }
-        if let json = await fetchJSON(githubURL) {
-            // GitHub's release object: tag_name and html_url.
-            if let tag = json["tag_name"] as? String, !tag.isEmpty {
-                return Found(version: tag, page: json["html_url"] as? String)
-            }
+        if let json = await fetchJSON(githubURL), let found = parseGitHubLatest(json) {
+            return found
         }
         return nil
+    }
+
+    /// The index as `scripts/release-sync.py` writes it, `{"releases": [{"tag": "v1.0.0", …}, …]}`
+    /// newest first (what Android reads): the first release with a tag, leading to the download
+    /// page. Older shapes (`ios.version`, `latest`, `version`, with `page` / `url`) still count,
+    /// so a changed index does not leave the row saying "Could not check".
+    nonisolated static func parseIndex(_ json: [String: Any]) -> Found? {
+        if let releases = json["releases"] as? [[String: Any]] {
+            for release in releases {
+                if let tag = release["tag"] as? String, !normalize(tag).isEmpty {
+                    let page = (release["page"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? downloadPage
+                    return Found(version: tag, page: page)
+                }
+            }
+        }
+        let ios = json["ios"] as? [String: Any]
+        let version = (ios?["version"] as? String) ?? (json["latest"] as? String) ?? (json["version"] as? String)
+        guard let version, !normalize(version).isEmpty else { return nil }
+        let page = (ios?["page"] as? String) ?? (ios?["url"] as? String) ?? (json["page"] as? String) ?? downloadPage
+        return Found(version: version, page: page)
+    }
+
+    /// GitHub's release object: `tag_name` and `html_url`.
+    nonisolated static func parseGitHubLatest(_ json: [String: Any]) -> Found? {
+        guard let tag = json["tag_name"] as? String, !normalize(tag).isEmpty else { return nil }
+        return Found(version: tag, page: json["html_url"] as? String)
     }
 
     private static func fetchJSON(_ address: String) async -> [String: Any]? {

@@ -460,6 +460,13 @@ Ours, in `NanoMuse/`:
   plan's 429 reaches the reach card, so *Resets in …* shows for a ChatGPT or Claude plan. A
   post's detail rows are a `Grid` whose label column takes the longest label; the avatar size
   is a menu, not five segments.
+- **The third audit: the version row (1.0.x)** (`NanoMuseUpdateCheck.swift`,
+  `MinisTests/NanoMuseLogicTests.swift`): the download index at `nanomuse.cn/dl/index.json` is
+  `{"releases": [{"tag": "v1.0.0", …}, …]}`, newest first, and that is what the row reads now,
+  as Android's `UpdateCheck.parseIndex` does; the shapes the row used to look for (`ios.version`,
+  `latest`) were never written, so on a phone that cannot reach GitHub the row always said *Could
+  not check*. A release found through the index leads to `nanomuse.cn/dl/`; one found through
+  GitHub leads to its release page. `parseIndex` and `parseGitHubLatest` are pure and tested.
 
 ## Building on a Mac
 

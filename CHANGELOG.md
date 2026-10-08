@@ -43,6 +43,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
+- The Version row in Settings reads the download index the way Android does (the newest release's tag in `releases`), so it finds the latest release from mainland China too, where GitHub is not reliably reachable; before, the index was read in a shape it never had, and the row said *Could not check* whenever GitHub did not answer. A tap on a newer version opens the download page.
+
 ### Project
 
 - `scripts/self-host.sh` and the self-hosting page name the SMS sender the relay actually uses (Alibaba Cloud's 号码认证服务 by default, 短信服务 with a template of your own); the script's sentences no longer carry a dash.
