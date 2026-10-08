@@ -35,8 +35,8 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 
 ## 🗞️ 最新消息
 
-- `2026-10-07` 📄 我們的論文已發布在 [arXiv](https://arxiv.org/abs/2610.08699)。
 - `2026-10-09` 🚀 最新版本：[1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0)。
+- `2026-10-07` 📄 我們的論文已發布在 [arXiv](https://arxiv.org/abs/2610.08699)。
 - `2026-09-25` 🎉 nanoMuse 發布。
 
 全部版本：[releases](https://github.com/nano-muse/nanoMuse/releases)。
@@ -47,7 +47,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 |---|---|
 | **瀏覽器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：一台模擬手機上的 nanoMuse，登入後體驗。這是示範；下面的用戶端才是正式的 |
 | **Android** 8.0 以上，arm64 | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk)：每個版本都用同一把金鑰簽署，直接覆蓋安裝即可升級 |
-| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc)：測試版；Apple 的 beta 審核通過後，就能從這個連結安裝 · [iOS](../ios.md) |
+| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc)：測試版，公開連結等 Apple 審核；通過後從這個連結安裝 · [iOS](../ios.md) |
 | **macOS** 12 以上 | [Apple 晶片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-x64.dmg)：未經公證：第一次右鍵 → 打開 |
 | **Windows** 10 以上 | [nanoMuse-Desktop-1.0.0-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-win-x64.exe)：點一次「仍要執行」 |
 | **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.tar.gz) |

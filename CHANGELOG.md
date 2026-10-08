@@ -19,6 +19,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Project
 
 - `docs/ios.md` says build 16 is the 1.0.0 build on TestFlight; the *New Contributors* and *Contributors* lines a release generates no longer carry a dash.
+- The *News* list of the README and its nine translations is newest first again (1.0.0, then the paper, then the first release); the Chinese READMEs and the docs home pages say the TestFlight link is public once Apple's review passes, and the docs home install tables no longer carry a dash. The release recipe in CONTRIBUTING.md says the latest-version line moves to the top.
 
 ## [1.0.0] - 2026-10-09 · Keel
 
