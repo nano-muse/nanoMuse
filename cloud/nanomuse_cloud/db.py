@@ -122,7 +122,8 @@ CREATE TABLE IF NOT EXISTS video_tasks (
     charged       INTEGER NOT NULL DEFAULT 0,  -- set when the task was first seen SUCCEEDED
     cost_uy       INTEGER NOT NULL DEFAULT 0,  -- priced at submission from the seconds asked for
     probe         INTEGER NOT NULL DEFAULT 0,  -- an empty task the app sent to see if the model exists
-    status        TEXT NOT NULL DEFAULT ''     -- the provider's last word: SUCCEEDED / FAILED / ...
+    status        TEXT NOT NULL DEFAULT '',    -- the provider's last word: SUCCEEDED / FAILED / ...
+    checks        INTEGER NOT NULL DEFAULT 0   -- 0.24: times the relay itself asked the provider (settle_video_tasks)
 );
 -- 0.4: conversations an account chose to contribute (accounts.contribute=1). The only
 -- place message content ever lands; empty for everyone else, and deleted with the account
@@ -348,7 +349,11 @@ class Database:
             if col not in cols("accounts"):
                 self._conn.execute(f"ALTER TABLE accounts ADD COLUMN {col} {ddl}")
         self._conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS accounts_invite_code ON accounts(invite_code) WHERE invite_code<>''")
-        for col, ddl in (("probe", "INTEGER NOT NULL DEFAULT 0"), ("status", "TEXT NOT NULL DEFAULT ''")):
+        for col, ddl in (
+            ("probe", "INTEGER NOT NULL DEFAULT 0"),
+            ("status", "TEXT NOT NULL DEFAULT ''"),
+            ("checks", "INTEGER NOT NULL DEFAULT 0"),
+        ):
             if col not in cols("video_tasks"):
                 self._conn.execute(f"ALTER TABLE video_tasks ADD COLUMN {col} {ddl}")
         if "contribute" not in cols("accounts"):
@@ -1429,7 +1434,7 @@ class Database:
             r = self._conn.execute(
                 "SELECT COALESCE(SUM(cost_uy),0) FROM video_tasks WHERE account_id=? AND charged=0 "
                 "AND probe=0 AND status NOT IN ('FAILED','CANCELED','UNKNOWN') AND created_at >= ?",
-                (account_id, now() - 3600),
+                (account_id, now() - self.VIDEO_HOLD_S),
             ).fetchone()
         return int(r[0])
 
@@ -1625,7 +1630,7 @@ class Database:
                 "ON CONFLICT(task_id) DO UPDATE SET model=excluded.model, cost_uy=excluded.cost_uy",
                 (task_id, account_id, model, t, max(0, int(cost_uy)), 1 if probe else 0),
             )
-            c.execute("DELETE FROM video_tasks WHERE created_at < ?", (t - 3 * 86400,))
+            c.execute("DELETE FROM video_tasks WHERE created_at < ?", (t - self.VIDEO_KEEP_S,))
 
     def video_task(self, task_id: str) -> sqlite3.Row | None:
         with self._lock:
@@ -1640,6 +1645,31 @@ class Database:
         with self.tx() as c:
             cur = c.execute("UPDATE video_tasks SET charged=1 WHERE task_id=? AND charged=0", (task_id,))
             return cur.rowcount == 1
+
+    VIDEO_HOLD_S = 3600  # how long a task's price is held against the allowance (pending_video_cost)
+    VIDEO_KEEP_S = 3 * 86400  # how long a task row is kept (insert_video_task purges older ones)
+
+    def video_tasks_to_settle(self, limit: int = 5, first_after_s: int = 3000) -> list[sqlite3.Row]:
+        """Tasks the relay should ask the provider about itself (0.24): still unsettled and
+        never polled to an end by the app, once shortly before the hold lapses
+        (`first_after_s` after submission) and once more shortly before the row is purged.
+        A handful per call, oldest first; a task answered FAILED/CANCELED/UNKNOWN, charged,
+        or a probe is not asked about."""
+        t = now()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM video_tasks WHERE charged=0 AND probe=0 "
+                "AND status NOT IN ('FAILED','CANCELED','UNKNOWN') "
+                "AND ((checks=0 AND created_at <= ?) OR (checks=1 AND created_at <= ?)) "
+                "ORDER BY created_at LIMIT ?",
+                (t - first_after_s, t - (self.VIDEO_KEEP_S - self.VIDEO_HOLD_S), max(1, int(limit))),
+            ).fetchall()
+        return list(rows)
+
+    def note_video_check(self, task_id: str) -> None:
+        """The relay asked the provider about this task and got an answer."""
+        with self.tx() as c:
+            c.execute("UPDATE video_tasks SET checks=checks+1 WHERE task_id=?", (task_id,))
 
     # -- the catalog's probes (catalog.py) ----------------------------------------
 

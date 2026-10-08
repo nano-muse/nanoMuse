@@ -92,7 +92,9 @@ The relay is the code in [`cloud/`](../cloud/README.md). It stores:
 - a timeline of account events — signed in, failed sign-in, password set or
   changed, signed out, refused for budget, upstream error — with a
   device name, a model or an error code as the detail, never message content;
-- the id of each video task, so only the account that started one can poll it;
+- the id of each video task with its price and the provider's last word on it,
+  so only the account that started one can poll it and the clip is charged once
+  (the rows go after three days);
 - the agent's name and look (`/v1/me/profile`): which face it wears — the dragon,
   an emoji on a colour, or one drawn in the avatar studio, with that face's five
   stills as small WebP pictures — so every device of the account shows the same
@@ -286,7 +288,13 @@ of the night; the hour the reply comes in decides. `qwen3.8-27b`, the hands
 model, usable for chat too, is ¥3 / ¥12; `qwen3.8-flash` ¥0.8 / ¥2.7;
 `qwen-image-3.0` ¥0.18 a picture, and an edit adds ¥0.02 for the picture sent
 in; `wan2.2-i2v-flash` ¥0.10 a second of video at 480P (a 5-second clip is
-¥0.50), ¥0.20 a second at 720P and ¥0.48 at 1080P. The part of a prompt the
+¥0.50), ¥0.20 a second at 720P and ¥0.48 at 1080P. A clip is charged once its
+task is done, at the price fixed when it was asked for; until then the price is
+held against the pool for up to an hour. An app that was closed never comes
+back for the answer, so since relay 0.24 the relay asks the provider itself,
+once before that hour is up and once more before the task's row is dropped:
+a finished clip is charged then, a failed one costs nothing, and a later poll
+from the app charges nothing more. The part of a prompt the
 provider served from its cache (the system prompt and the history, turn after
 turn) is counted at the provider's cached rate, 10 % of the input price on
 DeepSeek and 20 % on the Qwen models, as the reply's `usage` reports it. The
