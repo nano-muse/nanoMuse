@@ -29,7 +29,7 @@ export function CommunityNotice({ compact = false, className }: { compact?: bool
         )}
       </p>
       <p className={cx("mt-1.5 leading-relaxed text-fg/85", compact ? "text-[12.5px]" : "text-[13px]")}>
-        {t("This is a preview; the people building it use it every day. Report a bug, ask for a feature, send a pull request: that is what moves the project. A star on GitHub helps others find it.")}
+        {t("The people building it use it every day. Report a bug, ask for a feature, send a pull request: that is what moves the project. A star on GitHub helps others find it.")}
       </p>
       <div className="mt-3 flex flex-wrap gap-2 text-[12.5px] font-medium">
         {/* going to GitHub from here counts as the star being done: the asks stop (C1) */}

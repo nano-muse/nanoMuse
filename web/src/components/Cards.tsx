@@ -31,7 +31,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, fileUrl, frameUrl } from "../api";
 import { AllowanceWays } from "./AllowanceWays";
-import { localLabel, t, useT } from "../i18n";
+import { localLabel, localReason, t, useT } from "../i18n";
 import { useStore } from "../store";
 import type {
   ApprovalEvent,
@@ -303,7 +303,7 @@ export function ApprovalCard({
           <div className="space-y-1 px-4 pb-2">
             {event.warnings.map((w) => (
               <div key={w} className="flex items-start gap-1.5 text-[12.5px] text-rose-600 dark:text-rose-300">
-                <AlertTriangle size={13} className="mt-0.5 shrink-0" /> <span>{w}</span>
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" /> <span>{t(w)}</span>
               </div>
             ))}
           </div>
@@ -316,7 +316,7 @@ export function ApprovalCard({
               <div ref={previewRef} className={cx("-mt-1", !showArgs && "max-h-40 overflow-hidden")}>
                 <ArgsList args={event.args} />
                 {event.reasons?.length > 0 && (
-                  <div className="mt-1.5 text-[12px] text-muted">{t("Why it asks: {reasons}", { reasons: event.reasons.join(" · ") })}</div>
+                  <div className="mt-1.5 text-[12px] text-muted">{t("Why it asks: {reasons}", { reasons: event.reasons.map(localReason).join(" · ") })}</div>
                 )}
               </div>
               {(overflows || showArgs) && (

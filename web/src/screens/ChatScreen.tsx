@@ -11,7 +11,7 @@ import { Markdown, splitBlocks } from "../components/Markdown";
 import { MuseHeader, MuseRoundButton } from "../components/MuseHeader";
 import { MoreMenu } from "../components/TabHeader";
 import { stripNamingFence } from "../fences";
-import { localLabel, useLocale, useT } from "../i18n";
+import { localDetail, localLabel, useLocale, useT } from "../i18n";
 import { mentionSuggestions, mentionTarget } from "../mention";
 import { WORKING_TTL_MS } from "../presence";
 import { useStore } from "../store";
@@ -697,8 +697,9 @@ function Composer({
       api.upload(item.file)
         .then((info) => setPending((cur) => cur.map((p) => (p.key === item.key ? { ...p, info } : p))))
         .catch((e: Error) => {
-          setPending((cur) => cur.map((p) => (p.key === item.key ? { ...p, error: e.message || t("Upload failed") } : p)));
-          toast(e.message || t("Upload failed"));
+          const why = e.message ? localDetail(e.message) : t("Upload failed");
+          setPending((cur) => cur.map((p) => (p.key === item.key ? { ...p, error: why } : p)));
+          toast(why);
         });
     }
   };

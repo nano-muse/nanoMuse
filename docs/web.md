@@ -184,6 +184,24 @@ with an error: …* and the five the operator's switches send
 
 The raw reply stays under *Details* for a bug report, never as the only thing shown.
 
+**A connection test that fails** (*Test* under a model, the hands) says the same
+sentence a chat turn would for that error (`POST /api/connections/llm/test`
+answers `{ok: false, code, error, detail}`; `error` is the sentence, `detail`
+the provider's words), with *Details* under it.
+
+**Why the Sentinel asks** is written by the runtime from its settings
+(`'shell' is in always_ask_tools`, `risk level is 'sensitive' (mode=ask)`,
+`covered by your 'always' permission for shell:ls`, the taint sentence);
+`localReason()` in `web/src/i18n/index.ts` knows those shapes and renders each
+as a sentence in the console's language, keeping the tool, the risk and the
+destination. The same words appear under a denied step in today's record. A
+shape it does not know is shown as it came.
+
+**Permissions you granted** (avatar → Permissions) are listed by the risk class
+of the tool they cover, the gravest first: sensitive, moderate, low, safe (the
+class comes from `GET /api/state` → `settings.tools`); each row says the tool,
+how long the grant lasts and when it was given, and can be revoked on its own.
+
 ## Checks
 
 ```sh

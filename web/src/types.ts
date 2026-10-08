@@ -1189,7 +1189,11 @@ export interface CalendarData {
 
 export interface TestResult {
   ok: boolean;
+  /** what went wrong, as the sentence a chat turn would show (a dictionary key) */
   error?: string;
+  /** a model test: the error's own words, one tap away for bug reports */
+  detail?: string;
+  code?: string;
   reply?: string;
   ms?: number;
   inbox?: number | null;
