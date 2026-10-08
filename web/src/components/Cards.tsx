@@ -424,10 +424,27 @@ function noticeText(event: NoticeEvent): string {
   return t(event.text, event.vars);
 }
 
-export function Notice({ event }: { event: NoticeEvent }) {
+/**
+ * A line from the runtime. `onCloudRetry` is *Use nanoMuse Cloud this time* under a failed
+ * turn of one's own model (the own-key models contract, section 4): the same words again,
+ * one turn on the account's model, the next back on the own key. The chat screen passes it
+ * when the person is signed in, the chat is not the account's and the failed turn was not
+ * on the account already.
+ */
+export function Notice({ event, onCloudRetry }: { event: NoticeEvent; onCloudRetry?: () => Promise<void> }) {
   const t = useT();
   const [showDetail, setShowDetail] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
   const detail = event.detail && event.detail !== event.text ? event.detail : null;
+  const retryOnCloud = () => {
+    if (!onCloudRetry) return;
+    setBusy(true);
+    setCloudError(null);
+    onCloudRetry()
+      .catch((e: Error) => setCloudError(t(e.message || "Could not send")))
+      .finally(() => setBusy(false));
+  };
   // the relay refused the turn for a spent allowance: the sentence, then the three ways on
   if (event.code === "allowance" && event.allowance) {
     return (
@@ -458,6 +475,19 @@ export function Notice({ event }: { event: NoticeEvent }) {
             </button>
             {showDetail && <div className="mt-1.5 break-all text-left font-mono text-[11px] opacity-80">{detail}</div>}
           </>
+        )}
+        {onCloudRetry && (
+          <div className="mt-1.5 flex flex-col items-center gap-1">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={retryOnCloud}
+              className="rounded-full bg-accent/12 px-3 py-1 text-[12px] font-medium text-accent disabled:opacity-50"
+            >
+              {t("Use nanoMuse Cloud this time")}
+            </button>
+            {cloudError && <div className="text-[12px] text-rose-700 dark:text-rose-300">{cloudError}</div>}
+          </div>
         )}
       </div>
     </div>

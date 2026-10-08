@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { DRAGON } from "../avatars";
 import { Avatar } from "../components/Avatar";
+import { NOTICE_URL } from "../components/CommunityNotice";
 import { AVATAR_COLORS } from "../components/AvatarPicker";
 import { SignIn } from "../components/SignIn";
 import { identityOf } from "../components/IdentityForm";
@@ -125,6 +126,12 @@ export function Onboarding() {
               <Point n={3} title={t("It asks you first where it matters.")} body={t("A separate Sentinel reviews every action. Sending, paying, deleting: it stops and asks; your keys stay in a vault the model cannot read.")} />
             </ul>
             <p className="mt-5 max-w-sm text-[13px] text-muted">{t("There is no form to fill in: once it has a model, it introduces itself in the chat and asks what to call you.")}</p>
+            {/* the community line the sign-in gate says, for a runtime that does not ask for an account */}
+            <p className="mt-2 max-w-sm text-[13px] text-muted">
+              <a href={NOTICE_URL} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-accent">
+                {t("nanoMuse is a non-profit open-source community project, free forever.")}
+              </a>
+            </p>
           </div>
         )}
 

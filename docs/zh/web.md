@@ -59,6 +59,8 @@
 
 原始回复留在「详情」下面，供提 bug 时用，从不作为唯一显示的内容。
 
+**你自己的模型失败的一个回合**（key 被拒、端点不认识这个模型、限流、超时、连不上）显示它那句话，并且在你已登录、聊天没有用账号模型时，多一个按钮「这次改用 nanoMuse Cloud」（own-key 模型约定第 4 节；桌面端和手机端有同样的按钮）。它把同样的话带着 `via: "cloud"` 再发一次（`POST /api/threads/{id}/send`，或 socket 的 `send` 帧）：运行时用账号的 key 在中继推荐的聊天模型上跑这一个回合，下一回合回到你的模型。`[llm]`、「使用 nanoMuse Cloud 模型」开关和这段对话都不动；关掉 Cloud 模型后，只有这个按钮会花额度。用户气泡、回复和这一回合的失败提示都带 `model_used`（模型 id）；回复下面显示「这次由 nanoMuse Cloud 回答（模型）」，带 `model_used` 的失败提示不再给出这个按钮。未登录时运行时回 `401 signed_out`，句子是「请先登录 nanoMuse Cloud。」，显示在按钮下面。聊天模型是账号的时候关掉「使用 nanoMuse Cloud 模型」会被拒绝（`409 chat_on_cloud`，「先添加一个自己的服务商；关掉 nanoMuse Cloud 后没有别的模型能回答。」），显示在开关下面。
+
 **连接测试失败**（模型、动手下面的「测试」）说的是同一个错误在聊天里会说的那句话（`POST /api/connections/llm/test` 返回 `{ok: false, code, error, detail}`；`error` 是那句话，`detail` 是服务商的原话），下面带「详情」。
 
 **哨兵为什么询问**由运行时根据它的设置写出（`'shell' is in always_ask_tools`、`risk level is 'sensitive' (mode=ask)`、`covered by your 'always' permission for shell:ls`、污点那句）；`web/src/i18n/index.ts` 里的 `localReason()` 认识这些形状，把每一条按控制台的语言写成一句话，保留工具、风险和目的地。今日记录里被拒绝的一步下面是同样的话。不认识的形状原样显示。

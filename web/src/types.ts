@@ -37,6 +37,8 @@ export interface UserEvent extends BaseEvent {
   /** a synced message written on another device of the account */
   via_device?: string;
   via_device_name?: string;
+  /** *Use nanoMuse Cloud this time*: the model id this one turn ran on */
+  model_used?: string;
 }
 
 export interface AssistantEvent extends BaseEvent {
@@ -45,6 +47,8 @@ export interface AssistantEvent extends BaseEvent {
   reasoning?: string;
   /** A background pass that found nothing worth interrupting you for. */
   quiet?: boolean;
+  /** *Use nanoMuse Cloud this time*: the model id this reply came from */
+  model_used?: string;
   /** the device whose Muse said this (a chat addressed to a device) */
   device?: string;
   /** a synced reply written on another device of the account */
@@ -115,6 +119,8 @@ export interface NoticeEvent extends BaseEvent {
   code?: string;
   /** the raw exception, for bug reports */
   detail?: string;
+  /** the failed turn ran on *Use nanoMuse Cloud this time* already: the model id */
+  model_used?: string;
   /** values for the {placeholders} in `text` */
   vars?: Record<string, string | number>;
   source?: string;

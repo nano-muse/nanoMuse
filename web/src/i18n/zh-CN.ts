@@ -107,6 +107,8 @@ const zhCN: Record<string, string> = {
   "24h": "24 小时",
   low: "低",
   "Stopped.": "已停止。",
+  "Use nanoMuse Cloud this time": "这次改用 nanoMuse Cloud",
+  "Answered by nanoMuse Cloud this time ({model})": "这次由 nanoMuse Cloud 回答（{model}）",
   Deny: "拒绝",
   "Allow once": "允许一次",
   Allow: "允许",
@@ -982,6 +984,7 @@ const zhCN: Record<string, string> = {
   "The relay keeps an account id, a masked identifier, usage counts and your agent's name and look; what else, and what is yours to switch off, is in the": "中继保存账号 id、打码后的手机号或邮箱、用量计数和你的智能体的名字与形象；其余保存什么、哪些由你决定，见",
   "privacy policy": "隐私政策",
   "Free, open source, non-profit": "免费、开源、非营利",
+  "nanoMuse is a non-profit open-source community project, free forever.": "nanoMuse 是非营利的开源社区项目，永久免费。",
   "Chat apps": "聊天入口",
   "nanoMuse is a non-profit open-source community project, free forever. Sign in with a phone number or an e-mail and the model comes with a free allowance, paid by the developer; when it is gone, use your own key (Alibaba Cloud Bailian in mainland China, OpenRouter elsewhere). Nothing is sold; what the relay keeps is in the privacy policy, and Settings → Data controls is yours. Delete the account whenever you like.":
     "nanoMuse 是非营利的开源社区项目，永久免费。用手机号或邮箱登录，模型自带一份免费额度，费用由开发者承担；用完可以换自己的 key（中国大陆用阿里云百炼，海外用 OpenRouter）。数据不会出售；服务器保存什么写在隐私政策里，「设置 → 数据控制」由你决定。账号随时可以删除。",
@@ -1753,7 +1756,7 @@ const zhCN: Record<string, string> = {
   "Use nanoMuse Cloud models": "使用 nanoMuse Cloud 模型",
   "nanoMuse Cloud is one of the sources for the chat, the hands, pictures and clips; what runs on it comes off your allowance.": "nanoMuse Cloud 是聊天、双手、图片和短片的来源之一；在它上面运行的内容会消耗你的额度。",
   "Off: nothing runs on nanoMuse Cloud unless you choose it yourself. You stay signed in for sync and your devices.": "关闭后，除非你自己选择，否则不会有任何内容在 nanoMuse Cloud 上运行。账号保持登录，用于同步和你的设备。",
-  "The chat model is nanoMuse Cloud's. Pick another chat model first; then the account's models can be switched off.": "当前聊天模型是 nanoMuse Cloud 的。请先换一个聊天模型，然后才能关掉账号的模型。",
+  "Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer.": "先添加一个自己的服务商；关掉 nanoMuse Cloud 后没有别的模型能回答。",
   "Use your own API key instead": "改用自己的 API key",
   "You can sign in later under Connections, for sync and your devices.": "之后可以在「连接」里登录，用于同步和你的设备。",
 };

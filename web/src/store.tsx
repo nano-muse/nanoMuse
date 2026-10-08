@@ -573,6 +573,8 @@ interface StoreValue {
   state: AppState;
   dispatch: (a: Action) => void;
   send: (thread: string, text: string, files?: string[]) => Promise<void>;
+  /** *Use nanoMuse Cloud this time*: the words again, one turn on the account's model; rejects with the runtime's sentence */
+  sendViaCloud: (thread: string, text: string, files?: string[]) => Promise<void>;
   decide: (id: string, approved: boolean, scope?: string) => Promise<void>;
   loadEvents: (thread: string, before?: string) => Promise<void>;
   refreshGoals: () => Promise<void>;
@@ -783,6 +785,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (files.length > 0 || !wsRef.current?.send({ kind: "send", thread, text, language })) {
             await api.send(thread, text, files, language);
           }
+        } catch (e) {
+          if (e instanceof AuthError) dispatch({ type: "authError" });
+          throw e;
+        }
+      },
+      sendViaCloud: async (thread, text, files = []) => {
+        if (!text.trim() && files.length === 0) return;
+        try {
+          // over REST: a refusal (signed out, the relay down) comes back as an error with its sentence
+          await api.send(thread, text, files, getLocale(), "cloud");
         } catch (e) {
           if (e instanceof AuthError) dispatch({ type: "authError" });
           throw e;
