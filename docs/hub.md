@@ -268,8 +268,10 @@ computer's own hands — is in [every-device.md](every-device.md).
   (the socket, reconnect), [`harness/dsh-nanomuse/src/actions.ts`](../harness/dsh-nanomuse/src/actions.ts)
   (what this computer does for others, the card before a remote action) — [desktop.md](desktop.md).
 - iOS: [`NanoMuse/NanoMuseHub.swift`](../android/src/ios/NanoMuse/NanoMuseHub.swift) —
-  `info`, `open`, `notify`, `task`; `screen` is refused (`no_screen`), the shell and
-  files actions with `not_supported`.
+  `info`, `open`, `notify`, `task` (its `language` is honoured), `stop`; `screen` is
+  refused (`no_screen`), the shell and files actions with `not_supported`. A step of a
+  `task` that needs approval is not sent back as an `event`: with nanoMuse in front the
+  phone shows its own card, in the background the step is declined and the answer says so.
 - Runtime (`nanomuse serve`): [`nanomuse/cloud.py`](../nanomuse/cloud.py)
   (the account), [`nanomuse/hub/client.py`](../nanomuse/hub/client.py) (the
   socket, reconnect), [`nanomuse/hub/actions.py`](../nanomuse/hub/actions.py)

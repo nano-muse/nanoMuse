@@ -60,6 +60,25 @@ enum NanoMuseHubTasks {
 
     // MARK: - task
 
+    /// What this phone's Muse is told. A web console speaks for the person directly; a device's
+    /// Muse gets the context (who asked, from where). `language` is the asking device's screen
+    /// language (`task.language`, docs/hub.md, a BCP-47 tag): when it is there the answer is
+    /// asked for in it, so the person reads the result in the language of the device they used;
+    /// without it the model goes by the text.
+    static func prompt(text: String, senderName: String, senderKind: String, language: String?) -> String {
+        let tag = (language ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(20)
+        var lines: [String] = []
+        if senderKind != "web" {
+            lines.append(String(format: AppLocalized("The following was asked from %@, one of the user's other devices. Do it on this phone and answer in the user's language."), senderName))
+        }
+        if !tag.isEmpty {
+            // For the model, in English: the device that asked shows its screens in this language.
+            lines.append("Answer in the language tagged \(tag); the device that asked shows its screens in it.")
+        }
+        lines.append(text)
+        return lines.joined(separator: "\n\n")
+    }
+
     /// Runs `args.text` on this phone's Muse for the device in `from`; `event` carries progress.
     /// `callId` is the task frame's id, what a `stop {call}` from the same device names.
     static func run(callId: String, args: [String: Any], from: [String: Any], event: @escaping ([String: Any]) -> Void) async -> Outcome {
@@ -89,10 +108,7 @@ enum NanoMuseHubTasks {
         if let sessionId { thinking["session"] = sessionId }
         event(thinking)
 
-        // A web console speaks for the person directly; a device's Muse gets the context.
-        let prompt = senderKind == "web"
-            ? text
-            : String(format: AppLocalized("The following was asked from %@, one of the user's other devices. Do it on this phone and answer in the user's language."), senderName) + "\n\n" + text
+        let prompt = Self.prompt(text: text, senderName: senderName, senderKind: senderKind, language: args["language"] as? String)
 
         running[callId] = Run(senderId: senderId, conversation: conversation)
         defer { running[callId] = nil }

@@ -405,6 +405,11 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   的用量行里对话类写「对话」（`models.slot.chat`，Android 的 `nm_usage_kind_chat`）。
   `NanoMuseCopyTests` 遇到中文里的 "agent"、英文原文说 agent 处的「代理」、「中转」和「双手」
   就失败。
+- **第三轮审计：来自其他设备的任务（1.0.x）**（`NanoMuseHubTasks.swift`、
+  `MinisTests/NanoMuseHubTasksTests.swift`）：`task` 帧带着发起设备的界面语言（`language`，
+  见 [hub.md](hub.md)）；iPhone 的 Muse 现在被要求用这个语言回答，之前只看文字本身，所以在
+  英文桌面上对一个中文网页输入 `@iPhone` 的人会得到英文回答。`NanoMuseHubTasks.prompt`
+  是纯函数，有测试。手机自己发出的 `@设备` 提及从 1.0.0 起就带这个标签。
 
 ## 在 Mac 上构建 {#building-on-a-mac}
 
