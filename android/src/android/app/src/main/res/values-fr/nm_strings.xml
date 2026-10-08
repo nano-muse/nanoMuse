@@ -21,6 +21,7 @@
     <string name="nm_star_title">Une étoile sur GitHub aide</string>
     <string name="nm_star_action">Étoile sur GitHub</string>
     <string name="nm_star_later">Pas maintenant</string>
+    <string name="nm_star_done">Déjà fait</string>
     <string name="nm_star_signed_in">Bienvenue. nanoMuse est gratuit, open source et sans but lucratif : un agent personnel pour quiconque le fait tourner. Si cela compte pour vous, une étoile sur GitHub est ce qui permet à la personne suivante de le trouver.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">Une tâche accomplie. Si nanoMuse a aidé, une étoile sur GitHub le dit à ceux qui le construisent.</item>

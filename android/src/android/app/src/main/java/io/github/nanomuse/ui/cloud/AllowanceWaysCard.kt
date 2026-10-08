@@ -268,6 +268,9 @@ fun AllowanceWaysCard(
                         Spacer(Modifier.width(5.dp))
                         Text(stringResource(R.string.nm_star_action), fontSize = 13.sp, color = MuseTones.action)
                     }
+                    TextButton(onClick = { io.github.nanomuse.community.StarPrompt.markStarred(context); starred = true }) {
+                        Text(stringResource(R.string.nm_star_done), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

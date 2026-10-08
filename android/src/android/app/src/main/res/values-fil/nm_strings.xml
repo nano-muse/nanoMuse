@@ -21,6 +21,7 @@
     <string name="nm_star_title">Nakakatulong ang star sa GitHub</string>
     <string name="nm_star_action">Mag-star sa GitHub</string>
     <string name="nm_star_later">Hindi ngayon</string>
+    <string name="nm_star_done">Nabigyan ko na ng star</string>
     <string name="nm_star_signed_in">Maligayang pagdating. Libre, open source at non-profit ang nanoMuse: isang personal na agent para sa sinumang magpapatakbo nito. Kung may halaga ito sa iyo, ang star sa GitHub ang paraan para mahanap ito ng susunod na tao.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">Isang gawain ang tapos na. Kung nakatulong ang nanoMuse, sinasabi ng star sa GitHub sa mga gumagawa nito na nakatulong nga ito.</item>

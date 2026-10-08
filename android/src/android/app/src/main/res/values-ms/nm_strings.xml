@@ -21,6 +21,7 @@
     <string name="nm_star_title">Bintang di GitHub membantu</string>
     <string name="nm_star_action">Beri bintang di GitHub</string>
     <string name="nm_star_later">Bukan sekarang</string>
+    <string name="nm_star_done">Sudah saya beri bintang</string>
     <string name="nm_star_signed_in">Selamat datang. nanoMuse percuma, sumber terbuka dan bukan untuk keuntungan: ejen peribadi untuk sesiapa yang menjalankannya. Jika ia bermakna bagi anda, bintang di GitHub ialah cara orang seterusnya menjumpainya.</string>
     <plurals name="nm_star_tasks">
         <item quantity="other">%1$d tugas selesai. Jika nanoMuse berguna, bintang di GitHub membantu orang seterusnya menjumpainya.</item>

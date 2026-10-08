@@ -16,6 +16,7 @@ import { usePermissions } from './permissions.ts'
 import { settingsBus } from './bus.ts'
 import { IconBug, IconCheck, IconChevronRight, IconFile, IconHeart, IconLink, IconList, IconPlay, IconScale, IconShield } from './icons.tsx'
 import { useLive } from './live.ts'
+import { openStar } from './AccountPage.tsx'
 import { DOCS_URL, ISSUES_URL, REPO_URL } from './panels.ts'
 import { setPrefs, usePrefs } from './prefs.ts'
 
@@ -114,7 +115,8 @@ export function makeHelpSection(t: Translate, version: string) {
   return function HelpSection(): ReactNode {
     return h('div', { className: 'nm-section' },
       h('div', { className: 'nm-card' },
-        h(LinkRow, { icon: h(IconHeart, { size: 18 }), title: t('helpStar'), sub: t('helpStarSub'), onClick: () => openLink(REPO_URL) }),
+        // going to GitHub from here counts as the star being done: the asks stop (C1)
+        h(LinkRow, { icon: h(IconHeart, { size: 18 }), title: t('helpStar'), sub: t('helpStarSub'), onClick: () => openStar(REPO_URL) }),
         h(LinkRow, { icon: h(IconFile, { size: 18 }), title: t('helpDocs'), onClick: () => openLink(DOCS_URL) }),
         h(LinkRow, { icon: h(IconLink, { size: 18 }), title: t('helpSite'), sub: 'nanomuse.cn', onClick: () => openLink(SITE_URL) }),
         h(LinkRow, { icon: h(IconLink, { size: 18 }), title: t('helpDiscuss'), onClick: () => openLink(DISCUSS_URL) }),

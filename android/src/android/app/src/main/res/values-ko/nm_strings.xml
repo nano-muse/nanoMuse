@@ -21,6 +21,7 @@
     <string name="nm_star_title">GitHub 별 하나가 도움이 됩니다</string>
     <string name="nm_star_action">GitHub에서 별 주기</string>
     <string name="nm_star_later">나중에</string>
+    <string name="nm_star_done">이미 별을 눌렀어요</string>
     <string name="nm_star_signed_in">환영합니다. nanoMuse는 무료이고 오픈 소스이며 비영리입니다: 누구나 쓸 수 있는 개인 에이전트입니다. 그 점이 가치 있다고 느끼신다면, GitHub의 별 하나가 다음 사람이 이 프로젝트를 찾는 길이 됩니다.</string>
     <plurals name="nm_star_tasks">
         <item quantity="other">%1$d개의 작업을 마쳤습니다. nanoMuse가 쓸모 있다면, GitHub의 별 하나가 다음 사람이 찾는 데 도움이 됩니다.</item>

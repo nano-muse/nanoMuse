@@ -12,6 +12,7 @@ import { pickAsset } from '../desk.ts'
 import { call, type Translate } from './api.ts'
 import { bridge, openLink } from './bridge.ts'
 import { useLive, type UpdateInfo } from './live.ts'
+import { openStar } from './AccountPage.tsx'
 import { DOCS_URL, ISSUES_URL, REPO_URL } from './panels.ts'
 import { Sheet } from './ui.tsx'
 
@@ -116,14 +117,15 @@ export function makeAboutSheet(t: Translate, bundle: string) {
             h('span', { className: 'nm-row-title' }, t('legalLicense')),
             h('span', { className: 'nm-row-sub nm-wrap' }, t('legalLicenseText'))))),
       h('div', { className: 'nm-card' },
-        link(t('gnStar'), REPO_URL),
+        // going to GitHub from here counts as the star being done: the asks stop (C1)
+        link(t('gnStar'), REPO_URL, () => openStar(REPO_URL)),
         link(t('abReleases'), RELEASES_URL),
         link(t('abDocs'), DOCS_URL),
         link(t('abIssues'), ISSUES_URL)))
   }
 }
 
-function link(label: string, url: string): ReactNode {
-  return h('button', { type: 'button', className: 'nm-row nm-row-button', onClick: () => openLink(url) },
+function link(label: string, url: string, onClick: () => void = () => openLink(url)): ReactNode {
+  return h('button', { type: 'button', className: 'nm-row nm-row-button', onClick },
     h('div', { className: 'nm-row-main' }, h('span', { className: 'nm-row-title' }, label), h('span', { className: 'nm-row-sub' }, url.replace(/^https:\/\//, ''))))
 }

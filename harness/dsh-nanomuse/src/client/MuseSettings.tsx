@@ -335,7 +335,8 @@ export function makeGeneralSection(t: Translate, version: string) {
       h('h2', null, t('gnAbout')),
       h('div', { className: 'nm-card' },
         h(UpdateRow, { t, bundle: version }),
-        h('button', { type: 'button', className: 'nm-row nm-row-button', onClick: () => openLink(REPO_URL) },
+        // going to GitHub from here counts as the star being done: the asks stop (C1)
+        h('button', { type: 'button', className: 'nm-row nm-row-button', onClick: () => openStar(REPO_URL) },
           h('div', { className: 'nm-row-main' },
             h('span', { className: 'nm-row-title' }, t('gnStar')),
             h('span', { className: 'nm-row-sub' }, t('gnStarSub'))),

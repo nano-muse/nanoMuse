@@ -333,7 +333,8 @@ thirtieth task it finishes for you, on the seventh and thirtieth day you open
 it, when a goal is reached, when a new face is drawn, once on the account page,
 and when the pool is spent — with at least a week between two asks and at most
 four per device. Each ask is a card where it happens; "Not now" counts as one,
-and none comes back after you have been to the page. The operator changes the
+and none comes back after you have been to the page or said "I already
+starred" (per device; the account does not carry the flag). The operator changes the
 policy on the admin page (*Settings › Star asks*) without an app update; every
 app keeps the same defaults built in for when the relay cannot be reached. The
 policy says *when* and, if the operator wants, *what*: the words on the card

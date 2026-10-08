@@ -21,6 +21,7 @@
     <string name="nm_star_title">O stea pe GitHub ajută</string>
     <string name="nm_star_action">Dă o stea pe GitHub</string>
     <string name="nm_star_later">Nu acum</string>
+    <string name="nm_star_done">Am dat deja steaua</string>
     <string name="nm_star_signed_in">Bine ai venit. nanoMuse este gratuit, open source și nonprofit: un agent personal pentru oricine îl rulează. Dacă asta înseamnă ceva pentru tine, o stea pe GitHub este felul în care următoarea persoană îl găsește.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">O sarcină încheiată. Dacă nanoMuse a ajutat, o stea pe GitHub le spune celor care îl construiesc că a făcut-o.</item>

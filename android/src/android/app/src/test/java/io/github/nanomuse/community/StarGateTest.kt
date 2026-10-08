@@ -90,11 +90,17 @@ class StarGateTest {
     }
 
     @Test
-    fun `a tap on the star ends every ask for good`() {
+    fun `a tap on the star, or I already starred, ends every ask for good`() {
+        // starred with nothing ever shown: what "I already starred" on the first card leaves behind
         val starred = Ledger(starred = true)
+        assertEquals(0, starred.asks)
         assertFalse(Gate.due(policy, starred, Ask(Moment.TASKS, 3), now))
         assertFalse(Gate.due(policy, starred, Ask(Moment.EXHAUSTED), now))
-        assertFalse(Gate.due(policy.copy(cooldownDays = 0, maxAsks = 99), starred, Ask(Moment.DAYS_USED, 7), now))
+        val generous = policy.copy(cooldownDays = 0, maxAsks = 99)
+        Moment.values().forEach { m ->
+            val ask = if (m == Moment.TASKS) Ask(m, 3) else if (m == Moment.DAYS_USED) Ask(m, 7) else Ask(m)
+            assertFalse(m.name, Gate.due(generous, starred, ask, now + 365 * day))
+        }
     }
 
     @Test

@@ -48,7 +48,7 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 | 状态行说它正在做什么，绝不写「思考中」 | ✓ | ✓ 0.1.32 *「正在处理」* | ✓ | ✓ |
 | 状态行 = 这一步自己的话（`step`：*打开携程网站*），绝不是原始命令 | ✓ 0.1.33 | ✓ 0.1.33 | ✓ 0.1.33 | ✓ 0.1.33 |
 | 「显示执行步骤」，0.1.37 起默认开（存过的关闭保持关闭） | ✓ 0.1.37（`nm.show_steps`） | ✓ 0.1.37（`nanomuse.show_steps`）*(2)* | ✓ 0.1.37 | ✓ 0.1.37 |
-| 按中继定的时机请求点 Star（`/v1/nudges`：登录 · 第 3 / 10 / 30 个任务 · 第 7 / 30 天 · 达成一个目标 · 换了新形象 · 额度用完；间隔 7 天，每台设备 4 次；第一次对话里绝不问） | ✓ 0.1.35 | ✓ 0.1.35 *(3)* | ✓ 0.1.35 | ✓ 0.1.35 |
+| 按中继定的时机请求点 Star（`/v1/nudges`：登录 · 第 3 / 10 / 30 个任务 · 第 7 / 30 天 · 达成一个目标 · 换了新形象 · 额度用完；间隔 7 天，每台设备 4 次；第一次对话里绝不问）。每张卡片在「去 GitHub 点亮 Star」旁边都有「已经点过了」，点哪个这台设备都不再问 | ✓ 0.1.35 | ✓ 0.1.35 *(3)* | ✓ 0.1.35 | ✓ 0.1.35 |
 | 第一次对话：App 先开口，问该怎么称呼你，模型的 `nanomuse-naming` 围栏变成起名卡片 | ✓ | ✓ 0.1.34 | ✓ 0.1.35 *(25)* | ✓ *(39)* |
 | 第一次打开：先于一切的「登录——免费」 | ✓ | ✓ 0.1.32 *(4)* | ✓ | ✓ |
 | 审批卡片，三个层级，记住的授权 | ✓ | 上游的 | ✓ | ✓ |
@@ -155,7 +155,7 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 - 自己的 key 的服务商目录是 `nanomuse/llm/providers.json`；`node scripts/providers-json.mjs` 写出桌面、中继和手机的副本，`--check` 在某一份过期时失败。新服务商、改了的端点或某项能力只落在那里，别处不写。
 - 面向中继的代码在每个客户端上用同一个线路格式：`nanomuse/cloud.py`（运行时）、`harness/dsh-nanomuse/src/relay.ts`（桌面）、`io.github.nanomuse.cloud.NanoMuseCloud`（Android）、`NanoMuse/NanoMuseCloud.swift` + `NanoMuseAccount.swift`（iOS）。中继的新字段四处都要落。
 - 中继的拒绝代码（`docs/cloud.md`）在四个地方变成句子：`nanomuse/server/failures.py`（运行时和网页）、`harness/dsh-nanomuse/src/refusals.ts`（桌面——宿主改写失败，客户端画卡片）、Android 和 iOS 上的 `NanoMuseCloud.describe`。新代码四处都要落，句子在该客户端的每种语言里都要有；桌面的 `tests/refusals.test.mjs` 和 `tests/refusal-card.test.mjs` 是可以照抄的测试形状。
-- 请求点 Star 到处都遵循一个策略——中继的 `/v1/nudges`（`docs/cloud.md` 里的约定 C1），每个客户端内置同样的默认值：一个*任务*是这个人发起并得到回复的一轮，第一次对话、例程、动态和目标检查都不算；每个时机一次，间隔 `cooldown_days`，每台设备 `max_asks` 次，点了「去 GitHub 点亮 Star」之后永远不再问（`nm.star.*` / `nanomuse.star.*`）。客户端：`nanomuse/nudges.py`、`harness/dsh-nanomuse/src/nudges.ts`、`web/src/nudges.ts`、`io.github.nanomuse.community.Nudges`、`NanoMuse/NanoMuseNudges.swift`。
+- 请求点 Star 到处都遵循一个策略——中继的 `/v1/nudges`（`docs/cloud.md` 里的约定 C1），每个客户端内置同样的默认值：一个*任务*是这个人发起并得到回复的一轮，第一次对话、例程、动态和目标检查都不算；每个时机一次，间隔 `cooldown_days`，每台设备 `max_asks` 次，点了「去 GitHub 点亮 Star」之后永远不再问（`nm.star.*` / `nanomuse.star.*`）。每张卡片还有「已经点过了」，写的是同一个标记，之后这台设备不管冷却期和剩余次数都不再问；设置页和关于页里的「去 GitHub 点 Star」一行也算点过。这个标记只在本机：账号没有同步小设置的地方，所以另一台设备要单独告诉它一次。客户端：`nanomuse/nudges.py`、`harness/dsh-nanomuse/src/nudges.ts`、`web/src/nudges.ts`、`io.github.nanomuse.community.Nudges`、`NanoMuse/NanoMuseNudges.swift`。
 - 版本检查在每个客户端上按同样的顺序读同样的两个来源：`https://nanomuse.cn/dl/index.json`，然后 GitHub 的 `releases/latest`；缓存一天；那一行永远也显示已安装的版本。
 - 对话同步从四个客户端和一个中继说同一种线路格式（`docs/cloud.md` 里的约定 C7）：`cloud/nanomuse_cloud/sync.py`、`nanomuse/sync/`（运行时和网页）、`harness/dsh-nanomuse/src/sync.ts`（桌面）、`io.github.nanomuse.sync`（Android）、`NanoMuse/NanoMuseSync.swift`（iOS）。每个客户端都先应用一页的对话再应用它的消息，只在拉取时移动游标；每个客户端只推送这个人的话和最终答复——绝不推送工具步骤、工具结果或系统提示——例程、目标、动态和替另一台设备干的活都留在家里。
 - `ideas.en.json` / `ideas.zh.json` 是同一个文件存四份（Android 资源、iOS Resources、`harness/dsh-nanomuse/assets`、`web/src/ideas`）；某一份漂移时 harness 和网页的测试会失败。

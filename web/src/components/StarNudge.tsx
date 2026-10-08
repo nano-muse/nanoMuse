@@ -118,12 +118,18 @@ export const starDue = (m: StarMoment, n?: number): boolean => policyReady && as
 export const starShown = (m: StarMoment, n?: number): void => {
   recordAsk(kv, askId(m, n), Date.now());
 };
-/** The person has been to GitHub from one of the asks. */
+/** The person has been to GitHub from one of the asks, or said they already starred. */
 export const starred = (): boolean => ledger().starred;
+
+/**
+ * The star is done: the person went to GitHub from any "Star on GitHub" or said "I already
+ * starred". No ask comes back in this browser, whatever the cooldown and the asks left.
+ */
+export const markStarred = (): void => recordStarred(kv);
 
 /** Off to GitHub, and no more asking anywhere. */
 export function openStar(repoUrl?: string): void {
-  recordStarred(kv);
+  markStarred();
   window.open(repoUrl || policy.star.url || REPO_URL, "_blank", "noopener,noreferrer");
 }
 
@@ -187,7 +193,7 @@ export function useStarSentence(own: string): string {
 }
 
 /**
- * One card: the star, a line saying why, "Star on GitHub" and "Not now". The line is the
+ * One card: the star, a line saying why, "Star on GitHub", "Not now" and "I already starred". The line is the
  * relay's sentence when its policy carries one (`star.text`, `star.text_zh` for a Chinese
  * UI), else `text`, the app's own words for the moment; the title and buttons stay the app's.
  */
@@ -217,6 +223,16 @@ export function StarNudge({ text, onDone, className }: { text: string; onDone: (
         </button>
         <button type="button" className={cx(secondaryBtn, "!w-auto !py-1.5 !px-3.5 text-[13px]")} onClick={onDone}>
           {t("Not now")}
+        </button>
+        <button
+          type="button"
+          className={cx(secondaryBtn, "!w-auto !py-1.5 !px-3.5 text-[13px]")}
+          onClick={() => {
+            markStarred();
+            onDone();
+          }}
+        >
+          {t("I already starred")}
         </button>
       </div>
     </section>

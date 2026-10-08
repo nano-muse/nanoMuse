@@ -20,6 +20,7 @@
     <string name="nm_star_title">GitHub 上的一颗 Star 帮得上忙</string>
     <string name="nm_star_action">去 GitHub 点亮 Star</string>
     <string name="nm_star_later">以后再说</string>
+    <string name="nm_star_done">已经点过了</string>
     <string name="nm_star_signed_in">欢迎加入。nanoMuse 免费、开源、非营利，做的是一个属于每个人的个人智能体。如果你认同，GitHub 上的一颗 Star 能让下一个人也找到这里。</string>
     <plurals name="nm_star_tasks">
         <item quantity="other">已经一起完成 %1$d 个任务。如果 nanoMuse 帮上了忙，到 GitHub 点一颗 Star，下一个人也能找到它。</item>

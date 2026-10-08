@@ -103,6 +103,12 @@ describe("the gate", () => {
     const kv = mem();
     recordStarred(kv);
     expect(askDue("signed_in", DEFAULT_POLICY, readLedger(kv), T0)).toBe(false);
+    // "I already starred" with no ask ever shown: no cooldown, every ask left, still nothing
+    const generous = normalizePolicy({ star: { cooldown_days: 0, max_asks: 50 } });
+    expect(readLedger(kv).asks).toBe(0);
+    expect(canAsk(generous, readLedger(kv), T0 + 365 * DAY)).toBe(false);
+    expect(askDue("tasks", generous, readLedger(kv), T0 + 365 * DAY, 3)).toBe(false);
+    expect(askDue("days_used", generous, readLedger(kv), T0 + 365 * DAY, 7)).toBe(false);
     const off = normalizePolicy({ star: { enabled: false } });
     expect(askDue("signed_in", off, readLedger(mem()), T0)).toBe(false);
     const noGoal = normalizePolicy({ star: { moments: { goal_done: false } } });

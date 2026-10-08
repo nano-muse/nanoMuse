@@ -636,6 +636,17 @@ final class NanoMuseLogicTests: XCTestCase {
         starred.starred = true
         XCTAssertFalse(NanoMuseStarGate.due(.exhausted, ledger: starred, policy: policy, now: now.addingTimeInterval(30 * 86_400)))
 
+        // "I already starred" on the first card: nothing shown, no cooldown, every ask left, still nothing
+        var done = NanoMuseStarLedger()
+        done.starred = true
+        var generous = policy
+        generous.cooldownDays = 0
+        generous.maxAsks = 99
+        let later = now.addingTimeInterval(365 * 86_400)
+        for moment: NanoMuseStarMoment in [.signedIn, .tasks(3), .newLook, .exhausted, .daysUsed(7), .goalDone] {
+            XCTAssertFalse(NanoMuseStarGate.due(moment, ledger: done, policy: generous, now: later), "\(moment.key) after I already starred")
+        }
+
         var off = policy
         off.enabled = false
         XCTAssertFalse(NanoMuseStarGate.due(.signedIn, ledger: NanoMuseStarLedger(), policy: off, now: now))

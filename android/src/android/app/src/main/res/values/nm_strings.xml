@@ -21,6 +21,7 @@
     <string name="nm_star_title">A star on GitHub helps</string>
     <string name="nm_star_action">Star on GitHub</string>
     <string name="nm_star_later">Not now</string>
+    <string name="nm_star_done">I already starred</string>
     <string name="nm_star_signed_in">Welcome. nanoMuse is free, open source and non-profit: a personal agent for anyone who runs it. If that is worth something to you, a star on GitHub is how the next person finds it.</string>
     <plurals name="nm_star_tasks">
         <item quantity="one">One task done. If nanoMuse helped, a star on GitHub tells the people building it that it did.</item>

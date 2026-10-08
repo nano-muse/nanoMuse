@@ -21,6 +21,7 @@
     <string name="nm_star_title">ดาวบน GitHub ช่วยได้</string>
     <string name="nm_star_action">ให้ดาวบน GitHub</string>
     <string name="nm_star_later">ไว้ก่อน</string>
+    <string name="nm_star_done">ให้ดาวแล้ว</string>
     <string name="nm_star_signed_in">ยินดีต้อนรับ nanoMuse เป็นซอฟต์แวร์ฟรี โอเพนซอร์ส และไม่แสวงหากำไร เอเจนต์ส่วนตัวสำหรับทุกคนที่ใช้งาน ถ้าสิ่งนี้มีค่าสำหรับคุณ ดาวบน GitHub คือวิธีที่ทำให้คนถัดไปพบมัน</string>
     <plurals name="nm_star_tasks">
         <item quantity="other">ทำงานเสร็จไปแล้ว %1$d งาน ถ้า nanoMuse มีประโยชน์ ดาวบน GitHub ช่วยให้คนถัดไปพบมันได้</item>
