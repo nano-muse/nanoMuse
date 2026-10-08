@@ -467,6 +467,11 @@ Ours, in `NanoMuse/`:
   `latest`) were never written, so on a phone that cannot reach GitHub the row always said *Could
   not check*. A release found through the index leads to `nanomuse.cn/dl/`; one found through
   GitHub leads to its release page. `parseIndex` and `parseGitHubLatest` are pure and tested.
+- **The third audit: the sign-in sheet (1.0.x)** (`NanoMuseFirstRun.swift`): *Sign in · free* on
+  the welcome page opens the account page as a sheet; once the code or password goes through, the
+  sheet closes on its own (`nmOnChange` on the signed-in state) and the setup is on its next page,
+  the password or the source. Before, the sheet stayed open on the signed-in account page, with
+  its Devices and sync rows, and the person had to swipe it away to find the setup had moved on.
 
 ## Building on a Mac
 

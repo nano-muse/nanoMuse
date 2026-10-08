@@ -391,6 +391,10 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   `UpdateCheck.parseIndex` 一样；之前它找的 `ios.version`、`latest` 从来没有写进过索引，所以
   连不上 GitHub 的手机上这一行永远是*没查到*。从索引查到的版本点开去 `nanomuse.cn/dl/`，从
   GitHub 查到的去它的发布页。`parseIndex` 和 `parseGitHubLatest` 是纯函数，有测试。
+- **第三轮审计：登录表单（1.0.x）**（`NanoMuseFirstRun.swift`）：欢迎页的 *Sign in · free*
+  以浮层打开账号页；验证码或密码通过后，浮层自己关上（对登录状态做 `nmOnChange`），引导已经
+  翻到下一页，密码页或来源页。之前浮层停在登录后的账号页上，带着设备和同步那几行，人得把它
+  滑掉才发现引导已经往前走了。
 
 ## 在 Mac 上构建 {#building-on-a-mac}
 
