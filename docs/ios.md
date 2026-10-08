@@ -6,7 +6,7 @@ the TestFlight pipeline needs, and what is still to be ported from the Android a
 
 **Status.** The tree, the branding, the nanoMuse Cloud sign-in, the hub client and the pipeline
 were written on a Linux machine. The app **builds, signs and is on TestFlight**: the first build,
-0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 0.1.41 is build 14, with
+0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, with
 the internal testers and submitted to Apple's beta review for the public link
 (`https://testflight.apple.com/join/ZHexbDqc`, which delivers the build once the review has
 passed — *Where it stands* below). The testers' reports have driven the fixes in the release
@@ -526,8 +526,9 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
   on each build (none of it names other products); the external group *nanoMuse Beta* with its
   public link, `https://testflight.apple.com/join/ZHexbDqc`; the beta-review contact and a
   review account on the relay in *Beta App Review Information*;
-- **build 14 (0.1.41)** is with the internal testers and was added to *nanoMuse Beta* and
-  submitted to Apple's beta review (build 13, 0.1.40, went in on 2026-10-06); the public link delivers a build only once a
+- **build 16 (1.0.0)** is with the internal testers and was added to *nanoMuse Beta* and
+  submitted to Apple's beta review on 2026-10-09 (build 14, 0.1.41, was approved and is what the
+  public link delivers until then); the public link delivers a build only once a
   review has passed, so until then it shows the TestFlight page without an app. Each later
   version repeats the step (the review is per version). Nothing towards the App Store: the app
   is not going there.
