@@ -45,9 +45,17 @@ update*) and offers the download.
    (*Applies to the main chat and to new chats; a side chat keeps its model.*); a side
    chat already open keeps its model. The other three pickers
    open with *Automatic* (*Currently nanoMuse Cloud · qwen3.8-27b*), which forgets a choice
-   made there and lets the row follow the order below again. Running everything yourself
-   with no account at all is the runtime's `cloud.required = false`; the phone app asks for
-   the account.
+   made there and lets the row follow the order below again. Signed in, the page opens with
+   one switch, *Use nanoMuse Cloud models*: off, the account leaves every picker and the
+   automatic order, no side call (titles, memory, pictures, clips) runs on it, and only the
+   *Use nanoMuse Cloud this time* button on a refused turn does; the sign-in stays for sync and
+   your devices. If new chats were answering through the account at that moment, the Chat row
+   moves to your first own chat model (the catalogue's default for that provider), the same
+   move the desktop makes, and the page says *Applies to the main chat and to new chats*; with
+   no provider of your own the row reads *Not set* until one is added. Switching the Cloud
+   provider off on its own page (Settings → *Manage Providers*) does the same. A phone with a key of
+   its own works signed out: the welcome page offers *Use your own API key instead*. Running
+   everything yourself with no account at all is the runtime's `cloud.required = false`.
 4. Optional: the two permissions that let the agent use your phone's apps (skippable and
    revocable). *Settings → Hands* keeps its row for the screen model, which opens the same
    picker; *More picture and clip options* at the foot of the Models page is the old *Image &

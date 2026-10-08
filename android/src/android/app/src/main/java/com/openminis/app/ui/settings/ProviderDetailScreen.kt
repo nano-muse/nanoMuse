@@ -495,6 +495,8 @@ fun ProviderDetailScreen(
                     isEnabled = it
                     providerRepository.updateInstance(instance.copy(isEnabled = it))
                     AppLogger.info(TAG, "Set enabled=$it for ${instance.id}")
+                    // nanoMuse: off while new chats answered through it, the chat slot moves to the next source (ModelSlots.chatLeaves)
+                    if (!it) io.github.nanomuse.models.ModelSlots.chatLeaves(exportContext, instance.id)
                 },
                 showDivider = false,
             )

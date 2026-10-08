@@ -293,11 +293,16 @@ object NanoMuseCloud {
         return inst.isEnabled && isSignedIn(context)
     }
 
-    /** Switches the Cloud provider instance on or off as a model source; the sign-in stays. */
+    /**
+     * Switches the Cloud provider instance on or off as a model source; the sign-in stays. Off
+     * while new chats answer through the relay, the chat slot moves to the first own chat model
+     * ([io.github.nanomuse.models.ModelSlots.chatLeaves]), as the desktop does.
+     */
     fun setModelsOn(context: Context, on: Boolean) {
         val inst = instance(context) ?: return
         if (inst.isEnabled == on) return
         repo(context)?.updateInstance(inst.copy(isEnabled = on))
+        if (!on) io.github.nanomuse.models.ModelSlots.chatLeaves(context, inst.id)
     }
 
     private val _signedIn = MutableStateFlow<Boolean?>(null)

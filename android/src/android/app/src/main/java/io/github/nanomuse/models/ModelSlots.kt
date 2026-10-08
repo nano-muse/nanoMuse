@@ -115,8 +115,10 @@ object ModelSlots {
     // ── what each slot is now ───────────────────────────────────────────
 
     fun current(context: Context, slot: Slot): Value? = when (slot) {
+        // a provider switched off (the Cloud switch above all) answers nothing: the row says so
+        // rather than naming a model that will not run
         Slot.CHAT -> chatEntry(context)?.let { e ->
-            repo(context)?.config?.value?.instances?.firstOrNull { it.id == e.providerInstanceId }?.let { Value(it, e.model.id) }
+            repo(context)?.config?.value?.instances?.firstOrNull { it.id == e.providerInstanceId && it.isEnabled }?.let { Value(it, e.model.id) }
         }
         Slot.HANDS -> Hands.screenModel(context)?.let { m ->
             Value(m.instance, m.modelId, when (m.why) {
@@ -282,6 +284,28 @@ object ModelSlots {
         }
         lastChanged.value = slot
     }
+
+    /**
+     * A provider switched off while new chats answered through it — nanoMuse Cloud above all
+     * (Settings › Models › *Use nanoMuse Cloud models*; the desktop's `setCloudModels` does the
+     * same) — hands the chat slot to the first source that still talks: the relay's recommended
+     * chat model when the relay is on, else the first own provider with a chat model, its
+     * catalogue default first ([groups]' order). So the Models page names what answers, and new
+     * chats do not fall through upstream's last-used chain without a word. Nothing moves when
+     * the slot was elsewhere, or when nothing is left to serve it; then the row says *Not set*.
+     * Call after the instance was written off. Returns what the slot moved to.
+     */
+    fun chatLeaves(context: Context, instanceId: String): Option? {
+        val entry = chatEntry(context) ?: return null
+        if (entry.providerInstanceId != instanceId) return null
+        val option = nextChat(groups(context, Slot.CHAT), instanceId) ?: return null
+        choose(context, Slot.CHAT, option)
+        return option
+    }
+
+    /** The first row of the picker's [groups] that is not [leaving]'s: the relay's recommended model, else the first own provider's default. */
+    fun nextChat(groups: List<Group>, leaving: String): Option? =
+        groups.firstNotNullOfOrNull { g -> g.options.firstOrNull { it.instance.id != leaving } }
 
     /**
      * New chats and the main chat follow [entryId]: the entry leads a group named after its
