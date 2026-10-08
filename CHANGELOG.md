@@ -14,6 +14,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- The sign-in page no longer calls a mainland-China number "outside the mainland" while it is still being typed: seven to ten digits that can still become `1xx xxxx xxxx` (with or without `+86`) show no sentence and keep *Send* on; the sentence comes once the number cannot be a mainland one any more.
+- The welcome page's *Reach* line says how a computer joins today: install nanoMuse Desktop and sign in with the same account (it said "pair", which left in 0.1.24); the Chinese line under the nanoMuse Cloud provider says 服务商 like every other.
+
 ### iOS
 
 ### Project

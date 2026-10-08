@@ -616,7 +616,7 @@
     <string name="nm_welcome_feat_hands">ハンズ: スマートフォンを使います</string>
     <string name="nm_welcome_feat_hands_sub">列車の予約、食事の注文、アプリ内での調べもの。あなたは見守り、いつでも止められます</string>
     <string name="nm_welcome_feat_reach">リーチ: ここからコンピューターへ</string>
-    <string name="nm_welcome_feat_reach_sub">Mac、Windows、Linux のマシンをつなぎ、スマートフォンから仕事を任せます</string>
+    <string name="nm_welcome_feat_reach_sub">Mac、Windows、Linux のマシンに nanoMuse Desktop を入れて同じアカウントでサインインすれば、スマートフォンから仕事を任せられます</string>
     <string name="nm_welcome_notice">nanoMuse は非営利のオープンソースコミュニティプロジェクトです：ずっと無料です。モデルには開発者が負担する無料枠が付き、その後は自分のキーを使います。何も売りません。リレーが保持するものはプライバシーポリシーに書かれ、設定 → データ管理はあなたのものです。</string>
     <string name="nm_welcome_hands_title">スマートフォンを使わせる</string>
     <string name="nm_welcome_hands_sub">2 つの権限で、アプリを開き、タップし、入力を代わりに行えます。各ステップと停止ボタンの付いたカプセルが画面に残ります。ログイン、パスワード、コードは常にあなたのものです。</string>

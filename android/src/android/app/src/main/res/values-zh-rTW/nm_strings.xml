@@ -596,7 +596,7 @@
     <string name="nm_welcome_feat_hands">Hands：替你操作手機</string>
     <string name="nm_welcome_feat_hands_sub">訂車票、點外送、在應用程式裡查東西；你全程看著，隨時可以停</string>
     <string name="nm_welcome_feat_reach">Reach：從手機使用你的電腦</string>
-    <string name="nm_welcome_feat_reach_sub">配對一台 Mac、Windows 或 Linux 電腦，在手機上派工作給它</string>
+    <string name="nm_welcome_feat_reach_sub">在 Mac、Windows 或 Linux 電腦上裝好 nanoMuse 桌面版，用同一個帳號登入，就能在手機上派工作給它</string>
     <string name="nm_welcome_notice">nanoMuse 是非營利的開源社群專案，永久免費。模型自帶一份由開發者承擔的免費額度，用完換自己的 key。資料不會出售；伺服器保存什麼寫在隱私權政策裡，「設定 → 資料控制」由你決定。</string>
     <string name="nm_welcome_hands_title">讓它替你操作手機</string>
     <string name="nm_welcome_hands_sub">開啟兩項權限後，它就能替你打開應用程式、點按和輸入。螢幕上始終有顯示目前步驟和「停止」的膠囊；登入、密碼和驗證碼永遠由你自己來。</string>

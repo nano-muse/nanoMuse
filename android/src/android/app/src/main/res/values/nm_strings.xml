@@ -605,7 +605,7 @@
     <string name="nm_welcome_feat_hands">Hands: it uses your phone</string>
     <string name="nm_welcome_feat_hands_sub">Books the train, orders the meal, looks something up in an app; you watch, and can stop it any time</string>
     <string name="nm_welcome_feat_reach">Reach: your computers, from here</string>
-    <string name="nm_welcome_feat_reach_sub">Pair a Mac, Windows or Linux machine and give it work from the phone</string>
+    <string name="nm_welcome_feat_reach_sub">Install nanoMuse Desktop on a Mac, Windows or Linux machine, sign in with the same account, and give it work from the phone</string>
     <string name="nm_welcome_notice">nanoMuse is a non-profit open-source community project: free, forever. The model comes with a free allowance paid by the developer; after that, your own key. Nothing is sold; what the relay keeps is in the privacy policy, and Settings → Data controls is yours.</string>
     <string name="nm_welcome_hands_title">Let it use your phone</string>
     <string name="nm_welcome_hands_sub">With two permissions it can open apps, tap and type for you. A capsule with each step and a Stop button stays on screen; logins, passwords and codes are always yours.</string>

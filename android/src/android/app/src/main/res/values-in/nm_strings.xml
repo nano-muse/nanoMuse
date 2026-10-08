@@ -616,7 +616,7 @@
     <string name="nm_welcome_feat_hands">Tangan: ia memakai ponselmu</string>
     <string name="nm_welcome_feat_hands_sub">Memesan kereta, memesan makanan, mencari sesuatu di aplikasi; kamu mengawasi, dan bisa menghentikannya kapan saja</string>
     <string name="nm_welcome_feat_reach">Jangkauan: komputermu, dari sini</string>
-    <string name="nm_welcome_feat_reach_sub">Pasangkan mesin Mac, Windows atau Linux dan beri pekerjaan dari ponsel</string>
+    <string name="nm_welcome_feat_reach_sub">Pasang nanoMuse Desktop di mesin Mac, Windows atau Linux, masuk dengan akun yang sama, lalu beri pekerjaan dari ponsel</string>
     <string name="nm_welcome_notice">nanoMuse adalah proyek komunitas open source nirlaba: gratis, selamanya. Modelnya datang dengan kuota gratis yang dibayar pengembang; setelah itu, kuncimu sendiri. Tidak ada yang dijual; apa yang disimpan relay ada di kebijakan privasi, dan Pengaturan → Kontrol data ada di tanganmu.</string>
     <string name="nm_welcome_hands_title">Izinkan ia memakai ponselmu</string>
     <string name="nm_welcome_hands_sub">Dengan dua izin ia bisa membuka aplikasi, mengetuk dan mengetik untukmu. Kapsul dengan setiap langkah dan tombol Berhenti tetap ada di layar; login, kata sandi dan kode selalu milikmu.</string>

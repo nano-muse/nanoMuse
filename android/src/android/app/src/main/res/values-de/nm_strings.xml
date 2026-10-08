@@ -619,7 +619,7 @@
     <string name="nm_welcome_feat_hands">Hände: Er nutzt dein Telefon</string>
     <string name="nm_welcome_feat_hands_sub">Bucht den Zug, bestellt das Essen, schlägt etwas in einer App nach; du schaust zu und kannst ihn jederzeit stoppen</string>
     <string name="nm_welcome_feat_reach">Reichweite: deine Computer, von hier aus</string>
-    <string name="nm_welcome_feat_reach_sub">Kopple einen Mac, Windows- oder Linux-Rechner und gib ihm Arbeit vom Telefon aus</string>
+    <string name="nm_welcome_feat_reach_sub">Installiere nanoMuse Desktop auf einem Mac, Windows- oder Linux-Rechner, melde dich mit demselben Konto an und gib ihm Arbeit vom Telefon aus</string>
     <string name="nm_welcome_notice">nanoMuse ist ein gemeinnütziges quelloffenes Community-Projekt: kostenlos, für immer. Das Modell kommt mit einem kostenlosen Guthaben, bezahlt vom Entwickler; danach dein eigener Schlüssel. Nichts wird verkauft; was das Relay behält, steht in der Datenschutzerklärung, und Einstellungen → Datenkontrolle gehört dir.</string>
     <string name="nm_welcome_hands_title">Lass ihn dein Telefon nutzen</string>
     <string name="nm_welcome_hands_sub">Mit zwei Berechtigungen kann er Apps öffnen, für dich tippen und eingeben. Eine Kapsel mit jedem Schritt und einem Stopp-Knopf bleibt auf dem Bildschirm; Logins, Passwörter und Codes bleiben immer bei dir.</string>

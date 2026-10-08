@@ -32,11 +32,35 @@ object SignInIdentifier {
         return digits.length == 11 && digits[0] == '1' && digits.all { it.isDigit() }
     }
 
-    /** A number the relay cannot text: say so before asking for a code. Still typing (fewer than 7 digits) is not a verdict yet. */
+    /**
+     * A number the relay cannot text: say so before asking for a code. Still typing is not a
+     * verdict yet: fewer than 7 digits, or a number that can still become a mainland one
+     * ([couldBecomeMainland]) — `138 0000 00` is on its way to eleven digits, not abroad.
+     */
     fun phoneOutsideMainland(input: String): Boolean {
         if (!looksLikePhone(input)) return false
         val digits = input.count { it.isDigit() }
         if (digits < 7) return false
-        return !isMainlandPhone(input)
+        if (isMainlandPhone(input)) return false
+        return !couldBecomeMainland(input)
+    }
+
+    /**
+     * Whether more digits could still make [input] a mainland number: no country code, `+86`,
+     * `0086` or a bare `86` in front, and after it a `1` followed by fewer than ten digits.
+     * Eleven or more digits after the prefix, or another first digit, is a verdict.
+     */
+    fun couldBecomeMainland(input: String): Boolean {
+        var digits = separators.replace(input.trim(), "")
+        when {
+            digits.startsWith("+86") -> digits = digits.substring(3)
+            digits.startsWith("+") -> return false
+            digits.startsWith("0086") -> digits = digits.substring(4)
+            // a bare 86 before a 1: the country code of a number not finished yet (isMainlandPhone
+            // reads it so once there are thirteen digits)
+            digits.startsWith("861") && digits.length < 13 -> digits = digits.substring(2)
+        }
+        if (!digits.all { it.isDigit() }) return false
+        return digits.isNotEmpty() && digits[0] == '1' && digits.length < 11
     }
 }

@@ -619,7 +619,7 @@
     <string name="nm_welcome_feat_hands">Eller: telefonunu kullanır</string>
     <string name="nm_welcome_feat_hands_sub">Treni ayırtır, yemeği sipariş eder, bir uygulamada bir şeye bakar; sen izlersin ve istediğin an durdurabilirsin</string>
     <string name="nm_welcome_feat_reach">Erişim: bilgisayarların, buradan</string>
-    <string name="nm_welcome_feat_reach_sub">Bir Mac, Windows ya da Linux makinesi eşleştir ve ona telefondan iş ver</string>
+    <string name="nm_welcome_feat_reach_sub">Bir Mac, Windows ya da Linux makinesine nanoMuse Desktop kur, aynı hesapla oturum aç ve ona telefondan iş ver</string>
     <string name="nm_welcome_notice">nanoMuse kâr amacı gütmeyen, açık kaynaklı bir topluluk projesidir: ücretsiz, sonsuza kadar. Model, geliştiricinin ödediği ücretsiz bir kotayla gelir; sonrasında kendi anahtarın. Hiçbir şey satılmaz; relay’in neyi tuttuğu gizlilik politikasında yazar ve Ayarlar → Veri denetimleri senindir.</string>
     <string name="nm_welcome_hands_title">Telefonunu kullanmasına izin ver</string>
     <string name="nm_welcome_hands_sub">İki izinle senin için uygulama açabilir, dokunabilir ve yazabilir. Her adımı ve bir Durdur düğmesini gösteren bir kapsül ekranda kalır; oturum açma, parolalar ve kodlar her zaman sana aittir.</string>

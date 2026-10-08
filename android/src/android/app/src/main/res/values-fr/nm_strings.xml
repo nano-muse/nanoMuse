@@ -619,7 +619,7 @@
     <string name="nm_welcome_feat_hands">Mains : il utilise votre téléphone</string>
     <string name="nm_welcome_feat_hands_sub">Réserve le train, commande le repas, cherche quelque chose dans une app ; vous regardez, et pouvez l’arrêter à tout moment</string>
     <string name="nm_welcome_feat_reach">Portée : vos ordinateurs, d’ici</string>
-    <string name="nm_welcome_feat_reach_sub">Associez un Mac, un PC Windows ou Linux et donnez-lui du travail depuis le téléphone</string>
+    <string name="nm_welcome_feat_reach_sub">Installez nanoMuse Desktop sur un Mac, un PC Windows ou Linux, connectez-vous avec le même compte et donnez-lui du travail depuis le téléphone</string>
     <string name="nm_welcome_notice">nanoMuse est un projet communautaire open source sans but lucratif : gratuit, pour toujours. Le modèle vient avec un crédit gratuit payé par le développeur ; ensuite, votre propre clé. Rien n’est vendu ; ce que le relais conserve est dans la politique de confidentialité, et Réglages → Contrôle des données vous appartient.</string>
     <string name="nm_welcome_hands_title">Laissez-le utiliser votre téléphone</string>
     <string name="nm_welcome_hands_sub">Avec deux permissions, il peut ouvrir des apps, toucher et saisir pour vous. Une capsule avec chaque étape et un bouton Stop reste à l’écran ; les connexions, mots de passe et codes restent toujours à vous.</string>
