@@ -210,7 +210,11 @@ right now (*Currently nanoMuse Cloud · qwen3.8-27b*, say); pick it to drop a ch
 made and let the row follow the order again. A chat pick is the default for new chats and
 moves the main chat with it (*Applies to the main chat and to new chats; a side chat keeps
 its model.*); a side chat keeps the model it was given, and the same pick twice writes
-nothing. The phones follow the same rule. Pictures through your own key go straight to that provider — Model Studio's
+nothing. The phones follow the same rule. When the provider new chats answer through goes
+away (its key removed, or the account signed out), the chat slot moves with it: to the
+account while signed in, else to another key of yours, else to the stock default; it is
+never left on a route no adapter serves, which showed as *no adapter registered for
+provider "custom"* on every new chat in 0.1.41. Pictures through your own key go straight to that provider — Model Studio's
 native image API, OpenRouter's image API, or the OpenAI shape for the rest — and nothing
 is billed to the account; the avatar studio says so in place of the cost line. Clips come
 from Model Studio only, through the account or your own Bailian key.

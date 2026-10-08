@@ -20,7 +20,7 @@
  */
 import { createElement as h, Fragment, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { baseUrlFor, isLocal, keyUrlFor, ownKeyStepDone, providersWith, unavailableKey, waysOn, type Capability, type ProviderEntry, type Region, type WaysOn } from '../catalogue.ts'
-import { call, errorStyle, muted, row, type Translate, failureText } from './api.ts'
+import { call, errorCode, errorStyle, muted, row, type Translate, failureText } from './api.ts'
 import { openLink } from './bridge.ts'
 import { settingsBus } from './bus.ts'
 import { IconCheck, IconGlobe, IconKey } from './icons.tsx'
@@ -128,6 +128,9 @@ function KeyForm({ t, entry, region, configured, onSaved, onCancel }: { t: Trans
   const [baseURL, setBaseURL] = useState(configured?.baseURL ?? base)
   const [label, setLabel] = useState(configured?.label ?? '')
   const [caps, setCaps] = useState<Capability[]>(configured?.capabilities ?? ['chat'])
+  // the model ids typed for an endpoint that does not list its own (`no_models` from the host asks for them)
+  const [models, setModels] = useState('')
+  const [askModels, setAskModels] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const needsKey = !entry.auth.includes('none')
@@ -139,9 +142,13 @@ function KeyForm({ t, entry, region, configured, onSaved, onCancel }: { t: Trans
     const body: Record<string, unknown> = { id: entry.id, apiKey, lang: t('langTag') }
     if (editable) body.baseURL = baseURL
     if (entry.user_capabilities) { body.capabilities = caps; body.label = label }
+    if (entry.user_capabilities && models.trim()) body.models = models
     call<OwnProvider & { offer?: SlotOffer }>('providers/save', body)
       .then((saved) => onSaved(saved.models.length ? t('ownKeySaved', { n: saved.models.length }) : t('ownKeySavedNone'), { label: saved.label, offer: saved.offer ?? {} }))
-      .catch((err: unknown) => setError(failureText(t, err)))
+      .catch((err: unknown) => {
+        if (errorCode(err) === 'no_models') { setAskModels(true); setError(t('ownKeyNoModels')); return }
+        setError(failureText(t, err))
+      })
       .finally(() => setBusy(false))
   }
   const capWord: Record<Capability, string> = { chat: t('ownKeyCovChat'), vision: t('ownKeyCovVision'), image: t('ownKeyCovImage'), video: t('ownKeyCovVideo') }
@@ -153,6 +160,9 @@ function KeyForm({ t, entry, region, configured, onSaved, onCancel }: { t: Trans
       ? h('input', { className: 'nm-field', value: label, placeholder: t('ownKeyLabelField'), 'aria-label': t('ownKeyLabelField'), onChange: (e: FormEvent<HTMLInputElement>) => setLabel(e.currentTarget.value) })
       : null,
     h('input', { className: 'nm-field', type: 'password', value: apiKey, placeholder: entry.key_hint || t('ownKeyKeyField'), 'aria-label': t('ownKeyKeyField'), autoComplete: 'off', spellCheck: false, autoFocus: true, onChange: (e: FormEvent<HTMLInputElement>) => setApiKey(e.currentTarget.value) }),
+    entry.user_capabilities && (askModels || models)
+      ? h('input', { className: 'nm-field', value: models, placeholder: t('ownKeyModelsField'), 'aria-label': t('ownKeyModelsField'), autoComplete: 'off', spellCheck: false, 'data-testid': 'nm-ownkey-models', onChange: (e: FormEvent<HTMLInputElement>) => setModels(e.currentTarget.value) })
+      : null,
     entry.user_capabilities
       ? h('div', { style: row },
           h('span', { style: muted }, t('ownKeyCapsField')),
