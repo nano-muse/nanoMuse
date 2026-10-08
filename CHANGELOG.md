@@ -12,6 +12,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- The first page of the first run now shows the app's mark, as the phone does, and offers *Use your own API key instead* under *Sign in*: it goes straight to the models page with no account, and *Skip for now* there with no key saved returns to the first page.
+- The agent's opening lines in the first conversation no longer carry a dash.
+
 ### Android
 
 ### iOS

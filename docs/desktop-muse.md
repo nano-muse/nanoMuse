@@ -88,8 +88,11 @@ state in `$DSH_HOME/nanomuse/firstrun.json` (`src/firstrun.ts`) — *done* once 
 pressed, the permissions page seen, which source answers — so the pages are never skipped
 on a fresh install and never shown twice:
 
-1. **Welcome** — the face, *Welcome to nanoMuse*, the three feature rows (chat, hands,
-   reach), the community notice, one blue *Sign in* pill and *Use my own API key*. Sign-in
+1. **Welcome** — the app's mark (the face comes with the conversation, on the Meet page),
+   *Welcome to nanoMuse*, the three feature rows (chat, hands, reach), the community notice,
+   one blue *Sign in* pill and *Use your own API key instead*, which goes to the models page
+   with no account (the sign-in can come later; *Skip for now* there with no key saved is
+   Welcome again). Sign-in
    is the phone's: *Phone number or e-mail* with the line that a mainland China number
    gets an SMS and anything else an e-mail, the code boxes that verify themselves on the
    sixth digit, *Try another way* for a password (`/v1/auth/code`, `/v1/auth/verify`,

@@ -124,10 +124,12 @@ export interface StageInput {
  * The page to show, in the phone's order: Welcome until the account (or, on a desktop, a
  * model of one's own) is there; a password for a fresh account; which model answers; the
  * models page for one's own key until one is configured or skipped; the permissions where
- * the system gates them; then Meet.
+ * the system gates them; then Meet. Welcome's second door ("Use your own API key instead",
+ * as on the phone) leads to the models page with no account; Skip there, with no key saved,
+ * is Welcome again.
  */
 export function stageOf(s: StageInput): Stage {
-  if (!s.signedIn && !s.hasModel) return 'welcome'
+  if (!s.signedIn && !s.hasModel) return s.sourceChosen === 'own' && !s.modelsSkipped ? 'models' : 'welcome'
   if (s.signedIn && s.freshAccount && !s.passwordSeen) return 'password'
   if (s.sourceChosen === null) return 'source'
   if (s.sourceChosen === 'own' && !s.hasModel && !s.modelsSkipped) return 'models'
@@ -157,7 +159,7 @@ export function introLines(lang: string): [string, string, string] {
   }
   return [
     "Hi, I'm nanoMuse, the assistant that lives on your computer. Let me take a few things off your plate.",
-    'A bit about how I work:\n\n- I work on this computer — I can run commands, open websites and fill in forms.\n- I can read and organise the files and folders you point me to, and take care of reminders and scheduled tasks.\n- Before any step that matters, I ask you first.\n- Everything runs on this computer; your messages go only to the model you configured.',
+    'A bit about how I work:\n\n- I work on this computer: I can run commands, open websites and fill in forms.\n- I can read and organise the files and folders you point me to, and take care of reminders and scheduled tasks.\n- Before any step that matters, I ask you first.\n- Everything runs on this computer; your messages go only to the model you configured.',
     'Before we start, what should I call you?',
   ]
 }
