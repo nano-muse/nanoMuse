@@ -2,6 +2,7 @@ import { ArrowUp, ChevronDown, FileText, Loader2, Menu, MessageSquarePlus, Monit
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, fileUrl } from "../api";
 import { AllowanceHeadsUp } from "../components/AllowanceWays";
+import { cloudRetryTarget } from "../cloud-retry";
 import { AvatarOptionsCard } from "../components/AvatarOptionsCard";
 import { BrowserViewer } from "../components/BrowserViewer";
 import { MicButton, useDictation } from "../components/Dictation";
@@ -22,7 +23,7 @@ import { countDay, countTask, StarNudgeOnce } from "../components/StarNudge";
 import { useShowSteps } from "../steps";
 
 export function ChatScreen() {
-  const { state, send, decide, loadEvents, openFile, toast, setDrawer, setTab } = useStore();
+  const { state, send, sendViaCloud, decide, loadEvents, openFile, toast, setDrawer, setTab } = useStore();
   const t = useT();
   const { profile, status, activeThread, threads } = state;
   // undefined until the first fetch for this thread has returned — don't flash the empty state
@@ -170,6 +171,12 @@ export function ChatScreen() {
   // the steps (tool chips) stay out of the chat unless asked for; everything else always shows
   const steps = useShowSteps();
   const shown = useMemo(() => (steps ? events : events.filter((e) => e.type !== "tool")), [events, steps]);
+  // *Use nanoMuse Cloud this time* under a failed turn of one's own model (see cloud-retry.ts)
+  const cloudRetryCtx = { signedIn: Boolean(state.hub?.account.signed_in), chatOnCloud: Boolean(state.settings?.llm.cloud), deviceChat: Boolean(thread?.device) };
+  const cloudRetryFor = (i: number): (() => Promise<void>) | undefined => {
+    const target = cloudRetryTarget(shown, i, cloudRetryCtx);
+    return target ? () => sendViaCloud(activeThread, target.text, target.files) : undefined;
+  };
   // files made in this chat: a reply that names one ("saved to `plan.md`") opens it on tap
   const files = useMemo(
     () => Array.from(new Set(events.flatMap((e) => (e.type === "artifact" ? [e.path] : [])))),
@@ -247,6 +254,7 @@ export function ChatScreen() {
               onOpenFile={openFile}
               onOpenBrowser={setBrowserView}
               files={files}
+              onCloudRetry={cloudRetryFor(i)}
             />
           ))}
           {stream && stream.text && (
@@ -304,6 +312,7 @@ function EventView({
   onOpenFile,
   onOpenBrowser,
   files,
+  onCloudRetry,
 }: {
   event: TimelineEvent;
   prev?: TimelineEvent;
@@ -312,6 +321,8 @@ function EventView({
   onOpenFile: (path: string) => void;
   onOpenBrowser: (id: string) => void;
   files: readonly string[];
+  /** a failed turn's *Use nanoMuse Cloud this time*, when it applies */
+  onCloudRetry?: () => Promise<void>;
 }) {
   // a small centred time, iMessage style, when the conversation pauses for a while
   const divider = needsDivider(prev, event) ? <TimeDivider ts={event.ts} /> : null;
@@ -329,6 +340,7 @@ function EventView({
             files={files}
             onOpenFile={onOpenFile}
             spoken={event.via === "call"}
+            modelUsed={event.model_used}
           />
         );
       case "tool":
@@ -338,7 +350,7 @@ function EventView({
       case "question":
         return <QuestionCard event={event} name={name} />;
       case "notice":
-        return <Notice event={event} />;
+        return <Notice event={event} onCloudRetry={onCloudRetry} />;
       case "artifact":
         return <ArtifactCard event={event} onOpen={onOpenFile} />;
       case "browser":
@@ -466,6 +478,7 @@ function AssistantBubble({
   files,
   onOpenFile,
   spoken,
+  modelUsed,
 }: {
   text: string;
   reasoning?: string;
@@ -474,6 +487,8 @@ function AssistantBubble({
   files?: readonly string[];
   /** said aloud on a call rather than written */
   spoken?: boolean;
+  /** *Use nanoMuse Cloud this time*: the account's model this reply came from */
+  modelUsed?: string;
   onOpenFile?: (path: string) => void;
 }) {
   const [showReasoning, setShowReasoning] = useState(false);
@@ -518,6 +533,7 @@ function AssistantBubble({
             <span className="inline-block w-1.5 h-4 align-middle bg-accent/70 animate-pulse rounded-sm" />
           </div>
         )}
+        {modelUsed && !streaming && <div className="ml-1 text-[11px] text-muted">{t("Answered by nanoMuse Cloud this time ({model})", { model: modelUsed })}</div>}
       </div>
     </div>
   );

@@ -107,6 +107,9 @@ class SendBody(BaseModel):
     # the language of the client's screens (a BCP-47 tag such as "en" or "zh-CN"); the reply
     # is written in it unless Settings fixes one. Optional: without it the message's script decides.
     language: str = Field("", max_length=20)
+    # "cloud": *Use nanoMuse Cloud this time*; this one turn runs on the account's recommended
+    # chat model, the next is back on the configured model. 401 `signed_out` when signed out.
+    via: str = Field("", max_length=20)
 
 
 class ThreadBody(BaseModel):
@@ -571,9 +574,13 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     async def send_message(thread_id: str, body: SendBody) -> dict[str, Any]:
         thread = _thread_or_404(thread_id)
         try:
-            event = svc.send(thread.id, body.text, files=body.files, language=body.language)
+            event = svc.send(
+                thread.id, body.text, files=body.files, language=body.language, via=body.via
+            )
         except (ValueError, PermissionError) as exc:
             raise HTTPException(400, str(exc)) from exc
+        except CloudError as exc:
+            raise _cloud_http(exc) from exc
         return {"event": event, "thread": thread.meta()}
 
     # ------------------------------------------------------------------ approvals
@@ -1994,6 +2001,7 @@ async def _handle_ws_message(
                 str(data.get("text", ""))[:20_000],
                 files=[str(f) for f in files][:10] if isinstance(files, list) else None,
                 language=str(data.get("language") or "")[:20],
+                via=str(data.get("via") or "")[:20],
             )
         elif kind == "approval":
             approval_id = str(data.get("id", ""))
@@ -2019,6 +2027,8 @@ async def _handle_ws_message(
             await reply({"kind": "error", "error": f"unknown message kind: {kind}"})
     except (ValueError, PermissionError) as exc:
         await reply({"kind": "error", "error": str(exc)})
+    except CloudError as exc:
+        await reply({"kind": "error", "error": exc.describe(), "code": exc.code})
 
 
 __all__ = ["STATIC_DIR", "create_app"]

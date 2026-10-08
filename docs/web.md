@@ -184,6 +184,25 @@ with an error: …* and the five the operator's switches send
 
 The raw reply stays under *Details* for a bug report, never as the only thing shown.
 
+**A turn your own model failed** (a refused key, a model the endpoint does not
+know, a rate limit, a timeout, no connection) shows its sentence and, when you
+are signed in and the chat is not on the account, *Use nanoMuse Cloud this time*
+(the own-key models contract, section 4; the desktop and the phones have the
+same). It sends the same words again with `via: "cloud"` (`POST
+/api/threads/{id}/send`, or the socket's `send` frame): the runtime runs that
+one turn on the relay's recommended chat model under the account's key, and the
+next turn is back on your model. `[llm]`, *Use nanoMuse Cloud models* and the
+conversation stay as they were; with the Cloud models switched off this button
+is the only thing that spends the allowance. The user bubble, the reply and a
+failure of that turn carry `model_used` (the model id); the reply shows
+*Answered by nanoMuse Cloud this time (model)* under it, and a notice that
+carries `model_used` does not offer the button again. Signed out, the runtime
+answers `401 signed_out` with *Sign in to nanoMuse Cloud first.*, shown under the
+button. Switching *Use nanoMuse Cloud models* off while the chat model is the
+account's is refused with `409 chat_on_cloud` (*Add a provider of your own
+first; with nanoMuse Cloud off, nothing else could answer.*), shown under the
+switch.
+
 **A connection test that fails** (*Test* under a model, the hands) says the same
 sentence a chat turn would for that error (`POST /api/connections/llm/test`
 answers `{ok: false, code, error, detail}`; `error` is the sentence, `detail`

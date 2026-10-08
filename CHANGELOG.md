@@ -18,6 +18,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A failed model test says what went wrong in plain words.** *Test* under Connections showed the provider's raw error (`AuthenticationError: Error code: 401 ...`); it now shows the sentence a chat turn would show for the same error (the key was refused, the host could not be reached, the model is unknown), translated, with the provider's words one tap away under *Details*.
 - The first conversation's opening says where your messages go the way the phones do: to the model you configured, and, signed in to nanoMuse Cloud, the conversation also follows you to your other devices; Data controls switches that off. It used to say they go only to the model.
 - `docs/sentinel.md` describes the decision order the code has: the taint check and the warnings run after a decision is made and can only turn an allow into an ask, a rule's or an always-allow's included. `docs/hub.md` says what the runtime does after `4001`/`4002` (one try a minute, the hub shown as refused); `docs/web.md` names the first conversation's three lines and the block's keys as they are.
+- **One turn on nanoMuse Cloud, on request.** `POST /api/threads/{id}/send` and the socket's `send` frame take `via: "cloud"`: that one turn runs on the relay's recommended chat model under the account's key, and the next is back on the configured model; `[llm]`, *Use nanoMuse Cloud models* and the conversation do not move. The user bubble, the reply and a failure of that turn carry `model_used`. Signed out it is `401 signed_out` with *Sign in to nanoMuse Cloud first.*
+- Switching *Use nanoMuse Cloud models* off while the chat model is the account's now says *Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer.*
 
 ### Web
 
@@ -25,6 +27,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Permissions you granted are listed by risk**, the gravest first (sensitive, moderate, low, safe), as on the phone, so a glance says which standing allowances touch sending, paying or the shell.
 - A failed connection test shows the sentence in your language with the provider's words under *Details*, instead of the raw error.
 - The community notice no longer calls nanoMuse a preview; 1.0.0 is out.
+- **Use nanoMuse Cloud this time.** A turn your own model failed (a refused key, a timeout, no connection and the like) offers the button under its sentence when you are signed in and the chat is not on the account: the same words again, one turn on the account's model, the next back on your key, as on the desktop and the phones. The reply says *Answered by nanoMuse Cloud this time (model)* under it. Signed out, the button says to sign in first.
+- The first run's welcome page says nanoMuse is a non-profit open-source community project, free forever, as the sign-in gate does; a runtime that does not ask for an account showed no such line.
+- The web's copies of the ideas lists match the Android and desktop copies again (the sandbox wording from #250).
 
 ### Desktop
 

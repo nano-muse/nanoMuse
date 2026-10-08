@@ -449,6 +449,73 @@ def test_send_carries_the_clients_language(server):
     )
 
 
+def test_use_cloud_this_time_runs_one_turn_on_the_account(server, settings: Settings, monkeypatch):
+    """`via: "cloud"` (the own-key contract, section 4): one turn on the relay's recommended
+    chat model under the Cloud key, the configured model back for the next; `[llm]`, the
+    Cloud switch and the thread stay as they were. Signed out it is a 401."""
+    from nanomuse.cloud import CLOUD_KEY
+    from nanomuse.server import service as service_module
+
+    client, service, llm = server
+    settings.cloud.models = False  # the explicit retry is what spends while the models are off
+    # signed out: refused with one sentence, nothing queued
+    r = client.post("/api/threads/main/send", json={"text": "again", "via": "cloud"})
+    assert r.status_code == 401 and r.headers["x-nanomuse-code"] == "signed_out"
+    assert r.json()["detail"] == "Sign in to nanoMuse Cloud first."
+    assert events_of(client) == []
+    # signed in: the one-turn client is built for the relay with the account's key
+    service.app.vault.set(CLOUD_KEY, "cloud-key-for-the-test")
+    service.hub.chat_models = ["relay-chat-model", "other"]
+    cloud_llm = MockLLM([LLMResponse(content="from the account")])
+    built: list[Any] = []
+
+    def fake_create_llm(merged, data_dir=None):  # noqa: ANN001
+        built.append(merged)
+        return cloud_llm
+
+    monkeypatch.setattr(service_module, "create_llm", fake_create_llm)
+    before = (settings.llm.model, settings.llm.base_url, settings.llm.api_key)
+    r = client.post("/api/threads/main/send", json={"text": "again", "via": "cloud"})
+    assert r.status_code == 200 and r.json()["event"]["model_used"] == "relay-chat-model"
+    wait_idle(service)
+    assert len(built) == 1
+    assert built[0].model == "relay-chat-model"
+    assert built[0].api_key == "cloud-key-for-the-test"
+    assert built[0].base_url.endswith("/v1") and built[0].base_url.startswith(
+        settings.cloud.base_url
+    )
+    replies = events_of(client, kind="assistant")
+    assert replies[-1]["text"] == "from the account" and replies[-1]["model_used"] == (
+        "relay-chat-model"
+    )
+    assert len(cloud_llm.calls) == 1 and llm.calls == []
+    # nothing moved: the configured model, the Cloud switch, the thread's client
+    assert (settings.llm.model, settings.llm.base_url, settings.llm.api_key) == before
+    assert settings.cloud.models is False
+    assert service.threads["main"].agent.llm is llm
+    # the next turn is back on the own model, and says nothing about a model
+    llm.script.append(LLMResponse(content="from the own key"))
+    r = client.post("/api/threads/main/send", json={"text": "and now"})
+    assert "model_used" not in r.json()["event"]
+    wait_for(
+        lambda: [e for e in events_of(client, kind="assistant") if e["text"] == "from the own key"]
+    )
+    assert len(cloud_llm.calls) == 1 and len(llm.calls) == 1
+    assert "model_used" not in events_of(client, kind="assistant")[-1]
+    # a failure of the Cloud turn names the model too, so a client does not offer it again
+    cloud_llm.script.append(LLMResponse(content=""))
+
+    def boom(*args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        raise RuntimeError("the relay is down for the test")
+
+    monkeypatch.setattr(cloud_llm, "ask", boom)
+    client.post("/api/threads/main/send", json={"text": "again", "via": "cloud"})
+    wait_idle(service)
+    notice = events_of(client, kind="notice")[-1]
+    assert notice["level"] == "error" and notice["model_used"] == "relay-chat-model"
+    assert service.threads["main"].agent.llm is llm
+
+
 def test_stream_that_was_not_a_reply_is_discarded(server):
     """MockLLM streams the whole content; when the reply is a prompt-mode tool call the
     parser removes, the phone must drop the bubble it was filling."""

@@ -134,7 +134,7 @@ Meta 的 Muse「自己会做事，但不会做太多」。「设置」里的*主
 | PATCH / DELETE | `/api/threads/{id}` | 重命名 / 删除 |
 | POST | `/api/threads/{id}/clear` | 清空对话 |
 | GET | `/api/threads/{id}/events?limit=&before=` | 时间线事件 |
-| POST | `/api/threads/{id}/send` `{text, files?, language?}` | 把一条消息排进队列；立即返回。`files`：下面那个上传接口返回的工作区路径，最多十个；有文件时文字可以为空。`language`（1.0.0 起）：客户端界面语言的 BCP-47 标签（`en`、`zh-CN`）；除非「回复语言」固定了一种，回复就用这种语言写。不带它时照旧按消息的文字书写系统判断 |
+| POST | `/api/threads/{id}/send` `{text, files?, language?, via?}` | 把一条消息排进队列；立即返回。`files`：下面那个上传接口返回的工作区路径，最多十个；有文件时文字可以为空。`language`（1.0.0 起）：客户端界面语言的 BCP-47 标签（`en`、`zh-CN`）；除非「回复语言」固定了一种，回复就用这种语言写。不带它时照旧按消息的文字书写系统判断。`via: "cloud"` 是「这次改用 nanoMuse Cloud」：这一个回合用账号的 key 在账号推荐的聊天模型上跑，下一回合回到配置的模型，`[llm]` 不动；用户气泡、回复和这一回合的失败提示都带 `model_used`。没有登录账号时回 `401 signed_out` |
 | POST | `/api/threads/{id}/stop` | 停掉那个聊天里正在跑的一轮：队列丢弃，那里待处理的审批和提问卡片过期，对话照常能用。没有东西在跑时返回 `{ok: false}` |
 | POST | `/api/files/upload?name=` （请求体：文件字节） | 一个要附上的文件：落到 `attachments/<date>/` 下，文件名是 `name` 的安全版本；返回给 `files` 用的 `{path, name, size, kind, mime}`。超过 `server.max_upload_mb` 返回 413 |
 | POST | `/api/approvals/{id}` `{approved, scope, reason}` | 回答一张卡片；`scope` 是这张卡片 `grant_options` 中的一个（`once`、`task`、`session`、`24h`、`always`） |
@@ -231,7 +231,7 @@ Meta 的 Muse「自己会做事，但不会做太多」。「设置」里的*主
 | `device_ack`、`device_request` | 发给连着的手机：对它的通告的回应，以及要它的屏幕或要它做一个动作的请求（[gui.md](gui.md#the-device-protocol)） |
 | `error`、`pong` | 对客户端消息的答复 |
 
-客户端 → 服务器：`{"kind": "send", "thread": "main", "text": "…", "language": "en"}`（`language` 可选，含义同 `POST /api/threads/{id}/send`）、`{"kind": "approval", "id": "…", "approved": true, "scope": "once"}`、`{"kind": "ping"}`。允许智能体操作自己的手机还会发一次 `{"kind": "device", …}`，并对每个请求回一条 `{"kind": "device_result", …}`。
+客户端 → 服务器：`{"kind": "send", "thread": "main", "text": "…", "language": "en", "via": ""}`（`language` 和 `via` 可选，含义同 `POST /api/threads/{id}/send`；被拒绝的 `via: "cloud"` 以 `{"kind": "error", "error": "…", "code": "signed_out"}` 返回）、`{"kind": "approval", "id": "…", "approved": true, "scope": "once"}`、`{"kind": "ping"}`。允许智能体操作自己的手机还会发一次 `{"kind": "device", …}`，并对每个请求回一条 `{"kind": "device_result", …}`。
 
 时间线事件按会话持久化在 `<data_dir>/threads/<id>.json`，所以历史在重启后还在。
 
