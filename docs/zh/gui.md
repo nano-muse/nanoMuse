@@ -117,7 +117,7 @@ key 和其他 key 一样放进保险库（`nanomuse vault set GUI_API_KEY`，或
 
 ## 哨兵怎么处理它 {#what-sentinel-does-with-it}
 
-从屏幕上读到的一切都是隐私数据：第一次 `phone_screen` 之后会话就带上了隐私标记（tainted），之后把数据发到别处的步骤按更严的规则处理（见 [sentinel.md](sentinel.md)）。
+从屏幕上读到的一切都是隐私数据：第一次 `phone_screen` 之后这段对话就带上了隐私标记（tainted），之后把数据发到别处的步骤按更严的规则处理（见 [sentinel.md](sentinel.md)）。
 
 一次 `phone_act` 是 MODERATE——默认模式下可以自行执行——除非它看起来像是在做出某种承诺，这时它是带警告的 SENSITIVE，而警告永远意味着**问一次**：
 

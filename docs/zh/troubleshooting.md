@@ -20,7 +20,7 @@
 
 **终端里一直不出现审批卡片。** `nanomuse daemon` 和 `--auto` 按设计跑在哨兵（Sentinel）的 `auto` 模式下。要交互式审批，用 `nanomuse chat` 或者 App。
 
-**你想做的事被提示「Sentinel blocked」。** 查 `nanomuse audit -n 20` 看原因：一条拒绝规则、`deny_tools`，或者污染（本次会话早先读过私密数据，又出现了新的网络目的地）。把主机加进 `egress_allowlist`，或者允许一次。
+**你想做的事被提示「Sentinel blocked」。** 查 `nanomuse audit -n 20` 看原因：一条拒绝规则、`deny_tools`，或者污染（这段对话早先读过私密数据，又出现了新的网络目的地）。把主机加进 `egress_allowlist`，或者允许一次。
 
 **邮件工具返回不了有用的东西。** `scrub_secrets = true` 时，验证码和重置链接会在模型读邮件之前被去掉；这是有意为之。用 `nanomuse config show` 检查 IMAP 设置，用 `nanomuse vault list` 检查保险库条目。
 

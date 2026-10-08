@@ -45,7 +45,7 @@
 | `timer_set` | 在时钟 App 里设一个倒计时 | `seconds` 或 `minutes`、`message` | `SET_ALARM` | moderate | 否 |
 | `photo_pick` | 用户在系统选择器里挑照片；副本落在工作区里 | `max`（≤ 10）、`why` | 无——Photo Picker 不需要权限 | safe，隐私 | 否 |
 
-*风险*和*隐私*是 `nanomuse/runtime.py` 里 `DEVICE_TOOLS` 给出的哨兵默认值，通过 MCP 服务器条目的 `tools` 映射逐个工具套用（[configuration.md](configuration.md#mcp-servers)）。「会问」对应 [sentinel.md](sentinel.md) 里的 `ask` 模式那一列；`strict` 模式下每个 moderate 工具也会问。*隐私*工具会给会话带上隐私标记：`contacts_search` 或 `location` 之后，任何向未知主机发送数据的操作都会问。时间用手机本地时间（`YYYY-MM-DD HH:MM`，全天日程用日期）；全天日程的结束显示为它的最后一天。`location` 里的地址来自平台的地理编码器，手机上有它才有；没有的话工具只返回坐标。
+*风险*和*隐私*是 `nanomuse/runtime.py` 里 `DEVICE_TOOLS` 给出的哨兵默认值，通过 MCP 服务器条目的 `tools` 映射逐个工具套用（[configuration.md](configuration.md#mcp-servers)）。「会问」对应 [sentinel.md](sentinel.md) 里的 `ask` 模式那一列；`strict` 模式下每个 moderate 工具也会问。*隐私*工具会给这段对话带上隐私标记：`contacts_search` 或 `location` 之后，任何向未知主机发送数据的操作都会问。时间用手机本地时间（`YYYY-MM-DD HH:MM`，全天日程用日期）；全天日程的结束显示为它的最后一天。`location` 里的地址来自平台的地理编码器，手机上有它才有；没有的话工具只返回坐标。
 
 Kotlin 这边的列表（`DeviceTools.kt`）和 Python 这边的表（`DEVICE_TOOLS`）必须一致；`tests/test_bridge.py` 检查名字和默认值。
 
