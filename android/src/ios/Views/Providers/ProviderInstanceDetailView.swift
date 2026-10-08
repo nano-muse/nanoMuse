@@ -28,6 +28,7 @@ struct ProviderInstanceDetailView: View {
     @State private var editingModelEntry: ModelEntry?
     @State private var pendingDeleteModelEntry: ModelEntry?
     @State private var showKeyRevealed = false
+    @State private var nmCloudOffRefused = false // nanoMuse: the Cloud switch refused (see the Status section)
 
     private var instance: ProviderInstance? {
         store.instance(for: instanceId)
@@ -248,10 +249,17 @@ struct ProviderInstanceDetailView: View {
             }
 
             // MARK: Status
-            Section("Status") {
+            Section { // nanoMuse: was `Section("Status")`; the header moved below to make room for a footer
                 Toggle("Enabled", isOn: Binding(
                     get: { instance.isEnabled },
                     set: { newValue in
+                        // nanoMuse: the Cloud instance off is the same switch as Settings › Models: the
+                        // chat slot moves to the first own model, or the switch is refused with one sentence
+                        // while nothing else could answer. A provider of one's own keeps upstream's path.
+                        if instance.id == NanoMuseCloud.instance?.id {
+                            nmCloudOffRefused = !NanoMuseCloud.setModelsOn(newValue)
+                            return
+                        }
                         let hasApiKey = ProviderKeychainHelper.loadAPIKey(instanceId: instance.id) != nil
                         let hasOAuth = ProviderKeychainHelper.loadOAuthString(instanceId: instance.id, account: "manual-oauth-token") != nil
                             || (instance.providerType == .anthropic && ClaudeOAuthManager.shared.isAuthenticated(instanceId: instance.id))
@@ -261,6 +269,14 @@ struct ProviderInstanceDetailView: View {
                         store.updateInstance(updated)
                     }
                 ))
+            } header: {
+                Text("Status")
+            } footer: {
+                // nanoMuse: the refusal, under the switch, where the page has it
+                if nmCloudOffRefused {
+                    Text(AppLocalized("Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer."))
+                        .foregroundStyle(.red)
+                }
             }
 
             // MARK: Thinking Rules (Phase 2 §3)

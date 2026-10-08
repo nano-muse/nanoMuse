@@ -121,6 +121,27 @@ final class NanoMuseModelSlotsTests: XCTestCase {
         XCTAssertEqual(NanoMuseSlotResolver.resolve(slot: .chat, chosen: nil, chatProviderId: nil, providers: [openrouter, bailian]), NanoMuseSlotChoice(providerId: "openrouter-1", model: "deepseek/deepseek-v4.1-flash"))
     }
 
+    // MARK: - nanoMuse Cloud switched off while the chat was the account's (Android: ChatLeavesTest)
+
+    func testChatLeavesCloudForTheFirstOwnProvidersDefault() {
+        // The first own provider in the order they were added, on the catalogue's default for it.
+        XCTAssertEqual(NanoMuseSlotResolver.nextChat(leaving: cloudId, providers: [cloud, bailian, openrouter]), NanoMuseSlotChoice(providerId: "bailian-1", model: "deepseek-v4.1-flash"))
+        XCTAssertEqual(NanoMuseSlotResolver.nextChat(leaving: cloudId, providers: [cloud, openrouter, bailian]), NanoMuseSlotChoice(providerId: "openrouter-1", model: "deepseek/deepseek-v4.1-flash"))
+        // Cloud already gone from the list (the switch was written first): the same answer.
+        XCTAssertEqual(NanoMuseSlotResolver.nextChat(leaving: cloudId, providers: [bailian])?.providerId, "bailian-1")
+    }
+
+    func testChatLeavesIsRefusedWhenNothingElseChats() {
+        XCTAssertNil(NanoMuseSlotResolver.nextChat(leaving: cloudId, providers: [cloud]), "only the account: the switch stays on")
+        XCTAssertNil(NanoMuseSlotResolver.nextChat(leaving: cloudId, providers: []))
+        // A key that only draws is no chat model.
+        let drawsOnly = NanoMuseSlotProvider(id: "dashscope-img", label: "Model Studio", isCloud: false, capabilities: ["image"], defaults: [:], models: [.image: ["qwen-image-3.0"]])
+        XCTAssertNil(NanoMuseSlotResolver.nextChat(leaving: cloudId, providers: [cloud, drawsOnly]))
+        // A provider of one's own leaving hands the chat to the next own one, never back to itself.
+        XCTAssertEqual(NanoMuseSlotResolver.nextChat(leaving: "bailian-1", providers: [bailian, openrouter])?.providerId, "openrouter-1")
+        XCTAssertNil(NanoMuseSlotResolver.nextChat(leaving: "bailian-1", providers: [bailian]))
+    }
+
     // MARK: - The relay's menu
 
     private let menu: [[String: Any]] = [

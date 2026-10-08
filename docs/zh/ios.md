@@ -410,6 +410,17 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   见 [hub.md](hub.md)）；iPhone 的 Muse 现在被要求用这个语言回答，之前只看文字本身，所以在
   英文桌面上对一个中文网页输入 `@iPhone` 的人会得到英文回答。`NanoMuseHubTasks.prompt`
   是纯函数，有测试。手机自己发出的 `@设备` 提及从 1.0.0 起就带这个标签。
+- **第三轮审计：Cloud 开关与对话（1.0.x）**（`NanoMuseModelSlots.swift`、`NanoMuseCloud.swift`、
+  `NanoMuseModelsView.swift`、`ProviderInstanceDetailView.swift` 里的 `// nanoMuse:` 改动点、
+  `MinisTests/NanoMuseModelSlotsTests.swift`）：新对话还由账号回答时关掉*使用 nanoMuse Cloud
+  模型*（设置 › 模型，或 Cloud 服务商自己页面上的*已启用*），对话槽和主要聊天会交给第一个能对话
+  的自有服务商，用目录里它的默认模型（`NanoMuseSlotResolver.nextChat`，对应 Android 的
+  `ModelSlots.nextChat`；`NanoMuseModelSlots.chatLeaves` 经 `useForChat` 完成切换）。没有自有
+  对话模型时开关被拒绝：`NanoMuseCloud.setModelsOn` 返回 false，开关保持打开，开关下面出现
+  *先添加一个自己的服务商；关掉 nanoMuse Cloud 后没有别的模型能回答。*，模型页在卡片内，服务商
+  页在「状态」一节的脚注。之前开关会关掉，对话那一行仍写着账号，主要聊天停在上游的*未配置模型*
+  错误上；现在经这个开关到不了*未设置*的状态。自有服务商在自己页面上关掉仍走上游的路：对话经
+  默认分组重新解析，什么都不剩时说*未配置模型。请在设置中添加服务商。*
 
 ## 在 Mac 上构建 {#building-on-a-mac}
 
