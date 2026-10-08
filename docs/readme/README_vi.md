@@ -35,8 +35,8 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ Tin mới
 
-- `2026-10-07` 📄 Bài báo của chúng tôi đã có trên [arXiv](https://arxiv.org/abs/2610.08699).
 - `2026-10-09` 🚀 Phiên bản mới nhất: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0).
+- `2026-10-07` 📄 Bài báo của chúng tôi đã có trên [arXiv](https://arxiv.org/abs/2610.08699).
 - `2026-09-25` 🎉 nanoMuse đã ra mắt.
 
 Mọi phiên bản: [releases](https://github.com/nano-muse/nanoMuse/releases).

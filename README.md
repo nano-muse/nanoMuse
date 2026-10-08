@@ -35,8 +35,8 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ News
 
-- `2026-10-07` 📄 Our paper is available on [arXiv](https://arxiv.org/abs/2610.08699).
 - `2026-10-09` 🚀 Latest version: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0).
+- `2026-10-07` 📄 Our paper is available on [arXiv](https://arxiv.org/abs/2610.08699).
 - `2026-09-25` 🎉 nanoMuse is released.
 
 Every version: [releases](https://github.com/nano-muse/nanoMuse/releases).

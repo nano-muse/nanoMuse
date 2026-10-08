@@ -35,8 +35,8 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ ニュース
 
-- `2026-10-07` 📄 私たちの論文が [arXiv](https://arxiv.org/abs/2610.08699) に公開されました。
 - `2026-10-09` 🚀 最新版：[1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0)。
+- `2026-10-07` 📄 私たちの論文が [arXiv](https://arxiv.org/abs/2610.08699) に公開されました。
 - `2026-09-25` 🎉 nanoMuse を公開しました。
 
 すべてのバージョン：[releases](https://github.com/nano-muse/nanoMuse/releases)。
