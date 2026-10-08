@@ -56,7 +56,7 @@ import { AvatarMotion, ANIMATED, type MotionMood, type MotionView } from './moti
 import { DEFAULT_VIDEO_MODEL, hostOf, KNOWN_DASHSCOPE_MODELS, looksLikeVideoModel, probe as probeVideoModel, speaksDashScope, type VideoEndpoint } from './video.ts'
 import { editImage as ownEditImage, generateImage as ownGenerateImage, imageShapeOf, type ImageEndpoint } from './images.ts'
 import { checkMove, checkScreenshot, displayInfo, isBlack, runtimeInfo, screenHead, type MoveCheck, type RuntimeInfo, type ScreenshotCheck } from './hands-check.ts'
-import { apiOf, baseUrlFor, CAPABILITIES, capabilitiesForAuth, capabilitiesOf, CHATGPT_KEY_REF, CHATGPT_PROVIDER, ChatGptDesk, keyRefFor, listModels, loadCatalogue, modelsOf, ownProviderRow, regionOf, typedModelIds, type Capability, type ChatGptState, type LoginView, type OwnModel, type OwnProvider, type ProviderEntry, type Region } from './providers.ts'
+import { apiOf, baseUrlFor, CAPABILITIES, capabilitiesForAuth, capabilitiesOf, CHATGPT_KEY_REF, CHATGPT_PROVIDER, ChatGptDesk, keyRefFor, listModelRows, listModels, loadCatalogue, modelsOf, ownProviderRow, parseModelReasoning, regionOf, typedModelIds, type Capability, type ChatGptState, type LoginView, type OwnModel, type OwnProvider, type ProviderEntry, type Region } from './providers.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -464,7 +464,10 @@ function ownProvidersOf(raw: Record<string, unknown>): Record<string, OwnProvide
       baseURL: p.baseURL,
       keyRef: typeof p.keyRef === 'string' ? p.keyRef : '',
       capabilities: p.capabilities.filter((c): c is Capability => (CAPABILITIES as readonly string[]).includes(c)),
-      models: Array.isArray(p.models) ? p.models.filter((m): m is OwnModel => Boolean(m) && typeof m.id === 'string').map((m) => ({ id: m.id, name: typeof m.name === 'string' && m.name ? m.name : m.id, vision: m.vision === true, kind: m.kind === 'image' || m.kind === 'video' ? m.kind : 'chat' })) : [],
+      models: Array.isArray(p.models) ? p.models.filter((m): m is OwnModel => Boolean(m) && typeof m.id === 'string').map((m) => {
+        const reasoning = parseModelReasoning(m.reasoning)
+        return { id: m.id, name: typeof m.name === 'string' && m.name ? m.name : m.id, vision: m.vision === true, kind: m.kind === 'image' || m.kind === 'video' ? m.kind : 'chat', ...(reasoning ? { reasoning } : {}) }
+      }) : [],
       at: Number(p.at) || 0,
     }
   }
@@ -635,6 +638,8 @@ export default class NanomuseCloud extends Service {
     }
     this.catalogue = await loadCatalogue()
     if (!this.catalogue.length) this.ctx.logger.warn('nanomuse: assets/providers.json missing or empty; the own-key step lists nothing')
+    // Keys saved before the catalogue learned a vendor's thinking levels get them on this start.
+    this.refreshOwnRows()
     await this.profile.load()
     this.profile.onChange(() => this.broadcast())
     // The face's clips follow the face (C3): a face drawn here or pulled from the account drops the
@@ -1405,11 +1410,12 @@ export default class NanomuseCloud extends Service {
       const said = (input.capabilities ?? []).filter((c): c is Capability => (CAPABILITIES as readonly string[]).includes(c))
       capabilities = CAPABILITIES.filter((c) => c === 'chat' || said.includes(c))
     }
-    const listed = await listModels(entry.protocol, baseURL, apiKey)
+    const listed = await listModelRows(entry.protocol, baseURL, apiKey)
     // The ids the person typed (a gateway that does not answer `GET /models`, or one model
-    // wanted out of hundreds): first in the list, the endpoint's own after them.
+    // wanted out of hundreds): first in the list, the endpoint's own after them; a typed id the
+    // list also has keeps what the list said about it (OpenRouter's thinking levels).
     const typed = typedModelIds(input.models)
-    let models = modelsOf({ ...entry, capabilities }, [...typed, ...listed.filter((m) => !typed.includes(m))])
+    let models = modelsOf({ ...entry, capabilities }, [...typed.map((id) => listed.find((m) => m.id === id) ?? { id }), ...listed.filter((m) => !typed.includes(m.id))])
     if (entry.user_capabilities) models = models.map((m) => ({ ...m, vision: capabilities.includes('vision') }))
     // A row with no chat model cannot be served (the model adapter refuses a route that resolves
     // no models) and nothing could pick from it: a plain sentence, before anything is written.
@@ -1418,13 +1424,43 @@ export default class NanomuseCloud extends Service {
     if (keyRef) await this.ctx.credentials.set(credentialRef(keyRef), apiKey)
     const label = (input.label ?? '').trim() || (input.lang?.toLowerCase().startsWith('zh') ? entry.name_zh : entry.name)
     const row: OwnProvider = { provider: id, label, protocol: entry.protocol, baseURL, keyRef, capabilities, models, at: Date.now() }
-    await this.ctx.settings.update(LLM_ROW, { providers: { [id]: ownProviderRow(row) } })
+    await this.ctx.settings.update(LLM_ROW, { providers: { [id]: ownProviderRow(row, entry.reasoning) } })
     this.state = { ...this.state, providers: { ...this.state.providers, [id]: row } }
     await this.writeState()
     await this.adoptOwnDefault(id, row)
     await this.writeHands()
     this.broadcast()
     return row
+  }
+
+  /**
+   * The saved own-key rows written to the model adapter again, where the row it has differs from
+   * what the catalogue now says (a vendor's thinking levels learned after the key was saved).
+   * The adapter's settings entry may not be registered yet while the host starts: a few quiet
+   * retries, then the next start.
+   */
+  private refreshOwnRows(attempt = 0): void {
+    const rows = Object.entries(this.state.providers ?? {}).filter(([id]) => id !== CHATGPT_PROVIDER && id !== PROVIDER_ID)
+    if (!rows.length) return
+    let current: { value?: unknown } | undefined
+    try {
+      current = this.ctx.settings.describe().find((d) => d.ns === LLM_ROW)
+    } catch {
+      current = undefined
+    }
+    if (!current) {
+      if (attempt < 4) setTimeout(() => this.refreshOwnRows(attempt + 1), 3000 * (attempt + 1)).unref?.()
+      return
+    }
+    const written = (current.value as { providers?: Record<string, unknown> } | undefined)?.providers ?? {}
+    void (async () => {
+      for (const [id, row] of rows) {
+        const entry = this.catalogue.find((p) => p.id === row.provider)
+        const wanted = ownProviderRow(row, entry?.reasoning)
+        if (canonical(written[id] ?? null) === canonical(wanted)) continue
+        await this.ctx.settings.update(LLM_ROW, { providers: { [id]: wanted } }).catch((error: unknown) => this.ctx.logger.warn('nanomuse: own-key row %s not refreshed: %s', id, message(error)))
+      }
+    })()
   }
 
   /**

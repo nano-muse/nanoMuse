@@ -150,6 +150,21 @@ switches by itself: the error card offers *Use nanoMuse Cloud this time*
 no row. The desktop shows the same button after a failed studio round and a
 failed set of clips.
 
+**Thinking level (desktop).** The composer's model picker offers a thinking
+level for a model of yours where the vendor documents one, in the vendor's own
+shape: DeepSeek, Kimi (kimi-k3), Zhipu (GLM-5.2 and 5.3), SiliconFlow and
+Volcengine (their DeepSeek-V4 and GLM-5.2 ids, Doubao Seed 2), MiniMax
+(M3.1), OpenRouter (the levels its model list gives per model), OpenAI (the
+o-series, GPT-5 onwards), Anthropic (Claude 4.6 onwards), Gemini through its
+OpenAI layer, xAI (Grok 4.5 onwards), Groq, Mistral, and gpt-oss on Ollama or
+vLLM. The levels are the vendor's (`low`, `high`, `max` for DeepSeek, say),
+and *Provider default* sends no level at all, so the model thinks the way its
+vendor documents. There is no *Off* entry: with these vendors, turning
+thinking off is a different switch or a different model. A model nobody
+documents a level for shows no control, as do Bailian (its switch is
+`enable_thinking`, which cannot be left unsent), LM Studio and a custom
+endpoint. A key saved before this build gets the control at the next start.
+
 **Switching nanoMuse Cloud off.** While signed in, the Models page has one
 switch, *Use nanoMuse Cloud models*. Off, the Cloud leaves the pickers and the
 automatic order, no side call (a chat's title, memory, a portrait, the hands)

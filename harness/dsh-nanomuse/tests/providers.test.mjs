@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
 import {
-  apiOf, baseUrlFor, capabilitiesForAuth, capabilitiesOf, ChatGptDesk, chatGptOnly, keyRefFor, kindOf, LineReader, listModels, loadCatalogue, modelsOf, ownKeyStepDone, ownProviderRow, parseCatalogue, providersWith, regionOf, sighted, typedModelIds, unavailableKey, waysOn,
+  apiOf, baseUrlFor, capabilitiesForAuth, capabilitiesOf, ChatGptDesk, chatGptOnly, keyRefFor, kindOf, LineReader, listModelRows, listModels, loadCatalogue, modelsOf, ownKeyStepDone, ownProviderRow, parseCatalogue, parseListedReasoning, parseModelReasoning, parseReasoningHint, providersWith, reasoningFields, reasoningFor, regionOf, sighted, typedModelIds, unavailableKey, waysOn,
 } from '../lib/providers.js'
 
 const catalogue = parseCatalogue(JSON.parse(readFileSync(new URL('../assets/providers.json', import.meta.url), 'utf8')))
@@ -292,4 +292,117 @@ test('typedModelIds: a comma- or newline-separated field or a list, trimmed, wit
   assert.deepEqual(typedModelIds(42), [])
   assert.deepEqual(typedModelIds('x'.repeat(121)), [])
   assert.equal(typedModelIds(Array.from({ length: 50 }, (_, i) => `m${i}`)).length, 40)
+})
+
+// ---- the thinking level for own keys (the tester's item 10) -------------------------------------
+
+/** A row of an own-key provider with the given chat models, for the adapter's row. */
+function rowOf(provider, protocol, baseURL, models) {
+  return { provider, label: provider, protocol, baseURL, keyRef: keyRefFor(provider), capabilities: ['chat'], models: models.map((m) => (typeof m === 'string' ? { id: m, name: m, vision: false, kind: 'chat' } : m)), at: 1 }
+}
+
+test('the reasoning hint parses as shipped: the vendors that document a level carry one, the ones that do not carry none', () => {
+  const byId = Object.fromEntries(catalogue.map((p) => [p.id, p]))
+  assert.equal(byId.deepseek.reasoning.wire, 'thinking+reasoning_effort')
+  assert.deepEqual(byId.deepseek.reasoning.rules[0], { models: '^deepseek-', levels: ['low', 'high', 'max'], default: 'high' })
+  assert.equal(byId.zhipu.reasoning.wire, 'thinking+reasoning_effort')
+  assert.equal(byId.openai.reasoning.wire, 'reasoning_effort')
+  assert.equal(byId.anthropic.reasoning.wire, 'output_config.effort')
+  assert.equal(byId.openrouter.reasoning.wire, 'reasoning.effort')
+  assert.equal(byId.openrouter.reasoning.listed, true)
+  for (const id of ['moonshot', 'siliconflow', 'volcengine', 'minimax', 'gemini', 'xai', 'groq', 'mistral', 'ollama', 'vllm']) assert.equal(byId[id].reasoning.wire, 'reasoning_effort', id)
+  // Bailian's switch is `enable_thinking`, which the harness would have to send on every call; local servers and `custom` document nothing
+  for (const id of ['bailian', 'lm-studio', 'custom']) assert.equal(byId[id].reasoning, undefined, id)
+  for (const p of catalogue) for (const rule of p.reasoning?.rules ?? []) assert.match(p.reasoning.doc, /^https:\/\//, `${p.id} ${rule.models}`)
+  // malformed hints are dropped, not thrown on: an unknown wire, a pattern that does not compile, a rule without a level, a hint saying nothing
+  assert.equal(parseReasoningHint({ wire: 'enable_thinking', rules: [{ models: '.', levels: ['high'] }] }), undefined)
+  assert.deepEqual(parseReasoningHint({ doc: 'https://x.example', wire: 'reasoning_effort', rules: [{ models: '(', levels: ['high'] }, { models: 'ok', levels: ['nope'] }, { models: 'fine', levels: ['max', 'low', 'off'], default: 'none' }] }), { doc: 'https://x.example', wire: 'reasoning_effort', rules: [{ models: 'fine', levels: ['low', 'max'], default: 'none' }], listed: false })
+  assert.equal(parseReasoningHint({ wire: 'reasoning_effort', rules: [] }), undefined)
+  assert.deepEqual(parseReasoningHint({ wire: 'reasoning.effort', listed: true }), { doc: '', wire: 'reasoning.effort', rules: [], listed: true })
+  // what OpenRouter's list says about a model, and what cloud.json keeps of it
+  assert.deepEqual(parseListedReasoning({ default_effort: 'high', mandatory: true, supported_efforts: ['max', 'xhigh', 'high', 'medium', 'low', 'none'] }), { levels: ['low', 'medium', 'high', 'xhigh', 'max'], default: 'high' })
+  assert.deepEqual(parseListedReasoning({ default_enabled: false, mandatory: false, supported_efforts: ['high', 'low'] }), { levels: ['low', 'high'], default: 'none' })
+  assert.equal(parseListedReasoning({ mandatory: false }), undefined)
+  assert.equal(parseListedReasoning({ default_enabled: true, supports_max_tokens: true }), undefined)
+  assert.deepEqual(parseModelReasoning({ levels: ['high', 'low'], default: 'high' }), { levels: ['low', 'high'], default: 'high' })
+  assert.equal(parseModelReasoning({ levels: [] }), undefined)
+})
+
+test('reasoningFor: the first matching rule, without regard to case; the list wins where the hint reads it; nothing for a model no rule names', () => {
+  const openai = catalogue.find((p) => p.id === 'openai').reasoning
+  assert.deepEqual(reasoningFor(openai, 'o3-mini'), { levels: ['low', 'medium', 'high'], default: 'medium' })
+  assert.deepEqual(reasoningFor(openai, 'gpt-5'), { levels: ['minimal', 'low', 'medium', 'high'], default: 'medium' })
+  assert.deepEqual(reasoningFor(openai, 'gpt-5.4-mini'), { levels: ['low', 'medium', 'high', 'xhigh'], default: 'none' })
+  assert.equal(reasoningFor(openai, 'gpt-4.1'), undefined)
+  assert.equal(reasoningFor(openai, 'gpt-image-2.5-flare'), undefined)
+  const minimax = catalogue.find((p) => p.id === 'minimax').reasoning
+  assert.deepEqual(reasoningFor(minimax, 'minimax-m3.1').levels, ['low', 'medium', 'high', 'xhigh', 'max'])
+  assert.equal(reasoningFor(minimax, 'MiniMax-M3'), undefined)
+  const anthropic = catalogue.find((p) => p.id === 'anthropic').reasoning
+  assert.deepEqual(reasoningFor(anthropic, 'claude-sonnet-5-5'), { levels: ['low', 'medium', 'high', 'xhigh', 'max'], default: 'high' })
+  assert.deepEqual(reasoningFor(anthropic, 'claude-opus-5-5').default, 'medium')
+  assert.deepEqual(reasoningFor(anthropic, 'claude-sonnet-4-6').levels, ['low', 'medium', 'high', 'max'])
+  assert.equal(reasoningFor(anthropic, 'claude-haiku-4-5'), undefined)
+  const openrouter = catalogue.find((p) => p.id === 'openrouter').reasoning
+  assert.deepEqual(reasoningFor(openrouter, 'z-ai/glm-5.3', { levels: ['low', 'high', 'max'], default: 'max' }), { levels: ['low', 'high', 'max'], default: 'max' })
+  assert.equal(reasoningFor(openrouter, 'z-ai/glm-5.3'), undefined)
+  assert.equal(reasoningFor(undefined, 'deepseek-flash'), undefined)
+})
+
+test('the adapter row: the documented levels as reasoningEfforts, each sent as its own name, and the compat that puts pi-ai on the vendor wire', () => {
+  const hint = (id) => catalogue.find((p) => p.id === id).reasoning
+  // DeepSeek: `thinking: {type: "enabled"}` beside `reasoning_effort`; no `off`, so nothing goes out until a level is picked
+  const deepseek = ownProviderRow(rowOf('deepseek', 'openai', 'https://api.deepseek.com/v1', ['deepseek-flash', 'deepseek-v4-pro']), hint('deepseek'))
+  assert.deepEqual(deepseek.models[0], { id: 'deepseek-flash', displayName: 'deepseek-flash', input: ['text'], reasoningEfforts: { low: 'low', high: 'high', max: 'max' }, compat: { thinkingFormat: 'deepseek', supportsReasoningEffort: true } })
+  assert.equal('off' in deepseek.models[0].reasoningEfforts, false)
+  // OpenAI's plain field; a model the vendor documents no level for shows no control
+  const openai = ownProviderRow(rowOf('openai', 'openai', 'https://api.openai.com/v1', ['gpt-5.4', 'gpt-4.1']), hint('openai'))
+  assert.deepEqual(openai.models[0].reasoningEfforts, { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh' })
+  assert.deepEqual(openai.models[0].compat, { thinkingFormat: 'openai', supportsReasoningEffort: true })
+  assert.deepEqual(openai.models[1], { id: 'gpt-4.1', displayName: 'gpt-4.1', input: ['text'] })
+  // Moonshot and xAI: pi-ai's own detection turns reasoning_effort off for their hosts; the model's compat turns it back on
+  const moonshot = ownProviderRow(rowOf('moonshot', 'openai', 'https://api.moonshot.cn/v1', ['kimi-k3', 'kimi-k2.6']), hint('moonshot'))
+  assert.deepEqual(moonshot.models[0].compat, { thinkingFormat: 'openai', supportsReasoningEffort: true })
+  assert.equal(moonshot.models[1].reasoningEfforts, undefined)
+  // OpenRouter: the nested object, levels from the endpoint's own list
+  const listed = { id: 'anthropic/claude-sonnet-5.5', name: 'anthropic/claude-sonnet-5.5', vision: true, kind: 'chat', reasoning: { levels: ['low', 'medium', 'high', 'xhigh', 'max'], default: 'high' } }
+  const openrouter = ownProviderRow(rowOf('openrouter', 'openai', 'https://openrouter.ai/api/v1', [listed, 'unbiased/pareto-26.10-preview']), hint('openrouter'))
+  assert.deepEqual(openrouter.models[0].reasoningEfforts, { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' })
+  assert.deepEqual(openrouter.models[0].compat, { thinkingFormat: 'openrouter' })
+  assert.equal(openrouter.models[1].reasoningEfforts, undefined)
+  // Anthropic: adaptive thinking with `output_config.effort`
+  const anthropic = ownProviderRow(rowOf('anthropic', 'anthropic', 'https://api.anthropic.com', ['claude-sonnet-5-5', 'claude-haiku-4-5']), hint('anthropic'))
+  assert.deepEqual(anthropic.models[0].compat, { forceAdaptiveThinking: true })
+  assert.deepEqual(Object.keys(anthropic.models[0].reasoningEfforts), ['low', 'medium', 'high', 'xhigh', 'max'])
+  assert.equal(anthropic.models[1].reasoningEfforts, undefined)
+  // a wire that does not ride the row's API declares nothing, as does no hint at all (today's row, byte for byte)
+  assert.deepEqual(reasoningFields(hint('anthropic'), 'openai-completions', { id: 'claude-sonnet-5-5' }), {})
+  assert.deepEqual(reasoningFields(hint('deepseek'), 'anthropic-messages', { id: 'deepseek-flash' }), {})
+  const bare = rowOf('deepseek', 'openai', 'https://api.deepseek.com/v1', ['deepseek-flash'])
+  assert.deepEqual(ownProviderRow(bare), ownProviderRow(bare, undefined))
+  assert.deepEqual(ownProviderRow(bare).models[0], { id: 'deepseek-flash', displayName: 'deepseek-flash', input: ['text'] })
+  // image and video rows never carry a level
+  const zhipu = ownProviderRow({ ...rowOf('zhipu', 'openai', 'https://open.bigmodel.cn/api/paas/v4', ['glm-5.3']), models: [{ id: 'glm-5.3', name: 'glm-5.3', vision: false, kind: 'chat' }, { id: 'glm-image', name: 'glm-image', vision: false, kind: 'image' }] }, hint('zhipu'))
+  assert.equal(zhipu.models.length, 1)
+  assert.deepEqual(zhipu.models[0].compat, { thinkingFormat: 'deepseek', supportsReasoningEffort: true })
+})
+
+test('listModelRows keeps what OpenRouter says about a model; modelsOf carries it only where the catalogue reads the list', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({ data: [
+    { id: 'z-ai/glm-5.3', reasoning: { default_effort: 'max', default_enabled: true, mandatory: true, supported_efforts: ['max', 'high', 'low'] } },
+    { id: 'apodex/apodex-1.1-mini:free', reasoning: { mandatory: false } },
+    { id: 'unbiased/pareto-26.10-preview' },
+  ] }), { status: 200 })
+  const rows = await listModelRows('openai', 'https://openrouter.ai/api/v1', 'sk-or', fetchImpl)
+  assert.deepEqual(rows, [{ id: 'apodex/apodex-1.1-mini:free' }, { id: 'unbiased/pareto-26.10-preview' }, { id: 'z-ai/glm-5.3', reasoning: { levels: ['low', 'high', 'max'], default: 'max' } }])
+  assert.deepEqual(await listModels('openai', 'https://openrouter.ai/api/v1', 'sk-or', fetchImpl), ['apodex/apodex-1.1-mini:free', 'unbiased/pareto-26.10-preview', 'z-ai/glm-5.3'])
+  const openrouter = catalogue.find((p) => p.id === 'openrouter')
+  const models = modelsOf(openrouter, rows)
+  assert.deepEqual(models.find((m) => m.id === 'z-ai/glm-5.3').reasoning, { levels: ['low', 'high', 'max'], default: 'max' })
+  assert.equal(models.find((m) => m.id === 'unbiased/pareto-26.10-preview').reasoning, undefined)
+  // a provider whose hint has rules, not the list: what a gateway in front of it says is not kept
+  const deepseek = catalogue.find((p) => p.id === 'deepseek')
+  assert.equal(modelsOf(deepseek, [{ id: 'deepseek-flash', reasoning: { levels: ['low'] } }])[0].reasoning, undefined)
+  // ids alone still work
+  assert.deepEqual(modelsOf(deepseek, ['deepseek-flash']).map((m) => m.id), ['deepseek-flash'])
 })

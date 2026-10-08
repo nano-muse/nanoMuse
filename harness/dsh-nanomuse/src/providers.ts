@@ -23,7 +23,7 @@
  */
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
-import { CAPABILITIES, type Auth, type Capability, type Protocol, type ProviderEntry, type Region } from './catalogue.ts'
+import { CAPABILITIES, reasoningFor, REASONING_WIRES, THINKING_LEVELS, type Auth, type Capability, type ModelReasoning, type Protocol, type ProviderEntry, type ReasoningHint, type ReasoningRule, type ReasoningWire, type Region, type ThinkingLevel } from './catalogue.ts'
 
 // The shapes and the pure rules (the groups, the region, the gate) live in `catalogue.ts`, which the browser half imports too.
 export * from './catalogue.ts'
@@ -80,9 +80,77 @@ export function parseCatalogue(raw: unknown): ProviderEntry[] {
     }
     if (url(r.base_url_global)) entry.base_url_global = url(r.base_url_global)
     if (typeof r.key_url_global === 'string' && r.key_url_global) entry.key_url_global = r.key_url_global
+    const reasoning = parseReasoningHint(r.reasoning)
+    if (reasoning) entry.reasoning = reasoning
     out.push(entry)
   }
   return out
+}
+
+/** The levels of a rule or a listed model, kept to the names the harness knows, in its order. */
+function parseLevels(raw: unknown): ThinkingLevel[] {
+  const list = Array.isArray(raw) ? raw : []
+  return THINKING_LEVELS.filter((level) => list.includes(level))
+}
+
+/** A documented default: one of the levels, or `none` for a vendor whose default is not to think. */
+function parseDefault(raw: unknown, levels: ThinkingLevel[]): ThinkingLevel | 'none' | undefined {
+  if (raw === 'none') return 'none'
+  return typeof raw === 'string' && (levels as string[]).includes(raw) ? (raw as ThinkingLevel) : undefined
+}
+
+/**
+ * A provider's `reasoning` hint as `providers.json` has it: the wire shape must be one this
+ * plugin can declare to the harness, a rule needs a pattern that compiles and at least one
+ * level; a hint with neither rules nor `listed` says nothing and is dropped.
+ */
+export function parseReasoningHint(raw: unknown): ReasoningHint | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const wire = REASONING_WIRES.find((w) => w === r.wire)
+  if (!wire) return undefined
+  const rules: ReasoningRule[] = []
+  for (const item of Array.isArray(r.rules) ? r.rules : []) {
+    if (!item || typeof item !== 'object') continue
+    const rule = item as Record<string, unknown>
+    if (typeof rule.models !== 'string' || !rule.models) continue
+    try {
+      new RegExp(rule.models, 'i')
+    } catch {
+      continue
+    }
+    const levels = parseLevels(rule.levels)
+    if (!levels.length) continue
+    const fallback = parseDefault(rule.default, levels)
+    rules.push({ models: rule.models, levels, ...(fallback ? { default: fallback } : {}) })
+  }
+  const listed = r.listed === true
+  if (!rules.length && !listed) return undefined
+  return { doc: typeof r.doc === 'string' ? r.doc : '', wire, rules, listed }
+}
+
+/** A model's levels as `cloud.json` keeps them (`{levels, default}`), or nothing for a malformed value. */
+export function parseModelReasoning(raw: unknown): ModelReasoning | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const levels = parseLevels(r.levels)
+  if (!levels.length) return undefined
+  const fallback = parseDefault(r.default, levels)
+  return { levels, ...(fallback ? { default: fallback } : {}) }
+}
+
+/**
+ * What an endpoint's model list said about a model's thinking levels: OpenRouter's `reasoning`
+ * object (`supported_efforts`, `default_effort`, `default_enabled`, `mandatory`). A model whose
+ * entry names no efforts (on/off or a token budget only) gets no control.
+ */
+export function parseListedReasoning(raw: unknown): ModelReasoning | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const levels = parseLevels(r.supported_efforts)
+  if (!levels.length) return undefined
+  const fallback = parseDefault(r.default_effort, levels) ?? (r.default_enabled === false ? 'none' : undefined)
+  return { levels, ...(fallback ? { default: fallback } : {}) }
 }
 
 /**
@@ -124,6 +192,14 @@ export interface OwnModel {
   /** Takes pictures: the hands may see the screen with it. */
   vision: boolean
   kind: 'chat' | 'image' | 'video'
+  /** The thinking levels the endpoint's own list gave for it (OpenRouter); the catalogue's rules otherwise. */
+  reasoning?: ModelReasoning
+}
+
+/** One row of an endpoint's model list: the id, and what it said about thinking levels when it did. */
+export interface ListedModel {
+  id: string
+  reasoning?: ModelReasoning
 }
 
 /**
@@ -162,11 +238,11 @@ export function kindOf(modelId: string): OwnModel['kind'] {
 }
 
 /** The models of an entry as the pickers show them: the endpoint's list when it answered, else the catalogue's defaults. */
-export function modelsOf(entry: ProviderEntry, listed: string[]): OwnModel[] {
-  const ids = listed.length ? listed : Object.values(entry.defaults).filter((id): id is string => Boolean(id))
+export function modelsOf(entry: ProviderEntry, listed: (string | ListedModel)[]): OwnModel[] {
+  const rows: ListedModel[] = listed.length ? listed.map((m) => (typeof m === 'string' ? { id: m } : m)) : Object.values(entry.defaults).filter((id): id is string => Boolean(id)).map((id) => ({ id }))
   const seen = new Set<string>()
   const out: OwnModel[] = []
-  for (const id of ids) {
+  for (const { id, reasoning } of rows) {
     if (!id || seen.has(id)) continue
     seen.add(id)
     let kind = kindOf(id)
@@ -174,19 +250,48 @@ export function modelsOf(entry: ProviderEntry, listed: string[]): OwnModel[] {
     if (id === entry.defaults.video) kind = 'video'
     if (kind === 'image' && !entry.capabilities.includes('image')) continue
     if (kind === 'video' && !entry.capabilities.includes('video')) continue
-    out.push({ id, name: id, vision: kind === 'chat' && sighted(entry, id), kind })
+    // what the list said about levels is kept only where the catalogue reads the list for them
+    const listedLevels = kind === 'chat' && entry.reasoning?.listed ? reasoning : undefined
+    out.push({ id, name: id, vision: kind === 'chat' && sighted(entry, id), kind, ...(listedLevels ? { reasoning: listedLevels } : {}) })
   }
   return out
 }
 
-/** The provider row for the harness's model adapter: the base URL, the credential by name, the chat models (never a key). */
-export function ownProviderRow(p: OwnProvider): Record<string, unknown> {
+/** The harness `api` a wire shape belongs to: Anthropic's effort rides the Messages API, the rest the OpenAI-compatible one. */
+function apiOfWire(wire: ReasoningWire): string {
+  return wire === 'output_config.effort' ? 'anthropic-messages' : 'openai-completions'
+}
+
+/**
+ * The thinking-level fields of one model row for the harness (`@deepseek-ai/dsh-llm-pi-ai`):
+ * `reasoningEfforts` names the documented levels, each sent as its own name, and `compat` puts
+ * pi-ai on the vendor's wire shape. Nothing when the vendor documents no control for the model,
+ * or when the row speaks another API than the shape rides: the picker then shows no level, as
+ * before. `off` is never declared: with no level chosen nothing is sent, which is the vendor's
+ * documented default (the harness has no per-model default to carry it otherwise).
+ */
+export function reasoningFields(hint: ReasoningHint | undefined, api: string, model: Pick<OwnModel, 'id' | 'reasoning'>): Record<string, unknown> {
+  if (!hint || apiOfWire(hint.wire) !== api) return {}
+  const found = reasoningFor(hint, model.id, model.reasoning)
+  if (!found) return {}
+  const reasoningEfforts = Object.fromEntries(found.levels.map((level) => [level, level]))
+  switch (hint.wire) {
+    case 'reasoning_effort': return { reasoningEfforts, compat: { thinkingFormat: 'openai', supportsReasoningEffort: true } }
+    case 'thinking+reasoning_effort': return { reasoningEfforts, compat: { thinkingFormat: 'deepseek', supportsReasoningEffort: true } }
+    case 'reasoning.effort': return { reasoningEfforts, compat: { thinkingFormat: 'openrouter' } }
+    case 'output_config.effort': return { reasoningEfforts, compat: { forceAdaptiveThinking: true } }
+  }
+}
+
+/** The provider row for the harness's model adapter: the base URL, the credential by name, the chat models with their thinking levels (never a key). */
+export function ownProviderRow(p: OwnProvider, hint?: ReasoningHint): Record<string, unknown> {
+  const api = apiOf(p.protocol, p.baseURL)
   return {
     displayName: p.label,
-    api: apiOf(p.protocol, p.baseURL),
+    api,
     baseURL: p.baseURL,
     ...(p.keyRef ? { apiKeyEnv: p.keyRef } : {}),
-    models: p.models.filter((m) => m.kind === 'chat').map((m) => ({ id: m.id, displayName: m.name, input: m.vision ? ['text', 'image'] : ['text'] })),
+    models: p.models.filter((m) => m.kind === 'chat').map((m) => ({ id: m.id, displayName: m.name, input: m.vision ? ['text', 'image'] : ['text'], ...reasoningFields(hint, api, m) })),
   }
 }
 
@@ -217,6 +322,11 @@ export function keyRefFor(providerId: string): string {
  * for Gemini. Empty when it does not answer in time — the catalogue's defaults stand in.
  */
 export async function listModels(protocol: Protocol, baseURL: string, apiKey: string, fetchImpl: typeof fetch = fetch, timeoutMs = 8000): Promise<string[]> {
+  return (await listModelRows(protocol, baseURL, apiKey, fetchImpl, timeoutMs)).map((m) => m.id)
+}
+
+/** `listModels` with what the list said about each model's thinking levels (OpenRouter's `reasoning` object), sorted by id. */
+export async function listModelRows(protocol: Protocol, baseURL: string, apiKey: string, fetchImpl: typeof fetch = fetch, timeoutMs = 8000): Promise<ListedModel[]> {
   const base = baseURL.replace(/\/+$/, '')
   const signal = AbortSignal.timeout(timeoutMs)
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -238,14 +348,16 @@ export async function listModels(protocol: Protocol, baseURL: string, apiKey: st
     if (!res.ok) return []
     const body = (await Promise.race([res.json(), late])) as { data?: unknown; models?: unknown }
     const rows = Array.isArray(body.data) ? body.data : Array.isArray(body.models) ? body.models : []
-    const ids: string[] = []
+    const out: ListedModel[] = []
     for (const row of rows) {
       if (!row || typeof row !== 'object') continue
-      const r = row as { id?: unknown; name?: unknown }
+      const r = row as { id?: unknown; name?: unknown; reasoning?: unknown }
       const id = typeof r.id === 'string' ? r.id : typeof r.name === 'string' ? r.name.replace(/^models\//, '') : ''
-      if (id) ids.push(id)
+      if (!id) continue
+      const reasoning = parseListedReasoning(r.reasoning)
+      out.push(reasoning ? { id, reasoning } : { id })
     }
-    return ids.sort()
+    return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   } catch {
     return []
   } finally {
