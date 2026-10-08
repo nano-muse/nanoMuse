@@ -136,7 +136,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | PATCH / DELETE | `/api/threads/{id}` | rename / delete |
 | POST | `/api/threads/{id}/clear` | clear the conversation |
 | GET | `/api/threads/{id}/events?limit=&before=` | timeline events |
-| POST | `/api/threads/{id}/send` `{text, files?, language?}` | queue a message; returns immediately. `files`: workspace paths from the upload below, ten at most; text may be empty when there are files. `language` (since 1.0.0): the BCP-47 tag of the client's screens (`en`, `zh-CN`); the reply is written in that language unless *Reply language* fixes one. Without it the script of the message decides, as before |
+| POST | `/api/threads/{id}/send` `{text, files?, language?, via?}` | queue a message; returns immediately. `files`: workspace paths from the upload below, ten at most; text may be empty when there are files. `language` (since 1.0.0): the BCP-47 tag of the client's screens (`en`, `zh-CN`); the reply is written in that language unless *Reply language* fixes one. Without it the script of the message decides, as before. `via: "cloud"` is *Use nanoMuse Cloud this time*: this one turn runs on the account's recommended chat model under the account's key, the next is back on the configured model, and `[llm]` does not move; the user bubble, the reply and a failure of that turn carry `model_used`. `401 signed_out` when no account is signed in |
 | POST | `/api/threads/{id}/stop` | stop the run in that chat: the queue is dropped, pending approval and question cards there expire, the conversation stays usable. `{ok: false}` when nothing was running |
 | POST | `/api/files/upload?name=` (body: the bytes) | a file to attach: lands in `attachments/<date>/` under a safe version of `name`; returns `{path, name, size, kind, mime}` for `files`. 413 above `server.max_upload_mb` |
 | POST | `/api/approvals/{id}` `{approved, scope, reason}` | answer a card; `scope` is one of the card's `grant_options` (`once`, `task`, `session`, `24h`, `always`) |
@@ -233,7 +233,7 @@ The client's first frame is `{"kind": "auth", "token": "…"}` (within ten secon
 | `device_ack`, `device_request` | to a connected phone: the answer to its announcement, and a request for its screen or an action ([gui.md](gui.md#the-device-protocol)) |
 | `error`, `pong` | replies to client messages |
 
-Client → server: `{"kind": "send", "thread": "main", "text": "…", "language": "en"}` (`language` optional, as on `POST /api/threads/{id}/send`), `{"kind": "approval", "id": "…", "approved": true, "scope": "once"}`, `{"kind": "ping"}`. A phone that lets the agent operate it also sends `{"kind": "device", …}` once and `{"kind": "device_result", …}` in answer to each request.
+Client → server: `{"kind": "send", "thread": "main", "text": "…", "language": "en", "via": ""}` (`language` and `via` optional, as on `POST /api/threads/{id}/send`; a refused `via: "cloud"` comes back as `{"kind": "error", "error": "…", "code": "signed_out"}`), `{"kind": "approval", "id": "…", "approved": true, "scope": "once"}`, `{"kind": "ping"}`. A phone that lets the agent operate it also sends `{"kind": "device", …}` once and `{"kind": "device_result", …}` in answer to each request.
 
 Timeline events are persisted per thread in `<data_dir>/threads/<id>.json`, so the history survives restarts.
 

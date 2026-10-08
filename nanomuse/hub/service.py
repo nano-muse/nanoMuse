@@ -563,8 +563,8 @@ class HubService:
             raise CloudError(
                 409,
                 "chat_on_cloud",
-                "The chat model is nanoMuse Cloud's. Pick another chat model first; then the "
-                "account's models can be switched off.",
+                "Add a provider of your own first; with nanoMuse Cloud off, nothing else "
+                "could answer.",
             )
         cloud = dict(self.data.get("cloud") or {})
         cloud["models"] = bool(on)

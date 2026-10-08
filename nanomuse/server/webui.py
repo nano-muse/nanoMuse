@@ -115,6 +115,9 @@ class WebUI:
         # Events emitted meanwhile are tagged so the Feed can show what happened while you
         # were away.
         self.background: dict[str, str] = {}
+        # threads on *Use nanoMuse Cloud this time* → the model id; the turn's reply and a
+        # failure of it carry it as `model_used`
+        self.model_once: dict[str, str] = {}
         # called with every persisted event; the service decides what deserves a push
         self.on_event: Callable[[dict[str, Any]], None] | None = None
         # the browser as the user sees it: recent frames per thread (id -> jpeg) and the
@@ -125,9 +128,14 @@ class WebUI:
         self._hands_card: dict[str, str] = {}
 
     # ------------------------------------------------------------------ run lifecycle
-    def begin_run(self, thread: str, background: str | None = None) -> None:
-        """Called by the service before each agent run in ``thread``."""
+    def begin_run(self, thread: str, background: str | None = None, model_used: str = "") -> None:
+        """Called by the service before each agent run in ``thread``. ``model_used`` names
+        the model of a turn running on *Use nanoMuse Cloud this time*."""
         self.reply_shown.discard(thread)
+        if model_used:
+            self.model_once[thread] = model_used
+        else:
+            self.model_once.pop(thread, None)
         self.last_assistant_event.pop(thread, None)
         self._step_text.pop(thread, None)
         self._artifacts[thread] = {}
@@ -139,6 +147,7 @@ class WebUI:
 
     def end_run(self, thread: str) -> None:
         self.background.pop(thread, None)
+        self.model_once.pop(thread, None)
         self._ws_before.pop(thread, None)
         card = self._browser_card.pop(thread, None)
         if card is not None:
@@ -400,6 +409,8 @@ class WebUI:
             event["quiet"] = True
         if self.show_thinking and reasoning:
             event["reasoning"] = reasoning.strip()
+        if thread in self.model_once:
+            event["model_used"] = self.model_once[thread]
         self.last_assistant_text[thread] = text
         self._step_text[thread] = text
         self.last_assistant_event[thread] = self.emit(event)["id"]
