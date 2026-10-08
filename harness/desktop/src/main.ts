@@ -14,6 +14,7 @@ import { startOperatorServer, type OperatorServer } from "./operator-server";
 import { EXTERNAL_URL, navigationVerdict, sameOrigin } from "./navigation";
 import { relink } from "./profile-link";
 import { maskProxyUrl, proxyEnv, validProxyUrl } from "./proxy";
+import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
 
 /**
  * nanoMuse Desktop — the nanoMuse desktop, built on DeepSeek Harness.
@@ -39,7 +40,6 @@ const PROFILE = "nanomuse";
 // the agent's reminders — an optional bundle of the harness, on by default here), then ours.
 const BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@deepseek-ai/dsh-experimental-schedule-bundle", "dsh-nanomuse"];
 const BUNDLE = "dsh-nanomuse";
-const READY_TIMEOUT_MS = 120_000;
 const RELEASES_PAGE = "https://github.com/nano-muse/nanoMuse/releases/latest";
 const ISSUES_PAGE = "https://github.com/nano-muse/nanoMuse/issues";
 const DOCS_PAGE = "https://nanomuse.cn/docs/desktop";
@@ -50,6 +50,12 @@ const T = {
   starting: zh ? "正在启动…" : "Starting…",
   notReady: zh ? "nanoMuse 没能启动" : "nanoMuse could not start",
   stopped: zh ? "nanoMuse 的后台停止了" : "nanoMuse's host stopped",
+  stillStarting: zh ? "nanoMuse 还在启动" : "nanoMuse is still starting",
+  stillStartingDetail: (waited: string) =>
+    zh
+      ? `后台已经启动了 ${waited}，进程还在运行。装好之后的第一次启动可能要好几分钟：系统会把应用的每个文件检查一遍（Windows 上是实时防护在扫描），磁盘慢的话更久；之后再启动就快了。可以继续等，也可以退出（退出会停掉还在启动的后台）。`
+      : `The host has been starting for ${waited} and its process is still running. The first start after an install can take several minutes: the system checks each of the app's files once (on Windows that is the real-time scanner), and a slow disk adds to it; later starts are quicker. Keep waiting, or quit (quitting stops the host that is still starting).`,
+  keepWaiting: zh ? "继续等" : "Keep waiting",
   restart: zh ? "重新启动" : "Restart",
   quit: zh ? "退出" : "Quit",
   copyDetails: zh ? "复制详情" : "Copy details",
@@ -338,52 +344,101 @@ function startHost(): Promise<string> {
         const proc = spawn(process.execPath, args, { cwd: homedir(), env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
         child = proc;
         hostStderr = "";
-        let settled = false;
-        const timer = setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          reject(new Error(`the host did not announce its address within ${READY_TIMEOUT_MS / 1000} s`));
-        }, READY_TIMEOUT_MS);
-        let out = "";
+        // The wait (src/host-start.ts): no deadline while the Host runs. After two minutes the
+        // loading page says the start is slow and shows the Host's last lines; after ten the
+        // person is asked whether to keep waiting. Only the Host's exit fails the start.
+        const watch = new HostStartWatch({
+          onSlow: (state) => showSlowStart(state),
+          onCap: (state) => void askKeepWaiting(watch, state),
+        });
+        startWatch = watch;
+        let ready = false;
         proc.stdout?.setEncoding("utf8");
         proc.stdout?.on("data", (chunk: string) => {
-          out = (out + chunk).slice(-16_384);
-          const m = /dsh web: (http:\/\/127\.0\.0\.1:\d+\/\?token=\S+)/.exec(out);
-          if (m && m[1] && !settled) {
-            settled = true;
-            clearTimeout(timer);
-            resolve(m[1]);
-          }
-          for (const line of chunk.split("\n")) if (line.trim()) log(`dsh: ${line.replace(/token=\S+/, "token=…")}`);
+          watch.stdout(chunk);
+          for (const line of chunk.split("\n")) if (line.trim()) log(`dsh: ${maskToken(line)}`);
         });
         proc.stderr?.setEncoding("utf8");
         proc.stderr?.on("data", (chunk: string) => {
           const lines = chunk.split("\n").filter((line) => line.trim());
           const kept = process.platform === "linux" ? lines.filter((line) => !glibCritical(line)) : lines;
-          if (kept.length) hostStderr = (hostStderr + kept.join("\n") + "\n").slice(-65_536);
+          if (kept.length) {
+            hostStderr = (hostStderr + kept.join("\n") + "\n").slice(-65_536);
+            watch.stderr(kept.join("\n"));
+          }
           for (const line of kept) log(`dsh! ${line}`);
         });
-        proc.on("error", (exc) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          reject(exc);
-        });
+        proc.on("error", (exc) => watch.error(exc));
         proc.on("exit", (code, signal) => {
           log(`host exited: code=${code} signal=${signal}${glibCriticals ? ` (${glibCriticals} GLib-GObject-CRITICAL lines from sharp's libvips not logged)` : ""}`);
           glibCriticals = 0;
           child = null;
-          if (!settled) {
-            settled = true;
-            clearTimeout(timer);
+          watch.exited(code, signal);
+          if (ready && !quitting && !restartingHost) void hostStopped();
+        });
+        void watch.done.then((outcome) => {
+          if (startWatch === watch) startWatch = null;
+          if (outcome.kind === "ready") {
+            ready = true;
+            const waited = watch.state().waitedMs;
+            if (waited > 30_000) log(`host: ready after ${waitedText(waited, false)}`);
+            resolve(outcome.url);
+          } else if (outcome.kind === "exited") {
+            const { code, signal } = outcome;
             reject(new Error(`the host exited before it was ready (code ${code ?? signal})`));
-          } else if (!quitting && !restartingHost) {
-            void hostStopped();
-          }
+          } else reject(outcome.error);
         });
       })
       .catch(reject);
   });
+}
+
+/** The wait for the Host's address under way, so the cap dialog and the quit know about it. */
+let startWatch: HostStartWatch | null = null;
+
+/** The loading page: "Still starting", with the Host's last lines (resources/loading.html, `__slow`). */
+function showSlowStart(state: WaitState): void {
+  const win = mainWindow;
+  if (!win || win.isDestroyed() || hostUrl) return;
+  if (state.tail.length === 0 && state.silentMs === state.waitedMs) log(`host: no output after ${waitedText(state.waitedMs, false)}; still waiting`);
+  void win.webContents.executeJavaScript(`window.__slow && window.__slow(${JSON.stringify(state.tail)})`).catch(() => undefined);
+}
+
+/**
+ * The cap: the Host has run for CAP_MS without its address. The person decides; a Host
+ * that is alive is never stopped behind their back. "Keep waiting" asks again CAP_MS later;
+ * "Quit" ends the app, which stops the Host (before-quit), and the log says so.
+ */
+async function askKeepWaiting(watch: HostStartWatch, state: WaitState): Promise<void> {
+  if (quitting || startWatch !== watch) return;
+  const waited = waitedText(state.waitedMs, zh);
+  log(`host: still starting after ${waitedText(state.waitedMs, false)} (process alive, last line ${waitedText(state.silentMs, false)} ago); asking whether to keep waiting`);
+  for (;;) {
+    const { response } = await dialog.showMessageBox({
+      type: "warning",
+      title: T.stillStarting,
+      message: T.stillStarting,
+      detail: `${T.stillStartingDetail(waited)}${state.tail.length ? `\n\n${state.tail.slice(-4).join("\n")}` : ""}`,
+      buttons: [T.keepWaiting, T.copyDetails, T.quit],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (quitting || startWatch !== watch) return;
+    if (response === 1) {
+      clipboard.writeText(details(`${T.stillStarting} (${waited})`));
+      await dialog.showMessageBox({ type: "info", title: "nanoMuse", message: T.copied, buttons: ["OK"] });
+      continue;
+    }
+    if (response === 2) {
+      log(`host: still starting after ${waitedText(state.waitedMs, false)}; quitting at the person's request, which stops the host process`);
+      app.quit();
+      return;
+    }
+    log("host: keeping on waiting at the person's request");
+    watch.keepWaiting();
+    return;
+  }
 }
 
 /** How many `GLib-GObject-CRITICAL` lines the Host's stderr carried this launch (Linux; see glibCritical). */
@@ -1870,6 +1925,12 @@ if (!app.requestSingleInstanceLock({ version: app.getVersion() })) {
     globalShortcut.unregisterAll();
     if (quitting) return;
     quitting = true;
+    if (startWatch) {
+      // a Host still starting goes with the app; the log says it was alive
+      log("quit: the host was still starting; stopping it");
+      startWatch.dispose();
+      startWatch = null;
+    }
     if (child || operatorServer || macHelper?.running()) {
       e.preventDefault();
       void Promise.all([stopHost(), stopOperator()]).then(() => app.quit());

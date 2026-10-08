@@ -185,6 +185,16 @@ profile 里的 `node_modules/dsh-nanomuse` 是一个链接（Windows 上是 junc
 0.1.39 跨不过它，起不来（`desktop.log` 里是 `EEXIST: file already exists, symlink …`）。从 0.1.40
 起，失效的链接按链接删掉再重建；万一还是失败，提示信息会写明要手动删除的路径。
 
+第一次启动可能很慢，Windows 上尤其如此。Host 要等 profile 里的每个插件都加载完才打印地址，而刚装好的
+应用在 `resources/dsh/node_modules` 下有两万来个文件，系统是第一次读它们；Windows Defender 的实时
+防护会在第一次读取时逐个检查，磁盘慢或者装在移动硬盘上就更久，所以第一次启动可能要好几分钟。0.1.41
+及之前，外壳等 120 秒就放弃，提示「the host did not announce its address within 120 s」，而 Host
+其实还在加载（有一份报告里，它六秒之后就打印出了地址）。现在只要 Host 进程还在，外壳就一直等：两分钟
+后加载页改为显示「还在启动」，附一句原因和 Host 最近几行输出；十分钟后弹出对话框问是继续等还是退出，
+只有退出才会停掉还在启动的 Host。一次启动超过半分钟时，`desktop.log` 里会有一行 `host: ready after
+N min`。第二次启动会快很多，因为文件已经检查过一遍；如果每次都慢，把安装目录加进实时防护的排除列表
+会有帮助。
+
 ## macOS 权限 {#macos-permissions}
 
 手需要 macOS 给两样东西：截图要「录屏」，鼠标和键盘要「辅助功能」。从 0.1.38 起，这两项权限都

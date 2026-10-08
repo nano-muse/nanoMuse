@@ -25,6 +25,13 @@
   .error { display: none; color: var(--err); white-space: pre-wrap; text-align: left; font-size: 13px; margin-top: 12px; -webkit-app-region: no-drag; user-select: text; }
   .failed .ring { animation: none; border-color: var(--track); }
   .failed .error { display: block; }
+  /* The slow start (src/host-start.ts): one plain sentence and the Host's last lines, so the
+     person sees the start is moving rather than a ring that never ends. */
+  .slow { display: none; font-size: 13px; margin-top: 10px; }
+  .tail { display: none; text-align: left; font: 11px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); white-space: pre-wrap; word-break: break-all; max-height: 9em; overflow-y: auto; margin-top: 10px; -webkit-app-region: no-drag; user-select: text; }
+  .waiting .slow { display: block; }
+  .waiting .tail { display: block; }
+  .failed .slow, .failed .tail { display: none; }
 </style>
 </head>
 <body>
@@ -32,6 +39,8 @@
     <div class="mark" aria-hidden="true"><span class="ring"></span><img src="logo.png" alt=""></div>
     <h1>nanoMuse</h1>
     <p id="line" role="status"></p>
+    <p id="slow" class="slow"></p>
+    <pre id="tail" class="tail"></pre>
     <p id="error" class="error"></p>
   </div>
   <script>
@@ -39,9 +48,23 @@
       var params = new URLSearchParams(location.search);
       var zh = params.get("lang") === "zh" || (!params.get("lang") && /^zh/i.test(navigator.language));
       var line = document.getElementById("line");
+      var slow = document.getElementById("slow");
+      var tail = document.getElementById("tail");
       var error = document.getElementById("error");
       line.textContent = zh ? "正在启动" : "Starting";
+      // after two minutes without the host's address, while its process runs (src/host-start.ts)
+      window.__slow = function (lines) {
+        if (document.body.classList.contains("failed")) return;
+        document.body.classList.add("waiting");
+        line.textContent = zh ? "还在启动" : "Still starting";
+        slow.textContent = zh
+          ? "第一次启动可能要几分钟：系统会把应用的每个文件检查一遍。后台最近的输出："
+          : "The first start can take a few minutes: the system checks each of the app's files once. The last lines from the host:";
+        tail.textContent = Array.isArray(lines) && lines.length ? lines.join("\n") : (zh ? "（还没有输出）" : "(nothing yet)");
+        tail.scrollTop = tail.scrollHeight;
+      };
       window.__failed = function (message) {
+        document.body.classList.remove("waiting");
         document.body.classList.add("failed");
         line.textContent = zh ? "没能启动" : "Could not start";
         error.textContent = message || "";
