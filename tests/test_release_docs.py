@@ -1,0 +1,104 @@
+"""scripts/release-docs.py: the News list stays newest first after a release."""
+
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+from types import ModuleType
+
+import pytest
+
+SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "release-docs.py"
+
+README = """# nanoMuse
+
+Latest: **1.0.0 Keel**.
+
+## 🗞️ News
+
+- `2026-10-07` 📄 Our paper is available on [arXiv](https://arxiv.org/abs/2610.08699).
+- `2026-10-09` 🚀 Latest version: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0).
+- `2026-09-25` 🎉 nanoMuse is released.
+
+| **Android** | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk) |
+"""
+
+
+@pytest.fixture(scope="module")
+def release_docs() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("release_docs", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_latest_news_line_moves_to_the_top(release_docs: ModuleType) -> None:
+    text, left = release_docs.edit_page(README, "1.0.0", "1.0.1", "Keel", "Still", "2026-10-20")
+    lines = text.split("\n")
+    news = [line for line in lines if release_docs.NEWS_LINE.match(line)]
+    assert news == [
+        "- `2026-10-20` 🚀 Latest version: [1.0.1 Still]"
+        "(https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1).",
+        "- `2026-10-07` 📄 Our paper is available on [arXiv](https://arxiv.org/abs/2610.08699).",
+        "- `2026-09-25` 🎉 nanoMuse is released.",
+    ]
+    assert "Latest: **1.0.1 Still**." in text
+    assert "download/v1.0.1/nanoMuse-1.0.1-arm64.apk" in text
+    assert left == 0
+    # the list is still one block in the same place
+    assert lines.index(news[0]) == README.split("\n").index(
+        "- `2026-10-07` 📄 Our paper is available on [arXiv](https://arxiv.org/abs/2610.08699)."
+    )
+
+
+def test_a_list_already_newest_first_keeps_its_shape(release_docs: ModuleType) -> None:
+    once, _ = release_docs.edit_page(README, "1.0.0", "1.0.1", "Keel", "Still", "2026-10-20")
+    twice, _ = release_docs.edit_page(once, "1.0.1", "1.1.0", "Still", "Reach", "2026-11-01")
+    news = [line for line in twice.split("\n") if release_docs.NEWS_LINE.match(line)]
+    assert news[0].startswith("- `2026-11-01` 🚀 Latest version: [1.1.0 Reach]")
+    assert news[1].startswith("- `2026-10-07`") and news[2].startswith("- `2026-09-25`")
+    assert len(news) == 3
+
+
+def test_a_page_without_news_only_moves_the_version(release_docs: ModuleType) -> None:
+    page = "Download [v1.0.0](…/tag/v1.0.0) · 1.0.0 Keel · nanoMuse-1.0.0-arm64.apk · 1.0.0-win"
+    text, left = release_docs.edit_page(page, "1.0.0", "1.0.1", "Keel", "Still", "2026-10-20")
+    assert (
+        text
+        == "Download [v1.0.1](…/tag/v1.0.1) · 1.0.1 Still · nanoMuse-1.0.1-arm64.apk · 1.0.1-win"
+    )
+    assert left == 0
+
+
+def test_dry_run_prints_and_writes_nothing(
+    release_docs: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [Unreleased]\n\n- a line\n", encoding="utf-8"
+    )
+    (tmp_path / "README.md").write_text(README, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "zh").mkdir()
+    (tmp_path / "docs" / "readme").mkdir()
+    (tmp_path / "docs" / "index.md").write_text("[v1.0.0](…/tag/v1.0.0)\n", encoding="utf-8")
+    (tmp_path / "docs" / "zh" / "index.md").write_text("[v1.0.0](…/tag/v1.0.0)\n", encoding="utf-8")
+    (tmp_path / "docs" / "readme" / "README_zh.md").write_text(README, encoding="utf-8")
+    (tmp_path / "docs" / "release-notes-template.md").write_text(
+        "Codenames: Foundation, Keel (CHANGELOG.md has the list).\n", encoding="utf-8"
+    )
+    before = {p: p.read_text(encoding="utf-8") for p in tmp_path.rglob("*.md")}
+
+    code = release_docs.main(["1.0.0", "1.0.1", "Keel", "Still", "2026-10-20", "--dry-run"])
+
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "README.md: News after the edit" in out
+    assert "  - `2026-10-20` 🚀 Latest version: [1.0.1 Still]" in out
+    assert "dry run, nothing written" in out
+    assert {p: p.read_text(encoding="utf-8") for p in tmp_path.rglob("*.md")} == before
