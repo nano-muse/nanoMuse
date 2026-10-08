@@ -349,7 +349,7 @@ export function apply(ctx: Context): void {
             exec.signal.addEventListener('abort', onAbort, { once: true })
             let body: Record<string, unknown>
             try {
-              // `language` (runtime 0.1.42, `docs/hub.md`): the other end answers in this screen's language; an older runtime ignores the field
+              // `language` (runtime 1.0.0, `docs/hub.md`): the other end answers in this screen's language; an older runtime ignores the field
               body = await hub.call(d.id, 'task', { text: args.task, from: cloud.hub.devices.find((x) => x.id === hub.deviceId)?.name ?? 'computer', language: uiLanguage(ctx) }, { id: callId, signal: exec.signal, timeoutMs: 600_000, onEvent }).catch(fail)
             } finally {
               exec.signal.removeEventListener('abort', onAbort)

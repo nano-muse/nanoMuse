@@ -51,7 +51,7 @@ export interface OverlayHands {
 
 export interface HarnessBridge {
   platform: string
-  /** `appImage` (0.1.42): the Linux build runs from an AppImage, so an update should be one too. */
+  /** `appImage` (1.0.0): the Linux build runs from an AppImage, so an update should be one too. */
   info(): Promise<{ version: string; platform: string; arch: string; appImage?: boolean }>
   // `helper` since 0.1.38: true when "nanoMuse Computer Use" (the shell's helper app) holds the
   // grants — the rows to switch on in the panes are its, and a grant needs no app restart

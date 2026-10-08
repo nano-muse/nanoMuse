@@ -27,7 +27,7 @@
 
 **nanoMuse là một trợ lý cá nhân mã nguồn mở cho mọi thiết bị của bạn.** Một trợ lý duy nhất có tên và hình dáng riêng, cùng loại với [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) của Meta: nó làm việc thay vì chỉ trả lời câu hỏi, tiếp tục làm khi ứng dụng đã đóng, nhớ bạn, và dừng lại hỏi trước bất cứ việc gì bạn không thể hoàn tác.
 
-*nano* nghĩa là trọn bộ nhưng đủ nhỏ để bạn tự chạy và tự triển khai: ứng dụng điện thoại, ứng dụng máy tính, bảng điều khiển web và relay nối chúng lại đều nằm trong kho này, theo giấy phép GPL-3.0-or-later. **[Miễn phí, mã nguồn mở, phi lợi nhuận. Cùng nhau xây dựng.](../../CONTRIBUTING.md)** Đăng nhập là bạn có một khoản miễn phí để dùng mô hình qua relay của cộng đồng (do người phát triển trả); dùng hết thì [chuyển sang khóa của riêng bạn](../own-key.md). Cùng relay đó chạy được trên máy chủ của bạn, nên dữ liệu không cần rời khỏi nhà bạn. Phiên bản mới nhất: **0.1.41 Choice**, [ghi chú phát hành](https://github.com/nano-muse/nanoMuse/releases/tag/v0.1.41) · [dùng thử trên trình duyệt](https://demo.nanomuse.dev/).
+*nano* nghĩa là trọn bộ nhưng đủ nhỏ để bạn tự chạy và tự triển khai: ứng dụng điện thoại, ứng dụng máy tính, bảng điều khiển web và relay nối chúng lại đều nằm trong kho này, theo giấy phép GPL-3.0-or-later. **[Miễn phí, mã nguồn mở, phi lợi nhuận. Cùng nhau xây dựng.](../../CONTRIBUTING.md)** Đăng nhập là bạn có một khoản miễn phí để dùng mô hình qua relay của cộng đồng (do người phát triển trả); dùng hết thì [chuyển sang khóa của riêng bạn](../own-key.md). Cùng relay đó chạy được trên máy chủ của bạn, nên dữ liệu không cần rời khỏi nhà bạn. Phiên bản mới nhất: **1.0.0 Keel**, [ghi chú phát hành](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) · [dùng thử trên trình duyệt](https://demo.nanomuse.dev/).
 
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 ## 🗞️ Tin mới
 
 - `2026-10-07` 📄 Bài báo của chúng tôi đã có trên [arXiv](https://arxiv.org/abs/2610.08699).
-- `2026-10-07` 🚀 Phiên bản mới nhất: [0.1.41 Choice](https://github.com/nano-muse/nanoMuse/releases/tag/v0.1.41).
+- `2026-10-09` 🚀 Phiên bản mới nhất: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0).
 - `2026-09-25` 🎉 nanoMuse đã ra mắt.
 
 Mọi phiên bản: [releases](https://github.com/nano-muse/nanoMuse/releases).
@@ -46,11 +46,11 @@ Mọi phiên bản: [releases](https://github.com/nano-muse/nanoMuse/releases).
 | | |
 |---|---|
 | **Trình duyệt** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): một nanoMuse trên điện thoại mô phỏng, sau khi đăng nhập. Đây là bản demo; các ứng dụng bên dưới mới là bản thật |
-| **Android** 8.0 trở lên, arm64 | [nanoMuse-0.1.41-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-0.1.41-arm64.apk): mọi phiên bản ký cùng một khóa, cài đè lên bản cũ là được |
+| **Android** 8.0 trở lên, arm64 | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk): mọi phiên bản ký cùng một khóa, cài đè lên bản cũ là được |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): bản beta; liên kết sẽ cung cấp bản dựng khi Apple duyệt xong beta · [iOS](../ios.md) |
-| **macOS** 12 trở lên | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-mac-x64.dmg): chưa được công chứng: lần đầu nhấp chuột phải → *Mở* |
-| **Windows** 10 trở lên | [nanoMuse-Desktop-0.1.41-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-win-x64.exe): bấm *Vẫn chạy* một lần |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.tar.gz) |
+| **macOS** 12 trở lên | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-x64.dmg): chưa được công chứng: lần đầu nhấp chuột phải → *Mở* |
+| **Windows** 10 trở lên | [nanoMuse-Desktop-1.0.0-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-win-x64.exe): bấm *Vẫn chạy* một lần |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` để có relay của riêng bạn; `docker compose up -d app` để chạy ứng dụng web trên máy chủ của bạn; xem [tự lưu trữ](../self-hosting.md) |
 
 Mọi bản tải đều từ [bản phát hành mới nhất trên GitHub](https://github.com/nano-muse/nanoMuse/releases/latest); cùng các tệp đó có tại [nanomuse.cn/dl](https://nanomuse.cn/dl/) nếu GitHub chậm ở chỗ bạn. Mở ứng dụng, đăng nhập bằng e-mail hoặc số điện thoại Trung Quốc đại lục, và trợ lý đã có sẵn một mô hình để làm việc. Điện thoại, máy tính và web dùng chung một tài khoản và hiển thị cùng những cuộc trò chuyện.

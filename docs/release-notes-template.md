@@ -5,7 +5,7 @@
      Codenames so far: Foundation, Identity, Home, Guardrails, Memory, Avatar, Welcome, Polish,
      Portrait, Motion, Hatch, Hands, Reach, Home, Stage, Palette, Open, Ensemble, Presence,
      Footing, Commons, Welcome, Signal, Mirror, Window, Ledger, Harness, Likeness, Rooms, Locks,
-     Union, Steps, Turns, Accord, Thread, Weave, Loom, Keys, Clear, Choice (CHANGELOG.md has the list). One word, capitalised.
+     Union, Steps, Turns, Accord, Thread, Weave, Loom, Keys, Clear, Choice, Keel (CHANGELOG.md has the list). One word, capitalised.
 
      Voice: plain and specific, the maintainer talking to one person. Facts over promises; no
      slogans, no "every one brings…", no exclamation marks.

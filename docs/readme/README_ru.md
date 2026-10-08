@@ -27,7 +27,7 @@
 
 **nanoMuse — открытый персональный агент для всех ваших устройств.** Один агент со своим именем и обликом, того же рода, что [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) от Meta: он делает дела, а не отвечает на вопросы, продолжает работать при закрытом приложении, помнит вас и останавливается спросить перед тем, что нельзя отменить.
 
-*nano* значит полный комплект, достаточно небольшой, чтобы вы запустили и развернули его сами: приложение для телефона, приложение для компьютера, веб-консоль и реле, которое их связывает: всё это лежит в этом репозитории, под GPL-3.0-or-later. **[Бесплатно, открыто, некоммерчески. Давайте строить вместе.](../../CONTRIBUTING.md)** После входа вы получаете бесплатный лимит на модели через реле сообщества (его оплачивает разработчик); когда он кончится, [подключите свой ключ](../own-key.md). То же реле работает на вашем собственном сервере, и тогда ничего не покидает дом. Последняя версия: **0.1.41 Choice**, [заметки о выпуске](https://github.com/nano-muse/nanoMuse/releases/tag/v0.1.41) · [попробовать в браузере](https://demo.nanomuse.dev/).
+*nano* значит полный комплект, достаточно небольшой, чтобы вы запустили и развернули его сами: приложение для телефона, приложение для компьютера, веб-консоль и реле, которое их связывает: всё это лежит в этом репозитории, под GPL-3.0-or-later. **[Бесплатно, открыто, некоммерчески. Давайте строить вместе.](../../CONTRIBUTING.md)** После входа вы получаете бесплатный лимит на модели через реле сообщества (его оплачивает разработчик); когда он кончится, [подключите свой ключ](../own-key.md). То же реле работает на вашем собственном сервере, и тогда ничего не покидает дом. Последняя версия: **1.0.0 Keel**, [заметки о выпуске](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) · [попробовать в браузере](https://demo.nanomuse.dev/).
 
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 ## 🗞️ Новости
 
 - `2026-10-07` 📄 Наша статья доступна на [arXiv](https://arxiv.org/abs/2610.08699).
-- `2026-10-07` 🚀 Последняя версия: [0.1.41 Choice](https://github.com/nano-muse/nanoMuse/releases/tag/v0.1.41).
+- `2026-10-09` 🚀 Последняя версия: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0).
 - `2026-09-25` 🎉 nanoMuse выпущен.
 
 Все версии: [releases](https://github.com/nano-muse/nanoMuse/releases).
@@ -46,11 +46,11 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 | | |
 |---|---|
 | **Браузер** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): nanoMuse на симулированном телефоне, после входа. Это демо; настоящие приложения ниже |
-| **Android** 8.0+, arm64 | [nanoMuse-0.1.41-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-0.1.41-arm64.apk): все версии подписаны одним ключом и ставятся поверх предыдущей |
+| **Android** 8.0+, arm64 | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk): все версии подписаны одним ключом и ставятся поверх предыдущей |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): бета; ссылка выдаст сборку, как только она пройдёт бета-проверку Apple · [iOS](../ios.md) |
-| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-mac-x64.dmg). Без нотаризации: в первый раз правый клик → «Открыть» |
-| **Windows** 10+ | [nanoMuse-Desktop-0.1.41-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-win-x64.exe): один раз нажмите «Выполнить в любом случае» |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.tar.gz) |
+| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-x64.dmg). Без нотаризации: в первый раз правый клик → «Открыть» |
+| **Windows** 10+ | [nanoMuse-Desktop-1.0.0-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-win-x64.exe): один раз нажмите «Выполнить в любом случае» |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` для своего реле; `docker compose up -d app` для веб-приложения на своём сервере; см. [самостоятельный хостинг](../self-hosting.md) |
 
 Все загрузки — из [последнего выпуска на GitHub](https://github.com/nano-muse/nanoMuse/releases/latest); те же файлы лежат на [nanomuse.cn/dl](https://nanomuse.cn/dl/), если GitHub у вас медленный. Откройте приложение, войдите по e-mail или по номеру телефона материкового Китая, и у агента есть модель, чтобы думать. Телефон, компьютер и веб делят один аккаунт и показывают одни и те же разговоры.
