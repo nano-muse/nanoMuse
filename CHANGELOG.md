@@ -6,6 +6,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Fixed a relay without an upstream key holding a place in the account's in-flight count for every chat or clip request it refused with `upstream_unconfigured`: after four such requests the account was answered `too_many_in_flight` until the holds timed out. The key is checked before anything is held.
+- The `allowance_exhausted` sentence older apps print as it is says "Three ways on", which is what follows (a key of your own, a plan you already pay for, an invitation); it said two.
+
 ### Runtime
 
 ### Web
