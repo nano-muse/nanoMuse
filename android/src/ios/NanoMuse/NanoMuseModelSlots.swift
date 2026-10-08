@@ -460,6 +460,9 @@ enum NanoMuseModelSlots {
     /// pick in the chat's own picker, SessionModelPicker); side chats are left as they are.
     /// Nothing is written when the binding already says so, which also keeps the
     /// `sessionModelBindingChanged` → `followPick` → `useForChat` round from going on.
+    /// The group's default thinking level comes along, as it does when a group is picked in
+    /// the chat's own picker and when a new chat is made (`applyGroupSessionDefaults`): a
+    /// group the person set to think hard was followed with the main chat still on `off`.
     static func mainChatFollows(groupId: String, entry: ModelEntry) {
         guard let sid = UserDefaults.standard.string(forKey: NanoMuseMainChat.key), !sid.hasPrefix(NanoMuseMainChat.draftPrefix) else { return }
         let store = ProviderConfigStore.shared
@@ -467,6 +470,11 @@ enum NanoMuseModelSlots {
         let existing = store.binding(for: sid)
         if existing?.primarySource == source { return }
         store.setBinding(SessionModelBinding(sessionId: sid, primarySource: source, subModelSource: existing?.subModelSource), for: sid)
+        if let level = store.group(for: groupId)?.defaultThinkingLevel {
+            var cfg = store.inferenceConfig(for: sid) ?? SessionInferenceConfig()
+            cfg.thinkingLevel = level
+            store.setInferenceConfig(cfg, for: sid)
+        }
         NotificationCenter.default.post(name: .sessionModelBindingChanged, object: nil, userInfo: ["groupId": groupId, "sessionId": sid])
         let model = entry.model.id
         Task { await ChatStore.shared.updateSessionModelId(sid, modelId: model) }
