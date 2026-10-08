@@ -36,6 +36,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - The train-ticket idea no longer speaks of "the phone's Linux sandbox" on a computer (the same list ships on the phones).
 - A failed call on the Models page is told in plain words, like everywhere else.
 - The Library room is 资源库 in Chinese, as on the phone, in the docs and in the ideas it shows; the things in it stay 构件, and the folder under `~/nanoMuse` keeps its name.
+- Switching *Use nanoMuse Cloud models* off while the chat row is the account's and you have no chat model of your own is now refused with one sentence under the switch, which stays on; with an own chat model the row moves there, as before. The same rule as the web console and the phones; the host answers `409 chat_on_cloud`.
 
 ### Android
 
