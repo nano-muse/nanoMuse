@@ -2055,13 +2055,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先添加一个模型，例程由你的 agent 来跑。"
+            "value" : "先添加一个模型，例程由你的智能体来跑。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先添加一個模型，例程由你的 agent 來跑。"
+            "value" : "先添加一個模型，例程由你的智慧體來跑。"
           }
         }
       }
@@ -2114,13 +2114,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先添加一个模型，动态由你的 agent 来写。"
+            "value" : "先添加一个模型，动态由你的智能体来写。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先添加一個模型，動態由你的 agent 來寫。"
+            "value" : "先添加一個模型，動態由你的智慧體來寫。"
           }
         }
       }
@@ -2762,13 +2762,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "把别的助手已经了解的你带过来。用下面这段提示词去问它，把回答粘贴到这里，就会追加到 GLOBAL.md 的「导入」一节，你的 agent 每次对话开始都会读到。"
+            "value" : "把别的助手已经了解的你带过来。用下面这段提示词去问它，把回答粘贴到这里，就会追加到 GLOBAL.md 的「导入」一节，你的智能体每次对话开始都会读到。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "把別的助手已經了解的你帶過來。用下面這段提示詞去問它，把回答粘貼到這裡，就會追加到 GLOBAL.md 的「導入」一節，你的 agent 每次對話開始都會讀到。"
+            "value" : "把別的助手已經了解的你帶過來。用下面這段提示詞去問它，把回答粘貼到這裡，就會追加到 GLOBAL.md 的「導入」一節，你的智慧體每次對話開始都會讀到。"
           }
         }
       }
@@ -3470,13 +3470,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台中转暂时停了对话同步，已存的内容保留，各设备可以各自继续用。"
+            "value" : "这台中继暂时停了对话同步，已存的内容保留，各设备可以各自继续用。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台中轉暫時停了對話同步，已存的內容保留，各裝置可以各自繼續用。"
+            "value" : "這台中繼暫時停了對話同步，已存的內容保留，各裝置可以各自繼續用。"
           }
         }
       }
@@ -4303,13 +4303,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "agent 跨对话保留的长期记录：值得记住的事，用它自己的话写下，加上你从别的助手导入的内容。逐日的日记放在同一个记忆文件夹里。开着记忆时，每次对话开始都会读。这段说明不是文件的一部分。"
+            "value" : "智能体跨对话保留的长期记录：值得记住的事，用它自己的话写下，加上你从别的助手导入的内容。逐日的日记放在同一个记忆文件夹里。开着记忆时，每次对话开始都会读。这段说明不是文件的一部分。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "agent 跨對話保留的長期記錄：值得記住的事，用它自己的話寫下，加上你從別的助手導入的內容。逐日的日記放在同一個記憶文件夾裡。開著記憶時，每次對話開始都會讀。這段說明不是文件的一部分。"
+            "value" : "智慧體跨對話保留的長期記錄：值得記住的事，用它自己的話寫下，加上你從別的助手導入的內容。逐日的日記放在同一個記憶文件夾裡。開著記憶時，每次對話開始都會讀。這段說明不是文件的一部分。"
           }
         }
       }
@@ -4503,13 +4503,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "登录同一账号的每台设备都是一个 Muse：这台 iPhone、装了 nanoMuse 桌面版的电脑、网页控制台。它们之间可以互相交代事情，不必在同一个网络，经由 nanoMuse Cloud 中转。在 iOS 上，其他设备可以在这里打开链接、发通知；iPhone 自己的 Muse 在 iPhone 上工作。"
+            "value" : "登录同一账号的每台设备都是一个 Muse：这台 iPhone、装了 nanoMuse 桌面版的电脑、网页控制台。它们之间可以互相交代事情，不必在同一个网络，经由 nanoMuse Cloud 传递。在 iOS 上，其他设备可以在这里打开链接、发通知；iPhone 自己的 Muse 在 iPhone 上工作。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "登入同一帳號的每台裝置都是一個 Muse：這支 iPhone、裝了 nanoMuse 桌面版的電腦、網頁主控台。它們之間可以互相交代事情，不必在同一個網路，經由 nanoMuse Cloud 中轉。在 iOS 上，其他裝置可以在這裡開啟連結、傳通知；iPhone 自己的 Muse 在 iPhone 上工作。"
+            "value" : "登入同一帳號的每台裝置都是一個 Muse：這支 iPhone、裝了 nanoMuse 桌面版的電腦、網頁主控台。它們之間可以互相交代事情，不必在同一個網路，經由 nanoMuse Cloud 傳遞。在 iOS 上，其他裝置可以在這裡開啟連結、傳通知；iPhone 自己的 Muse 在 iPhone 上工作。"
           }
         }
       }
@@ -8065,7 +8065,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "中转已暂停"
+            "value" : "中继已暂停"
           }
         },
         "zh-Hant" : {
@@ -9620,13 +9620,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台中转暂时关闭了注册。已有的账号仍可登录。"
+            "value" : "这台中继暂时关闭了注册。已有的账号仍可登录。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台中轉暫時關閉了註冊。已有的帳號仍可登入。"
+            "value" : "這台中繼暫時關閉了註冊。已有的帳號仍可登入。"
           }
         }
       }
@@ -10606,13 +10606,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台中转暂时停了设备互联，各设备可以各自继续用。"
+            "value" : "这台中继暂时停了设备互联，各设备可以各自继续用。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台中轉暫時停了裝置互聯，各裝置可以各自繼續用。"
+            "value" : "這台中繼暫時停了裝置互聯，各裝置可以各自繼續用。"
           }
         }
       }
@@ -10665,13 +10665,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台中转暂时停发了免费额度，不是用完了。"
+            "value" : "这台中继暂时停发了免费额度，不是用完了。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台中轉暫時停發了免費額度，不是用完了。"
+            "value" : "這台中繼暫時停發了免費額度，不是用完了。"
           }
         }
       }
@@ -10724,13 +10724,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台中转暂时停发了免费额度，不是用完了。到「设置 → nanoMuse Cloud」添加自己的密钥，或用已付费的订阅登录。登录、多设备和剩余额度都原样保留。"
+            "value" : "这台中继暂时停发了免费额度，不是用完了。到「设置 → nanoMuse Cloud」添加自己的密钥，或用已付费的订阅登录。登录、多设备和剩余额度都原样保留。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台中轉暫時停發了免費額度，不是用完了。到「設定 → nanoMuse Cloud」加入自己的金鑰，或用已付費的訂閱登入。登入、多裝置和剩餘額度都原樣保留。"
+            "value" : "這台中繼暫時停發了免費額度，不是用完了。到「設定 → nanoMuse Cloud」加入自己的金鑰，或用已付費的訂閱登入。登入、多裝置和剩餘額度都原樣保留。"
           }
         }
       }
@@ -12140,13 +12140,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "中转说：%@"
+            "value" : "中继说：%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "中轉說：%@"
+            "value" : "中繼說：%@"
           }
         }
       }
@@ -12435,13 +12435,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这些文件属于 agent：它是谁、它对你的了解、它记住的事、它为你写的东西、它什么时候自己醒来。都存在你手机里；agent 在它的 shell 里通过 /var/minis/memory 读写，你也可以在这里直接改。"
+            "value" : "这些文件属于智能体：它是谁、它对你的了解、它记住的事、它为你写的东西、它什么时候自己醒来。都存在你手机里；智能体在它的 shell 里通过 /var/minis/memory 读写，你也可以在这里直接改。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這些文件屬於 agent：它是誰、它對你的了解、它記住的事、它為你寫的東西、它什麼時候自己醒來。都存在你手機裡；agent 在它的 shell 裡通過 /var/minis/memory 讀寫，你也可以在這裡直接改。"
+            "value" : "這些文件屬於智慧體：它是誰、它對你的了解、它記住的事、它為你寫的東西、它什麼時候自己醒來。都存在你手機裡；智慧體在它的 shell 裡通過 /var/minis/memory 讀寫，你也可以在這裡直接改。"
           }
         }
       }
@@ -12612,13 +12612,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这是一台私人中转，这个地址不在名单上。"
+            "value" : "这是一台私人中继，这个地址不在名单上。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這是一台私人中轉，這個地址不在名單上。"
+            "value" : "這是一台私人中繼，這個地址不在名單上。"
           }
         }
       }
@@ -12966,13 +12966,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "agent 什么时候自己醒来：每条例程和每个目标检查，它们的时间和上次运行的结果。由例程实时生成，所以这里只能看，要改请去 目标 → 例程。这段说明不是文件的一部分。"
+            "value" : "智能体什么时候自己醒来：每条例程和每个目标检查，它们的时间和上次运行的结果。由例程实时生成，所以这里只能看，要改请去 目标 → 例程。这段说明不是文件的一部分。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "agent 什麼時候自己醒來：每條例程和每個目標檢查，它們的時間和上次運行的結果。由例程實時生成，所以這裡只能看，要改請去 目標 → 例程。這段說明不是文件的一部分。"
+            "value" : "智慧體什麼時候自己醒來：每條例程和每個目標檢查，它們的時間和上次運行的結果。由例程實時生成，所以這裡只能看，要改請去 目標 → 例程。這段說明不是文件的一部分。"
           }
         }
       }
@@ -126255,13 +126255,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "例程是 agent 在设定的时间发给自己的一条消息，在它自己的对话里运行。在 iPhone 上，它在应用打开时运行：如果到点时应用在休眠，手机会弹出提醒，你一打开它就跑。iOS 偶尔也会在后台唤醒应用，那时例程会在后台运行。"
+            "value" : "例程是智能体在设定的时间发给自己的一条消息，在它自己的对话里运行。在 iPhone 上，它在应用打开时运行：如果到点时应用在休眠，手机会弹出提醒，你一打开它就跑。iOS 偶尔也会在后台唤醒应用，那时例程会在后台运行。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "例程是 agent 在設定的時間發給自己的一條消息，在它自己的對話裡運行。在 iPhone 上，它在應用打開時運行：如果到點時應用在休眠，手機會彈出提醒，你一打開它就跑。iOS 偶爾也會在後臺喚醒應用，那時例程會在後臺運行。"
+            "value" : "例程是智慧體在設定的時間發給自己的一條消息，在它自己的對話裡運行。在 iPhone 上，它在應用打開時運行：如果到點時應用在休眠，手機會彈出提醒，你一打開它就跑。iOS 偶爾也會在後臺喚醒應用，那時例程會在後臺運行。"
           }
         }
       }
@@ -126314,13 +126314,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "关于这个 agent"
+            "value" : "关于这个智能体"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "關於這個 agent"
+            "value" : "關於這個智慧體"
           }
         }
       }
@@ -127494,13 +127494,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下次新建对话时重新显示首次使用页面和第一次对话。什么都不会删除；agent 的名字也保留。"
+            "value" : "下次新建对话时重新显示首次使用页面和第一次对话。什么都不会删除；智能体的名字也保留。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下次新建對話時重新顯示首次使用頁面和第一次對話。什麼都不會刪除；agent 的名字也保留。"
+            "value" : "下次新建對話時重新顯示首次使用頁面和第一次對話。什麼都不會刪除；智慧體的名字也保留。"
           }
         }
       }
@@ -132414,13 +132414,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这里还是空的。点铅笔来写，或者让 agent 在聊天中慢慢填。"
+            "value" : "这里还是空的。点铅笔来写，或者让智能体在聊天中慢慢填。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這裡還是空的。點鉛筆來寫，或者讓 agent 在聊天中慢慢填。"
+            "value" : "這裡還是空的。點鉛筆來寫，或者讓智慧體在聊天中慢慢填。"
           }
         }
       }
@@ -133476,13 +133476,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开 nanoMuse 来运行。应用休眠时手机无法运行 agent。"
+            "value" : "打开 nanoMuse 来运行。应用休眠时手机无法运行智能体。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打開 nanoMuse 來運行。應用休眠時手機無法運行 agent。"
+            "value" : "打開 nanoMuse 來運行。應用休眠時手機無法運行智慧體。"
           }
         }
       }
@@ -135364,13 +135364,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "到点时作为一条消息发给 agent，在它自己的对话里。在 iPhone 上，运行发生在应用打开时；到点时你会收到提醒去打开。应用休眠时什么都不会运行。"
+            "value" : "到点时作为一条消息发给智能体，在它自己的对话里。在 iPhone 上，运行发生在应用打开时；到点时你会收到提醒去打开。应用休眠时什么都不会运行。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "到點時作為一條消息發給 agent，在它自己的對話裡。在 iPhone 上，運行發生在應用打開時；到點時你會收到提醒去打開。應用休眠時什麼都不會運行。"
+            "value" : "到點時作為一條消息發給智慧體，在它自己的對話裡。在 iPhone 上，運行發生在應用打開時；到點時你會收到提醒去打開。應用休眠時什麼都不會運行。"
           }
         }
       }
@@ -136426,13 +136426,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "agent 把这个文件当作关于你的工作笔记：你的名字、你喜欢的称呼、你的时区，以及它要派上用场所需要的背景，比如你正在做的事。它会从你们的对话里逐渐填进来，并在每次对话开始时读一遍。它反映的是 agent 当前的理解，可能不完整或过时。这里的任何内容你都可以改，agent 会照你写的来。这段说明不是文件的一部分。"
+            "value" : "智能体把这个文件当作关于你的工作笔记：你的名字、你喜欢的称呼、你的时区，以及它要派上用场所需要的背景，比如你正在做的事。它会从你们的对话里逐渐填进来，并在每次对话开始时读一遍。它反映的是智能体当前的理解，可能不完整或过时。这里的任何内容你都可以改，智能体会照你写的来。这段说明不是文件的一部分。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "agent 把這個文件當作關於你的工作筆記：你的名字、你喜歡的稱呼、你的時區，以及它要派上用場所需要的背景，比如你正在做的事。它會從你們的對話裡逐漸填進來，並在每次對話開始時讀一遍。它反映的是 agent 當前的理解，可能不完整或過時。這裡的任何內容你都可以改，agent 會照你寫的來。這段說明不是文件的一部分。"
+            "value" : "智慧體把這個文件當作關於你的工作筆記：你的名字、你喜歡的稱呼、你的時區，以及它要派上用場所需要的背景，比如你正在做的事。它會從你們的對話裡逐漸填進來，並在每次對話開始時讀一遍。它反映的是智慧體當前的理解，可能不完整或過時。這裡的任何內容你都可以改，智慧體會照你寫的來。這段說明不是文件的一部分。"
           }
         }
       }
@@ -136721,13 +136721,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "图片没有生成出来。到 agent 页面 → 形象工坊检查图像模型，再试一次。"
+            "value" : "图片没有生成出来。到智能体页面 → 形象工坊检查图像模型，再试一次。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "圖片沒有生成出來。到 agent 頁面 → 形象工坊檢查圖像模型，再試一次。"
+            "value" : "圖片沒有生成出來。到智慧體頁面 → 形象工坊檢查圖像模型，再試一次。"
           }
         }
       }
@@ -136898,13 +136898,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这是 agent 的人格：它在每次对话里努力守住的价值和习惯、它的名字、它回答时的风格。从 nanoMuse 自带的模板开始，agent 可能会随着时间打磨它，并在改动时告诉你。你随时可以编辑。这段说明不是文件的一部分。"
+            "value" : "这是智能体的人格：它在每次对话里努力守住的价值和习惯、它的名字、它回答时的风格。从 nanoMuse 自带的模板开始，智能体可能会随着时间打磨它，并在改动时告诉你。你随时可以编辑。这段说明不是文件的一部分。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這是 agent 的人格：它在每次對話裡努力守住的價值和習慣、它的名字、它回答時的風格。從 nanoMuse 自帶的模板開始，agent 可能會隨著時間打磨它，並在改動時告訴你。你隨時可以編輯。這段說明不是文件的一部分。"
+            "value" : "這是智慧體的人格：它在每次對話裡努力守住的價值和習慣、它的名字、它回答時的風格。從 nanoMuse 自帶的模板開始，智慧體可能會隨著時間打磨它，並在改動時告訴你。你隨時可以編輯。這段說明不是文件的一部分。"
           }
         }
       }
@@ -144755,13 +144755,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "通知是 App 关着时代理找到你的方式：一个例行任务做完了、一台电脑回话了、另一台设备上来了回复。"
+            "value" : "通知是 App 关着时智能体找到你的方式：一个例行任务做完了、一台电脑回话了、另一台设备上来了回复。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "通知是 App 關著時代理找到你的方式：一個例行任務做完了、一台電腦回話了、另一台裝置上來了回覆。"
+            "value" : "通知是 App 關著時智慧體找到你的方式：一個例行任務做完了、一台電腦回話了、另一台裝置上來了回覆。"
           }
         }
       }
@@ -144932,13 +144932,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "双手"
+            "value" : "Hands"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "雙手"
+            "value" : "Hands"
           }
         }
       }
@@ -145109,13 +145109,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在你的电脑上使用双手"
+            "value" : "你电脑上的 Hands"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在你的電腦上使用雙手"
+            "value" : "你電腦上的 Hands"
           }
         }
       }
@@ -145168,13 +145168,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「双手」是代理亲自操作设备的方式：在 App 里点按、填表、读屏幕上的内容。在 Android 和你的电脑上，你允许后代理就能接手操作。"
+            "value" : "Hands 是智能体亲自操作设备的方式：在 App 里点按、填表、读屏幕上的内容。在 Android 和你的电脑上，你允许后智能体就能接手操作。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「雙手」是代理親自操作裝置的方式：在 App 裡點按、填表、讀螢幕上的內容。在 Android 和你的電腦上，你允許後代理就能接手操作。"
+            "value" : "Hands 是智慧體親自操作裝置的方式：在 App 裡點按、填表、讀螢幕上的內容。在 Android 和你的電腦上，你允許後智慧體就能接手操作。"
           }
         }
       }
@@ -145227,13 +145227,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS 不允许一个 App 操作另一个 App，所以这里没有开关：代理只能在 nanoMuse 里面行动。它可以在内置浏览器里打开网页、管理自己的文件、运行例行任务；这台手机上的其他 App 本来就不在它够得到的范围内。"
+            "value" : "iOS 不允许一个 App 操作另一个 App，所以这里没有开关：智能体只能在 nanoMuse 里面行动。它可以在内置浏览器里打开网页、管理自己的文件、运行例行任务；这台手机上的其他 App 本来就不在它够得到的范围内。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS 不允許一個 App 操作另一個 App，所以這裡沒有開關：代理只能在 nanoMuse 裡面行動。它可以在內建瀏覽器裡打開網頁、管理自己的檔案、執行例行任務；這台手機上的其他 App 本來就不在它夠得到的範圍內。"
+            "value" : "iOS 不允許一個 App 操作另一個 App，所以這裡沒有開關：智慧體只能在 nanoMuse 裡面行動。它可以在內建瀏覽器裡打開網頁、管理自己的檔案、執行例行任務；這台手機上的其他 App 本來就不在它夠得到的範圍內。"
           }
         }
       }
@@ -145994,13 +145994,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "消息以 @ 加设备名开头，那台设备上的代理就会去做；回答会回到这个对话。"
+            "value" : "消息以 @ 加设备名开头，那台设备上的智能体就会去做；回答会回到这个对话。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "訊息以 @ 加裝置名開頭，那台裝置上的代理就會去做；回答會回到這個對話。"
+            "value" : "訊息以 @ 加裝置名開頭，那台裝置上的智慧體就會去做；回答會回到這個對話。"
           }
         }
       }
@@ -149010,6 +149010,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Этот провайдер и есть ваш аккаунт nanoMuse Cloud, удалить его нельзя. Чтобы не использовать его модели, выключите «Использовать модели nanoMuse Cloud» в разделе «Модели»; вы остаётесь в системе для синхронизации."
+          }
+        }
+      }
+    },
+    "tab.chat" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채팅"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чат"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聊天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聊天"
           }
         }
       }

@@ -197,7 +197,7 @@ struct NanoMuseAccountSections: View {
 
     private func kindWord(_ kind: String) -> String {
         switch kind {
-        case "chat": return AppLocalized("Chat")
+        case "chat": return AppLocalized("models.slot.chat") // 对话, as the Models page and Android's usage rows
         case "image": return AppLocalized("Images")
         case "video": return AppLocalized("Video")
         case "realtime": return AppLocalized("Calls")

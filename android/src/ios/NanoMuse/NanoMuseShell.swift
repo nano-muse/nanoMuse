@@ -40,7 +40,7 @@ enum NanoMuseTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .chat: return AppLocalized("Chat")
+        case .chat: return AppLocalized("tab.chat") // its own key: 聊天 as on Android, not upstream's 闲聊
         case .feed: return AppLocalized("Feed")
         case .ideas: return AppLocalized("Ideas")
         case .goals: return AppLocalized("Goals")

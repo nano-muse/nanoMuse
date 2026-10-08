@@ -472,6 +472,17 @@ Ours, in `NanoMuse/`:
   sheet closes on its own (`nmOnChange` on the signed-in state) and the setup is on its next page,
   the password or the source. Before, the sheet stayed open on the signed-in account page, with
   its Devices and sync rows, and the person had to swipe it away to find the setup had moved on.
+- **The third audit: Chinese words (1.0.x)** (`Localizable.xcstrings`, `NanoMuseShell.swift`,
+  `NanoMuseAccountView.swift`, `MinisTests/NanoMuseCopyTests.swift`): the Chinese copy says what
+  Android says. The agent is 智能体 (繁體 智慧體) in the 19 keys where it was still "agent" in
+  English (the system files' notes, the routines, *About the agent*, the avatar's failure line) or
+  代理, which in Settings → Network means the proxy; the relay is 中继 / 中繼 in the seven
+  relay sentences that said 中转 / 中轉 (*The relay says*, *Paused by the relay*, the paused
+  sign-ups, allowance, sync and hub, the private relay); *Hands* stays in English as Android's
+  设置 → Hands does; the chat tab has its own key, `tab.chat` (聊天, Android's `nm_tab_chat`),
+  instead of upstream's *Chat* (闲聊), and the account page's usage rows say 对话 for the chat
+  kind (`models.slot.chat`, Android's `nm_usage_kind_chat`). `NanoMuseCopyTests` fails on
+  "agent" in a Chinese value, 代理 where the English says agent, 中转 and 双手.
 
 ## Building on a Mac
 

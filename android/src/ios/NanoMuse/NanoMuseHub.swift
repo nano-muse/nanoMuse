@@ -3,9 +3,10 @@
 // web console) reach it from any network, and it can ask them for things.
 //
 // The protocol is docs/hub.md. What this phone does for others is decided here: `info`, `open`,
-// `notify` always work; `shell`, `files` and `task` are not offered on iOS yet (the sandbox
-// and the chat runner have no headless entry point in this build), so a caller asking for them
-// gets a clear `not_supported` rather than a hang. Mirrors io.github.nanomuse.hub on Android.
+// `notify`, `task` and `stop` work (the task runs on this phone's Muse, NanoMuseHubTasks);
+// `screen` is refused with `no_screen`, and `shell`, `files` and `approve` are not offered on
+// iOS (the sandbox has no entry point for other devices), so a caller asking for them gets a
+// clear `not_supported` rather than a hang. Mirrors io.github.nanomuse.hub on Android.
 
 import Foundation
 import UIKit

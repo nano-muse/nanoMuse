@@ -98,4 +98,24 @@ final class NanoMuseCopyTests: XCTestCase {
         }
         XCTAssertTrue(offenders.isEmpty, "the relay's name is translated:\n" + offenders.sorted().joined(separator: "\n"))
     }
+
+    /// The Chinese copy uses Android's words: the agent is 智能体 / 智慧體 (never "agent" left in
+    /// English, never 代理 where the English says agent: 代理 is the proxy), the relay is 中继 /
+    /// 中繼 (not 中转), and "Hands" stays in English.
+    func testChineseTermsMatchAndroid() throws {
+        let cat = try Self.load()
+        var offenders: [String] = []
+        let agentWord = try NSRegularExpression(pattern: "(?i)\\bagents?\\b")
+        for key in cat.ours {
+            for lang in ["zh-Hans", "zh-Hant"] {
+                guard let value = cat.values[key]?[lang] else { continue }
+                let range = NSRange(value.startIndex..., in: value)
+                if agentWord.firstMatch(in: value, range: range) != nil { offenders.append("[\(lang)] agent: \(value.prefix(80))") }
+                if value.contains("代理"), key.lowercased().contains("agent") { offenders.append("[\(lang)] 代理: \(value.prefix(80))") }
+                if value.contains("中转") || value.contains("中轉") { offenders.append("[\(lang)] 中转: \(value.prefix(80))") }
+                if value.contains("双手") || value.contains("雙手") { offenders.append("[\(lang)] 双手: \(value.prefix(80))") }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty, "Chinese words that differ from Android's:\n" + offenders.sorted().joined(separator: "\n"))
+    }
 }

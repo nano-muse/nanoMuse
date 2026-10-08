@@ -395,6 +395,16 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   以浮层打开账号页；验证码或密码通过后，浮层自己关上（对登录状态做 `nmOnChange`），引导已经
   翻到下一页，密码页或来源页。之前浮层停在登录后的账号页上，带着设备和同步那几行，人得把它
   滑掉才发现引导已经往前走了。
+- **第三轮审计：中文用词（1.0.x）**（`Localizable.xcstrings`、`NanoMuseShell.swift`、
+  `NanoMuseAccountView.swift`、`MinisTests/NanoMuseCopyTests.swift`）：中文文案和 Android 说
+  一样的词。19 个 key 里还写着英文 "agent" 或「代理」的地方（系统文件的说明、例程、*关于这个
+  智能体*、形象失败那句）改成智能体（繁體 智慧體），「代理」在「设置 → 网络」里是代理服务器的
+  意思；七句说「中转」的中继句子（*中继说*、*中继已暂停*、暂停注册、额度、同步、互联、私人
+  中继）改成中继 / 中繼；*Hands* 保留英文，和 Android 的「设置 → Hands」一致；聊天标签有了
+  自己的 key `tab.chat`（聊天，Android 的 `nm_tab_chat`），不再用上游的 *Chat*（闲聊）；账号页
+  的用量行里对话类写「对话」（`models.slot.chat`，Android 的 `nm_usage_kind_chat`）。
+  `NanoMuseCopyTests` 遇到中文里的 "agent"、英文原文说 agent 处的「代理」、「中转」和「双手」
+  就失败。
 
 ## 在 Mac 上构建 {#building-on-a-mac}
 
