@@ -155,6 +155,7 @@ def fake_upstream() -> FastAPI:
         }
 
     up.state.image_429s = 0  # how many times the next pictures are refused with a 429 first
+    up.state.task_status = {}  # task id -> the status (or an HTTP code) to answer with, instead of running-then-done
 
     @up.post("/ds/api/v1/services/aigc/multimodal-generation/generation")
     async def draw(request: Request):
@@ -189,8 +190,11 @@ def fake_upstream() -> FastAPI:
     @up.get("/ds/api/v1/tasks/{task_id}")
     async def task(task_id: str, request: Request):
         up.state.requests.append(("task", dict(request.headers), task_id))
+        fixed = up.state.task_status.get(task_id)
+        if isinstance(fixed, int):
+            return JSONResponse(status_code=fixed, content={"code": "InvalidParameter", "message": "task not exist"})
         polls = sum(1 for r in up.state.requests if r[0] == "task" and r[2] == task_id)
-        status = "RUNNING" if polls == 1 else "SUCCEEDED"
+        status = fixed or ("RUNNING" if polls == 1 else "SUCCEEDED")
         return {"output": {"task_id": task_id, "task_status": status, "video_url": "http://upstream/clip.mp4"}}
 
     @up.get("/ds/api/v1/uploads")

@@ -1526,13 +1526,28 @@ class Cloud:
         self.db.charge(caller.account_id, "image", model.id, 0, 0, charged, request_id, cost_uy=cost)
         return charged
 
-    def charge_video(self, caller: Caller, model: ModelSpec, request_id: str, cost_uy: int = 0) -> int:
-        """One accepted task = one clip; the provider bills per output second, so
-        `per_clip` is set for the short clips the app asks for and the money
-        was priced from the seconds asked for when the task was submitted."""
-        charged = model.per_clip
-        self.db.charge(caller.account_id, "video", model.id, 0, 0, charged, request_id, cost_uy=cost_uy)
-        return charged
+    def settle_video_task(self, task: Any, status: str | None) -> int | None:
+        """The provider's word on a clip, from the app's poll or from the relay's own check
+        (0.24). One accepted task = one clip (`per_clip`), the money priced from the seconds
+        asked for when the task was submitted. The row remembers the status, and the first SUCCEEDED charges the clip at the
+        price fixed when it was submitted. Idempotent: `mark_video_charged` flips once, so a
+        poll after the relay settled a task (or the other way round) charges nothing more.
+        Returns what was charged (micro-yuan), 0 when a SUCCEEDED task's model is gone from
+        the menu, None when nothing was charged."""
+        task_id = str(task["task_id"])
+        if status and status != task["status"]:
+            self.db.set_video_status(task_id, str(status))
+        if status != "SUCCEEDED" or not self.db.mark_video_charged(task_id):
+            return None
+        model_id = str(task["model"])
+        spec = self.s.model(model_id)
+        if spec is None or spec.kind != "video":
+            spec = self.s.unlisted_model(model_id, "video")  # a member's own pick
+        if spec is None:
+            return 0  # a model gone from the menu since the task was submitted
+        account_id = str(task["account_id"])
+        self.db.charge(account_id, "video", spec.id, 0, 0, spec.per_clip, task_id[:16], cost_uy=int(task["cost_uy"] or 0))
+        return spec.per_clip
 
     def note(self, account_id: str, kind: str, detail: str = "") -> None:
         """An event on the account's timeline (never message content)."""

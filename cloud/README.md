@@ -224,7 +224,8 @@ Any OpenAI-compatible upstream works for chat; the image and video
 endpoints assume DashScope. Video is relayed under DashScope's own paths
 (`/api/v1/services/aigc/video-generation/video-synthesis`, `/api/v1/tasks/{id}`,
 `/api/v1/uploads`), so the app's video code only needs to point its host at
-the relay; a task can be polled by the account that created it only.
+the relay; a task can be polled by the account that created it only, and the
+relay polls on the account's behalf when the app does not (*Money*, below).
 
 ### Runtime settings (0.15)
 
@@ -465,7 +466,16 @@ allowance check one by one and overshoot it together. Now each request is
 *reserved* while it runs and *settled* when it is over: a picture or a clip at
 its known price, a chat at a typical turn's worth of its model (6 000 prompt
 and 1 500 completion tokens — the ledger gets the real figure when the reply is
-in), and a clip still being made holds its price until the task is seen done.
+in), and a clip still being made holds its price until the task is seen done,
+for an hour at most. A clip is charged once, at the price fixed when it was
+submitted, the first time its task is seen `SUCCEEDED`: by the app's poll, or
+(0.24) by the relay itself. Since an app that was closed never polls, the relay
+asks the provider about every unsettled task once shortly before the hour's
+hold lapses and once more before the row is purged (three days), a handful of
+tasks a minute: `SUCCEEDED` charges the clip, `FAILED` or `CANCELED` lets the
+hold go, a task the provider no longer knows is marked `UNKNOWN`; a provider
+that does not answer is asked again next minute. A poll after the relay settled
+a task charges nothing more.
 The check counts what is held: a chat starts while anything is left beyond it,
 a picture or a clip only when its own price fits on top. At most `MAX_IN_FLIGHT`
 requests of one account run at once; the one over that is told so

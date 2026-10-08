@@ -342,6 +342,79 @@ async def test_clips_are_priced_by_resolution_and_charged_once():
     assert (await submit({"resolution": "480P"})).startswith("task-")
 
 
+async def test_clips_never_polled_are_settled_by_the_relay():
+    """A clip the app never polls to an end (the app was closed) is still charged: shortly
+    before the hour's hold lapses the relay asks the provider itself, charges a SUCCEEDED
+    clip once, lets a FAILED one go, and asks about a task once more before the row is
+    purged. A poll after the relay settled a task charges nothing more, and the other way
+    round; a handful of tasks per tick."""
+    app, client, sender, up, cloud = make(allowance_cny=5)
+    data = await sign_up(client, sender)
+    auth = {"Authorization": f"Bearer {data['api_key']}"}
+    path = "/api/v1/services/aigc/video-generation/video-synthesis"
+    caller = cloud.authenticate(data["api_key"])
+    settle = app.state.settle_video_tasks
+
+    async def submit() -> str:
+        body = {"model": "wan2.2-i2v-flash", "input": {"prompt": "wave", "img_url": "oss://x"}, "parameters": {"resolution": "480P"}}
+        r = await client.post(path, headers=auth, json=body)
+        assert r.status_code == 200, r.text
+        return r.json()["output"]["task_id"]
+
+    done, failed, running, polled, gone, extra = [await submit() for _ in range(6)]
+    up.state.task_status.update({done: "SUCCEEDED", failed: "FAILED", running: "RUNNING", gone: 404, extra: "SUCCEEDED"})
+    clip = round(0.10 * 5 * M)
+    assert cloud.db.pending_video_cost(caller.account_id) == 6 * clip
+    # the app polled one of them to the end: charged by the poll
+    for _ in range(2):
+        assert (await client.get(f"/api/v1/tasks/{polled}", headers=auth)).status_code == 200
+    assert cloud.db.video_task(polled)["charged"] == 1
+    # too young: the relay asks about nothing yet
+    assert await settle() == 0
+    # 50 minutes on: the five unsettled tasks are due; a tick takes a handful
+    with cloud.db.tx() as c:
+        c.execute("UPDATE video_tasks SET created_at = created_at - 3100")
+    asked_before = len([r for r in up.state.requests if r[0] == "task"])
+    assert await settle(limit=2) == 2
+    assert len([r for r in up.state.requests if r[0] == "task"]) == asked_before + 2
+    assert await settle() == 3
+    assert await settle() == 0  # each asked once; nothing due for a second look yet
+    rows = {t: cloud.db.video_task(t) for t in (done, failed, running, gone, extra, polled)}
+    assert rows[done]["status"] == "SUCCEEDED" and rows[done]["charged"] == 1
+    assert rows[extra]["status"] == "SUCCEEDED" and rows[extra]["charged"] == 1
+    assert rows[failed]["status"] == "FAILED" and rows[failed]["charged"] == 0
+    assert rows[gone]["status"] == "UNKNOWN" and rows[gone]["charged"] == 0
+    assert rows[running]["status"] == "RUNNING" and rows[running]["charged"] == 0 and rows[running]["checks"] == 1
+    assert rows[polled]["checks"] == 0  # settled by the app's poll; never asked about
+    me = (await client.get("/v1/me", headers=auth)).json()
+    clips = [r for r in me["recent"] if r["kind"] == "video"]
+    assert len(clips) == 3 and me["spend"]["total"] == 1.5  # polled, done, extra: ¥0.50 each
+    # only the running one still holds money (and only until the hour is up)
+    assert cloud.db.pending_video_cost(caller.account_id) == clip
+    # the app comes back and polls the settled ones: nothing charged twice
+    for t in (done, extra, failed):
+        assert (await client.get(f"/api/v1/tasks/{t}", headers=auth)).status_code == 200
+    me = (await client.get("/v1/me", headers=auth)).json()
+    assert len([r for r in me["recent"] if r["kind"] == "video"]) == 3 and me["spend"]["total"] == 1.5
+    # the hold has lapsed and the row is about to be purged: one more look, and it finished
+    with cloud.db.tx() as c:
+        c.execute("UPDATE video_tasks SET created_at = created_at - ?", (3 * 86400 - 3600,))
+    up.state.task_status[running] = "SUCCEEDED"
+    assert await settle() == 1  # the running one only; the others were answered for good
+    assert cloud.db.video_task(running)["charged"] == 1 and cloud.db.video_task(running)["checks"] == 2
+    assert await settle() == 0
+    me = (await client.get("/v1/me", headers=auth)).json()
+    assert len([r for r in me["recent"] if r["kind"] == "video"]) == 4 and me["spend"]["total"] == 2.0
+    # a provider that does not answer is not counted as a check; the next tick asks again
+    fresh = await submit()
+    with cloud.db.tx() as c:
+        c.execute("UPDATE video_tasks SET created_at = created_at - 3100 WHERE task_id=?", (fresh,))
+    up.state.task_status[fresh] = 500
+    assert await settle() == 0 and cloud.db.video_task(fresh)["checks"] == 0
+    up.state.task_status[fresh] = "SUCCEEDED"
+    assert await settle() == 1 and cloud.db.video_task(fresh)["charged"] == 1
+
+
 async def test_two_chats_at_the_boundary_do_not_both_pass():
     """With less than one typical turn left, two chats started together: the first holds a
     turn's worth, so the second is refused rather than both passing the same check; the
