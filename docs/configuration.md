@@ -272,7 +272,7 @@ password      = "{{vault:EMAIL_PASSWORD}}"
 scrub_secrets = true   # remove one-time codes and reset links before the model reads a mail
 ```
 
-Store the values with `nanomuse vault set EMAIL_ADDRESS` and `nanomuse vault set EMAIL_PASSWORD`. `read_emails` marks the session as tainted; `send_email` is in `always_ask_tools` by default.
+Store the values with `nanomuse vault set EMAIL_ADDRESS` and `nanomuse vault set EMAIL_PASSWORD`. `read_emails` marks the conversation as tainted; `send_email` is in `always_ask_tools` by default.
 
 ### Calendar
 
@@ -313,7 +313,7 @@ name = "Nextcloud"
 url  = "{{vault:CONTACTS_NEXTCLOUD}}"   # a link, kept in the vault: nanomuse vault set CONTACTS_NEXTCLOUD
 ```
 
-Besides the sources there is always *My contacts*, `<data_dir>/contacts.vcf`: the people the agent was told about in chat ("the landlord is Bob Li, bob@example.com") through `contacts` action=add — the only book it writes to, and the only one it can remove people from. The `contacts` tool searches by name, nickname, company, email or phone (every word must match, prefixes count, a character inside a Chinese name counts); a look-up is private data and taints the session. `nanomuse contacts search | list | add | sources | add-source | remove-source` from the CLI.
+Besides the sources there is always *My contacts*, `<data_dir>/contacts.vcf`: the people the agent was told about in chat ("the landlord is Bob Li, bob@example.com") through `contacts` action=add — the only book it writes to, and the only one it can remove people from. The `contacts` tool searches by name, nickname, company, email or phone (every word must match, prefixes count, a character inside a Chinese name counts); a look-up is private data and taints the conversation. `nanomuse contacts search | list | add | sources | add-source | remove-source` from the CLI.
 
 ### Web search
 
@@ -407,7 +407,7 @@ name               = "calendar"
 url                = "http://localhost:8000/mcp"   # streamable HTTP; falls back to SSE
 risk               = "sensitive"
 egress             = true         # counts as network egress for taint tracking
-reads_private_data = true         # taints the session when called
+reads_private_data = true         # taints the conversation when called
 
 # one tool of a server may differ from the server's defaults
 [mcp.servers.tools.list_events]

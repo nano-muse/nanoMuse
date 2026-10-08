@@ -272,7 +272,7 @@ password      = "{{vault:EMAIL_PASSWORD}}"
 scrub_secrets = true   # remove one-time codes and reset links before the model reads a mail
 ```
 
-用 `nanomuse vault set EMAIL_ADDRESS` 和 `nanomuse vault set EMAIL_PASSWORD` 存值。`read_emails` 会把会话标记为已污染；`send_email` 默认在 `always_ask_tools` 里。
+用 `nanomuse vault set EMAIL_ADDRESS` 和 `nanomuse vault set EMAIL_PASSWORD` 存值。`read_emails` 会把这段对话标记为已污染；`send_email` 默认在 `always_ask_tools` 里。
 
 ### 日历 {#calendar}
 
@@ -313,7 +313,7 @@ name = "Nextcloud"
 url  = "{{vault:CONTACTS_NEXTCLOUD}}"   # a link, kept in the vault: nanomuse vault set CONTACTS_NEXTCLOUD
 ```
 
-除了这些来源，始终还有一本「我的联系人」，`<data_dir>/contacts.vcf`：在聊天里告诉过智能体的人（「房东是 Bob Li，bob@example.com」），通过 `contacts` 的 action=add 加进去——这是它唯一会写的一本，也是唯一能从里面删人的一本。`contacts` 工具按姓名、昵称、公司、邮箱或电话搜索（每个词都要匹配上，前缀算数，中文名里的一个字也算数）；一次查询属于私密数据，会污染会话。命令行用 `nanomuse contacts search | list | add | sources | add-source | remove-source`。
+除了这些来源，始终还有一本「我的联系人」，`<data_dir>/contacts.vcf`：在聊天里告诉过智能体的人（「房东是 Bob Li，bob@example.com」），通过 `contacts` 的 action=add 加进去——这是它唯一会写的一本，也是唯一能从里面删人的一本。`contacts` 工具按姓名、昵称、公司、邮箱或电话搜索（每个词都要匹配上，前缀算数，中文名里的一个字也算数）；一次查询属于私密数据，会污染这段对话。命令行用 `nanomuse contacts search | list | add | sources | add-source | remove-source`。
 
 ### 网页搜索 {#web-search}
 
@@ -407,7 +407,7 @@ name               = "calendar"
 url                = "http://localhost:8000/mcp"   # streamable HTTP; falls back to SSE
 risk               = "sensitive"
 egress             = true         # counts as network egress for taint tracking
-reads_private_data = true         # taints the session when called
+reads_private_data = true         # taints the conversation when called
 
 # one tool of a server may differ from the server's defaults
 [mcp.servers.tools.list_events]

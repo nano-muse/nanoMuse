@@ -118,7 +118,7 @@ The operator's own rules, in its prompt: never type passwords, PINs, card number
 
 ## What Sentinel does with it
 
-Everything read from the screen is private data: the session is *tainted* after the first `phone_screen`, so later steps that send data elsewhere are held to the stricter rules (see [sentinel.md](sentinel.md)).
+Everything read from the screen is private data: the conversation is *tainted* after the first `phone_screen`, so later steps that send data elsewhere are held to the stricter rules (see [sentinel.md](sentinel.md)).
 
 A `phone_act` is MODERATE — allowed on its own in the default mode — except when it looks like it commits to something, in which case it is SENSITIVE with a warning, and a warning always means **ask, once**:
 

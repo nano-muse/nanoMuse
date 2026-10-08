@@ -20,7 +20,7 @@ Start with `nanomuse doctor`: it prints the config file in use, the data directo
 
 **An approval card never appears in the terminal.** `nanomuse daemon` and `--auto` run in Sentinel `auto` mode by design. Use `nanomuse chat` or the app for interactive approvals.
 
-**"Sentinel blocked" for something you wanted.** Check `nanomuse audit -n 20` for the reason: a deny rule, `deny_tools`, or taint (private data read earlier in the session plus a new network destination). Add the host to `egress_allowlist` or approve once.
+**"Sentinel blocked" for something you wanted.** Check `nanomuse audit -n 20` for the reason: a deny rule, `deny_tools`, or taint (private data read earlier in the conversation plus a new network destination). Add the host to `egress_allowlist` or approve once.
 
 **Email tool returns nothing useful.** With `scrub_secrets = true` one-time codes and reset links are removed before the model reads a mail; that is intentional. Check IMAP settings with `nanomuse config show` and the vault entries with `nanomuse vault list`.
 
