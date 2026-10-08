@@ -17,6 +17,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - The first page of the first run now shows the app's mark, as the phone does, and offers *Use your own API key instead* under *Sign in*: it goes straight to the models page with no account, and *Skip for now* there with no key saved returns to the first page.
 - The agent's opening lines in the first conversation no longer carry a dash.
+- The Chinese copy says 操作屏幕 where it used to say 手 or 动手 for the Hands (the Computer use badges, the permissions rows, the Models page, the first run's source page), and 形象 for the avatar throughout; *Manage routines* now reads 管理例程 like the rest of the Goals page.
+- The first run's Reach row no longer speaks of pairing, which went away in 0.1.24: the way in is the same account on your phone and your other computers.
+- The avatar studio's estimate, when it is more than the day's allowance, points to a key of your own instead of to "adding credit"; nothing is sold.
+- The train-ticket idea no longer speaks of "the phone's Linux sandbox" on a computer (the same list ships on the phones).
+- A failed call on the Models page is told in plain words, like everywhere else.
+- The Library room is 资源库 in Chinese, as on the phone, in the docs and in the ideas it shows; the things in it stay 构件, and the folder under `~/nanoMuse` keeps its name.
 
 ### Android
 

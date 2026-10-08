@@ -1317,7 +1317,7 @@ export default class NanomuseRooms extends Service {
     }
     const pair = what[kind] ?? what.document!
     const framing = zh
-      ? `[对方在「构件」里点了「创建」：请做${pair[1]}，保存到 ${folder}/（没有就创建），做完用 present 声明这个文件，让它出现在对方的构件库里。先做再说，简短汇报。]`
+      ? `[对方在「资源库」里点了「创建」：请做${pair[1]}，保存到 ${folder}/（没有就创建），做完用 present 声明这个文件，让它出现在对方的资源库里。先做再说，简短汇报。]`
       : `[The person pressed "Create" in their Library: make ${pair[0]}, save it under ${folder}/ (create the folder if needed), and declare the file with present when done so it appears in their Library. Make it first, then report briefly.]`
     await mkdir(folder, { recursive: true })
     const title = firstLine(text).slice(0, 60)
@@ -1342,7 +1342,7 @@ export default class NanomuseRooms extends Service {
     // the composer, and the person is meant to type first here.
     let workspaceId: string | undefined
     try {
-      workspaceId = (await (this.ctx.get('workspaceRegistry') as RegistryLike | undefined)?.create(folder, zh ? '构件' : 'Library'))?.id
+      workspaceId = (await (this.ctx.get('workspaceRegistry') as RegistryLike | undefined)?.create(folder, zh ? '资源库' : 'Library'))?.id
     } catch (error) {
       this.warn('library workspace', error)
     }
