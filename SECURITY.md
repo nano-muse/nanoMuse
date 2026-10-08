@@ -8,7 +8,7 @@ Please do not open a public issue for anything that lets the model or a third pa
 
 Use GitHub's private reporting: **Security → Report a vulnerability** on [github.com/nano-muse/nanoMuse](https://github.com/nano-muse/nanoMuse/security/advisories/new). Include the version (`nanomuse version`), your config with secrets removed, and the steps or prompt that reproduce it. You will get an acknowledgement within a week; fixes ship as a patch release with a note in the changelog and credit if you want it.
 
-Things that are documented as out of scope — a command you approved doing damage, the vault key being readable by your own user, an exposed port on the public internet — are not vulnerabilities in nanoMuse, but if the documentation left you with the wrong impression, that is a bug too: open an issue.
+Things that are documented as out of scope (a command you approved doing damage, the vault key being readable by your own user, an exposed port on the public internet) are not vulnerabilities in nanoMuse, but if the documentation left you with the wrong impression, that is a bug too: open an issue.
 
 ## Supported versions
 
