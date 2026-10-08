@@ -146,6 +146,18 @@ enum NanoMuseSlotResolver {
     static func automatic(slot: NanoMuseSlot, chatProviderId: String?, providers: [NanoMuseSlotProvider]) -> NanoMuseSlotChoice? {
         resolve(slot: slot, chosen: nil, chatProviderId: chatProviderId, providers: providers)
     }
+
+    /// Where the chat slot goes when the provider `leaving` is switched off while new chats
+    /// answered through it: the first other provider in `providers` (the order they were added)
+    /// that chats, on its default chat model (the catalogue's default for that provider, else
+    /// its first chat model). Nil when nothing else could answer; the switch is then refused.
+    /// Android: `ModelSlots.nextChat`.
+    static func nextChat(leaving: String, providers: [NanoMuseSlotProvider]) -> NanoMuseSlotChoice? {
+        for p in providers where p.id != leaving && p.has(.chat) {
+            if let model = p.defaultModel(for: .chat) { return NanoMuseSlotChoice(providerId: p.id, model: model) }
+        }
+        return nil
+    }
 }
 
 // MARK: - The picker's groups (pure, tested)
@@ -416,6 +428,25 @@ enum NanoMuseModelSlots {
 
     /// The instance new chats start on, if any.
     static func chatProviderId() -> String? { chatEntry()?.providerInstanceId }
+
+    /// Whether the chat slot could leave `instanceId` (nanoMuse Cloud, when its switch goes
+    /// off): new chats do not run on it, or a provider of one's own could take them
+    /// (`NanoMuseSlotResolver.nextChat`). False is the refusal the switch shows as one sentence.
+    static func canLeave(_ instanceId: String) -> Bool {
+        chatProviderId() != instanceId || NanoMuseSlotResolver.nextChat(leaving: instanceId, providers: providers()) != nil
+    }
+
+    /// `instanceId` was switched off: when new chats answered through it, the chat slot and the
+    /// main chat move to the next provider that chats (`useForChat`), so the Models page names
+    /// what answers and no chat stops at the switch. Nothing moves when the slot was elsewhere
+    /// or nothing is left; call after the instance was written off. Returns what it moved to.
+    @discardableResult
+    static func chatLeaves(_ instanceId: String) -> NanoMuseSlotChoice? {
+        guard chatProviderId() == instanceId,
+              let next = NanoMuseSlotResolver.nextChat(leaving: instanceId, providers: providers()),
+              useForChat(instanceId: next.providerId, model: next.model) else { return nil }
+        return next
+    }
 
     /// The chat slot as a choice, or nil when no group can answer.
     static func chatChoice() -> NanoMuseSlotChoice? {

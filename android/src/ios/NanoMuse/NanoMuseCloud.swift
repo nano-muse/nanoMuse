@@ -233,10 +233,19 @@ enum NanoMuseCloud {
 
     /// Flip the switch. Upstream's `isEnabled` on the Cloud instance is the stored bit, so a
     /// chat pinned to a Cloud entry stops at it the same way as for any disabled provider.
-    static func setModelsOn(_ on: Bool) {
-        guard var inst = instance, inst.isEnabled != on else { return }
+    /// Off while new chats answer through the account: the chat slot and the main chat move to
+    /// the first provider of one's own that chats (`NanoMuseModelSlots.chatLeaves`); with none,
+    /// the switch is refused and stays on, which is the `false` the page shows as one sentence.
+    /// The same rule on every client (Android `NanoMuseCloud.setModelsOn`, the desktop's
+    /// `setCloudModels`, the runtime's `409 chat_on_cloud`).
+    @discardableResult
+    static func setModelsOn(_ on: Bool) -> Bool {
+        guard var inst = instance, inst.isEnabled != on else { return true }
+        if !on, !NanoMuseModelSlots.canLeave(inst.id) { return false }
         inst.isEnabled = on
         ProviderConfigStore.shared.updateInstance(inst)
+        if !on { NanoMuseModelSlots.chatLeaves(inst.id) }
+        return true
     }
 
     static var account: Account? {

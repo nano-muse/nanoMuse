@@ -489,6 +489,21 @@ Ours, in `NanoMuse/`:
   before it went by the text alone, so a person typing `@iPhone` on an English desktop about a
   Chinese page gets the answer in English. `NanoMuseHubTasks.prompt` is pure and tested. The
   phone's own `@device` mentions have sent the tag since 1.0.0.
+- **The third audit: the Cloud switch and the chat (1.0.x)** (`NanoMuseModelSlots.swift`,
+  `NanoMuseCloud.swift`, `NanoMuseModelsView.swift`, the `// nanoMuse:` spots of
+  `ProviderInstanceDetailView.swift`, `MinisTests/NanoMuseModelSlotsTests.swift`): *Use nanoMuse
+  Cloud models* off (Settings › Models, or *Enabled* on the Cloud provider's own page) while new
+  chats answer through the account now hands the Chat slot and the main chat to the first provider
+  of your own that chats, on the catalogue's default for it (`NanoMuseSlotResolver.nextChat`,
+  Android's `ModelSlots.nextChat`; `NanoMuseModelSlots.chatLeaves` does the move through
+  `useForChat`). With no own chat model the switch is refused: `NanoMuseCloud.setModelsOn` returns
+  false, the switch stays on, and *Add a provider of your own first; with nanoMuse Cloud off,
+  nothing else could answer.* appears under it, inside the card on the Models page and as the
+  Status section's footer on the provider page. Before, the switch went off, the Chat row kept
+  naming the account, and the main chat stopped with upstream's *No model configured* error; the
+  *Not set* state is no longer reachable through this switch. A provider of your own switched off
+  on its page keeps upstream's path: the chat re-resolves through the default group and, when
+  nothing is left, says *No model configured. Add a provider in Settings.*
 
 ## Building on a Mac
 

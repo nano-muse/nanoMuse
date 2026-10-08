@@ -21,6 +21,7 @@ struct NanoMuseModelsView: View {
     @State private var chatChanged = false
     @State private var adding = false
     @State private var cloudOn = NanoMuseCloud.modelsOn
+    @State private var cloudRefused = false
 
     var body: some View {
         NanoMusePage(title: AppLocalized("Models")) {
@@ -40,11 +41,23 @@ struct NanoMuseModelsView: View {
                     NanoMuseToggleRow(title: AppLocalized("Use nanoMuse Cloud models"), isOn: Binding(
                         get: { cloudOn },
                         set: { on in
-                            cloudOn = on
-                            NanoMuseCloud.setModelsOn(on)
+                            // Off is refused while the chat model is the account's and no model
+                            // of one's own could take it: the switch stays on and the sentence
+                            // under it says why. Otherwise the chat slot moves to the first own model.
+                            let chatWasCloud = NanoMuseModelSlots.chatProviderId() == NanoMuseCloud.instance?.id
+                            cloudRefused = !NanoMuseCloud.setModelsOn(on)
+                            if !on, !cloudRefused, chatWasCloud { chatChanged = true } // the chat slot moved: the note under the rows says so
                             reload()
                         }
                     ))
+                    if cloudRefused {
+                        Text(AppLocalized("Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer."))
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                    }
                 }
                 NanoMuseCaption(text: cloudOn
                     ? AppLocalized("nanoMuse Cloud is one of the sources for the chat, pictures and clips; what runs on it comes off your allowance.")

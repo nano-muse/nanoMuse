@@ -149072,6 +149072,65 @@
           }
         }
       }
+    },
+    "Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge zuerst einen eigenen Anbieter hinzu; mit ausgeschalteter nanoMuse Cloud könnte sonst nichts antworten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade primero un proveedor propio; con nanoMuse Cloud apagado, nada más podría responder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez d’abord un fournisseur à vous ; nanoMuse Cloud désactivé, rien d’autre ne pourrait répondre."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に自分のプロバイダーを追加してください。nanoMuse Cloud をオフにすると、ほかに答えられるものがありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먼저 자신의 제공자를 추가하세요. nanoMuse Cloud를 끄면 답할 수 있는 모델이 없습니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала добавьте собственного провайдера; с выключенным nanoMuse Cloud отвечать было бы нечему."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先添加一个自己的服务商；关掉 nanoMuse Cloud 后没有别的模型能回答。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先新增一個自己的服務商；關掉 nanoMuse Cloud 後沒有別的模型能回答。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
