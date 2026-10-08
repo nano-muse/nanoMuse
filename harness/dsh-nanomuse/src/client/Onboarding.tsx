@@ -32,7 +32,6 @@ import { IconCheck, IconHand, IconMessage, IconMonitor, IconSettings, IconUsers 
 import { useLive } from './live.ts'
 import { setMainChatId } from './MuseChats.tsx'
 import { OwnKeyStep } from './OwnKey.tsx'
-import { REPO_URL } from './panels.ts'
 import { nav, roomsCall, useRooms } from './rooms.ts'
 
 /** The owner share the onboarding coordinator passes to a step. */
@@ -325,13 +324,16 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
           h('span', { className: 'nm-ob-sep', 'aria-hidden': true }, '·'),
           h('button', { type: 'button', className: 'nm-ob-link', onClick: () => { setError(undefined); setPassword(''); setSignIn('identifier') } }, t('obChangeIdentifier'))))
     } else if (stage === 'welcome') {
+      // the app's mark, as on the phone (the face comes with the conversation, on the Meet page);
+      // two doors: the account, or a key of one's own (the models page; the sign-in can come later)
       body = h(Page, {
-        hero: h(Avatar, { size: 104, profile, mood: 'idle' }),
+        hero: h(BrandMark, { size: 104, className: 'nm-fr-hero-mark' }),
         title: t('frWelcomeTitle'),
         sub: t('frTagline'),
         primary: { label: t('frSignIn'), onClick: () => { setError(undefined); setSignIn('identifier') } },
+        secondary: { label: t('frWelcomeOwnKey'), onClick: () => { setModelsSkipped(false); choose('own') } },
         fine: config.allowance_cny ? `${t('frWelcomeFine')} ${t('obFreeAmount', { allowance: config.allowance_cny })}` : t('frWelcomeFine'),
-        learnMore: REPO_URL,
+        learnMore: PRIVACY_URL,
         t,
       },
         h('div', { className: 'nm-fr-features' },

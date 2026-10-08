@@ -15,6 +15,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- The first page of the first run now shows the app's mark, as the phone does, and offers *Use your own API key instead* under *Sign in*: it goes straight to the models page with no account, and *Skip for now* there with no key saved returns to the first page.
+- The agent's opening lines in the first conversation no longer carry a dash.
+
 ### Android
 
 - The sign-in page no longer calls a mainland-China number "outside the mainland" while it is still being typed: seven to ten digits that can still become `1xx xxxx xxxx` (with or without `+86`) show no sentence and keep *Send* on; the sentence comes once the number cannot be a mainland one any more.
