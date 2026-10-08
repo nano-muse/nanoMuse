@@ -113,6 +113,39 @@ export function localLabel(label: string): string {
   return label === "Tidied memory" ? t("Tidied memory") : label;
 }
 
+/**
+ * Why the Sentinel asked, in the person's language and words. The runtime's reasons are
+ * built from its settings (`'shell' is in always_ask_tools`, `risk level is 'sensitive'
+ * (mode=ask)`); the shapes it uses are known, so the fixed part is translated and the
+ * tool, the risk and the destination are kept. A shape not known here is shown as it came.
+ */
+export function localReason(reason: string): string {
+  let m = /^'([^']+)' is in always_ask_tools$/.exec(reason);
+  if (m) return t("{tool} is on your always-ask list", { tool: m[1] });
+  m = /^'([^']+)' is in always_allow_tools$/.exec(reason);
+  if (m) return t("{tool} is on your always-allow list", { tool: m[1] });
+  m = /^'([^']+)' is in sentinel\.deny_tools$/.exec(reason);
+  if (m) return t("{tool} is switched off in your settings", { tool: m[1] });
+  m = /^risk level is '(\w+)' \(mode=(\w+)\)$/.exec(reason);
+  if (m) return t("an action rated {risk}, in {mode} mode", { risk: t(m[1]), mode: t(m[2]) });
+  if (reason === "auto mode: approval skipped") return t("auto mode: not asked");
+  m = /^covered by your '([^']+)' permission for (.+)$/.exec(reason);
+  if (m) return t("covered by your {scope} permission for {key}", { scope: t(m[1]), key: m[2] });
+  m = /^private data was read earlier in this conversation and '([^']+)' can send data to (.+), which is not on sentinel\.egress_allowlist$/.exec(reason);
+  if (m) return t("private data was read earlier in this conversation, and {tool} could send it to {target}, which is not on your allowed list", { tool: m[1], target: m[2] });
+  return t(reason);
+}
+
+/**
+ * A sentence from the server that carries a number (`the file is larger than 25 MB`):
+ * the fixed part is translated, the number kept. Anything else goes through `t()`.
+ */
+export function localDetail(detail: string): string {
+  const m = /^the file is larger than (\d+) MB$/.exec(detail);
+  if (m) return t("The file is larger than {n} MB.", { n: m[1] });
+  return t(detail);
+}
+
 /** `t` bound to the live locale: the component re-renders when the language changes. */
 export function useT(): typeof t {
   useLocale();

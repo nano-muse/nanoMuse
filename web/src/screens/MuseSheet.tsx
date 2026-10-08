@@ -27,7 +27,7 @@ import { AvatarShareSheet } from "../components/AvatarShareSheet";
 import { ApprovalCard, RiskBadge, grantSubject, scopeLabel, toolIcon } from "../components/Cards";
 import { LoadError } from "../components/LoadError";
 import { Sheet } from "../components/Sheet";
-import { intlLocale, useT } from "../i18n";
+import { intlLocale, localReason, useT } from "../i18n";
 import { useStore } from "../store";
 import type {
   ActivityData,
@@ -1022,36 +1022,56 @@ function grantUntil(g: Grant, t: (key: string, vars?: Record<string, string | nu
   }
 }
 
-/** Every standing permission you granted, one row each, revocable on its own. */
+/** The risk classes a tool can carry, the gravest first: the order the grants are listed in. */
+const RISK_ORDER = ["sensitive", "moderate", "low", "safe"] as const;
+
+/**
+ * Every standing permission you granted, revocable on its own, listed by the risk class of
+ * the tool it covers (the phone does the same): the ones that matter most come first, and
+ * a glance says which standing allowances touch sending, paying or the shell.
+ */
 function GrantList({ grants, onRevoke }: { grants: Grant[]; onRevoke: (g: Grant) => void }) {
   const t = useT();
+  const { state } = useStore();
+  const riskOf = (tool: string): string => state.settings?.tools.find((x) => x.name === tool)?.risk ?? "moderate";
+  const groups = RISK_ORDER.map((risk) => ({ risk, rows: grants.filter((g) => riskOf(g.tool) === risk) })).filter((x) => x.rows.length > 0);
   return (
-    <div>
-      <div className="text-[12px] uppercase tracking-wide text-muted font-semibold mb-1.5">{t("Permissions you granted")}</div>
+    <div className="space-y-3">
       {grants.length === 0 ? (
-        <div className="text-[13px] text-muted">{t("No standing approvals. When you answer “always allow” to a risky step, it is listed here and can be revoked; approvals you give once are not kept.")}</div>
+        <div>
+          <div className="text-[12px] uppercase tracking-wide text-muted font-semibold mb-1.5">{t("Permissions you granted")}</div>
+          <div className="text-[13px] text-muted">{t("No standing approvals. When you answer “always allow” to a risky step, it is listed here and can be revoked; approvals you give once are not kept.")}</div>
+        </div>
       ) : (
-        <ul className="space-y-1.5">
-          {grants.map((g) => (
-            <li key={g.key} className="flex items-center gap-2.5 rounded-2xl bg-surface-2/60 px-3 py-2">
-              <span className="text-accent">{toolIcon(g.tool, 15)}</span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13.5px] font-medium truncate">{grantSubject(g.tool, g.target)}</div>
-                <div className="text-[11.5px] text-muted">
-                  {g.tool} · {grantUntil(g, t)} · {t("granted {time}", { time: timeShort(g.granted_at) })}
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label={t("Revoke {what}", { what: scopeLabel(g.scope, g.tool, g.target) })}
-                onClick={() => onRevoke(g)}
-                className="rounded-full p-1.5 text-muted hover:bg-surface active:scale-95"
-              >
-                <X size={15} />
-              </button>
-            </li>
-          ))}
-        </ul>
+        groups.map((group, i) => (
+          <div key={group.risk}>
+            <div className="text-[12px] uppercase tracking-wide text-muted font-semibold mb-1.5">
+              {i === 0 ? `${t("Permissions you granted")} · ` : ""}
+              {t(group.risk)}
+            </div>
+            <ul className="space-y-1.5">
+              {group.rows.map((g) => (
+                <li key={g.key} className="flex items-center gap-2.5 rounded-2xl bg-surface-2/60 px-3 py-2">
+                  <span className="text-accent">{toolIcon(g.tool, 15)}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13.5px] font-medium truncate">{grantSubject(g.tool, g.target)}</div>
+                    <div className="text-[11.5px] text-muted">
+                      {g.tool} · {grantUntil(g, t)} · {t("granted {time}", { time: timeShort(g.granted_at) })}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={t("Revoke {what}", { what: scopeLabel(g.scope, g.tool, g.target) })}
+                    onClick={() => onRevoke(g)}
+                    className="rounded-full p-1.5 text-muted hover:bg-surface active:scale-95"
+                  >
+                    <X size={15} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
       )}
     </div>
   );
@@ -1106,7 +1126,7 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
           {failed && <span className="text-amber-600">{t("failed")}</span>}
           {typeof entry.duration_ms === "number" && <span>{(entry.duration_ms / 1000).toFixed(1)}s</span>}
         </div>
-        {denied && entry.reasons && entry.reasons.length > 0 && <div className="mt-0.5 text-[12px] text-muted">{entry.reasons.join(" · ")}</div>}
+        {denied && entry.reasons && entry.reasons.length > 0 && <div className="mt-0.5 text-[12px] text-muted">{entry.reasons.map(localReason).join(" · ")}</div>}
       </div>
     </li>
   );

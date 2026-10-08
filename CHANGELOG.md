@@ -16,6 +16,11 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **The approval card says why it asks in your language.** *Why it asks* showed the runtime's own notes (`'shell' is in always_ask_tools`, `risk level is 'sensitive' (mode=ask)`); they now read as sentences, in English or 简体中文, with the tool, the risk and the destination kept. The same words appear under a denied step in today's record. The *Stopped.* notice, an oversized upload (*The file is larger than 25 MB.*) and the server's short answers a toast can show (*thread is busy*, *empty file*, *the main chat cannot be deleted* and the like) are translated too.
+- **Permissions you granted are listed by risk**, the gravest first (sensitive, moderate, low, safe), as on the phone, so a glance says which standing allowances touch sending, paying or the shell.
+- A failed connection test shows the sentence in your language with the provider's words under *Details*, instead of the raw error.
+- The community notice no longer calls nanoMuse a preview; 1.0.0 is out.
+
 ### Desktop
 
 ### Android

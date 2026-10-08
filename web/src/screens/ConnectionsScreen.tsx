@@ -3343,7 +3343,12 @@ function Field({
   );
 }
 
+/** The outcome of a connection test: the sentence in the person's language; a failed model
+ * test keeps the provider's own words one tap away. */
 function TestLine({ result, okText }: { result: TestResult; okText: string }) {
+  const t = useT();
+  const [showDetail, setShowDetail] = useState(false);
+  const detail = !result.ok && result.detail && result.detail !== result.error ? result.detail : null;
   return (
     <div
       className={cx(
@@ -3353,7 +3358,16 @@ function TestLine({ result, okText }: { result: TestResult; okText: string }) {
           : "bg-rose-500/12 text-rose-700 dark:text-rose-300",
       )}
     >
-      {result.ok ? okText : result.error}
+      {result.ok ? okText : t(result.error ?? "The model provider did not answer.")}
+      {detail && (
+        <>
+          {" "}
+          <button type="button" onClick={() => setShowDetail((v) => !v)} className="underline decoration-dotted underline-offset-2 opacity-70 hover:opacity-100">
+            {showDetail ? t("Hide details") : t("Details")}
+          </button>
+          {showDetail && <div className="mt-1.5 break-all font-mono text-[11px] opacity-80">{detail}</div>}
+        </>
+      )}
     </div>
   );
 }

@@ -75,3 +75,32 @@ describe("localLabel", () => {
     expect(localLabel("Check-in: Japanese")).toBe("Check-in: Japanese");
   });
 });
+
+describe("localReason", () => {
+  it("says why the Sentinel asked in the person's words, keeping the tool and the target", async () => {
+    const { localReason } = await import("./index");
+    setLocaleSetting("en");
+    expect(localReason("'shell' is in always_ask_tools")).toBe("shell is on your always-ask list");
+    expect(localReason("risk level is 'sensitive' (mode=ask)")).toBe("an action rated sensitive, in ask mode");
+    expect(localReason("auto mode: approval skipped")).toBe("auto mode: not asked");
+    expect(localReason("covered by your 'always' permission for shell:ls")).toBe("covered by your always permission for shell:ls");
+    expect(localReason("matched rule tool='shell' match=rm")).toBe("matched rule tool='shell' match=rm");
+    setLocaleSetting("zh-CN");
+    expect(localReason("'shell' is in always_ask_tools")).toBe("shell 在你的「总是询问」列表里");
+    expect(localReason("risk level is 'sensitive' (mode=ask)")).toBe("这个操作的风险等级是「敏感」，哨兵处于询问模式");
+    expect(
+      localReason("private data was read earlier in this conversation and 'web_fetch' can send data to example.org, which is not on sentinel.egress_allowlist"),
+    ).toBe("这段对话早些时候读取过私密数据，而 web_fetch 可能把它发给 example.org，这个地址不在你的允许列表里");
+  });
+});
+
+describe("localDetail", () => {
+  it("translates a server sentence that carries a number", async () => {
+    const { localDetail } = await import("./index");
+    setLocaleSetting("zh-CN");
+    expect(localDetail("the file is larger than 25 MB")).toBe("文件超过了 25 MB。");
+    expect(localDetail("empty file")).toBe("文件是空的");
+    setLocaleSetting("en");
+    expect(localDetail("the file is larger than 25 MB")).toBe("The file is larger than 25 MB.");
+  });
+});
