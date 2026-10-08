@@ -604,6 +604,11 @@ minutes there, not an upload. The full `xcodebuild` log is attached to the run. 
 when a warning is reported in a file under `NanoMuse/` (upstream's files are not held to this),
 so the zero-warnings rule above is checked, not just asked for.
 
+The strings catalogue has a check of its own that runs on every pull request, on Linux:
+`tests/test_ios_strings.py` parses `Localizable.xcstrings` with every key pair in hand and fails
+when a key is listed twice (a JSON parser keeps one of the two entries and drops the other
+without a word, Xcode included, so the translations that ship would depend on which one won).
+
 ### Running it
 
 *Actions → iOS · TestFlight → Run workflow*, or push a tag `ios-<anything>`. The job builds the

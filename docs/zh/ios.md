@@ -515,6 +515,10 @@ gh secret set IOS_DIST_P12_PASSWORD -R nano-muse/nanoMuse < dist.p12.pass
 `xcodebuild` 日志附在运行记录上。`NanoMuse/` 下的文件只要报出一个警告，这次运行就算失败
 （上游的文件不算），所以上面「零警告」的规矩是被检查的，不只是写在这里。
 
+字符串目录另有一项检查，每个 pull request 都在 Linux 上跑：`tests/test_ios_strings.py` 逐对键值
+解析 `Localizable.xcstrings`，同一个键出现两次就失败（JSON 解析器会悄悄留下其中一条、丢掉另一条，
+Xcode 也一样，于是真正打进包里的翻译取决于哪一条赢了）。
+
 ### 跑起来 {#running-it}
 
 *Actions → iOS · TestFlight → Run workflow*，或者推一个 `ios-<anything>` 标签。任务会构建原生
