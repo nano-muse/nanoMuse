@@ -537,7 +537,7 @@ test('the hands row says why: the mount’s outcome reaches hands/runtime, with 
   }
 })
 
-// The main chat follows the chat slot (the phones' rule, 0.1.42): a pick on the Models page or
+// The main chat follows the chat slot (the phones' rule, 1.0.0): a pick on the Models page or
 // the "Use it for" card moves the one conversation the Chat tab always shows; side chats keep
 // theirs; a session that already says so is not written again.
 function fakeSessions(selections) {

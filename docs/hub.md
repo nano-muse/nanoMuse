@@ -49,7 +49,7 @@ Two kinds of request travel over the hub:
   the device that asked.
 - **Tasks** — `task {text, conversation?, language?}`: a whole job in words for the target device's own
   Muse, in a conversation of its own (`conversation` names it; the sender's id
-  when absent). `language` (runtime 0.1.42, optional) is the BCP-47 tag of the
+  when absent). `language` (runtime 1.0.0, optional) is the BCP-47 tag of the
   asking device's screens; the target answers in it instead of guessing from
   the text. It may take minutes. When that Muse hits
   something that needs approval, it does not decide alone: the question travels

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nanomuse-cloud"
-version = "0.22.0"
+version = "0.23.0"
 description = "nanoMuse Cloud: sign up with a phone number or an e-mail address, get a key that works out of the box; an OpenAI-shaped relay with a token grant per account."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }

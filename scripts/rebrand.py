@@ -45,8 +45,8 @@ IOS = ROOT / "android" / "src" / "ios"
 
 APP_ID = "io.github.nanomuse.app"
 NAME = "nanoMuse"
-VERSION_NAME = "0.1.41"
-VERSION_CODE = 42
+VERSION_NAME = "1.0.0"
+VERSION_CODE = 43
 REPO = "nano-muse/nanoMuse"
 REPO_URL = f"https://github.com/{REPO}"
 PRIVACY_URL = f"{REPO_URL}/blob/main/docs/privacy.md"
@@ -329,8 +329,8 @@ def ios_project() -> None:
     edit(
         pbx,
         [
-            (r"MARKETING_VERSION = 1\.\d+;", f"MARKETING_VERSION = {VERSION_NAME};"),
-            (r"MARKETING_VERSION = 0\.\d+\.\d+;", f"MARKETING_VERSION = {VERSION_NAME};"),
+            # upstream's `1.13` and every version of ours before this one
+            (r"MARKETING_VERSION = \d+(?:\.\d+)+;", f"MARKETING_VERSION = {VERSION_NAME};"),
             (r"CURRENT_PROJECT_VERSION = \d+;", f"CURRENT_PROJECT_VERSION = {VERSION_CODE};"),
             (
                 r'INFOPLIST_KEY_CFBundleDisplayName = "Share to Minis";',
@@ -498,7 +498,9 @@ def ios_check() -> int:
         return 0
     problems = 0
     leftovers = re.compile(
-        r"com\.openminis\.(app|Minis)|openminis\.github\.io|MARKETING_VERSION = 1\."
+        r"com\.openminis\.(app|Minis)|openminis\.github\.io|MARKETING_VERSION = (?!"
+        + re.escape(VERSION_NAME)
+        + r";)"
     )
     for path in ios_files(".swift", ".plist", ".entitlements", ".pbxproj"):
         for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):

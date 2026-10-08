@@ -136,7 +136,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | PATCH / DELETE | `/api/threads/{id}` | rename / delete |
 | POST | `/api/threads/{id}/clear` | clear the conversation |
 | GET | `/api/threads/{id}/events?limit=&before=` | timeline events |
-| POST | `/api/threads/{id}/send` `{text, files?, language?}` | queue a message; returns immediately. `files`: workspace paths from the upload below, ten at most; text may be empty when there are files. `language` (since 0.1.42): the BCP-47 tag of the client's screens (`en`, `zh-CN`); the reply is written in that language unless *Reply language* fixes one. Without it the script of the message decides, as before |
+| POST | `/api/threads/{id}/send` `{text, files?, language?}` | queue a message; returns immediately. `files`: workspace paths from the upload below, ten at most; text may be empty when there are files. `language` (since 1.0.0): the BCP-47 tag of the client's screens (`en`, `zh-CN`); the reply is written in that language unless *Reply language* fixes one. Without it the script of the message decides, as before |
 | POST | `/api/threads/{id}/stop` | stop the run in that chat: the queue is dropped, pending approval and question cards there expire, the conversation stays usable. `{ok: false}` when nothing was running |
 | POST | `/api/files/upload?name=` (body: the bytes) | a file to attach: lands in `attachments/<date>/` under a safe version of `name`; returns `{path, name, size, kind, mime}` for `files`. 413 above `server.max_upload_mb` |
 | POST | `/api/approvals/{id}` `{approved, scope, reason}` | answer a card; `scope` is one of the card's `grant_options` (`once`, `task`, `session`, `24h`, `always`) |

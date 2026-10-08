@@ -27,16 +27,16 @@ hero:
 | | |
 |---|---|
 | **Browser** | [demo.nanomuse.dev](https://demo.nanomuse.dev/) — a nanoMuse on a simulated phone, after a sign-in. A demo; the apps below are the real thing |
-| **Android** 8.0+, arm64 | [nanoMuse-0.1.41-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-0.1.41-arm64.apk) · [how to install](/android) |
+| **Android** 8.0+, arm64 | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk) · [how to install](/android) |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc) — a beta; the link delivers the build once Apple's beta review has passed · [iOS](/ios) |
-| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-mac-x64.dmg) · [the desktop app](/desktop) |
-| **Windows** 10+ | [nanoMuse-Desktop-0.1.41-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-win-x64.exe) |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v0.1.41/nanoMuse-Desktop-0.1.41-linux-x64.tar.gz) |
+| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-x64.dmg) · [the desktop app](/desktop) |
+| **Windows** 10+ | [nanoMuse-Desktop-1.0.0-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-win-x64.exe) |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` for your own relay; `docker compose up -d app` for the web app · [run it yourself](/self-hosting) |
 
 Every download is on the [latest release](https://github.com/nano-muse/nanoMuse/releases/latest); the same files are at [nanomuse.cn/dl](https://nanomuse.cn/dl/) when GitHub is slow where you are.
 
-[What changed in 0.1.41 Choice](https://github.com/nano-muse/nanoMuse/releases/tag/v0.1.41) · [What each client can do](/parity) · [Where to start contributing](/roadmap) · [What the relay keeps](/privacy) · [What stays on a phone, and whose it is](/sync)
+[What changed in 1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) · [What each client can do](/parity) · [Where to start contributing](/roadmap) · [What the relay keeps](/privacy) · [What stays on a phone, and whose it is](/sync)
 
 ## The film
 

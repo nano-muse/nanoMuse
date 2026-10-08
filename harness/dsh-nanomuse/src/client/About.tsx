@@ -22,7 +22,7 @@ interface AppInfo {
   version: string
   platform: string
   arch: string
-  /** The Linux build runs from an AppImage (shell 0.1.42); absent from older shells. */
+  /** The Linux build runs from an AppImage (shell 1.0.0); absent from older shells. */
   appImage?: boolean
 }
 
