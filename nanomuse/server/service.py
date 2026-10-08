@@ -1286,16 +1286,27 @@ class MuseService:
                 finally:
                     self.ui.end_run(thread.id)
                     thread.agent.inbox = None
-                    if incoming.llm is not None:
-                        if thread.agent.llm is incoming.llm:
-                            thread.agent.llm = self.app.llm
-                        spawn(incoming.llm.close(), "closing the one-turn Cloud client")
+                    self._release_llm(thread)
                     thread.busy = False
                     thread.updated_at = now_iso()
                     self.ui.set_status("idle", "", thread.id)
                     self.bus.publish({"kind": "thread", "thread": thread.meta()})
         finally:
             current_thread.reset(token)
+
+    def _release_llm(self, thread: Thread) -> None:
+        """A run ended: the thread goes back to the configured model client. The client the
+        run held, when it is another one (the one-turn Cloud client of *Use nanoMuse Cloud
+        this time*, or the client a model switch replaced while this turn was running; see
+        ``Connections._swap_llm``), is closed once no other running turn still holds it."""
+        held = thread.agent.llm
+        thread.agent.llm = self.app.llm
+        if held is self.app.llm:
+            return
+        for other in self.threads.values():
+            if other is not thread and other.busy and other.agent.llm is held:
+                return
+        spawn(held.close(), "closing a retired model client")
 
     def _finish_run(self, thread: Thread, purpose: str | None, final: str, quiet: bool) -> None:
         """The run's last word: shown as the assistant bubble unless it is on screen
