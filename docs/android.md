@@ -228,6 +228,10 @@ cd android/src/android
 ./gradlew :app:assembleRelease      # signed with android/keystore.properties when present
 ```
 
+`rclone.aar` is built with Go, which fetches its modules through Go's default proxy
+(`https://proxy.golang.org,direct`); on a mainland-China network set
+`export GOPROXY=https://goproxy.cn,direct` first, and `env.sh` keeps whatever you exported.
+
 `scripts/rebrand.py` carries the version (`VERSION_NAME`, `VERSION_CODE`) and applies
 nanoMuse's naming to the OpenMinis tree; `android/BUILDING.md` covers the native pieces.
 Without a signing key the release build is signed with the debug key, which installs but

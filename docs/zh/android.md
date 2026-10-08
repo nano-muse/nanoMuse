@@ -187,6 +187,9 @@ cd android/src/android
 ./gradlew :app:assembleRelease      # signed with android/keystore.properties when present
 ```
 
+`rclone.aar` 用 Go 构建，模块走 Go 自己的默认代理（`https://proxy.golang.org,direct`）；在中国大陆网络下先
+`export GOPROXY=https://goproxy.cn,direct`，`env.sh` 会沿用你导出的值。
+
 `scripts/rebrand.py` 带着版本号（`VERSION_NAME`、`VERSION_CODE`），把 nanoMuse 的命名套到
 OpenMinis 树上；`android/BUILDING.md` 讲原生部分。没有签名密钥时，release 构建用 debug 密钥签名，
 能安装，但不能升级一个正式签名的构建。要签名，先创建一次密钥，放在仓库之外：
