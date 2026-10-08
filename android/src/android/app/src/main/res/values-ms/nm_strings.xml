@@ -1084,6 +1084,8 @@
     <string name="nm_models_cloud_switch">Gunakan model nanoMuse Cloud</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud ialah salah satu sumber untuk baris di bawah; apa yang berjalan di situ ditolak daripada peruntukan anda.</string>
     <string name="nm_models_cloud_off_sub">Dimatikan: tiada apa berjalan di nanoMuse Cloud melainkan anda ketik \"Guna nanoMuse Cloud kali ini\". Anda kekal log masuk untuk penyegerakan dan peranti anda.</string>
+    <string name="nm_models_cloud_off_refused">Tambah penyedia anda sendiri dahulu; dengan nanoMuse Cloud dimatikan, tiada yang lain boleh menjawab.</string>
+    <string name="nm_chat_no_model">Tiada model yang boleh menjawab sekarang. Pilih satu di Tetapan › Model.</string>
     <string name="nm_cloud_provider_no_delete">Pembekal ini ialah akaun nanoMuse Cloud anda. Matikan di atas untuk berhenti menggunakan modelnya; untuk log keluar, buka Tetapan › nanoMuse Cloud.</string>
     <string name="nm_welcome_own_key">Guna kunci API sendiri</string>
     <string name="nm_useit_title">Guna untuk</string>

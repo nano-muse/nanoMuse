@@ -5326,7 +5326,7 @@ class ChatViewModel(
 
         val initialProvider = currentProvider
         if (initialProvider == null) {
-            _error.value = "No provider configured"
+            _error.value = context.getString(R.string.nm_chat_no_model) // nanoMuse: where to fix it, in the person's language
             return false
         }
         _canResume.value = false
@@ -5492,7 +5492,7 @@ class ChatViewModel(
 
         val initialProvider = currentProvider
         if (initialProvider == null) {
-            _error.value = "No provider configured"
+            _error.value = context.getString(R.string.nm_chat_no_model) // nanoMuse: where to fix it, in the person's language
             return
         }
         val provider: LLMProvider = initialProvider
@@ -6922,7 +6922,7 @@ class ChatViewModel(
 
         val initialProvider = currentProvider
         if (initialProvider == null) {
-            _error.value = "No provider configured"
+            _error.value = context.getString(R.string.nm_chat_no_model) // nanoMuse: where to fix it, in the person's language
             return
         }
         var provider: LLMProvider = initialProvider
@@ -12286,7 +12286,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
     fun resume() {
         if (_isStreaming.value || !_canResume.value) return
         val provider = currentProvider ?: run {
-            _error.value = "No provider configured"
+            _error.value = context.getString(R.string.nm_chat_no_model) // nanoMuse: where to fix it, in the person's language
             return
         }
         _canResume.value = false

@@ -296,12 +296,23 @@ object ModelSlots {
      * Call after the instance was written off. Returns what the slot moved to.
      */
     fun chatLeaves(context: Context, instanceId: String): Option? {
-        val entry = chatEntry(context) ?: return null
-        if (entry.providerInstanceId != instanceId) return null
+        if (!chatRunsOn(context, instanceId)) return null
         val option = nextChat(groups(context, Slot.CHAT), instanceId) ?: return null
         choose(context, Slot.CHAT, option)
         return option
     }
+
+    /** Whether new chats answer through [instanceId] right now (the chat default's entry is its). */
+    fun chatRunsOn(context: Context, instanceId: String): Boolean = chatEntry(context)?.providerInstanceId == instanceId
+
+    /**
+     * Whether [instanceId] may be switched off as far as the chat slot is concerned: new chats
+     * do not run on it, or another source could take them ([nextChat]). False is the refusal
+     * the Cloud switch shows as one sentence: with nothing else to answer, the switch stays on
+     * rather than leaving the slot empty. Ask before the instance is written off.
+     */
+    fun canLeave(context: Context, instanceId: String): Boolean =
+        !chatRunsOn(context, instanceId) || nextChat(groups(context, Slot.CHAT), instanceId) != null
 
     /** The first row of the picker's [groups] that is not [leaving]'s: the relay's recommended model, else the first own provider's default. */
     fun nextChat(groups: List<Group>, leaving: String): Option? =

@@ -296,13 +296,18 @@ object NanoMuseCloud {
     /**
      * Switches the Cloud provider instance on or off as a model source; the sign-in stays. Off
      * while new chats answer through the relay, the chat slot moves to the first own chat model
-     * ([io.github.nanomuse.models.ModelSlots.chatLeaves]), as the desktop does.
+     * ([io.github.nanomuse.models.ModelSlots.chatLeaves]), as every client does; with no chat
+     * model of the person's own the switch is refused and stays on, since nothing else could
+     * answer (the 1.0.0 rule). Returns false for that refusal, which the page says in one
+     * sentence (`nm_models_cloud_off_refused`); true when the state is as asked.
      */
-    fun setModelsOn(context: Context, on: Boolean) {
-        val inst = instance(context) ?: return
-        if (inst.isEnabled == on) return
+    fun setModelsOn(context: Context, on: Boolean): Boolean {
+        val inst = instance(context) ?: return false
+        if (inst.isEnabled == on) return true
+        if (!on && !io.github.nanomuse.models.ModelSlots.canLeave(context, inst.id)) return false
         repo(context)?.updateInstance(inst.copy(isEnabled = on))
         if (!on) io.github.nanomuse.models.ModelSlots.chatLeaves(context, inst.id)
+        return true
     }
 
     private val _signedIn = MutableStateFlow<Boolean?>(null)

@@ -1088,6 +1088,8 @@
     <string name="nm_models_cloud_switch">nanoMuse Cloud modellerini kullan</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud aşağıdaki satırların kaynaklarından biridir; üzerinde çalışanlar kotanızdan düşer.</string>
     <string name="nm_models_cloud_off_sub">Kapalı: \"Bu sefer nanoMuse Cloud kullan\" seçeneğine dokunmadıkça nanoMuse Cloud üzerinde hiçbir şey çalışmaz. Eşitleme ve cihazlarınız için oturumunuz açık kalır.</string>
+    <string name="nm_models_cloud_off_refused">Önce kendi sağlayıcını ekle; nanoMuse Cloud kapalıyken başka hiçbir şey yanıt veremez.</string>
+    <string name="nm_chat_no_model">Şu anda yanıt verebilecek bir model yok. Ayarlar › Modeller altında birini seç.</string>
     <string name="nm_cloud_provider_no_delete">Bu sağlayıcı nanoMuse Cloud hesabınızın kendisidir. Modellerini kullanmayı bırakmak için yukarıdan kapatın; oturumu kapatmak için Ayarlar › nanoMuse Cloud bölümünü açın.</string>
     <string name="nm_welcome_own_key">Bunun yerine kendi API anahtarımı kullan</string>
     <string name="nm_useit_title">Ne için kullanılsın</string>

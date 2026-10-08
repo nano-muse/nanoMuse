@@ -1065,6 +1065,8 @@
     <string name="nm_models_cloud_switch">Use nanoMuse Cloud models</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud is one of the sources for the rows below; what runs on it comes off your allowance.</string>
     <string name="nm_models_cloud_off_sub">Off, nothing runs on nanoMuse Cloud unless you tap \"Use nanoMuse Cloud this time\". You stay signed in for sync and your devices.</string>
+    <string name="nm_models_cloud_off_refused">Add a provider of your own first; with nanoMuse Cloud off, nothing else could answer.</string>
+    <string name="nm_chat_no_model">No model can answer right now. Choose one under Settings › Models.</string>
     <string name="nm_cloud_provider_no_delete">This provider is your nanoMuse Cloud account. Switch it off above to stop using its models; to sign out, open Settings › nanoMuse Cloud.</string>
     <string name="nm_welcome_own_key">Use your own API key instead</string>
     <string name="nm_useit_title">Use it for</string>

@@ -49,11 +49,16 @@ update*) and offers the download.
    one switch, *Use nanoMuse Cloud models*: off, the account leaves every picker and the
    automatic order, no side call (titles, memory, pictures, clips) runs on it, and only the
    *Use nanoMuse Cloud this time* button on a refused turn does; the sign-in stays for sync and
-   your devices. If new chats were answering through the account at that moment, the Chat row
-   moves to your first own chat model (the catalogue's default for that provider), the same
-   move the desktop makes, and the page says *Applies to the main chat and to new chats*; with
-   no provider of your own the row reads *Not set* until one is added. Switching the Cloud
-   provider off on its own page (Settings → *Manage Providers*) does the same. A phone with a key of
+   your devices. If the chat model is still the account's at that moment, the Chat row moves
+   to your first own chat model (the catalogue's default for that provider), as every client
+   does, and the page says *Applies to the main chat and to new chats*. Switching off is
+   refused with one sentence while the chat model is still the account's and you have no
+   chat model of your own, since nothing else could answer: the switch stays on and *Add a
+   provider of your own first; with nanoMuse Cloud off, nothing else could answer.* appears
+   under it. The Cloud provider's own page (Settings → *Manage Providers*) follows the same
+   rule; a provider of your own switched off there while the chat ran on it hands the chat
+   to the next source, and when none is left a send says *No model can answer right now.
+   Choose one under Settings › Models.* A phone with a key of
    its own works signed out: the welcome page offers *Use your own API key instead*. Running
    everything yourself with no account at all is the runtime's `cloud.required = false`.
 4. Optional: the two permissions that let the agent use your phone's apps (skippable and

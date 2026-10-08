@@ -1084,6 +1084,8 @@
     <string name="nm_models_cloud_switch">ใช้โมเดลของ nanoMuse Cloud</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud เป็นหนึ่งในแหล่งของรายการด้านล่าง สิ่งที่ทำงานบนนั้นจะหักจากโควตาของคุณ</string>
     <string name="nm_models_cloud_off_sub">ปิดอยู่: จะไม่มีอะไรทำงานบน nanoMuse Cloud เว้นแต่คุณแตะ \"ใช้ nanoMuse Cloud ครั้งนี้\" คุณยังคงลงชื่อเข้าใช้อยู่เพื่อการซิงค์และอุปกรณ์ของคุณ</string>
+    <string name="nm_models_cloud_off_refused">เพิ่มผู้ให้บริการของคุณเองก่อน เมื่อปิด nanoMuse Cloud แล้วจะไม่มีอะไรอื่นตอบได้</string>
+    <string name="nm_chat_no_model">ตอนนี้ไม่มีโมเดลที่ตอบได้ เลือกสักตัวใน การตั้งค่า › โมเดล</string>
     <string name="nm_cloud_provider_no_delete">ผู้ให้บริการนี้คือบัญชี nanoMuse Cloud ของคุณ ปิดสวิตช์ด้านบนเพื่อเลิกใช้โมเดลของมัน หากต้องการออกจากระบบ ให้เปิด การตั้งค่า › nanoMuse Cloud</string>
     <string name="nm_welcome_own_key">ใช้คีย์ API ของตัวเองแทน</string>
     <string name="nm_useit_title">ใช้ทำอะไร</string>

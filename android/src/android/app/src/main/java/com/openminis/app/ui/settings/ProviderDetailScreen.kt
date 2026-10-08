@@ -488,18 +488,36 @@ fun ProviderDetailScreen(
 
         // ─── Status ─────────────────────────────────────────────────
         SettingsSection(header = stringResource(R.string.provider_detail_status)) {
+            // nanoMuse: the Cloud instance off is the same switch as Settings › Models (refused, with the
+            // sentence, while nothing else could answer); a provider of the person's own off while new
+            // chats answered through it moves the chat slot to the next source (ModelSlots.chatLeaves)
+            val nmCloud = io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id == instanceId
+            var nmRefused by remember { mutableStateOf(false) }
             SettingsSwitchRow(
                 title = stringResource(R.string.provider_detail_enabled),
                 checked = isEnabled,
                 onCheckedChange = {
-                    isEnabled = it
-                    providerRepository.updateInstance(instance.copy(isEnabled = it))
-                    AppLogger.info(TAG, "Set enabled=$it for ${instance.id}")
-                    // nanoMuse: off while new chats answered through it, the chat slot moves to the next source (ModelSlots.chatLeaves)
-                    if (!it) io.github.nanomuse.models.ModelSlots.chatLeaves(exportContext, instance.id)
+                    if (nmCloud) { // nanoMuse: see above
+                        val done = io.github.nanomuse.cloud.NanoMuseCloud.setModelsOn(exportContext, it)
+                        nmRefused = !done
+                        if (done) isEnabled = it
+                    } else {
+                        isEnabled = it
+                        providerRepository.updateInstance(instance.copy(isEnabled = it))
+                        AppLogger.info(TAG, "Set enabled=$it for ${instance.id}")
+                        if (!it) io.github.nanomuse.models.ModelSlots.chatLeaves(exportContext, instance.id) // nanoMuse: see above
+                    }
                 },
                 showDivider = false,
             )
+            if (nmRefused) { // nanoMuse: the refusal, under the switch
+                Text(
+                    text = stringResource(R.string.nm_models_cloud_off_refused),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp),
+                )
+            }
         }
 
         // ─── Voice Service (dual visibility) ────────────────────────

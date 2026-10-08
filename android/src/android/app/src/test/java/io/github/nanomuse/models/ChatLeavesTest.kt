@@ -47,4 +47,14 @@ class ChatLeavesTest {
         assertNull(ModelSlots.nextChat(emptyList(), leaving = cloud.id))
         assertNull(ModelSlots.nextChat(listOf(group(bailian, false, "qwen-plus")), leaving = bailian.id))
     }
+
+    @Test fun `the Cloud switch is refused while only the account could answer`() {
+        // signed in, no provider of the person's own: the picker lists the relay alone, so
+        // nothing could take the chat; NanoMuseCloud.setModelsOn(false) leaves the switch on
+        val onlyCloud = listOf(group(cloud, true, "deepseek-v4.1-flash", "qwen3.8-27b"))
+        assertNull(ModelSlots.nextChat(onlyCloud, leaving = cloud.id))
+        // one own chat model is enough for the move
+        val withOwn = onlyCloud + group(deepseek, false, "deepseek-chat")
+        assertEquals("deepseek-chat", ModelSlots.nextChat(withOwn, leaving = cloud.id)?.modelId)
+    }
 }
