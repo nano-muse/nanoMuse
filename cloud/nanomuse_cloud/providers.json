@@ -42,7 +42,14 @@
       },
       "note": "deepseek-flash (DeepSeek-V4.1-Flash) reads pictures; deepseek-v4-pro is text only. No image or video models.",
       "note_zh": "deepseek-flash（DeepSeek-V4.1-Flash）能看图；deepseek-v4-pro 只处理文字。没有图像和视频模型。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://api-docs.deepseek.com/guides/thinking_mode",
+        "wire": "thinking+reasoning_effort",
+        "rules": [
+          { "models": "^deepseek-", "levels": ["low", "high", "max"], "default": "high" }
+        ]
+      }
     },
     {
       "id": "moonshot",
@@ -63,7 +70,14 @@
       },
       "note": "Two editions: api.moonshot.cn for mainland China, api.moonshot.ai elsewhere, each with its own console and keys. kimi-k2.6 and kimi-k3 read pictures. The phone apps can sign in with a Kimi account (device code) instead of a key.",
       "note_zh": "两个版本：中国大陆用 api.moonshot.cn，海外用 api.moonshot.ai，各自有控制台和 key。kimi-k2.6、kimi-k3 能看图。手机 App 可以用 Kimi 账号登录（设备码），不用贴 key。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://platform.moonshot.ai/docs/api/chat",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^kimi-k3", "levels": ["low", "high", "max"], "default": "max" }
+        ]
+      }
     },
     {
       "id": "zhipu",
@@ -83,7 +97,15 @@
       },
       "note": "glm-4.6v reads pictures; pictures are drawn by glm-image or cogview-4 through /images/generations.",
       "note_zh": "glm-4.6v 能看图；画图用 glm-image 或 cogview-4，走 /images/generations。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8",
+        "wire": "thinking+reasoning_effort",
+        "rules": [
+          { "models": "^glm-5\\.3", "levels": ["low", "high", "max"], "default": "max" },
+          { "models": "^glm-5\\.2", "levels": ["high", "max"], "default": "max" }
+        ]
+      }
     },
     {
       "id": "siliconflow",
@@ -103,7 +125,15 @@
       },
       "note": "Many open models behind one key; model ids carry the maker's prefix. Pictures through /images/generations (Qwen-Image, Kolors, FLUX).",
       "note_zh": "一把 key 后面是许多开源模型，模型 id 带厂商前缀。画图走 /images/generations（Qwen-Image、Kolors、FLUX）。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.siliconflow.cn/cn/api-reference/chat-completions/chat-completions",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^(Pro/)?deepseek-ai/DeepSeek-V4(-|$)", "levels": ["high", "max"], "default": "high" },
+          { "models": "^Pro/zai-org/GLM-5\\.2", "levels": ["high", "max"], "default": "high" }
+        ]
+      }
     },
     {
       "id": "volcengine",
@@ -123,7 +153,16 @@
       },
       "note": "Model ids are dated deployments; the live list has the exact ones. Doubao Seed 2.0 reads pictures; Seedream draws them through /images/generations. Seedance video uses Ark's own task API, which nanoMuse does not speak, so clips are left out.",
       "note_zh": "模型 id 带日期后缀，以实时列表为准。豆包 Seed 2.0 能看图；Seedream 画图走 /images/generations。Seedance 视频走方舟自己的任务接口，nanoMuse 还不支持，所以不列视频。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.volcengine.com/docs/ark/model-parameter-support?lang=zh",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^doubao-seed-2-", "levels": ["minimal", "low", "medium", "high"], "default": "high" },
+          { "models": "^deepseek-v4-", "levels": ["low", "high", "max"], "default": "high" },
+          { "models": "^glm-5-2", "levels": ["high", "max"], "default": "max" }
+        ]
+      }
     },
     {
       "id": "minimax",
@@ -143,7 +182,14 @@
       },
       "note": "Two editions: api.minimaxi.com for mainland China, api.minimax.io elsewhere. MiniMax-M3 reads pictures; the M2 series is text only.",
       "note_zh": "两个版本：中国大陆用 api.minimaxi.com，海外用 api.minimax.io。MiniMax-M3 能看图；M2 系列只处理文字。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://platform.minimax.io/docs/api-reference/text-chat",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^MiniMax-M3\\.1", "levels": ["low", "medium", "high", "xhigh", "max"], "default": "max" }
+        ]
+      }
     },
     {
       "id": "openrouter",
@@ -163,7 +209,13 @@
       },
       "note": "One account, one key, pay as you go, international cards; models carry the maker's prefix. Pictures only through image-output models (openai/gpt-image-2, google/gemini-2.5-flash-image, bytedance-seed/seedream-4.5) on OpenRouter's Image API (/api/v1/images). The phone apps can sign in to OpenRouter instead of pasting a key.",
       "note_zh": "一个账号一把 key，按量付费，国际信用卡；模型带厂商前缀。画图只能用出图模型（openai/gpt-image-2、google/gemini-2.5-flash-image、bytedance-seed/seedream-4.5），走 OpenRouter 的图像接口（/api/v1/images）。手机 App 可以直接登录 OpenRouter，不用贴 key。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://openrouter.ai/docs/use-cases/reasoning-tokens",
+        "wire": "reasoning.effort",
+        "listed": true,
+        "rules": []
+      }
     },
     {
       "id": "openai",
@@ -186,7 +238,19 @@
       },
       "note": "With an API key: chat, hands and pictures (gpt-image-2.5-flare / gpt-image-2 through /images/generations). Signed in with a ChatGPT plan (the Codex OAuth): chat and hands only; the Codex backend has no image or video endpoints. OpenAI's terms cover using a ChatGPT plan inside OpenAI's own Codex; other apps have had this access cut off before (OpenCode, January 2026). If it stops working, an API key does.",
       "note_zh": "用 API key：对话、手、画图（gpt-image-2.5-flare / gpt-image-2，走 /images/generations）。用 ChatGPT 订阅登录（Codex 的 OAuth）：只有对话和手，Codex 后端没有图像和视频接口。OpenAI 的条款只允许在它自己的 Codex 里使用 ChatGPT 订阅；其他应用的这条路曾被切断过（OpenCode，2026 年 1 月）。如果哪天不能用了，API key 还能用。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://developers.openai.com/api/docs/guides/reasoning",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^o[1-9]", "levels": ["low", "medium", "high"], "default": "medium" },
+          { "models": "^gpt-5(-|$)", "levels": ["minimal", "low", "medium", "high"], "default": "medium" },
+          { "models": "^gpt-5\\.1(-|$)", "levels": ["low", "medium", "high"], "default": "none" },
+          { "models": "^gpt-5\\.4", "levels": ["low", "medium", "high", "xhigh"], "default": "none" },
+          { "models": "^gpt-5\\.[235-9]", "levels": ["low", "medium", "high", "xhigh"] },
+          { "models": "^gpt-6", "levels": ["low", "medium", "high", "xhigh"] }
+        ]
+      }
     },
     {
       "id": "anthropic",
@@ -205,7 +269,16 @@
       },
       "note": "The Messages API, not OpenAI's shape; every current Claude model reads pictures. No image or video models. The phone apps can sign in with a Claude account instead of a key.",
       "note_zh": "用的是 Messages 接口，不是 OpenAI 格式；现行 Claude 模型都能看图。没有图像和视频模型。手机 App 可以用 Claude 账号登录，不用贴 key。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.claude.com/en/docs/build-with-claude/effort",
+        "wire": "output_config.effort",
+        "rules": [
+          { "models": "^claude-(opus|haiku)-5-5", "levels": ["low", "medium", "high", "xhigh", "max"], "default": "medium" },
+          { "models": "^claude-(opus|sonnet)-4-6", "levels": ["low", "medium", "high", "max"], "default": "high" },
+          { "models": "^claude-(opus-4-[78]|opus-5|sonnet-5|haiku-5|fable-5|mythos-5)", "levels": ["low", "medium", "high", "xhigh", "max"], "default": "high" }
+        ]
+      }
     },
     {
       "id": "gemini",
@@ -225,7 +298,14 @@
       },
       "note": "Google's OpenAI-compatible layer. Gemini models read pictures. Pictures through /images/generations work with gemini-2.5-flash-image and gemini-3-pro-image-preview only; the newer 3.1 image models are not served there. Veo video is not on the compatible layer, so clips are left out.",
       "note_zh": "Google 的 OpenAI 兼容层。Gemini 模型能看图。走 /images/generations 画图只支持 gemini-2.5-flash-image 和 gemini-3-pro-image-preview，更新的 3.1 出图模型不在兼容层上。Veo 视频不走兼容层，所以不列视频。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://ai.google.dev/gemini-api/docs/openai",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^gemini-(2\\.5|3)", "levels": ["low", "medium", "high"] }
+        ]
+      }
     },
     {
       "id": "xai",
@@ -245,7 +325,15 @@
       },
       "note": "grok-4.7 reads pictures (JPEG and PNG). Pictures through /images/generations with grok-imagine-image-2.0. Grok Imagine video uses xAI's own endpoints, so clips are left out.",
       "note_zh": "grok-4.7 能看图（JPEG、PNG）。画图走 /images/generations，模型 grok-imagine-image-2.0。Grok Imagine 视频走 xAI 自己的接口，所以不列视频。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.x.ai/docs/guides/reasoning",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^grok-4\\.5", "levels": ["low", "medium", "high"], "default": "high" },
+          { "models": "^grok-4\\.[6-9]", "levels": ["low", "medium", "high", "xhigh"], "default": "high" }
+        ]
+      }
     },
     {
       "id": "groq",
@@ -264,7 +352,15 @@
       },
       "note": "Fast hosting of open models. qwen/qwen3.8-27b reads pictures; gpt-oss and Llama do not. No image or video models.",
       "note_zh": "开源模型的高速托管。qwen/qwen3.8-27b 能看图；gpt-oss 和 Llama 不能。没有图像和视频模型。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://console.groq.com/docs/reasoning",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^openai/gpt-oss-", "levels": ["low", "medium", "high"] },
+          { "models": "^qwen/qwen3\\.8", "levels": ["low", "medium", "high"], "default": "none" }
+        ]
+      }
     },
     {
       "id": "mistral",
@@ -283,7 +379,15 @@
       },
       "note": "mistral-large-2512, mistral-medium-2508, mistral-small-2506 and the Ministral 3 models read pictures. No image or video models.",
       "note_zh": "mistral-large-2512、mistral-medium-2508、mistral-small-2506 和 Ministral 3 系列能看图。没有图像和视频模型。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.mistral.ai/capabilities/reasoning/",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^mistral-(small-latest|medium-3-5|large-4-0)", "levels": ["high"], "default": "none" },
+          { "models": "^zai-glm-5-3", "levels": ["low", "high", "max"] }
+        ]
+      }
     },
     {
       "id": "ollama",
@@ -300,7 +404,14 @@
       },
       "note": "Runs on this machine, no key, nothing leaves it. Hands need a model that reads pictures (a vision model such as a Qwen VL build); the model list says which.",
       "note_zh": "跑在本机，不要 key，什么都不出去。手需要能看图的模型（例如 Qwen 的 VL 版本），模型列表里能看出来。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.ollama.com/api/openai-compatibility",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "gpt-oss", "levels": ["low", "medium", "high"] }
+        ]
+      }
     },
     {
       "id": "lm-studio",
@@ -330,7 +441,14 @@
       "defaults": {},
       "note": "A vLLM server you run yourself; a key only if you started it with one. Vision only if the served model has it.",
       "note_zh": "自己跑的 vLLM 服务；启动时设了 key 才需要填。服务的模型能看图才能用手。",
-      "verified": "2026-10"
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://docs.vllm.ai/en/latest/features/reasoning_outputs/",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "gpt-oss", "levels": ["low", "medium", "high"] }
+        ]
+      }
     },
     {
       "id": "custom",
