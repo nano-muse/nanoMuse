@@ -1084,6 +1084,8 @@
     <string name="nm_models_cloud_switch">nanoMuse Cloud のモデルを使う</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud は下の各行の提供元のひとつで、そこで動いた分は利用枠から差し引かれます。</string>
     <string name="nm_models_cloud_off_sub">オフにすると「今回は nanoMuse Cloud を使う」をタップしない限り、nanoMuse Cloud では何も動きません。同期と端末のためにサインインは保たれます。</string>
+    <string name="nm_models_cloud_off_refused">先に自分のプロバイダーを追加してください。nanoMuse Cloud をオフにすると、ほかに答えられるものがありません。</string>
+    <string name="nm_chat_no_model">いま答えられるモデルがありません。設定 › モデルで一つ選んでください。</string>
     <string name="nm_cloud_provider_no_delete">このプロバイダーは nanoMuse Cloud のアカウントそのものです。モデルを使わないようにするには上のスイッチをオフにし、サインアウトするには「設定 › nanoMuse Cloud」を開いてください。</string>
     <string name="nm_welcome_own_key">自分の API キーを使う</string>
     <string name="nm_useit_title">何に使うか</string>

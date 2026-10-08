@@ -1096,6 +1096,8 @@
     <string name="nm_models_cloud_switch">Использовать модели nanoMuse Cloud</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud входит в источники для строк ниже; то, что выполняется на нём, списывается с вашего лимита.</string>
     <string name="nm_models_cloud_off_sub">Выключено: на nanoMuse Cloud ничего не выполняется, пока вы не нажмёте \"Использовать nanoMuse Cloud в этот раз\". Вы остаётесь в аккаунте для синхронизации и своих устройств.</string>
+    <string name="nm_models_cloud_off_refused">Сначала добавьте собственного провайдера; с выключенным nanoMuse Cloud отвечать было бы нечему.</string>
+    <string name="nm_chat_no_model">Сейчас ни одна модель не может ответить. Выберите одну в Настройки › Модели.</string>
     <string name="nm_cloud_provider_no_delete">Этот провайдер и есть ваш аккаунт nanoMuse Cloud. Выключите его выше, чтобы не использовать его модели; чтобы выйти, откройте Настройки › nanoMuse Cloud.</string>
     <string name="nm_welcome_own_key">Использовать свой ключ API</string>
     <string name="nm_useit_title">Для чего использовать</string>

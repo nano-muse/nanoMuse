@@ -1084,6 +1084,8 @@
     <string name="nm_models_cloud_switch">Gunakan model nanoMuse Cloud</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud adalah salah satu sumber untuk baris di bawah; yang berjalan di sana dipotong dari jatah Anda.</string>
     <string name="nm_models_cloud_off_sub">Mati: tidak ada yang berjalan di nanoMuse Cloud kecuali Anda mengetuk \"Pakai nanoMuse Cloud kali ini\". Anda tetap masuk untuk sinkronisasi dan perangkat Anda.</string>
+    <string name="nm_models_cloud_off_refused">Tambahkan penyedia Anda sendiri lebih dulu; dengan nanoMuse Cloud mati, tidak ada lagi yang bisa menjawab.</string>
+    <string name="nm_chat_no_model">Saat ini tidak ada model yang bisa menjawab. Pilih satu di Setelan › Model.</string>
     <string name="nm_cloud_provider_no_delete">Penyedia ini adalah akun nanoMuse Cloud Anda. Matikan di atas untuk berhenti memakai modelnya; untuk keluar, buka Pengaturan › nanoMuse Cloud.</string>
     <string name="nm_welcome_own_key">Pakai kunci API sendiri saja</string>
     <string name="nm_useit_title">Pakai untuk</string>

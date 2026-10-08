@@ -16,6 +16,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -111,15 +112,27 @@ fun ModelsScreen(
         val cloudInstance = config?.instances?.firstOrNull { it.id == cloudId }
         if (cloudInstance != null && remember(config) { NanoMuseCloud.isSignedIn(context) }) {
             val cloudOn = cloudInstance.isEnabled
+            // Off is refused while the chat model is still the account's and no model of the
+            // person's own could take it: the switch stays on and this one sentence says why.
+            var refused by remember { mutableStateOf(false) }
             SettingsSection(footer = stringResource(if (cloudOn) R.string.nm_models_cloud_on_sub else R.string.nm_models_cloud_off_sub)) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.nm_models_cloud_switch),
                     checked = cloudOn,
-                    onCheckedChange = { NanoMuseCloud.setModelsOn(context, it) },
+                    onCheckedChange = { refused = !NanoMuseCloud.setModelsOn(context, it) },
                     icon = Icons.Outlined.CloudQueue,
                     iconColor = if (cloudOn) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
                     showDivider = false,
                 )
+                if (refused) {
+                    Text(
+                        text = stringResource(R.string.nm_models_cloud_off_refused),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp),
+                    )
+                }
             }
         }
         Slot.values().forEach { slot ->

@@ -1088,6 +1088,8 @@
     <string name="nm_models_cloud_switch">nanoMuse-Cloud-Modelle verwenden</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud ist eine der Quellen für die Zeilen unten; was darauf läuft, geht von deinem Kontingent ab.</string>
     <string name="nm_models_cloud_off_sub">Aus: Nichts läuft auf nanoMuse Cloud, außer du tippst auf \"Diesmal nanoMuse Cloud verwenden\". Du bleibst angemeldet, für die Synchronisierung und deine Geräte.</string>
+    <string name="nm_models_cloud_off_refused">Füge zuerst einen eigenen Anbieter hinzu; mit ausgeschalteter nanoMuse Cloud könnte sonst nichts antworten.</string>
+    <string name="nm_chat_no_model">Gerade kann kein Modell antworten. Wähle eines unter Einstellungen › Modelle.</string>
     <string name="nm_cloud_provider_no_delete">Dieser Anbieter ist dein nanoMuse-Cloud-Konto. Schalte ihn oben aus, um seine Modelle nicht mehr zu verwenden; zum Abmelden öffne Einstellungen › nanoMuse Cloud.</string>
     <string name="nm_welcome_own_key">Stattdessen eigenen API-Schlüssel verwenden</string>
     <string name="nm_useit_title">Wofür verwenden</string>

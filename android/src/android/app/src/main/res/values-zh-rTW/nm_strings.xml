@@ -1054,6 +1054,8 @@
     <string name="nm_models_cloud_switch">使用 nanoMuse Cloud 模型</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud 是下面各項的來源之一，在它上面執行的內容計入你的額度。</string>
     <string name="nm_models_cloud_off_sub">關閉後，除非你點「這次改用 nanoMuse Cloud」，否則不會有任何內容在 nanoMuse Cloud 上執行。帳號保持登入，用於同步和你的裝置。</string>
+    <string name="nm_models_cloud_off_refused">先新增一個自己的服務商；關掉 nanoMuse Cloud 後沒有別的模型能回答。</string>
+    <string name="nm_chat_no_model">現在沒有能回答的模型。請在「設定 › 模型」裡選一個。</string>
     <string name="nm_cloud_provider_no_delete">這個提供商就是你的 nanoMuse Cloud 帳號。要停用它的模型，請在上面關閉開關；要登出，請開啟「設定 › nanoMuse Cloud」。</string>
     <string name="nm_welcome_own_key">改用自己的 API key</string>
     <string name="nm_useit_title">用它來做什麼</string>

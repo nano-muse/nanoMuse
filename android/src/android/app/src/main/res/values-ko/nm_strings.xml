@@ -1084,6 +1084,8 @@
     <string name="nm_models_cloud_switch">nanoMuse Cloud 모델 사용</string>
     <string name="nm_models_cloud_on_sub">nanoMuse Cloud는 아래 항목의 출처 중 하나이며, 여기서 실행된 내용은 사용량에서 차감됩니다.</string>
     <string name="nm_models_cloud_off_sub">끄면 \"이번에는 nanoMuse Cloud 사용\"을 누르지 않는 한 nanoMuse Cloud에서 아무것도 실행되지 않습니다. 동기화와 기기를 위해 로그인은 유지됩니다.</string>
+    <string name="nm_models_cloud_off_refused">먼저 자신의 제공자를 추가하세요. nanoMuse Cloud를 끄면 답할 수 있는 모델이 없습니다.</string>
+    <string name="nm_chat_no_model">지금 답할 수 있는 모델이 없습니다. 설정 › 모델에서 하나를 고르세요.</string>
     <string name="nm_cloud_provider_no_delete">이 제공자는 nanoMuse Cloud 계정 자체입니다. 모델 사용을 멈추려면 위 스위치를 끄고, 로그아웃하려면 설정 › nanoMuse Cloud를 여세요.</string>
     <string name="nm_welcome_own_key">내 API 키 사용</string>
     <string name="nm_useit_title">어디에 쓸지</string>
