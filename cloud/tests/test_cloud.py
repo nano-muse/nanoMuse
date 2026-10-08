@@ -581,6 +581,29 @@ async def test_unconfigured_upstream_answers_503(stack):
     assert (await client.get("/healthz")).json()["ok"] is True
 
 
+async def test_unconfigured_upstream_holds_nothing(stack):
+    # Before 0.23.1 the chat and video routes reserved the turn's price and only then found
+    # there was no key, so the hold was never settled: after max_in_flight such turns the
+    # account was refused with too_many_in_flight until the holds timed out.
+    app, client, sender, up, cloud = stack
+    object.__setattr__(app.state.settings, "upstream_key", "")
+    data = await sign_up(client, sender)
+    headers = {"Authorization": f"Bearer {data['api_key']}"}
+    account_id = cloud.authenticate(data["api_key"]).account_id
+    for _ in range(cloud.s.max_in_flight + 1):
+        r = await client.post("/v1/chat/completions", headers=headers, json={"model": "qwen3.8-27b", "messages": []})
+        assert r.status_code == 503 and r.json()["error"]["code"] == "upstream_unconfigured"
+        r = await client.post(
+            "/api/v1/services/aigc/video-generation/video-synthesis",
+            headers=headers,
+            json={"model": "wan2.2-i2v-flash", "input": {"prompt": "a wave"}, "parameters": {"duration": 5}},
+        )
+        assert r.status_code == 503 and r.json()["error"]["code"] == "upstream_unconfigured"
+    assert cloud.in_flight.count(account_id) == 0
+    health = (await client.get("/v1/admin/health", headers={"X-Admin-Token": "admin"})).json()
+    assert health["in_flight"]["requests"] == 0
+
+
 def make_stack(**overrides):
     up = fake_upstream()
     kwargs = dict(

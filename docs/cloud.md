@@ -78,8 +78,8 @@ in a model group.
 
 The relay is the code in [`cloud/`](../cloud/README.md). It stores:
 
-- a salted hash (HMAC-SHA256) of the e-mail address (phone accounts from
-  0.1.18–0.1.21 keep working), a masked hint such as `so***@example.com`, and
+- a salted hash (HMAC-SHA256) of the e-mail address or the mainland China
+  phone number, a masked hint such as `so***@example.com`, and
   the address itself encrypted (AES-GCM, key derived from the relay's secret)
   so the operator can see who an account belongs to on the admin page — the
   database file alone shows nothing;

@@ -706,6 +706,9 @@ def create_app(
     async def chat(request: Request, caller: Caller = Depends(caller_dep)) -> Response:
         body = await _json(request)
         spec = cloud.model_for(str(body.get("model", "")), "chat", caller)
+        # a relay without a key answers before anything is held: a hold taken here and never
+        # settled would count against the account's in-flight limit until it timed out
+        headers = upstream_headers()
         request_id = uuid.uuid4().hex[:16]
         # held at a typical turn's price while it runs; settled when the reply is in
         cloud.check_budget(caller, request_id=request_id, hold_uy=cloud.chat_reserve_uy(spec), place=client_place(request))
@@ -721,7 +724,6 @@ def create_app(
         # provider's abuse tooling can tell accounts apart without knowing them.
         body["user"] = caller.account_id[:32]
         url = settings.upstream_base.rstrip("/") + "/chat/completions"
-        headers = upstream_headers()
         fallback_prompt_tokens = math.ceil(prompt_chars(body.get("messages") or []) / 3)
         # For an account that opted in, the turn is kept once it is answered (service.keep_sample)
         # with the platform and language hints from the headers and, since 0.10, the address
@@ -1025,10 +1027,10 @@ def create_app(
         clip_cost = 0 if probe else spec.video_cost_uy(_clip_seconds(body, spec), _clip_resolution(body))
         # reserved while the submission runs; once accepted, the task row holds the clip's
         # price against the allowance (db.pending_video_cost) until the clip is charged
+        headers = upstream_headers()  # before the hold, as for chat: no key, nothing held
         request_id = uuid.uuid4().hex[:16]
         cloud.check_budget(caller, minimum=spec.per_clip, cost_uy=clip_cost, request_id=request_id, place=client_place(request))
         body["model"] = spec.upstream
-        headers = upstream_headers()
         headers["X-DashScope-Async"] = "enable"
         if request.headers.get("x-dashscope-ossresourceresolve"):
             headers["X-DashScope-OssResourceResolve"] = request.headers["x-dashscope-ossresourceresolve"]

@@ -1176,7 +1176,7 @@ class Cloud:
         bonus = f"+¥{self.s.invite_bonus_cny:g} for each of you"
         key = exhausted_key_line(region)
         message = (
-            f"Your free allowance ({grant}) is used up. Two ways on: {key}, or invite a friend ({bonus}). "
+            f"Your free allowance ({grant}) is used up. Three ways on: {key}, or invite a friend ({bonus}). "
             "Your sign-in and your devices keep working either way."
         )
         return CloudError(

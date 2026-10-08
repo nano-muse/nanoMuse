@@ -415,7 +415,7 @@ block (`total`, `grant`, `left`, `unlimited`, `warn` at 80 %, `usd_cny`,
 `left_today` / `resets_at` = 0 for one more version) and each model in
 `/v1/models` carries its `nanomuse.price_cny`, so the apps show what was spent
 in both currencies. The refusal, `429 allowance_exhausted`, says what is left
-and where the two ways on lead (invite a friend, one's own key) — sign-in and
+and where the three ways on lead (one's own key, a plan one already pays for, an invited friend) — sign-in and
 the hub are never gated, only the model routes. The admin page shows spend per
 account and per day (`DAY_OFFSET_H`) in ¥ and $.
 
