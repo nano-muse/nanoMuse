@@ -41,7 +41,7 @@ die() { printf 'self-host: %s\n' "$*" >&2; exit 1; }
 # --- tools --------------------------------------------------------------------------------
 if docker compose version >/dev/null 2>&1; then COMPOSE=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then COMPOSE=(docker-compose)
-else die "docker compose is not installed — https://docs.docker.com/compose/install/"; fi
+else die "docker compose is not installed: https://docs.docker.com/compose/install/"; fi
 command -v curl >/dev/null 2>&1 || die "curl is not installed"
 docker info >/dev/null 2>&1 || die "docker is installed but not running, or you are not allowed to use it (try: sudo usermod -aG docker \$USER, then log in again)"
 
@@ -95,7 +95,7 @@ if [ "$LOCAL" = 1 ]; then
 else
   say
   say "1/5  The relay's public domain, pointing at this machine (an A record), with ports 80 and"
-  say "     443 open — Caddy fetches the certificate. Type \"local\" for this machine only, no TLS."
+  say "     443 open; Caddy fetches the certificate. Type \"local\" for this machine only, no TLS."
   ask DOMAIN "     Domain" "${cur_domain:-local}"
 fi
 if [ "$DOMAIN" = local ] || [ "$DOMAIN" = localhost ]; then
@@ -128,9 +128,9 @@ if [ "$LOCAL" = 1 ]; then
   SENDER=log
 else
   say "3/5  How sign-in codes reach people:"
-  say "       log     printed to the relay's log only (you read them out — fine for a family)"
+  say "       log     printed to the relay's log only (you read them out; fine for a family)"
   say "       smtp    e-mail, through a mailbox you own"
-  say "       aliyun  SMS to mainland-China numbers through Aliyun Dysmsapi; e-mail is not sent"
+  say "       aliyun  SMS to mainland China numbers through Alibaba Cloud (号码认证服务 by default); e-mail is not sent"
   say "       both    smtp for e-mail addresses, aliyun for phone numbers"
   cur_sender="$(get CODE_SENDER)"
   while :; do
@@ -165,7 +165,7 @@ set_kv UPSTREAM_BASE "${UP_BASE:-https://dashscope.aliyuncs.com/compatible-mode/
 has_key=0; [ -n "$(get UPSTREAM_KEY)" ] && has_key=1
 ask_secret UP_KEY "     API key" "$has_key"
 [ -n "$UP_KEY" ] && set_kv UPSTREAM_KEY "$UP_KEY"
-[ -z "$(get UPSTREAM_KEY)" ] && say "     (no key — add UPSTREAM_KEY to cloud/.env later and run this again)"
+[ -z "$(get UPSTREAM_KEY)" ] && say "     (no key; add UPSTREAM_KEY to cloud/.env later and run this again)"
 
 # --- 5. the admin password -----------------------------------------------------------------
 say
@@ -187,7 +187,7 @@ fi
 [ "$(get INVITE_URL)" = "https://nanomuse.cn/web/?invite=" ] && set_kv INVITE_URL "$BASE/app/?invite="
 
 say
-say "Wrote $ENV_FILE (mode 600). Back it up together with cloud/data/ — see docs/self-hosting.md."
+say "Wrote $ENV_FILE (mode 600). Back it up together with cloud/data/; see docs/self-hosting.md."
 [ "$START" = 1 ] || exit 0
 
 # --- start ------------------------------------------------------------------------------------

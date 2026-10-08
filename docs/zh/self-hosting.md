@@ -45,7 +45,7 @@ bash scripts/self-host.sh --local --bind 0.0.0.0   # reachable from the phones o
 
 - `log`——只打印到中继的日志：`cd cloud && docker compose logs relay` 里能看到 `verification code for …`。一家人用够了：你把验证码念给对方。`--local` 用的就是这个。
 - `smtp`——通过你自己的一个邮箱发邮件（`SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`、`SMTP_PASSWORD`、`SMTP_FROM`）。任何支持 SMTP 的邮箱都行；几个人用，一个免费邮箱就够。
-- `aliyun`——通过阿里云 Dysmsapi 给中国大陆手机号发短信；需要一个已签约的模板。`both` 对邮箱地址用 SMTP，对手机号用阿里云。短信只发得到中国大陆手机号；其他人都用邮箱登录。
+- `aliyun`——通过阿里云给中国大陆手机号发短信：默认走号码认证服务（`ALIYUN_SMS_API=dypns`，用它现成的模板），也可以走短信服务并使用你自己签约的模板（`ALIYUN_SMS_API=dysms`）；相关变量见 `cloud/.env.example`。`both` 对邮箱地址用 SMTP，对手机号用阿里云。短信只发得到中国大陆手机号；其他人都用邮箱登录。
 
 ### 管理页 {#the-admin-page}
 

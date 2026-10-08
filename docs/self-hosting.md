@@ -45,7 +45,7 @@ A code goes out every time someone signs in. `CODE_SENDER` says how:
 
 - `log` — printed to the relay's log only: `cd cloud && docker compose logs relay` shows `verification code for …`. Fine for a family: you read the code out. This is what `--local` uses.
 - `smtp` — by e-mail through a mailbox you own (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`). Any mailbox with SMTP works; a free one is enough for a few people.
-- `aliyun` — by SMS to mainland-China numbers through Aliyun Dysmsapi; needs a signed template. `both` uses SMTP for addresses and Aliyun for numbers. SMS reaches mainland numbers only; everyone else signs in by e-mail.
+- `aliyun` — by SMS to mainland China numbers through Alibaba Cloud: 号码认证服务 by default (`ALIYUN_SMS_API=dypns`, its ready-made templates), or 短信服务 with a signed template of your own (`ALIYUN_SMS_API=dysms`); the variables are in `cloud/.env.example`. `both` uses SMTP for addresses and Aliyun for numbers. SMS reaches mainland numbers only; everyone else signs in by e-mail.
 
 ### The admin page
 
