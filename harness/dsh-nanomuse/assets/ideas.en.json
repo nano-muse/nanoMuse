@@ -8,7 +8,7 @@
           "id": "train-watch",
           "emoji": "🚄",
           "title": "Tell me where you're going and when; I'll watch for seats and lower fares.",
-          "body": "I set up the lookup tools inside the phone's Linux sandbox, check trains, classes and availability as often as you like, and tell you the moment something opens up. Booking and paying stay in your hands.",
+          "body": "I set up the lookup tools in my sandbox, check trains, classes and availability as often as you like, and tell you the moment something opens up. Booking and paying stay in your hands.",
           "kind": "GOAL",
           "category": "other",
           "prompt": "I want to watch a train route: ask me for the origin, destination, date and acceptable departure window, then set up a goal that checks availability regularly."

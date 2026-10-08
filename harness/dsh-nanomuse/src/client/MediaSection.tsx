@@ -42,7 +42,7 @@ export function makeMediaSection(t: Translate) {
   return function MediaSection(): ReactNode {
     const live = useLive()
     const providers = useProviders(t)
-    const models = useModels()
+    const models = useModels(t)
     const [view, setView] = useState<MediaView | null>(null)
     const [busy, setBusy] = useState<'model' | 'image' | 'animate' | 'clips' | 'check' | null>(null)
     const [error, setError] = useState('')

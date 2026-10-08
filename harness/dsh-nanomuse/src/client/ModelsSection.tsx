@@ -69,7 +69,7 @@ function slotIcon(slot: Slot): ReactNode {
 }
 
 /** `GET /models`, again whenever the host's live state says the rows, the sign-in or a choice moved. */
-export function useModels(): { view: ModelsView | undefined; error: string | undefined; reload(): void; setView(view: ModelsView): void } {
+export function useModels(t: Translate): { view: ModelsView | undefined; error: string | undefined; reload(): void; setView(view: ModelsView): void } {
   const live = useLive()
   const [view, setView] = useState<ModelsView | undefined>()
   const [error, setError] = useState<string | undefined>()
@@ -81,7 +81,7 @@ export function useModels(): { view: ModelsView | undefined; error: string | und
     let alive = true
     call<ModelsView>('models')
       .then((v) => { if (alive) { setView(v); setError(undefined) } })
-      .catch((err: unknown) => { if (alive) setError((err as Error).message) })
+      .catch((err: unknown) => { if (alive) setError(failureText(t, err)) })
     return () => { alive = false }
   }, [tick, key])
   return { view, error, reload, setView }
@@ -146,7 +146,7 @@ export function openAccountWays(): void {
 
 export function makeModelsSection(t: Translate) {
   return function ModelsSection(): ReactNode {
-    const { view, error, reload, setView } = useModels()
+    const { view, error, reload, setView } = useModels(t)
     const providers = useProviders(t)
     const [busy, setBusy] = useState<Slot | null>(null)
     const [said, setSaid] = useState<Partial<Record<Slot, string>>>({})
@@ -159,7 +159,7 @@ export function makeModelsSection(t: Translate) {
       setFailed(undefined)
       call<ModelsView>('cloud-models', { on })
         .then((next) => { setView(next); setSaid({}); reload() })
-        .catch((err: unknown) => setFailed(t('failed', { message: (err as Error).message })))
+        .catch((err: unknown) => setFailed(failureText(t, err)))
         .finally(() => setSwitching(false))
     }
     const pick = (slot: Slot, provider: string, model: string) => {
