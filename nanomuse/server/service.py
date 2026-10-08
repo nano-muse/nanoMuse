@@ -44,7 +44,14 @@ from nanomuse.schema import Attachment, Message, Role
 from nanomuse.sentinel.grants import normalize_scope
 from nanomuse.server import firstrun
 from nanomuse.server.connections import Connections
-from nanomuse.server.events import MAIN_THREAD, EventBus, Timeline, new_id, now_iso
+from nanomuse.server.events import (
+    MAIN_THREAD,
+    STOPPED_NOTICE,
+    EventBus,
+    Timeline,
+    new_id,
+    now_iso,
+)
 from nanomuse.server.failures import failure_notice
 from nanomuse.server.providers import ChatGPTSignIn, Providers
 from nanomuse.server.push import PushService
@@ -1045,7 +1052,9 @@ class MuseService:
         agent.state = agent.state.__class__.IDLE
         agent._save_session()
         thread.stopping = False
-        self.ui.emit({"type": "notice", "level": "info", "text": "Stopped.", "thread": thread.id})
+        self.ui.emit(
+            {"type": "notice", "level": "info", "text": STOPPED_NOTICE, "thread": thread.id}
+        )
 
     def clear_thread(self, thread_id: str) -> bool:
         thread = self.threads.get(thread_id)
@@ -2224,6 +2233,21 @@ class MuseService:
         lines.append(f"- today's date: {datetime.now().strftime('%A %d %B %Y')}")
         return lines
 
+    def feed_language(self) -> str:
+        """The language the feed is written in, for the prompt. A reply language set under
+        Settings wins; else the language of the person's screens, as the main chat last heard
+        it from a client or as Start was pressed in the first conversation (a batch written
+        the moment the setup ends has no reply of the person's yet to take the language
+        from); else whatever the context is written in."""
+        fixed = self.settings.agent.language
+        if fixed not in ("", "auto"):
+            return fixed
+        main = self.threads.get(MAIN_THREAD)
+        ui = prompts.language_name(main.agent.ui_language) if main is not None else ""
+        if not ui:
+            ui = prompts.language_name(self.firstrun.state.lang)
+        return ui or "the same language as the context above"
+
     async def write_feed_posts(self, n: int = 3) -> dict[str, Any]:
         """Write a fresh batch of posts and notify the phone once about the first."""
         if self._writing_feed:
@@ -2231,16 +2255,13 @@ class MuseService:
         self._writing_feed = True
         try:
             data = self.feed_posts()
-            language = self.settings.agent.language
             prompt = FEED_PROMPT.format(
                 name=self.profile.name,
                 n=n,
                 instructions=data["instructions"]
                 or "(none yet; write what a good personal agent would)",
                 context="\n".join(self._feed_context()),
-                language="the same language as the context above"
-                if language in ("", "auto")
-                else language,
+                language=self.feed_language(),
             )
             response = await self.app.llm.ask_complete([Message.user(prompt)], tools=None)
             posts = _parse_posts(response.content or "")

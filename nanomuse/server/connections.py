@@ -37,6 +37,7 @@ from nanomuse.llm.chatgpt import DEFAULT_MODEL as CHATGPT_DEFAULT_MODEL
 from nanomuse.logger import logger
 from nanomuse.schema import Message
 from nanomuse.search import WebSearchProvider
+from nanomuse.server.failures import describe_failure
 from nanomuse.tools import (
     Calendar,
     Contacts,
@@ -312,6 +313,18 @@ def _link_or_path(url: str) -> bool:
     return url.startswith(("http://", "https://", "file://", "/", "~")) or bool(
         re.match(r"^[A-Za-z]:[\\/]", url)
     )
+
+
+def _test_failed(exc: BaseException) -> dict[str, Any]:
+    """A model test that failed: the sentence a chat turn would show for the same error
+    (the apps translate it), the error's own words one tap away as ``detail``."""
+    code, text = describe_failure(exc)
+    return {
+        "ok": False,
+        "code": code,
+        "error": text,
+        "detail": f"{type(exc).__name__}: {str(exc).strip()[:400]}",
+    }
 
 
 class Connections:
@@ -865,10 +878,8 @@ class Connections:
                 self.svc.app.llm.ask([Message.user("Reply with the single word OK.")], tools=None),
                 timeout=45,
             )
-        except TimeoutError:
-            return {"ok": False, "error": "no answer within 45 s"}
         except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:400]}
+            return _test_failed(exc)
         return {
             "ok": True,
             "reply": (response.content or "").strip()[:200],
@@ -1427,10 +1438,8 @@ class Connections:
             response = await asyncio.wait_for(
                 llm.ask([Message.user("Reply with the single word OK.")], tools=None), timeout=45
             )
-        except TimeoutError:
-            return {"ok": False, "error": "no answer within 45 s"}
         except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:400]}
+            return _test_failed(exc)
         finally:
             await llm.close()
         return {

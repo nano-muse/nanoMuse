@@ -24,8 +24,8 @@
 
 首次运行的清单是「接一个模型 → 连接邮箱、日历、联系人（可选）→ 开始」。没有起名那一页：「开始」让运行时开启第一次对话（`POST /api/firstrun/start {lang}`，同时把首次运行标记为完成）并打开聊天，开场在那里进行，和手机、桌面版一样（[parity.md](parity.md) 里的约定 C4）：
 
-1. **App 先开口**，以智能体的身份说三句，用控制台的语言——你好、「我是这台电脑上的个人智能体，免费开源，来自一个小小的非营利项目」、「我该怎么称呼你？」。这三句不花 token，模型从不把它们当作消息看到；聊天把它们画在历史的开头（`GET /api/firstrun?lang=` 以 `intro` 返回）。
-2. **模型问你的名字**，你说了（或者不想说）之后，它在回复末尾用一个 ```` ```nanomuse-naming ```` 代码块汇报——和桌面版、手机读的是同一份 JSON（`addressGiven`、`userAddress`、`suggestions`、`agentName`）。阶段由运行时掌握（`none → ask_user_name → ask_agent_name → named → done`，`nanomuse/server/firstrun.py`，存为资料旁边的 `firstrun.json`），它把你的称呼写进资料和记忆（「Call them: …」），并通过 socket 通知页面（`firstrun` 帧）。那个代码块本身从不显示，流式传到一半也不显示。
+1. **App 先开口**，以智能体的身份说三句，用控制台的语言——你好、「先说说我怎么工作」（这台电脑、你指给它的文件、关键一步先问、消息发到哪里）、「我该怎么称呼你？」。这三句不花 token，模型从不把它们当作消息看到；聊天把它们画在历史的开头（`GET /api/firstrun?lang=` 以 `intro` 返回）。
+2. **模型问你的名字**，你说了（或者不想说）之后，它在回复末尾用一个 ```` ```nanomuse-naming ```` 代码块汇报——和桌面版、手机读的是同一份 JSON（`user_address`、`suggest`、`agent_name`；`nanomuse/fences.py`）。阶段由运行时掌握（`none → ask_user_name → ask_agent_name → named → done`，`nanomuse/server/firstrun.py`，存为资料旁边的 `firstrun.json`），它把你的称呼写进资料和记忆（「Call them: …」），并通过 socket 通知页面（`firstrun` 帧）。那个代码块本身从不显示，流式传到一半也不显示。
 3. **起名卡片**出现在回复下面：模型给的两三个名字建议，或者它没给时内置名单里的两个，再加一个「换一个」让你自己起。点一个名字立刻保存（`POST /api/firstrun/pick {name}`）并把它作为你的消息发出去，模型的下一条回复就是它以这个名字说的第一句；自己输入的名字会到模型那里，再从代码块里回来。App 自己回答的卡片（形象选项）会撤掉起名卡片（`POST /api/firstrun/dismiss`）。
 
 第一次对话进行期间，它的回合对请求点 Star 来说从不算*任务*。告诉模型这套开场的附加提示只进入对话绑定的那个聊天，从不进入例程、动态或别的聊天。「跳过设置」只做普通的「已完成首次运行」，不开启对话；身份表单留在「设置」里，以后改名字、形象和语气用。没有这些路由的旧版运行时得到的是原来的问候和没有表单的清单。

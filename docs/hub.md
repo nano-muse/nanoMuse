@@ -186,9 +186,11 @@ reconnects with backoff like after any network close).
 
 A key refused in the `Authorization` header is answered the same way as one
 refused in `hello`: the handshake completes, an `error` frame carries the
-code, then the close with `4001`. A client that sees `4001` or `4002` stops
-reconnecting and asks the person to sign in again; any other close is the
-network and is retried with backoff.
+code, then the close with `4001`. A client that sees `4001` or `4002` leaves
+the backoff, shows the hub as refused and asks the person to sign in again (the
+runtime still tries once a minute, so a key restored on the relay comes back
+without a restart); any other close is the network and is retried with
+backoff.
 
 Frames the relay does not know (`type` it has no handler for, a text frame
 that is not a JSON object, a binary frame) are answered with

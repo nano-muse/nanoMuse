@@ -19,6 +19,8 @@ from typing import Any
 from nanomuse.logger import logger
 
 MAIN_THREAD = "main"
+# the notice a stopped run ends on; the web dictionary translates the sentence
+STOPPED_NOTICE = "Stopped."
 
 
 def now_iso() -> str:
@@ -182,4 +184,4 @@ class EventBus:
                 self._subscribers.discard(q)
 
 
-__all__ = ["MAIN_THREAD", "EventBus", "Timeline", "new_id", "now_iso"]
+__all__ = ["MAIN_THREAD", "STOPPED_NOTICE", "EventBus", "Timeline", "new_id", "now_iso"]

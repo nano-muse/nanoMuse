@@ -748,6 +748,56 @@ def test_task_from_a_device_runs_in_a_visible_side_chat(hub_server) -> None:
     assert len([t for t in client.get("/api/threads").json() if t["title"] == "From Pixel"]) == 1
 
 
+def test_a_stopped_task_fails_with_cancelled_and_only_for_its_asker(hub_server) -> None:
+    """docs/hub.md: the asking device ends its task with `stop {call}` or
+    `stop {conversation}`; the target answers `{stopped: true}` and the `task` call fails
+    with `cancelled`, never with an older reply as its answer. Another device gets
+    `{stopped: false}` and the run goes on."""
+    client, service, llm, relay = hub_server
+    sign_in(client)
+    wait_for(lambda: client.get("/api/hub").json()["state"] == "connected")
+    service.settings.sentinel.mode = "auto"
+    # an earlier task answered, so the thread has a last reply a stop must not hand back
+    llm.script.append(LLMResponse(content="Earlier answer"))
+    relay.call_runtime("task", {"text": "first", "conversation": "conv-s"}, "t1")
+    assert relay.next_frame("result")["body"]["text"] == "Earlier answer"
+
+    llm.script.append(LLMResponse(tool_calls=[tc("shell", command="sleep 20")]))
+    relay.call_runtime("task", {"text": "take a while", "conversation": "conv-s"}, "t2")
+    assert relay.next_frame("event")["body"]["stage"] == "tool"
+    # another device of the account cannot stop it, by call id or by conversation
+    other = {**PHONE, "id": "phone-2", "name": "Tablet"}
+    relay.send(
+        {"type": "call", "id": "x1", "from": other, "action": "stop", "args": {"call": "t2"}}
+    )
+    assert relay.next_frame("result")["body"] == {"stopped": False}
+    relay.send(
+        {
+            "type": "call",
+            "id": "x2",
+            "from": other,
+            "action": "stop",
+            "args": {"conversation": "conv-s"},
+        }
+    )
+    assert relay.next_frame("result")["body"] == {"stopped": False}
+    assert client.get("/api/state").json()["status"]["state"] != "idle"
+    # the asker can
+    relay.call_runtime("stop", {"call": "t2"}, "s1")
+    results = {f["id"]: f for f in (relay.next_frame("result"), relay.next_frame("result"))}
+    assert results["s1"]["body"] == {"stopped": True}
+    assert results["t2"]["ok"] is False and results["t2"]["error"] == "cancelled"
+    wait_for(lambda: client.get("/api/state").json()["status"]["state"] == "idle")
+    # the stop button here does the same for a task under way
+    llm.script.append(LLMResponse(tool_calls=[tc("shell", command="sleep 20")]))
+    relay.call_runtime("task", {"text": "once more", "conversation": "conv-s"}, "t3")
+    assert relay.next_frame("event")["body"]["stage"] == "tool"
+    side = [t for t in client.get("/api/threads").json() if t["title"] == "From Pixel"][0]
+    assert client.post(f"/api/threads/{side['id']}/stop").json() == {"ok": True}
+    res = relay.next_frame("result")
+    assert res["id"] == "t3" and res["ok"] is False and res["error"] == "cancelled"
+
+
 def test_task_approval_is_relayed_and_answered_by_the_device(hub_server) -> None:
     client, service, llm, relay = hub_server
     sign_in(client)

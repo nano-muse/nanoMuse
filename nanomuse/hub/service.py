@@ -34,7 +34,7 @@ from nanomuse.hub.profile import ProfileSync
 from nanomuse.logger import logger
 from nanomuse.schema import RiskLevel
 from nanomuse.sentinel.grants import grant_key, normalize_scope
-from nanomuse.server.events import MAIN_THREAD, now_iso
+from nanomuse.server.events import MAIN_THREAD, STOPPED_NOTICE, now_iso
 from nanomuse.server.webui import current_thread
 from nanomuse.ui import ApprovalRequest
 
@@ -53,6 +53,10 @@ GATED_ACTIONS = frozenset(
     {"shell", "files", "file.get", "file.put", "open", "screen", "coding.send", "coding.stop"}
 )
 REMOTE_CONTROL_TOOL = "remote_control"
+
+
+class _RunStopped(Exception):
+    """The run a `task` call was following was stopped before it answered."""
 
 
 class HubService:
@@ -690,9 +694,11 @@ class HubService:
             await self._task(call)
             return
         if call.action == "stop":
-            tid = self._incoming.get(str(call.args.get("call") or "")) or self._thread_for(
-                call.sender_id, str(call.args.get("conversation") or "")
-            )
+            # only the device that asked may stop its task (docs/hub.md): a `call` id must be
+            # one of the sender's own, a `conversation` one the sender's tasks run in
+            tid = self._incoming.get(str(call.args.get("call") or ""))
+            if tid is None or not self._asked_by(tid, call.sender_id):
+                tid = self._thread_for(call.sender_id, str(call.args.get("conversation") or ""))
             stopped = bool(tid) and self.svc.stop_thread(tid or "")
             await call.result({"stopped": stopped})
             return
@@ -822,11 +828,21 @@ class HubService:
         return decision.approved
 
     def _thread_for(self, sender_id: str, conversation: str) -> str | None:
+        """The thread of ``sender_id``'s tasks in ``conversation`` (its own per-device one
+        when it named none); never another device's."""
         key = conversation or sender_id
         for t in self.svc.threads.values():
-            if t.remote_from and t.remote_from.get("conversation") == key:
+            if (
+                t.remote_from
+                and t.remote_from.get("conversation") == key
+                and t.remote_from.get("device") == sender_id
+            ):
                 return t.id
         return None
+
+    def _asked_by(self, thread_id: str, sender_id: str) -> bool:
+        thread = self.svc.threads.get(thread_id)
+        return bool(thread and thread.remote_from and thread.remote_from.get("device") == sender_id)
 
     async def _task(self, call: IncomingCall) -> None:
         text = str(call.args.get("text") or "").strip()
@@ -856,6 +872,11 @@ class HubService:
         except TimeoutError:
             self.svc.stop_thread(thread.id)
             await call.fail("timeout", "the task took longer than the hub allows")
+            return
+        except _RunStopped:
+            # stopped before it answered (by the asking device's `stop`, or the stop button
+            # here): the call fails, it does not hand back an older reply as the answer
+            await call.fail("cancelled", "the task was stopped before it answered")
             return
         finally:
             self.svc.bus.unsubscribe(queue)
@@ -890,6 +911,7 @@ class HubService:
         """Follow the run in ``thread`` on the bus; send its steps to the caller; return
         the final answer once the thread is idle again."""
         started = False
+        stopped = False
         final = ""
         while True:
             msg = await queue.get()
@@ -902,6 +924,8 @@ class HubService:
                     continue
                 if ev.get("type") == "assistant" and ev.get("text") and not ev.get("quiet"):
                     final = str(ev["text"])
+                elif ev.get("type") == "notice" and ev.get("text") == STOPPED_NOTICE:
+                    stopped = True
                 await self._forward_event(call, ev, fresh=kind == "event")
             elif kind == "thread":
                 meta = msg.get("thread") or {}
@@ -911,6 +935,8 @@ class HubService:
                     started = True
                 elif started and not meta.get("queued"):
                     break
+        if stopped:
+            raise _RunStopped
         return final or self.svc.ui.last_assistant_text.get(thread.id, "")
 
     async def _forward_event(

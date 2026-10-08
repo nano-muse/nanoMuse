@@ -115,14 +115,15 @@ first run done) and opens the chat, where the opening happens the way it does
 on the phones and the desktop (contract C4 in [parity.md](parity.md)):
 
 1. **The app speaks first**, as the agent, three lines in the console's
-   language — hello, *I am a personal agent on this computer, free and open
-   source, from a small non-profit*, and *what should I call you?* They cost no
-   tokens and the model never sees them as messages; the chat draws them where
-   the history begins (`GET /api/firstrun?lang=` returns them as `intro`).
+   language — hello, *a bit about how I work* (this computer, the files you
+   point it to, asking first, where your messages go), and *what should I call
+   you?* They cost no tokens and the model never sees them as messages; the
+   chat draws them where the history begins (`GET /api/firstrun?lang=` returns
+   them as `intro`).
 2. **The model asks your name** and, when you give it (or decline), reports it
    in a ```` ```nanomuse-naming ```` block at the end of its reply — the same
-   JSON the desktop and the phones read (`addressGiven`, `userAddress`,
-   `suggestions`, `agentName`). The runtime owns the phases
+   JSON the desktop and the phones read (`user_address`, `suggest`,
+   `agent_name`; `nanomuse/fences.py`). The runtime owns the phases
    (`none → ask_user_name → ask_agent_name → named → done`,
    `nanomuse/server/firstrun.py`, saved as `firstrun.json` next to the
    profile), writes your address to the profile and to memory as *Call them:
