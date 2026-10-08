@@ -190,6 +190,22 @@ export function ownProviderRow(p: OwnProvider): Record<string, unknown> {
   }
 }
 
+/**
+ * The model ids a person typed for an endpoint (a comma- or newline-separated field, or a
+ * list): trimmed, without duplicates, at most 40 of up to 120 characters each.
+ */
+export function typedModelIds(input: unknown): string[] {
+  const raw = Array.isArray(input) ? input.map(String) : typeof input === 'string' ? input.split(/[,\n]/) : []
+  const out: string[] = []
+  for (const piece of raw) {
+    const id = piece.trim()
+    if (!id || id.length > 120 || out.includes(id)) continue
+    out.push(id)
+    if (out.length === 40) break
+  }
+  return out
+}
+
 /** The credential name an own key is kept under. */
 export function keyRefFor(providerId: string): string {
   return `NANOMUSE_KEY_${providerId.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`

@@ -256,7 +256,7 @@ Anything that speaks the OpenAI API works — choose *Custom*:
 |---|---|
 | Base URL | the provider's address, usually ending in `/v1` |
 | API key | the key made in the provider's console (a local server may leave it empty) |
-| Model | pick from the list after saving; if none appears, type the model id from the provider's docs |
+| Model | pick from the list after saving; if the endpoint does not list its models, the form asks for their ids (comma-separated) and saves with those |
 
 What a custom endpoint covers is yours to say: nanoMuse takes it for chat, and
 the hands, picture and clip models count once their ids are filled in.

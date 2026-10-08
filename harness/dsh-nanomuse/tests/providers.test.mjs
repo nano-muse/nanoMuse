@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
 import {
-  apiOf, baseUrlFor, capabilitiesForAuth, capabilitiesOf, ChatGptDesk, chatGptOnly, keyRefFor, kindOf, LineReader, listModels, loadCatalogue, modelsOf, ownKeyStepDone, ownProviderRow, parseCatalogue, providersWith, regionOf, sighted, unavailableKey, waysOn,
+  apiOf, baseUrlFor, capabilitiesForAuth, capabilitiesOf, ChatGptDesk, chatGptOnly, keyRefFor, kindOf, LineReader, listModels, loadCatalogue, modelsOf, ownKeyStepDone, ownProviderRow, parseCatalogue, providersWith, regionOf, sighted, typedModelIds, unavailableKey, waysOn,
 } from '../lib/providers.js'
 
 const catalogue = parseCatalogue(JSON.parse(readFileSync(new URL('../assets/providers.json', import.meta.url), 'utf8')))
@@ -283,4 +283,13 @@ test('ChatGPT status: the runtime’s one JSON line, read without the network', 
   spawned[0].child.stdout.emit('data', Buffer.from('{"signed_in":true,"label":"ChatGPT Pro","plan":"pro","models":["gpt-5.6-sol"]}\n'))
   spawned[0].child.emit('exit', 0)
   assert.deepEqual(await p, { signedIn: true, label: 'ChatGPT Pro' })
+})
+
+test('typedModelIds: a comma- or newline-separated field or a list, trimmed, without doubles, capped', () => {
+  assert.deepEqual(typedModelIds('glm-4.7, kimi-k2.5\n glm-4.7 ,, '), ['glm-4.7', 'kimi-k2.5'])
+  assert.deepEqual(typedModelIds(['a', ' b ', 'a', '']), ['a', 'b'])
+  assert.deepEqual(typedModelIds(undefined), [])
+  assert.deepEqual(typedModelIds(42), [])
+  assert.deepEqual(typedModelIds('x'.repeat(121)), [])
+  assert.equal(typedModelIds(Array.from({ length: 50 }, (_, i) => `m${i}`)).length, 40)
 })

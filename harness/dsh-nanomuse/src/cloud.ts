@@ -56,7 +56,7 @@ import { AvatarMotion, ANIMATED, type MotionMood, type MotionView } from './moti
 import { DEFAULT_VIDEO_MODEL, hostOf, KNOWN_DASHSCOPE_MODELS, looksLikeVideoModel, probe as probeVideoModel, speaksDashScope, type VideoEndpoint } from './video.ts'
 import { editImage as ownEditImage, generateImage as ownGenerateImage, imageShapeOf, type ImageEndpoint } from './images.ts'
 import { checkMove, checkScreenshot, displayInfo, isBlack, runtimeInfo, screenHead, type MoveCheck, type RuntimeInfo, type ScreenshotCheck } from './hands-check.ts'
-import { apiOf, baseUrlFor, CAPABILITIES, capabilitiesForAuth, capabilitiesOf, CHATGPT_KEY_REF, CHATGPT_PROVIDER, ChatGptDesk, keyRefFor, listModels, loadCatalogue, modelsOf, ownProviderRow, regionOf, type Capability, type ChatGptState, type LoginView, type OwnModel, type OwnProvider, type ProviderEntry, type Region } from './providers.ts'
+import { apiOf, baseUrlFor, CAPABILITIES, capabilitiesForAuth, capabilitiesOf, CHATGPT_KEY_REF, CHATGPT_PROVIDER, ChatGptDesk, keyRefFor, listModels, loadCatalogue, modelsOf, ownProviderRow, regionOf, typedModelIds, type Capability, type ChatGptState, type LoginView, type OwnModel, type OwnProvider, type ProviderEntry, type Region } from './providers.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -70,6 +70,8 @@ export const TOKEN_REF = 'NANOMUSE_CLOUD_TOKEN'
 export const PROVIDER_ID = 'nanomuse'
 /** The profile row the Models page edits too. */
 export const LLM_ROW = 'llm-pi-ai'
+/** dsh-base's stock chat default (its `agent-default-model` row): what `adoptOwnDefault` and `adoptDefaultModel` read as "nothing chosen yet". */
+export const STOCK_DEFAULT_MODEL = { provider: 'deepseek-official', model: 'deepseek-flash' } as const
 /**
  * The image budget of one request through the relay (`dsh-llm-pi-ai` profile keys): the relay
  * refuses a body past 6 MiB (413 `too_large`), so the base64 images of a request are held to
@@ -1386,7 +1388,7 @@ export default class NanomuseCloud extends Service {
    * adapter the way the Models page writes one. The row's capabilities are the catalogue's;
    * `custom` takes what the person says.
    */
-  async saveProvider(input: { id: string; apiKey?: string; baseURL?: string; label?: string; capabilities?: string[]; lang?: string }): Promise<OwnProvider> {
+  async saveProvider(input: { id: string; apiKey?: string; baseURL?: string; label?: string; capabilities?: string[]; models?: string[]; lang?: string }): Promise<OwnProvider> {
     const id = input.id.trim().toLowerCase()
     if (id === CHATGPT_PROVIDER || id === PROVIDER_ID) throw new RelayError(400, 'bad_provider', 'That row is written by a sign-in, not a key')
     const entry = this.catalogue.find((p) => p.id === id)
@@ -1396,17 +1398,24 @@ export default class NanomuseCloud extends Service {
     if (!/^https?:\/\//.test(baseURL)) throw new RelayError(400, 'bad_url', 'The address must start with http:// or https://')
     const apiKey = (input.apiKey ?? '').trim()
     if (!apiKey && !entry.auth.includes('none')) throw new RelayError(400, 'no_key', 'This provider needs a key')
-    if (apiKey && /\s/.test(apiKey)) throw new RelayError(400, 'bad_key', 'A key has no spaces in it')
+    // not `bad_key`: the client reads that code as a retired sign-in
+    if (apiKey && /\s/.test(apiKey)) throw new RelayError(400, 'key_shape', 'A key has no spaces in it')
     let capabilities: Capability[] = entry.capabilities
     if (entry.user_capabilities) {
       const said = (input.capabilities ?? []).filter((c): c is Capability => (CAPABILITIES as readonly string[]).includes(c))
       capabilities = CAPABILITIES.filter((c) => c === 'chat' || said.includes(c))
     }
+    const listed = await listModels(entry.protocol, baseURL, apiKey)
+    // The ids the person typed (a gateway that does not answer `GET /models`, or one model
+    // wanted out of hundreds): first in the list, the endpoint's own after them.
+    const typed = typedModelIds(input.models)
+    let models = modelsOf({ ...entry, capabilities }, [...typed, ...listed.filter((m) => !typed.includes(m))])
+    if (entry.user_capabilities) models = models.map((m) => ({ ...m, vision: capabilities.includes('vision') }))
+    // A row with no chat model cannot be served (the model adapter refuses a route that resolves
+    // no models) and nothing could pick from it: a plain sentence, before anything is written.
+    if (!models.some((m) => m.kind === 'chat')) throw new RelayError(400, 'no_models', 'The endpoint did not list its models (GET /models). Type the ids of the models it serves, separated by commas.')
     const keyRef = apiKey ? keyRefFor(id) : ''
     if (keyRef) await this.ctx.credentials.set(credentialRef(keyRef), apiKey)
-    const listed = await listModels(entry.protocol, baseURL, apiKey)
-    let models = modelsOf({ ...entry, capabilities }, listed)
-    if (entry.user_capabilities) models = models.map((m) => ({ ...m, vision: capabilities.includes('vision') }))
     const label = (input.label ?? '').trim() || (input.lang?.toLowerCase().startsWith('zh') ? entry.name_zh : entry.name)
     const row: OwnProvider = { provider: id, label, protocol: entry.protocol, baseURL, keyRef, capabilities, models, at: Date.now() }
     await this.ctx.settings.update(LLM_ROW, { providers: { [id]: ownProviderRow(row) } })
@@ -1509,17 +1518,42 @@ export default class NanomuseCloud extends Service {
       }
       this.state = { ...this.state, media }
     }
-    const svc = this.defaultModelService()
-    try {
-      if (svc?.currentSelection().provider === id) {
-        const next = this.chatOptions()[0]
-        if (next) await svc.saveSelection({ provider: next.provider, model: next.id })
-      }
-    } catch {
-      // the default model service may not be up
-    }
+    await this.releaseChatRoute(id)
     await this.writeState()
     await this.writeHands()
+  }
+
+  /**
+   * A provider route is going away (an own row removed, the account signed out). A chat slot
+   * or the main chat still naming it would send every turn to a route no adapter serves, and
+   * the person would read `no adapter registered for provider "custom"` (NO_ADAPTER) with
+   * nothing to do about it. The slot moves to the first chat model left (the account's, then
+   * the own rows'), else back to dsh's stock DeepSeek default, which the next key or sign-in
+   * adopts again as it does on a fresh profile; the main chat follows when it sat on that route.
+   */
+  private async releaseChatRoute(id: string): Promise<void> {
+    const svc = this.defaultModelService()
+    if (!svc) return
+    try {
+      let to: { provider: string; model: string } | undefined
+      if (svc.currentSelection().provider === id) {
+        const next = this.chatOptions().find((o) => o.provider !== id)
+        to = next ? { provider: next.provider, model: next.id } : { ...STOCK_DEFAULT_MODEL }
+        await svc.saveSelection(to)
+        this.ctx.logger.info('nanomuse: %s is gone; new chats answer through %s/%s', id, to.provider, to.model)
+      }
+      const main = this.syncMainSession()
+      if (main) {
+        const current = await this.sessionSelection(main).catch(() => undefined)
+        const held = this.cloudOnce.get(main)
+        if (current?.provider === id || held?.provider === id) {
+          to ??= svc.currentSelection()
+          await this.mainChatFollows(to.provider, to.model)
+        }
+      }
+    } catch (error: unknown) {
+      this.ctx.logger.warn('nanomuse: the chat slot could not leave %s: %s', id, message(error))
+    }
   }
 
   /** `POST /chatgpt/login`: starts the runtime's sign-in and returns the page to open; `done` follows in the live state. */
@@ -2577,6 +2611,8 @@ export default class NanomuseCloud extends Service {
     this.sync?.signedOut()
     this.signedInCache = false
     this.lastSharedConnectors = ''
+    // the account's route is gone from the model layer: a chat slot left on it would fail every turn with NO_ADAPTER
+    await this.releaseChatRoute(PROVIDER_ID)
     await this.writeState()
     await this.writeHands().catch(() => rm(join(this.dir(), 'hands.json'), { force: true }).catch(() => undefined))
     await this.profile.reset()
@@ -3226,6 +3262,7 @@ export default class NanomuseCloud extends Service {
         if (typeof body.label === 'string') input.label = body.label
         if (typeof body.lang === 'string') input.lang = body.lang
         if (Array.isArray(body.capabilities)) input.capabilities = body.capabilities.map(String)
+        if (Array.isArray(body.models) || typeof body.models === 'string') input.models = typedModelIds(body.models)
         const row = await this.serialize(() => this.saveProvider(input))
         // the "Use it for" card: the slots this row could take and the model each would get
         return send(res, 200, { ...row, offer: this.slotOffer(row.provider) })
