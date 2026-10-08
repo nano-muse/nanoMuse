@@ -14,6 +14,39 @@ export type Region = 'cn' | 'global'
 /** How a person gets in: a key, a sign-in flow a client may support, nothing (a local server). */
 export type Auth = 'key' | 'oauth-chatgpt' | 'oauth-claude' | 'oauth-openrouter' | 'device-kimi' | 'none'
 
+/** The thinking levels the harness's picker can offer (pi-ai's names, `off` aside). */
+export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export const THINKING_LEVELS: readonly ThinkingLevel[] = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+
+/**
+ * How a vendor takes the chosen level on the wire (the catalogue's `reasoning.wire`):
+ * `reasoning_effort` (the OpenAI-compatible top-level field), `thinking+reasoning_effort`
+ * (`thinking: {type: "enabled"}` beside it: DeepSeek, Zhipu), `reasoning.effort` (OpenRouter's
+ * nested object), `output_config.effort` (Anthropic's Messages API with adaptive thinking).
+ */
+export type ReasoningWire = 'reasoning_effort' | 'thinking+reasoning_effort' | 'reasoning.effort' | 'output_config.effort'
+export const REASONING_WIRES: readonly ReasoningWire[] = ['reasoning_effort', 'thinking+reasoning_effort', 'reasoning.effort', 'output_config.effort']
+
+/** The levels a vendor documents for the models an id pattern names; `default` is what the vendor applies when nothing is sent (`none`: no thinking). */
+export interface ReasoningRule {
+  /** A regular expression over the model id, matched without regard to case. */
+  models: string
+  levels: ThinkingLevel[]
+  default?: ThinkingLevel | 'none'
+}
+
+/**
+ * A provider's thinking-level facts (`reasoning` in `providers.json`), verified against the page
+ * `doc` names: the wire shape, the documented levels per model pattern (first match wins), or
+ * `listed` when the endpoint's own model list says which levels each model takes (OpenRouter).
+ */
+export interface ReasoningHint {
+  doc: string
+  wire: ReasoningWire
+  rules: ReasoningRule[]
+  listed: boolean
+}
+
 /** One row of the catalogue (`providers.json`). */
 export interface ProviderEntry {
   id: string
@@ -39,6 +72,34 @@ export interface ProviderEntry {
   note_zh: string
   /** The month the row was checked against the vendor's documentation; empty for a draft. */
   verified: string
+  /** How the vendor takes a thinking level, when it documents one; absent: no control is offered. */
+  reasoning?: ReasoningHint
+}
+
+/** The levels of a listed or hinted model, as the pickers may offer them. */
+export interface ModelReasoning {
+  levels: ThinkingLevel[]
+  default?: ThinkingLevel | 'none'
+}
+
+/**
+ * The thinking levels a model takes: what the endpoint's own list said about it (OpenRouter's
+ * `reasoning.supported_efforts`) when the hint reads the list, else the first rule whose pattern
+ * matches the id. Nothing for a model the vendor documents no control for.
+ */
+export function reasoningFor(hint: ReasoningHint | undefined, modelId: string, listed?: ModelReasoning): ModelReasoning | undefined {
+  if (!hint) return undefined
+  if (hint.listed && listed?.levels.length) return listed
+  for (const rule of hint.rules) {
+    let re: RegExp
+    try {
+      re = new RegExp(rule.models, 'i')
+    } catch {
+      continue
+    }
+    if (re.test(modelId) && rule.levels.length) return { levels: rule.levels, ...(rule.default ? { default: rule.default } : {}) }
+  }
+  return undefined
 }
 
 /** The base URL for a region: the global edition when the entry has one and the person is outside mainland China. */

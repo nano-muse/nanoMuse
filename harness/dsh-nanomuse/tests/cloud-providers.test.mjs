@@ -58,7 +58,7 @@ function modelsServer(ids) {
   const server = createServer((req, res) => {
     if (req.url?.endsWith('/models')) {
       res.writeHead(200, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ data: ids.map((id) => ({ id })) }))
+      res.end(JSON.stringify({ data: ids.map((id) => (typeof id === 'string' ? { id } : id)) }))
     } else {
       res.writeHead(404).end()
     }
@@ -275,6 +275,50 @@ test('POST /providers/remove: the row, its credential and the choices that point
     }
   } finally {
     await server.close()
+    await out.done()
+  }
+})
+
+test('the thinking level for an own key: the saved row declares the vendor’s documented levels per model, OpenRouter’s from its list; a row saved before the catalogue knew them gets them at the next start', async () => {
+  const out = await cloud()
+  const deepseek = await modelsServer(['deepseek-flash', 'deepseek-v4-pro'])
+  const openrouter = await modelsServer([
+    { id: 'z-ai/glm-5.3', reasoning: { default_effort: 'max', default_enabled: true, mandatory: true, supported_efforts: ['max', 'high', 'low'] } },
+    { id: 'unbiased/pareto-26.10-preview' },
+  ])
+  try {
+    await out.api('POST', '/providers/save', { id: 'deepseek', apiKey: 'sk-secret', baseURL: deepseek.url })
+    const row = out.settings[LLM_ROW].providers.deepseek
+    assert.deepEqual(row.models.map((m) => [m.id, m.reasoningEfforts, m.compat]), [
+      ['deepseek-flash', { low: 'low', high: 'high', max: 'max' }, { thinkingFormat: 'deepseek', supportsReasoningEffort: true }],
+      ['deepseek-v4-pro', { low: 'low', high: 'high', max: 'max' }, { thinkingFormat: 'deepseek', supportsReasoningEffort: true }],
+    ])
+    // never `off`: with no level picked nothing is sent, which is the vendor's default
+    assert.ok(row.models.every((m) => !('off' in m.reasoningEfforts)))
+    // OpenRouter: the levels its own list gives, kept in cloud.json so a restart can write them again
+    await out.api('POST', '/providers/save', { id: 'openrouter', apiKey: 'sk-or', baseURL: openrouter.url, models: 'z-ai/glm-5.3' })
+    const or = out.settings[LLM_ROW].providers.openrouter
+    assert.deepEqual(or.models.map((m) => [m.id, m.reasoningEfforts, m.compat]), [
+      ['z-ai/glm-5.3', { low: 'low', high: 'high', max: 'max' }, { thinkingFormat: 'openrouter' }],
+      ['unbiased/pareto-26.10-preview', undefined, undefined],
+    ])
+    assert.deepEqual((await out.state()).providers.openrouter.models[0].reasoning, { levels: ['low', 'high', 'max'], default: 'max' })
+    // a key saved by an older build: the adapter's row has no levels; the next start writes them
+    const stale = JSON.parse(JSON.stringify(out.settings[LLM_ROW].providers))
+    for (const p of Object.values(stale)) for (const m of p.models) { delete m.reasoningEfforts; delete m.compat }
+    const fake = fakeContext()
+    fake.settings[LLM_ROW].providers = stale
+    const again = new NanomuseCloud(fake.ctx, { baseURL: 'https://relay.invalid', deviceName: 'test-desktop', statePath: out.statePath })
+    again.hub.start = () => undefined
+    again.refresh = async () => again.status()
+    await again[Service.init]()
+    await new Promise((r) => setTimeout(r, 20))
+    assert.deepEqual(fake.settings[LLM_ROW].providers.deepseek.models[0].reasoningEfforts, { low: 'low', high: 'high', max: 'max' })
+    assert.deepEqual(fake.settings[LLM_ROW].providers.openrouter.models[0].compat, { thinkingFormat: 'openrouter' })
+    assert.equal(fake.settings[LLM_ROW].providers.openrouter.models[1].reasoningEfforts, undefined)
+  } finally {
+    await deepseek.close()
+    await openrouter.close()
     await out.done()
   }
 })
