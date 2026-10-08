@@ -16,10 +16,9 @@
   // project site, nanomuse.cn. The site has the header, so ours is hidden (page.css); links
   // out of the page open in the top window, not inside the frame; the site tells us its
   // language and theme over postMessage ({type: "nanomuse:lang", lang} / {type: "nanomuse:theme",
-  // theme}), the first paint taking them from ?lang= and ?theme=; and a wheel turned over a
-  // part of this page that has nothing to scroll is handed up to the site
-  // ({type: "nanomuse:wheel", deltaX, deltaY}), so the homepage still scrolls with the pointer
-  // over the frame.
+  // theme}), the first paint taking them from ?lang= and ?theme=. Nothing on this page
+  // scrolls, so a wheel turned over the frame reaches the site by itself (the browser hands a
+  // scroll on to the parent when the frame has nowhere to go).
   var embed = root.getAttribute("data-embed") === "1";
   var EMBEDDERS = ["https://nanomuse.cn", "https://www.nanomuse.cn", "https://nano-muse.github.io"];
   // the page that holds the frame, when it is one of ours (a local preview of the site counts
@@ -247,9 +246,10 @@
     if (!hero || !layout || !wrap) return;
     var wide = window.innerWidth >= 1280; // their chrome beside the phone
     var column = window.innerWidth < 1000; // phones: a column that scrolls, the phone at its size
-    // the room the chrome needs, in the phone's own pixels (it scales with the phone)
-    var roomLeft = wide ? 24 + 168 + 8 : BEZEL + 6;
-    var roomRight = wide ? 24 + 52 + 24 : BEZEL + 6;
+    // the room the chrome needs, in the phone's own pixels (it scales with the phone); below
+    // 1280px the dock row under the phone is wider than the phone by about 55px a side
+    var roomLeft = wide ? 24 + 168 + 8 : 60;
+    var roomRight = wide ? 24 + 52 + 24 : 60;
     var roomBelow = wide ? 24 : 0; // the "Patch state" hint under the dock
     var layoutH = SCREEN_H + (wide ? 0 : 162); // their pills under the phone below 1280px (page.css)
     var s = 1;
@@ -298,17 +298,19 @@
   if (window.ResizeObserver && hero) new ResizeObserver(fitPhone).observe(hero);
   fitPhone();
 
-  // the column's lower edge fades while there is more of it below (page.css .side.more)
-  function sideMore() {
-    if (!side) return;
-    var more = side.scrollHeight > side.clientHeight + 4 && side.scrollTop + side.clientHeight < side.scrollHeight - 4;
-    side.classList.toggle("more", more);
+  // the lines' column fits the stage; in a window too short for all of them it scrolls, and
+  // its lower edge fades while there is more of it below (page.css .groups.more)
+  var groups = document.querySelector(".groups");
+  function groupsMore() {
+    if (!groups) return;
+    var more = groups.scrollHeight > groups.clientHeight + 4 && groups.scrollTop + groups.clientHeight < groups.scrollHeight - 4;
+    groups.classList.toggle("more", more);
   }
-  if (side) {
-    side.addEventListener("scroll", sideMore, { passive: true });
-    window.addEventListener("resize", sideMore);
-    if (window.ResizeObserver) new ResizeObserver(sideMore).observe(side);
-    sideMore();
+  if (groups) {
+    groups.addEventListener("scroll", groupsMore, { passive: true });
+    window.addEventListener("resize", groupsMore);
+    if (window.ResizeObserver) new ResizeObserver(groupsMore).observe(groups);
+    groupsMore();
   }
 
   // ---- the status line ------------------------------------------------------------------
@@ -437,42 +439,6 @@
   });
 
   render();
-
-  // ---- the wheel over the frame, on the project site ----------------------------------------
-  // The homepage holds this page in a frame that fills the first screen, and a frame takes the
-  // wheel: with the pointer over it the homepage did not scroll. Where this page has nothing
-  // of its own to scroll under the pointer (the stage, the keys, the dock, a column already at
-  // its end) the wheel is handed up and the site scrolls by it; over the phone's screen the
-  // phone keeps it. Only on this page's own document: the phone is a frame of its own and
-  // its apps take the wheel as they do.
-  function scrollsBy(el, dx, dy) {
-    for (; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
-      var cs = getComputedStyle(el);
-      if (dy && /auto|scroll/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1) {
-        if (dy < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1) return true;
-      }
-      if (dx && /auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) {
-        if (dx < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth - 1) return true;
-      }
-    }
-    return false;
-  }
-  if (embed && embedder && window.parent !== window) {
-    document.addEventListener(
-      "wheel",
-      function (ev) {
-        if (ev.ctrlKey || scrollsBy(ev.target, ev.deltaX, ev.deltaY)) return;
-        // lines and pages become pixels, roughly, so the site scrolls as it would for its own wheel
-        var unit = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? window.innerHeight : 1;
-        try {
-          window.parent.postMessage({ type: "nanomuse:wheel", deltaX: ev.deltaX * unit, deltaY: ev.deltaY * unit }, embedder);
-        } catch (e) {
-          /* the site is not listening */
-        }
-      },
-      { passive: true },
-    );
-  }
 
   // ---- the phone turns itself on, and the Muse starts once a person is looking --------------
   // The phone is on as soon as the page is, the frame on the project site included, and
