@@ -483,6 +483,12 @@ Ours, in `NanoMuse/`:
   instead of upstream's *Chat* (闲聊), and the account page's usage rows say 对话 for the chat
   kind (`models.slot.chat`, Android's `nm_usage_kind_chat`). `NanoMuseCopyTests` fails on
   "agent" in a Chinese value, 代理 where the English says agent, 中转 and 双手.
+- **The third audit: tasks from other devices (1.0.x)** (`NanoMuseHubTasks.swift`,
+  `MinisTests/NanoMuseHubTasksTests.swift`): a `task` frame carries the asking device's screen
+  language (`language`, [hub.md](hub.md)); the iPhone's Muse is now told to answer in it, where
+  before it went by the text alone, so a person typing `@iPhone` on an English desktop about a
+  Chinese page gets the answer in English. `NanoMuseHubTasks.prompt` is pure and tested. The
+  phone's own `@device` mentions have sent the tag since 1.0.0.
 
 ## Building on a Mac
 

@@ -46,6 +46,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - The Version row in Settings reads the download index the way Android does (the newest release's tag in `releases`), so it finds the latest release from mainland China too, where GitHub is not reliably reachable; before, the index was read in a shape it never had, and the row said *Could not check* whenever GitHub did not answer. A tap on a newer version opens the download page.
 - The first run's sign-in sheet closes by itself once the sign-in succeeds, so the next setup page is in view at once; before, the sheet stayed on the account page and had to be swiped away.
 - The Chinese copy uses the same words as the Android app: the agent is 智能体 (繁體: 智慧體) where it was still "agent" in English or 代理, the relay is 中继 (繁體: 中繼) instead of 中转, "Hands" stays in English, and the chat tab is 聊天, not upstream's 闲聊; the account page's usage rows say 对话 for the chat kind. `NanoMuseCopyTests` keeps it that way.
+- A task another device hands the iPhone (`@iPhone …`) is answered in the language of the device that asked, as the hub protocol's `language` field says (runtime 1.0.0); before, the iPhone's agent went by the text alone. `docs/hub.md` now says what the iPhone does with a step that needs approval: its own card when the app is in front, a declined step named in the answer when it is not.
 
 ### Project
 
