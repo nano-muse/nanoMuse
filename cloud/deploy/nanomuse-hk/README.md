@@ -12,7 +12,7 @@ relay itself is [`cloud/`](../../README.md).
 | container | `nanomuse-relay`, on the `showcase_edge` network, no published ports |
 | TLS / vhost | `demo/showcase/sites.d/cloud.nanomuse.cn.caddy` → `nanomuse-relay:8787` |
 | backups | `/opt/nanomuse/backups/cloud-*.db.gz`, daily 04:10 UTC, 30 days (`backup.sh`, systemd timer) |
-| self-check | `selfcheck.sh` every 10 min (systemd timer): the public `/healthz`, the relay's `/v1/admin/health` (aggregates only: requests under way, hub counters, the hour's upstream errors and refusals, the database), free disk — one line in the journal (`journalctl -t nanomuse-selfcheck`); with `ALERT_URL` in `.env` (a webhook taking `{"text": …}`) a problem is posted there, once an hour per problem |
+| self-check | `selfcheck.sh` every 10 min (systemd timer): the public `/healthz`, the relay's `/v1/admin/health` (aggregates only: requests under way, hub counters, the hour's upstream errors and refusals, the database), free disk, and the age of the newest `cloud-*.db.gz` under `/opt/nanomuse/backups` (a problem when it is older than 48 hours, `BACKUP_MAX_H`, or there is none) — one line in the journal (`journalctl -t nanomuse-selfcheck`); with `ALERT_URL` in `.env` (a webhook taking `{"text": …}`) a problem is posted there, once an hour per problem |
 | admin | `https://cloud.nanomuse.cn/app/admin/`, token in `/opt/nanomuse/relay/ADMIN_TOKEN.txt` (0600) |
 | DNS | DNSPod: `cloud` A → the box's address, same as the apex |
 
@@ -69,8 +69,9 @@ a machine with the SSH alias:
 cloud/deploy/nanomuse-hk/deploy.sh
 ```
 
-which syncs `cloud/`, installs the compose file, the backup timer and the
-Caddy site, builds and starts the container, and checks `/healthz` inside
+which syncs `cloud/`, installs the compose file, the backup and self-check
+scripts with their timers (the units run `/opt/nanomuse/relay/*.sh`, the copies
+`deploy.sh` puts there, not the checkout) and the Caddy site, builds and starts the container, and checks `/healthz` inside
 the container and through the public name. The public check fails until the
 `cloud` A record has spread and Caddy has fetched the certificate (a minute
 after the record resolves).

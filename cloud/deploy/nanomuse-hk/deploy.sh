@@ -41,7 +41,7 @@ ssh "$host" "cd /tmp && sudo install -m 644 $units /etc/systemd/system/ && rm -f
 	&& sudo systemctl enable --now nanomuse-relay-backup.timer nanomuse-relay-selfcheck.timer >/dev/null"
 
 if ! ssh "$host" "test -s $remote/.env"; then
-	echo "no $remote/.env on $host yet — create it first (see README.md in this directory), then run again" >&2
+	echo "no $remote/.env on $host yet; create it first (see README.md in this directory), then run again" >&2
 	exit 2
 fi
 
@@ -61,5 +61,5 @@ if [ -n "$build" ]; then
 	sleep 3
 	ssh "$host" "docker exec nanomuse-relay python -c \"import urllib.request; print('relay:', urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=5).read().decode()[:160])\""
 	printf 'public: '
-	curl -fsS -m 15 "$public/healthz" && echo || echo "(not reachable yet through $public — DNS or certificate still on the way)"
+	curl -fsS -m 15 "$public/healthz" && echo || echo "(not reachable yet through $public; DNS or certificate still on the way)"
 fi
