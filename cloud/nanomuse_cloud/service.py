@@ -2207,6 +2207,7 @@ class Cloud:
                 "sign_in_failures": counts.get("sign_in.failed", 0),
                 "budget_refusals": counts.get("budget.refused", 0),
                 "upstream_errors": counts.get("upstream.error", 0),
+                "content_rejected": counts.get("content.rejected", 0),
                 "calls": counts.get("call.ended", 0),
             },
             "top_accounts": top,
@@ -2245,6 +2246,7 @@ class Cloud:
                     "calls": e.get("call.ended", 0),
                     "budget_refusals": e.get("budget.refused", 0),
                     "upstream_errors": e.get("upstream.error", 0),
+                    "content_rejected": e.get("content.rejected", 0),
                 }
             )
         devices = [{"kind": r["kind"], "os": r["os"] or "", "count": int(r["n"])} for r in self.db.devices_by_kind_os()]
