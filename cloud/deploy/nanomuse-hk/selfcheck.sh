@@ -5,8 +5,9 @@
 #   GET https://cloud.nanomuse.cn/healthz              the public door answers
 #   GET http://nanomuse-relay:8787/v1/admin/health     aggregates only (api.py admin_health):
 #                                                      requests under way, the hub's counters,
-#                                                      the last hour's refusals and upstream
-#                                                      errors, the database; never an account
+#                                                      the last hour's refusals, upstream errors
+#                                                      and content-check refusals, the database;
+#                                                      never an account
 #   df on the relay's volume                           free disk
 #   the newest cloud-*.db.gz under BACKUP_DIR          backup.sh ran lately
 #
@@ -58,9 +59,9 @@ h = json.load(sys.stdin)
 hub = h.get('hub') or {}
 lh = h.get('last_hour') or {}
 inf = h.get('in_flight') or {}
-print('v%s hub=%s online/%s accounts, pending=%s, dropped=%s, flood_closes=%s; last hour: %s requests, %s upstream errors, %s refused, %s sign-ins (%s failed); in flight %s/%s accounts; db %.1f MB%s' % (
+print('v%s hub=%s online/%s accounts, pending=%s, dropped=%s, flood_closes=%s; last hour: %s requests, %s upstream errors, %s content checks, %s refused, %s sign-ins (%s failed); in flight %s/%s accounts; db %.1f MB%s' % (
     h.get('version'), hub.get('online'), hub.get('accounts_online'), hub.get('pending_calls'), hub.get('dropped_frames'), hub.get('flood_closes'),
-    lh.get('requests'), lh.get('upstream_errors'), lh.get('budget_refused'), lh.get('sign_ins'), lh.get('sign_in_failures'),
+    lh.get('requests'), lh.get('upstream_errors'), lh.get('content_rejected', 0), lh.get('budget_refused'), lh.get('sign_ins'), lh.get('sign_in_failures'),
     inf.get('requests'), inf.get('accounts'), (h.get('db') or {}).get('size_bytes', 0) / 1048576, '' if (h.get('db') or {}).get('writable') else ' NOT WRITABLE'))
 for p in h.get('problems') or []:
     print('PROBLEM ' + p)

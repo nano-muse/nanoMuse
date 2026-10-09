@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS events (
     ts            INTEGER NOT NULL,
     kind          TEXT NOT NULL,              -- sign_in.code | sign_in.password | sign_in.session | sign_in.failed | sign_out |
                                               -- sign_out.all | password.set | account.created | account.deleted |
-                                              -- device.joined | upstream.error | budget.refused | call.ended
+                                              -- device.joined | upstream.error | content.rejected | budget.refused | call.ended
     detail        TEXT NOT NULL DEFAULT ''    -- a device name, a model, an error code: never message content
 );
 CREATE INDEX IF NOT EXISTS events_account_ts ON events(account_id, ts);

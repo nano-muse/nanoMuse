@@ -516,7 +516,8 @@ with their key deletes the account, its keys, ledger and devices.
 
 Two more panels come from `/v1/admin/series` and `/v1/admin/traffic`: the
 relay's own numbers by day (sign-ins, new and active accounts, sign-ups
-through an invite, data switches turned on, calls, refusals, upstream errors),
+through an invite, data switches turned on, calls, refusals, upstream errors, and the
+provider's content-check refusals, counted apart since they say nothing about the provider),
 the remembered devices by kind and system, the invite funnel and — with
 `WEB_INFO_URL` — how many nanoMuse Web accounts and sessions the gateway
 holds; and, with `TRAFFIC_DB`, the project site's visits and downloads:
@@ -666,8 +667,9 @@ tokens, the newest turns, and the export.
 
 ```bash
 # is it well? aggregates only (0.13): requests under way, the hub's counters, the last
-# hour's requests / upstream errors / refusals / sign-ins, the database, `problems` —
-# what deploy/nanomuse-hk/selfcheck.sh reads every ten minutes
+# hour's requests / upstream errors / content-check refusals / refusals / sign-ins, the
+# database, `problems` (twenty upstream errors in an hour is one; a content check declining
+# words is not) — what deploy/nanomuse-hk/selfcheck.sh reads every ten minutes
 curl -H "X-Admin-Token: $CLOUD_ADMIN_TOKEN" https://$CLOUD_DOMAIN/v1/admin/health
 # who signed up (with the phone numbers and addresses since 0.22 — the console's answer)
 curl -H "X-Admin-Token: $CLOUD_ADMIN_TOKEN" https://$CLOUD_DOMAIN/v1/admin/accounts

@@ -28,17 +28,17 @@
     kAccounts: "账号", kAccountsSub: (c) => `${c.with_password || 0} 个设了密码 · ${c.unlimited || 0} 个成员 · ${c.disabled || 0} 个已停用`,
     kActive: "活跃账号", kActiveSub: (n) => `${n} 个新注册`, kSpent: "花费", kSpentSub: (r, t) => `${fmt(r)} 次 · ${fmt(t)} tokens`,
     kOnline: "在线设备", kOnlineSub: (k, s) => `记住了 ${k} 台 · ${s} 个有效登录`, kSignals: "今天的信号",
-    kSignalsSub: (s) => `${s.sign_ins} 次登录 · ${s.sign_in_failures} 次失败 · ${s.budget_refusals} 次超额 · ${s.upstream_errors} 次上游错误 · ${s.calls} 通电话`,
+    kSignalsSub: (s) => `${s.sign_ins} 次登录 · ${s.sign_in_failures} 次失败 · ${s.budget_refusals} 次超额 · ${s.upstream_errors} 次上游错误 · ${s.content_rejected} 次内容审核未放行 · ${s.calls} 通电话`,
     byKind: "按类型", byModel: "按模型", byDay: (d) => `每日花费 · 最近 ${d} 天`, top: (d) => `花费最多 · 最近 ${d} 天`, events: "最近动态", accounts: "全部账号", config: "当前配置",
     kinds: { chat: "对话", image: "图片", video: "视频", realtime: "实时通话", grant: "加 tokens", credit: "加额度" },
     lanes: { chat: "聊天", gui: "动手" }, laneDefault: (l) => `${l}默认`, laneTitle: (l) => `这个模型供「${l}」选择器选用`, laneDefaultTitle: (l) => `「${l}」选择器的默认模型`,
     thWho: "账号", thJoined: "注册", thSpent: "花费 累计 / 今天", thTokens: "tokens 累计 / 今天", thReqs: "请求", thActive: "最近活跃", thDevices: "设备",
     never: "从未", phone: "手机", email: "邮箱", disabled: "已停用", locked: "已锁定", member: "成员", listed: "白名单", review: "审核", reviewNote: "应用商店审核员的登录账号（REVIEW_ADDRESSES）：固定验证码，不计入注册数", password: "密码", noAccounts: "还没有人登录过。", search: "搜索提示 / ID / 地址…",
     reqs: (n) => `${fmt(n)} 次`, tokens: (n) => `${fmt(n)} tokens`, seconds: (n) => `${fmt(n)} 秒`, pictures: (n) => `${fmt(n)} 张`, inOut: (i, o) => `输入 ${fmt(i)} · 输出 ${fmt(o)}`,
-    all: "全部", signIns: "登录", refusals: "超额", errors: "错误", calls: "通话", passwords: "密码",
+    all: "全部", signIns: "登录", refusals: "超额", errors: "错误", contentChecks: "内容审核", calls: "通话", passwords: "密码",
     eventName: {
       "account.created": "注册", "sign_in.code": "验证码登录", "sign_in.password": "密码登录", "sign_in.session": "换会话密钥", "sign_in.failed": "登录失败", "password.set": "设置密码", "password.changed": "修改密码",
-      "password.cleared": "移除密码", "sign_out": "退出", "sign_out.all": "全部退出", "pool.set": "额度调整", "pool.set.many": "批量额度调整", "budget.refused": "超出额度被拒", "upstream.error": "上游出错", "call.ended": "通话结束", "contribute.on": "开启「帮助改进」", "contribute.default": "新账号默认开启「帮助改进」", "contribute.bonus": "早期共创奖励 +¥10", "contribute.off": "关闭「帮助改进」", "contribute.deleted": "删除保存的对话", "invite.accepted": "邀请成功", "invite.used": "通过邀请注册", "invite.unknown": "无效邀请码", "credit.granted": "获得额度奖励", "profile.put": "更新资料", "profile.clear": "清空资料", "profile.connectors": "更新连接列表", "settings.changed": "修改配置", "nudges.changed": "修改 star 提示规则", "control.switch": "开关切换", "control.rule": "阈值规则触发",
+      "password.cleared": "移除密码", "sign_out": "退出", "sign_out.all": "全部退出", "pool.set": "额度调整", "pool.set.many": "批量额度调整", "budget.refused": "超出额度被拒", "upstream.error": "上游出错", "content.rejected": "内容审核未放行", "call.ended": "通话结束", "contribute.on": "开启「帮助改进」", "contribute.default": "新账号默认开启「帮助改进」", "contribute.bonus": "早期共创奖励 +¥10", "contribute.off": "关闭「帮助改进」", "contribute.deleted": "删除保存的对话", "invite.accepted": "邀请成功", "invite.used": "通过邀请注册", "invite.unknown": "无效邀请码", "credit.granted": "获得额度奖励", "profile.put": "更新资料", "profile.clear": "清空资料", "profile.connectors": "更新连接列表", "settings.changed": "修改配置", "nudges.changed": "修改 star 提示规则", "control.switch": "开关切换", "control.rule": "阈值规则触发",
     },
     // drawer
     spendToday: "今天", spendTotal: "累计", requests: "请求", cap: "总额度", noCap: "无上限", left: "剩余", usageToday: "今天", usagePeriod: (d) => `最近 ${d} 天`, usageTotal: "累计",
@@ -83,7 +83,7 @@
     siteUpdated: (t) => `更新于 ${t}`, siteNote: "来自 Caddy 的访问日志（保留 7 天）：按天计数，访客用当天的随机盐对地址和浏览器做哈希，不存 IP。",
     sPages: "页面浏览", sVisitors: "访客", sBots: "爬虫 / 监控", sMirror: "镜像下载", sGithub: "GitHub 下载", sStars: "Stars", sPeriod: "本期", sDelta: (n) => (n > 0 ? `+${fmt(n)} 本期` : n < 0 ? `${fmt(n)} 本期` : "本期无变化"),
     sFiles: "下载的文件", sMirrorCol: "镜像", sGithubCol: "GitHub 累计", sRefs: "来源站点", sTop: "页面", sNone: "还没有数据", sSince: (d) => `自 ${d}`,
-    mSignIns: "登录", mNew: "新注册", mActive: "活跃账号", mInvites: "通过邀请注册", mContribute: "开启「帮助改进」", mCalls: "通话", mRefused: "超额被拒", mErrors: "上游错误",
+    mSignIns: "登录", mNew: "新注册", mActive: "活跃账号", mInvites: "通过邀请注册", mContribute: "开启「帮助改进」", mCalls: "通话", mRefused: "超额被拒", mErrors: "上游错误", mContentRejected: "内容审核未放行",
     devices: "设备", devKinds: { phone: "手机", computer: "电脑", web: "网页版" }, invitesTitle: "邀请", invitesLine: (f) => `${fmt(f.with_code)} 人生成了邀请码 · ${fmt(f.inviters)} 人邀请成功 · ${fmt(f.invited)} 人经邀请注册`,
     // data controls
     data: (d) => `数据控制 · 最近 ${d} 天`, dOn: "开启「帮助改进」的账号", dOnSub: (on, total) => `共 ${fmt(total)} 个账号 · ${fmt(on)} 开启 · ${fmt(Math.max(0, total - on))} 关闭`, dOff: "主动关闭过的账号", dOffSub: "曾经把开关关掉的人数", dTurns: "保存的对话", dTurnsSub: (all, acc) => `累计 ${fmt(all)} 轮 · 来自 ${fmt(acc)} 个账号`, dTokens: "保存对话的 tokens", dTokensSub: (i, o) => `输入 ${fmt(i)} · 输出 ${fmt(o)}`, dDefault: (on) => on ? "新账号默认开启（IMPROVE_DEFAULT=1）" : "新账号默认关闭（IMPROVE_DEFAULT=0）", dKeeps: () => "保存：用户写的、模型回答的、它选择调用的工具，以及模型、token 数、客户端和语言。不保存：系统提示（记忆、SOUL、指令）、工具返回的内容、图片 / 音频 / 视频、用户的身份。",
@@ -144,7 +144,7 @@
     aSearch: "搜索提示 / 内容…", aCount: (n) => `${fmt(n)} 条`,
     dPerDay: "每天的体验次数", dReasons: "结束原因", dReason: { idle: "闲置超时", "time is up": "到时", "ended by the visitor": "访客自己结束", "gateway stopping": "网关重启", "failed to start": "没启动起来" }, dPlaces: "访客地区", dAll: "全部", dRunning: "进行中", dSigned: "已登录", dAnon: "未登录", dByokOnly: "自带 key",
     cSearch: "搜索模型…", cOnlyVision: "只看能看图的",
-    hOk: "一切正常", hProblems: "需要看一下", hInFlight: "在飞的请求", hInFlightSub: (a, l) => `${fmt(a)} 个账号 · ${l > 0 ? `每账号最多 ${l}` : "不限"}`, hHub: "设备通道", hOnline: "在线连接", hAccountsOnline: "在线账号", hPending: "等回复的调用", hDropped: "丢掉的帧", hFlood: "因刷屏断开", hLastHour: "最近一小时", hRequests: "请求", hUpstreamErrors: "上游错误", hRefused: "超额被拒", hSignIns: "登录", hFailures: "登录失败", hDb: "数据库", hWritable: "可写", hNotWritable: "不可写", hUpstream: "上游 key", hHave: "已配置", hMissing: "没有", hServerTime: "服务器时间", hAuto: "每 30 秒自动刷新", hNote: "同一份数据，服务器上的自检定时器每 10 分钟也读一次（journalctl -t nanomuse-selfcheck）；问题持续时按配置的 ALERT_URL 通知。",
+    hOk: "一切正常", hProblems: "需要看一下", hInFlight: "在飞的请求", hInFlightSub: (a, l) => `${fmt(a)} 个账号 · ${l > 0 ? `每账号最多 ${l}` : "不限"}`, hHub: "设备通道", hOnline: "在线连接", hAccountsOnline: "在线账号", hPending: "等回复的调用", hDropped: "丢掉的帧", hFlood: "因刷屏断开", hLastHour: "最近一小时", hRequests: "请求", hUpstreamErrors: "上游错误", hContentRejected: "内容审核未放行", hRefused: "超额被拒", hSignIns: "登录", hFailures: "登录失败", hDb: "数据库", hWritable: "可写", hNotWritable: "不可写", hUpstream: "上游 key", hHave: "已配置", hMissing: "没有", hServerTime: "服务器时间", hAuto: "每 30 秒自动刷新", hNote: "同一份数据，服务器上的自检定时器每 10 分钟也读一次（journalctl -t nanomuse-selfcheck）；问题持续时按配置的 ALERT_URL 通知。",
   } : {
     title: "nanoMuse Cloud admin", tokenLabel: "Admin token", tokenHint: "The value of CLOUD_ADMIN_TOKEN in the relay's .env; it stays in this tab only.",
     enter: "Open", wrong: "That token is not right.", offline: "Cannot reach the server.", refresh: "Refresh", lock: "Lock", loading: "Loading…",
@@ -153,17 +153,17 @@
     kAccounts: "Accounts", kAccountsSub: (c) => `${c.with_password || 0} with a password · ${c.unlimited || 0} members · ${c.disabled || 0} disabled`,
     kActive: "Active accounts", kActiveSub: (n) => `${n} new`, kSpent: "Spent", kSpentSub: (r, t) => `${fmt(r)} requests · ${fmt(t)} tokens`,
     kOnline: "Devices online", kOnlineSub: (k, s) => `${k} remembered · ${s} live sign-ins`, kSignals: "Signals today",
-    kSignalsSub: (s) => `${s.sign_ins} sign-ins · ${s.sign_in_failures} failed · ${s.budget_refusals} over budget · ${s.upstream_errors} upstream errors · ${s.calls} calls`,
+    kSignalsSub: (s) => `${s.sign_ins} sign-ins · ${s.sign_in_failures} failed · ${s.budget_refusals} over budget · ${s.upstream_errors} upstream errors · ${s.content_rejected} content checks · ${s.calls} calls`,
     byKind: "By kind", byModel: "By model", byDay: (d) => `Spend by day · last ${d} days`, top: (d) => `Top spenders · last ${d} days`, events: "Activity", accounts: "All accounts", config: "Configuration",
     kinds: { chat: "Chat", image: "Pictures", video: "Video", realtime: "Calls", grant: "Tokens granted", credit: "Credit" },
     lanes: { chat: "chat", gui: "hands" }, laneDefault: (l) => `${l} default`, laneTitle: (l) => `offered in the ${l} picker`, laneDefaultTitle: (l) => `the ${l} picker's default`,
     thWho: "Account", thJoined: "Joined", thSpent: "Spent all / today", thTokens: "Tokens all / today", thReqs: "Requests", thActive: "Last active", thDevices: "Devices",
     never: "never", phone: "phone", email: "e-mail", disabled: "disabled", locked: "locked", member: "member", listed: "listed", review: "review", reviewNote: "the app store reviewer's sign-in (REVIEW_ADDRESSES): a fixed code, left out of the sign-up counts", password: "password", noAccounts: "Nobody has signed in yet.", search: "Search hint / id / address…",
     reqs: (n) => `${fmt(n)} req`, tokens: (n) => `${fmt(n)} tokens`, seconds: (n) => `${fmt(n)} s`, pictures: (n) => `${fmt(n)} pictures`, inOut: (i, o) => `${fmt(i)} in · ${fmt(o)} out`,
-    all: "All", signIns: "Sign-ins", refusals: "Refusals", errors: "Errors", calls: "Calls", passwords: "Passwords",
+    all: "All", signIns: "Sign-ins", refusals: "Refusals", errors: "Errors", contentChecks: "Content checks", calls: "Calls", passwords: "Passwords",
     eventName: {
       "account.created": "Joined", "sign_in.code": "Signed in with a code", "sign_in.password": "Signed in with the password", "sign_in.session": "Took a session key", "sign_in.failed": "Failed sign-in", "password.set": "Password set", "password.changed": "Password changed",
-      "password.cleared": "Password removed", "sign_out": "Signed out", "sign_out.all": "Signed out everywhere", "pool.set": "Pool set", "pool.set.many": "Pools set", "budget.refused": "Refused: over budget", "upstream.error": "Upstream error", "call.ended": "Call ended", "contribute.on": "“Help improve” on", "contribute.default": "New account: “help improve” on by default", "contribute.bonus": "Early co-creation bonus +¥10", "contribute.off": "“Help improve” off", "contribute.deleted": "Kept turns deleted", "invite.accepted": "Invited a friend", "invite.used": "Signed up via invite", "invite.unknown": "Unknown invite code", "credit.granted": "Credit granted", "profile.put": "Profile updated", "profile.clear": "Profile cleared", "profile.connectors": "Connectors updated", "settings.changed": "Settings changed", "nudges.changed": "Star asks policy changed", "control.switch": "Switch flipped", "control.rule": "Threshold rule fired",
+      "password.cleared": "Password removed", "sign_out": "Signed out", "sign_out.all": "Signed out everywhere", "pool.set": "Pool set", "pool.set.many": "Pools set", "budget.refused": "Refused: over budget", "upstream.error": "Upstream error", "content.rejected": "Content check declined", "call.ended": "Call ended", "contribute.on": "“Help improve” on", "contribute.default": "New account: “help improve” on by default", "contribute.bonus": "Early co-creation bonus +¥10", "contribute.off": "“Help improve” off", "contribute.deleted": "Kept turns deleted", "invite.accepted": "Invited a friend", "invite.used": "Signed up via invite", "invite.unknown": "Unknown invite code", "credit.granted": "Credit granted", "profile.put": "Profile updated", "profile.clear": "Profile cleared", "profile.connectors": "Connectors updated", "settings.changed": "Settings changed", "nudges.changed": "Star asks policy changed", "control.switch": "Switch flipped", "control.rule": "Threshold rule fired",
     },
     spendToday: "Today", spendTotal: "All time", requests: "Requests", cap: "Pool", noCap: "no cap", left: "left", usageToday: "Today", usagePeriod: (d) => `Last ${d} days`, usageTotal: "All time",
     sessions: "Sign-ins (incl. revoked)", revoked: "revoked", via: { code: "code", password: "password", session: "session key" }, lastUsed: "last used", devices: "Devices", firstSeen: "first", lastSeen: "last",
@@ -203,7 +203,7 @@
     siteUpdated: (t) => `updated ${t}`, siteNote: "From Caddy's access log (kept seven days): counted by day; a visitor is a hash of address and browser under a salt made for that day. No addresses are stored.",
     sPages: "Page views", sVisitors: "Visitors", sBots: "Crawlers / monitors", sMirror: "Mirror downloads", sGithub: "GitHub downloads", sStars: "Stars", sPeriod: "this period", sDelta: (n) => (n > 0 ? `+${fmt(n)} this period` : n < 0 ? `${fmt(n)} this period` : "no change this period"),
     sFiles: "Files downloaded", sMirrorCol: "mirror", sGithubCol: "GitHub, all time", sRefs: "Referring sites", sTop: "Pages", sNone: "Nothing yet", sSince: (d) => `since ${d}`,
-    mSignIns: "Sign-ins", mNew: "New accounts", mActive: "Active accounts", mInvites: "Signed up via invite", mContribute: "“Help improve” turned on", mCalls: "Calls", mRefused: "Refused: over budget", mErrors: "Upstream errors",
+    mSignIns: "Sign-ins", mNew: "New accounts", mActive: "Active accounts", mInvites: "Signed up via invite", mContribute: "“Help improve” turned on", mCalls: "Calls", mRefused: "Refused: over budget", mErrors: "Upstream errors", mContentRejected: "Content check declined",
     devices: "Devices", devKinds: { phone: "phones", computer: "computers", web: "web" }, invitesTitle: "Invites", invitesLine: (f) => `${fmt(f.with_code)} made an invite code · ${fmt(f.inviters)} brought someone · ${fmt(f.invited)} came through one`,
     data: (d) => `Data controls · last ${d} days`, dOn: "Accounts with “help improve” on", dOnSub: (on, total) => `${fmt(total)} accounts · ${fmt(on)} on · ${fmt(Math.max(0, total - on))} off`, dOff: "Accounts that turned it off", dOffSub: "ever switched it off themselves", dTurns: "Kept turns", dTurnsSub: (all, acc) => `${fmt(all)} in all · from ${fmt(acc)} accounts`, dTokens: "Tokens in kept turns", dTokensSub: (i, o) => `${fmt(i)} in · ${fmt(o)} out`, dDefault: (on) => on ? "New accounts start with it on (IMPROVE_DEFAULT=1)" : "New accounts start with it off (IMPROVE_DEFAULT=0)", dKeeps: (k) => `Kept: ${k.kept.join(", ")}. Not kept: ${k.not_kept.join(", ")}.`,
     syTitle: "Conversation sync", syOn: "Accounts with sync on", syOnSub: (off) => `${fmt(off)} turned it off`, syWith: "Accounts with synced data", syConvs: "Conversations", syMsgs: "Messages", syMsgsSub: (limit) => `at most ${fmt(limit)} per account`, syBytes: "Text stored", syNote: "0.19: the text of conversations synced between an account's devices. User and assistant texts and attachment names and sizes only; no files, no images. Only totals are shown here, never a text; the relay deletes at once when the switch goes off or the person asks.",
@@ -260,7 +260,7 @@
     aSearch: "Search hint / detail…", aCount: (n) => `${fmt(n)} events`,
     dPerDay: "Demos a day", dReasons: "Ended because", dReason: { idle: "idle", "time is up": "time was up", "ended by the visitor": "visitor ended it", "gateway stopping": "gateway restarted", "failed to start": "failed to start" }, dPlaces: "Visitors by place", dAll: "All", dRunning: "Running", dSigned: "Signed in", dAnon: "Not signed in", dByokOnly: "Own key",
     cSearch: "Search models…", cOnlyVision: "Only ones that see pictures",
-    hOk: "All well", hProblems: "Needs a look", hInFlight: "Requests under way", hInFlightSub: (a, l) => `${fmt(a)} accounts · ${l > 0 ? `${l} per account at most` : "no limit"}`, hHub: "Device hub", hOnline: "Connections", hAccountsOnline: "Accounts online", hPending: "Calls awaiting a reply", hDropped: "Frames dropped", hFlood: "Closed for flooding", hLastHour: "Last hour", hRequests: "Requests", hUpstreamErrors: "Upstream errors", hRefused: "Refused: over budget", hSignIns: "Sign-ins", hFailures: "Failed sign-ins", hDb: "Database", hWritable: "writable", hNotWritable: "not writable", hUpstream: "Upstream key", hHave: "set", hMissing: "missing", hServerTime: "Server time", hAuto: "refreshes every 30 s", hNote: "The self-check timer on the server reads the same figures every ten minutes (journalctl -t nanomuse-selfcheck); a problem that stays goes to ALERT_URL when one is set.",
+    hOk: "All well", hProblems: "Needs a look", hInFlight: "Requests under way", hInFlightSub: (a, l) => `${fmt(a)} accounts · ${l > 0 ? `${l} per account at most` : "no limit"}`, hHub: "Device hub", hOnline: "Connections", hAccountsOnline: "Accounts online", hPending: "Calls awaiting a reply", hDropped: "Frames dropped", hFlood: "Closed for flooding", hLastHour: "Last hour", hRequests: "Requests", hUpstreamErrors: "Upstream errors", hContentRejected: "Content check declined", hRefused: "Refused: over budget", hSignIns: "Sign-ins", hFailures: "Failed sign-ins", hDb: "Database", hWritable: "writable", hNotWritable: "not writable", hUpstream: "Upstream key", hHave: "set", hMissing: "missing", hServerTime: "Server time", hAuto: "refreshes every 30 s", hNote: "The self-check timer on the server reads the same figures every ten minutes (journalctl -t nanomuse-selfcheck); a problem that stays goes to ALERT_URL when one is set.",
   };
 
   const moneyN = (v) => { const c = Number(v || 0); return c >= 100 ? c.toFixed(0) : c >= 1 ? c.toFixed(2) : c > 0 && c < 0.01 ? c.toFixed(4) : c.toFixed(2); };
@@ -315,10 +315,10 @@
   const EVENT_STYLE = {
     "account.created": ["ok", ICON.person], "sign_in.code": ["", ICON.in], "sign_in.password": ["", ICON.in], "sign_in.session": ["", ICON.key], "sign_in.failed": ["warn", ICON.warn],
     "password.set": ["violet", ICON.key], "password.changed": ["violet", ICON.key], "password.cleared": ["violet", ICON.key], "sign_out": ["grey", ICON.out], "sign_out.all": ["grey", ICON.out],
-    "budget.refused": ["bad", ICON.warn], "upstream.error": ["bad", ICON.warn], "call.ended": ["ok", ICON.realtime],
+    "budget.refused": ["bad", ICON.warn], "upstream.error": ["bad", ICON.warn], "content.rejected": ["warn", ICON.warn], "call.ended": ["ok", ICON.realtime],
     "control.switch": ["warn", ICON.warn], "control.rule": ["warn", ICON.warn],
   };
-  const FILTERS = [["", "all"], ["sign_in.code,sign_in.password,sign_in.session,sign_in.failed,account.created", "signIns"], ["budget.refused", "refusals"], ["upstream.error", "errors"], ["call.ended", "calls"], ["password.set,password.changed,password.cleared", "passwords"]];
+  const FILTERS = [["", "all"], ["sign_in.code,sign_in.password,sign_in.session,sign_in.failed,account.created", "signIns"], ["budget.refused", "refusals"], ["upstream.error", "errors"], ["content.rejected", "contentChecks"], ["call.ended", "calls"], ["password.set,password.changed,password.cleared", "passwords"]];
   const VIEWS = ["overview", "people", "places", "money", "activity", "demo", "data", "site", "models", "health", "stats", "controls", "settings"];
   const PAGE = 50;
 
@@ -693,7 +693,7 @@
       h("div", { class: "sparks" },
         sparkRow(T.mSignIns, rows, "sign_ins", "blue", dayOf), sparkRow(T.mNew, rows, "new_accounts", "ok", dayOf), sparkRow(T.mActive, rows, "active_accounts", "cyan", dayOf),
         sparkRow(T.mInvites, rows, "invites_used", "violet", dayOf), sparkRow(T.mContribute, rows, "contribute_on", "violet", dayOf), sparkRow(T.mCalls, rows, "calls", "ok", dayOf),
-        sparkRow(T.mRefused, rows, "budget_refusals", "warn", dayOf), sparkRow(T.mErrors, rows, "upstream_errors", "warn", dayOf)),
+        sparkRow(T.mRefused, rows, "budget_refusals", "warn", dayOf), sparkRow(T.mErrors, rows, "upstream_errors", "warn", dayOf), sparkRow(T.mContentRejected, rows, "content_rejected", "grey", dayOf)),
       h("div", { class: "kv" },
         h("b", {}, T.devices), h("span", {}, Object.keys(byKind).length ? Object.entries(byKind).map(([k, v]) => h("div", {}, h("span", { class: "pill", style: "margin-right:6px" }, `${T.devKinds[k] || k} ${fmt(v.n)}`), h("span", { class: "fine" }, v.os.join(" · ")))) : T.none),
         h("b", {}, T.invitesTitle), h("span", {}, T.invitesLine({ with_code: 0, inviters: 0, invited: 0, ...(sr.invites || {}) })),
@@ -1191,7 +1191,7 @@
         kpi(`${T.kActive} · ${T.today}`, fmt(today.active_accounts), T.kActiveSub(today.new_accounts || 0), `/ ${fmt(period.active_accounts)} ${T.period(days)}`),
         spendKpi(T.today, today), spendKpi(T.week, week), spendKpi(T.period(days), period),
         kpi(T.kOnline, fmt(ov.online_devices), T.kOnlineSub(c.devices || 0, c.live_keys || 0)),
-        kpi(T.kSignals, fmt((sig.sign_ins || 0) + (sig.calls || 0)), T.kSignalsSub({ sign_ins: 0, sign_in_failures: 0, budget_refusals: 0, upstream_errors: 0, calls: 0, ...sig })),
+        kpi(T.kSignals, fmt((sig.sign_ins || 0) + (sig.calls || 0)), T.kSignalsSub({ sign_ins: 0, sign_in_failures: 0, budget_refusals: 0, upstream_errors: 0, content_rejected: 0, calls: 0, ...sig })),
         samplesKpi),
       h("div", { class: "panel" }, h("h2", {}, T.byDay(Math.min(days, 90)), h("span", { class: "sp" }), seeAll("money")), usage ? (usage._error ? h("div", { class: "empty" }, T.loadFailed(usage._error)) : dayBars(usage.days, Math.min(days, 90), s.day_offset_h, rate)) : h("div", { class: "empty" }, T.loading)),
       h("div", { class: "grid2" },
@@ -1308,7 +1308,7 @@
         card(T.hOnline, fmt(hub.online || 0)), card(T.hAccountsOnline, fmt(hub.accounts_online || 0)), card(T.hPending, fmt(hub.pending_calls || 0)),
         card(T.hDropped, fmt(hub.dropped_frames || 0), null, tone(false, hub.dropped_frames > 0)), card(T.hFlood, fmt(hub.flood_closes || 0), null, tone(hub.flood_closes > 0))),
       h("div", { class: "label" }, T.hLastHour), h("div", { class: "kpis" },
-        card(T.hRequests, fmt(hr.requests || 0)), card(T.hUpstreamErrors, fmt(hr.upstream_errors || 0), null, tone(hr.upstream_errors >= 20, hr.upstream_errors > 0)), card(T.hRefused, fmt(hr.budget_refused || 0), null, tone(false, hr.budget_refused > 0)),
+        card(T.hRequests, fmt(hr.requests || 0)), card(T.hUpstreamErrors, fmt(hr.upstream_errors || 0), null, tone(hr.upstream_errors >= 20, hr.upstream_errors > 0)), card(T.hContentRejected, fmt(hr.content_rejected || 0)), card(T.hRefused, fmt(hr.budget_refused || 0), null, tone(false, hr.budget_refused > 0)),
         card(T.hSignIns, fmt(hr.sign_ins || 0)), card(T.hFailures, fmt(hr.sign_in_failures || 0), null, tone(false, hr.sign_in_failures > 0))),
       h("div", { class: "label" }, T.hDb), h("div", { class: "kpis" },
         card(T.hDb, sizeOf(db.size_bytes || 0), db.writable ? T.hWritable : T.hNotWritable, tone(!db.writable)), card(T.hUpstream, hv.upstream_key ? T.hHave : T.hMissing, null, tone(!hv.upstream_key))),

@@ -178,6 +178,15 @@ def upstream_detail(kind: str, status: int, model: str, raw: bytes | str) -> str
 CONTENT_CHECK_MARKS = ("data_inspection_failed", "datainspectionfailed", "inappropriate content", "green net")
 
 
+def upstream_event_kind(status: int, raw: bytes | str) -> str:
+    """The event a provider's refusal is kept as: `content.rejected` when its content check
+    declined the words (the provider is fine; the request's words are the matter, and one long
+    conversation can be declined hundreds of times as its client retries), `upstream.error`
+    for everything else. The health page counts the two apart and only the second one is a
+    problem."""
+    return "content.rejected" if status == 400 and content_check_refusal(raw) else "upstream.error"
+
+
 def content_check_refusal(raw: bytes | str) -> bool:
     """True when the provider refused because its content check rejected the words, not
     because anything was wrong with the request — the person needs different words, not a
@@ -759,7 +768,11 @@ def create_app(
                     log.warning("upstream error: %s", e)
                     raise CloudError(502, "upstream", "The model provider did not answer") from e
                 if r.status_code >= 400:
-                    cloud.note(caller.account_id, "upstream.error", upstream_detail("chat", r.status_code, spec.id, r.content))
+                    cloud.note(
+                        caller.account_id,
+                        upstream_event_kind(r.status_code, r.content),
+                        upstream_detail("chat", r.status_code, spec.id, r.content),
+                    )
                     return _relay_error(r, request)
                 try:
                     obj = r.json()
@@ -792,7 +805,11 @@ def create_app(
                 async with http.stream("POST", url, headers=headers, content=dumps(body).encode()) as r:
                     if r.status_code >= 400:
                         raw = await r.aread()
-                        cloud.note(caller.account_id, "upstream.error", upstream_detail("chat", r.status_code, spec.id, raw))
+                        cloud.note(
+                            caller.account_id,
+                            upstream_event_kind(r.status_code, raw),
+                            upstream_detail("chat", r.status_code, spec.id, raw),
+                        )
                         failed = True
                         err = relay_error_body(r.status_code, raw)
                         cloud.db.daily_add("error", str(err["error"]["code"]))  # the 200 has left; count it here
@@ -1214,8 +1231,11 @@ def create_app(
     @app.get("/v1/admin/health", dependencies=[Depends(admin_dep)])
     async def admin_health() -> dict:
         """What the self-check timer reads (deploy/nanomuse-hk/selfcheck.sh): aggregates
-        only — requests under way, the hub's counters, the last hour's refusals and upstream
-        errors, the database — never an account. `ok` is false when something needs a look."""
+        only — requests under way, the hub's counters, the last hour's refusals, upstream
+        errors and content-check refusals, the database — never an account. `ok` is false
+        when something needs a look; the provider's content check declining a request's
+        words (`content_rejected`) is counted apart and is never one of the problems, since
+        the provider is answering and only the words are the matter."""
         hub = getattr(app.state, "hub", None)
         t = int(time.time())
         hour = cloud.db.events_since(t - 3600)
@@ -1231,6 +1251,7 @@ def create_app(
             "last_hour": {
                 "requests": cloud.db.requests_since_all(t - 3600),
                 "upstream_errors": upstream_errors,
+                "content_rejected": int(hour.get("content.rejected", 0)),
                 "budget_refused": int(hour.get("budget.refused", 0)),
                 "sign_ins": int(hour.get("sign_in.code", 0)) + int(hour.get("sign_in.password", 0)),
                 "sign_in_failures": int(hour.get("sign_in.failed", 0)),
