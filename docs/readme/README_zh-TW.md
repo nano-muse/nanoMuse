@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 
 ## 🗞️ 最新消息
 
-- `2026-10-09` 🚀 最新版本：[1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0)，手機、電腦和瀏覽器都有；安裝在上一版之上，資料保留，每一處改動都寫在發布說明裡。
+- `2026-10-09` 🚀 版本 [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) 發布，手機、電腦和瀏覽器都有；安裝在上一版之上，資料保留，每一處改動都寫在發布說明裡。
 - `2026-10-08` 🤗 我們的論文登上 [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699)，在 10 月 8 日的榜單上排第三；歡迎到論文頁提問和留言。
 - `2026-10-07` 📄 我們的論文已發布在 [arXiv](https://arxiv.org/abs/2610.08699)：《nanoMuse: An Open-Source Personal Agent for Every Device You Own》，作者 Guangyi Liu、Yong Liu、Jiangning Zhang（浙江大學）；引用格式見本頁末尾。
 - `2026-09-25` 🎉 nanoMuse 以 GPL-3.0-or-later 發布在 GitHub：一個基於 OpenMinis 1.13 的 Android 應用程式；中繼、電腦版和 iPhone 版在隨後幾天陸續到來。

@@ -9,17 +9,17 @@
   …`` headings for the next version are put back by hand (see the previous release commit).
 - ``README.md``, ``docs/readme/README_*.md``, ``docs/index.md``, ``docs/zh/index.md``: ``<old> <OldName>`` becomes
   ``<new> <NewName>``, every ``v<old>`` tag and ``nanoMuse-<old>`` asset name moves to the new
-  version. In a *News* list (lines ``- `<date>` …``) the one line that names the latest version
-  (``[<old> <OldName>](…/tag/v<old>)``) is rewritten for the new version and its date and moved
-  to the top, so the list stays newest first; the paper, the first release and the other
-  milestones keep their lines, their dates and their order. The homepage's ``index.html`` is
-  edited by hand the same way.
+  version. A *News* list (lines ``- `<date>` …``) is left as written: its lines are milestones,
+  and a milestone's line keeps its date, its version and its words for good. A major version
+  (``x.0.0``) is a milestone and gets a new line, written by hand and put first, in the ten
+  READMEs and on the homepage's ``index.html``; a smaller release gets none, the download
+  tables and the version line say what the current version is.
 - ``docs/release-notes-template.md``: the new codename joins the list.
 - ``docs/roadmap.md`` (the past-releases table) and ``docs/parity.md`` (cells that said "next
   release") are edited by hand.
 
 ``--dry-run`` writes nothing and prints, for every page with a News list, its first three News
-lines as they would be after the edit.
+lines (unchanged by this script) so the reviewer sees what a new milestone line would go above.
 
 Run from the repository root. ``scripts/release-bump.sh`` comes before this, ``scripts/rebrand.py``
 in between; CONTRIBUTING.md has the whole recipe.
@@ -64,15 +64,11 @@ def move_version(line: str, old: str, new: str, oldname: str, newname: str) -> s
     return re.sub(rf"(?<![\d.]){re.escape(old)}-", f"{new}-", line)
 
 
-def edit_page(
-    text: str, old: str, new: str, oldname: str, newname: str, date: str
-) -> tuple[str, int]:
+def edit_page(text: str, old: str, new: str, oldname: str, newname: str) -> tuple[str, int]:
     """The page after the release edit, and how many lines still name the old version.
 
-    Outside the News lists every mention moves to the new version. Inside a News list only
-    the line that names the latest version changes: it gets the new version, codename and
-    date and goes to the top of its list; the other milestone lines are left as written, in
-    their order."""
+    Outside the News lists every mention moves to the new version. A News list is left as
+    written: every line of it is a milestone and keeps its date, its version and its words."""
     lines = text.split("\n")
     blocks = news_blocks(lines)
     in_news = {i for start, end in blocks for i in range(start, end)}
@@ -80,18 +76,14 @@ def edit_page(
         line if i in in_news else move_version(line, old, new, oldname, newname)
         for i, line in enumerate(lines)
     ]
-    for start, end in blocks:
-        block = out[start:end]
-        latest = [i for i, line in enumerate(block) if f"/tag/v{old}" in line]
-        if not latest:
-            continue
-        i = latest[0]
-        line = move_version(block[i], old, new, oldname, newname)
-        line = NEWS_LINE.sub(f"- `{date}` ", line, count=1)
-        block = [line] + block[:i] + block[i + 1 :]
-        out[start:end] = block
     left = sum(1 for i, line in enumerate(out) if old in line and i not in in_news)
     return "\n".join(out), left
+
+
+def is_major(version: str) -> bool:
+    """``x.0.0``: a milestone with a News line of its own."""
+    parts = version.split(".")
+    return len(parts) == 3 and parts[1] == "0" and parts[2] == "0"
 
 
 def main(argv: list[str]) -> int:
@@ -122,11 +114,11 @@ def main(argv: list[str]) -> int:
     pages = [*PAGES, *sorted(glob.glob("docs/readme/README_*.md"))]
     for name in pages:
         p = Path(name)
-        text, left = edit_page(p.read_text(encoding="utf-8"), old, new, oldname, newname, date)
+        text, left = edit_page(p.read_text(encoding="utf-8"), old, new, oldname, newname)
         if dry_run:
             lines = text.split("\n")
             for start, end in news_blocks(lines):
-                print(f"{name}: News after the edit")
+                print(f"{name}: News, left as written")
                 for line in lines[start : min(end, start + 3)]:
                     print(f"  {line}")
         else:
@@ -146,10 +138,18 @@ def main(argv: list[str]) -> int:
             s.replace(f", {oldname} (CHANGELOG", f", {oldname}, {newname} (CHANGELOG"),
             encoding="utf-8",
         )
+    news = (
+        f"a News line for {new} {newname} (`{date}`, first in the list, the same words in the "
+        "ten READMEs and on the homepage; the earlier versions' lines stay), "
+        if is_major(new)
+        else "no News line (the News lists are milestones; this is not a major version), "
+    )
     print(
         ("dry run, nothing written. " if dry_run else "")
-        + "by hand now: the homepage's News list (the same move), docs/roadmap.md's "
-        "past-releases row, docs/parity.md, the empty Unreleased headings in CHANGELOG.md"
+        + "by hand now: "
+        + news
+        + "the homepage's version line and download links, docs/roadmap.md's past-releases row, "
+        "docs/parity.md, the empty Unreleased headings in CHANGELOG.md"
     )
     return 0
 
