@@ -124,6 +124,7 @@ status code or the JSON body:
 | The relay said | The card says | Button |
 | --- | --- | --- |
 | `413` (the request is too big for the relay or the model's window) | *That message is too large for the model's window. Shorten it, leave out some attachments, or start a new chat.* | *New chat* |
+| `400 content_rejected` (the provider's content check declined the words; a provider's own `DataInspectionFailed` on your own key reads the same) | *The model provider's content check declined this request. Try different words, or start a new chat if it keeps happening: the words it objects to can be earlier in the conversation.* | *New chat*, *Try again* |
 | `401` (the key was retired elsewhere — a sign-out of every device, a deleted account) | *This sign-in is no longer valid. Sign in again under Settings → nanoMuse Cloud.* The desktop signs itself out at the same time, as it does when `/v1/me` answers 401. | *Sign in* |
 | `403` (the account is disabled, or the relay does not take it) | *This account cannot use nanoMuse Cloud right now.*, with the relay's own words under it | *Open Settings → nanoMuse Cloud* |
 | `429` without the allowance code (too many requests at once, the provider busy) | *Too many requests at once. Wait a moment and try again.* — with the relay's `retry_after` when it sent one | *Try again* |

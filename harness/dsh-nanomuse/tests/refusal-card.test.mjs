@@ -122,6 +122,19 @@ test('413: one sentence and New chat, whether the relay sent JSON or the proxy p
   assert.doesNotMatch(markup, /413/)
 })
 
+test('400 content_rejected: one sentence, New chat and Try again, the provider’s line kept out', () => {
+  const relay = { message: "The model provider's content check declined this request; try different words", type: 'upstream', code: 'content_rejected', upstream: '<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.' }
+  const en = render('en', nodeFor(400, relay, 'INVALID_REQUEST'))
+  assert.match(en, /data-kind="content_rejected"/)
+  assert.match(en, /content check declined this request/)
+  assert.match(en, />New chat</)
+  assert.match(en, />Try again</)
+  assert.doesNotMatch(en, /400|DataInspectionFailed|[{}]/)
+  const zh = render('zh', nodeFor(400, relay, 'INVALID_REQUEST'))
+  assert.match(zh, /内容审核没有放行/)
+  assert.match(zh, />新聊天</)
+})
+
 test('401: the sign-in expired — one sentence and Sign in; 5xx and a timeout: the relay did not answer — Try again', () => {
   const signedOut = render('en', nodeFor(401, { message: 'Unknown or revoked key.', code: 'bad_key' }, 'AUTH'))
   assert.match(signedOut, /This sign-in is no longer valid/)

@@ -708,6 +708,7 @@
     <string name="nm_cloud_err_password_weak">Masyadong madaling hulaan ang password na iyan.</string>
     <string name="nm_cloud_err_signup_closed">Naka-pause muna ang pag-sign up sa relay na ito. Puwede pa ring mag-sign in ang account na mayroon na.</string>
     <string name="nm_cloud_err_too_large">Masyadong malaki ang mensaheng iyan para sa model. Paikliin ito, alisin ang ilang attachment, o magsimula ng bagong chat.</string>
+    <string name="nm_cloud_err_content_rejected">Tinanggihan ng content check ng model provider ang kahilingang ito. Subukan ang ibang mga salita, o magsimula ng bagong chat kung paulit-ulit itong nangyayari: ang mga salitang tinutulan nito ay maaaring nasa mas maagang bahagi ng usapan.</string>
     <string name="nm_cloud_err_provider_busy">Abala ngayon ang provider ng model. Subukan muli maya-maya.</string>
     <string name="nm_cloud_err_provider_busy_wait">Abala ngayon ang provider ng model. Subukan muli pagkalipas ng %1$s.</string>
     <string name="nm_cloud_err_model_not_offered">Hindi na inaalok ng nanoMuse Cloud ang model na iyan. Pumili ng iba sa Settings → nanoMuse Cloud.</string>

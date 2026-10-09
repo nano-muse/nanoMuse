@@ -708,6 +708,7 @@
     <string name="nm_cloud_err_password_weak">Esa contraseña es demasiado fácil de adivinar.</string>
     <string name="nm_cloud_err_signup_closed">Los registros están pausados en este relay por ahora. Una cuenta que ya existe puede seguir iniciando sesión.</string>
     <string name="nm_cloud_err_too_large">Ese mensaje es demasiado grande para el modelo. Acórtalo, quita algunos adjuntos o empieza un chat nuevo.</string>
+    <string name="nm_cloud_err_content_rejected">La revisión de contenido del proveedor del modelo rechazó esta solicitud. Prueba con otras palabras o, si se repite, empieza un chat nuevo: las palabras que objeta pueden estar antes en la conversación.</string>
     <string name="nm_cloud_err_provider_busy">El proveedor del modelo está ocupado ahora mismo. Inténtalo de nuevo en un momento.</string>
     <string name="nm_cloud_err_provider_busy_wait">El proveedor del modelo está ocupado ahora mismo. Inténtalo de nuevo en %1$s.</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud ya no ofrece ese modelo. Elige otro en Ajustes → nanoMuse Cloud.</string>

@@ -683,6 +683,7 @@
     <string name="nm_cloud_err_password_weak">這個密碼太好猜了。</string>
     <string name="nm_cloud_err_signup_closed">這台中繼暫時關閉了註冊。已有的帳號仍可登入。</string>
     <string name="nm_cloud_err_too_large">這則訊息對模型來說太長了。縮短一些、去掉幾個附件，或者新開一個對話。</string>
+    <string name="nm_cloud_err_content_rejected">模型服務商的內容審核沒有放行這次請求。換個說法試試；如果反覆出現，就新開一個對話，被攔下的可能是對話裡更早的內容。</string>
     <string name="nm_cloud_err_provider_busy">模型服務商現在很忙，稍後再試。</string>
     <string name="nm_cloud_err_provider_busy_wait">模型服務商現在很忙，請在 %1$s 後再試。</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud 不再提供這個模型。到「設定 → nanoMuse Cloud」換一個。</string>

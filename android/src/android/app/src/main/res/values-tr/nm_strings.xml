@@ -708,6 +708,7 @@
     <string name="nm_cloud_err_password_weak">Bu parolayı tahmin etmek çok kolay.</string>
     <string name="nm_cloud_err_signup_closed">Bu relay’de kayıtlar şimdilik durduruldu. Zaten var olan bir hesap oturum açmaya devam edebilir.</string>
     <string name="nm_cloud_err_too_large">Bu mesaj model için fazla büyük. Kısalt, bazı ekleri çıkar ya da yeni bir sohbet başlat.</string>
+    <string name="nm_cloud_err_content_rejected">Model sağlayıcısının içerik denetimi bu isteği reddetti. Başka sözcükler deneyin; tekrarlanırsa yeni bir sohbet başlatın, itiraz edilen sözcükler konuşmanın daha önceki kısmında olabilir.</string>
     <string name="nm_cloud_err_provider_busy">Model sağlayıcısı şu anda yoğun. Birazdan yeniden dene.</string>
     <string name="nm_cloud_err_provider_busy_wait">Model sağlayıcısı şu anda yoğun. %1$s sonra yeniden dene.</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud bu modeli artık sunmuyor. Ayarlar → nanoMuse Cloud altından başka bir model seç.</string>

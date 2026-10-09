@@ -8,7 +8,7 @@
  *
  * - `exhausted`: the allowance card (`AllowanceWays`), with the figures from `/me`, and *Try again*;
  *   `allowance_paused` (relay 0.22) the same card, saying the allowance is paused, not spent;
- * - `too_large`: one sentence and *New chat*;
+ * - `too_large`: one sentence and *New chat*; `content_rejected`: one sentence, *New chat* and *Try again*;
  * - `signed_out`: one sentence and *Sign in*; the others one sentence and *Try again*.
  *
  * Any other failure — an own key the provider refused, a model that timed out — gets a plain
@@ -51,6 +51,8 @@ export function refusalText(t: Translate, kind: RefusalKind, message: string, re
       return t('rfAllowancePaused')
     case 'too_large':
       return t('rfTooLarge')
+    case 'content_rejected':
+      return t('rfContentRejected')
     case 'signed_out':
       return t('rfSignedOut')
     case 'disabled':
@@ -87,6 +89,8 @@ export function providerFailureText(t: Translate, code: string | undefined, mess
       return t('rfGenQuota')
     case 'too_large':
       return t('rfGenTooLarge')
+    case 'content_rejected':
+      return t('rfGenContentRejected')
     case 'busy':
       return t('rfGenBusy')
     case 'server':
@@ -193,7 +197,7 @@ export function makeTurnError(t: Translate, deps: RefusalDeps) {
       h('div', { className: 'nm-refusal-actions', style: row },
         button(t('rfRetry'), retry, false, h(IconRefresh, { size: 14 })),
         signedIn && sessionId ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm nm-pill-ghost', 'data-testid': 'nm-rf-cloud-once', disabled: busy, onClick: retryOnCloud }, t('rfUseCloudOnce')) : null,
-        generic === 'too_large' ? button(t('rfNewChat'), () => deps.newChat()) : null,
+        generic === 'too_large' || generic === 'content_rejected' ? button(t('rfNewChat'), () => deps.newChat()) : null,
         generic === 'auth' || generic === 'quota' ? button(t('rfSettings'), openSettings) : null))
   }
 }

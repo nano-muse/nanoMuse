@@ -732,6 +732,7 @@ object NanoMuseCloud {
                 ?.let { context.getString(R.string.nm_cloud_err_provider_busy_wait, io.github.nanomuse.ui.chat.duration(context, it)) }
                 ?: context.getString(R.string.nm_cloud_err_provider_busy)
             "too_large" -> context.getString(R.string.nm_cloud_err_too_large)
+            "content_rejected" -> context.getString(R.string.nm_cloud_err_content_rejected)
             "model_not_offered" -> context.getString(R.string.nm_cloud_err_model_not_offered)
             "service_paused" -> context.getString(R.string.nm_cloud_err_service_paused)
             "sync_paused" -> context.getString(R.string.nm_cloud_err_sync_paused)

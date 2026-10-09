@@ -705,6 +705,7 @@
     <string name="nm_cloud_err_password_weak">Kata sandi itu terlalu mudah ditebak.</string>
     <string name="nm_cloud_err_signup_closed">Pendaftaran di relay ini dijeda untuk sementara. Akun yang sudah ada tetap bisa masuk.</string>
     <string name="nm_cloud_err_too_large">Pesan itu terlalu besar untuk model. Persingkat, hilangkan beberapa lampiran, atau mulai obrolan baru.</string>
+    <string name="nm_cloud_err_content_rejected">Pemeriksaan konten penyedia model menolak permintaan ini. Coba kata-kata lain, atau mulai obrolan baru jika terus terjadi: kata-kata yang ditolaknya bisa berada lebih awal dalam percakapan.</string>
     <string name="nm_cloud_err_provider_busy">Penyedia model sedang sibuk. Coba lagi sebentar lagi.</string>
     <string name="nm_cloud_err_provider_busy_wait">Penyedia model sedang sibuk. Coba lagi dalam %1$s.</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud tidak lagi menyediakan model itu. Pilih yang lain di Pengaturan → nanoMuse Cloud.</string>

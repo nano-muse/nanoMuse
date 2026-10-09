@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.PauseCircle
@@ -52,7 +53,8 @@ private const val CLOUD_DEEP_LINK = "minis://settings/cloud"
 /**
  * A turn the relay refused (docs/parity.md, item 35): one plain sentence from
  * [NanoMuseCloud.describe] and the button that fits — *New chat* for a message too large,
- * *Sign in* for a key the relay no longer takes, *Open Settings* for a model that left the
+ * *New chat* (and *Try again*) for a content check that declined the words, *Sign in* for a key
+ * the relay no longer takes, *Open Settings* for a model that left the
  * menu or an account the relay does not take, *Try again* for the rest (busy, the provider
  * behind the relay, the operator's switches). The relay's own sentence is shown under ours
  * only where it adds something (a disabled account, an unknown code). The desktop's
@@ -65,6 +67,7 @@ fun RelayRefusalCard(refusal: RelayRefusal.Refusal, onRetry: () -> Unit, modifie
     val sentence = NanoMuseCloud.describe(context, refusal.toException())
     val (icon, tint) = when (refusal.kind) {
         RelayRefusal.Kind.TOO_LARGE -> Icons.Outlined.UnfoldLess to Color(0xFFE0772C)
+        RelayRefusal.Kind.CONTENT_REJECTED -> Icons.Outlined.Block to Color(0xFFE0772C)
         RelayRefusal.Kind.SIGNED_OUT, RelayRefusal.Kind.DISABLED -> Icons.Outlined.VpnKey to MuseTones.action
         RelayRefusal.Kind.BUSY -> Icons.Outlined.HourglassEmpty to Color(0xFF7C5CFF)
         RelayRefusal.Kind.SERVICE_PAUSED, RelayRefusal.Kind.SYNC_PAUSED, RelayRefusal.Kind.HUB_PAUSED -> Icons.Outlined.PauseCircle to Color(0xFF7C5CFF)
@@ -100,6 +103,11 @@ fun RelayRefusalCard(refusal: RelayRefusal.Refusal, onRetry: () -> Unit, modifie
             FlowRow(verticalArrangement = Arrangement.Center, modifier = Modifier.padding(top = 10.dp)) {
                 when (refusal.kind) {
                     RelayRefusal.Kind.TOO_LARGE -> Primary(stringResource(R.string.nm_refusal_new_chat)) { ChatLinkResolver.dispatchDeepLink(context, NEW_CHAT_DEEP_LINK) }
+                    // the words are the matter: a new chat leaves them behind; *Try again* sends the same ones once more, by choice
+                    RelayRefusal.Kind.CONTENT_REJECTED -> {
+                        Primary(stringResource(R.string.nm_refusal_new_chat)) { ChatLinkResolver.dispatchDeepLink(context, NEW_CHAT_DEEP_LINK) }
+                        Secondary(stringResource(R.string.nm_reach_try_again), onRetry)
+                    }
                     RelayRefusal.Kind.SIGNED_OUT -> {
                         Primary(stringResource(R.string.nm_refusal_sign_in)) { ChatLinkResolver.dispatchDeepLink(context, CLOUD_DEEP_LINK) }
                         Secondary(stringResource(R.string.nm_reach_try_again), onRetry)

@@ -55,6 +55,7 @@ struct NanoMuseRelayRefusalCard: View {
     private var icon: String {
         switch refusal.kind {
         case .tooLarge: return "arrow.down.right.and.arrow.up.left"
+        case .contentRejected: return "hand.raised"
         case .signedOut, .disabled: return "key"
         case .busy: return "hourglass"
         case .servicePaused, .syncPaused, .hubPaused, .allowancePaused: return "pause.circle"
@@ -65,7 +66,7 @@ struct NanoMuseRelayRefusalCard: View {
 
     private var tint: Color {
         switch refusal.kind {
-        case .tooLarge, .relayDown, .other, .model: return Color(red: 0.88, green: 0.47, blue: 0.17)
+        case .tooLarge, .contentRejected, .relayDown, .other, .model: return Color(red: 0.88, green: 0.47, blue: 0.17)
         case .signedOut, .disabled: return NanoMuseTones.action
         case .busy, .servicePaused, .syncPaused, .hubPaused, .allowancePaused, .exhausted, .dailyCap: return Color(red: 0.49, green: 0.36, blue: 1.0)
         }
@@ -77,6 +78,10 @@ struct NanoMuseRelayRefusalCard: View {
             switch refusal.kind {
             case .tooLarge:
                 primary(AppLocalized("New chat")) { NotificationCenter.default.post(name: .newChatRequested, object: nil) }
+            case .contentRejected:
+                // the words are the matter: a new chat leaves them behind; *Try again* sends the same ones once more, by choice
+                primary(AppLocalized("New chat")) { NotificationCenter.default.post(name: .newChatRequested, object: nil) }
+                secondary(AppLocalized("Try again"), onRetry)
             case .signedOut:
                 primary(AppLocalized("Sign in")) { openSettings() }
                 secondary(AppLocalized("Try again"), onRetry)

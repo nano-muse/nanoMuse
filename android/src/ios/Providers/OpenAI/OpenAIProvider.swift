@@ -609,6 +609,12 @@ final class OpenAIProvider: LLMProvider {
                               let event = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else { continue }
 
                         if self.usesChatCompletionsAPI {
+                            // nanoMuse: an error inside the stream (nanoMuse Cloud answers 200 and puts the
+                            // provider's refusal in a data: line, as OpenRouter does) ends the turn with that
+                            // error and its card, not with an empty reply; the status is unknown here (0)
+                            if let inline = event["error"] as? [String: Any], !inline.isEmpty {
+                                throw self.mapHTTPError(statusCode: 0, body: payload)
+                            }
                             if let choices = event["choices"] as? [[String: Any]],
                                let delta = choices.first?["delta"] as? [String: Any],
                                let text = delta["content"] as? String {

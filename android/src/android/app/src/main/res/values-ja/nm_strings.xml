@@ -705,6 +705,7 @@
     <string name="nm_cloud_err_password_weak">そのパスワードは推測されやすすぎます。</string>
     <string name="nm_cloud_err_signup_closed">このリレーでは新規登録を一時停止しています。すでにあるアカウントはそのままサインインできます。</string>
     <string name="nm_cloud_err_too_large">このメッセージはモデルには大きすぎます。短くするか、添付をいくつか外すか、新しいチャットを始めてください。</string>
+    <string name="nm_cloud_err_content_rejected">モデル提供元のコンテンツ審査がこのリクエストを通しませんでした。言い方を変えてみてください。続くようなら新しいチャットを始めてください。問題とされた言葉は会話のもっと前にあることもあります。</string>
     <string name="nm_cloud_err_provider_busy">モデル提供元が混み合っています。少ししてからもう一度お試しください。</string>
     <string name="nm_cloud_err_provider_busy_wait">モデル提供元が混み合っています。%1$s 後にもう一度お試しください。</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud ではそのモデルの提供を終了しました。設定 → nanoMuse Cloud で別のモデルを選んでください。</string>

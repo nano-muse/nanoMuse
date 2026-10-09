@@ -145,7 +145,11 @@ Codex 登录的 ChatGPT 套餐只有聊天和视觉——Codex 后端没有图�
 「Rate limited」。回复在响应体还完整时读取（`AllowanceSignal.noteHttpError`，经由 `OpenAIProvider` 里
 同一处 `// nanoMuse:` 改动），以规范的 `nm_relay:` 行存进消息，由卡片绘制：`413 too_large`（也包括
 中继主机上的代理返回的普通 413）→「这条消息对模型来说太大了。缩短一点、去掉一些附件，或者开
-一个新聊天。」加「新聊天」；`401 bad_key` / `account_deleted` →「登录」；`403 not_invited` /
+一个新聊天。」加「新聊天」；`400 content_rejected`（服务商的内容审核没有放行这些内容；用自己的
+key 时服务商自己的 `DataInspectionFailed` 也算）→「模型服务商的内容审核没有放行这次请求。换个说法
+试试；如果反复出现，就新开一个对话，被拦下的可能是对话里更早的内容。」加「新聊天」和「重试」，
+压缩的对半重试（`ChatViewModel.shouldSplitOnError`）不碰它，因为请求再小，同样的内容回来还是被拒；
+`401 bad_key` / `account_deleted` →「登录」；`403 not_invited` /
 `account_disabled` / `signup_closed` →「打开设置」；`429 too_many_in_flight` / `locked` /
 `rate_limited` 和 `provider_busy`（附 `retry_after` 的等待时间）→「重试」；`404
 model_not_offered` →「打开设置」；`503 service_paused`、`sync_paused`、`hub_paused` 以及任何 5xx

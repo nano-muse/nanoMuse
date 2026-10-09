@@ -705,6 +705,7 @@
     <string name="nm_cloud_err_password_weak">รหัสผ่านนั้นเดาง่ายเกินไป</string>
     <string name="nm_cloud_err_signup_closed">รีเลย์นี้หยุดรับสมัครชั่วคราว บัญชีที่มีอยู่แล้วยังลงชื่อเข้าใช้ได้</string>
     <string name="nm_cloud_err_too_large">ข้อความนี้ใหญ่เกินไปสำหรับโมเดล ย่อให้สั้นลง ตัดไฟล์แนบบางส่วนออก หรือเริ่มแชตใหม่</string>
+    <string name="nm_cloud_err_content_rejected">การตรวจสอบเนื้อหาของผู้ให้บริการโมเดลปฏิเสธคำขอนี้ ลองใช้คำอื่น หรือถ้าเกิดซ้ำ ให้เริ่มแชทใหม่ เพราะคำที่ถูกปฏิเสธอาจอยู่ในช่วงต้นของบทสนทนา</string>
     <string name="nm_cloud_err_provider_busy">ผู้ให้บริการโมเดลกำลังยุ่งอยู่ ลองอีกครั้งในอีกสักครู่</string>
     <string name="nm_cloud_err_provider_busy_wait">ผู้ให้บริการโมเดลกำลังยุ่งอยู่ ลองอีกครั้งในอีก %1$s</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud ไม่ให้บริการโมเดลนี้แล้ว เลือกโมเดลอื่นได้ที่ การตั้งค่า → nanoMuse Cloud</string>

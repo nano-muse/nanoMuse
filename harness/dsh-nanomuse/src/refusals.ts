@@ -21,6 +21,8 @@ export type RefusalKind =
   | 'allowance_paused'
   /** 413 (the relay's `too_large`, or the proxy's plain `Request too large`); a 400 about the context window. */
   | 'too_large'
+  /** 400 `content_rejected`: the provider's content check declined the words (the relay's code, or a provider's own `DataInspectionFailed`). Final: change the words or start a new chat. */
+  | 'content_rejected'
   /** 401: the key was retired elsewhere; sign in again. */
   | 'signed_out'
   /** 403: the account is disabled, or this relay does not take it. */
@@ -46,7 +48,7 @@ export type RefusalKind =
   /** Any other refusal: the relay's own sentence is shown. */
   | 'other'
 
-export const REFUSAL_KINDS: readonly RefusalKind[] = ['exhausted', 'allowance_paused', 'too_large', 'signed_out', 'disabled', 'daily_cap', 'busy', 'model', 'relay_down', 'unreachable', 'service_paused', 'sync_paused', 'hub_paused', 'cloud_off', 'other']
+export const REFUSAL_KINDS: readonly RefusalKind[] = ['exhausted', 'allowance_paused', 'too_large', 'content_rejected', 'signed_out', 'disabled', 'daily_cap', 'busy', 'model', 'relay_down', 'unreachable', 'service_paused', 'sync_paused', 'hub_paused', 'cloud_off', 'other']
 
 /** The operator's switches (relay 0.22, `docs/cloud.md` → Controls): the code is the kind. */
 const PAUSED_CODES: Record<string, RefusalKind> = { service_paused: 'service_paused', sync_paused: 'sync_paused', hub_paused: 'hub_paused' }
@@ -114,6 +116,19 @@ export function transportFailure(error: unknown): 'timeout' | 'unreachable' | un
 
 const CONTEXT = /\b(?:context (?:length|window)|too many tokens|maximum context|prompt is too long|content is too long|exceeds the model|token limit)\b/i
 
+/**
+ * How a provider's content check says no, in the relay's sentence or in the provider's own body:
+ * the relay's code and its words, Bailian's `DataInspectionFailed` / `data_inspection_failed` with
+ * its "inappropriate content" line (the relay keeps the same marks in `CONTENT_CHECK_MARKS`). The
+ * phones match the same list. A miss leaves the error as any other provider error.
+ */
+const CONTENT_CHECK = /content_rejected|content check declined|data_inspection_failed|datainspectionfailed|inappropriate content|green net/i
+
+/** True when `text` (an error body, or an error's own line) is a content check saying no. */
+export function contentCheck(text: string | undefined | null): boolean {
+  return typeof text === 'string' && CONTENT_CHECK.test(text)
+}
+
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 
@@ -143,6 +158,7 @@ export function classifyRefusal(status: number, code: string, message: string, p
   if (code === 'allowance_exhausted' || code === 'out_of_tokens') return 'exhausted'
   if (PAUSED_CODES[code]) return PAUSED_CODES[code]
   if (status === 413 || code === 'too_large') return 'too_large'
+  if (code === 'content_rejected' || (status === 400 && contentCheck(message))) return 'content_rejected'
   if (status === 400 && CONTEXT.test(message)) return 'too_large'
   if (status === 401) return 'signed_out'
   if (status === 403) return 'disabled'
@@ -205,6 +221,8 @@ export function refusalSentence(refusal: RelayRefusal): string {
       return 'The free allowance is paused on this relay for now, not used up. Add a key of your own or sign in with a plan you already pay for, both under Settings → nanoMuse Cloud. Your sign-in, your devices and what is left stay as they are.'
     case 'too_large':
       return 'That message is too large for the model. Shorten it, leave out some attachments, or start a new chat.'
+    case 'content_rejected':
+      return "The model provider's content check declined this request. Try different words, or start a new chat if it keeps happening: the words it objects to can be earlier in the conversation."
     case 'signed_out':
       return 'This sign-in is no longer valid. Sign in again under Settings → nanoMuse Cloud.'
     case 'disabled':
@@ -281,6 +299,9 @@ export function refusalCard(kind: RefusalKind): { actions: RefusalAction[]; show
       return { actions: ['ways', 'retry'], showRelayText: false }
     case 'too_large':
       return { actions: ['new-chat'], showRelayText: false }
+    case 'content_rejected':
+      // the words are the matter: a new chat leaves them behind; *Try again* sends the same ones once more, by choice
+      return { actions: ['new-chat', 'retry'], showRelayText: false }
     case 'signed_out':
       return { actions: ['sign-in'], showRelayText: false }
     case 'disabled':
@@ -305,7 +326,7 @@ export function refusalCard(kind: RefusalKind): { actions: RefusalAction[]; show
 }
 
 /** The harness's own routing codes, read for a provider that is not the relay (an own key): what the generic card says. */
-export type ProviderFailureKind = 'auth' | 'quota' | 'too_large' | 'busy' | 'server' | 'unreachable' | 'other'
+export type ProviderFailureKind = 'auth' | 'quota' | 'too_large' | 'content_rejected' | 'busy' | 'server' | 'unreachable' | 'other'
 
 export function providerFailureKind(code: string | undefined, message: string): ProviderFailureKind {
   switch (code) {
@@ -326,6 +347,7 @@ export function providerFailureKind(code: string | undefined, message: string): 
     case 'TRANSPORT':
       return 'unreachable'
     default:
+      if (contentCheck(message)) return 'content_rejected'
       if (/\b413\b/.test(message) || CONTEXT.test(message)) return 'too_large'
       return 'other'
   }

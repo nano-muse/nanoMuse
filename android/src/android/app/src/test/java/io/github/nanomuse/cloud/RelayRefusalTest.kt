@@ -1,5 +1,7 @@
 package io.github.nanomuse.cloud
 
+import com.openminis.app.data.model.LLMError
+import com.openminis.app.ui.chat.ChatViewModel.Companion.shouldSplitOnError
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,6 +23,7 @@ class RelayRefusalTest {
             Triple(402, "out_of_tokens", "") to RelayRefusal.Kind.EXHAUSTED,
             Triple(429, "daily_cap", "") to RelayRefusal.Kind.DAILY_CAP,
             Triple(413, "too_large", "") to RelayRefusal.Kind.TOO_LARGE,
+            Triple(400, "content_rejected", "") to RelayRefusal.Kind.CONTENT_REJECTED,
             Triple(401, "bad_key", "") to RelayRefusal.Kind.SIGNED_OUT,
             Triple(401, "account_deleted", "") to RelayRefusal.Kind.SIGNED_OUT,
             Triple(403, "account_disabled", "") to RelayRefusal.Kind.DISABLED,
@@ -83,6 +86,45 @@ class RelayRefusalTest {
         assertNull(RelayRefusal.parse(500, null))
         // the relay's code without the type still counts (an older relay)
         assertEquals(RelayRefusal.Kind.TOO_LARGE, RelayRefusal.parse(413, """{"error":{"message":"too big","code":"too_large"}}""")!!.kind)
+    }
+
+    @Test fun `a content check saying no is one kind, from the relay or from a key of one's own, and nothing splits it`() {
+        // the relay's 400: `content_rejected`, the provider's line under `upstream`
+        val relayBody = """{"error":{"message":"The model provider's content check declined this request; try different words","type":"upstream","code":"content_rejected","upstream":"<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content."}}"""
+        val fromRelay = RelayRefusal.parse(400, relayBody, fromRelay = true)!!
+        assertEquals(RelayRefusal.Kind.CONTENT_REJECTED, fromRelay.kind)
+        assertEquals("content_rejected", fromRelay.code)
+        assertEquals("The model provider's content check declined this request; try different words", fromRelay.message)
+        assertFalse(fromRelay.isAllowance)
+        // the same inside a stream: the relay answers 200 and puts the error in a data: line, so the
+        // client maps it with status 0; the code alone says what it is
+        assertEquals(RelayRefusal.Kind.CONTENT_REJECTED, RelayRefusal.parse(0, relayBody)!!.kind)
+        // Bailian's own 400 on a key of one's own: not the relay's shape, the same kind and code
+        val bailian = """{"error":{"message":"<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.","type":"invalid_request_error","code":"data_inspection_failed"}}"""
+        val own = RelayRefusal.parse(400, bailian)!!
+        assertEquals(RelayRefusal.Kind.CONTENT_REJECTED, own.kind)
+        assertEquals("content_rejected", own.code)
+        assertTrue(own.message.startsWith("<400> InternalError.Algo.DataInspectionFailed"))
+        // an older relay passing the provider's words through as upstream_400 lands on the same kind
+        assertEquals(
+            RelayRefusal.Kind.CONTENT_REJECTED,
+            RelayRefusal.parse(400, """{"error":{"message":"<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.","type":"upstream","code":"upstream_400"}}""")!!.kind,
+        )
+        // another provider's 400 is still not ours
+        assertNull(RelayRefusal.parse(400, """{"error":{"message":"Invalid value for 'temperature'","type":"invalid_request_error","code":"invalid_value"}}"""))
+        assertNull(RelayRefusal.parse(400, """{"error":{"message":"Invalid value for 'temperature'","type":"invalid_request_error","code":"invalid_value"}}""", fromRelay = true))
+        // the stored line survives a reload
+        assertEquals(own, RelayRefusal.fromCanonical(RelayRefusal.canonical(own)))
+        // the compaction's split-retry leaves a content check alone: the words are the matter, not the size.
+        // The HTTP path's "[400] …", the stream's "[0] …", and the provider's own line all count
+        assertFalse(shouldSplitOnError(LLMError.ProviderError("[400] The model provider's content check declined this request; try different words")))
+        assertFalse(shouldSplitOnError(LLMError.ProviderError("[0] The model provider's content check declined this request; try different words")))
+        assertFalse(shouldSplitOnError(LLMError.ProviderError("[400] <400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.")))
+        // an over-length refusal still splits, as upstream's test expects
+        assertTrue(shouldSplitOnError(LLMError.ProviderError("[400] Your input exceeds the context window of this model")))
+        assertTrue(RelayRefusal.contentCheck("content_rejected"))
+        assertFalse(RelayRefusal.contentCheck(null))
+        assertFalse(RelayRefusal.contentCheck("Model not exist."))
     }
 
     @Test fun `the stored line round-trips, with the message and the flags`() {

@@ -692,6 +692,7 @@
     <string name="nm_cloud_err_password_weak">That password is too easy to guess.</string>
     <string name="nm_cloud_err_signup_closed">Sign-ups are paused on this relay for now. An account that already exists can still sign in.</string>
     <string name="nm_cloud_err_too_large">That message is too large for the model. Shorten it, leave out some attachments, or start a new chat.</string>
+    <string name="nm_cloud_err_content_rejected">The model provider\'s content check declined this request. Try different words, or start a new chat if it keeps happening: the words it objects to can be earlier in the conversation.</string>
     <string name="nm_cloud_err_provider_busy">The model provider is busy right now. Try again in a moment.</string>
     <string name="nm_cloud_err_provider_busy_wait">The model provider is busy right now. Try again in %1$s.</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud no longer offers that model. Pick another under Settings → nanoMuse Cloud.</string>

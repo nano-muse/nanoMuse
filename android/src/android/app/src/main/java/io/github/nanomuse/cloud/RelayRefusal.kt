@@ -28,6 +28,13 @@ object RelayRefusal {
         /** 413 (the relay's `too_large`, or the proxy's plain `Request too large`): shorten it or start a new chat. */
         TOO_LARGE("too_large"),
 
+        /**
+         * 400 `content_rejected`: the provider's content check declined the words (the relay's
+         * code, or a provider's own `DataInspectionFailed` on a key of one's own). Final: the
+         * same words come back refused, so nothing retries it; change them or start a new chat.
+         */
+        CONTENT_REJECTED("content_rejected"),
+
         /** 401: the key was retired elsewhere (`bad_key`), or the account was deleted (`account_deleted`); sign in again. */
         SIGNED_OUT("signed_out"),
 
@@ -88,10 +95,29 @@ object RelayRefusal {
 
     /** The codes the relay sends today; a body with one of these is the relay's even without the type. */
     val RELAY_CODES: Set<String> = setOf(
-        "allowance_exhausted", "out_of_tokens", "daily_cap", "too_large", "bad_key", "account_deleted",
-        "account_disabled", "not_invited", "signup_closed", "rate_limited", "too_many_in_flight",
-        "provider_busy", "locked", "model_not_offered", "service_paused", "sync_paused", "hub_paused", "upstream",
+        "allowance_exhausted", "out_of_tokens", "daily_cap", "too_large", "content_rejected", "bad_key",
+        "account_deleted", "account_disabled", "not_invited", "signup_closed", "rate_limited",
+        "too_many_in_flight", "provider_busy", "locked", "model_not_offered", "service_paused", "sync_paused",
+        "hub_paused", "upstream",
     )
+
+    /**
+     * How a provider's content check says no, in its own body or in the relay's sentence: the
+     * relay's code, the relay's own words, and Bailian's `DataInspectionFailed` /
+     * `data_inspection_failed` with its "inappropriate content" line (the relay keeps the same
+     * marks in `CONTENT_CHECK_MARKS`). Matched case-insensitively; a miss means the error is
+     * treated like any other provider error, as before.
+     */
+    private val CONTENT_CHECK_MARKS = listOf(
+        "content_rejected", "content check declined", "data_inspection_failed", "datainspectionfailed",
+        "inappropriate content", "green net",
+    )
+
+    /** True when [text] (an error body, or an error's own line) is a content check saying no. */
+    fun contentCheck(text: String?): Boolean {
+        val lower = text?.lowercase() ?: return false
+        return CONTENT_CHECK_MARKS.any { it in lower }
+    }
 
     private val PAUSED_CODES = mapOf(
         "service_paused" to Kind.SERVICE_PAUSED,
@@ -106,6 +132,7 @@ object RelayRefusal {
         code == "allowance_exhausted" && paused -> Kind.ALLOWANCE_PAUSED
         code == "allowance_exhausted" || code == "out_of_tokens" -> Kind.EXHAUSTED
         code == "daily_cap" -> Kind.DAILY_CAP
+        code == "content_rejected" -> Kind.CONTENT_REJECTED
         PAUSED_CODES[code] != null -> PAUSED_CODES.getValue(code)
         status == 413 || code == "too_large" -> Kind.TOO_LARGE
         status == 401 -> Kind.SIGNED_OUT
@@ -131,18 +158,23 @@ object RelayRefusal {
      * relay's: the body carries `type: nanomuse_cloud` or one of the relay's codes, or the
      * status is a 413 (a proxy's plain `Request too large` on the way to the relay).
      * [fromRelay] says the call went to the relay's host; without it only a body that says
-     * so counts, so another provider's 429 keeps upstream's card.
+     * so counts, so another provider's 429 keeps upstream's card. One exception for every
+     * host: a 400 whose body is a content check saying no ([contentCheck]) is
+     * [Kind.CONTENT_REJECTED] whoever sent it, so a key of one's own gets the same sentence
+     * and the same end to retrying.
      */
     fun parse(status: Int, body: String?, fromRelay: Boolean = false): Refusal? {
         val err = errorObject(body)
         val code = err?.optString("code")?.takeIf { it.isNotBlank() }
         val relays = err?.optString("type") == RELAY_TYPE || (code != null && code in RELAY_CODES)
-        if (!relays && !(fromRelay && (status == 413 || status >= 500 || status == 401))) return null
+        val contentCheck = status == 400 && contentCheck(body)
+        if (!relays && !contentCheck && !(fromRelay && (status == 413 || status >= 500 || status == 401))) return null
         val paused = err?.optBoolean("paused", false) == true
         val retry = err?.optDouble("retry_after", 0.0)?.takeIf { it > 0 }?.let { kotlin.math.ceil(it).toInt() }
         val message = err?.optString("message")?.takeIf { it.isNotBlank() }
             ?: body?.trim()?.takeIf { it.isNotBlank() && !it.startsWith("{") && !it.startsWith("<") }?.take(200)
             ?: ""
+        if (contentCheck) return Refusal(Kind.CONTENT_REJECTED, status, "content_rejected", message)
         val relayCode = code ?: "http_$status"
         return Refusal(classify(status, relayCode, paused), status, relayCode, message, retry, paused)
     }

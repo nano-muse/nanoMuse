@@ -217,7 +217,15 @@ Ours, in `NanoMuse/`:
   message, which `NanoMuseProviderReachCard` draws as the refusal card. The sentence is
   `NanoMuseCloud.describe`'s, the same the sign-in and account pages use, in all nine locales:
   `413 too_large` → *That message is too large for the model. Shorten it, leave out some
-  attachments, or start a new chat.* with *New chat*; `401 bad_key` / `account_deleted` → *Sign
+  attachments, or start a new chat.* with *New chat*; `400 content_rejected` (the provider's
+  content check declined the words; also a provider's own `DataInspectionFailed` on a key of
+  one's own) → *The model provider's content check declined this request. Try different words,
+  or start a new chat if it keeps happening: the words it objects to can be earlier in the
+  conversation.* with *New chat* and *Try again*, and the compaction's split-retry
+  (`isSegmentRetryableError`) leaves it alone, since the same words come back refused however
+  small the request; an error the relay puts inside a stream (`data: {"error": …}` on a 200)
+  now ends the turn with its card instead of an empty reply (a `// nanoMuse:` spot in
+  `OpenAIProvider`'s stream loop); `401 bad_key` / `account_deleted` → *Sign
   in*; `403 not_invited` / `account_disabled` / `signup_closed` → *Open Settings*; `429
   too_many_in_flight` / `locked` / `rate_limited` and `provider_busy` (with the wait from
   `retry_after`) → *Try again*; `404 model_not_offered` → *Open Settings*; `503 service_paused`,
