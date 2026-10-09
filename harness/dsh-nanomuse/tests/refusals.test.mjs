@@ -80,6 +80,29 @@ test('413: the relay’s too_large JSON and the proxy’s plain text both say "t
   assert.equal(classifyRefusal(400, 'upstream', "This model's maximum context length is 128000 tokens."), 'too_large')
 })
 
+test('400 content_rejected: the provider’s content check said no, as the relay’s code, as the provider’s own words on an own key, and as an older relay’s upstream_400', () => {
+  const relay = { message: "The model provider's content check declined this request; try different words", type: 'upstream', code: 'content_rejected', upstream: '<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.' }
+  const r = parseRelayFailure(relayLine(400, relay), 'INVALID_REQUEST')
+  assert.equal(r?.kind, 'content_rejected')
+  assert.equal(r?.code, 'content_rejected')
+  // the stream's shape: pi-ai prints the inline error without a status; the host still rewrites the finish by the code
+  assert.equal(classifyRefusal(0, 'content_rejected', relay.message), 'content_rejected')
+  // an older relay passing Bailian's own line through as upstream_400
+  assert.equal(classifyRefusal(400, 'upstream_400', '<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.'), 'content_rejected')
+  // the same words on a key of one's own: the generic card says the same thing
+  assert.equal(providerFailureKind('INVALID_REQUEST', '400 {"error":{"code":"data_inspection_failed","message":"Input data may contain inappropriate content."}}'), 'content_rejected')
+  assert.equal(providerFailureKind('INVALID_REQUEST', '400 {"error":{"code":"invalid_parameter_error","message":"Model not exist."}}'), 'other')
+  // the finish chunk: our code (never retried by the harness), our sentence, no JSON
+  const out = relayFailure({ message: relayLine(400, relay), code: 'INVALID_REQUEST' })
+  assert.equal(out?.failure.code, 'nanomuse/content_rejected')
+  assert.equal(out?.failure.status, 400)
+  assert.match(out?.failure.message ?? '', /content check declined/)
+  assert.doesNotMatch(out?.failure.message ?? '', /[{}"]/)
+  // the card: a new chat leaves the words behind; Try again is there, by choice
+  assert.deepEqual(refusalCard('content_rejected').actions, ['new-chat', 'retry'])
+  assert.equal(refusalCard('content_rejected').showRelayText, false)
+})
+
 test('401 bad_key: signed out; 403: disabled; 404 model_not_offered: model', () => {
   assert.equal(parseRelayFailure(relayLine(401, { message: 'Unknown or revoked key.', type: 'nanomuse_cloud', code: 'bad_key' }), 'AUTH')?.kind, 'signed_out')
   assert.equal(parseRelayFailure('401 Unauthorized', 'AUTH')?.kind, 'signed_out')

@@ -178,7 +178,13 @@ read where the body is still whole (`AllowanceSignal.noteHttpError`, through the
 `// nanoMuse:` spot in `OpenAIProvider`), stored in the message as a canonical `nm_relay:` line
 and drawn by the card: `413 too_large` (also a proxy's plain 413 from the relay's host) → *That
 message is too large for the model. Shorten it, leave out some attachments, or start a new
-chat.* with *New chat*; `401 bad_key` / `account_deleted` → *Sign in*; `403 not_invited` /
+chat.* with *New chat*; `400 content_rejected` (the provider's content check declined the
+words; also a provider's own `DataInspectionFailed` on a key of one's own) → *The model
+provider's content check declined this request. Try different words, or start a new chat if it
+keeps happening: the words it objects to can be earlier in the conversation.* with *New chat*
+and *Try again*, and the compaction's split-retry (`ChatViewModel.shouldSplitOnError`) leaves it
+alone, since the same words come back refused however small the request; `401 bad_key` /
+`account_deleted` → *Sign in*; `403 not_invited` /
 `account_disabled` / `signup_closed` → *Open Settings*; `429 too_many_in_flight` / `locked` /
 `rate_limited` and `provider_busy` (with the wait from `retry_after`) → *Try again*; `404
 model_not_offered` → *Open Settings*; `503 service_paused`, `sync_paused`, `hub_paused` and any

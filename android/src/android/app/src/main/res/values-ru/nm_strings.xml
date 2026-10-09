@@ -714,6 +714,7 @@
     <string name="nm_cloud_err_password_weak">Этот пароль слишком легко угадать.</string>
     <string name="nm_cloud_err_signup_closed">Регистрация на этом релее пока приостановлена. Уже существующий аккаунт может войти как прежде.</string>
     <string name="nm_cloud_err_too_large">Это сообщение слишком велико для модели. Сократите его, уберите часть вложений или начните новый чат.</string>
+    <string name="nm_cloud_err_content_rejected">Проверка содержимого у поставщика модели отклонила этот запрос. Попробуйте другие слова, а если это повторяется, начните новый чат: слова, к которым есть претензии, могут быть раньше в разговоре.</string>
     <string name="nm_cloud_err_provider_busy">Провайдер модели сейчас перегружен. Повторите через минуту.</string>
     <string name="nm_cloud_err_provider_busy_wait">Провайдер модели сейчас перегружен. Повторите через %1$s.</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud больше не предлагает эту модель. Выберите другую в Настройки → nanoMuse Cloud.</string>

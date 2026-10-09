@@ -188,7 +188,13 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   中继主机的裸 413 / 401 / 5xx——变成消息里一行规范的 `nm_relay:`，`NanoMuseProviderReachCard`
   把它画成拒绝卡片。句子来自 `NanoMuseCloud.describe`，和登录页、账号页用的是同一套，九种
   语言都有：`413 too_large` → *这条消息对模型来说太长了。缩短一些、去掉几个附件，或者新开
-  一个对话。* 配 *新对话*；`401 bad_key` / `account_deleted` → *登录*；`403 not_invited` /
+  一个对话。* 配 *新对话*；`400 content_rejected`（服务商的内容审核没有放行这些内容；用自己的
+  key 时服务商自己的 `DataInspectionFailed` 也算）→ *模型服务商的内容审核没有放行这次请求。换个
+  说法试试；如果反复出现，就新开一个对话，被拦下的可能是对话里更早的内容。* 配 *新对话* 和
+  *重试*，压缩的对半重试（`isSegmentRetryableError`）不碰它，因为请求再小，同样的内容回来还是
+  被拒；中继放在流里的错误（200 里的 `data: {"error": …}`）现在以它的卡片结束这一回合，而不是
+  一个空回复（`OpenAIProvider` 流循环里的一处 `// nanoMuse:`）；`401 bad_key` / `account_deleted`
+  → *登录*；`403 not_invited` /
   `account_disabled` / `signup_closed` → *打开设置*；`429 too_many_in_flight` / `locked` /
   `rate_limited` 和 `provider_busy`（带 `retry_after` 给出的等待时间）→ *重试*；
   `404 model_not_offered` → *打开设置*；`503 service_paused`、`sync_paused`、`hub_paused`

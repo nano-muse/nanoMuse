@@ -15,6 +15,7 @@ final class NanoMuseRound7Tests: XCTestCase {
     func testEveryRelayCodeHasAKindAndASentence() {
         let table: [(Int, String, NanoMuseRelayRefusal.Kind)] = [
             (413, "too_large", .tooLarge),
+            (400, "content_rejected", .contentRejected),
             (403, "not_invited", .disabled),
             (429, "too_many_in_flight", .busy),
             (429, "provider_busy", .busy),
@@ -65,6 +66,36 @@ final class NanoMuseRound7Tests: XCTestCase {
         XCTAssertEqual(NanoMuseRelayRefusal.parse(status: 502, body: "<html>bad gateway</html>", fromRelay: true)?.kind, .relayDown)
         // another provider's 429 keeps upstream's card
         XCTAssertNil(NanoMuseRelayRefusal.parse(status: 429, body: #"{"error":{"message":"Rate limit","type":"rate_limit_error"}}"#))
+    }
+
+    func testAContentCheckSayingNoIsOneKindAndNothingSplitsIt() {
+        // the relay's 400: `content_rejected`, the provider's line under `upstream`
+        let relayBody = #"{"error":{"message":"The model provider's content check declined this request; try different words","type":"upstream","code":"content_rejected","upstream":"<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content."}}"#
+        let fromRelay = NanoMuseRelayRefusal.parse(status: 400, body: relayBody, fromRelay: true)
+        XCTAssertEqual(fromRelay?.kind, .contentRejected)
+        XCTAssertEqual(fromRelay?.code, "content_rejected")
+        XCTAssertEqual(fromRelay?.isAllowance, false)
+        // the same inside a stream: the relay answers 200 and puts the error in a data: line, so the
+        // client maps it with status 0; the code alone says what it is
+        XCTAssertEqual(NanoMuseRelayRefusal.parse(status: 0, body: relayBody)?.kind, .contentRejected)
+        // Bailian's own 400 on a key of one's own: not the relay's shape, the same kind and code
+        let bailian = #"{"error":{"message":"<400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.","type":"invalid_request_error","code":"data_inspection_failed"}}"#
+        let own = NanoMuseRelayRefusal.parse(status: 400, body: bailian)
+        XCTAssertEqual(own?.kind, .contentRejected)
+        XCTAssertEqual(own?.code, "content_rejected")
+        XCTAssertEqual(own.flatMap { NanoMuseRelayRefusal.fromCanonical(NanoMuseRelayRefusal.canonical($0)) }, own)
+        // another provider's 400 is still not ours
+        XCTAssertNil(NanoMuseRelayRefusal.parse(status: 400, body: #"{"error":{"message":"Invalid value for 'temperature'","type":"invalid_request_error","code":"invalid_value"}}"#, fromRelay: true))
+        // the sentence is ours and says what to do
+        let sentence = NanoMuseCloud.describe(own!.cloudError)
+        XCTAssertTrue(sentence.lowercased().contains("content check"))
+        XCTAssertFalse(sentence.contains("!"))
+        // the compaction's split-retry leaves a content check alone: the words are the matter, not the size
+        XCTAssertFalse(AIChatViewModel.isSegmentRetryableError(LLMError.providerError(message: "[400] The model provider's content check declined this request; try different words")))
+        XCTAssertFalse(AIChatViewModel.isSegmentRetryableError(LLMError.providerError(message: "[0] The model provider's content check declined this request; try different words")))
+        XCTAssertFalse(AIChatViewModel.isSegmentRetryableError(LLMError.providerError(message: "[400] <400> InternalError.Algo.DataInspectionFailed: Input data may contain inappropriate content.")))
+        // an over-length refusal still splits, as upstream expects
+        XCTAssertTrue(AIChatViewModel.isSegmentRetryableError(LLMError.providerError(message: "[400] Your input exceeds the context window of this model")))
     }
 
     func testCanonicalLineRoundTrips() {

@@ -167,6 +167,10 @@ class ChatViewModel(
          */
         internal fun shouldSplitOnError(error: Throwable): Boolean {
             if (error is CancellationException) return false
+            // nanoMuse: a content check saying no (the relay's `content_rejected`, a provider's
+            // `DataInspectionFailed`) is about the words, not the size; halving sends the same
+            // words twice, and one long chat was refused two hundred times in an hour that way.
+            if (error is LLMError.ProviderError && io.github.nanomuse.cloud.RelayRefusal.contentCheck(error.detail)) return false
             if (error is LLMError) {
                 return when (error) {
                     // Never worth a smaller payload:

@@ -460,6 +460,8 @@ enum NanoMuseCloud {
             return AppLocalized("The free allowance is used up. Use a key of your own, or invite a friend; both are under nanoMuse Cloud in Settings.")
         case "too_large":
             return AppLocalized("That message is too large for the model. Shorten it, leave out some attachments, or start a new chat.")
+        case "content_rejected":
+            return AppLocalized("The model provider's content check declined this request. Try different words, or start a new chat if it keeps happening: the words it objects to can be earlier in the conversation.")
         case "too_many_in_flight":
             return AppLocalized("Too many requests at once. Try again shortly.")
         case "provider_busy":

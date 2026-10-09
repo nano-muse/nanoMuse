@@ -714,6 +714,7 @@
     <string name="nm_cloud_err_password_weak">To hasło jest zbyt łatwe do odgadnięcia.</string>
     <string name="nm_cloud_err_signup_closed">Rejestracja na tym relayu jest na razie wstrzymana. Istniejące konto nadal może się zalogować.</string>
     <string name="nm_cloud_err_too_large">Ta wiadomość jest za duża dla modelu. Skróć ją, usuń część załączników albo zacznij nowy czat.</string>
+    <string name="nm_cloud_err_content_rejected">Kontrola treści dostawcy modelu odrzuciła to żądanie. Spróbuj innych słów, a jeśli to się powtarza, zacznij nowy czat: zakwestionowane słowa mogą być wcześniej w rozmowie.</string>
     <string name="nm_cloud_err_provider_busy">Dostawca modelu jest teraz zajęty. Spróbuj ponownie za chwilę.</string>
     <string name="nm_cloud_err_provider_busy_wait">Dostawca modelu jest teraz zajęty. Spróbuj ponownie za %1$s.</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud nie oferuje już tego modelu. Wybierz inny w Ustawienia → nanoMuse Cloud.</string>

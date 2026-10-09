@@ -29,6 +29,10 @@ enum NanoMuseRelayRefusal {
         case dailyCap = "daily_cap"
         /// 413 (the relay's `too_large`, or a proxy's plain page): shorten it or start a new chat.
         case tooLarge = "too_large"
+        /// 400 `content_rejected`: the provider's content check declined the words (the relay's code, or a
+        /// provider's own `DataInspectionFailed` on a key of one's own). Final: the same words come back
+        /// refused, so nothing retries it; change them or start a new chat.
+        case contentRejected = "content_rejected"
         /// 401: the key was retired elsewhere (`bad_key`), or the account was deleted (`account_deleted`).
         case signedOut = "signed_out"
         /// 403: the account is disabled, or this relay does not take it (`not_invited`, `signup_closed`).
@@ -89,10 +93,26 @@ enum NanoMuseRelayRefusal {
 
     /// The codes the relay sends today; a body with one of these is the relay's even without the type.
     static let relayCodes: Set<String> = [
-        "allowance_exhausted", "out_of_tokens", "daily_cap", "too_large", "bad_key", "account_deleted",
-        "account_disabled", "not_invited", "signup_closed", "rate_limited", "too_many_in_flight",
-        "provider_busy", "locked", "model_not_offered", "service_paused", "sync_paused", "hub_paused", "upstream",
+        "allowance_exhausted", "out_of_tokens", "daily_cap", "too_large", "content_rejected", "bad_key",
+        "account_deleted", "account_disabled", "not_invited", "signup_closed", "rate_limited",
+        "too_many_in_flight", "provider_busy", "locked", "model_not_offered", "service_paused", "sync_paused",
+        "hub_paused", "upstream",
     ]
+
+    /// How a provider's content check says no, in its own body or in the relay's sentence: the relay's
+    /// code, the relay's own words, and Bailian's `DataInspectionFailed` / `data_inspection_failed` with
+    /// its "inappropriate content" line (the relay keeps the same marks in `CONTENT_CHECK_MARKS`).
+    /// Matched case-insensitively; a miss means the error is treated like any other provider error.
+    private static let contentCheckMarks = [
+        "content_rejected", "content check declined", "data_inspection_failed", "datainspectionfailed",
+        "inappropriate content", "green net",
+    ]
+
+    /// True when `text` (an error body, or an error's own line) is a content check saying no.
+    static func contentCheck(_ text: String?) -> Bool {
+        guard let lower = text?.lowercased() else { return false }
+        return contentCheckMarks.contains { lower.contains($0) }
+    }
 
     private static let canonicalPrefix = "nm_relay:"
 
@@ -102,6 +122,7 @@ enum NanoMuseRelayRefusal {
         case "allowance_exhausted": return paused ? .allowancePaused : .exhausted
         case "out_of_tokens": return .exhausted
         case "daily_cap": return .dailyCap
+        case "content_rejected": return .contentRejected
         case "service_paused": return .servicePaused
         case "sync_paused": return .syncPaused
         case "hub_paused": return .hubPaused
@@ -130,12 +151,16 @@ enum NanoMuseRelayRefusal {
     /// relay's: the body carries `type: nanomuse_cloud` or one of the relay's codes, or the
     /// call went to the relay's host and the status is a 413, a 401 or a 5xx (a proxy's plain
     /// `Request too large` on the way, the relay fallen over). Without `fromRelay` only a body
-    /// that says so counts, so another provider's 429 keeps upstream's card.
+    /// that says so counts, so another provider's 429 keeps upstream's card. One exception for
+    /// every host: a 400 whose body is a content check saying no (`contentCheck`) is
+    /// `.contentRejected` whoever sent it, so a key of one's own gets the same sentence and the
+    /// same end to retrying.
     static func parse(status: Int, body: String?, fromRelay: Bool = false) -> Refusal? {
         let err = errorObject(body)
         let code = (err?["code"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let relays = (err?["type"] as? String) == relayType || (code.map { relayCodes.contains($0) } ?? false)
-        if !relays && !(fromRelay && (status == 413 || status >= 500 || status == 401)) { return nil }
+        let isContentCheck = status == 400 && contentCheck(body)
+        if !relays && !isContentCheck && !(fromRelay && (status == 413 || status >= 500 || status == 401)) { return nil }
         let paused = (err?["paused"] as? Bool) ?? ((err?["paused"] as? NSNumber)?.boolValue ?? false)
         let retry = (err?["retry_after"] as? NSNumber).map { $0.doubleValue }.flatMap { $0 > 0 ? Int(ceil($0)) : nil }
         var message = (err?["message"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? ""
@@ -143,6 +168,7 @@ enum NanoMuseRelayRefusal {
             let t = body.trimmingCharacters(in: .whitespacesAndNewlines)
             if !t.isEmpty, !t.hasPrefix("{"), !t.hasPrefix("<") { message = String(t.prefix(200)) }
         }
+        if isContentCheck { return Refusal(kind: .contentRejected, status: status, code: "content_rejected", message: message) }
         let relayCode = code ?? "http_\(status)"
         return Refusal(kind: classify(status: status, code: relayCode, paused: paused), status: status, code: relayCode, message: message, retryAfterS: retry, paused: paused)
     }

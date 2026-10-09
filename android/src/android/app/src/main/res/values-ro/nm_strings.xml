@@ -711,6 +711,7 @@
     <string name="nm_cloud_err_password_weak">Parola e prea ușor de ghicit.</string>
     <string name="nm_cloud_err_signup_closed">Înscrierile sunt oprite pe acest relay deocamdată. Un cont care există deja se poate conecta în continuare.</string>
     <string name="nm_cloud_err_too_large">Mesajul acesta e prea mare pentru model. Scurtează-l, renunță la câteva atașamente sau începe o conversație nouă.</string>
+    <string name="nm_cloud_err_content_rejected">Verificarea de conținut a furnizorului modelului a respins această cerere. Încearcă alte cuvinte sau, dacă se repetă, începe o conversație nouă: cuvintele respinse pot fi mai devreme în conversație.</string>
     <string name="nm_cloud_err_provider_busy">Furnizorul modelului e ocupat acum. Reîncearcă peste puțin timp.</string>
     <string name="nm_cloud_err_provider_busy_wait">Furnizorul modelului e ocupat acum. Reîncearcă peste %1$s.</string>
     <string name="nm_cloud_err_model_not_offered">nanoMuse Cloud nu mai oferă acest model. Alege altul din Setări → nanoMuse Cloud.</string>
