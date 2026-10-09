@@ -363,8 +363,13 @@ a community project with no affiliation — apply unchanged.
    PyInstaller build, and `NANOMUSE_PY` points the preset at it. `desktop-app.yml` builds
    the Windows installer, the macOS dmg/zip for both architectures and the Linux
    AppImage/deb on every release tag, boots each packaged harness once in Node mode as a
-   check, and attaches them to the release (the same Apple secrets sign and notarize the
-   macOS build when they are set). It shipped as *nanoMuse Harness* beside the older
+   check, lists the Windows installer's archive to see that the face's four clips are in
+   it (electron-builder's NSIS target keeps video files out of that archive by default and
+   adds them back one by one, skipping every `node_modules`, where the plugin's clips
+   live; `nsis.preCompressedFileExtensions: []` in `electron-builder.yml` turns that off,
+   and `tests/installer.test.mjs` keeps it so), and attaches them to the release (the
+   same Apple secrets sign and notarize the macOS build when they are set). It shipped as
+   *nanoMuse Harness* beside the older
    desktop app in 0.1.28 and 0.1.29; **from 0.1.30 it is nanoMuse Desktop**, the one
    desktop app — `nanoMuse-Desktop-<v>-…`, the application id of the retired
    `desktop/app` so it installs over it — and the site's downloads point here.

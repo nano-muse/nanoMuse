@@ -178,6 +178,24 @@ jobs:
             Windows) node scripts/smoke.mjs --app dist/win-unpacked ;;
             *) node scripts/smoke.mjs --app dist/linux-unpacked ;;
           esac
+      # The unpacked app is complete whatever the installer does; the installer is what
+      # people get. electron-builder's NSIS target used to leave the face's clips out of it
+      # (electron-builder.yml, nsis.preCompressedFileExtensions); the archive inside the
+      # installer must list them.
+      - name: The installer carries the face's clips (Windows)
+        if: runner.os == 'Windows'
+        working-directory: harness/desktop
+        shell: bash
+        run: |
+          # 7-Zip is on the Windows runner's PATH; the app's archive sits in the installer as
+          # $PLUGINSDIR/app-64.7z, and -r finds it by name (nsis-check/ is beside dist/, not in it,
+          # so the artifact upload does not see it)
+          7z e -y -r -onsis-check dist/*.exe app-64.7z > /dev/null
+          7z l nsis-check/app-64.7z > nsis-check/list.txt
+          for mood in idle working waiting happy; do
+            grep -Eq "dsh-nanomuse[/\\\\]assets[/\\\\]dragon-$mood\.mp4" nsis-check/list.txt || { echo "the installer's archive lacks dsh-nanomuse/assets/dragon-$mood.mp4" >&2; exit 1; }
+          done
+          echo "the installer's archive carries the four clips"
       - name: What was built
         shell: bash
         working-directory: harness/desktop
