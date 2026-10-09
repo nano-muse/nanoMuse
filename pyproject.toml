@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nanomuse"
-version = "1.0.0"
+version = "1.0.1"
 description = "An open-source personal AI agent inspired by Meta's Muse: it does the work, a Sentinel decides what may run, and it reaches services through APIs, MCP servers, CLIs or the phone's screen. Phone today, web and desktop next. Bring your own model."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }

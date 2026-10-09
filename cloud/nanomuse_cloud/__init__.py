@@ -7,4 +7,4 @@ against the account's grant. Nothing about the conversation is stored — only
 the token counts. See README.md in this folder.
 """
 
-__version__ = "0.23.0"
+__version__ = "0.24.0"

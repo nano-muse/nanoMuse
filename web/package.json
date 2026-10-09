@@ -1,7 +1,7 @@
 {
   "name": "nanomuse-web",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "nanoMuse mobile-first web app (chat, goals, ideas, memory, approvals)",
   "type": "module",
   "scripts": {

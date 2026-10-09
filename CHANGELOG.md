@@ -6,6 +6,24 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+### Runtime
+
+### Web
+
+### Desktop
+
+### Android
+
+### iOS
+
+### Project
+
+## [1.0.1] - 2026-10-10 · Ballast
+
+Ballast: the first day of 1.0 in people's hands, read back. The phone app has its own URL scheme (`nanomuse://`, and `nanomuse-mcp://` on the iPhone), so a phone that also has OpenMinis installed no longer asks which app should open a link, a notification or a share; a model provider's content check saying no is one sentence with *New chat* and *Try again* on every client, nothing retries it, and the relay's Health page counts those refusals apart from upstream errors; a chat the desktop received from another device scrolls to its start ([#261](https://github.com/nano-muse/nanoMuse/issues/261)); the glow and the capsule stay up for a whole hands run and the face moves on Windows; one turn can run on nanoMuse Cloud on request from the web console; *Use nanoMuse Cloud models* follows one rule on every client (it refuses to go off while nothing else could answer, and comes back on when the last own key goes); the first feed day is written in the language of your screens; the hands on Android notice when they go round in circles; a task another device stopped ends as cancelled; the Settings page's nanoMuse Cloud row says what is left in yuan; the relay (0.24.0) charges a clip the app never polled to an end and no longer holds a place for a request it refused. The TestFlight beta passed Apple's review, so the public link installs it.
+
+### Cloud
+
 - **A content check saying no is no longer an upstream error.** When the provider's content check declines a request's words (`content_rejected`), the relay used to keep it as an `upstream.error` like a 5xx, so one long conversation that a client kept retrying put two hundred of them into an hour and the Health page said the provider needed a look. The event is now `content.rejected`: the Health page, the operator's overview and series, the timeline filters and the self-check line count it apart (*Content check declined*), it is never one of the `problems`, and a person's own timeline still lists each one. Twenty real upstream errors in an hour remain a problem.
 - Fixed a relay without an upstream key holding a place in the account's in-flight count for every chat or clip request it refused with `upstream_unconfigured`: after four such requests the account was answered `too_many_in_flight` until the holds timed out. The key is checked before anything is held.
 - The `allowance_exhausted` sentence older apps print as it is says "Three ways on", which is what follows (a key of your own, a plan you already pay for, an invitation); it said two.
@@ -80,6 +98,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - `CONTRIBUTING.md` and `AGENTS.md` read without a dash as punctuation, and the codename list in the release recipe runs to Keel.
 - `scripts/release-docs.py` leaves the *News* lists of the ten READMEs as written: their lines are milestones and keep their date, version and words for good, so 1.0.0 Keel's line stays when a smaller version follows; a major version gets a new line by hand, first in the list, and the script says so (`--dry-run` shows the lists without writing; tests cover it). CONTRIBUTING.md's release recipe says the same. The 1.0.0 release notes say GitHub's downloads are quick from China in our measurements instead of the fastest.
 - The install tables of the README, its nine translations and the docs home pages say the TestFlight beta passed Apple's review and the public link installs it; `docs/ios.md` says build 16 passed and build 17 is with the internal testers.
+- `scripts/release-docs.py` moves the example versions in the issue forms (`1.0.1 (44)`, `desktop 1.0.1`) along with the download links, so a bug report's hint names the current version.
+- `scripts/release-bump.sh` moves only a lock file's own two version lines (the root entry and `packages[""]`), where it rewrote every dependency that happened to sit at the old version, and reports how many lines moved.
 - The *News* list of the README, its nine translations and the homepage has a line for 2026-10-08: the paper is on Hugging Face Daily Papers, third on the list for that day. Each News line now says in about a line what the milestone was (what 1.0.0 is for and that it installs over the version before, the paper's title and authors, what the first release contained) instead of a few words. The 1.0.0 line now says *Version 1.0.0 Keel is out* rather than *Latest version*, so it stays true once a smaller version follows it.
 
 ## [1.0.0] - 2026-10-09 · Keel

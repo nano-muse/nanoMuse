@@ -24,6 +24,11 @@ Latest: **1.0.0 Keel**.
 | **Android** | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk) |
 """
 
+ISSUE_FORM = """      description: Settings → About, e.g. 1.0.0 (43)
+      description: e.g. Windows 11 / desktop 1.0.0, iOS 18 / iPhone 15
+      description: the relay answered 1.0.0-rc, or so the log says
+"""
+
 
 @pytest.fixture(scope="module")
 def release_docs() -> ModuleType:
@@ -102,6 +107,14 @@ def _tree(tmp_path: Path) -> None:
     (tmp_path / "docs" / "release-notes-template.md").write_text(
         "Codenames: Foundation, Keel (CHANGELOG.md has the list).\n", encoding="utf-8"
     )
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "rebrand.py").write_text(
+        'VERSION_NAME = "1.0.1"\nVERSION_CODE = 44\n', encoding="utf-8"
+    )
+    (tmp_path / ".github" / "ISSUE_TEMPLATE").mkdir(parents=True)
+    (tmp_path / ".github" / "ISSUE_TEMPLATE" / "app_bug_report.yml").write_text(
+        ISSUE_FORM, encoding="utf-8"
+    )
 
 
 def test_dry_run_prints_and_writes_nothing(
@@ -148,3 +161,30 @@ def test_a_major_version_asks_for_a_news_line_by_hand(
     assert "## [2.0.0] - 2027-01-01 · Reach" in (tmp_path / "CHANGELOG.md").read_text(
         encoding="utf-8"
     )
+
+
+def test_the_issue_forms_examples_move_with_the_version(release_docs: ModuleType) -> None:
+    text, moved = release_docs.edit_issue_form(ISSUE_FORM, "1.0.0", "1.0.1", "44")
+    assert moved == 2
+    assert "e.g. 1.0.1 (44)" in text
+    assert "desktop 1.0.1, iOS 18" in text
+    # a mention that is not an example version stays
+    assert "answered 1.0.0-rc" in text
+
+
+def test_main_moves_the_issue_forms_but_not_on_a_dry_run(
+    release_docs: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _tree(tmp_path)
+    form = tmp_path / ".github" / "ISSUE_TEMPLATE" / "app_bug_report.yml"
+
+    assert release_docs.main(["1.0.0", "1.0.1", "Keel", "Still", "2026-10-20", "--dry-run"]) == 0
+    assert form.read_text(encoding="utf-8") == ISSUE_FORM
+    assert "app_bug_report.yml: 2 example version(s) now 1.0.1 (44)" in capsys.readouterr().out
+
+    assert release_docs.main(["1.0.0", "1.0.1", "Keel", "Still", "2026-10-20"]) == 0
+    assert "e.g. 1.0.1 (44)" in form.read_text(encoding="utf-8")
