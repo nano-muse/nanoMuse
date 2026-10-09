@@ -26,9 +26,9 @@ import kotlinx.coroutines.launch
 
 /**
  * The four model slots of Settings → Models (0.1.41 "Choice"): chat, the hands (operating the
- * screen), pictures and clips. Each slot keeps its value where it always was — the default
+ * screen), pictures and clips. Each slot keeps its value where it always was, that is the default
  * model group for chat (`defaultPrimaryGroupId`), `hands.model_entry`, `avatar.provider_id /
- * avatar.model`, `media.video.*` — so the upstream Model groups screen, Settings → Hands and
+ * avatar.model` and `media.video.*`, so the upstream Model groups screen, Settings → Hands and
  * Settings → Image & video models stay consistent with the page. This object is the one place
  * that lists what a slot can be set to, says what it is now, and sets it; the order for a slot
  * nobody chose is [SlotOrder].
@@ -286,9 +286,9 @@ object ModelSlots {
     }
 
     /**
-     * A provider switched off while new chats answered through it — nanoMuse Cloud above all
+     * A provider switched off while new chats answered through it, nanoMuse Cloud above all
      * (Settings › Models › *Use nanoMuse Cloud models*; the desktop's `setCloudModels` does the
-     * same) — hands the chat slot to the first source that still talks: the relay's recommended
+     * same), hands the chat slot to the first source that still talks: the relay's recommended
      * chat model when the relay is on, else the first own provider with a chat model, its
      * catalogue default first ([groups]' order). So the Models page names what answers, and new
      * chats do not fall through upstream's last-used chain without a word. Nothing moves when

@@ -6,10 +6,9 @@ the TestFlight pipeline needs, and what is still to be ported from the Android a
 
 **Status.** The tree, the branding, the nanoMuse Cloud sign-in, the hub client and the pipeline
 were written on a Linux machine. The app **builds, signs and is on TestFlight**: the first build,
-0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, with
-the internal testers and submitted to Apple's beta review for the public link
-(`https://testflight.apple.com/join/ZHexbDqc`, which delivers the build once the review has
-passed — *Where it stands* below). The testers' reports have driven the fixes in the release
+0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, which
+passed Apple's beta review, so the public link
+(`https://testflight.apple.com/join/ZHexbDqc`) installs it (*Where it stands* below). The testers' reports have driven the fixes in the release
 notes (the composer, onboarding, sign-out); the Devices section and notifications from other
 devices still have the fewest hours on a real device. The first archive taught the pipeline
 that automatic signing wants a registered device, which is why it signs manually now.
@@ -583,12 +582,12 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
   on each build (none of it names other products); the external group *nanoMuse Beta* with its
   public link, `https://testflight.apple.com/join/ZHexbDqc`; the beta-review contact and a
   review account on the relay in *Beta App Review Information*;
-- **build 16 (1.0.0)** is with the internal testers and was added to *nanoMuse Beta* and
-  submitted to Apple's beta review on 2026-10-09 (build 14, 0.1.41, was approved and is what the
-  public link delivers until then); the public link delivers a build only once a
-  review has passed, so until then it shows the TestFlight page without an app. Each later
-  version repeats the step (the review is per version). Nothing towards the App Store: the app
-  is not going there.
+- **build 16 (1.0.0)** was added to *nanoMuse Beta* and submitted to Apple's beta review on
+  2026-10-09 and passed it, so the public link installs it (build 14, 0.1.41, was what the link
+  delivered before); build 17, 1.0.0 with the fixes merged after the tag, is with the internal
+  testers. The public link delivers a build only once a review has passed, and each new version
+  repeats the step (the review is per version; later builds of an approved version need none).
+  Nothing towards the App Store: the app is not going there.
 
 ### Once, in App Store Connect
 

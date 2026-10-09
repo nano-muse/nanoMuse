@@ -280,7 +280,10 @@ export function ProviderRow({ t, entry, view, onChanged }: { t: Translate; entry
   const remove = () => {
     setBusy(true)
     setError(undefined)
-    call('providers/remove', { id: entry.id }).then(() => { setSaid(undefined); setOffer(undefined); onChanged() }).catch((err: unknown) => setError(failureText(t, err))).finally(() => setBusy(false))
+    call<{ cloudModelsOn?: boolean } | undefined>('providers/remove', { id: entry.id })
+      // the row was the last chat source while the account's models were off: they are on again, said once here
+      .then((r) => { setSaid(r?.cloudModelsOn ? t('ownKeyRemovedCloudOn') : undefined); setOffer(undefined); onChanged() })
+      .catch((err: unknown) => setError(failureText(t, err))).finally(() => setBusy(false))
   }
   return h('div', { className: 'nm-way' },
     h('span', { className: 'nm-way-icon' }, configured ? h(IconCheck, { size: 15 }) : h(IconKey, { size: 15 })),
