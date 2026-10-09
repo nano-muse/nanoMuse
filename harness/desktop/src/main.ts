@@ -964,6 +964,9 @@ function registerBridge(): void {
 //     question the agent asked before a step (Allow once / Deny) or the hold ("Your turn —
 //     Done"); shown when the main window is not the one in front, so the person can see and
 //     answer from wherever they are. It moves out of the way when the hands act under it.
+// Both stay up for the whole run: the web client keeps `active` from the first computer call
+// of a turn to the turn's end (the host's `hands.run`), so the model's thinking between two
+// steps does not take the glow and the capsule down and put them back (they blinked, 1.0.0).
 
 interface OverlayCard {
   id: string;
@@ -974,6 +977,7 @@ interface OverlayCard {
 }
 
 interface OverlayHands {
+  /** The hands have this screen: a run is on, from its first computer call to its turn's end. */
   active: boolean;
   held: boolean;
   x: number;

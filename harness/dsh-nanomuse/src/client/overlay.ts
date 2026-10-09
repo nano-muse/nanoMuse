@@ -7,6 +7,11 @@
  * live state and sends the shell only what it needs — fractions of the screen for the
  * pointer, words for the capsule — and turns the capsule's answers into the same calls
  * the chat makes. Content protection on this window follows the hands too.
+ *
+ * Both pieces stay up for the whole run: from the first `computer_*` call of a turn to the
+ * turn's end (`live.hands.run`, the host's word), not only while a call is in flight. Between
+ * two steps the model thinks for seconds, and the glow and the capsule used to go dark for
+ * each of those gaps (1.0.0). While it thinks the capsule says what the hands last did.
  */
 import { call, type Translate } from './api.ts'
 import { stillUrl } from './Avatar.tsx'
@@ -27,25 +32,30 @@ export function syncOverlay({ t, stop }: OverlayOptions): () => void {
   let protectedOn = false
   let sessionId = ''
   const push = (live: Live) => {
-    const busy = live.hands.calls.length > 0
+    const calls = live.hands.calls
+    const busy = calls.length > 0
+    // the hands have this screen: the host's run, or (an older host) a `computer_*` call in flight
+    const run = live.hands.run ?? null
+    const onScreen = Boolean(run) || calls.some((c) => c.name.startsWith('mcp__nanomuse__computer_'))
     const stage = live.stage
     const hold = live.holds[0]
     const action = stage.action
     const pointed = action && action.x >= 0 && action.y >= 0 && stage.width > 0 && stage.height > 0 && (POINTED.has(action.kind) || action.kind === 'type')
-    sessionId = stage.sessionId || live.hands.calls[0]?.sessionId || ''
-    const hands = busy || hold
+    sessionId = run?.sessionId || stage.sessionId || calls[0]?.sessionId || ''
+    const hands = onScreen || busy || hold
       ? {
-          active: busy && stage.source === 'computer',
+          active: onScreen,
           held: Boolean(hold),
           x: pointed ? Math.min(1, Math.max(0, action.x / stage.width)) : -1,
           y: pointed ? Math.min(1, Math.max(0, action.y / stage.height)) : -1,
           kind: action?.kind ?? '',
           step: live.hands.steps,
           title: hold ? t('stageYourTurn') : t('capsuleStepTitle', { n: live.hands.steps }),
-          text: hold ? hold.reason : stage.seq ? describeStep(t, action, busy) : t('stageLooking'),
+          // what is being done while a call runs; what was just done while the model thinks
+          text: hold ? hold.reason : action ? describeStep(t, action, busy) : t('stageLooking'),
           face: new URL(stillUrl(live.profile, hold ? 'waiting' : 'working'), document.baseURI).href,
-          stop: busy && sessionId ? t('capsuleStop') : '',
-          take: busy && !hold && stage.source === 'computer' && sessionId ? t('stageTakeIt') : '',
+          stop: (onScreen || busy) && sessionId ? t('capsuleStop') : '',
+          take: onScreen && !hold && sessionId ? t('stageTakeIt') : '',
         }
       : null
     const zh = t('langTag') === 'zh'

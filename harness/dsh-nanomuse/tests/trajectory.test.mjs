@@ -2,7 +2,7 @@
 // actions it took and the words it said become steps, and the caps that keep it light.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { MAX_RUNS, MAX_STEPS, MAX_WORDS, REST_MS, Trajectory } from '../lib/trajectory.js'
+import { MAX_RUNS, MAX_STEPS, MAX_WORDS, REST_MS, SCREEN_RUN_IDLE_MS, ScreenRuns, Trajectory } from '../lib/trajectory.js'
 import { stageAction } from '../lib/cloud.js'
 
 const act = (kind, extra = {}) => ({ kind, label: '', text: '', x: -1, y: -1, x2: -1, y2: -1, dy: 0, at: 1, ...extra })
@@ -185,4 +185,47 @@ test('stageAction carries the far end of a drag and the way of a scroll, for the
   assert.equal(up.dy, -400)
   const click = stageAction({ action: 'click', x: 1, y: 2 })
   assert.deepEqual([click.x2, click.y2, click.dy], [-1, -1, 0])
+})
+
+// The screen runs (ScreenRuns): what the glow round the screen and the capsule outside the
+// window follow. A run is on from a session's first computer call to its turn's end, so the
+// model's thinking between two steps does not take them down.
+test('a screen run opens at the first computer call and stays through the gaps between calls', () => {
+  const runs = new ScreenRuns()
+  assert.equal(runs.current(), null)
+  // a Reach call or a connector's tool does not take this screen
+  assert.equal(runs.began('s1', 'device_screen', 1000), false)
+  assert.equal(runs.began('s1', 'mcp__nanomuse__read_emails', 1000), false)
+  assert.equal(runs.current(), null)
+  assert.equal(runs.began('s1', 'mcp__nanomuse__computer_screen', 1000), true)
+  assert.deepEqual(runs.current(), { sessionId: 's1', since: 1000 })
+  runs.ended('s1', 1800)
+  // the model thinks: nothing in flight, the run is still on
+  assert.deepEqual(runs.current(), { sessionId: 's1', since: 1000 })
+  assert.equal(runs.began('s1', 'mcp__nanomuse__computer_act', 9000), false, 'the same run goes on')
+  runs.ended('s1', 9700)
+  assert.deepEqual(runs.current(), { sessionId: 's1', since: 1000 })
+  // the turn ends: the screen is free
+  assert.equal(runs.turnEnded('s1'), true)
+  assert.equal(runs.turnEnded('s1'), false)
+  assert.equal(runs.current(), null)
+  assert.equal(runs.size, 0)
+})
+
+test('the newest of several sessions on the screen is the one shown, and the idle sweep is the safety net', () => {
+  const runs = new ScreenRuns()
+  runs.began('old', 'mcp__nanomuse__computer_screen', 1000)
+  runs.ended('old', 1500)
+  runs.began('new', 'mcp__nanomuse__computer_act', 2000)
+  assert.deepEqual(runs.current(), { sessionId: 'new', since: 2000 })
+  assert.equal(runs.size, 2)
+  // not quiet for long enough: nothing closes
+  assert.equal(runs.sweep(1500 + SCREEN_RUN_IDLE_MS - 1, () => false), false)
+  assert.equal(runs.size, 2)
+  // quiet for long enough, but a call of "new" is still in flight: only "old" closes
+  assert.equal(runs.sweep(2000 + SCREEN_RUN_IDLE_MS, (id) => id === 'new'), true)
+  assert.deepEqual(runs.current(), { sessionId: 'new', since: 2000 })
+  runs.ended('new', 2000 + SCREEN_RUN_IDLE_MS)
+  assert.equal(runs.sweep(2000 + 2 * SCREEN_RUN_IDLE_MS, () => false), true)
+  assert.equal(runs.current(), null)
 })

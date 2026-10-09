@@ -284,3 +284,73 @@ export class Trajectory {
     this.rev += 1
   }
 }
+
+/** A run that goes this long without a call closes on its own: the safety net for a turn whose end the host never saw. */
+export const SCREEN_RUN_IDLE_MS = 5 * 60_000
+
+/** The hands have this computer's screen: which session, since when. */
+export interface ScreenRun {
+  sessionId: string
+  since: number
+}
+
+/**
+ * Which sessions have this computer's screen, for the glow round the screen and the
+ * capsule the shell draws outside the window. A session's run opens at its first
+ * `computer_*` call and closes when its turn ends, so the glow and the capsule stay up
+ * while the model thinks between two steps; they used to follow the calls in flight and
+ * went dark between every two (1.0.0). Reach calls (`device_*`, `delegate`) and the
+ * connectors' tools open nothing: they do not touch this screen. A run that stays quiet
+ * for `SCREEN_RUN_IDLE_MS` with no call in flight closes in `sweep`.
+ */
+export class ScreenRuns {
+  private readonly runs = new Map<string, { since: number; lastAt: number }>()
+
+  /** A hands call began: a `computer_*` one opens the session's run or keeps it fresh. True when a run opened. */
+  began(sessionId: string, name: string, now = Date.now()): boolean {
+    if (!name.startsWith('mcp__nanomuse__computer_')) return false
+    const run = this.runs.get(sessionId)
+    if (run) {
+      run.lastAt = now
+      return false
+    }
+    this.runs.set(sessionId, { since: now, lastAt: now })
+    return true
+  }
+
+  /** A call of that session ended: its run is fresh as of now. */
+  ended(sessionId: string, now = Date.now()): void {
+    const run = this.runs.get(sessionId)
+    if (run) run.lastAt = now
+  }
+
+  /** The session's turn ended (or was stopped): its run closes. True when there was one. */
+  turnEnded(sessionId: string): boolean {
+    return this.runs.delete(sessionId)
+  }
+
+  /** Runs quiet for `SCREEN_RUN_IDLE_MS` with nothing of theirs in flight close. True when any did. */
+  sweep(now: number, inFlight: (sessionId: string) => boolean): boolean {
+    let changed = false
+    for (const [sessionId, run] of this.runs) {
+      if (now - run.lastAt >= SCREEN_RUN_IDLE_MS && !inFlight(sessionId)) {
+        this.runs.delete(sessionId)
+        changed = true
+      }
+    }
+    return changed
+  }
+
+  /** The run on now; the newest when several sessions have the screen; null when none has. */
+  current(): ScreenRun | null {
+    let best: ScreenRun | null = null
+    for (const [sessionId, run] of this.runs) {
+      if (!best || run.since > best.since) best = { sessionId, since: run.since }
+    }
+    return best
+  }
+
+  get size(): number {
+    return this.runs.size
+  }
+}
