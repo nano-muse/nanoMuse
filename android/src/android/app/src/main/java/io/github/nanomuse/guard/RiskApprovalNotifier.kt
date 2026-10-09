@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
+import io.github.nanomuse.deeplink.OwnScheme
 import io.github.nanomuse.identity.NanoMuseIdentity
 
 /**
@@ -39,10 +40,7 @@ class RiskApprovalNotifier(
 
         val open = PendingIntent.getActivity(
             context, request.id.hashCode(),
-            Intent(Intent.ACTION_VIEW, Uri.parse("minis://session/${request.sessionId}")).apply {
-                setPackage(context.packageName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            },
+            OwnScheme.intent(context, Uri.parse("minis://session/${request.sessionId}"), Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         fun action(decision: RiskDecision, code: Int): PendingIntent = PendingIntent.getBroadcast(

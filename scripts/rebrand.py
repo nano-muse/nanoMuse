@@ -155,6 +155,18 @@ def links() -> None:
     )
 
 
+SYSTEM_SCHEME = "nanomuse"  # what the system knows the app by; inside, links stay minis://
+
+
+def schemes() -> None:
+    """The scheme registered with the system is ours, so a phone with OpenMinis installed too
+    never has two apps claiming `minis://`; the in-app vocabulary (`minis://…`) does not change."""
+    edit(
+        MAIN / "AndroidManifest.xml",
+        [(r'<data android:scheme="minis" />', f'<data android:scheme="{SYSTEM_SCHEME}" />')],
+    )
+
+
 # (pattern, replacement); applied to Theme.kt only.
 THEME_MAP = [
     ("0xFF528AD2", "0xFF015CFB"),  # primary
@@ -324,6 +336,22 @@ def ios_ids() -> None:
     )
 
 
+def ios_schemes() -> None:
+    """Same as `schemes()` for the phone's other half: Info.plist registers `nanomuse` and
+    `nanomuse-mcp`, the share extension opens `nanomuse://share`; `minis://` stays in-app."""
+    edit(
+        IOS / "Info.plist",
+        [
+            (r"<string>minis</string>", f"<string>{SYSTEM_SCHEME}</string>"),
+            (r"<string>minis-mcp</string>", f"<string>{SYSTEM_SCHEME}-mcp</string>"),
+        ],
+    )
+    edit(
+        IOS / "ShareExtension" / "ShareViewController.swift",
+        [(r"minis://share", f"{SYSTEM_SCHEME}://share")],
+    )
+
+
 def ios_project() -> None:
     pbx = IOS / "Minis.xcodeproj" / "project.pbxproj"
     edit(
@@ -486,6 +514,7 @@ def ios() -> None:
     if not IOS.is_dir():
         return
     ios_ids()
+    ios_schemes()
     ios_project()
     ios_product_name()
     ios_links()
@@ -511,6 +540,14 @@ def ios_check() -> int:
         if path.name != "PrivacyInfo.xcprivacy" and WORD.search(path.read_text(encoding="utf-8")):
             print(f"  ! Minis left in {path.relative_to(ROOT)}")
             problems += 1
+    plist = (IOS / "Info.plist").read_text(encoding="utf-8")
+    if re.search(r"<string>minis(-mcp)?</string>", plist):
+        print("  ! Info.plist still registers upstream's URL scheme")
+        problems += 1
+    share = (IOS / "ShareExtension" / "ShareViewController.swift").read_text(encoding="utf-8")
+    if "minis://share" in share:
+        print("  ! the share extension still opens minis://share")
+        problems += 1
     return problems
 
 
@@ -528,6 +565,9 @@ def check() -> int:
             if leftovers.search(line):
                 print(f"  ! {path.relative_to(ROOT)}:{i}: {line.strip()[:80]}")
                 problems += 1
+    if 'android:scheme="minis"' in (MAIN / "AndroidManifest.xml").read_text(encoding="utf-8"):
+        print("  ! AndroidManifest.xml still registers upstream's URL scheme")
+        problems += 1
     return problems
 
 
@@ -539,6 +579,7 @@ def main() -> int:
     product_name()
     soul_defaults()
     links()
+    schemes()
     colours()
     notification_icons()
     notification_faces()

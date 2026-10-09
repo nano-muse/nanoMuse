@@ -36,7 +36,7 @@ object ChatLinkResolver {
 
         // 1. minis:// deep links — only branch out when the URL maps to a known action,
         //    otherwise fall through to sandbox-path handling.
-        if (scheme == "minis") {
+        if (io.github.nanomuse.deeplink.OwnScheme.isOwn(scheme)) { // nanoMuse: `nanomuse://` reads the same
             val action = DeepLinkHandler.parse(uri)
             if (action !is DeepLinkAction.Unknown) {
                 return ChatLinkAction.DeepLink(action)
@@ -198,10 +198,9 @@ object ChatLinkResolver {
 
     /** Fire a system intent so MainActivity's BROWSABLE filter picks the deep link up. */
     fun dispatchDeepLink(context: Context, originalUrl: String) {
-        val intent = Intent(Intent.ACTION_VIEW, originalUrl.toUri()).apply {
-            setPackage(context.packageName)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        // nanoMuse: addressed to MainActivity by name; the manifest no longer registers `minis`, and a
+        // link of the app's own must never go through the system's choice of an app for a scheme
+        val intent: Intent = io.github.nanomuse.deeplink.OwnScheme.intent(context, originalUrl.toUri())
         runCatching { context.startActivity(intent) }
     }
 }

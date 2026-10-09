@@ -49,8 +49,13 @@ Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pul
   `.FileProvider`), the app group `group.io.github.nanomuse.app`, the iCloud container
   `iCloud.io.github.nanomuse.app`, the background-task, UTType and URL-scheme ids that carry the
   bundle id. Unlike Android there is no source-package constraint on iOS, so the whole family
-  moves. The `minis://` and `minis-mcp://` schemes stay: they are upstream's contract with its
-  own sandbox.
+  moves. The URL schemes the system knows the app by are `nanomuse` (the share extension opens
+  `nanomuse://share`) and `nanomuse-mcp`, so a phone that also has OpenMinis installed never has
+  two apps claiming one scheme. Inside the app, links stay `minis://…`: that is upstream's
+  contract with its own sandbox, the system prompt and the model; a `nanomuse://` link arriving
+  from the system is read as its `minis://` form (`NanoMuse/NanoMuseOwnScheme.swift`), and a
+  button of ours outside the chat opens such a link through the deep-link router, never through
+  the system.
 - **Names.** Display name nanoMuse, "Share to nanoMuse", "nanoMuse Files"; "Minis" → "nanoMuse"
   in Swift string literals, in `Localizable.xcstrings` (keys renamed, all nine translations
   updated) and in the Info.plist usage descriptions in every language. The OpenRouter
