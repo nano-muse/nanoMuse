@@ -38,4 +38,6 @@ Start with `nanomuse doctor`: it prints the config file in use, the data directo
 
 **The Android app says "Refused by the relay — sign in again" under Devices.** The relay no longer accepts this phone's key (signed out everywhere, or the account was deleted). Sign out and in again on the Account screen; the hub joins again on its own.
 
+**The chat says the model provider's content check declined the request.** The provider that answers (nanoMuse Cloud's upstream, or the vendor behind a key of your own: Alibaba Cloud's `DataInspectionFailed`, for one) read something in the conversation it will not process, and said so before any model ran. It is not an outage and nothing retries it by itself: the card offers *Try again* and *New chat*. Different words usually get through; if the refusal comes back, the words it objects to are probably earlier in the conversation, and a new chat is the way on. On the relay's Health page these refusals are counted apart from upstream errors, since they say nothing about the provider's health.
+
 **Reset everything.** Stop the server and delete `~/.nanomuse` (or your `data_dir`). The vault key lives there too, so export secrets first if you need them.
