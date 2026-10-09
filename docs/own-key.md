@@ -60,6 +60,8 @@ short videos.
 | xAI Grok | ● | ● | ● | | outside mainland China | [console.x.ai](https://console.x.ai) |
 | Groq | ● | ● | | | outside mainland China | [console.groq.com](https://console.groq.com/keys) |
 | Mistral AI | ● | ● | | | outside mainland China | [console.mistral.ai](https://console.mistral.ai/api-keys) |
+| OpenCode Go | ● | | | | outside mainland China | [opencode.ai/auth](https://opencode.ai/auth) |
+| OpenCode Zen | ● | | | | outside mainland China | [opencode.ai/auth](https://opencode.ai/auth) |
 | Ollama / LM Studio / vLLM (on your machine) | ● | | | | both | no key |
 
 Only Bailian has a dot under *Clips* because nanoMuse's clip generation speaks
@@ -91,6 +93,7 @@ or paste it into a chat.**
 - **Anthropic.** [platform.claude.com](https://platform.claude.com/settings/keys). nanoMuse speaks Anthropic's own API; no compatibility layer is needed.
 - **Google Gemini.** [aistudio.google.com/apikey](https://aistudio.google.com/apikey), base URL `https://generativelanguage.googleapis.com/v1beta/openai`.
 - **xAI, Groq, Mistral.** A key from each console; base URLs `https://api.x.ai/v1`, `https://api.groq.com/openai/v1`, `https://api.mistral.ai/v1`.
+- **OpenCode Go and OpenCode Zen.** Both make their key in the same console, [opencode.ai/auth](https://opencode.ai/auth): Zen is pay per request from a balance (a few models are free), Go is a subscription with the monthly usage counted per model. Base URLs `https://opencode.ai/zen/v1` and `https://opencode.ai/zen/go/v1`. Only the models on the OpenAI shape are reached, so chat and no hands: the vision model OpenCode lists, `deepseek-v4-flash-vision-exp`, is an id DeepSeek has retired on its own platform. OpenCode publishes no plan sign-in, only a key, so there is nothing to sign in with here. OpenCode asks a client to send a session id in `x-opencode-session` for each conversation; nanoMuse does not send it yet.
 
 **Paste it into nanoMuse.**
 

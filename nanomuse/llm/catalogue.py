@@ -134,6 +134,13 @@ class Provider:
                 out.add(host)
         return out
 
+    def urls(self) -> set[str]:
+        out = set()
+        for url in (self.base_url, self.base_url_global):
+            if url:
+                out.add(url.rstrip("/"))
+        return out
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -175,11 +182,18 @@ class Catalogue:
         return [p.id for p in self.providers]
 
     def by_base_url(self, base_url: str | None) -> Provider | None:
-        """The entry whose endpoint is at the URL's host (either edition); None for a host
-        nobody lists — a gateway, a relay, a server of one's own."""
-        host = (urlparse(base_url or "").hostname or "").lower()
+        """The entry whose endpoint is the address (either edition); the host alone when the
+        address is not one, so a key pasted with or without ``/v1`` still finds its vendor;
+        None for a host nobody lists — a gateway, a relay, a server of one's own. Two
+        editions on one host (``opencode.ai/zen/v1`` and ``opencode.ai/zen/go/v1``) are told
+        apart by the whole address."""
+        url = (base_url or "").strip().rstrip("/")
+        host = (urlparse(url).hostname or "").lower()
         if not host:
             return None
+        for p in self.providers:
+            if url in p.urls():
+                return p
         for p in self.providers:
             if host in p.hosts():
                 return p

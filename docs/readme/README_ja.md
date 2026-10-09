@@ -73,7 +73,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
   </tr>
   <tr>
     <td width="50%" valign="top"><b>自分の姿。</b><br>言葉で描写すれば画像モデルが描き、動画モデルが動かします。デフォルトは小さなドラゴン。</td>
-    <td width="50%" valign="top"><b>どのモデルでも。</b><br>リレーの無料枠、18 社（Bailian、OpenRouter、OpenAI、Gemini、DeepSeek など）のいずれかで自分のキー、あるいは既に支払っているプラン：ChatGPT、Claude、Kimi。画像や動画のモデルがない事業者ではその二つは使えず、アプリがそう伝えます。</td>
+    <td width="50%" valign="top"><b>どのモデルでも。</b><br>リレーの無料枠、20 社（Bailian、OpenRouter、OpenAI、Gemini、DeepSeek など）のいずれかで自分のキー、あるいは既に支払っているプラン：ChatGPT、Claude、Kimi。画像や動画のモデルがない事業者ではその二つは使えず、アプリがそう伝えます。</td>
   </tr>
 </table>
 

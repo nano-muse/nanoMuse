@@ -73,7 +73,7 @@ Tous les téléchargements viennent de la [dernière version](https://github.com
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Une apparence à lui.</b><br>Décrivez-la, votre modèle d'image la dessine, un modèle vidéo la fait bouger. Un petit dragon par défaut.</td>
-    <td width="50%" valign="top"><b>N'importe quel modèle.</b><br>Le crédit du relais, votre propre clé chez l'un des dix-huit fournisseurs (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek et d'autres), ou un abonnement que vous payez déjà : ChatGPT, Claude, Kimi. Sans modèle d'image ou de vidéo chez le fournisseur, ces deux fonctions restent éteintes et l'application le dit.</td>
+    <td width="50%" valign="top"><b>N'importe quel modèle.</b><br>Le crédit du relais, votre propre clé chez l'un des vingt fournisseurs (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek et d'autres), ou un abonnement que vous payez déjà : ChatGPT, Claude, Kimi. Sans modèle d'image ou de vidéo chez le fournisseur, ces deux fonctions restent éteintes et l'application le dit.</td>
   </tr>
 </table>
 

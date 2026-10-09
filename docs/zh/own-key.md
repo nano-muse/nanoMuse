@@ -37,6 +37,8 @@ nanoMuse 免费、非营利。它背后的模型要花钱，每个账号的起�
 | xAI Grok | ● | ● | ● | | 海外 | [console.x.ai](https://console.x.ai) |
 | Groq | ● | ● | | | 海外 | [console.groq.com](https://console.groq.com/keys) |
 | Mistral AI | ● | ● | | | 海外 | [console.mistral.ai](https://console.mistral.ai/api-keys) |
+| OpenCode Go | ● | | | | 海外 | [opencode.ai/auth](https://opencode.ai/auth) |
+| OpenCode Zen | ● | | | | 海外 | [opencode.ai/auth](https://opencode.ai/auth) |
 | Ollama / LM Studio / vLLM（本机） | ● | | | | 都可以 | 不需要 key |
 
 「视频」一栏只有百炼，是因为 nanoMuse 的视频生成走的是百炼的接口；其他家的视频模型用的是各自的任务接口，这一轮还没有接。「画图」一栏里，OpenRouter 走的是它的 Image API，模型例如 `openai/gpt-image-2`；Gemini 用 `gemini-2.5-flash-image`。
@@ -59,6 +61,7 @@ nanoMuse 免费、非营利。它背后的模型要花钱，每个账号的起�
 - **Anthropic。** [platform.claude.com](https://platform.claude.com/settings/keys)。nanoMuse 直接用 Anthropic 的接口，不需要兼容层。
 - **Google Gemini。** [aistudio.google.com/apikey](https://aistudio.google.com/apikey)，地址 `https://generativelanguage.googleapis.com/v1beta/openai`。
 - **xAI、Groq、Mistral。** 各自的控制台创建 key；地址分别是 `https://api.x.ai/v1`、`https://api.groq.com/openai/v1`、`https://api.mistral.ai/v1`。
+- **OpenCode Go、OpenCode Zen。** 两家的 key 都在同一个控制台申请 [opencode.ai/auth](https://opencode.ai/auth)：Zen 按请求从余额里扣费（有几个模型免费），Go 是订阅，用量按模型每月计。地址分别是 `https://opencode.ai/zen/v1` 和 `https://opencode.ai/zen/go/v1`。只有 OpenAI 格式的那些模型到得了，所以只有对话、没有动手：OpenCode 列出的视觉模型 `deepseek-v4-flash-vision-exp` 在 DeepSeek 自家平台上已经退役。OpenCode 没有套餐登录，只有 key，所以这里没有可以登录的东西。OpenCode 要求客户端在每个对话里用 `x-opencode-session` 传会话 id；nanoMuse 目前还没发。
 
 **贴到 nanoMuse 里。**
 
