@@ -35,9 +35,10 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ Tin mới
 
-- `2026-10-09` 🚀 Phiên bản mới nhất: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0).
-- `2026-10-07` 📄 Bài báo của chúng tôi đã có trên [arXiv](https://arxiv.org/abs/2610.08699).
-- `2026-09-25` 🎉 nanoMuse đã ra mắt.
+- `2026-10-09` 🚀 Phiên bản mới nhất: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0), cho điện thoại, máy tính và trình duyệt; cài đè lên bản trước mà vẫn giữ dữ liệu của bạn, và ghi chú phát hành liệt kê mọi thay đổi.
+- `2026-10-08` 🤗 Bài báo của chúng tôi có mặt trên [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699), xếp thứ ba trong danh sách ngày 8 tháng 10; câu hỏi và góp ý xin gửi tại trang bài báo.
+- `2026-10-07` 📄 Bài báo của chúng tôi đã có trên [arXiv](https://arxiv.org/abs/2610.08699): *nanoMuse: An Open-Source Personal Agent for Every Device You Own*, tác giả Guangyi Liu, Yong Liu và Jiangning Zhang (Đại học Chiết Giang); trích dẫn ở cuối trang này.
+- `2026-09-25` 🎉 nanoMuse đã ra mắt trên GitHub theo GPL-3.0-or-later: một ứng dụng Android xây trên OpenMinis 1.13; relay, ứng dụng máy tính và ứng dụng iPhone lần lượt ra mắt trong những ngày sau đó.
 
 Mọi phiên bản: [releases](https://github.com/nano-muse/nanoMuse/releases).
 
