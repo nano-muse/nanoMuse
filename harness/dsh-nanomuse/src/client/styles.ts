@@ -210,10 +210,15 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-col-top { height: 
    the phone's rhythm — rather than running, sweeping or shimmering. A steady light under reduced motion. */
 @keyframes nm-breathe-light { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 /* a session with no turn of its own yet (the chat's "hero" layout centres the composer): the other
-   devices' turns sit above the composer, bottom-aligned like a transcript, inside the scrolling body */
-[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll]:has(.nm-remote) { justify-content: flex-end; }
+   devices' turns, and a run's card, sit above the composer, bottom-aligned like a transcript, inside
+   the scrolling body. The bottom alignment is an auto margin on the first of them, not
+   justify-content: a column aligned to its end (or centred) puts what overflows above the top edge,
+   where no scroll reaches it (#261: a long thread from the phone could not be scrolled up at all);
+   an auto margin takes the free space while there is some and is nothing once the thread is taller
+   than the body, so the body scrolls from its first line. */
+[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll]:has(.nm-remote, .nm-traj) { justify-content: flex-start; }
 [data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll] > .nm-remote { flex: 0 0 auto; width: min(var(--dsh-chat-content-width, 680px), 100%); align-self: center; box-sizing: border-box; padding: 0 var(--dsh-composer-side-clearance, 16px); }
-[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll] > .nm-remote:first-child { margin-top: 16px; }
+[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll] > :is(.nm-remote, .nm-traj):not(:is(.nm-remote, .nm-traj) ~ :is(.nm-remote, .nm-traj)) { margin-top: auto; padding-top: 16px; }
 
 /* ---- the pinned agent header over the conversation -------------------- */
 header[data-window-drag]:has(.nm-header) { position: relative; min-height: 108px; }

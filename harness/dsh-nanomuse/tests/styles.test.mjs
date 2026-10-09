@@ -61,6 +61,22 @@ test('the lights breathe: nothing runs round, sweeps across or flows in the styl
   assert.match(css, /@keyframes nm-breathe-light \{ 0%, 100% \{ opacity: 0\.3; \} 50% \{ opacity: 1; \} \}/)
 })
 
+test('a thread from other devices in the hero layout is bottom-aligned by an auto margin, so it scrolls (#261)', () => {
+  const scroll = '[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll]'
+  // the bubbles and the run card in the scrolling body: the alignment of the column itself stays at
+  // the start, since a column aligned to its end or centred puts its overflow above the top edge,
+  // where no scroll reaches it
+  assert.match(rule(`${scroll}:has(.nm-remote, .nm-traj)`), /justify-content:\s*flex-start/)
+  for (const line of css.split('\n').filter((l) => l.startsWith(scroll))) {
+    assert.doesNotMatch(line, /justify-content:\s*(flex-end|end|center|safe)/, line)
+  }
+  // the first of them takes the free space above it while there is some
+  const first = rule(`${scroll} > :is(.nm-remote, .nm-traj):not(:is(.nm-remote, .nm-traj) ~ :is(.nm-remote, .nm-traj))`)
+  assert.match(first, /margin-top:\s*auto/)
+  // and the old first-child margin, which did nothing once the bubbles overflowed, is gone
+  assert.doesNotMatch(css, /\.nm-remote:first-child \{ margin-top: 16px/)
+})
+
 test('under prefers-reduced-motion every breathing light is steady', () => {
   const reduced = css.split('\n').filter((l) => l.startsWith('@media (prefers-reduced-motion: reduce)'))
   assert.ok(reduced.length >= 2)
