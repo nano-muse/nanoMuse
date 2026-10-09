@@ -61,6 +61,27 @@ def test_a_list_already_newest_first_keeps_its_shape(release_docs: ModuleType) -
     assert len(news) == 3
 
 
+def test_the_words_after_the_latest_version_link_stay(release_docs: ModuleType) -> None:
+    """The latest-version line says more than the link (1.0.0's README does); only the
+    version, the codename, the tag and the date move, the rest of the sentence is kept."""
+    page = (
+        "- `2026-10-09` 🚀 Latest version: [1.0.0 Keel]"
+        "(https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0), for the phone, the desktop"
+        " and the browser; it installs over the version before and keeps your data.\n"
+        "- `2026-10-08` 🤗 Our paper is on [Hugging Face Daily Papers]"
+        "(https://huggingface.co/papers/2610.08699), ranked third on the list for October 8.\n"
+    )
+    text, left = release_docs.edit_page(page, "1.0.0", "1.0.1", "Keel", "Still", "2026-10-20")
+    news = text.split("\n")
+    assert news[0] == (
+        "- `2026-10-20` 🚀 Latest version: [1.0.1 Still]"
+        "(https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1), for the phone, the desktop"
+        " and the browser; it installs over the version before and keeps your data."
+    )
+    assert news[1] == page.split("\n")[1]
+    assert left == 0
+
+
 def test_a_page_without_news_only_moves_the_version(release_docs: ModuleType) -> None:
     page = "Download [v1.0.0](…/tag/v1.0.0) · 1.0.0 Keel · nanoMuse-1.0.0-arm64.apk · 1.0.0-win"
     text, left = release_docs.edit_page(page, "1.0.0", "1.0.1", "Keel", "Still", "2026-10-20")

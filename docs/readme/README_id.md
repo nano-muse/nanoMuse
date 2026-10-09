@@ -35,9 +35,10 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ Kabar
 
-- `2026-10-09` 🚀 Versi terbaru: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0).
-- `2026-10-07` 📄 Makalah kami tersedia di [arXiv](https://arxiv.org/abs/2610.08699).
-- `2026-09-25` 🎉 nanoMuse dirilis.
+- `2026-10-09` 🚀 Versi terbaru: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0), untuk ponsel, desktop, dan peramban; dipasang di atas versi sebelumnya dengan data tetap utuh, dan catatan rilisnya memuat setiap perubahan.
+- `2026-10-08` 🤗 Makalah kami masuk [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699), peringkat ketiga di daftar 8 Oktober; pertanyaan dan komentar silakan disampaikan di halaman makalah.
+- `2026-10-07` 📄 Makalah kami tersedia di [arXiv](https://arxiv.org/abs/2610.08699): *nanoMuse: An Open-Source Personal Agent for Every Device You Own*, oleh Guangyi Liu, Yong Liu, dan Jiangning Zhang (Universitas Zhejiang); sitasinya ada di akhir halaman ini.
+- `2026-09-25` 🎉 nanoMuse dirilis di GitHub di bawah GPL-3.0-or-later: aplikasi Android yang dibangun di atas OpenMinis 1.13; relay, aplikasi desktop, dan aplikasi iPhone menyusul dalam beberapa hari berikutnya.
 
 Semua versi: [releases](https://github.com/nano-muse/nanoMuse/releases).
 
