@@ -86,11 +86,17 @@ struct NanoMuseSettingsHomeView: View {
         }
     }
 
-    /// Android: "Sign in" until signed in; then what is left of the allowance, or who is signed in when there is no ceiling.
+    /// Android: "Sign in" until signed in; then what is left of the allowance (in yuan on a relay that
+    /// prices in money, the account page's headline figure; tokens on an older relay), or who is
+    /// signed in when there is no ceiling.
     private var cloudLine: String {
         _ = store.instances
         guard NanoMuseCloud.isSignedIn, let account = NanoMuseCloud.account else { return AppLocalized("Sign in") }
         if account.unlimited { return account.hint }
+        if let left = account.poolLeftCny {
+            let whole = left.rounded() == left
+            return String(format: AppLocalized("%@ left"), "¥" + left.formatted(.number.precision(.fractionLength(whole ? 0 : 2))))
+        }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         let left = formatter.string(from: NSNumber(value: account.remaining)) ?? "\(account.remaining)"

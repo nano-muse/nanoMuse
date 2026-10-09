@@ -44,6 +44,19 @@ final class NanoMuseAccountsTests: XCTestCase {
         let decoded = try JSONDecoder().decode(NanoMuseCloudAccount.self, from: cached)
         XCTAssertEqual(decoded.id, "")
         XCTAssertEqual(decoded.hint, "138****1234")
+        XCTAssertNil(decoded.poolLeftCny, "an account cached before 1.0.1 carries no pool")
+    }
+
+    func testTheSettingsRowReadsThePoolInYuanOnAMoneyRelay() {
+        // the Settings row and the account page name the same figure: what is left of the pool
+        let reply: [String: Any] = ["account": ["channel": "sms", "hint": "138****1234"], "tokens": ["granted": 1000, "used": 10],
+                                    "spend": ["total": 1.8, "grant": 5, "left": 3.2, "usd_cny": 7.2]]
+        XCTAssertEqual(NanoMuseCloud.parseAccount(reply).poolLeftCny, 3.2)
+        // a member or an open relay has no pool; an older relay sends tokens only
+        XCTAssertNil(NanoMuseCloud.parseAccount(["account": ["channel": "sms"], "spend": ["total": 1.8, "unlimited": true, "left": NSNull()]]).poolLeftCny)
+        XCTAssertNil(NanoMuseCloud.parseAccount(["account": ["channel": "sms"], "tokens": ["granted": 1000, "used": 10]]).poolLeftCny)
+        // spent past the pool reads as nothing left, not a negative figure
+        XCTAssertEqual(NanoMuseCloud.parseAccount(["account": ["channel": "sms"], "spend": ["grant": 5, "left": -0.4]]).poolLeftCny, 0)
     }
 
     // MARK: - C12 (0.1.40): a key the relay refuses

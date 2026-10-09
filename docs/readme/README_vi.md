@@ -48,7 +48,7 @@ Mọi phiên bản: [releases](https://github.com/nano-muse/nanoMuse/releases).
 |---|---|
 | **Trình duyệt** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): một nanoMuse trên điện thoại mô phỏng, sau khi đăng nhập. Đây là bản demo; các ứng dụng bên dưới mới là bản thật |
 | **Android** 8.0 trở lên, arm64 | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk): mọi phiên bản ký cùng một khóa, cài đè lên bản cũ là được |
-| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): bản beta; liên kết sẽ cung cấp bản dựng khi Apple duyệt xong beta · [iOS](../ios.md) |
+| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): bản beta đã qua vòng duyệt beta của Apple; cài từ liên kết này · [iOS](../ios.md) |
 | **macOS** 12 trở lên | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-x64.dmg): chưa được công chứng: lần đầu nhấp chuột phải → *Mở* |
 | **Windows** 10 trở lên | [nanoMuse-Desktop-1.0.0-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-win-x64.exe): bấm *Vẫn chạy* một lần |
 | **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.tar.gz) |

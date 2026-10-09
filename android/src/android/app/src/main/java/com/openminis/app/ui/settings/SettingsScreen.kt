@@ -202,7 +202,9 @@ fun SettingsScreen(
                     icon = Icons.Outlined.CloudQueue,
                     value = when {
                         cloudAccount == null || !io.github.nanomuse.cloud.NanoMuseCloud.isSignedIn(context) -> stringResource(R.string.nm_cloud_row_sign_in)
-                        // Money relays: today's spend; the hint carries who is signed in.
+                        // Money relays: what is left of the pool, the account page's headline figure;
+                        // a member or an open relay has no pool, so today's spend with who is signed in.
+                        cloudAccount.pricesInMoney && cloudAccount.limited -> stringResource(R.string.nm_cloud_row_remaining, "¥" + io.github.nanomuse.ui.cloud.money(cloudAccount.leftCny))
                         cloudAccount.pricesInMoney -> cloudAccount.hint + " · ¥" + io.github.nanomuse.ui.cloud.money(cloudAccount.spentTodayCny)
                         cloudAccount.unlimited -> cloudAccount.hint
                         else -> stringResource(R.string.nm_cloud_row_remaining, java.text.NumberFormat.getIntegerInstance().format(cloudAccount.remaining))

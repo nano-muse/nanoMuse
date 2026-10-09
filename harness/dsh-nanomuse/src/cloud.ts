@@ -1538,16 +1538,25 @@ export default class NanomuseCloud extends Service {
     }
   }
 
-  /** `POST /providers/remove`: the row, the credential and the choices that pointed at it. */
-  async removeProvider(id: string): Promise<void> {
-    if (id === CHATGPT_PROVIDER) return this.chatGptLogout()
+  /**
+   * `POST /providers/remove`: the row, the credential and the choices that pointed at it.
+   * `cloudModelsOn` is true when the row was the last chat source while the account's models
+   * were off, so they are on again (the person reads one sentence under the row).
+   */
+  async removeProvider(id: string): Promise<{ cloudModelsOn: boolean }> {
+    if (id === CHATGPT_PROVIDER) {
+      await this.chatGptLogout()
+      return { cloudModelsOn: false }
+    }
     const row = this.state.providers?.[id]
     if (!row) throw new RelayError(404, 'not_found', 'No such row')
-    await this.dropOwnRow(id, row)
+    const cloudModelsOn = await this.dropOwnRow(id, row)
     this.broadcast()
+    return { cloudModelsOn }
   }
 
-  private async dropOwnRow(id: string, row: OwnProvider): Promise<void> {
+  /** Removes the row and what pointed at it; true when the account's models had to come back on. */
+  private async dropOwnRow(id: string, row: OwnProvider): Promise<boolean> {
     try {
       await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', id] }])
     } catch (error: unknown) {
@@ -1573,9 +1582,10 @@ export default class NanomuseCloud extends Service {
       }
       this.state = { ...this.state, media }
     }
-    await this.releaseChatRoute(id)
+    const cloudModelsOn = await this.releaseChatRoute(id)
     await this.writeState()
     await this.writeHands()
+    return cloudModelsOn
   }
 
   /**
@@ -1583,16 +1593,28 @@ export default class NanomuseCloud extends Service {
    * or the main chat still naming it would send every turn to a route no adapter serves, and
    * the person would read `no adapter registered for provider "custom"` (NO_ADAPTER) with
    * nothing to do about it. The slot moves to the first chat model left (the account's, then
-   * the own rows'), else back to dsh's stock DeepSeek default, which the next key or sign-in
-   * adopts again as it does on a fresh profile; the main chat follows when it sat on that route.
+   * the own rows'). When nothing is left because the account's models are switched off, they
+   * come back on and the slot takes the account's chat model (the same rule as the switch
+   * itself, which refuses to go off while nothing else could answer); only with no account at
+   * all does the slot fall back to dsh's stock DeepSeek default, which the next key or sign-in
+   * adopts again as it does on a fresh profile. The main chat follows when it sat on that
+   * route. Returns true when the account's models came back on.
    */
-  private async releaseChatRoute(id: string): Promise<void> {
+  private async releaseChatRoute(id: string): Promise<boolean> {
     const svc = this.defaultModelService()
-    if (!svc) return
+    if (!svc) return false
+    let cloudModelsOn = false
     try {
       let to: { provider: string; model: string } | undefined
       if (svc.currentSelection().provider === id) {
-        const next = this.chatOptions().find((o) => o.provider !== id)
+        let next = this.chatOptions().find((o) => o.provider !== id)
+        if (!next && this.state.cloudModelsOff && this.signedInCache && this.state.account) {
+          const { cloudModelsOff: _off, ...rest } = this.state
+          this.state = rest
+          next = this.chatOptions().find((o) => o.provider !== id)
+          cloudModelsOn = true
+          this.ctx.logger.info('nanomuse: %s was the last chat source; the account\'s models are on again', id)
+        }
         to = next ? { provider: next.provider, model: next.id } : { ...STOCK_DEFAULT_MODEL }
         await svc.saveSelection(to)
         this.ctx.logger.info('nanomuse: %s is gone; new chats answer through %s/%s', id, to.provider, to.model)
@@ -1609,6 +1631,7 @@ export default class NanomuseCloud extends Service {
     } catch (error: unknown) {
       this.ctx.logger.warn('nanomuse: the chat slot could not leave %s: %s', id, message(error))
     }
+    return cloudModelsOn
   }
 
   /** `POST /chatgpt/login`: starts the runtime's sign-in and returns the page to open; `done` follows in the live state. */
@@ -3352,8 +3375,7 @@ export default class NanomuseCloud extends Service {
       }
       if (req.method === 'POST' && route === '/providers/remove') {
         const body = await json(req)
-        await this.serialize(() => this.removeProvider(String(body.id ?? '')))
-        return send(res, 204)
+        return send(res, 200, await this.serialize(() => this.removeProvider(String(body.id ?? ''))))
       }
       if (req.method === 'POST' && route === '/chatgpt/login') return send(res, 200, { url: await this.chatGptLogin() })
       if (req.method === 'POST' && route === '/chatgpt/cancel') {

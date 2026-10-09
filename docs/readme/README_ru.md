@@ -48,7 +48,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 |---|---|
 | **Браузер** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): nanoMuse на симулированном телефоне, после входа. Это демо; настоящие приложения ниже |
 | **Android** 8.0+, arm64 | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk): все версии подписаны одним ключом и ставятся поверх предыдущей |
-| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): бета; ссылка выдаст сборку, как только она пройдёт бета-проверку Apple · [iOS](../ios.md) |
+| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): бета, прошедшая бета-проверку Apple; ссылка устанавливает её · [iOS](../ios.md) |
 | **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-x64.dmg). Без нотаризации: в первый раз правый клик → «Открыть» |
 | **Windows** 10+ | [nanoMuse-Desktop-1.0.0-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-win-x64.exe): один раз нажмите «Выполнить в любом случае» |
 | **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.tar.gz) |

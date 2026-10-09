@@ -6,7 +6,7 @@ import kotlin.math.abs
  * Notices when the hands go round in circles: the same action, again, on a screen that did
  * not change since the last one. The prompt's rule 5 asks the model to change tack after two
  * tries; this is the floor under it, the same one the runtime has (docs/gui.md): a line in the
- * history at the third identical step, a stop at the sixth — one model call with a screenshot
+ * history at the third identical step, a stop at the sixth: one model call with a screenshot
  * per step is what a loop costs, for up to thirty minutes without it.
  *
  * Pure Kotlin: fed the fingerprint of each screenshot ([print], a small grid of grey levels the

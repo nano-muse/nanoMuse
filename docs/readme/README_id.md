@@ -48,7 +48,7 @@ Semua versi: [releases](https://github.com/nano-muse/nanoMuse/releases).
 |---|---|
 | **Browser** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): sebuah nanoMuse di ponsel simulasi, setelah masuk. Ini demo; aplikasi di bawah inilah yang sebenarnya |
 | **Android** 8.0+, arm64 | [nanoMuse-1.0.0-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-1.0.0-arm64.apk): setiap versi ditandatangani dengan kunci yang sama dan dipasang menimpa versi sebelumnya |
-| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): versi beta; tautan ini memberikan build begitu tinjauan beta Apple lolos · [iOS](../ios.md) |
+| **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): versi beta yang sudah lolos tinjauan beta Apple; pasang dari tautan ini · [iOS](../ios.md) |
 | **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-mac-x64.dmg): belum dinotarisasi: klik kanan → *Open* saat pertama kali |
 | **Windows** 10+ | [nanoMuse-Desktop-1.0.0-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-win-x64.exe): klik *Run anyway* sekali |
 | **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.0/nanoMuse-Desktop-1.0.0-linux-x64.tar.gz) |
