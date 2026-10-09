@@ -78,6 +78,15 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   shortcutName: nanoMuse
+  # electron-builder keeps files with these extensions out of the installer's 7z archive and
+  # writes them into the installer one by one instead, and when it does it skips every
+  # node_modules folder. The default list has .mp4, so the face's clips under
+  # resources/dsh/node_modules/dsh-nanomuse/assets/ were in neither place: the Windows install
+  # had no dragon-*.mp4 and the face above the chat stood still (1.0.0; Linux and macOS, which
+  # do not go through NSIS, had them). Nothing here is big enough to be worth the exception:
+  # everything goes into the archive. tests/installer.test.mjs keeps this line, and the
+  # workflow checks the installer for the clips.
+  preCompressedFileExtensions: []
 mac:
   # the zip and dmg come from scripts/desktop-app/package-mac.sh; `npm run dist` alone leaves
   # the unpacked .app (the workflow passes --dir)

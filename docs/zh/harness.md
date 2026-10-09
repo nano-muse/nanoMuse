@@ -274,8 +274,11 @@ DeepSeek Harness 是 MIT 许可；它是依赖，不是内嵌的拷贝，它的�
    bundle 也一起；用的是 `~/.nanomuse/desktop` 下它自己的 profile，里面写明 bundle，并链接到 App 内的
    那份拷贝。负责手的运行时以 PyInstaller 构建随行，`NANOMUSE_PY` 把预设指向它。`desktop-app.yml`
    在每个发布标签上构建 Windows 安装包、两种架构的 macOS dmg/zip 和 Linux AppImage/deb，把每个打包好
-   的 harness 以 Node 模式启动一次作为检查，然后附到发布上（设置了同一组 Apple 密钥时，还会给 macOS
-   构建签名和公证）。它在 0.1.28 和 0.1.29 以 *nanoMuse Harness* 之名和旧桌面 App 并列发布；**从
+   的 harness 以 Node 模式启动一次作为检查，再列一遍 Windows 安装包里的压缩档，确认形象的四段短片在里面
+   （electron-builder 的 NSIS 目标默认把视频文件排除在这个压缩档之外、再逐个加回去，加回去时跳过所有
+   `node_modules`，而插件的短片正好放在那里；`electron-builder.yml` 里的
+   `nsis.preCompressedFileExtensions: []` 关掉了这个行为，`tests/installer.test.mjs` 守着它），然后附到
+   发布上（设置了同一组 Apple 密钥时，还会给 macOS 构建签名和公证）。它在 0.1.28 和 0.1.29 以 *nanoMuse Harness* 之名和旧桌面 App 并列发布；**从
    0.1.30 起它就是 nanoMuse 桌面版**，唯一的那个桌面 App——`nanoMuse-Desktop-<v>-…`，沿用已退役的
    `desktop/app` 的应用 id，所以可以直接覆盖安装——站点的下载也指向这里。
 7. **新外壳上的日常可用**——Muse 在聊天旁边的那些房间（动态、点子、目标、资源库）、手在这块屏幕上
