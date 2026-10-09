@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ Actualités
 
-- `2026-10-09` 🚀 Dernière version : [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0), pour le téléphone, l'ordinateur et le navigateur ; elle s'installe par-dessus la précédente en gardant vos données, et ses notes de version listent chaque changement.
+- `2026-10-09` 🚀 La version [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) est sortie, pour le téléphone, l'ordinateur et le navigateur ; elle s'installe par-dessus la précédente en gardant vos données, et ses notes de version listent chaque changement.
 - `2026-10-08` 🤗 Notre article est sur [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699), classé troisième de la liste du 8 octobre ; questions et commentaires sont les bienvenus sur la page de l'article.
 - `2026-10-07` 📄 Notre article est disponible sur [arXiv](https://arxiv.org/abs/2610.08699) : *nanoMuse: An Open-Source Personal Agent for Every Device You Own*, par Guangyi Liu, Yong Liu et Jiangning Zhang (université du Zhejiang) ; la citation est en bas de cette page.
 - `2026-09-25` 🎉 nanoMuse est publié sur GitHub sous GPL-3.0-or-later : une application Android construite sur OpenMinis 1.13 ; le relais, l'application de bureau et l'application iPhone sont arrivés dans les jours suivants.

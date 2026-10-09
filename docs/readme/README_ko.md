@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ 소식
 
-- `2026-10-09` 🚀 최신 버전: [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0), 휴대폰과 데스크톱과 브라우저 모두를 위한 버전입니다; 이전 버전 위에 설치되어 데이터가 그대로 남고, 릴리스 노트에 모든 변경 사항이 적혀 있습니다.
+- `2026-10-09` 🚀 버전 [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0)이 나왔습니다. 휴대폰과 데스크톱과 브라우저 모두를 위한 버전입니다; 이전 버전 위에 설치되어 데이터가 그대로 남고, 릴리스 노트에 모든 변경 사항이 적혀 있습니다.
 - `2026-10-08` 🤗 저희 논문이 [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699)에 올라 10월 8일 목록에서 3위를 차지했습니다; 질문과 의견은 논문 페이지에 남겨 주세요.
 - `2026-10-07` 📄 저희 논문이 [arXiv](https://arxiv.org/abs/2610.08699)에 공개되었습니다: 『nanoMuse: An Open-Source Personal Agent for Every Device You Own』, 저자 Guangyi Liu, Yong Liu, Jiangning Zhang(저장대학교); 인용 정보는 이 페이지 끝에 있습니다.
 - `2026-09-25` 🎉 nanoMuse를 GPL-3.0-or-later로 GitHub에 공개했습니다: OpenMinis 1.13을 바탕으로 한 Android 앱입니다; 릴레이, 데스크톱 앱, iPhone 앱이 그 뒤 며칠에 걸쳐 차례로 더해졌습니다.
