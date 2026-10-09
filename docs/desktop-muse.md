@@ -34,7 +34,13 @@ stylesheet over the harness's stable DOM hooks (`data-composer-card`,
   empty top, which is a drag handle, and full screen takes the clearance away. Windows
   gets the same frameless window with the system's own caption buttons drawn over the
   top right (`titleBarOverlay`, recoloured with the theme); Linux keeps the window
-  manager's bar, since there is no portable overlay there.
+  manager's bar, since there is no portable overlay there. On Windows the pages whose
+  top bar has buttons at its right end (Feed, Goals, Library and its file viewer, the
+  document editor, the profile panel, the first run, Plugins, Schedules, the right-hand
+  dock) leave the caption buttons' width free there, so those buttons sit to the left of
+  them; a task's details, a narrow column at the top right, moves its tabs down below the
+  caption buttons instead. Full screen and the split pane, whose bars start lower, get no
+  extra space.
 - The chats column: a *Search* field with a *···* menu (archived chats), **Main chat**
   — one session that stays at the top, the first one or the one you chose with *Make
   main chat* — and **Side chats** with a *+*: every other session, pinned first, each
