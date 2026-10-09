@@ -15,6 +15,8 @@
   READMEs and on the homepage's ``index.html``; a smaller release gets none, the download
   tables and the version line say what the current version is.
 - ``docs/release-notes-template.md``: the new codename joins the list.
+- ``.github/ISSUE_TEMPLATE/*.yml``: the example versions (``1.0.0 (43)``, ``desktop 1.0.0``)
+  move to the new version and the ``VERSION_CODE`` that ``scripts/rebrand.py`` carries.
 - ``docs/roadmap.md`` (the past-releases table) and ``docs/parity.md`` (cells that said "next
   release") are edited by hand.
 
@@ -86,6 +88,24 @@ def is_major(version: str) -> bool:
     return len(parts) == 3 and parts[1] == "0" and parts[2] == "0"
 
 
+def edit_issue_form(text: str, old: str, new: str, code: str) -> tuple[str, int]:
+    """An issue form's example versions moved to the new version, and how many lines moved.
+
+    ``<old> (<any code>)`` becomes ``<new> (<code>)`` and ``desktop <old>`` becomes
+    ``desktop <new>``; anything else that names the old version is left alone."""
+    out, n1 = re.subn(rf"{re.escape(old)} \(\d+\)", f"{new} ({code})", text)
+    out, n2 = re.subn(rf"desktop {re.escape(old)}(?![\d.])", f"desktop {new}", out)
+    return out, n1 + n2
+
+
+def version_code() -> str:
+    """The Android ``VERSION_CODE`` as ``scripts/rebrand.py`` carries it after the bump."""
+    m = re.search(r"^VERSION_CODE = (\d+)$", Path("scripts/rebrand.py").read_text("utf-8"), re.M)
+    if not m:
+        raise SystemExit("scripts/rebrand.py: no VERSION_CODE line")
+    return m.group(1)
+
+
 def main(argv: list[str]) -> int:
     dry_run = "--dry-run" in argv
     argv = [a for a in argv if a != "--dry-run"]
@@ -124,6 +144,15 @@ def main(argv: list[str]) -> int:
         else:
             p.write_text(text, encoding="utf-8")
         print(f"{name}: {left} line(s) still naming {old} outside the News list")
+
+    code = version_code()
+    for name in sorted(glob.glob(".github/ISSUE_TEMPLATE/*.yml")):
+        p = Path(name)
+        text, moved = edit_issue_form(p.read_text(encoding="utf-8"), old, new, code)
+        if moved and not dry_run:
+            p.write_text(text, encoding="utf-8")
+        if moved:
+            print(f"{name}: {moved} example version(s) now {new} ({code})")
 
     template = Path("docs/release-notes-template.md")
     s = template.read_text(encoding="utf-8")

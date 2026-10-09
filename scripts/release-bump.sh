@@ -27,15 +27,31 @@ sedi "s/^version: $old\$/version: $new/" CITATION.cff
 sedi "s/^date-released: .*$/date-released: $(date +%F)/" CITATION.cff
 sedi "s/const VERSION = \"$old\"/const VERSION = \"$new\"/" cloud/nanomuse_cloud/console/app.js
 sedi "s/\"version\": \"$old\"/\"version\": \"$new\"/" \
-  web/package.json web/package-lock.json \
-  harness/dsh-nanomuse/package.json harness/desktop/package.json harness/desktop/package-lock.json
+  web/package.json harness/dsh-nanomuse/package.json harness/desktop/package.json
+# A lock file names its own package twice (the root entry and packages[""]) and may list
+# dependencies that happen to carry the same version string, so only those two lines move.
+for lock in web/package-lock.json harness/desktop/package-lock.json; do
+  python3 - "$lock" "$old" "$new" <<'EOF'
+import sys
+
+path, old, new = sys.argv[1:4]
+lines = open(path, encoding="utf-8").read().split("\n")
+moved = 0
+for i, line in enumerate(lines):
+    own = i < 5 or '"": {' in "\n".join(lines[max(0, i - 3):i])
+    if own and line.strip() == f'"version": "{old}",':
+        lines[i] = line.replace(old, new)
+        moved += 1
+if moved != 2:
+    sys.exit(f'{path}: {moved} own version lines found, expected 2 (the root entry and packages[""])')
+open(path, "w", encoding="utf-8").write("\n".join(lines))
+EOF
+done
 if [ -n "$rold" ]; then
   sedi "s/^__version__ = \"$rold\"/__version__ = \"$rnew\"/" cloud/nanomuse_cloud/__init__.py
   sedi "s/^version = \"$rold\"/version = \"$rnew\"/" cloud/pyproject.toml
 fi
 
-# Each lock file names its own package twice (the root entry and ""); anything else means a
-# dependency happened to carry the same version string — look before you commit.
-echo "lock occurrences of $new: web=$(grep -c "\"version\": \"$new\"" web/package-lock.json) desktop=$(grep -c "\"version\": \"$new\"" harness/desktop/package-lock.json) (expect 2 each)"
+echo "lock files: $(git diff --numstat -- web/package-lock.json harness/desktop/package-lock.json | awk '{print $1" lines in "$3}' | paste -sd ',' -) (expect 2 each)"
 grep -n "^VERSION_NAME\|^VERSION_CODE" scripts/rebrand.py
 echo "next: python scripts/rebrand.py  (must print 'clean' on a second run), then scripts/release-docs.py"
