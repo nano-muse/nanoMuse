@@ -274,7 +274,7 @@ stay (a card sliding in, the marker locking on, the two ripples of a click), and
 the face's moods and the plain spinners. Under the system's *reduce motion* setting every
 breathing light is a steady light and the marker's arc stands still.
 
-**The glow.** While the hands run, the shell puts a transparent, click-through,
+**The glow.** While the hands have the screen, the shell puts a transparent, click-through,
 always-on-top window over the whole display (UI-TARS's ScreenMarker, in the phone's
 vocabulary — `HandsStage.kt` drawn for a desktop): a light breathing along the four
 edges, 7 % of the shorter side deep with a 1.5 px hairline at the rim — Muse's action blue
@@ -289,8 +289,13 @@ screen, write their name where the last ring was. The marker fades 1.6 s after t
 action. It comes from the operator itself (its own fractions of the display), not from
 the client's reading of the tool call, so it is where the click went; when another
 backend acts (the runtime's own hands), the client's point stands in, without words. The
-glow cannot take focus or a click, it is gone 400 ms after the hands stop, and it, the
-capsule and the nanoMuse window itself while the hands run all have
+glow is up for the whole run, from the turn's first `computer_screen` or `computer_act`
+call to the turn's end, through the seconds the model thinks between two steps (the host
+says which session has the screen in `hands.run`; the glow and the capsule used to follow
+the calls in flight and went dark between every two), and it goes 400 ms after the turn
+ends, after *Stop*, or after five minutes without a call. The glow cannot take focus or a
+click, and it, the
+capsule and the nanoMuse window itself while the hands have the screen all have
 `setContentProtection(true)`, so none of them is in the screenshots the runtime takes —
 on Linux, where content protection does nothing, the glow and the capsule step out of the
 way for the instant of the capture instead. The phone's long-press ring has no desktop
@@ -300,9 +305,11 @@ capsule, so the desktop's face at the pointer (0.1.34–0.1.39) is gone.
 **The capsule** is the phone's `HandsCapsule`, sized for a pointer: a pill at most 420 px
 wide at the top centre of the work area (ink at 82 %, a white hairline), the agent's face
 in a 36 px ring of three hues — the action blue, violet, cyan — breathing with four small
-bars, **Step N** and what the hands are doing (*clicked "Save"*, *typed "hello"*, *looking
-at the screen*), **I'll take it** and a red **Stop**. It slides in over 320 ms when the
-hands start, is shown only while the nanoMuse window is not the one in front (the chat
+bars, **Step N** and what the hands are doing (*looking at the screen*, *clicked "Save"*,
+*typed "hello"*; the last step's words stay while the model thinks about the next),
+**I'll take it** and a red **Stop**. It slides in over 320 ms when the
+hands start, stays for the whole run like the glow, is shown only while the nanoMuse
+window is not the one in front (the chat
 shows the same in the trajectory card), and goes 220 ms after the run ends. When the
 hands are about to click or drag under it, it moves to the bottom of the work area first
 (and back up next time), the way the phone's capsule dodges the finger. A hold turns it

@@ -43,6 +43,12 @@ export interface LiveCall {
   since: number
 }
 
+/** The hands have this computer's screen: which session, since when (from its first `computer_*` call to its turn's end). */
+export interface LiveScreenRun {
+  sessionId: string
+  since: number
+}
+
 export interface LiveNotice {
   id: number
   /** `notify`: words from another device; `call`: `action` ran here for `from`. */
@@ -121,7 +127,8 @@ export interface Live {
   cloud: { signedIn: boolean; hint: string }
   profile: LiveProfile
   hub: LiveHub
-  hands: { calls: LiveCall[]; steps: number }
+  /** The calls in flight, the step count, and the run that has this screen (`run`; absent on an older host, null between runs). */
+  hands: { calls: LiveCall[]; steps: number; run?: LiveScreenRun | null }
   stage: LiveStage
   notices: LiveNotice[]
   /** Questions the agent asked before a step, open now; the stage answers them too. */
@@ -188,7 +195,7 @@ const INITIAL: Live = {
   cloud: { signedIn: false, hint: '' },
   profile: DEFAULT_PROFILE,
   hub: { connected: false, deviceId: '', deviceName: '', remoteControl: false, trusted: [], asks: [], devices: [] },
-  hands: { calls: [], steps: 0 },
+  hands: { calls: [], steps: 0, run: null },
   stage: { seq: 0, at: 0, source: 'computer', device: '', width: 0, height: 0, title: '', action: null, sessionId: '' },
   notices: [],
   approvals: [],

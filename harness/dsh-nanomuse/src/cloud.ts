@@ -50,7 +50,7 @@ import { ProfileStore, type Profile } from './profile.ts'
 import { cloudOffFailure, relayFailure, transportFailure, type RelayRefusal } from './refusals.ts'
 import { Relay, RelayError, type Account, type Estimate, type Invite, type ProfileWrite, type RelayModel, type SignIn } from './relay.ts'
 import { TaskRunner, textOf } from './task.ts'
-import { Trajectory, type StepAction, type TrajectoryView } from './trajectory.ts'
+import { SCREEN_RUN_IDLE_MS, ScreenRuns, Trajectory, type ScreenRun, type StepAction, type TrajectoryView } from './trajectory.ts'
 import { RemoteStore, SyncEngine, SyncRelay, type RemoteLine, type SessionInfo, type SessionLine, type SyncState } from './sync.ts'
 import { AvatarMotion, ANIMATED, type MotionMood, type MotionView } from './motion.ts'
 import { DEFAULT_VIDEO_MODEL, hostOf, KNOWN_DASHSCOPE_MODELS, looksLikeVideoModel, probe as probeVideoModel, speaksDashScope, type VideoEndpoint } from './video.ts'
@@ -253,7 +253,12 @@ export interface LiveState {
   cloud: { signedIn: boolean; hint: string }
   profile: Profile
   hub: HubState
-  hands: { calls: HandsCall[]; steps: number }
+  /**
+   * The calls in flight, the step count, and `run`: the session that has this computer's
+   * screen, from its first `computer_*` call to its turn's end (null between runs). The
+   * shell's glow and capsule follow `run`, so they stay up while the model thinks.
+   */
+  hands: { calls: HandsCall[]; steps: number; run: ScreenRun | null }
   stage: StageState
   notices: Notice[]
   /** Questions the agent asked before a step, open right now (C2); the stage answers them too. */
@@ -557,6 +562,9 @@ export default class NanomuseCloud extends Service {
   private stage: StageState = NO_STAGE
   /** The hands' runs, step by step, with their pictures (0.1.40). */
   private readonly trajectory = new Trajectory()
+  /** Which session has this computer's screen right now, for the glow and the capsule. */
+  private readonly screenRuns = new ScreenRuns()
+  private runTimer: NodeJS.Timeout | undefined
   private stageTimer: NodeJS.Timeout | undefined
   private signedInCache = false
   /** When the account was last re-read for the allowance (after a turn, after a refusal). */
@@ -853,15 +861,23 @@ export default class NanomuseCloud extends Service {
         }
       })
     })
-    // The trajectory (0.1.40): the model's words before a step, and the turn's end closing the run.
+    // The trajectory (0.1.40): the model's words before a step, and the turn's end closing the
+    // run; the same end lets go of the screen (the glow and the capsule outside the window).
     this.ctx.effect(
       () =>
         this.ctx.on('session/event', (session: Session, event: SessionEvent) => {
           const id = String(session.id)
           if (event.type === 'assistant/message') this.trajectory.said(id, textOf(event.data.message.content))
-          else if (event.type === 'turn/end' && this.trajectory.running(id)) {
-            this.trajectory.turnEnded(id)
-            this.broadcast()
+          else if (event.type === 'turn/end') {
+            let changed = this.screenRuns.turnEnded(id)
+            if (this.trajectory.running(id)) {
+              this.trajectory.turnEnded(id)
+              changed = true
+            }
+            if (changed) {
+              this.armRunSweep()
+              this.broadcast()
+            }
           }
         }),
       'nanomuse cloud: trajectory',
@@ -1858,7 +1874,7 @@ export default class NanomuseCloud extends Service {
       cloud: { signedIn: this.signedInCache && Boolean(account), hint: account?.hint ?? '' },
       profile: this.profile.current(),
       hub: this.hubState(),
-      hands: { calls: [...this.calls.values()], steps: this.steps },
+      hands: { calls: [...this.calls.values()], steps: this.steps, run: this.screenRuns.current() },
       stage: this.stage,
       notices: this.notices,
       approvals: this.approvalDesk.list(),
@@ -2701,12 +2717,17 @@ export default class NanomuseCloud extends Service {
     this.steps += 1
     this.calls.set(callId, { id: callId, name, args: pickArgs(args), sessionId, since: now })
     this.trajectory.began(sessionId, callId)
+    this.screenRuns.began(sessionId, name, now)
+    this.armRunSweep()
     this.broadcast()
   }
 
   private ended(callId: string): void {
-    if (this.calls.delete(callId)) {
+    const call = this.calls.get(callId)
+    if (call && this.calls.delete(callId)) {
       this.lastCallAt = Date.now()
+      this.screenRuns.ended(call.sessionId, this.lastCallAt)
+      this.armRunSweep()
       this.broadcast()
     }
     // the stage empties itself a while after the hands rest
@@ -2716,6 +2737,24 @@ export default class NanomuseCloud extends Service {
       if (this.calls.size === 0 && Date.now() - this.lastCallAt >= STAGE_REST_MS - 1000) this.clearStage()
     }, STAGE_REST_MS)
     this.stageTimer.unref?.()
+  }
+
+  /**
+   * The screen runs close with their turn (`turn/end`, below); this is the safety net for a
+   * turn whose end never came: a run quiet for `SCREEN_RUN_IDLE_MS` with nothing in flight
+   * lets go of the screen, and the glow goes down.
+   */
+  private armRunSweep(): void {
+    if (this.runTimer) clearTimeout(this.runTimer)
+    this.runTimer = undefined
+    if (this.screenRuns.size === 0) return
+    this.runTimer = setTimeout(() => {
+      this.runTimer = undefined
+      const inFlight = (sessionId: string) => [...this.calls.values()].some((c) => c.sessionId === sessionId)
+      if (this.screenRuns.sweep(Date.now(), inFlight)) this.broadcast()
+      this.armRunSweep()
+    }, SCREEN_RUN_IDLE_MS + 50)
+    this.runTimer.unref?.()
   }
 
   // -- the Live stage -------------------------------------------------------------------

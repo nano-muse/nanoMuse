@@ -34,6 +34,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **The glow and the capsule stay up for the whole run.** While the hands work on this computer, the breathing light round the screen and the pill at the top used to follow the tool calls in flight, so they went dark and came back between every two steps while the model thought. They now stay from the turn's first `computer_screen` or `computer_act` call to the turn's end (the host's live state says which session has the screen, `hands.run`), go down after *Stop*, and as a safety net after five minutes without a call; between steps the capsule keeps the last step's words. Reach calls and the connectors' tools no longer light the glow, since they do not touch this screen.
 - The first page of the first run now shows the app's mark, as the phone does, and offers *Use your own API key instead* under *Sign in*: it goes straight to the models page with no account, and *Skip for now* there with no key saved returns to the first page.
 - The agent's opening lines in the first conversation no longer carry a dash.
 - The Chinese copy says 操作屏幕 where it used to say 手 or 动手 for the Hands (the Computer use badges, the permissions rows, the Models page, the first run's source page), and 形象 for the avatar throughout; *Manage routines* now reads 管理例程 like the rest of the Goals page.
