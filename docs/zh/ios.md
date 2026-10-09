@@ -46,8 +46,12 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
 - **身份。** Bundle id `io.github.nanomuse.app`（加 `.ShareExtension`、`.AgentWidget`、
   `.FileProvider`）、app group `group.io.github.nanomuse.app`、iCloud 容器
   `iCloud.io.github.nanomuse.app`，以及带着 bundle id 的后台任务、UTType 和 URL scheme 的
-  id。和 Android 不同，iOS 上没有源码包名的限制，所以整个家族一起换。`minis://` 和
-  `minis-mcp://` 这两个 scheme 保留：那是上游和它自己沙箱之间的约定。
+  id。和 Android 不同，iOS 上没有源码包名的限制，所以整个家族一起换。系统认得这个 App 的
+  URL scheme 是 `nanomuse`（分享扩展打开 `nanomuse://share`）和 `nanomuse-mcp`，这样同一部手机上
+  也装了 OpenMinis 时，不会有两个 App 抢同一个 scheme。App 内部的链接仍是 `minis://…`：那是上游
+  和它自己的沙箱、系统提示词和模型之间的约定；从系统进来的 `nanomuse://` 链接按它的 `minis://`
+  形式读（`NanoMuse/NanoMuseOwnScheme.swift`），聊天之外我们自己的按钮打开这类链接时走深链路由，
+  不经过系统。
 - **名字。** 显示名 nanoMuse、「Share to nanoMuse」「nanoMuse Files」；Swift 字符串字面量、
   `Localizable.xcstrings`（键名改了，九种翻译全部更新）和 Info.plist 各语言的用途说明里，
   「Minis」→「nanoMuse」。OpenRouter 的 `HTTP-Referer` 仍指向 OpenMinis，和 Android 一样：

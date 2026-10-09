@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import com.openminis.app.R
 import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.ui.theme.ChatColors
+import io.github.nanomuse.deeplink.OwnScheme
 import io.github.nanomuse.ui.avatar.AgentMood
 
 /**
@@ -114,27 +115,15 @@ fun NanoMuseStatusLine(text: String, mood: AgentMood) {
 
 /** Opens Settings → Soul, where the name, icon and style live. Tapping the face is the shortcut. */
 fun openSoulSettings(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("minis://settings/soul")).apply {
-        setPackage(context.packageName)
-        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    }
-    runCatching { context.startActivity(intent) }
+    runCatching { context.startActivity(OwnScheme.intent(context, Uri.parse("minis://settings/soul"), Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
 }
 
 /** Opens the agent's profile page (today's activity, approvals, daily, soul & memory). Tapping the face is the shortcut, as in Muse. */
 fun openAgentProfile(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("minis://settings/profile")).apply {
-        setPackage(context.packageName)
-        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    }
-    runCatching { context.startActivity(intent) }
+    runCatching { context.startActivity(OwnScheme.intent(context, Uri.parse("minis://settings/profile"), Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
 }
 
 /** Opens the avatar studio (the face, its moods, the image model) — the advanced entry behind the profile page. */
 fun openAvatarStudio(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("minis://settings/avatar")).apply {
-        setPackage(context.packageName)
-        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    }
-    runCatching { context.startActivity(intent) }
+    runCatching { context.startActivity(OwnScheme.intent(context, Uri.parse("minis://settings/avatar"), Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
 }

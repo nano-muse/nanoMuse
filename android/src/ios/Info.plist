@@ -162,7 +162,8 @@
 			<string>nanoMuse Share</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>minis</string>
+				<!-- nanoMuse: the system knows the app as nanomuse://, so a phone with OpenMinis too never has two apps on one scheme; inside, links stay minis:// (NanoMuseOwnScheme) -->
+				<string>nanomuse</string>
 			</array>
 		</dict>
 		<dict>
@@ -170,7 +171,7 @@
 			<string>MCP OAuth Callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>minis-mcp</string>
+				<string>nanomuse-mcp</string>
 			</array>
 		</dict>
 	</array>

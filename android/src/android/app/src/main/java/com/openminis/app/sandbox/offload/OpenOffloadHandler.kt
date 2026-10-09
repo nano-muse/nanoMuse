@@ -54,6 +54,9 @@ class OpenOffloadHandler(private val context: Context) : NativeOffloadHandler {
                     // intent, so let the system-wide chooser apply.
                     selector = null
                 }
+            } else if (io.github.nanomuse.deeplink.OwnScheme.isOwn(Uri.parse(url).scheme)) {
+                // nanoMuse: `minis://` and `nanomuse://` are this app's; to MainActivity by name
+                io.github.nanomuse.deeplink.OwnScheme.intent(context, Uri.parse(url))
             } else {
                 Intent(Intent.ACTION_VIEW, Uri.parse(url))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

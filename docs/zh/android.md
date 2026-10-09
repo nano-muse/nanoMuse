@@ -3,7 +3,12 @@
 `android/` 是手机上的 nanoMuse：[OpenMinis](https://github.com/OpenMinis/OpenMinis)
 1.13（GPL-3.0）——一个原生 App，智能体**在手机上**运行，Linux shell、浏览器、MCP 服务器、
 技能和定时任务都装在 APK 里——再加上 nanoMuse 自己的身份、设计和功能。属于 nanoMuse 的一切
-都在 `io.github.nanomuse.*` 下；OpenMinis 文件里的改动用 `// nanoMuse:` 标出。这个选择的来龙去脉
+都在 `io.github.nanomuse.*` 下；OpenMinis 文件里的改动用 `// nanoMuse:` 标出。应用 id 是
+`io.github.nanomuse.app`，系统认得这个 App 的 URL scheme 是 `nanomuse://`，这样同一部手机上也装了
+OpenMinis 时，不会有两个 App 抢同一个 scheme；App 内部的链接仍是 `minis://…`（上游的词汇，沙箱、
+系统提示词和模型都用它），从系统进来的 `nanomuse://` 链接按它的 `minis://` 形式读，App 自己打开
+自己的链接时一律按名字指向 `MainActivity`，不交给系统去解析
+（`io.github.nanomuse.deeplink.OwnScheme`）。这个选择的来龙去脉
 在 [roadmap.md](roadmap.md)；它之前的方案（包着一个 Python 服务器的 WebView，两个 APK 变体）
 作为设计记录保留在 [archive/android-python-line.md](../archive/android-python-line.md)，不是你今天
 下载到的东西。
