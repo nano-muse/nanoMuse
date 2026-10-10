@@ -1,7 +1,8 @@
 """Long-term memory: small facts about the user that persist across sessions.
 
 Stored in SQLite. Retrieval is a lightweight keyword/bigram overlap score weighted
-by how rare each word is in the store (works for English and CJK without external
+by how rare each word is in the store (words in any alphabetic script, Latin, Cyrillic,
+Greek, Arabic and the rest, plus character bigrams for CJK, without external
 embeddings); when an embedding endpoint is available (``embeddings.py``) a second
 ranking by meaning is fused in. Memories can always be listed and *forgotten* by the
 user. Every change a tidy-up makes (see ``consolidate.py``) is logged with the text
@@ -25,7 +26,11 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from nanomuse.memory.embeddings import MemoryIndex
 
-_WORD_RE = re.compile(r"[A-Za-z0-9_]+")
+# A word is a run of letters or digits in any script (Cyrillic, Greek, Arabic, accented
+# Latin, ...); CJK is left out of the class and handled by character below. The old
+# ``[A-Za-z0-9_]+`` made every non-Latin line an empty set, and the tidy-up's guard then
+# had nothing to compare and approved anything (#270).
+_WORD_RE = re.compile(r"[^\W_\u3400-\u9fff]+")
 _CJK_RE = re.compile(r"[\u3400-\u9fff]")
 
 
@@ -71,8 +76,8 @@ class MemoryChange:
 
 
 def tokenize(text: str) -> set[str]:
-    """Words for latin text + character bigrams for CJK."""
-    tokens = {w.lower() for w in _WORD_RE.findall(text) if len(w) > 1}
+    """Words for alphabetic scripts (case folded) + character bigrams for CJK."""
+    tokens = {w.casefold() for w in _WORD_RE.findall(text) if len(w) > 1}
     cjk = "".join(_CJK_RE.findall(text))
     tokens.update(cjk[i : i + 2] for i in range(len(cjk) - 1))
     if len(cjk) == 1:

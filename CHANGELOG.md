@@ -8,6 +8,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **The memory tidy-up judges every script, and refuses what it cannot judge.** Its tokenizer knew Latin letters and CJK only, so a Russian (or Greek, Arabic, Hebrew) merge had no words to compare and the guard against invented facts approved anything, while recall between two Russian lines scored zero. Words are now Unicode words in any alphabet; a word that only differs from a source's by its ending (`Пекин`, `Пекине`) counts as the same; and when there is nothing to compare, the merge is refused rather than waved through (#270).
+
 ### Web
 
 ### Desktop

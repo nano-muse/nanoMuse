@@ -178,3 +178,57 @@ def test_tidy_summary_follows_the_reply_language():
     assert _tidy_summary(zh_report, "English").startswith(
         "I tidied your memory: merged 1 line and dropped 1:"
     )
+
+
+def test_the_guard_judges_every_script_and_refuses_what_it_cannot_judge():
+    """#270: the tokenizer was ASCII only, so a Russian merge had nothing to compare
+    against and the guard approved anything, invented facts included."""
+    from nanomuse.memory import MemoryItem
+    from nanomuse.memory.consolidate import _no_new_words
+
+    def item(content: str) -> MemoryItem:
+        return MemoryItem(id="m", content=content, category="fact", created_at="", source="user")
+
+    ru = [item("Живёт в Шанхае"), item("Переехал в Пекин в марте")]
+    # invented facts, in Russian: refused
+    assert not _no_new_words("Владеет тремя кошками и любит верховую езду", ru)
+    # invented facts in English against Russian sources: refused
+    assert not _no_new_words("owns three cats", ru)
+    # an honest merge that keeps the newer fact; the case endings change, the words do not
+    assert _no_new_words("Живёт в Пекине, переехал из Шанхая в марте", ru)
+    assert _no_new_words("ЖИВЁТ В ПЕКИНЕ (ПЕРЕЕХАЛ ИЗ ШАНХАЯ)", ru)
+    # a shared stem is not a shared prefix: a different word is still new
+    assert not _no_new_words("Предпочитает окна", [item("Его предпочтения: окна у прохода")])
+    # the same word in two case forms of a five-letter noun passes (марте, марта)
+    assert _no_new_words("С марта живёт в Пекине", ru)
+    # nothing to compare: letters that make no word, on either side, mean no
+    assert not _no_new_words("a b", [item("Lives in Shanghai")])
+    assert not _no_new_words("Lives in Shanghai", [item("x")])
+    # the English behaviour is as before
+    en = [item("Lives in Shanghai"), item("Moved to Beijing in March 2026")]
+    assert _no_new_words("Lives in Beijing, moved from Shanghai in March 2026", en)
+    assert not _no_new_words("Lives in Beijing and owns three cats", en)
+    # and so is the CJK one
+    assert _no_new_words("住在北京，从上海搬来", [item("住在上海"), item("搬到北京")])
+    assert not _no_new_words("住在北京，养了三只猫", [item("住在上海"), item("搬到北京")])
+
+
+def test_tokens_and_similarity_cover_cyrillic_and_the_other_alphabets():
+    from nanomuse.memory.store import similarity, tokenize
+
+    assert tokenize("Пользователь предпочитает окна у прохода") == {
+        "пользователь",
+        "предпочитает",
+        "окна",
+        "прохода",
+    }
+    # case folding, not lowercasing: a final sigma folds to the ordinary one
+    assert tokenize("Ο χρήστης μένει στην Αθήνα") == {"χρήστησ", "μένει", "στην", "αθήνα"}
+    assert tokenize("يعيش في القاهرة") == {"يعيش", "في", "القاهرة"}
+    assert tokenize("Déménagé à Zürich") == {"déménagé", "zürich"}
+    assert tokenize("住在上海 since 2024") == {"住在", "在上", "上海", "since", "2024"}
+    assert similarity("Живёт в Шанхае", "Живёт в Шанхае") == 1.0
+    different = similarity("Живёт в Шанхае", "Переехал в Пекин в марте")
+    assert different == 0.0
+    shared = similarity("Живёт в Шанхае", "Живёт в Пекине")
+    assert 0.0 < shared < 0.5

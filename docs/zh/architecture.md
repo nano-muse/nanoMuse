@@ -43,7 +43,7 @@ sequenceDiagram
 | 在手机上 | `nanomuse/runtime.py`、`nanomuse/bridge/` | `device()` 读 `NANOMUSE_DEVICE*`；`DEVICE_TOOLS`（手机那些工具在哨兵里的默认值）和 `device_mcp_server()`（App 的 MCP 服务器作为 `device` 条目，工具名 `device__*`）；CLI 桥（`/api/bridge/*`，一次一条命令的令牌），背后是 `nanomuse-device` / `nanomuse-browser` / `nanomuse-open`——见 [device.md](device.md)、[local-runtime.md](local-runtime.md) |
 | 手机 | `nanomuse/phone/link.py`、`screen.py`、`operator.py`、`trace.py`、`nanomuse/tools/phone.py` | 已连接的设备，以及经 App 的 WebSocket 走的请求/响应；屏幕是一张截图加一段说明文字；操作器循环（MemGUI 的 `mobile_use` 方言，坐标落在 999 网格上），用它自己的模型；JSONL 轨迹和它的 HTML 渲染；`phone_screen` / `phone_act` / `phone_task` 和它们在哨兵里的评估（见 [gui.md](gui.md)） |
 | LLM | `nanomuse/llm/base.py`、`openai_chat.py`、`openai_responses.py`、`prompt_tools.py`、`factory.py`、`mock.py`；`catalogue.py` + `providers.json`、`chatgpt.py`、`codex.py`、`chatgpt_proxy.py` | `BaseLLM`、带 `<think>` 过滤的流式输出、重试、基于提示的工具调用、给测试用的 `MockLLM`；服务商目录（谁覆盖对话、视觉、图像、视频）；ChatGPT 登录（PKCE、令牌存储）以及 `provider = "chatgpt"` 和 `nanomuse chatgpt proxy` 背后 Chat Completions ↔ Codex Responses 的转换 |
-| 记忆、目标 | `nanomuse/memory/store.py`、`nanomuse/memory/consolidate.py`、`nanomuse/goals/store.py` | SQLite；注入记忆时按罕见词（IDF）排序；整理计划器和它的检查；带撤销的变更日志 |
+| 记忆、目标 | `nanomuse/memory/store.py`、`nanomuse/memory/consolidate.py`、`nanomuse/goals/store.py` | SQLite；注入记忆时按罕见词（IDF）排序，词按任何字母文字切分，中日韩按双字；整理计划器和它的检查，判不了的合并一律拒绝；带撤销的变更日志 |
 | App 服务器 | `nanomuse/server/service.py`、`api.py`、`webui.py`、`events.py` | 线程和工作任务、REST + WebSocket、把回调变成事件的 `UI` 实现、时间线持久化 |
 | 前端 | `web/src/` | React + TypeScript + Tailwind；`store.tsx`（状态、WebSocket）、`screens/`（各个标签页）、`components/`（卡片、形象、Markdown） |
 | 终端 | `nanomuse/console.py`、`nanomuse/cli.py` | 基于 Rich 的控制台界面，审批就在行内；Typer 命令 |
