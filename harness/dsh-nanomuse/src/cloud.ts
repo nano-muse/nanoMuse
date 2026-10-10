@@ -506,8 +506,9 @@ function canonical(value: unknown): string {
 /**
  * The runtime's refusal in an MCP error result, or `undefined` for any other failure.
  * The mark it is recognised by: `nanomuse mcp` said "Not done — " until 1.0 and has said
- * "Not done: " since (the runtime's sentences carry no dashes, `tests/test_voice.py`),
- * and this plugin's own declines read "Not done — " — both are the same refusal.
+ * "Not done: " since (the runtime's sentences carry no dashes, `tests/test_voice.py`); this
+ * plugin's own declines say "Not done: " too. Both marks are the same refusal, and the old
+ * one stays recognised for a runtime that predates 1.0.
  */
 const REFUSAL_MARKS = ['Not done: ', 'Not done — '] as const
 
@@ -540,8 +541,9 @@ function errorText(result: ToolExecutionResult): string {
   return texts.join('\n')
 }
 
-function declined(step: string, why: string): ToolExecutionResult {
-  const text = `Not done — ${step}. The person did not approve this step on their permission card (${why}); do not retry it. Ask them what to do instead, or carry on without it.`
+/** The plugin's own refusal of a step the person declined on the card: the same mark as the runtime's. */
+export function declined(step: string, why: string): ToolExecutionResult {
+  const text = `Not done: ${step}. The person did not approve this step on their permission card (${why}); do not retry it. Ask them what to do instead, or carry on without it.`
   return { isError: true, error: { message: text, info: { name: 'HandsDeclined', code: 'REJECTED' } }, content: [{ type: 'text', text }] }
 }
 
