@@ -116,10 +116,10 @@
     "@deepseek-ai/dsh-user-approval": "0.2.0-rc.2",
     "@deepseek-ai/dsh-util-values": "0.2.0-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.19.1",
     "@types/react": "~18.3.1",
     "@types/react-dom": "18.3.1",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.2",
     "react": "^18.2.0",
     "react-dom": "18.3.1",
     "typescript": "^5.9.0"
