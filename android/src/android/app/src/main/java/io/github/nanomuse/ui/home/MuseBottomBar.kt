@@ -28,10 +28,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.hazeEffect
 
 /**
  * nanoMuse's bottom bar: a floating frosted-glass pill, five glyphs, icons only. The pill blurs
@@ -55,14 +54,13 @@ fun MuseBottomBar(
     ) {
         Row(
             modifier = Modifier
-                .hazeBlur(
-                    input = HazeInput.Sources(hazeState),
-                    style = HazeBlurStyle {
-                        blurRadius(28.dp)
-                        backgroundColor(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f))
-                        noiseFactor(0.08f)
-                    },
-                )
+                .hazeEffect(state = hazeState) {
+                    style = HazeStyle(
+                        backgroundColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
+                        blurRadius = 28.dp,
+                        noiseFactor = 0.08f,
+                    )
+                }
                 .clip(CircleShape)
                 .border(
                     width = 1.dp,
