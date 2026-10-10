@@ -30,15 +30,25 @@ struct NanoMuseCloudAccount: Codable, Equatable, Sendable {
     /// C10: the relay's opaque id of the account (`account.id` of `/v1/me`) — what the local
     /// conversations are keyed to, never the identifier. Empty from a relay that sends none.
     var id: String = ""
+    /// The pool in yuan (`spend.grant` / `spend.left` of `/v1/me`) on a relay that prices in money;
+    /// nil from an older relay, from the sign-in reply, or when the account has no pool.
+    var grantCny: Double? = nil
+    var leftCny: Double? = nil
 
     var remaining: Int64 { max(granted - used, 0) }
+    /// The relay prices in money and this account has a pool to run out of: the Settings row
+    /// says what is left of it, as the account page's headline does.
+    var poolLeftCny: Double? {
+        guard let grantCny, grantCny > 0, let leftCny else { return nil }
+        return max(leftCny, 0)
+    }
     /// 0..1 of the grant still unspent.
     var fraction: Double {
         guard granted > 0 else { return 0 }
         return min(max(Double(remaining) / Double(granted), 0), 1)
     }
 
-    init(channel: String, hint: String, granted: Int64, used: Int64, usedToday: Int64, dailyCap: Int64, checkedAt: Date, unlimited: Bool = false, id: String = "") {
+    init(channel: String, hint: String, granted: Int64, used: Int64, usedToday: Int64, dailyCap: Int64, checkedAt: Date, unlimited: Bool = false, id: String = "", grantCny: Double? = nil, leftCny: Double? = nil) {
         self.channel = channel
         self.hint = hint
         self.granted = granted
@@ -48,6 +58,8 @@ struct NanoMuseCloudAccount: Codable, Equatable, Sendable {
         self.checkedAt = checkedAt
         self.unlimited = unlimited
         self.id = id
+        self.grantCny = grantCny
+        self.leftCny = leftCny
     }
 
     // `unlimited` and `id` came later; an account cached by an earlier build decodes without them.
@@ -62,6 +74,8 @@ struct NanoMuseCloudAccount: Codable, Equatable, Sendable {
         checkedAt = try c.decode(Date.self, forKey: .checkedAt)
         unlimited = try c.decodeIfPresent(Bool.self, forKey: .unlimited) ?? false
         id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+        grantCny = try c.decodeIfPresent(Double.self, forKey: .grantCny)
+        leftCny = try c.decodeIfPresent(Double.self, forKey: .leftCny)
     }
 }
 
@@ -553,10 +567,16 @@ enum NanoMuseCloud {
     static func parseAccount(_ reply: [String: Any]) -> Account {
         let account = reply["account"] as? [String: Any] ?? [:]
         let tokens = reply["tokens"] as? [String: Any] ?? [:]
+        let spend = reply["spend"] as? [String: Any] ?? [:]
         func int64(_ value: Any?) -> Int64 {
             if let n = value as? NSNumber { return n.int64Value }
             if let s = value as? String { return Int64(s) ?? 0 }
             return 0
+        }
+        func money(_ value: Any?) -> Double? {
+            if let n = value as? NSNumber { return n.doubleValue }
+            if let s = value as? String { return Double(s) }
+            return nil
         }
         return Account(
             channel: account["channel"] as? String ?? "",
@@ -567,7 +587,9 @@ enum NanoMuseCloud {
             dailyCap: int64(tokens["daily_cap"]),
             checkedAt: Date(),
             unlimited: (tokens["unlimited"] as? Bool) ?? ((tokens["unlimited"] as? NSNumber)?.boolValue ?? false),
-            id: account["id"] as? String ?? ""
+            id: account["id"] as? String ?? "",
+            grantCny: money(spend["grant"]),
+            leftCny: money(spend["left"])
         )
     }
 

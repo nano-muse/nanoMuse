@@ -6,9 +6,8 @@ Mac runner 上构建后交给 TestFlight。这一页说的是：源码树里有�
 
 **现状。** 源码树、品牌、nanoMuse Cloud 登录、hub 客户端和流水线都是在一台 Linux 机器上
 写的。这个 App **能构建、能签名、已经上了 TestFlight**：第一个构建 0.1.31 (2) 于 2026-10-03 走完
-*iOS · TestFlight* 工作流；1.0.0 是构建 16，在内部测试员手里，并已提交 Apple 的 beta 审核，
-为的是公开链接（`https://testflight.apple.com/join/ZHexbDqc`，审核通过后这个链接就能装——见
-下文*现状*）。测试员的反馈推动了发布说明里的那些修复（输入框、引导、退出登录）；「设备」区
+*iOS · TestFlight* 工作流；1.0.0 是构建 16，已通过 Apple 的 beta 审核，公开链接
+（`https://testflight.apple.com/join/ZHexbDqc`）装的就是它；1.0.1 是构建 18，2026-10-10 提交了审核（见下文*现状*）。测试员的反馈推动了发布说明里的那些修复（输入框、引导、退出登录）；「设备」区
 和来自其他设备的通知仍是真机上跑得最少的部分。第一次归档教会了流水线一件事：
 自动签名需要一台已注册的设备，这就是它现在改为手动签名的原因。
 
@@ -46,8 +45,12 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
 - **身份。** Bundle id `io.github.nanomuse.app`（加 `.ShareExtension`、`.AgentWidget`、
   `.FileProvider`）、app group `group.io.github.nanomuse.app`、iCloud 容器
   `iCloud.io.github.nanomuse.app`，以及带着 bundle id 的后台任务、UTType 和 URL scheme 的
-  id。和 Android 不同，iOS 上没有源码包名的限制，所以整个家族一起换。`minis://` 和
-  `minis-mcp://` 这两个 scheme 保留：那是上游和它自己沙箱之间的约定。
+  id。和 Android 不同，iOS 上没有源码包名的限制，所以整个家族一起换。系统认得这个 App 的
+  URL scheme 是 `nanomuse`（分享扩展打开 `nanomuse://share`）和 `nanomuse-mcp`，这样同一部手机上
+  也装了 OpenMinis 时，不会有两个 App 抢同一个 scheme。App 内部的链接仍是 `minis://…`：那是上游
+  和它自己的沙箱、系统提示词和模型之间的约定；从系统进来的 `nanomuse://` 链接按它的 `minis://`
+  形式读（`NanoMuse/NanoMuseOwnScheme.swift`），聊天之外我们自己的按钮打开这类链接时走深链路由，
+  不经过系统。
 - **名字。** 显示名 nanoMuse、「Share to nanoMuse」「nanoMuse Files」；Swift 字符串字面量、
   `Localizable.xcstrings`（键名改了，九种翻译全部更新）和 Info.plist 各语言的用途说明里，
   「Minis」→「nanoMuse」。OpenRouter 的 `HTTP-Referer` 仍指向 OpenMinis，和 Android 一样：
@@ -486,9 +489,10 @@ open src/ios/Minis.xcodeproj
   以及每个构建的 *What to Test*（没有一处提到别的产品）；外部组 *nanoMuse Beta* 和它的公开
   链接 `https://testflight.apple.com/join/ZHexbDqc`；*Beta App Review Information* 里的 beta
   审核联系人和中继上的一个审核账号；
-- **构建 16（1.0.0）** 在内部测试员手里，已于 2026-10-09 加进 *nanoMuse Beta* 并提交 Apple 的 beta 审核
-  （构建 14，0.1.41，已通过审核，在那之前公开链接给的就是它）；公开链接只在审核通过后才会给出构建，在那之前它显示的是一个没有 App 的
-  TestFlight 页面。以后每个版本都要重复这一步（审核按版本进行）。任何通往 App Store 的事
+- **构建 16（1.0.0）** 于 2026-10-09 加进 *nanoMuse Beta* 并提交 Apple 的 beta 审核，已经通过，公开链接装的就是它
+  （在那之前链接给的是构建 14，0.1.41）；构建 17 是打标签之后合并的修复加上 1.0.0，只到了内部测试员手里。
+  **构建 18（1.0.1）** 于 2026-10-10 加进 *nanoMuse Beta* 并提交审核，通过之前链接装的仍是构建 16。公开链接只在审核
+  通过后才会给出构建，以后每个新版本都要重复这一步（审核按版本进行；已通过版本的后续构建不用再审）。任何通往 App Store 的事
   都没有：这个 App 不上架。
 
 ### 在 App Store Connect 里做一次的事 {#once-in-app-store-connect}

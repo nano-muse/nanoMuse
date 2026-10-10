@@ -222,11 +222,15 @@
                  calls keep working because MainActivity is always enabled.
                  The minis:// deep-link filter stays on MainActivity since
                  deep-links never go through the LAUNCHER category. -->
+            <!-- nanoMuse: the scheme the system knows us by is `nanomuse`, not upstream's `minis`,
+                 so a phone with OpenMinis installed too never gets a chooser for either app's links
+                 (io.github.nanomuse.deeplink.OwnScheme reads both; the app's own links go to this
+                 activity by name). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="minis" />
+                <data android:scheme="nanomuse" />
             </intent-filter>
         </activity>
 

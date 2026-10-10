@@ -236,7 +236,10 @@ sits on a Cloud model is not sent: a card says so and offers another model, a ne
 is off. You stay signed in; sync, your devices and Settings → nanoMuse Cloud keep working.
 Switching off while the chat row is the account's moves that row to your own chat model
 when you have one; when you have none, the switch is refused with one sentence under it and
-stays on, since nothing else could answer (the same rule on every client).
+stays on, since nothing else could answer (the same rule on every client). The rule holds the
+other way round too: removing the last own key while the switch is off puts the account's
+models back on and the chat row on the account's chat model, and the key's row says so in one
+sentence; before 1.0.1 the chat fell onto dsh's stock default, which no key served.
 
 The profile's `node_modules/dsh-nanomuse` is a link (a junction on Windows) to the plugin
 inside the installed app, rewritten at every launch whose install folder differs from the

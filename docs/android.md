@@ -5,6 +5,13 @@
 browser, MCP servers, skills and scheduled tasks inside the APK — with nanoMuse's own
 identity, design and features on top. Everything of nanoMuse's lives in
 `io.github.nanomuse.*`; edits inside OpenMinis files are marked `// nanoMuse:`. The
+application id is `io.github.nanomuse.app` and the URL scheme the system knows the app by is
+`nanomuse://`, so a phone that also has OpenMinis installed never has two apps claiming one
+scheme; inside the app, links stay `minis://…` (upstream's vocabulary, shared with the sandbox,
+the system prompt and the model), a `nanomuse://` link arriving from the system is read as its
+`minis://` form, and every link of the app's own that the app opens itself is addressed to
+`MainActivity` by name, never resolved by the system
+(`io.github.nanomuse.deeplink.OwnScheme`). The
 history of this choice is in [roadmap.md](roadmap.md); what came before it (a WebView
 around a Python server, two APK flavours) is kept as a design record in
 [archive/android-python-line.md](archive/android-python-line.md) and is not what you

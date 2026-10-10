@@ -35,7 +35,7 @@ object SignInIdentifier {
     /**
      * A number the relay cannot text: say so before asking for a code. Still typing is not a
      * verdict yet: fewer than 7 digits, or a number that can still become a mainland one
-     * ([couldBecomeMainland]) — `138 0000 00` is on its way to eleven digits, not abroad.
+     * ([couldBecomeMainland]): `138 0000 00` is on its way to eleven digits, not abroad.
      */
     fun phoneOutsideMainland(input: String): Boolean {
         if (!looksLikePhone(input)) return false

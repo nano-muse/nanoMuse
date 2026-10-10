@@ -121,11 +121,13 @@ async def test_shell_timeout_stops_the_whole_tree(tmp_path: Path):
     """A timed-out command used to lose only the shell: `sleep` in a pipeline, a server put
     in the background, lived on. The command runs in its own session now and the group goes."""
     import os
+    import subprocess
     import time
 
     marker = tmp_path / "pid"
     shell = Shell(workspace=tmp_path)
-    r = await shell.execute(command=f"sh -c 'echo $$ > {marker}; sleep 30' | cat", timeout=1)
+    # two seconds, so a loaded runner has forked the grandchild before the timeout fires
+    r = await shell.execute(command=f"sh -c 'echo $$ > {marker}; sleep 30' | cat", timeout=2)
     assert r.error and "timed out" in r.error
     for _ in range(50):
         if marker.is_file() and marker.read_text().strip():
@@ -134,12 +136,18 @@ async def test_shell_timeout_stops_the_whole_tree(tmp_path: Path):
     pid = int(marker.read_text().strip())
 
     def alive() -> bool:
+        """Running, as opposed to gone or a zombie waiting for init to reap it (as good as gone;
+        init is not always prompt): Linux reads /proc, macOS asks ps."""
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
             return False
-        stat = Path(f"/proc/{pid}/stat")  # Linux: a zombie waiting for init is as good as gone
-        return not (stat.is_file() and stat.read_text().rsplit(")", 1)[-1].split()[0] == "Z")
+        stat = Path(f"/proc/{pid}/stat")
+        if stat.is_file():
+            return stat.read_text().rsplit(")", 1)[-1].split()[0] != "Z"
+        ps = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True)
+        state = ps.stdout.strip()
+        return bool(state) and not state.startswith("Z")
 
     for _ in range(100):  # the kill is delivered at once; the reap takes a moment
         if not alive():

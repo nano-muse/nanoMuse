@@ -16,7 +16,6 @@ struct NanoMuseProviderReachCard: View {
     let reach: NanoMuseProviderReach.Reach
     var onRetry: (() -> Void)?
 
-    @Environment(\.openURL) private var openURL
     @State private var details = false
     @State private var network = false
 
@@ -162,7 +161,7 @@ struct NanoMuseProviderReachCard: View {
         NanoMuseFlowLayout(spacing: 8) {
             if reach.kind == .signedOut {
                 Button(plan ? AppLocalized("Sign in again") : AppLocalized("Open providers")) {
-                    openURL(URL(string: "minis://settings/providers")!)
+                    NanoMuseOwnScheme.open("minis://settings/providers")
                 }
                 .buttonStyle(.borderedProminent).tint(NanoMuseTones.action).controlSize(.small)
                 if let onRetry { Button(AppLocalized("Try again"), action: onRetry).buttonStyle(.plain).font(.footnote).foregroundStyle(NanoMuseTones.action) }
@@ -183,7 +182,7 @@ struct NanoMuseProviderReachCard: View {
                 }
                 if reach.kind != .rateLimited {
                     Button {
-                        openURL(URL(string: "minis://settings/providers")!)
+                        NanoMuseOwnScheme.open("minis://settings/providers")
                     } label: {
                         Label(AppLocalized("Add a key of your own"), systemImage: "key").font(.footnote)
                     }

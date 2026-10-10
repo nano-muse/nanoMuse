@@ -6,10 +6,10 @@ the TestFlight pipeline needs, and what is still to be ported from the Android a
 
 **Status.** The tree, the branding, the nanoMuse Cloud sign-in, the hub client and the pipeline
 were written on a Linux machine. The app **builds, signs and is on TestFlight**: the first build,
-0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, with
-the internal testers and submitted to Apple's beta review for the public link
-(`https://testflight.apple.com/join/ZHexbDqc`, which delivers the build once the review has
-passed — *Where it stands* below). The testers' reports have driven the fixes in the release
+0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, which
+passed Apple's beta review, so the public link
+(`https://testflight.apple.com/join/ZHexbDqc`) installs it; 1.0.1 is build 18, submitted to the
+review on 2026-10-10 (*Where it stands* below). The testers' reports have driven the fixes in the release
 notes (the composer, onboarding, sign-out); the Devices section and notifications from other
 devices still have the fewest hours on a real device. The first archive taught the pipeline
 that automatic signing wants a registered device, which is why it signs manually now.
@@ -49,8 +49,13 @@ Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pul
   `.FileProvider`), the app group `group.io.github.nanomuse.app`, the iCloud container
   `iCloud.io.github.nanomuse.app`, the background-task, UTType and URL-scheme ids that carry the
   bundle id. Unlike Android there is no source-package constraint on iOS, so the whole family
-  moves. The `minis://` and `minis-mcp://` schemes stay: they are upstream's contract with its
-  own sandbox.
+  moves. The URL schemes the system knows the app by are `nanomuse` (the share extension opens
+  `nanomuse://share`) and `nanomuse-mcp`, so a phone that also has OpenMinis installed never has
+  two apps claiming one scheme. Inside the app, links stay `minis://…`: that is upstream's
+  contract with its own sandbox, the system prompt and the model; a `nanomuse://` link arriving
+  from the system is read as its `minis://` form (`NanoMuse/NanoMuseOwnScheme.swift`), and a
+  button of ours outside the chat opens such a link through the deep-link router, never through
+  the system.
 - **Names.** Display name nanoMuse, "Share to nanoMuse", "nanoMuse Files"; "Minis" → "nanoMuse"
   in Swift string literals, in `Localizable.xcstrings` (keys renamed, all nine translations
   updated) and in the Info.plist usage descriptions in every language. The OpenRouter
@@ -578,12 +583,14 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
   on each build (none of it names other products); the external group *nanoMuse Beta* with its
   public link, `https://testflight.apple.com/join/ZHexbDqc`; the beta-review contact and a
   review account on the relay in *Beta App Review Information*;
-- **build 16 (1.0.0)** is with the internal testers and was added to *nanoMuse Beta* and
-  submitted to Apple's beta review on 2026-10-09 (build 14, 0.1.41, was approved and is what the
-  public link delivers until then); the public link delivers a build only once a
-  review has passed, so until then it shows the TestFlight page without an app. Each later
-  version repeats the step (the review is per version). Nothing towards the App Store: the app
-  is not going there.
+- **build 16 (1.0.0)** was added to *nanoMuse Beta* and submitted to Apple's beta review on
+  2026-10-09 and passed it, so the public link installs it (build 14, 0.1.41, was what the link
+  delivered before); build 17, 1.0.0 with the fixes merged after the tag, went to the internal
+  testers only. **Build 18 (1.0.1)** was added to *nanoMuse Beta* and submitted to the review on
+  2026-10-10; the link installs build 16 until it passes. The public link delivers a build only
+  once a review has passed, and each new version repeats the step (the review is per version;
+  later builds of an approved version need none).
+  Nothing towards the App Store: the app is not going there.
 
 ### Once, in App Store Connect
 

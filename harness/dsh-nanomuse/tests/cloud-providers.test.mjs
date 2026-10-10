@@ -257,7 +257,8 @@ test('POST /providers/remove: the row, its credential and the choices that point
     assert.equal((await out.state()).handsProvider, 'bailian')
     assert.equal((await out.api('POST', '/providers/remove', { id: 'nobody' })).status, 404)
     const removed = await out.api('POST', '/providers/remove', { id: 'bailian' })
-    assert.equal(removed.status, 204)
+    assert.equal(removed.status, 200)
+    assert.deepEqual(removed.body, { cloudModelsOn: false }, 'the account was never switched off, so nothing to say')
     const state = await out.state()
     assert.equal(state.providers.bailian, undefined)
     assert.equal(state.handsProvider, undefined)
@@ -350,7 +351,7 @@ test('a removed row never leaves the chat slot on its route (NO_ADAPTER): the sl
   try {
     await alone.api('POST', '/providers/save', { id: 'custom', apiKey: 'sk-secret', baseURL: server.url, label: 'Gateway', capabilities: ['chat'] })
     assert.deepEqual(alone.selection.current, { provider: 'custom', model: 'my-model' }, 'the first own key is adopted')
-    assert.equal((await alone.api('POST', '/providers/remove', { id: 'custom' })).status, 204)
+    assert.equal((await alone.api('POST', '/providers/remove', { id: 'custom' })).status, 200)
     assert.deepEqual(alone.selection.current, STOCK_DEFAULT_MODEL)
   } finally {
     await alone.done()

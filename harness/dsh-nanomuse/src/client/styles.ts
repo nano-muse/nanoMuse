@@ -149,6 +149,29 @@ html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-header-back { top: 
 html[data-nm-platform='win32']:not([data-nm-fullscreen]) header[data-window-drag]:has(.nm-header) { min-height: 122px; }
 html[data-nm-platform='win32']:not([data-nm-fullscreen]) [data-slot="conversation.session.header"] > :first-child { padding-right: 150px; min-height: 40px; }
 html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-ob-pager { top: 48px; }
+/* Windows, out of full screen: the caption buttons cover the top right corner, so each top bar
+   with actions at its right end keeps their width free. --nm-caption-inset is that width, read
+   from the window's title bar area (0 in a plain browser); every bar below adds it to the end
+   padding its own rule sets, so when a base rule's right padding changes, change it here too.
+   The split pane's bars start below its 44px top and get nothing. Schedules' title row clears them
+   only while no task is open: an open task's detail then takes the top right, and as a narrow
+   column its tab bar moves down by --nm-caption-height, the caption buttons' height, instead of
+   giving up their width (that rule sets the bar's top padding outright; the harness's own is 0).
+   The harness's bars are found by its data-* hooks; the two schedule rules also rely on its
+   data-testid and a class-name stem (_pageHeading) as of dsh 0.2.0-rc.2, which
+   harness/desktop/scripts/prepare-dsh.mjs installs by exact version with no lock file: check them
+   when that version moves. */
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) { --nm-caption-inset: max(0px, 100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)); --nm-caption-height: env(titlebar-area-height, 0px); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-room-head:not(.nm-split *) { padding-inline-end: calc(40px + var(--nm-caption-inset)); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-lib-main .nm-room-head:not(.nm-split *) { padding-inline-end: calc(32px + var(--nm-caption-inset)); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-view-bar:not(.nm-split *) { padding-inline-end: calc(16px + var(--nm-caption-inset)); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-doc-bar { padding-inline-end: calc(14px + var(--nm-caption-inset)); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-pf-top { padding-inline-end: calc(10px + var(--nm-caption-inset)); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-fr-gear { right: calc(16px + var(--nm-caption-inset)); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) [data-plugin-panel] > header[data-window-drag] { padding-inline-end: var(--nm-caption-inset); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) [data-testid="task-manager-page"]:not(:has(> aside)) [class*="_pageHeading"] { padding-inline-end: var(--nm-caption-inset); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) [data-testid="task-manager-page"] > aside > div:has(> [role="tablist"] > [data-detail-tab]) { padding-top: var(--nm-caption-height); }
+html[data-nm-platform='win32']:not([data-nm-fullscreen]) [data-sidebar-right-panel] [data-dockkit-strip]:has(> [data-dockkit-strip-chrome]) { padding-inline-end: calc(6px + var(--nm-caption-inset)); }
 .nm-rail-avatar { width: 44px; height: 44px; margin: 2px 0 10px; border: 0; padding: 0; border-radius: 50%; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .nm-rail-avatar:focus-visible { outline: 2px solid var(--nm-accent); outline-offset: 2px; }
 .nm-rail-btn { position: relative; width: 44px; height: 44px; border: 0; padding: 0; border-radius: 13px; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 120ms, color 120ms; }
@@ -210,10 +233,15 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-col-top { height: 
    the phone's rhythm — rather than running, sweeping or shimmering. A steady light under reduced motion. */
 @keyframes nm-breathe-light { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 /* a session with no turn of its own yet (the chat's "hero" layout centres the composer): the other
-   devices' turns sit above the composer, bottom-aligned like a transcript, inside the scrolling body */
-[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll]:has(.nm-remote) { justify-content: flex-end; }
+   devices' turns, and a run's card, sit above the composer, bottom-aligned like a transcript, inside
+   the scrolling body. The bottom alignment is an auto margin on the first of them, not
+   justify-content: a column aligned to its end (or centred) puts what overflows above the top edge,
+   where no scroll reaches it (#261: a long thread from the phone could not be scrolled up at all);
+   an auto margin takes the free space while there is some and is nothing once the thread is taller
+   than the body, so the body scrolls from its first line. */
+[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll]:has(.nm-remote, .nm-traj) { justify-content: flex-start; }
 [data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll] > .nm-remote { flex: 0 0 auto; width: min(var(--dsh-chat-content-width, 680px), 100%); align-self: center; box-sizing: border-box; padding: 0 var(--dsh-composer-side-clearance, 16px); }
-[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll] > .nm-remote:first-child { margin-top: 16px; }
+[data-conversation-content][data-content-phase="hero"] > [data-conversation-scroll] > :is(.nm-remote, .nm-traj):not(:is(.nm-remote, .nm-traj) ~ :is(.nm-remote, .nm-traj)) { margin-top: auto; padding-top: 16px; }
 
 /* ---- the pinned agent header over the conversation -------------------- */
 header[data-window-drag]:has(.nm-header) { position: relative; min-height: 108px; }

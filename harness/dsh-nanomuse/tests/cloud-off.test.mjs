@@ -201,6 +201,36 @@ test('the switch goes off when an own chat model exists: the chat slot moves the
   }
 })
 
+test('off, then the last own key is removed: the account’s models come back on, the chat slot takes the account’s model, and the reply says so', async () => {
+  const out = await cloud({ defaultModel: { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' } })
+  const server = await modelsServer(BAILIAN_MODELS)
+  try {
+    await out.api('POST', '/providers/save', { id: 'bailian', apiKey: 'sk-test', baseURL: server.url })
+    assert.equal((await out.api('POST', '/cloud-models', { on: false })).status, 200)
+    assert.deepEqual(out.selection.current, { provider: 'bailian', model: 'deepseek-v4.1-flash' })
+
+    const res = await out.api('POST', '/providers/remove', { id: 'bailian' })
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.body, { cloudModelsOn: true })
+    const state = await out.state()
+    assert.equal(state.cloudModelsOff, undefined, 'the switch is on again')
+    assert.equal(state.providers.bailian, undefined, 'the row is gone')
+    assert.equal(state.account.id, 'acct-1', 'the account is kept')
+    // new chats answer through the account's recommended chat model, not dsh's stock default
+    assert.deepEqual(out.selection.current, { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' })
+    const view = (await out.api('GET', '/models')).body
+    assert.equal(view.cloudModels, true)
+    assert.equal(view.slots.chat.provider, PROVIDER_ID)
+
+    // a second own row removed while the switch is on, or while another own row still answers, says nothing
+    await out.api('POST', '/providers/save', { id: 'bailian', apiKey: 'sk-test', baseURL: server.url })
+    assert.deepEqual((await out.api('POST', '/providers/remove', { id: 'bailian' })).body, { cloudModelsOn: false })
+  } finally {
+    await server.close()
+    await out.done()
+  }
+})
+
 test('off with nothing of one’s own: every slot is empty, the chat default stays where it is, and the studio says no image model rather than sign in', async () => {
   const out = await cloud({ defaultModel: { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' }, off: true })
   try {
