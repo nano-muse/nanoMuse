@@ -12,6 +12,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **On Windows the window's caption buttons no longer cover page buttons.** The minimise, maximise and close buttons Windows draws over the top right corner sat on top of the buttons at the right end of several pages' top bars, so those were partly hidden and a click there could reach the window instead: *Select*, *Sort* and *Create* in the Library, *Open* and *More* in its file viewer, *More* and *Close* in the document editor, *Share* in the profile panel, the first run's settings gear, *Refresh* and *Add plugin* on Plugins, *New* on Schedules, a task's detail buttons, the right-hand dock's buttons, and, in a narrow window, the settings button on Feed and *More* on Goals. These bars now leave the caption buttons' width free on their right, read from the window's title bar area rather than a fixed number; a task's details, a narrow column, moves its tabs and content down by the buttons' height instead. Full screen gives the space back, and the other pages' titles and bodies and the sidebar stay where they were.
+
 ### Android
 
 ### iOS
