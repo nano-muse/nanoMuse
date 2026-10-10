@@ -68,9 +68,11 @@ def test_guidance_orders_by_region():
     assert ids[:2] == ["openrouter", "openai"]
     assert "bailian" not in ids and "zhipu" not in ids and "siliconflow" not in ids and "volcengine" not in ids
     assert "anthropic" in ids and "gemini" in ids and "deepseek" in ids
-    # OpenCode Go wants a session id per conversation, which the phones reading this do not send
+    # OpenCode Go wants a session id per conversation: listed apart, so the apps that do not
+    # send one (they read `providers` only) never offer it
     assert "opencode-zen" in ids and "opencode-go" not in ids
-    assert pv.provider("opencode-go")["session_header"] == "x-opencode-session"
+    assert [(p["id"], p["session_header"]) for p in intl["session_providers"]] == [("opencode-go", "x-opencode-session")]
+    assert pv.guidance("cn", DOCS)["session_providers"] == []
     # …and its global edition elsewhere
     moonshot = next(p for p in intl["providers"] if p["id"] == "moonshot")
     assert moonshot["base_url"] == "https://api.moonshot.ai/v1" and "kimi.ai" in moonshot["key_url"]

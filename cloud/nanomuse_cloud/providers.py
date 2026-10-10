@@ -99,9 +99,11 @@ def guidance(region: str, docs_url: str) -> dict[str, Any]:
     cat = catalogue()
     by_id = {p["id"]: p for p in cat["providers"]}
     first = [pid for pid in FIRST.get(region, FIRST["unknown"]) if pid in by_id and _fits(by_id[pid], region)]
-    # a vendor that wants a session id per conversation (`session_header`, OpenCode Go) is left
-    # out: the phones read this list, and their provider clients do not send one
+    # a vendor that wants a session id per conversation (`session_header`, OpenCode Go) is listed
+    # apart, under `session_providers`: the apps of before it (1.0.1 and older) read `providers`
+    # and do not send the id, the apps that do read both
     rest = [p for p in cat["providers"] if p["id"] not in first and p["id"] not in LOCAL and p["id"] != "custom" and not p.get("session_header") and _fits(p, region)]
+    session = [p for p in cat["providers"] if p.get("session_header") and _fits(p, region)]
     # the rest grouped by what they can do: the fuller key first, the catalogue's order within
     rest.sort(key=lambda p: -len(p["capabilities"]))
     providers = [_public(by_id[pid], region) for pid in first] + [_public(p, region) for p in rest]
@@ -127,6 +129,7 @@ def guidance(region: str, docs_url: str) -> dict[str, Any]:
         "region": region,
         "docs": docs_url,
         "providers": providers,
+        "session_providers": [{**_public(p, region), "session_header": p["session_header"]} for p in session],
         "plans": plans,
         "local": [_public(by_id[pid], region) for pid in LOCAL if pid in by_id],
         "caveats": {"chatgpt": CHATGPT_CAVEAT, "chatgpt_zh": CHATGPT_CAVEAT_ZH},

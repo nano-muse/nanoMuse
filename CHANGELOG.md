@@ -6,7 +6,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
-- **The "ways on" guidance leaves out a provider the phones cannot use.** OpenCode Go wants a session header per conversation that the phone apps do not send, so `spend.guidance` no longer lists an entry with a `session_header` (thanks @PovedaAqui).
+- **The "ways on" guidance lists OpenCode Go apart.** An entry whose vendor wants a session id per conversation (`session_header`) goes under a new `session_providers` key instead of `providers`, so the phone apps of 1.0.1 and before, which do not send the id, never offer it; the apps that do send it append the list (thanks @PovedaAqui).
 
 ### Runtime
 
@@ -36,14 +36,14 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
-- **OpenCode Go is not offered on the phone.** The catalogue entry wants a session id per conversation that the app's provider clients do not send, so the bundled catalogue skips it (thanks @PovedaAqui).
+- **OpenCode Go works on the phone.** Chat and Responses requests to OpenCode's host carry `x-opencode-session`, the chat's prompt cache key (a hash of its first message, the same on every turn), beside the app's own `nanoMuse/<version>` user agent; the ways-on card lists Go from the relay's new `session_providers`, and a provider set up on Go's address is told apart from Zen by the whole address (thanks @PovedaAqui).
 - **The app starts beside OpenMinis.** Both apps bound the same Linux abstract socket, `native-offload`, for the sandbox's calls back into the app, and abstract sockets are one namespace for every app on the device, so whichever app started second failed to bind and died before its first screen. nanoMuse's socket is now `io.github.nanomuse.app.native-offload`; when even that is still held by a previous process of ours, the app binds a per-process name and tells proot that one instead of crashing (#271).
 - **When even the per-process socket cannot be bound, the crash names that socket.** The message used to blame the app's own socket name whatever had failed, and carried a dash; it now names the per-process socket that failed last and says that another process may hold the namespace (#288).
 - **The private-address hint reads the same in every language.** The two sentences that list the addresses plain `http://` is accepted for (under *Use a different server* and in the LAN-only notice) wrote the `172.16` to `172.31` range with a dash in all seventeen languages; it is `172.16-31.x` now. The Chinese and Traditional Chinese Sentinel card for a tap and the two *Connected on another device* lines under Connectors put a space on each side of the device or app name they insert.
 
 ### iOS
 
-- **OpenCode Go is not offered on the phone.** The catalogue entry wants a session id per conversation that the app's provider clients do not send, so the bundled catalogue skips it (thanks @PovedaAqui).
+- **OpenCode Go works on the phone.** Chat and Responses requests to OpenCode's host carry `x-opencode-session`, the chat's prompt cache key (a hash of its first message, the same on every turn), beside the app's own `nanoMuse/<version>` user agent; the ways-on card lists Go from the relay's new `session_providers` (thanks @PovedaAqui).
 - **The app's own pages read in German, Spanish, French, Japanese, Korean and Russian too.** Thirty-eight of nanoMuse's strings on iPhone (the account page, the About credits, the feed and goal prompts, the chats drawer) had English and Chinese only and fell back to English elsewhere; they now carry all nine languages, and a test holds every string the app's own views use to that.
 - **Two Russian sentences lose their dashes, and the Chinese lines that name a device or the agent put a space around the name.** The About credits and the Muse home description used the dash Russian likes as a copula; they are written out now. In Chinese and Traditional Chinese, *Connected on another device* under Connectors, the agent page's greeting and the new-look reply put a space on each side of the inserted name.
 

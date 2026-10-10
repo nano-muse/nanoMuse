@@ -26,8 +26,9 @@
 // An optional `session_header` names the request header in which the vendor's docs ask a client
 // to send one stable id per conversation (OpenCode Go: `x-opencode-session`). The runtime sends
 // it with its own user agent; the desktop writes such an entry as its model adapter's catalog
-// route of the same id, which sends the header itself; the phones, which cannot send it yet,
-// leave the entry out, and so does the relay's guidance, which the phones read.
+// route of the same id, which sends the header itself; the phones send it to OpenCode's host
+// (io.github.nanomuse.net.OpenCodeSession, NanoMuseOpenCodeSession.swift); the relay's guidance
+// lists such an entry apart, under `session_providers`, so the apps of before never offer it.
 // The copies are byte-identical to the source; the source is validated here so a typo never
 // reaches a client.
 import { readFileSync, writeFileSync } from 'node:fs'

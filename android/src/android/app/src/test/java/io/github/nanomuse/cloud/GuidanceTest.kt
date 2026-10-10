@@ -57,6 +57,21 @@ class GuidanceTest {
         assertNull(Guidance.parse(null as org.json.JSONObject?))
     }
 
+    @Test fun `the relay's session providers follow its list, once each`() {
+        val g = Guidance.parse(
+            """{"region":"intl","providers":[
+              {"id":"openrouter","name":"OpenRouter","protocol":"openai","base_url":"https://openrouter.ai/api/v1","key_url":"https://openrouter.ai/keys","auth":["key"],"regions":["global"],"covers":["chat"]}
+            ],"session_providers":[
+              {"id":"opencode-go","name":"OpenCode Go","protocol":"openai","base_url":"https://opencode.ai/zen/go/v1","key_url":"https://opencode.ai/auth","auth":["key"],"regions":["global"],"covers":["chat"],"session_header":"x-opencode-session"},
+              {"id":"openrouter","name":"OpenRouter twice","protocol":"openai","base_url":"https://openrouter.ai/api/v1","key_url":"","auth":["key"],"regions":["global"],"covers":["chat"]}
+            ]}""",
+        )!!
+        assertEquals(listOf("openrouter", "opencode-go"), g.providers.map { it.id })
+        assertEquals("OpenRouter", g.providers[0].name)
+        // session providers alone are no guidance: the relay always sends its main list
+        assertNull(Guidance.parse("""{"providers":[],"session_providers":[{"id":"opencode-go","base_url":"https://opencode.ai/zen/go/v1"}]}"""))
+    }
+
     @Test fun `guidance first - the relay's order and docs win over the bundled catalogue`() {
         val ways = Ways.resolve(Guidance.parse(guidance), shipped, mainland = true)
         assertTrue(ways.fromRelay)

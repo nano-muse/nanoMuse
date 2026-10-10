@@ -3,6 +3,7 @@ package io.github.nanomuse.cloud
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
+import io.github.nanomuse.net.OpenCodeSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -47,13 +48,22 @@ class ProviderCatalogueTest {
         assertEquals(setOf("x.example"), list.single().hosts())
     }
 
-    @Test fun `a vendor that wants a session id per conversation is left out, the phone does not send one`() {
-        assertFalse(shipped.any { it.id == "opencode-go" })
-        assertTrue(shipped.any { it.id == "opencode-zen" })
-        val list = ProviderCatalogue.parse(
-            """{"providers":[{"id":"x","name":"X","protocol":"openai","base_url":"https://x.example/v1","auth":["key"],"regions":["global"],"capabilities":["chat"],"session_header":"x-session"}]}""",
-        )
-        assertTrue(list.isEmpty())
+    @Test fun `a vendor that wants a session id per conversation is on a host that gets one`() {
+        val go = shipped.first { it.id == "opencode-go" }
+        assertEquals(OpenCodeSession.HEADER, go.sessionHeader)
+        assertNull(shipped.first { it.id == "opencode-zen" }.sessionHeader)
+        // every entry naming a session header is on an endpoint OpenAIProvider sends it to
+        for (p in shipped.filter { it.sessionHeader != null }) {
+            assertEquals(p.id, OpenCodeSession.HEADER, p.sessionHeader)
+            assertTrue(p.id, OpenCodeSession.wants(p.baseUrl))
+        }
+        assertTrue(OpenCodeSession.wants("https://opencode.ai/zen/go/v1"))
+        assertFalse(OpenCodeSession.wants("https://api.deepseek.com/v1"))
+        assertFalse(OpenCodeSession.wants("https://notopencode.ai/v1"))
+        assertFalse(OpenCodeSession.wants(null))
+        // Zen and Go share a host: the whole address says which one a configured provider is
+        assertEquals("opencode-go", ProviderCatalogue.match(shipped, inst(ProviderType.openAI, "https://opencode.ai/zen/go/v1"))?.id)
+        assertEquals("opencode-zen", ProviderCatalogue.match(shipped, inst(ProviderType.openAI, "https://opencode.ai/zen/v1/"))?.id)
     }
 
     @Test fun `the card's order - the region's first, local servers and the blank entry left out`() {

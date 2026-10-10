@@ -328,6 +328,11 @@ docs link and the honest line about the ChatGPT sign-in (`caveats.chatgpt`,
 provider's `name`, `name_zh`, `key_url`, `covers` and `auth`, so a 0.1.38
 client draws the same two buttons it always did. The console at `/app` draws
 the card from `guidance` and falls back to the two links on an older relay.
+A provider whose vendor wants one stable id per conversation (the catalogue's
+`session_header`, OpenCode Go) is listed apart, under `session_providers`, with
+that header named: the phone apps of 1.0.1 and before read `providers` only and
+do not send the id, so they never offer it; the apps that send it append the
+list to `providers`.
 Other relays may set other rules
 (`ALLOWANCE_CNY`, `INVITE_BONUS_CNY`, `SIGNUP_OPEN`, `ALLOWED_IDENTIFIERS`;
 all three figures adjustable while the relay runs, relay 0.15; see
