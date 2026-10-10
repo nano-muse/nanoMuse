@@ -88,7 +88,7 @@ def test_providers_signed_out_with_the_default_model(server):
     view = client.get("/api/providers").json()
     assert view["region"] == ""
     ids = [p["id"] for p in view["providers"]]
-    assert len(ids) == 20 and "nanomuse_cloud" not in ids
+    assert len(ids) == 19 and "nanomuse_cloud" not in ids
     # DeepSeek is the default chat model, by its host; the hands follow the chat model
     assert view["configured"]["chat"]["provider"] == "deepseek"
     assert view["configured"]["chat"]["protocol"] == "openai"

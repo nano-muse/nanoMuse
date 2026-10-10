@@ -73,7 +73,7 @@ Mọi bản tải đều từ [bản phát hành mới nhất trên GitHub](http
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Có dáng vẻ riêng.</b><br>Mô tả một dáng vẻ, mô hình ảnh của bạn vẽ ra, mô hình video làm nó chuyển động. Mặc định là một chú rồng nhỏ.</td>
-    <td width="50%" valign="top"><b>Mô hình nào cũng được.</b><br>Hạn mức của relay, khóa của riêng bạn ở một trong hai mươi nhà cung cấp (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek và các nhà cung cấp khác), hoặc gói bạn đã trả tiền: ChatGPT, Claude, Kimi. Nhà cung cấp không có mô hình ảnh hay video thì hai tính năng đó tắt, và ứng dụng nói rõ điều đó.</td>
+    <td width="50%" valign="top"><b>Mô hình nào cũng được.</b><br>Hạn mức của relay, khóa của riêng bạn ở một trong mười chín nhà cung cấp (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek và các nhà cung cấp khác), hoặc gói bạn đã trả tiền: ChatGPT, Claude, Kimi. Nhà cung cấp không có mô hình ảnh hay video thì hai tính năng đó tắt, và ứng dụng nói rõ điều đó.</td>
   </tr>
 </table>
 

@@ -185,8 +185,7 @@ class Catalogue:
         """The entry whose endpoint is the address (either edition); the host alone when the
         address is not one, so a key pasted with or without ``/v1`` still finds its vendor;
         None for a host nobody lists — a gateway, a relay, a server of one's own. Two
-        editions on one host (``opencode.ai/zen/v1`` and ``opencode.ai/zen/go/v1``) are told
-        apart by the whole address."""
+        entries on one host are told apart by the whole address."""
         url = (base_url or "").strip().rstrip("/")
         host = (urlparse(url).hostname or "").lower()
         if not host:

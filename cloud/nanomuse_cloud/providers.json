@@ -390,23 +390,6 @@
       }
     },
     {
-      "id": "opencode-go",
-      "name": "OpenCode Go",
-      "name_zh": "OpenCode Go",
-      "protocol": "openai",
-      "base_url": "https://opencode.ai/zen/go/v1",
-      "key_url": "https://opencode.ai/auth",
-      "auth": ["key"],
-      "regions": ["global"],
-      "capabilities": ["chat"],
-      "defaults": {
-        "chat": "deepseek-v4.1-flash"
-      },
-      "note": "A subscription, not a balance: Go ($10 a month) or Go Plus ($40) in the OpenCode console, with the monthly usage counted per model. Its open coding models answer on the OpenAI shape; the GPT, Grok and Claude ids on the same host speak the Responses and Messages shapes, which this entry does not reach, and the one vision model OpenCode lists (deepseek-v4-flash-vision-exp) is the id DeepSeek has retired on its own platform, so the hands are not claimed here. OpenCode publishes no plan sign-in, only a key. OpenCode asks a client to identify itself and to send a session id in x-opencode-session for each conversation, and lists DeepSeek Harness, the base of the desktop app, among the clients whose session support is incomplete; nanoMuse sends neither yet.",
-      "note_zh": "这是订阅，不是余额：在 OpenCode 控制台订阅 Go（每月 10 美元）或 Go Plus（每月 40 美元），用量按模型每月计。开源编程模型走 OpenAI 格式；同一域名上的 GPT、Grok、Claude 走 Responses 和 Messages 格式，本条目到不了；它列的那个视觉模型（deepseek-v4-flash-vision-exp）在 DeepSeek 自家平台上已经退役，所以「动手」不列入。OpenCode 没有套餐登录，只有 key。OpenCode 要求客户端说明自己是谁，并在每个对话里用 x-opencode-session 传会话 id；它把桌面版所基于的 DeepSeek Harness 列在会话支持不完整的客户端里，而 nanoMuse 目前两者都不发。",
-      "verified": "2026-10"
-    },
-    {
       "id": "opencode-zen",
       "name": "OpenCode Zen",
       "name_zh": "OpenCode Zen",
@@ -419,8 +402,8 @@
       "defaults": {
         "chat": "deepseek-v4.1-flash"
       },
-      "note": "OpenCode's own gateway: pay per request from a balance, a key made in the same console as Go, and a few free models beside the paid ones. Chat answers on the OpenAI shape; the GPT, Claude and Gemini ids on the same host speak the Responses, Messages and Google shapes, which this entry does not reach, and the vision model OpenCode lists is deepseek-v4-flash-vision-exp, the id DeepSeek has retired on its own platform, so the hands are not claimed here. OpenCode publishes no plan sign-in, only a key.",
-      "note_zh": "OpenCode 自己的网关：按请求从余额里扣费，key 和 Go 在同一个控制台申请，付费模型之外还有几个免费的。对话走 OpenAI 格式；同一域名上的 GPT、Claude、Gemini 走 Responses、Messages 和 Google 格式，本条目到不了；它列的视觉模型是 deepseek-v4-flash-vision-exp，这个 id 在 DeepSeek 自家平台上已经退役，所以「动手」不列入。OpenCode 没有套餐登录，只有 key。",
+      "note": "OpenCode's own gateway: pay per request from a balance, a key made in the OpenCode console, and a few free models beside the paid ones. Chat answers on the OpenAI shape; the GPT, Claude and Gemini ids on the same host speak the Responses, Messages and Google shapes, which this entry does not reach, and the vision model OpenCode lists is deepseek-v4-flash-vision-exp, the id DeepSeek has retired on its own platform, so the hands are not claimed here. OpenCode publishes no plan sign-in, only a key.",
+      "note_zh": "OpenCode 自己的网关：按请求从余额里扣费，key 在 OpenCode 控制台申请，付费模型之外还有几个免费的。对话走 OpenAI 格式；同一域名上的 GPT、Claude、Gemini 走 Responses、Messages 和 Google 格式，本条目到不了；它列的视觉模型是 deepseek-v4-flash-vision-exp，这个 id 在 DeepSeek 自家平台上已经退役，所以「动手」不列入。OpenCode 没有套餐登录，只有 key。",
       "verified": "2026-10"
     },
     {
