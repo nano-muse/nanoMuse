@@ -1432,7 +1432,7 @@ export const zh: typeof en = {
   langTag: 'zh',
   nav: 'nanoMuse Cloud',
   brand: 'nanoMuse',
-  title: 'nanoMuse 账号',
+  title: 'nanoMuse Cloud',
   intro: '一个账号，每台设备。用中国大陆手机号或邮箱登录，模型、名字和形象都跟着账号来。',
   identifier: '手机号或邮箱',
   identifierHint: '中国大陆手机号收短信验证码，其他的发到邮箱。',

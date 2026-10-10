@@ -14,7 +14,7 @@
  */
 import { Button, Input } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createElement as h, Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { call, errorStyle, type Translate } from './api.ts'
+import { call, errorStyle, failureText, type Translate } from './api.ts'
 import { IconArrowUp, IconChevronLeft, IconChevronRight, IconCpu, IconFolder, IconLaptop, IconPlus, IconRefresh, IconSquare } from './icons.tsx'
 import { composing } from './keys.ts'
 import { useLive, type LiveDevice } from './live.ts'
@@ -237,7 +237,7 @@ export function makeCodingPanel(t: Translate) {
         setRuns(a.runs ?? [])
         setSessions(s.sessions)
       } catch (err: unknown) {
-        setError((err as Error).message)
+        setError(failureText(t, err))
         setAgents([])
         setSessions([])
       } finally {
@@ -409,7 +409,7 @@ function SessionView({ t, device, deviceLabel, agent, id, agentLabel, onBack }: 
       setSession(await api.session(device, agent, id))
       setError(undefined)
     } catch (err: unknown) {
-      setError((err as Error).message)
+      setError(failureText(t, err))
     }
   }, [device, agent, id])
   useEffect(() => {
@@ -438,7 +438,7 @@ function SessionView({ t, device, deviceLabel, agent, id, agentLabel, onBack }: 
       setText('')
       setError(undefined)
     } catch (err: unknown) {
-      setError((err as Error).message)
+      setError(failureText(t, err))
     } finally {
       setSending(false)
     }
@@ -487,7 +487,7 @@ function SessionView({ t, device, deviceLabel, agent, id, agentLabel, onBack }: 
             },
           }),
           running
-            ? h('button', { type: 'button', className: 'nm-cd-send nm-cd-stop', 'aria-label': t('cdStop'), title: t('cdStop'), onClick: () => void api.stop(running.run.id, device).catch((err: Error) => setError(err.message)) }, h(IconSquare, { size: 16 }))
+            ? h('button', { type: 'button', className: 'nm-cd-send nm-cd-stop', 'aria-label': t('cdStop'), title: t('cdStop'), onClick: () => void api.stop(running.run.id, device).catch((err: unknown) => setError(failureText(t, err))) }, h(IconSquare, { size: 16 }))
             : h('button', { type: 'submit', className: 'nm-cd-send', disabled: !text.trim() || sending || !canSend, 'aria-label': t('cdSend'), title: t('cdSend') }, h(IconArrowUp, { size: 18 }))))))
 }
 
@@ -544,7 +544,7 @@ function NewChatSheet({ t, agent: initial, agents, device, deviceLabel, onClose,
     try {
       onStarted(await api.send({ agent, text: text.trim(), workspace: workspace.trim(), device }))
     } catch (err: unknown) {
-      setError((err as Error).message)
+      setError(failureText(t, err))
     } finally {
       setBusy(false)
     }
