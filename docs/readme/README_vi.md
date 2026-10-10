@@ -36,6 +36,10 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
 
+> ### nanoMuse không ngừng phát triển
+>
+> Trợ lý cá nhân không nên chỉ sống trong đám mây của người khác, nên nanoMuse muốn là lựa chọn thay thế mã nguồn mở, chi phí thấp: chạy trên thiết bị của chính bạn, mô hình do bạn chọn, relay cũng có thể tự dựng. Chúng tôi muốn cùng các nhà phát triển và người dùng khắp nơi xây dựng nó, để mỗi người thật sự có một trợ lý cá nhân của riêng mình. Mở một [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) hay gửi một [pull request](../../CONTRIBUTING.md), cách nào cũng giúp nanoMuse tốt hơn.
+
 ## 🗞️ Tin mới
 
 - `2026-10-09` 🚀 Phiên bản [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) đã ra mắt, cho điện thoại, máy tính và trình duyệt; cài đè lên bản trước mà vẫn giữ dữ liệu của bạn, và ghi chú phát hành liệt kê mọi thay đổi.

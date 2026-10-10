@@ -36,6 +36,10 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
 
+> ### nanoMuse 在持续进化
+>
+> 个人智能体不该只长在别人的云里，nanoMuse 想做一个开源、低成本的平替：装在自己的设备上，模型自己选，中继也能自己架。我们希望和全球的开发者、使用者一起，让每个人真正拥有自己的个人智能体。提个 [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) 或者发个 [PR](../../CONTRIBUTING.md) 都是在帮 nanoMuse 变得更好。
+
 ## 🗞️ 动态
 
 - `2026-10-09` 🚀 版本 [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) 发布，手机、电脑和浏览器都有；装在上一版之上，数据保留，每一处改动都写在发布说明里。
