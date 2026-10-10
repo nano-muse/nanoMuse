@@ -63,9 +63,12 @@ jobs:
         run: node scripts/connectors-json.mjs --check
       - name: The clients' copies of the provider catalogue are current
         run: node scripts/providers-json.mjs --check
+      # The same grep runs on every pull request in ci.yml ("what changed"); here it also
+      # guards a tag build. pnpm-lock.yaml has no resolved URLs (integrity only), so it is not
+      # a file a mirror can leak into.
       - name: Lock files resolve against the public registry only
         run: |
-          if grep -hoE '"resolved": "https?://[^/]+' harness/desktop/package-lock.json web/package-lock.json | grep -v 'registry.npmjs.org'; then
+          if grep -HoE '"resolved": "https?://[^/]+' harness/desktop/package-lock.json web/package-lock.json website/package-lock.json | grep -v 'registry.npmjs.org'; then
             echo "a package-lock.json resolves packages from a host other than registry.npmjs.org (a private mirror leaked in); regenerate it against the public registry" >&2
             exit 1
           fi
