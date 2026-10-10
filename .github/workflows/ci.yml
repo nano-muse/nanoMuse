@@ -197,7 +197,7 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         run: |
           if [ -n "$(git status --porcelain nanomuse/server/static)" ]; then
-            echo "nanomuse/server/static is out of date — run 'cd web && npm run build' and commit the result"
+            echo "nanomuse/server/static is out of date: run 'cd web && npm run build' and commit the result"
             git status --porcelain nanomuse/server/static
             exit 1
           fi

@@ -67,7 +67,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
           labels: |
-            org.opencontainers.image.title=nanoMuse showcase — Caddy and the phone
+            org.opencontainers.image.title=nanoMuse showcase: Caddy and the phone
             org.opencontainers.image.licenses=GPL-3.0-or-later
 
       - name: Build and push (caddy)
@@ -91,7 +91,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
           labels: |
-            org.opencontainers.image.title=nanoMuse showcase — session gateway
+            org.opencontainers.image.title=nanoMuse showcase: session gateway
             org.opencontainers.image.licenses=GPL-3.0-or-later
 
       - name: Build and push (gateway)
