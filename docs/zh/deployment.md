@@ -90,9 +90,9 @@ muse.example.com {
 ## 更新 {#updating}
 
 ```bash
-uv tool upgrade nanomuse                               # PyPI install (or: pip install -U nanomuse)
-git pull --ff-only && uv pip install -e ".[dev]"      # source install
-docker compose build && docker compose up -d app       # Docker
+git pull --ff-only && uv pip install -e ".[dev]"      # 源码安装
+docker compose build && docker compose up -d app       # Docker，本机构建
+docker pull ghcr.io/nano-muse/nanomuse:latest          # Docker，发布的镜像；拉完重新启动
 ```
 
 数据格式（SQLite、JSONL、JSON）在同一个次版本号内保持向后兼容。
