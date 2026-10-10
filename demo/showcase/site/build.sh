@@ -23,6 +23,8 @@ fi
 cd "$checkout"
 [ -d node_modules ] || npm ci --no-audit --no-fund
 "$root/demo/mobilegym/install.sh" "$checkout"
+# the showcase's one change to the seed data (张伟 invites to a hike); fails if upstream moved it
+sh "$root/demo/mobilegym/patch-seed.sh" "$checkout"
 VITE_NANOMUSE_DEMO="$gateway" VITE_CDN_BASE="$cdn" npm run build
 rm -rf "$here/dist"
 cp -R dist "$here/dist"

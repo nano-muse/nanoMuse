@@ -102,11 +102,11 @@ the operator reads is one call:
 | en | Remember: I have an iced americano every morning / What do I usually drink in the morning? | memory kept and recalled | 2, then 1 or 2 | 12 to 15 s each |
 | en | Remind me in 2 minutes to stand up and stretch | a reminder that fires while the visitor is there | 3 | 12 to 25 s, the notice on the minute |
 | zh | 换个形象：一只戴圆框眼镜的橘猫 | the studio, as above | 1, and 8 pictures | 10 s, then 55 s |
-| zh | 打开微信，看看张伟最新发来的消息说了什么 | a chat read | 6 | 30 to 35 s |
-| zh | 在微信里回复张伟：好啊，几点？ | typing, then the Sentinel's card before 「发送」 | 6 to 7 | 40 s |
+| zh | 打开微信，看看张伟最新发来的消息说了什么 | a chat read (「明天一起去徒步吗？」) | 5 to 6 | 30 to 35 s |
+| zh | 在微信里回复张伟：好啊，几点出发？ | typing, then the Sentinel's card before 「发送」 | 6 to 7 | 40 to 45 s |
 | zh | 打开手机上的铁路12306，查一下明天上海到南京最早的一班车 | a date picked, a search, the list read | 7 to 8 | 65 to 70 s |
 | zh | 打开天气，看看北京明天会不会下雨 | a screen read and reported | 3 to 9 | 30 to 75 s |
-| zh | 先在微信看看张伟约了什么，再打开天气看看北京明天怎么样，告诉我去不去合适 | two apps, one answer | 16 in a fresh chat, 4 after the two reads above | 115 s, or 40 s |
+| zh | 张伟约我明天徒步。先在天气里看一眼北京明天会不会下雨，不下雨就在微信里回他：好啊，几点出发？ | two apps and a decision: tomorrow's weather read, the chat read, the reply typed, the Sentinel's card before 「发送」, the answer naming both | 21 | 155 s |
 | zh | 记住：我每天早上要喝一杯冰美式 / 我早上一般喝什么？ | memory | 2, then 2 | 15 s each |
 | zh | 2 分钟后提醒我站起来活动一下 | the reminder | 2 | 15 s, the notice on the minute |
 
@@ -118,6 +118,15 @@ are what was seen. The session's tokens (`SESSION_LLM_TOKENS`, 300k) run out bef
 do on the second way: one such run spent 210k tokens on one line, and the fourth line of that
 session was refused.
 
+**One change to the seed.** 张伟's message in 微信 reads 「明天一起去徒步吗？」 on the showcase,
+not upstream's 「明天一起去吃火锅吗？」: a hike depends on the weather and hot pot does not, which is
+what gives the two-app line its reason to look at the weather before answering him.
+`demo/mobilegym/patch-seed.sh` rewrites that one string in `apps/Wechat/data/defaults.json` of
+the checkout; `caddy/Dockerfile` runs it after the clone and `site/build.sh` before the build,
+and it fails the build if upstream's sentence is not there exactly once (an upstream change
+shows up as a red build, not as a demo quietly back on hot pot). His 朋友圈 post and profile are
+upstream's. To drop the patch, delete the script and its two call sites.
+
 What the runs taught, for the next line anyone adds: name the app ("打开手机上的铁路12306",
 "in the Weather app"); without it the model tries the web first, which has no way out of a
 session, and asks the visitor to approve a fetch that cannot work; the old 12306 line went
@@ -125,7 +134,10 @@ looking for an MCP server and asked a question instead of opening the app. Ask f
 the first screen: the Weather app's home has tomorrow's line, and a goal that wants the
 "chance of rain" sends the operator digging for a detail page that is not there. A line that
 writes in Notes is 6 to 20 steps (the body field is slow to take focus), so none of the kept
-lines does. A new text from the compose page is fragile (the send arrow is at the screen's
+lines does. A line that ends in a message needs the words: told "回他去不去", the model reads the
+weather and then drafts three replies and asks which to send (the `phone-messages` skill sends
+only on the user's own wording); told "回他：好啊，几点出发？", it types that and the Sentinel's
+card is the confirmation. A new text from the compose page is fragile (the send arrow is at the screen's
 edge and the operator's taps land beside it); a reply inside a thread sends. One look per
 session: a look is eight pictures and four clips, and `IMAGE_PER_SESSION` (12) and
 `CLIPS_PER_SESSION` (4) are sized for one.

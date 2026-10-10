@@ -21,6 +21,10 @@ RUN apt-get update \
 WORKDIR /src
 RUN git clone --depth 1 --branch "${MOBILEGYM_REF}" "${MOBILEGYM_REPO}" mobilegym
 COPY demo/mobilegym/apps/nanoMuse mobilegym/apps/nanoMuse
+# the showcase's one change to MobileGym's seed (张伟's 微信 message invites to a hike, for the
+# page's weather line); the build fails if upstream's sentence is no longer there as expected
+COPY demo/mobilegym/patch-seed.sh /src/patch-seed.sh
+RUN sh /src/patch-seed.sh /src/mobilegym
 WORKDIR /src/mobilegym
 # modern-screenshot renders the phone's screenshot in the tab (the nanoMuse module's only
 # extra dependency); --no-save keeps MobileGym's lockfile as upstream has it
