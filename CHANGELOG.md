@@ -16,6 +16,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **A refused request says a sentence, not a status line.** When the runtime refused a request without a sentence of its own (a route that crashed, a body it could not read, a file that is not there), the toast showed the HTTP status text (*Internal Server Error*, *Not Found*, `HTTP 502`) or the raw JSON body; it now says *Your nanoMuse hit a problem; try again in a moment.* for a runtime problem and *Your nanoMuse could not do that.* otherwise, in English and Chinese, and the runtime's own sentence still comes through when there is one. The sign-in form's and the profile form's text fields are now labelled for screen readers (a tap on the label focuses the field).
+
 ### Desktop
 
 - **On Linux, reading a picture no longer kills the harness.** Electron's Linux binary links the system's GLib and leaks its symbols into the process; sharp's native libvips carries its own, and the clash printed `GLib-GObject-CRITICAL` on every picture and, on some systems, ended the harness with a SIGSEGV on the first picture it decoded, so a *read image* call got no answer. The Linux package now ships sharp's WebAssembly build instead of the native one; a picture takes about twice as long (some 50 ms for a 2560×1440 screenshot) and the clash is gone. macOS and Windows keep the native build (#274).
