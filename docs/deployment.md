@@ -2,7 +2,7 @@
 
 Meta runs each Muse in a per-user secure VM. Locally, a container is the nearest equivalent: the agent sees only its data directory and its workspace.
 
-This page is about the Python runtime — the web app's agent — in Docker. Running the relay (your own sign-in, hub and sync) and pointing the apps at it is [self-hosting.md](self-hosting.md), which also puts the three ways to run nanoMuse yourself in order.
+This page is about the Python runtime (the web app's agent) in Docker. Running the relay (your own sign-in, hub and sync) and pointing the apps at it is [self-hosting.md](self-hosting.md), which also puts the three ways to run nanoMuse yourself in order.
 
 ## Docker
 
@@ -23,7 +23,7 @@ docker compose up -d daemon                       # advance goals on a timer, no
 
 The image runs as a non-root user with all capabilities dropped. Two volumes hold state: `nanomuse-data` (memory, goals, vault, audit log, threads) and `./workspace` (the agent's files). `config/config.toml` is mounted read-only. Set `NANOMUSE_SERVER_TOKEN` in `.env` so the token is stable across restarts, and open the printed URL from your phone using the host's address.
 
-Without cloning — the published image (linux/amd64 and linux/arm64, so a Raspberry Pi or an Apple-silicon Mac works):
+Without cloning, the published image (linux/amd64 and linux/arm64, so a Raspberry Pi or an Apple-silicon Mac works):
 
 ```bash
 docker run -d --name muse -p 8787:8787 --env-file .env \

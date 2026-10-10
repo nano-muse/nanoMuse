@@ -1,6 +1,6 @@
 # 聊天入口
 
-把你的 nanoMuse 放进你已经在用的聊天软件：飞书 / Lark、钉钉、企业微信和 Telegram。在手机上给机器人发消息，回答的就是同一个 Muse——每个聊天对应一个对话，回复边生成边发回来，工具在跑时显示一行状态，审批用一个词或一个按钮回答。标了「推送到这里」的聊天还会收到 Muse 自己主动做的事：问候、提醒、后台任务的结果、它需要你回答的问题。
+把你的 nanoMuse 放进你已经在用的聊天软件：飞书 / Lark、钉钉、企业微信和 Telegram。在手机上给机器人发消息，回答的就是同一个 Muse：每个聊天对应一个对话，回复边生成边发回来，工具在跑时显示一行状态，审批用一个词或一个按钮回答。标了「推送到这里」的聊天还会收到 Muse 自己主动做的事：问候、提醒、后台任务的结果、它需要你回答的问题。
 
 不需要公网地址。每家都提供一种由机器人从你的网络内部主动发起的长连接（Telegram 是长轮询），所以运行时放在路由器后面或一台笔记本上就够了。socket 的活由各家自己的 SDK 来干；它们是可选的额外依赖：
 
@@ -15,10 +15,10 @@ Docker 镜像带全了这些。没装 SDK 时，应用会显示要安装的那�
 
 ## 在哪里找到它 {#where-to-find-it}
 
-* **应用**——设置 → 「聊天入口」。每个聊天软件一张卡片：开关、凭据、谁可以和它说话、已配对的聊天和各自的「推送到这里」开关、一个「发一条测试消息」按钮，还有设置步骤和指向厂商控制台的链接。
-* **终端**——`nanomuse channels status | pending | approve <code> | deny <code> | login feishu [--lark] | test <name>`。`nanomuse serve` 在跑时，这些命令走它的 API；否则它们直接改 `<data_dir>/channels/` 下的文件，服务器启动时（或按「重新加载」时）读入。
-* **API**——`GET /api/channels`、`PUT /api/channels/<name>`、`POST /api/channels/pairing/<code>/approve|deny`、`PUT|DELETE /api/channels/<name>/chats/<sender>`、`POST /api/channels/<name>/test`、`POST /api/channels/deliver {text}`、`POST /api/channels/reload`，飞书还有 `POST /api/channels/feishu/login` + `GET /api/channels/feishu/login/<device_code>`。
-* **config.toml**——手工搭的服务器也可以写一张 `[channels.<name>]` 表：
+* **应用**：设置 → 「聊天入口」。每个聊天软件一张卡片：开关、凭据、谁可以和它说话、已配对的聊天和各自的「推送到这里」开关、一个「发一条测试消息」按钮，还有设置步骤和指向厂商控制台的链接。
+* **终端**：`nanomuse channels status | pending | approve <code> | deny <code> | login feishu [--lark] | test <name>`。`nanomuse serve` 在跑时，这些命令走它的 API；否则它们直接改 `<data_dir>/channels/` 下的文件，服务器启动时（或按「重新加载」时）读入。
+* **API**：`GET /api/channels`、`PUT /api/channels/<name>`、`POST /api/channels/pairing/<code>/approve|deny`、`PUT|DELETE /api/channels/<name>/chats/<sender>`、`POST /api/channels/<name>/test`、`POST /api/channels/deliver {text}`、`POST /api/channels/reload`，飞书还有 `POST /api/channels/feishu/login` + `GET /api/channels/feishu/login/<device_code>`。
+* **config.toml**：手工搭的服务器也可以写一张 `[channels.<name>]` 表：
 
   ```toml
   [channels.telegram]
@@ -28,7 +28,7 @@ Docker 镜像带全了这些。没装 SDK 时，应用会显示要安装的那�
   group_policy = "mention"        # or "open"
   ```
 
-  应用里保存的值按字段优先。在应用里填的密钥进保险库（文件里留的是 `{{vault:CHANNEL_TELEGRAM_BOT_TOKEN}}`），之后不再显示——密钥字段只告诉你有没有填过。
+  应用里保存的值按字段优先。在应用里填的密钥进保险库（文件里留的是 `{{vault:CHANNEL_TELEGRAM_BOT_TOKEN}}`），之后不再显示；密钥字段只告诉你有没有填过。
 
 ## 逐个设置 {#setting-up-each-app}
 
@@ -36,7 +36,7 @@ Docker 镜像带全了这些。没装 SDK 时，应用会显示要安装的那�
 
 ### 飞书 / Lark {#feishu-lark}
 
-最快的办法：在应用里按「扫码创建机器人」（或运行 `nanomuse channels login feishu`，国际版加 `--lark`），用飞书扫码，确认，完成——App ID 和 Secret 已经保存，这个入口随即打开。这是飞书自己为个人智能体提供的扫码建应用流程；它创建出来的应用已经带上机器人能力和长连接事件。
+最快的办法：在应用里按「扫码创建机器人」（或运行 `nanomuse channels login feishu`，国际版加 `--lark`），用飞书扫码，确认，完成；App ID 和 Secret 已经保存，这个入口随即打开。这是飞书自己为个人智能体提供的扫码建应用流程；它创建出来的应用已经带上机器人能力和长连接事件。
 
 手动的话，到 <https://open.feishu.cn/app>（Lark：<https://open.larksuite.com/app>）：
 
@@ -82,16 +82,16 @@ socket 主机（`openws.work.weixin.qq.com`）已加进运行时进程的 `NO_PR
 
 找到机器人的人都能给它发消息；Muse 只回答你放进来的人。
 
-* 陌生人的第一条私聊只会得到一个**配对码**（六位字母和数字，不含 0/O/1/I，十分钟有效），别的什么都没有——这条消息不会到 Muse。在 设置 → 聊天入口 里通过这个码，或者运行 `nanomuse channels approve <code>`。对方会收到通知，此后的消息就通了。
-* **免配对的 ID**（`allow_from`）：不需要配对码的厂商用户 id。单独一个 `*` 放行所有人——只适合别人都找不到的机器人。
+* 陌生人的第一条私聊只会得到一个**配对码**（六位字母和数字，不含 0/O/1/I，十分钟有效），别的什么都没有；这条消息不会到 Muse。在 设置 → 聊天入口 里通过这个码，或者运行 `nanomuse channels approve <code>`。对方会收到通知，此后的消息就通了。
+* **免配对的 ID**（`allow_from`）：不需要配对码的厂商用户 id。单独一个 `*` 放行所有人，只适合别人都找不到的机器人。
 * **群**：群里的陌生人被静静忽略（群里不发配对码）。已配对的人在群里的消息，机器人被 @ 时才回答（`group_policy = "mention"`），或者每条都回（`"open"`）。群本身是一个独立的对话；每一行都带着发送者的名字。
 * 在应用里**移除**一个已配对的聊天（或从 `pairing.json` 里删掉）；对方的下一条消息会收到新的配对码。
 
-配对关系和配对码存在 `<data_dir>/channels/pairing.json`——在数据目录，不在工作区，所以智能体自己的文件工具改不了谁可以和它说话。
+配对关系和配对码存在 `<data_dir>/channels/pairing.json`（在数据目录，不在工作区），所以智能体自己的文件工具改不了谁可以和它说话。
 
 ## 聊天怎么对应到 Muse {#how-a-chat-maps-to-the-muse}
 
-每个聊天是智能体的一个对话，id 是 `channel-<app>-<chat id>`，在应用抽屉里的标题是「飞书 · Ann」/「Telegram · Team」。来自聊天的消息和在应用里打的字走同一个入口，所以其他一切——记忆、目标、哨兵（Sentinel）、技能——都是同一个 Muse。附件（照片、文件、语音）保存在工作区的 `attachments/` 下，并附在消息上。
+每个聊天是智能体的一个对话，id 是 `channel-<app>-<chat id>`，在应用抽屉里的标题是「飞书 · Ann」/「Telegram · Team」。来自聊天的消息和在应用里打的字走同一个入口，所以其他一切，记忆、目标、哨兵（Sentinel）、技能，都是同一个 Muse。附件（照片、文件、语音）保存在工作区的 `attachments/` 下，并附在消息上。
 
 运行进行时：
 
@@ -105,13 +105,13 @@ socket 主机（`openws.work.weixin.qq.com`）已加进运行时进程的 `NO_PR
 
 ## 推送到这里 {#deliver-here}
 
-给一个已配对的聊天打开「推送到这里」，它还会收到 Muse 没被要求也会做的事——也就是手机 App 变成通知的那些事件：后台运行的最后一句话（安静的除外）、等待中的审批（可以直接在聊天里回答）、需要你的问题。一个 Muse 可以推送到好几个聊天；每个聊天自己决定。`POST /api/channels/deliver {"text": …}` 给它们全部发一行字——脚本或提醒里用得上。
+给一个已配对的聊天打开「推送到这里」，它还会收到 Muse 没被要求也会做的事，也就是手机 App 变成通知的那些事件：后台运行的最后一句话（安静的除外）、等待中的审批（可以直接在聊天里回答）、需要你的问题。一个 Muse 可以推送到好几个聊天；每个聊天自己决定。`POST /api/channels/deliver {"text": …}` 给它们全部发一行字，脚本或提醒里用得上。
 
 ## 安全 {#security}
 
 * 密钥进保险库，从不经 API 回传；设置文件里只有占位符。日志里是厂商的错误原文，不含凭据。
 * 只有已配对或在放行名单里的人能到达 Muse；陌生人得到一个配对码，在群里则是沉默。审批卡片上的按钮，只有已配对的人按才算数。
-* 来自聊天的审批是一次性的决定，理由是「来自飞书」（等等）——聊天里不会记住任何东西。
+* 来自聊天的审批是一次性的决定，理由是「来自飞书」（等等）；聊天里不会记住任何东西。
 * 聊天入口的数据放在数据目录，智能体够不着。
 * 连接都是向外发起的；不开端口，不涉及公网地址。
 

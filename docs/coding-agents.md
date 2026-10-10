@@ -1,8 +1,8 @@
 # Coding agents
 
 The Cursor, Codex and Claude Code sessions on your computer, seen and steered from
-any device of your account — the phone on the way home, the browser, another
-computer — and from the Muse itself.
+any device of your account (the phone on the way home, the browser, another
+computer) and from the Muse itself.
 
 Nothing is installed into the agents and nothing is proxied through anyone's
 server. The runtime or the desktop app on the computer reads what the agents
@@ -14,22 +14,22 @@ the frames.
 
 - **Phone**: the drawer's *Coding* row (or *Settings → Coding agents*, or the
   `nanomuse://coding` link). Pick a computer, an agent, a session; read the
-  transcript; type a message and watch the run — the text as it streams, the
-  tools as they are called — and stop it if it goes wrong.
+  transcript; type a message and watch the run (the text as it streams, the
+  tools as they are called) and stop it if it goes wrong.
 - **Web**: the *Coding* screen. This computer's agents at the top, the
   account's other computers after them.
 - **Desktop**: *Settings → Coding agents*, also opened by the *Coding agents*
-  chip on a device card under *Settings → Devices*. This computer first — each
+  chip on a device card under *Settings → Devices*. This computer first (each
   agent with its version, how many of its processes run right now and its
-  chats — then the account's other computers; an agent's chats, a chat's
+  chats), then the account's other computers; an agent's chats, a chat's
   transcript, a composer, the run as it streams (text and tools) and a *Stop*
   button. A computer with none of the three installed says so.
-- **The Muse**: ask it — "what did I ask Cursor to do last?", "tell Codex in the
-  api repo to add a test for the parser" — and it uses the `coding_agents` tool
+- **The Muse**: ask it ("what did I ask Cursor to do last?", "tell Codex in the
+  api repo to add a test for the parser"), and it uses the `coding_agents` tool
   with the same read-only readers and the same runner, on this computer or,
   with `device`, on another one.
 
-Only computers that announce the `coding.*` actions on the hub appear — one
+Only computers that announce the `coding.*` actions on the hub appear: one
 running the runtime, or one with the desktop app, which announces them too; a
 phone never does.
 
@@ -55,7 +55,7 @@ resumable turns out unknown to the CLI.
 
 `running` on an agent is the number of its processes alive right now, read from
 `/proc` on Linux, `ps` on macOS and `tasklist` (plus the command lines of
-`node.exe`, for the node-bundled Cursor CLI) on Windows — never `pgrep -f`, and
+`node.exe`, for the node-bundled Cursor CLI) on Windows; never `pgrep -f`, and
 at most once every two seconds.
 
 The runner stops reading when the agent's terminal event arrives, not at pipe
@@ -65,8 +65,8 @@ after a grace period.
 
 ## Where it runs
 
-Every agent runs with the permissions it has on that computer — Codex in
-`workspace-write`, Claude Code with `acceptEdits`, Cursor with `--force` — and
+Every agent runs with the permissions it has on that computer (Codex in
+`workspace-write`, Claude Code with `acceptEdits`, Cursor with `--force`) and
 edits files there. Sending a message is therefore treated like running a
 command on that computer: the request travels only between devices of one
 account, over the account's own hub session, and the computer can refuse remote
@@ -112,7 +112,7 @@ lives in the plugin's data directory under `coding/`.
 
 `device` names another computer; the same request travels as hub actions
 (`coding.agents`, `coding.sessions`, `coding.session`, `coding.send`,
-`coding.stop`, `coding.runs` — see [hub.md](hub.md)). `coding.send` with `wait`
+`coding.stop`, `coding.runs`; see [hub.md](hub.md)). `coding.send` with `wait`
 follows the run on the target's bus and forwards each step as an `event` frame
 whose body carries the run id, so the caller can `coding.stop` it; the `result`
 frame is the finished run.

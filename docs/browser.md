@@ -1,6 +1,6 @@
 # The browser
 
-The agent has one browser tool and two browsers to run it in: Chromium through Playwright on the computer the server runs on, and the phone's own WebView inside the nanoMuse app. The tool is the same either way — the same actions, the same numbered elements on the page, the same pictures in the chat, the same take-over — so a skill written against one works on the other, and a task can move from the desk to the phone without changing a line.
+The agent has one browser tool and two browsers to run it in: Chromium through Playwright on the computer the server runs on, and the phone's own WebView inside the nanoMuse app. The tool is the same either way (the same actions, the same numbered elements on the page, the same pictures in the chat, the same take-over), so a skill written against one works on the other, and a task can move from the desk to the phone without changing a line.
 
 Where the browser sits in the order of things: the agent reaches a service through its API, MCP server or command-line tool first; then through a **logged-in `fetch`** (a request that carries the browser's cookies, no page rendered); then through the browser page itself; and only last through the screen of an app on the phone ([gui.md](gui.md)). The browser is rung two and three of that ladder.
 
@@ -9,12 +9,12 @@ Where the browser sits in the order of things: the agent reaches a service throu
 | | `playwright` | `device` |
 | --- | --- | --- |
 | Runs | on the server, headless Chromium | in the nanoMuse app on the phone, an offscreen WebView |
-| Needs | `pip install "nanomuse[browser]" && playwright install chromium` (or the `-browser` Docker image) | the app connected — either flavour; the local build always has it |
-| Logins live in | `<workspace>/browser-profile/` — a persistent profile, so a login survives a restart | the app's WebView cookie store, on the phone |
-| Take over | from the browser card: tap the picture to click, type, press Enter | the same WebView slides up in the app — no reload, same cookies, your fingers on the real page |
+| Needs | `pip install "nanomuse[browser]" && playwright install chromium` (or the `-browser` Docker image) | the app connected, either flavour; the local build always has it |
+| Logins live in | `<workspace>/browser-profile/`, a persistent profile, so a login survives a restart | the app's WebView cookie store, on the phone |
+| Take over | from the browser card: tap the picture to click, type, press Enter | the same WebView slides up in the app: no reload, same cookies, your fingers on the real page |
 | Sites see | Chrome on Linux (or the profile's user agent) | Android WebView (or the profile's user agent) |
 
-`backend = "auto"` (the default) uses the phone when a nanoMuse app with a browser is connected and Playwright otherwise. On the phone's local build there is no Chromium — PRoot cannot start one — so the WebView is the browser, always.
+`backend = "auto"` (the default) uses the phone when a nanoMuse app with a browser is connected and Playwright otherwise. On the phone's local build there is no Chromium (PRoot cannot start one), so the WebView is the browser, always.
 
 ```toml
 [browser]
@@ -35,18 +35,18 @@ The tool's actions, identical on both backends:
 | --- | --- |
 | `navigate url` | open a page; the reply lists the interactive elements on it, numbered |
 | `extract` | the page's text (the first several thousand characters) |
-| `click n` | click element `n` from the last listing (by its centre — what a finger would do) |
+| `click n` | click element `n` from the last listing (by its centre, what a finger would do) |
 | `type n text` | fill element `n`, with the page's own input events so React and Vue forms notice |
 | `key key` | press Enter, Tab, Escape … |
 | `scroll dy` | scroll by pixels, negative for up |
 | `back` | one step back in history |
 | `wait [seconds]` | a pause of up to 15 s for a page that is still drawing itself (a single-page app after `load`), then the page state |
 | `screenshot` | a fresh picture for the chat card |
-| `fetch url [method] [body]` | an HTTP request with the browser's cookies, no page rendered — an order list as JSON, an `.ics` behind a login, a form post |
+| `fetch url [method] [body]` | an HTTP request with the browser's cookies, no page rendered: an order list as JSON, an `.ics` behind a login, a form post |
 | `profile name` | present as `mobile` (412×915, a phone's user agent) or `desktop` (1280×900), or a custom user agent and size |
 | `close` | close the page; the profile and its cookies stay |
 
-Every action that changes the page sends a frame to the chat: a JPEG of the page, its title and URL, and a caption of what just happened ("Clicked 'Sign in'"). Frames are the size of the profile's viewport in CSS pixels, so a point on the picture is the same point on the page — the take-over relies on that. They stay in memory on the server for the session; the last dozen per chat.
+Every action that changes the page sends a frame to the chat: a JPEG of the page, its title and URL, and a caption of what just happened ("Clicked 'Sign in'"). Frames are the size of the profile's viewport in CSS pixels, so a point on the picture is the same point on the page; the take-over relies on that. They stay in memory on the server for the session; the last dozen per chat.
 
 From a script inside the sandbox on the phone the same tool is `nanomuse-browser <action> …` ([local-runtime.md](local-runtime.md#the-python-side-on-a-phone)): `nanomuse-browser fetch https://example.com/api/orders` is rung two from the shell, under the same Sentinel.
 
@@ -55,25 +55,25 @@ From a script inside the sandbox on the phone the same tool is `nanomuse-browser
 A page that wants a login is the user's job, not the model's. The agent stops at the form and hands the page over (`browser` → `hand_over`, with the reason: *sign in to 12306*, *type the code from the SMS*, *solve the CAPTCHA*, *confirm the payment*); the user does it and presses **Done**; the agent continues with the page as it is. The browser card in the chat is where that happens, and the same card appears when the user takes over first:
 
 - **On the server's Chromium**: *Take over* on the card (or the agent's hand-over), then tap the picture to click, scroll, go back, type into the focused field, press Enter, or open a URL; **Done** returns the page. The frame is the page; the taps are mapped onto it; the picture refreshes every second while you have it.
-- **On the phone**: *Take over* slides the real WebView up as a sheet in the app — not a picture of it. Sign in with the phone's keyboard, its autofill and its password manager, and tap **Done**. The view goes back offscreen and the agent is told the page was handed back; its next look shows what you left.
+- **On the phone**: *Take over* slides the real WebView up as a sheet in the app, not a picture of it. Sign in with the phone's keyboard, its autofill and its password manager, and tap **Done**. The view goes back offscreen and the agent is told the page was handed back; its next look shows what you left.
 
-While the page is yours — a *hold* — every browser action of that conversation waits; the agent waits up to ten minutes for Done, then carries on with what it sees and says you did not come back. The chat, the live stage, the capsule and the browser viewer all show the same *Your turn — <reason> — Done* card. Over the API: `POST /api/browser/{thread}/control` with `take_over` / `handed_back`, or `POST /api/holds` and `POST /api/holds/{id}/done`; `GET /api/state` lists the open holds.
+While the page is yours (a *hold*), every browser action of that conversation waits; the agent waits up to ten minutes for Done, then carries on with what it sees and says you did not come back. The chat, the live stage, the capsule and the browser viewer all show the same *Your turn · <reason> · Done* card. Over the API: `POST /api/browser/{thread}/control` with `take_over` / `handed_back`, or `POST /api/holds` and `POST /api/holds/{id}/done`; `GET /api/state` lists the open holds.
 
-Passwords go to the website, never through the model: what the model sees is the frame after you are done. The agent asks in words (`ask_user`) only for things it needs to know — which account, which date — never for a password or a code.
+Passwords go to the website, never through the model: what the model sees is the frame after you are done. The agent asks in words (`ask_user`) only for things it needs to know (which account, which date), never for a password or a code.
 
-Cookies persist. On the server the Playwright profile is a real Chromium profile directory; on the phone the WebView's cookie store is flushed to disk after every navigation and `fetch`. Session cookies — the kind without an expiry, which a browser drops when it closes — do not survive a server restart on either side, so a site that uses only those asks again after `nanomuse serve` restarts; most sites set a longer "remember me" cookie once you tick the box.
+Cookies persist. On the server the Playwright profile is a real Chromium profile directory; on the phone the WebView's cookie store is flushed to disk after every navigation and `fetch`. Session cookies (the kind without an expiry, which a browser drops when it closes) do not survive a server restart on either side, so a site that uses only those asks again after `nanomuse serve` restarts; most sites set a longer "remember me" cookie once you tick the box.
 
 ### What does not work, and why
 
-- **Google accounts cannot sign in inside a WebView.** Google refuses embedded sign-in (`disallowed_useragent`) for good reasons. The take-over sheet has an arrow that opens the same URL in the system browser — but a login made there stays in Chrome, not in nanoMuse's WebView. For Google services use the API path (a calendar's private `.ics` link, an app password for mail) instead of the browser; on the server's Chromium a Google login works but may be challenged as "not secure".
-- **A QR code cannot be scanned on the same phone.** Sites that log in by "scan with our app" (微信, 支付宝, 淘宝 …) show the code where the camera would need to be. On the phone's browser this is a dead end; on the server's Chromium you scan the frame in the chat with the phone — which is the one case where the server's browser is the easier one.
+- **Google accounts cannot sign in inside a WebView.** Google refuses embedded sign-in (`disallowed_useragent`) for good reasons. The take-over sheet has an arrow that opens the same URL in the system browser, but a login made there stays in Chrome, not in nanoMuse's WebView. For Google services use the API path (a calendar's private `.ics` link, an app password for mail) instead of the browser; on the server's Chromium a Google login works but may be challenged as "not secure".
+- **A QR code cannot be scanned on the same phone.** Sites that log in by "scan with our app" (微信, 支付宝, 淘宝 …) show the code where the camera would need to be. On the phone's browser this is a dead end; on the server's Chromium you scan the frame in the chat with the phone, which is the one case where the server's browser is the easier one.
 - **Passkeys are not portable.** A passkey created in the phone's Chrome belongs to that browser's credential store; the WebView does not see it, and a headless Chromium on a server has none. Password-and-code logins work everywhere.
 - **Downloads** land in the workspace: `<workspace>/downloads/` on the server (Playwright) and in the local build on the phone (where the agent can read them); in the connect build, whose agent is on the computer, they go to the phone's Downloads folder.
 - One tab. A link that opens a new window opens in the same page instead.
 
 ## How the phone's browser works
 
-The WebView must think it is on screen — a hidden WebView throttles `requestAnimationFrame` to nothing and timers to one a second, and many pages never finish loading. The app therefore gives it a screen: a private **virtual display** (an `ImageReader` surface, seen by nobody) with a `Presentation` window on it holding the WebView. Chromium composes frames into that surface at full speed whether or not the app is on screen; the latest frame is what a `screenshot` returns, so video, canvas and WebGL come out as they are. Measured on the emulator with the app in the background: 60 rAF/s, `setInterval(10 ms)` at 100/s, `visibilityState = visible`. On a device that refuses a virtual display the WebView falls back to being measured and drawn by hand.
+The WebView must think it is on screen: a hidden WebView throttles `requestAnimationFrame` to nothing and timers to one a second, and many pages never finish loading. The app therefore gives it a screen: a private **virtual display** (an `ImageReader` surface, seen by nobody) with a `Presentation` window on it holding the WebView. Chromium composes frames into that surface at full speed whether or not the app is on screen; the latest frame is what a `screenshot` returns, so video, canvas and WebGL come out as they are. Measured on the emulator with the app in the background: 60 rAF/s, `setInterval(10 ms)` at 100/s, `visibilityState = visible`. On a device that refuses a virtual display the WebView falls back to being measured and drawn by hand.
 
 Taps are injected as touch events at the element's centre, typing goes through the page's own setters plus `input` / `change` events (so frameworks notice), Enter presses the key. The one page is a singleton; the take-over moves that same `WebView` object into the sheet's container and back, so nothing reloads. Cookies, including third-party ones, are on; `CookieManager.flush()` runs after every load and `fetch`.
 
@@ -98,7 +98,7 @@ profile   {user_agent, width, height, mobile}  → {}
 close     {}                                   → {}
 ```
 
-An unknown op or a failure comes back as `{"ok": false, "error": "…"}` — a message the model can read. Another app that wants to lend its browser to a nanoMuse server implements these fourteen ops and the hello.
+An unknown op or a failure comes back as `{"ok": false, "error": "…"}`, a message the model can read. Another app that wants to lend its browser to a nanoMuse server implements these fourteen ops and the hello.
 
 ## Testing it
 

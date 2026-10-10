@@ -5,13 +5,13 @@ nanoMuse is free and non-profit. The model behind it costs money, and the
 developer pays for a starting allowance per account (the app shows the relay's
 current figures). When it is gone, there are two ways on that need nothing
 from nanoMuse: a key of your own at a model provider, or a plan you already
-pay for — ChatGPT, Claude, Kimi — signed in from the app.
+pay for (ChatGPT, Claude, Kimi) signed in from the app.
 
 Every client reads the same list of providers, with what each one covers:
 **chat**, **the hands** (a model that sees screenshots), **pictures** (the
 avatar studio) and **clips** (the avatar's short videos). A feature no
 configured provider covers is simply not offered, with one sentence saying
-which providers would — nothing breaks.
+which providers would; nothing breaks.
 
 Your sign-in, your invite code and your devices are not affected: the account
 stays, only the model provider changes. Nothing you say passes through nanoMuse
@@ -21,13 +21,13 @@ Cloud once your own key or plan is in use.
 
 | | First | What one key there covers |
 |---|---|---|
-| Mainland China | **Alibaba Cloud Bailian** | chat, the hands, pictures and clips — all four under one key |
+| Mainland China | **Alibaba Cloud Bailian** | chat, the hands, pictures and clips, all four under one key |
 | Everywhere else | **OpenRouter**, then **OpenAI** | chat, the hands and pictures; clips are Bailian only for now |
 
 Bailian only signs up accounts with a mainland Chinese identity; outside, one
 OpenRouter account puts hundreds of models behind one key, pay as you go.
-Beyond the first pick, every provider below works on its own or beside another
-— DeepSeek for the chat and Zhipu for pictures, say.
+Beyond the first pick, every provider below works on its own or beside another:
+DeepSeek for the chat and Zhipu for pictures, say.
 
 Four jobs, four settings, one page: **Settings › Models** on Android, the
 iPhone and the desktop, the *Connections* page in the web console. The rows are
@@ -70,7 +70,7 @@ Image API with models such as `openai/gpt-image-2`; Gemini uses
 `gemini-2.5-flash-image`.
 
 The table is the repository's catalogue,
-[`nanomuse/llm/providers.json`](../nanomuse/llm/providers.json) — every client
+[`nanomuse/llm/providers.json`](../nanomuse/llm/providers.json): every client
 and the relay read it; endpoints, default models and what each covers are in
 there, checked against each vendor's documentation in October 2026.
 
@@ -85,7 +85,7 @@ or paste it into a chat.**
 - **Kimi.** The mainland edition is [platform.moonshot.cn](https://platform.moonshot.cn/console/api-keys), base URL `https://api.moonshot.cn/v1`; the global one is [platform.kimi.ai](https://platform.kimi.ai/console), base URL `https://api.moonshot.ai/v1`. Accounts and keys are not shared between the two.
 - **Zhipu GLM.** [open.bigmodel.cn](https://open.bigmodel.cn/usercenter/apikeys), base URL `https://open.bigmodel.cn/api/paas/v4`.
 - **SiliconFlow.** [cloud.siliconflow.cn](https://cloud.siliconflow.cn/account/ak), base URL `https://api.siliconflow.cn/v1`; model ids carry the vendor prefix, e.g. `deepseek-ai/DeepSeek-V4-Flash`.
-- **Volcengine Ark.** [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) — enable the models you want in Ark, then create a key; base URL `https://ark.cn-beijing.volces.com/api/v3`.
+- **Volcengine Ark.** [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey): enable the models you want in Ark, then create a key; base URL `https://ark.cn-beijing.volces.com/api/v3`.
 - **MiniMax.** Mainland edition at [platform.minimaxi.com](https://platform.minimaxi.com/user-center/basic-information/interface-key), base URL `https://api.minimaxi.com/v1`; the global base URL is `https://api.minimax.io/v1`.
 - **OpenRouter.** Sign in at [openrouter.ai](https://openrouter.ai/) with Google, GitHub or an e-mail address, add credit under *Credits*, create a key under *Keys*; it starts with `sk-or-v1-`. *Settings → Limits* puts a monthly cap on a key.
 - **OpenAI.** [platform.openai.com](https://platform.openai.com/api-keys), base URL `https://api.openai.com/v1`.
@@ -251,7 +251,7 @@ as entered and says whether it got through and in how many milliseconds. The
 same setting lives where each app keeps its keys: the phones have it in the
 provider form; the desktop under **Settings → nanoMuse Cloud → Network**, one
 address (`http://host:port` or `socks5://host:port`) that the app applies to its
-host process at the next start — *Restart now* is under the row — so every own
+host process at the next start (*Restart now* is under the row), so every own
 key, the ChatGPT sign-in, the hands' runtime and whatever else the app sends out go
 through it, and nanoMuse Cloud never does ([desktop.md](desktop.md)); the web app has the *Proxy* field in the
 own-key form; the runtime has `[llm] proxy` in `config.toml`
@@ -270,7 +270,7 @@ one of the providers in the table.
 
 ## Any other OpenAI-compatible endpoint
 
-Anything that speaks the OpenAI API works — choose *Custom*:
+Anything that speaks the OpenAI API works; choose *Custom*:
 
 | Field | Value |
 |---|---|

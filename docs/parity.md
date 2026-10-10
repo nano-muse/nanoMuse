@@ -1,10 +1,10 @@
 # Feature parity across the clients
 
-nanoMuse is one agent on every device: the phone (Android, iOS), the computer (nanoMuse Desktop —
+nanoMuse is one agent on every device: the phone (Android, iOS), the computer (nanoMuse Desktop,
 the `dsh-nanomuse` harness bundle in the Electron shell) and the browser (nanoMuse Web, served by
 the runtime). The rule since 0.1.32 is the **union**: whatever one client can do, every client
 does, unless the platform itself forbids it (the computer does not build a mini-Linux the way the
-phone does; iOS does not let an app drive another). This page is the ledger — what each client
+phone does; iOS does not let an app drive another). This page is the ledger: what each client
 has, what is platform-specific by design, and what is still open for a decision.
 
 Legend: **✓** done · **◐** partial (what is missing is in the note) · **—** not on this client ·
@@ -37,13 +37,13 @@ Legend: **✓** done · **◐** partial (what is missing is in the note) · **�
 | With a key of your own the app works signed out (chat, hands, pictures, clips); the first screen offers *Use your own API key instead* and the sign-in waits for the Cloud models, sync and the devices | ✓ | ✓ | ✓ the sign-in was never a wall | ✓ the sign-in page steps aside once a model is ready or the button was taken |
 | No silent fallback: a failed turn on an own model offers *Use nanoMuse Cloud this time* (signed in), that one turn on the account, no row changed | ✓ 0.1.41 `CloudRetry` | ✓ 0.1.41 `NanoMuseCloudOnce` | ✓ 0.1.41 also after a failed studio round and a failed set of clips | — the failure is shown; the rows stay as set *(40)* |
 | "Ways on" ordered by region (Bailian first on the mainland, OpenRouter first elsewhere) | ✓ 0.1.34 | ✓ 0.1.34 | ✓ 0.1.34 | ✓ 0.1.34 |
-| Own-key catalogue (`providers.json`: 19 providers, what each covers — chat · screen · pictures · clips — key pages, regions; one file, generated for every client) | ✓ 0.1.39 | ✓ 0.1.40 `NanoMuseCatalogue` *(32)* | ✓ 0.1.39 | ✓ 0.1.39 |
+| Own-key catalogue (`providers.json`: 19 providers, what each covers (chat · screen · pictures · clips), key pages, regions; one file, generated for every client) | ✓ 0.1.39 | ✓ 0.1.40 `NanoMuseCatalogue` *(32)* | ✓ 0.1.39 | ✓ 0.1.39 |
 | "Ways on" from the catalogue: the region's lead first, *more providers*, the plans one can sign in with, the key taken inline | ✓ 0.1.39 | ✓ 0.1.40 the pinned card, Settings → nanoMuse Cloud and the own-key sheet, one list (`NanoMuseWaysList`) *(32)* | ✓ 0.1.39 Settings → nanoMuse Cloud, the own-key first-run step | ✓ 0.1.39 |
 | The ways read from the relay's `spend.guidance` (providers for the region, plans, caveats, docs) rather than a list in the app; the bundled catalogue only when the relay sends none | ✓ 0.1.40 `guidance` first, the catalogue when none *(34)* | ✓ 0.1.40 the same (`NanoMuseWays`) *(32)* | ✓ 0.1.40 the chat card and Settings → nanoMuse Cloud, one component | ✓ 0.1.39 |
-| A refused turn (`429 allowance_exhausted`) is a card under it in the chat: one sentence, the three ways on, *Open Settings*, *Try again* — never the relay's reply as text | ✓ 0.1.39 `AllowanceWaysCard` | ✓ 0.1.40 pinned under the header like the star card (`NanoMuseAllowanceCard`) *(33)* | ✓ 0.1.40 *(before: the JSON, after five retries as a rate limit)* | ✓ 0.1.39 notice with the ways |
+| A refused turn (`429 allowance_exhausted`) is a card under it in the chat: one sentence, the three ways on, *Open Settings*, *Try again*; never the relay's reply as text | ✓ 0.1.39 `AllowanceWaysCard` | ✓ 0.1.40 pinned under the header like the star card (`NanoMuseAllowanceCard`) *(33)* | ✓ 0.1.40 *(before: the JSON, after five retries as a rate limit)* | ✓ 0.1.39 notice with the ways |
 | The relay's other refusals as one sentence and a button: 413 *too large* → *New chat*, 401 → *Sign in*, 403, 429 busy (with the wait), the daily cap, 404 model, 5xx / no answer → *Try again*; never a status code or JSON | ✓ 0.1.40 `RelayRefusal` + `RelayRefusalCard`, 17 locales *(35)* | ✓ 0.1.40 `NanoMuseRelayRefusal` + `NanoMuseRelayRefusalCard`, 9 locales; a refused chat turn goes through `describe` *(35)* | ✓ 0.1.40 | ✓ 0.1.40 `failures.py` (413, `not_invited`, `too_many_in_flight`, `provider_busy` added) |
 | The operator's switches (relay 0.22, [cloud.md](cloud.md#controls)) as plain sentences: the allowance *paused, not used up* (the same card), `service_paused`, `sync_paused`, `hub_paused`, `signup_closed` at sign-in | ✓ 0.1.40 *(35)* | ✓ 0.1.40 *(35)* | ✓ 0.1.40 | ✓ 0.1.40 |
-| Sign in with a ChatGPT plan — chat and the hands' screen reading only, with the line about OpenAI's terms | ✓ 0.1.39 upstream's sign-ins (also Claude, Kimi, OpenRouter) | ✓ 0.1.40 upstream's Codex OAuth from the ways on (also Claude, Kimi, OpenRouter) *(32)* | ✓ 0.1.39 through the bundled runtime | ✓ 0.1.39 the runtime's `nanomuse chatgpt login` |
+| Sign in with a ChatGPT plan: chat and the hands' screen reading only, with the line about OpenAI's terms | ✓ 0.1.39 upstream's sign-ins (also Claude, Kimi, OpenRouter) | ✓ 0.1.40 upstream's Codex OAuth from the ways on (also Claude, Kimi, OpenRouter) *(32)* | ✓ 0.1.39 through the bundled runtime | ✓ 0.1.39 the runtime's `nanomuse chatgpt login` |
 | A capability nobody configured has is one sentence naming who could (pictures, clips, the screen), never a raw error | ✓ 0.1.39 | ✓ 0.1.41 an empty Models row says what is missing and offers *Add a provider* *(32)* | ✓ 0.1.39 | ✓ 0.1.39 |
 | Conversations belong to the account that synced them: another account's stay on the device, hidden, never pushed under the new key; a switch restarts the pull (contract C10) | ✓ 0.1.39 | ✓ 0.1.39 | ✓ 0.1.39 | ✓ 0.1.39 the runtime's lists |
 
@@ -56,10 +56,10 @@ Legend: **✓** done · **◐** partial (what is missing is in the note) · **�
 | "Show the agent's steps", on by default since 0.1.37 (a stored off stays off) | ✓ 0.1.37 (`nm.show_steps`) | ✓ 0.1.37 (`nanomuse.show_steps`) *(2)* | ✓ 0.1.37 | ✓ 0.1.37 |
 | Star asks at the relay's moments (`/v1/nudges`: sign-in · 3rd / 10th / 30th task · 7th / 30th day · a goal reached · a new look · allowance spent; 7 days apart, 4 per device; never in the first conversation). Every card has *I already starred* next to *Star on GitHub*; either ends the asks on that device for good | ✓ 0.1.35 | ✓ 0.1.35 *(3)* | ✓ 0.1.35 | ✓ 0.1.35 |
 | First conversation: the app speaks first, asks what to call you, the model's `nanomuse-naming` fence becomes the naming card | ✓ | ✓ 0.1.34 | ✓ 0.1.35 *(25)* | ✓ *(39)* |
-| First run: "Sign in — free" before anything else | ✓ | ✓ 0.1.32 *(4)* | ✓ | ✓ |
+| First run: "Sign in (free)" before anything else | ✓ | ✓ 0.1.32 *(4)* | ✓ | ✓ |
 | Approval cards, three tiers, remembered grants; a Permissions page listing the remembered grants by risk tier, with Revoke | ✓ | upstream's | ✓ Settings → Permissions → *Standing grants*: the remote-control switch, the trusted devices and the hands' per-app grants under the phone's three tiers | ✓ |
 | Approvals answered outside the app while the hands work | ✓ 0.1.33 capsule *Allow / Deny* | n/a *(10)* | ✓ 0.1.34 stage *Allow once / Always in app / Deny*, capsule when the window is behind *(17)* | n/a |
-| Hand-over: a login / code / payment / CAPTCHA goes back to the person, the agent waits and resumes (holds) | ✓ 0.1.33 `hand_over` | — *(16)* | ✓ 0.1.34 *Your turn — Done*, *I'll take it* *(16)* | ✓ 0.1.34 drivable browser viewer, hold cards *(16)* |
+| Hand-over: a login / code / payment / CAPTCHA goes back to the person, the agent waits and resumes (holds) | ✓ 0.1.33 `hand_over` | — *(16)* | ✓ 0.1.34 *Your turn* with *Done*, *I'll take it* *(16)* | ✓ 0.1.34 drivable browser viewer, hold cards *(16)* |
 | Face tap opens the agent page (Change avatar · Edit name · studio; Activity · Approvals · Daily · Soul & memory; share card) | ✓ | ✓ 0.1.34 | ✓ 0.1.34 | ✓ Muse page |
 | Change the look from the chat (the same words, four candidates, pick by words, regenerate) | ✓ | ✓ 0.1.34 | ✓ 0.1.34 | ✓ studio intercept, reference picture 0.1.34 |
 
@@ -75,14 +75,14 @@ Legend: **✓** done · **◐** partial (what is missing is in the note) · **�
 | Skills | ✓ upstream | ✓ upstream | — *(8)* | ✓ |
 | Coding agents (Cursor, Codex, Claude Code on the computers) | ✓ | ✓ 0.1.34 over the hub *(9)* | ✓ *Settings → Coding agents*, this computer first; announces and serves `coding.*` *(8)* | ✓ |
 | Devices of the account, remote control, rename, forget | ✓ | ◐ list, Reach sheet 0.1.33 | ✓ | ✓ |
-| Hub, outbound: the model reaches the account's other devices (`devices`, `device_*`, `delegate`, `@<device>`) | ✓ *Computers*, the reach offload | ◐ the Reach sheet by hand and `@device` to the hub — since round 9 also a tap on an online device in the account's Devices list, as on Android; no tool in the model's hands *(29)* | ✓ `reach.ts` | ✓ the runtime's `tools/devices.py` |
+| Hub, outbound: the model reaches the account's other devices (`devices`, `device_*`, `delegate`, `@<device>`) | ✓ *Computers*, the reach offload | ◐ the Reach sheet by hand and `@device` to the hub; since round 9 also a tap on an online device in the account's Devices list, as on Android; no tool in the model's hands *(29)* | ✓ `reach.ts` | ✓ the runtime's `tools/devices.py` |
 | Hub, inbound: the device answers the others (shell · files · open · screen · notify · task) | ✓ `HubActions` | ◐ info · open · notify · task; shell, files and screen answer *not supported* *(10)* | ✓ `actions.ts` | ✓ the runtime; a browser tab is not a device |
-| Hands — the device's own screen as a hand | ✓ | n/a *(10)* | ✓ Linux X11 (Wayland *(21)*); macOS one window while the person keeps the mouse, per-app grants, glow and capsule out of the shots *(19)*; Windows to be tried *(31)* | n/a |
+| Hands: the device's own screen as a hand | ✓ | n/a *(10)* | ✓ Linux X11 (Wayland *(21)*); macOS one window while the person keeps the mouse, per-app grants, glow and capsule out of the shots *(19)*; Windows to be tried *(31)* | n/a |
 | Report a problem: one tap opens a GitHub issue | ✓ Settings → Account | ✓ About → *Report an issue* | ✓ the corner menu; under the shell a screenshot goes to Downloads and the issue opens filled in | ✓ Settings → Feedback |
 | Installed and latest version, side by side (`nanomuse.cn/dl/index.json` first, GitHub second, a day's cache) | ✓ 0.1.35 Settings → Version | ✓ 0.1.35 Settings → Version | ✓ 0.1.35 About, Settings row | ✓ 0.1.35 Settings |
 | A black capture is an error with the fix (Screen Recording, Wayland), never a picture | n/a | n/a | ✓ 0.1.33 | n/a |
 | macOS permissions read back live; *Open System Settings* after an ask; Screen Recording relaunch notice | n/a | n/a | ✓ 0.1.33; 0.1.35: one row to switch on, *Try it* rows, a restart dialog when Screen Recording flips on; since 0.1.38 the row is *nanoMuse Computer Use*, the helper app *(26)* | n/a |
-| Mini-Linux sandbox on the device | ✓ | ✓ upstream (iSH) | n/a — the runtime's own sandbox | n/a |
+| Mini-Linux sandbox on the device | ✓ | ✓ upstream (iSH) | n/a (the runtime's own sandbox) | n/a |
 
 ## Face, rooms, look
 
@@ -112,20 +112,20 @@ Legend: **✓** done · **◐** partial (what is missing is in the note) · **�
 
 ## Open for a decision (the "next-next" list)
 
-These are the gaps left open on purpose since 0.1.32 — either the platform makes them a
+These are the gaps left open on purpose since 0.1.32: either the platform makes them a
 different design, or they are large enough that the call is the maintainer's. Numbers match the
 notes above; a settled item keeps its number and says how it went.
 
-1. **iOS · Data controls** — done in 0.1.33 (`NanoMuseDataControls.swift`).
+1. **iOS · Data controls.** Done in 0.1.33 (`NanoMuseDataControls.swift`).
 2. **iOS · Steps.** The header line (and the face) are there since 0.1.33; the steps of the message
    still running stay visible even with the setting off, finished messages hide them. *Hide them
    too, now that the status line says what is going on?*
-3. **iOS · Star after the first task** — done in 0.1.33, as a card pinned under the header (the
+3. **iOS · Star after the first task.** Done in 0.1.33, as a card pinned under the header (the
    message list is a UICollectionView; nothing can be placed under the last message). A cancelled
    turn counts as finished, the stream has no cancel signal. In 0.1.35 the card follows the
    relay's policy like everyone else (28): no ask in the first conversation, the 3rd task is the
    first moment.
-4. **iOS · First run** — done in 0.1.34 (`NanoMuseFirstRun.swift`, the Android `needed / stage`
+4. **iOS · First run.** Done in 0.1.34 (`NanoMuseFirstRun.swift`, the Android `needed / stage`
    logic). Shown to anyone without a Cloud account, so a person upgrading who only ever used their
    own key sees it once; *All settings* skips it.
 5. **Android · OAuth connectors need a device test.** Discovery, dynamic client registration, PKCE
@@ -135,7 +135,7 @@ notes above; a settled item keeps its number and says how it went.
    browser hand-over. Key and open connectors are plain MCP entries and need nothing new. The
    token ends up in `servers.json` next to API keys, as the in-guest client reads it; refresh runs
    at app start and when the page opens, not in the background.
-6. **iOS · Connectors** — done in 0.1.33 (`NanoMuseConnectors.swift`, the Android flow ported),
+6. **iOS · Connectors.** Done in 0.1.33 (`NanoMuseConnectors.swift`, the Android flow ported),
    with the same caveat as 5: compiled, not yet signed into on a device.
 7. **Web · Connectors.** The runtime would have to run the OAuth flow itself and hold the tokens
    (the desktop does it in the harness host). The web app has MCP servers by hand. *Decision: run
@@ -146,67 +146,67 @@ notes above; a settled item keeps its number and says how it went.
    this computer's CLIs and chats first, the account's other computers after, and the desktop
    announces and answers the `coding.*` hub actions itself (`src/coding.ts`), so a phone sees a
    computer with only the desktop app as a coding computer too.
-9. **iOS · Coding agents** — done in 0.1.34 (`NanoMuseCoding.swift`, the hub's `coding.*`).
+9. **iOS · Coding agents.** Done in 0.1.34 (`NanoMuseCoding.swift`, the hub's `coding.*`).
 10. **iOS · Hands.** iOS does not let an app drive another; App Intents / Shortcuts are the door.
-    Not planned as "hands". Settled in 0.1.36: the Settings row is there (*Hands — Not on iPhone*)
+    Not planned as "hands". Settled in 0.1.36: the Settings row is there (*Hands: Not on iPhone*)
     and opens a page that says why, and what a computer of the account can do; the iPhone's own
     Muse takes `task` calls from the other devices while the app is open (`@iPhone …`).
-11. **iOS · The Muse shell** — done in 0.1.33 on the iPhone; in 0.1.34 Feed and Goals are real
+11. **iOS · The Muse shell.** Done in 0.1.33 on the iPhone; in 0.1.34 Feed and Goals are real
     (`NanoMuseScheduler.swift`: foreground catch-up, `BGAppRefreshTask`, a local notification at
     the set time), the iPad runs the shell too, the shell and header switches are in the nanoMuse
     settings page, and the studio draws through the relay or your own Bailian key. Left: a
-    routine runs in the background only when iOS gives the refresh task a slot — the copy says
+    routine runs in the background only when iOS gives the refresh task a slot; the copy says
     so (*at the set time the phone reminds you to open it*); the hub route (a computer of the
-    account runs them) is still the sure one. The iPad's layout is the iPhone's, larger —
-    settled in 0.1.35: no split layout of its own.
+    account runs them) is still the sure one. The iPad's layout is the iPhone's, larger.
+    Settled in 0.1.35: no split layout of its own.
 12. **Android and iOS · Emoji faces.** A face set to an emoji on the web or the desktop shows the
     dragon on the phones. Small.
-13. **Theme colour swatches** — settled in 0.1.33: removed from the desktop; one rule everywhere,
+13. **Theme colour swatches.** Settled in 0.1.33: removed from the desktop; one rule everywhere,
     the accent follows the avatar.
 14. **Android · Memory as a room.** It is a settings page on the phone, a room elsewhere. Design
     call.
 15. **Browser viewer on the desktop.** The trajectory in the chat shows the hands; a page viewer
     like the web app's is not there. Design call.
-16. **Hand-over on the desktop and the web** — settled in 0.1.34, both: *holds* in the runtime
+16. **Hand-over on the desktop and the web.** Settled in 0.1.34, both: *holds* in the runtime
     (`nanomuse/agent/holds.py`; `hand_over` on `browser`, `computer_act`, `phone_act`; `POST
     /api/holds`, `/done`; `hold` events; the agent waits up to ten minutes and looks again). The
-    desktop's stage shows *Your turn — Done* and *I'll take it*; the web's browser viewer can be
+    desktop's stage shows *Your turn* with *Done*, and *I'll take it*; the web's browser viewer can be
     driven (*Take over*, click, type, scroll, URL, *Done*). Left: iOS has no hands, so nothing
     to hand over there (10).
-17. **Desktop · approvals outside the window** — settled in 0.1.34: the live stage carries
+17. **Desktop · approvals outside the window.** Settled in 0.1.34: the live stage carries
     *Allow once / Always in <app> / Deny*, and a small always-on-top capsule shows the same card
     when the main window is not in front. Left to check on a Mac: the capsule's `showInactive`
-    must not steal focus from the app being driven — on the Mac task sheet
+    must not steal focus from the app being driven; on the Mac task sheet
     (`docs/tasks/mac-check-0.1.36.md`, D).
-18. **Connections shared across devices** — settled in 0.1.34: the profile's `connectors`
+18. **Connections shared across devices.** Settled in 0.1.34: the profile's `connectors`
     (relay 0.17; merged per device, 64 at most, a key-like field name is a 400), four clients
-    read and write it, the other devices' entries show as *Connected on <device> — sign in
+    read and write it, the other devices' entries show as *Connected on <device>; sign in
     here*. The credential never leaves the device that minted it.
-19. **Desktop · hands that do not fight the person** — settled for macOS in 0.1.34 the way the
+19. **Desktop · hands that do not fight the person.** Settled for macOS in 0.1.34 the way the
     Codex app does it: *window mode* (`nanomuse/computer/mac_window.py`; `[hands] mode = auto`)
     captures one application's window and posts the events to its process, so the person keeps
     the mouse; each application asks once (*Let <Muse> use <App>?*). Elsewhere the screen is
     shared, with the UI-TARS-style glow and the overlays kept out of the shots. Left: Linux and
-    Windows have no window mode (a virtual display or a second session would be the port — Linux
+    Windows have no window mode (a virtual display or a second session would be the port; Linux
     first, cheapest); the macOS path is written against the Quartz APIs and must be tried on a
     Mac (Screen Recording fallback, AX-less clicks, Retina mapping, scroll direction). Settled in
-    0.1.35: `auto` stays the default, with a fail-safe — when the Quartz layer itself fails (not
+    0.1.35: `auto` stays the default, with a fail-safe: when the Quartz layer itself fails (not
     "the window went away", which is retried every look) the hands fall back to the whole screen
     for the rest of that target and say so once; an explicit `window` mode keeps trying. Settled
     in 0.1.36 for the pointer itself: the desktop's hands are UI-TARS-desktop's operator moved
     into the Electron main process (`harness/desktop/src/operator.ts`, `@computer-use/nut-js`,
     loopback HTTP to the runtime's `desktop` backend), and the model's coordinates are pixels of
-    the picture it saw, mapped once to the operator's screen (`nanomuse/computer/coords.py`) — the
+    the picture it saw, mapped once to the operator's screen (`nanomuse/computer/coords.py`); the
     clicks that landed beside their targets on scaled displays are gone (≤1 px on a 4K display at
     scale 2). Left to try on a Mac and on Windows: the native addon in the packaged app, the
-    coordinate space (points on a Mac), scroll units, ⌘ for `ctrl`, content protection — the Mac
-    task sheet, F.
-20. **Services without a public remote MCP server** — the chat apps are settled in 0.1.34 the
+    coordinate space (points on a Mac), scroll units, ⌘ for `ctrl`, content protection (the Mac
+    task sheet, F).
+20. **Services without a public remote MCP server.** The chat apps are settled in 0.1.34 the
     way nanobot does it: 飞书, 钉钉, 企业微信 and Telegram are *channels* the agent answers in
     (`nanomuse/channels/`, the vendors' long-connection SDKs, no public address, pairing codes),
     which is what most people wanted from them. Still open as *connectors* (the agent reading or
     acting in the service): Zoom, LinkedIn, Zoho Invoice, WHOOP, 腾讯文档, 滴答清单, 网易邮箱, QQ
-    邮箱, 微信读书 — each a bridge of its own over the vendor's REST API, one developer account
+    邮箱, 微信读书: each a bridge of its own over the vendor's REST API, one developer account
     per vendor. *Decision: which, if any, are worth a bridge?*
 21. **Hands on Linux under Wayland.** The capture and the pointer need X11 or XWayland today; a
     Wayland session gives a black frame (now an error with the hint). Since 0.1.36 the operator
@@ -216,9 +216,9 @@ notes above; a settled item keeps its number and says how it went.
     permission dialog per session. *Decision: worth it before the Linux desktop is promoted?*
 22. **Chat apps on the phones.** The channels live in the runtime; the web app (and so the
     desktop) has the settings screen. Android and iOS would need an `/api/channels` client and
-    the same card list (switch, fields, pairing codes, paired chats, Feishu QR) — the API and the
+    the same card list (switch, fields, pairing codes, paired chats, Feishu QR); the API and the
     strings are ready. *Decision: next version?* Also open: no vendor was connected end to end
-    from the build machine (the SDK calls were checked offline against the real packages) — one
+    from the build machine (the SDK calls were checked offline against the real packages), so one
     test bot per vendor before announcing; Feishu sender names need `contact:user.base:readonly`;
     approvals from a chat are always *once*.
 23. **Own-key presets and the chat default.** After a Bailian or OpenRouter key is saved, the
@@ -229,21 +229,21 @@ notes above; a settled item keeps its number and says how it went.
     them separately and the count exceeds the completion count they are added, otherwise taken
     as included. A provider that reports them separately *and* smaller would be under-counted.
     *Decision: keep the heuristic, or switch per provider?*
-25. **Desktop · first run and first conversation** — settled in 0.1.35 after the phone: the host
+25. **Desktop · first run and first conversation.** Settled in 0.1.35 after the phone: the host
     keeps `firstrun.json` and never skips the pages on a fresh install; the app speaks first
     (three scripted lines, no tokens), asks what to call you, and the model's `nanomuse-naming`
     fence becomes the naming card (`take_name` / `ask_user_question` are gone). Left, by design:
     the scripted lines are a client overlay, not stored messages; the address is a memory line
     rather than a `GLOBAL.md` edit; the gear on the first-run pages dismisses them for the
     session only.
-26. **Desktop · macOS permissions** — re-audited in 0.1.35: TCC attributes the bundled runtime to
+26. **Desktop · macOS permissions.** Re-audited in 0.1.35: TCC attributes the bundled runtime to
     the responsible process, so only *nanoMuse Desktop* has to be switched on (the words say so
     now; the runtime no longer appears as a second entry to hunt for). Since 0.1.38 the two grants
     belong to the helper app *nanoMuse Computer Use* instead ([desktop.md](desktop.md#macos-permissions)). Left to try on a Mac: the
     *Try it* rows after a fresh grant, the restart dialog when Screen Recording flips on, the
     capsule's `showInactive` (17), window mode's AX-less clicks and Retina mapping (19), the
     face click after 0.1.36's change (no drag region under the face at all; the face below the
-    title-bar band) — all on the Mac task sheet, `docs/tasks/mac-check-0.1.36.md`, written so that
+    title-bar band), all on the Mac task sheet, `docs/tasks/mac-check-0.1.36.md`, written so that
     an agent on a Mac can run it end to end and send the fixes back.
 27. **Web · motion clips.** The clips are per device (drawn where the face lives: the phone, the
     iPhone, the desktop). The web app shows the still face. *Decision: draw them in the runtime
@@ -253,7 +253,7 @@ notes above; a settled item keeps its number and says how it went.
     Android asks once per phone when the allowance is spent (the other clients the same); the
     first feed day is not written when the person changes the face during the naming conversation
     (the first run never reaches *done*). Small.
-29. **One conversation on every device** — settled in 0.1.36 (contract C7 in `docs/cloud.md`): the
+29. **One conversation on every device.** Settled in 0.1.36 (contract C7 in `docs/cloud.md`): the
     text of the chats lives on the relay (`/v1/sync/*`, relay 0.19), on by default when signed in,
     with the switch and the delete under Data controls on every client; one main conversation per
     account; what a device started on its own (routines, goals, the feed, work for another device)
@@ -267,12 +267,12 @@ notes above; a settled item keeps its number and says how it went.
     rather than removed from the log; switching sync off on one device reaches the others at
     their next push or pull (a `409`), not at once; on iOS a pulled message that arrives late sits
     after the local ones (the OpenMinis store appends). `@<device name>` runs a turn on another
-    device — computers whenever online, phones while the app is open; on iOS the mention goes to
+    device (computers whenever online, phones while the app is open); on iOS the mention goes to
     the hub directly (no `delegate` tool there) and the iPhone answers `task` calls itself.
-30. **iOS · composer, bubbles, header** — settled in 0.1.36 after the phone: the one-row pill,
+30. **iOS · composer, bubbles, header.** Settled in 0.1.36 after the phone: the one-row pill,
     flat grey bubbles for the person, a floating translucent header. Left: on iOS 16–18 the
     transcript starts below the header's edge rather than scrolling under it (the UIKit list
-    needs the inset passed down; to be tried on a device — the risk of covering the first message
+    needs the inset passed down; to be tried on a device, since the risk of covering the first message
     was not worth taking blind).
 31. **Desktop · the operator on a Mac and on Windows.** Ported from UI-TARS-desktop and proven on
     Linux X11; the native addon, the coordinate space (points on a Mac, physical pixels on
@@ -300,7 +300,7 @@ notes above; a settled item keeps its number and says how it went.
 34. **Android · the ways from the relay's guidance.** `AllowanceWaysCard` reads the bundled
     `providers.json`; `/v1/me` carries `spend.guidance` (the region's providers, the plans, the
     caveats) and the card ignores it. *Proposal:* prefer `guidance` when the relay sends it, fall
-    back to the catalogue — the web and the desktop already do; a few dozen lines in
+    back to the catalogue, as the web and the desktop already do; a few dozen lines in
     `AllowanceWaysCard.kt` and `NanoMuseCloud.kt`. *Settled in 0.1.40:* `Guidance.kt`
     parses it, `Ways.resolve` prefers it, the card and Settings → nanoMuse Cloud read it.
 35. **Phones · 413, the remaining refusals and the operator's switches.** The phones' `describe`
@@ -308,9 +308,9 @@ notes above; a settled item keeps its number and says how it went.
     upstream's trouble, but not `too_large` (413), `not_invited`, `too_many_in_flight` or
     `provider_busy`, nor relay 0.22's `service_paused`, `sync_paused`, `hub_paused`,
     `signup_closed` and `allowance_exhausted` with `paused: true` (the allowance card says *used
-    up* where the relay says *paused*) — those reach the person as upstream's text or the relay's
+    up* where the relay says *paused*); those reach the person as upstream's text or the relay's
     English sentence. Settled for the web and the desktop in 0.1.40 (`nanomuse/server/failures.py`,
-    `harness/dsh-nanomuse/src/refusals.ts` — the reference sentences, en and zh). *Proposal:* the
+    `harness/dsh-nanomuse/src/refusals.ts`: the reference sentences, en and zh). *Proposal:* the
     nine codes in both `describe`s with those sentences, the 413 one pointing at *New chat*, the
     paused allowance as a different lead on the same card; on iOS route a refused chat turn
     through `describe` too. Strings per locale on the phones. *Settled in 0.1.40* on both
@@ -321,7 +321,7 @@ notes above; a settled item keeps its number and says how it went.
     Dictation page and the web works only in browsers that have it; neither reads a reply aloud.
     *Proposal:* speech in and out through the runtime (`/api/speech`), using a configured
     provider's models (Bailian's `paraformer` / `cosyvoice`, OpenAI's `whisper` / `tts`) with the
-    person's own key or the relay — one implementation for both clients; the phones keep the
+    person's own key or the relay, one implementation for both clients; the phones keep the
     system's engines.
 37. **Web · data export.** The desktop's rooms host writes a zip of the agent's data
     (`/data/export`) to Downloads; the web app shares the face card and has Data controls, but no
@@ -363,11 +363,11 @@ notes above; a settled item keeps its number and says how it went.
   `harness/dsh-nanomuse/src/relay.ts` (desktop), `io.github.nanomuse.cloud.NanoMuseCloud` (Android),
   `NanoMuse/NanoMuseCloud.swift` + `NanoMuseAccount.swift` (iOS). A new relay field lands in all four.
 - The relay's refusal codes (`docs/cloud.md`) become sentences in four places: `nanomuse/server/failures.py`
-  (runtime and web), `harness/dsh-nanomuse/src/refusals.ts` (desktop — the host rewrites the failure,
+  (runtime and web), `harness/dsh-nanomuse/src/refusals.ts` (desktop: the host rewrites the failure,
   the client draws the card), `NanoMuseCloud.describe` on Android and on iOS. A new code lands in
   all four, with the sentence in every locale the client has; the desktop's `tests/refusals.test.mjs`
   and `tests/refusal-card.test.mjs` are the shape of the test to copy.
-- The star asks follow one policy everywhere — the relay's `/v1/nudges` (contract C1 in
+- The star asks follow one policy everywhere, the relay's `/v1/nudges` (contract C1 in
   `docs/cloud.md`), with the same defaults built into every client: a *task* is a turn the person
   started that got a reply, never the first conversation, a routine, a feed post or a goal
   check-in; once per moment, `cooldown_days` apart, `max_asks` per device, never again after
@@ -385,7 +385,7 @@ notes above; a settled item keeps its number and says how it went.
   one relay: `cloud/nanomuse_cloud/sync.py`, `nanomuse/sync/` (runtime and web), `harness/dsh-nanomuse/src/sync.ts`
   (desktop), `io.github.nanomuse.sync` (Android), `NanoMuse/NanoMuseSync.swift` (iOS). Every client
   applies a page's conversations before its messages and moves its cursor only on a pull; every
-  client pushes the person's lines and the final answer only — never tool steps, tool results or the
-  system prompt — and leaves routines, goals, the feed and work for another device at home.
+  client pushes the person's lines and the final answer only (never tool steps, tool results or the
+  system prompt) and leaves routines, goals, the feed and work for another device at home.
 - `ideas.en.json` / `ideas.zh.json` are one file four times (Android assets, iOS Resources,
   `harness/dsh-nanomuse/assets`, `web/src/ideas`); the harness and web tests fail when a copy drifts.

@@ -327,8 +327,9 @@ test("operator: a helper whose capture fails is reported with its own words — 
     await assert.rejects(operator.screenshot({ width: 640, height: 400 }), (exc) => {
       assert.ok(exc instanceof OperatorError);
       assert.equal(exc.status, 500);
-      assert.match(exc.message, /^no screenshot: nanoMuse Computer Use could not take the picture — /);
-      assert.ok(exc.message.includes("ScreenCaptureKit userDeclined (-3801)"), exc.message);
+      assert.match(exc.message, /^no screenshot: nanoMuse Computer Use could not take the picture: /);
+      assert.ok(exc.message.includes("picture: ScreenCaptureKit userDeclined (-3801)"), exc.message);
+      assert.equal(exc.message.split("no screenshot:").length, 2, "the prefix is said once");
       return true;
     });
     assert.equal(electronFake.captures, 0, "desktopCapturer was used behind the helper's back");

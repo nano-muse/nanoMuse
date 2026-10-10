@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("version", help="x.y.z — reads docs/releases/v<version>.md")
+    ap.add_argument("version", help="x.y.z; reads docs/releases/v<version>.md")
     ap.add_argument(
         "--previous", help="the previous tag (default: the newest v* tag before --target)"
     )

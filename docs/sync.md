@@ -1,6 +1,6 @@
 # What stays on a phone, and whose it is
 
-A phone can be signed in as one account today and another tomorrow — a family's
+A phone can be signed in as one account today and another tomorrow: a family's
 tablet, a phone handed on, a tester with two accounts. This page is the table of
 every piece of state the nanoMuse apps keep on the phone, where it lives, whether
 it belongs to the **account**, the **device** or to nobody in particular, and what
@@ -16,7 +16,7 @@ earlier rule for conversations alone (C10, 0.1.39) is in
   from before 0.1.40 are claimed the same way the first time the updated app
   runs: by the account signed in at that moment (a chat that had already been
   synced keeps the account its sync mapping names), else as nobody's.
-- **You see the signed-in owner's chats and no others** — in the drawer, the
+- **You see the signed-in owner's chats and no others**: in the drawer, the
   search, the Chat tab, the Library, *Today's chats*, Siri's shortcuts, and in
   what goes up to the relay. Signed out, only the chats made while signed out
   show; every account's are out of sight.
@@ -27,19 +27,19 @@ earlier rule for conversations alone (C10, 0.1.39) is in
   and comes back untouched when the account signs in again. Signing in as a
   different account, and *Use a different server*, go through the same sign-out.
 - **Delete the account** deletes it at the relay and removes everything of it
-  from the phone, with no question — there is nothing to come back to. The next
+  from the phone, with no question: there is nothing to come back to. The next
   sign-in with the same address is a new account and starts empty.
 - **A key the relay refuses** (*Sign out everywhere* from another device, a
-  relay reset, a relay bug — a `401` nobody on this phone asked for) is a
+  relay reset, a relay bug: a `401` nobody on this phone asked for) is a
   sign-out nobody could answer, so the phone answers it the careful way: the
   account's data is **kept**, exactly as *Keep this account's chats on this
-  device* would — the chats stay hidden behind their owner rows, the files and
-  preferences go aside under the account's folder, the relay key is removed —
-  and the sign-in page says *Your sign-in on this phone was ended — sign in
+  device* would (the chats stay hidden behind their owner rows, the files and
+  preferences go aside under the account's folder, the relay key is removed),
+  and the sign-in page says *Your sign-in on this phone was ended. Sign in
   again to continue; your chats are kept on this device until then.* The next
   sign-in with the **same account id** restores all of it; a different account
-  sees nothing of it. Only when the relay answers `401 account_deleted` — the
-  account itself no longer exists — is there nothing to come back to, and the
+  sees nothing of it. Only when the relay answers `401 account_deleted` (the
+  account itself no longer exists) is there nothing to come back to, and the
   phone removes the data as *Delete the account* would.
 - **A reinstall starts empty.** On Android, the app no longer takes part in the
   device backup (`allowBackup="false"`): nothing of it is copied to Google, and a
@@ -50,7 +50,7 @@ earlier rule for conversations alone (C10, 0.1.39) is in
   iCloud Keychain, and a 0.1.39 key moves there on the first launch. A restore
   from the person's own iPhone backup brings UserDefaults and files back
   together, marker included, and is treated as the same install.
-- **The account's key is the relay's opaque `account.id`** — never the number or
+- **The account's key is the relay's opaque `account.id`**, never the number or
   the address; the folder names on disk are hashes of it. Nothing of the sorting
   involves the relay: an older relay behaves the same.
 
@@ -88,7 +88,7 @@ out), the hooks in `ChatRepository.createSession` and `MinisApp`, the sheet in
 
 ## iPhone and iPad
 
-Paths are in the app's sandbox — Application Support, or the app group's
+Paths are in the app's sandbox: Application Support, or the app group's
 `MinisConfig/` and `var/minis/`. *Aside* means moved under
 `MinisConfig/nanomuse/accounts/<hash>/`. The *Key refused* column reads as on
 Android: `bad_key` first, `account_deleted` second.
@@ -115,7 +115,7 @@ Android: `bad_key` first, `account_deleted` second.
 off by default) and iCloud Keychain are the person's Apple ID, not the account's.
 With upstream's iCloud sync on, a chat deleted by a sign-out is deleted through it
 as a chat deleted by hand would be, and a chat kept aside can reach the person's
-other iPhone without its owner row — on that phone it is claimed by whoever is
+other iPhone without its owner row; on that phone it is claimed by whoever is
 signed in there. The owners file, the sync tables and the folders put aside are
 in the iPhone's device backup like the rest of the app's data.
 
@@ -125,10 +125,10 @@ the hooks in `ChatStore.createSession` and `NanoMuseShell`.
 
 ## The relay
 
-`POST /v1/auth/delete` removes every row of the account — the account, its keys,
+`POST /v1/auth/delete` removes every row of the account: the account, its keys,
 devices, profile (name, face, connectors), the ledger, events, the kept
 *Data controls* conversations and video tasks, the synced conversations,
-messages and cursors — drops its hub connections and, from the relay that ships with 0.1.40, forgets
+messages and cursors. It drops its hub connections and, from the relay that ships with 0.1.40, forgets
 the account's live *working* notes too (they were memory, not rows). The relay's
 tests sign an account up, fill every table, delete it, and check that every
 table has zero rows for it and that the same address signing up again gets a new
@@ -137,7 +137,7 @@ account id and an empty sync store.
 One thing outlives the account for a while: the SHA-256 hashes of the keys it
 held, in `deleted_keys`, for 90 days. They name nobody (no account id, no
 address, no device), and they are what lets a phone that still holds one of
-those keys hear `401 account_deleted` instead of `401 bad_key` — the difference
+those keys hear `401 account_deleted` instead of `401 bad_key`, the difference
 between *remove the account's data, there is nothing to come back to* and *keep
 it aside, the person may sign in again*. A relay from before 0.1.40 answers
 `bad_key` for both, and the phone keeps the data; nothing is lost, the folder
@@ -146,8 +146,8 @@ simply waits.
 ## For the maintainers
 
 The old records a person saw after deleting an account in 0.1.39 were the
-phone's: a chat with no sync mapping — a side chat with the side-chat switch
-off, a chat from before 0.1.39 — had no owner, so it showed under every
+phone's: a chat with no sync mapping (a side chat with the side-chat switch
+off, a chat from before 0.1.39) had no owner, so it showed under every
 account and was pushed under the next one. The relay had already deleted its
 side. C12 gives every chat an owner and makes a sign-out take the account's
 data with it unless asked not to.
