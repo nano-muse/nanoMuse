@@ -34,13 +34,14 @@
 
 *nano* means the whole set, small enough to run and deploy yourself: the phone app, the desktop app, the web console and the relay that joins them are all in this repository, under GPL-3.0-or-later. **[Free, open source, non-profit. Let's build it together.](CONTRIBUTING.md)** Sign in and you get a free allowance of model use on the community relay (the developer pays for it); when it is gone, [use your own key](docs/own-key.md). The same relay runs on a server of yours, so nothing has to leave your house. Latest: **1.0.1 Ballast**, [release notes](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [try it in the browser](https://demo.nanomuse.dev/).
 
+> [!NOTE]
+> **nanoMuse keeps evolving**
+>
+> A personal agent should not live only in someone else's cloud, so nanoMuse is the open-source, low-cost alternative: on your own devices, with a model you choose and a relay you can host yourself. We want to build it with developers and users everywhere, so that each person truly owns a personal agent. Open an [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) or send a [pull request](CONTRIBUTING.md); either one helps nanoMuse get better.
+
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
-
-> ### nanoMuse keeps evolving
->
-> A personal agent should not live only in someone else's cloud, so nanoMuse is the open-source, low-cost alternative: on your own devices, with a model you choose and a relay you can host yourself. We want to build it with developers and users everywhere, so that each person truly owns a personal agent. Open an [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) or send a [pull request](CONTRIBUTING.md); either one helps nanoMuse get better.
 
 ## 🗞️ News
 

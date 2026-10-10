@@ -34,13 +34,14 @@
 
 *nano*는 직접 돌리고 직접 배포할 수 있을 만큼 작은, 완전한 한 세트라는 뜻입니다. 휴대폰 앱, 데스크톱 앱, 웹 콘솔, 그리고 이들을 잇는 릴레이가 모두 이 저장소에 GPL-3.0-or-later로 들어 있습니다. **[무료, 오픈 소스, 비영리. 함께 만들어 갑시다.](../../CONTRIBUTING.md)** 로그인하면 커뮤니티 릴레이에서 모델을 쓸 수 있는 무료 사용량을 받습니다. 비용은 개발자가 부담합니다. 다 쓰면 [자신의 키로 바꾸세요](../own-key.md). 같은 릴레이를 자신의 서버에서 돌릴 수도 있어, 데이터가 집 밖으로 나갈 필요가 없습니다. 최신 버전: **1.0.1 Ballast**, [릴리스 노트](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [브라우저에서 써 보기](https://demo.nanomuse.dev/).
 
+> [!NOTE]
+> **nanoMuse는 계속 진화합니다**
+>
+> 개인 에이전트가 남의 클라우드 안에서만 자라서는 안 됩니다. 그래서 nanoMuse는 오픈소스이고 비용이 낮은 대안이 되려 합니다. 자기 기기에 설치하고, 모델은 직접 고르고, 릴레이도 직접 세울 수 있습니다. 전 세계의 개발자, 사용자와 함께 만들어서 모든 사람이 진짜 자기만의 개인 에이전트를 갖게 하고 싶습니다. [이슈](https://github.com/nano-muse/nanoMuse/issues/new/choose)를 열거나 [풀 리퀘스트](../../CONTRIBUTING.md)를 보내는 것, 어느 쪽이든 nanoMuse를 더 낫게 만드는 데 보탬이 됩니다.
+
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
-
-> ### nanoMuse는 계속 진화합니다
->
-> 개인 에이전트가 남의 클라우드 안에서만 자라서는 안 됩니다. 그래서 nanoMuse는 오픈소스이고 비용이 낮은 대안이 되려 합니다. 자기 기기에 설치하고, 모델은 직접 고르고, 릴레이도 직접 세울 수 있습니다. 전 세계의 개발자, 사용자와 함께 만들어서 모든 사람이 진짜 자기만의 개인 에이전트를 갖게 하고 싶습니다. [이슈](https://github.com/nano-muse/nanoMuse/issues/new/choose)를 열거나 [풀 리퀘스트](../../CONTRIBUTING.md)를 보내는 것, 어느 쪽이든 nanoMuse를 더 낫게 만드는 데 보탬이 됩니다.
 
 ## 🗞️ 소식
 

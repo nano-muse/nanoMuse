@@ -34,13 +34,14 @@
 
 *nano* berarti satu paket lengkap yang cukup kecil untuk kamu jalankan dan pasang sendiri: aplikasi ponsel, aplikasi desktop, konsol web, dan relay yang menghubungkan semuanya ada di repositori ini, di bawah GPL-3.0-or-later. **[Gratis, sumber terbuka, nirlaba. Mari bangun bersama.](../../CONTRIBUTING.md)** Masuk dan kamu mendapat jatah gratis pemakaian model di relay komunitas (pengembang yang membayarnya); kalau habis, [pakai kunci sendiri](../own-key.md). Relay yang sama bisa berjalan di servermu, jadi tidak ada data yang harus keluar dari rumahmu. Versi terbaru: **1.0.1 Ballast**, [catatan rilis](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [coba di browser](https://demo.nanomuse.dev/).
 
+> [!NOTE]
+> **nanoMuse terus berkembang**
+>
+> Agen pribadi seharusnya tidak hanya hidup di cloud milik orang lain, maka nanoMuse menjadi alternatif sumber terbuka yang murah: berjalan di perangkatmu sendiri, dengan model pilihanmu dan relay yang bisa kamu pasang sendiri. Kami ingin membangunnya bersama pengembang dan pengguna di seluruh dunia, supaya setiap orang benar-benar memiliki agen pribadinya sendiri. Buka sebuah [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) atau kirim [pull request](../../CONTRIBUTING.md); keduanya membantu nanoMuse menjadi lebih baik.
+
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
-
-> ### nanoMuse terus berkembang
->
-> Agen pribadi seharusnya tidak hanya hidup di cloud milik orang lain, maka nanoMuse menjadi alternatif sumber terbuka yang murah: berjalan di perangkatmu sendiri, dengan model pilihanmu dan relay yang bisa kamu pasang sendiri. Kami ingin membangunnya bersama pengembang dan pengguna di seluruh dunia, supaya setiap orang benar-benar memiliki agen pribadinya sendiri. Buka sebuah [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) atau kirim [pull request](../../CONTRIBUTING.md); keduanya membantu nanoMuse menjadi lebih baik.
 
 ## 🗞️ Kabar
 

@@ -34,13 +34,14 @@
 
 *nano* veut dire l'ensemble complet, assez petit pour que vous le fassiez tourner et le déployiez vous-même : l'app du téléphone, l'app de bureau, la console web et le relais qui les relie sont tous dans ce dépôt, sous GPL-3.0-or-later. **[Gratuit, open source, à but non lucratif. Construisons-le ensemble.](../../CONTRIBUTING.md)** Connectez-vous et vous recevez un crédit gratuit d'utilisation des modèles sur le relais de la communauté (payé par le développeur) ; quand il est épuisé, [utilisez votre propre clé](../own-key.md). Le même relais tourne sur un serveur à vous, et rien n'a besoin de sortir de chez vous. Dernière version : **1.0.1 Ballast**, [notes de version](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [essayer dans le navigateur](https://demo.nanomuse.dev/).
 
+> [!NOTE]
+> **nanoMuse continue d'évoluer**
+>
+> Un agent personnel ne devrait pas vivre seulement dans le cloud de quelqu'un d'autre, alors nanoMuse est l'alternative open source et à bas coût : sur vos propres appareils, avec le modèle que vous choisissez et un relais que vous pouvez héberger vous-même. Nous voulons le construire avec des développeurs et des utilisateurs du monde entier, pour que chacun possède vraiment un agent personnel à lui. Ouvrez une [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) ou envoyez une [pull request](../../CONTRIBUTING.md) ; l'une comme l'autre aide nanoMuse à s'améliorer.
+
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
-
-> ### nanoMuse continue d'évoluer
->
-> Un agent personnel ne devrait pas vivre seulement dans le cloud de quelqu'un d'autre, alors nanoMuse est l'alternative open source et à bas coût : sur vos propres appareils, avec le modèle que vous choisissez et un relais que vous pouvez héberger vous-même. Nous voulons le construire avec des développeurs et des utilisateurs du monde entier, pour que chacun possède vraiment un agent personnel à lui. Ouvrez une [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) ou envoyez une [pull request](../../CONTRIBUTING.md) ; l'une comme l'autre aide nanoMuse à s'améliorer.
 
 ## 🗞️ Actualités
 
