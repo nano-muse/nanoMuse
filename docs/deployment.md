@@ -90,9 +90,9 @@ muse.example.com {
 ## Updating
 
 ```bash
-uv tool upgrade nanomuse                               # PyPI install (or: pip install -U nanomuse)
 git pull --ff-only && uv pip install -e ".[dev]"      # source install
-docker compose build && docker compose up -d app       # Docker
+docker compose build && docker compose up -d app       # Docker, built here
+docker pull ghcr.io/nano-muse/nanomuse:latest          # Docker, the published image; then start it again
 ```
 
 Data formats (SQLite, JSONL, JSON) are kept backward compatible within a minor version.
