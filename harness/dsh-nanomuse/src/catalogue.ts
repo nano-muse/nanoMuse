@@ -74,6 +74,12 @@ export interface ProviderEntry {
   verified: string
   /** How the vendor takes a thinking level, when it documents one; absent: no control is offered. */
   reasoning?: ReasoningHint
+  /**
+   * The header the vendor's docs want one stable id per conversation in (OpenCode Go:
+   * `x-opencode-session`). The model adapter's catalog route of the same id sends it, so such a
+   * row is written as that route (`ownProviderRow`, `catalogRoute`).
+   */
+  session_header?: string
 }
 
 /** The levels of a listed or hinted model, as the pickers may offer them. */

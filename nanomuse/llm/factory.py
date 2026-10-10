@@ -28,10 +28,11 @@ def create_llm(settings: LLMSettings, data_dir: Path | None = None) -> BaseLLM:
     else:
         if base_url != settings.base_url:
             settings = settings.model_copy(update={"base_url": base_url})
+        header = session_header(settings.provider, settings.base_url)
         if protocol == "openai":
-            llm = OpenAIChatLLM(settings)
+            llm = OpenAIChatLLM(settings, session_header=header)
         elif protocol == "openai_responses":
-            llm = OpenAIResponsesLLM(settings)
+            llm = OpenAIResponsesLLM(settings, session_header=header)
         else:  # pragma: no cover - guarded by the provider validator
             raise ValueError(f"unknown llm provider: {settings.provider}")
     if settings.tool_mode == "prompt":
@@ -39,6 +40,17 @@ def create_llm(settings: LLMSettings, data_dir: Path | None = None) -> BaseLLM:
     elif settings.tool_mode == "auto":
         llm = PromptToolAdapter(llm, native_first=True)
     return llm
+
+
+def session_header(provider: str, base_url: str | None) -> str:
+    """The header the slot's vendor wants a conversation id in: the entry whose endpoint the
+    slot's address is (an OpenAI-shaped slot pointed at OpenCode Go sends it too), else the
+    entry the slot names; empty for every other vendor."""
+    from nanomuse.llm import catalogue
+
+    cat = catalogue.load()
+    entry = cat.by_base_url(base_url) or cat.get(provider)
+    return entry.session_header if entry is not None else ""
 
 
 def is_local_endpoint(base_url: str | None) -> bool:
@@ -77,4 +89,4 @@ def llm_ready(
     return True
 
 
-__all__ = ["create_llm", "is_local_endpoint", "llm_ready"]
+__all__ = ["create_llm", "is_local_endpoint", "llm_ready", "session_header"]

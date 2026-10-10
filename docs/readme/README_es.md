@@ -83,7 +83,7 @@ Todas las descargas vienen de la [última versión](https://github.com/nano-muse
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Un aspecto propio.</b><br>Descríbelo, tu modelo de imagen lo dibuja, un modelo de vídeo lo hace moverse. Un dragoncito por defecto.</td>
-    <td width="50%" valign="top"><b>Cualquier modelo.</b><br>El crédito del relay, tu propia clave en uno de diecinueve proveedores (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek y más), o un plan que ya pagas: ChatGPT, Claude, Kimi. Si un proveedor no tiene modelos de imagen o vídeo, esas dos funciones quedan apagadas y la app lo dice.</td>
+    <td width="50%" valign="top"><b>Cualquier modelo.</b><br>El crédito del relay, tu propia clave en uno de veinte proveedores (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek y más), o un plan que ya pagas: ChatGPT, Claude, Kimi. Si un proveedor no tiene modelos de imagen o vídeo, esas dos funciones quedan apagadas y la app lo dice.</td>
   </tr>
 </table>
 

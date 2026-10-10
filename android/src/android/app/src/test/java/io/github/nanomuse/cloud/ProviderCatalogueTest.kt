@@ -47,6 +47,15 @@ class ProviderCatalogueTest {
         assertEquals(setOf("x.example"), list.single().hosts())
     }
 
+    @Test fun `a vendor that wants a session id per conversation is left out, the phone does not send one`() {
+        assertFalse(shipped.any { it.id == "opencode-go" })
+        assertTrue(shipped.any { it.id == "opencode-zen" })
+        val list = ProviderCatalogue.parse(
+            """{"providers":[{"id":"x","name":"X","protocol":"openai","base_url":"https://x.example/v1","auth":["key"],"regions":["global"],"capabilities":["chat"],"session_header":"x-session"}]}""",
+        )
+        assertTrue(list.isEmpty())
+    }
+
     @Test fun `the card's order - the region's first, local servers and the blank entry left out`() {
         val cn = ProviderCatalogue.ordered(shipped, mainland = true).map { it.id }
         assertEquals("bailian", cn.first())

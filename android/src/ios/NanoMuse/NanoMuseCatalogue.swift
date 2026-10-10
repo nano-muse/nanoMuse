@@ -94,9 +94,12 @@ enum NanoMuseCatalogue {
         (list ?? []).compactMap(vendor)
     }
 
-    /// One entry; nil for one without an id (a malformed entry is skipped, not the whole list).
+    /// One entry; nil for one without an id (a malformed entry is skipped, not the whole list),
+    /// and for one whose vendor wants a session id per conversation (`session_header`, OpenCode
+    /// Go): the app's provider clients do not send it, so a key from there would not work here.
     static func vendor(_ p: [String: Any]) -> NanoMuseVendor? {
         guard let id = p["id"] as? String, !id.isEmpty else { return nil }
+        if let header = p["session_header"] as? String, !header.isEmpty { return nil }
         func strings(_ v: Any?) -> [String] { (v as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty } }
         let authCaps = (p["auth_capabilities"] as? [String: Any] ?? [:]).reduce(into: [String: Set<String>]()) { out, kv in
             out[kv.key] = Set(strings(kv.value))

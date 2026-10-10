@@ -82,6 +82,7 @@ export function parseCatalogue(raw: unknown): ProviderEntry[] {
     if (typeof r.key_url_global === 'string' && r.key_url_global) entry.key_url_global = r.key_url_global
     const reasoning = parseReasoningHint(r.reasoning)
     if (reasoning) entry.reasoning = reasoning
+    if (typeof r.session_header === 'string' && /^x-[a-z0-9-]+$/.test(r.session_header)) entry.session_header = r.session_header
     out.push(entry)
   }
   return out
@@ -184,6 +185,12 @@ export interface OwnProvider {
   /** The models the endpoint listed (or the catalogue's defaults), as the pickers show them. */
   models: OwnModel[]
   at: number
+  /**
+   * Served by the model adapter's catalog route of the same id (pi-ai's own OpenCode Go
+   * provider) rather than a hand-declared one: the route sends the per-conversation header the
+   * vendor wants and speaks each model's own shape, so the row names no `api` and no base URL.
+   */
+  catalogRoute?: boolean
 }
 
 export interface OwnModel {
@@ -285,6 +292,16 @@ export function reasoningFields(hint: ReasoningHint | undefined, api: string, mo
 
 /** The provider row for the harness's model adapter: the base URL, the credential by name, the chat models with their thinking levels (never a key). */
 export function ownProviderRow(p: OwnProvider, hint?: ReasoningHint): Record<string, unknown> {
+  if (p.catalogRoute) {
+    // each model keeps the catalog's endpoint, protocol and thinking levels; the ids are the
+    // ones the catalog lists (saveProvider asks the harness), which is all a catalog route takes
+    const chat = p.models.filter((m) => m.kind === 'chat')
+    return {
+      displayName: p.label,
+      ...(p.keyRef ? { apiKeyEnv: p.keyRef } : {}),
+      ...(chat.length ? { models: chat.map((m) => ({ id: m.id, displayName: m.name, input: m.vision ? ['text', 'image'] : ['text'] })) } : {}),
+    }
+  }
   const api = apiOf(p.protocol, p.baseURL)
   return {
     displayName: p.label,

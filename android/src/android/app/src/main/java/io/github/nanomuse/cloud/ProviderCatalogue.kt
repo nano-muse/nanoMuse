@@ -117,7 +117,11 @@ object ProviderCatalogue {
             ?: NanoMuseCloud.guidance(context)?.let { g -> (g.providers + g.local).firstOrNull { it.id == key } }
     }
 
-    /** The file's `providers[]`; a malformed entry is skipped rather than failing the whole list. */
+    /**
+     * The file's `providers[]`; a malformed entry is skipped rather than failing the whole list,
+     * and so is one whose vendor wants a session id per conversation (`session_header`, OpenCode
+     * Go): the app's provider clients do not send it, so a key from there would not work here.
+     */
     fun parse(json: String): List<CatalogueProvider> {
         val root = JSONObject(json)
         val arr = root.optJSONArray("providers") ?: JSONArray()
@@ -126,6 +130,7 @@ object ProviderCatalogue {
 
     private fun entry(o: JSONObject): CatalogueProvider? {
         val id = o.optString("id").takeIf { it.isNotBlank() } ?: return null
+        if (o.optString("session_header").isNotBlank()) return null
         val authCaps = o.optJSONObject("auth_capabilities")?.let { ac ->
             ac.keys().asSequence().associateWith { k -> strings(ac.optJSONArray(k)).toSet() }
         } ?: emptyMap()

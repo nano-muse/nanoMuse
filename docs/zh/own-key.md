@@ -38,6 +38,7 @@ nanoMuse 免费、非营利。它背后的模型要花钱，每个账号的起�
 | Groq | ● | ● | | | 海外 | [console.groq.com](https://console.groq.com/keys) |
 | Mistral AI | ● | ● | | | 海外 | [console.mistral.ai](https://console.mistral.ai/api-keys) |
 | OpenCode Zen | ● | | | | 海外 | [opencode.ai/auth](https://opencode.ai/auth) |
+| OpenCode Go（桌面版、网页控制台、运行时） | ● | | | | 海外 | [opencode.ai/auth](https://opencode.ai/auth) |
 | Ollama / LM Studio / vLLM（本机） | ● | | | | 都可以 | 不需要 key |
 
 「视频」一栏只有百炼，是因为 nanoMuse 的视频生成走的是百炼的接口；其他家的视频模型用的是各自的任务接口，这一轮还没有接。「画图」一栏里，OpenRouter 走的是它的 Image API，模型例如 `openai/gpt-image-2`；Gemini 用 `gemini-2.5-flash-image`。
@@ -60,7 +61,8 @@ nanoMuse 免费、非营利。它背后的模型要花钱，每个账号的起�
 - **Anthropic。** [platform.claude.com](https://platform.claude.com/settings/keys)。nanoMuse 直接用 Anthropic 的接口，不需要兼容层。
 - **Google Gemini。** [aistudio.google.com/apikey](https://aistudio.google.com/apikey)，地址 `https://generativelanguage.googleapis.com/v1beta/openai`。
 - **xAI、Groq、Mistral。** 各自的控制台创建 key；地址分别是 `https://api.x.ai/v1`、`https://api.groq.com/openai/v1`、`https://api.mistral.ai/v1`。
-- **OpenCode Zen。** 在 [opencode.ai/auth](https://opencode.ai/auth) 申请 key；按请求从余额里扣费，有几个模型免费。地址 `https://opencode.ai/zen/v1`。只有 OpenAI 格式的那些模型到得了，所以只有对话、没有动手：OpenCode 列出的视觉模型 `deepseek-v4-flash-vision-exp` 在 DeepSeek 自家平台上已经退役。OpenCode 没有套餐登录，只有 key，所以这里没有可以登录的东西。同一域名上的订阅 OpenCode Go 不在目录里：OpenCode 把它定位给编程智能体，要求客户端自报身份并在每次请求里用 `x-opencode-session` 传会话 id，nanoMuse 目前还不发。
+- **OpenCode Zen。** 在 [opencode.ai/auth](https://opencode.ai/auth) 申请 key；按请求从余额里扣费，有几个模型免费。地址 `https://opencode.ai/zen/v1`。只有 OpenAI 格式的那些模型到得了，所以只有对话、没有动手：OpenCode 列出的视觉模型 `deepseek-v4-flash-vision-exp` 在 DeepSeek 自家平台上已经退役。OpenCode 没有套餐登录，只有 key，所以这里没有可以登录的东西。
+- **OpenCode Go。** 同一域名上的订阅：在 OpenCode 控制台订阅 Go（每月 10 美元）或 Go Plus（每月 40 美元），再到 [opencode.ai/auth](https://opencode.ai/auth) 申请 key。地址 `https://opencode.ai/zen/go/v1`。用量按模型计，分每月、每周和每 5 小时三档上限。OpenCode 把 Go 定位给编程智能体，要求客户端说明自己是谁，并在 `x-opencode-session` 里为每个对话带上一个固定的 id（[它的文档](https://opencode.ai/docs/go/#where-can-i-use-it)）。运行时（也就是网页控制台）每次请求 Go 都把 `nanoMuse/<版本>` 作为 user agent，并在这个请求头里带上对话的 id；不属于任何对话的调用（比如连接测试）带的是它自己的 id。桌面版把 Go 写成模型适配器自带的 OpenCode Go 路由，这条路由同样会带上这个请求头，并按每个模型自己的格式访问：桌面版提供这条路由的目录里列出的模型，走 Responses 和 Messages 格式的也在内；其他地方只走 OpenAI 格式。手机端暂时不列 Go：它们的服务商客户端还不发这个请求头。和 Zen 一样只有对话。
 
 **贴到 nanoMuse 里。**
 

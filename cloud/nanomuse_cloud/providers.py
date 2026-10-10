@@ -99,7 +99,9 @@ def guidance(region: str, docs_url: str) -> dict[str, Any]:
     cat = catalogue()
     by_id = {p["id"]: p for p in cat["providers"]}
     first = [pid for pid in FIRST.get(region, FIRST["unknown"]) if pid in by_id and _fits(by_id[pid], region)]
-    rest = [p for p in cat["providers"] if p["id"] not in first and p["id"] not in LOCAL and p["id"] != "custom" and _fits(p, region)]
+    # a vendor that wants a session id per conversation (`session_header`, OpenCode Go) is left
+    # out: the phones read this list, and their provider clients do not send one
+    rest = [p for p in cat["providers"] if p["id"] not in first and p["id"] not in LOCAL and p["id"] != "custom" and not p.get("session_header") and _fits(p, region)]
     # the rest grouped by what they can do: the fuller key first, the catalogue's order within
     rest.sort(key=lambda p: -len(p["capabilities"]))
     providers = [_public(by_id[pid], region) for pid in first] + [_public(p, region) for p in rest]
