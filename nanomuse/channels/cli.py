@@ -153,7 +153,10 @@ def _fail(exc: BaseException) -> None:
 
 
 @channels_app.command("status")
-def status(config: ConfigOpt = None, as_json: bool = typer.Option(False, "--json")) -> None:
+def status(
+    config: ConfigOpt = None,
+    as_json: Annotated[bool, typer.Option("--json", help="The same as JSON, for scripts")] = False,
+) -> None:
     """What is switched on, connected, and who is paired."""
     settings = _settings(config)
     try:

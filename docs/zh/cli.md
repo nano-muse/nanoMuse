@@ -44,7 +44,7 @@ nanomuse daemon [--interval 3600] [--once]
 ## 目标 {#goals}
 
 ```bash
-nanomuse goals list [--status active|paused|done] [--category health|finance|career|learning|…]
+nanomuse goals list [--status active|paused|done|cancelled] [--category health|finance|career|learning|…]
 nanomuse goals show g_1a2b3c
 nanomuse goals add "Learn Rust" -s "Read the book, ch. 1–4" -s "Build a CLI" -s "Publish a crate" \
     --category learning --due 2026-12-31 --check-in "weekly sun 19:00"
@@ -142,6 +142,31 @@ nanomuse vault delete EMAIL_PASSWORD
 ```
 
 在配置里用 `{{vault:EMAIL_PASSWORD}}` 引用机密（只限连接器；命令永远拿不到机密）。见 [sentinel.md](sentinel.md#credential-vault)。
+
+## 聊天入口 {#chat-apps}
+
+```bash
+nanomuse channels status [--json]              # 哪些入口已开启、已连接，谁已配对
+nanomuse channels pending                      # 已经展示给人、等待批准的配对码
+nanomuse channels approve 482913               # 让拿到这个配对码的人和 Muse 对话
+nanomuse channels deny 482913
+nanomuse channels login feishu [--lark]        # 扫码创建飞书机器人
+nanomuse channels test feishu [--chat <id>]    # 发一条测试消息（默认发到第一个已配对的会话）
+```
+
+`nanomuse serve` 在运行时，这些命令走它的 API；否则直接改数据目录下的文件，服务器启动时读取。各个应用、配对和各自需要什么：[channels.md](channels.md)。
+
+## ChatGPT 登录 {#chatgpt-sign-in}
+
+```bash
+nanomuse chatgpt login [--no-browser] [--port 1455] [--timeout 600]   # 浏览器打开 OpenAI 的登录页
+nanomuse chatgpt status                        # 谁已登录、有效期到何时；不访问网络
+nanomuse chatgpt usage                         # 套餐用量窗口还剩多少
+nanomuse chatgpt logout                        # 忘掉这次登录；上游不会撤销
+nanomuse chatgpt proxy [--port 0] [--token …]  # 回环地址上的一个 OpenAI 兼容服务
+```
+
+每个子命令都接受 `--json`（每行一个 JSON 对象）；需要访问 chatgpt.com 的子命令还接受 `--proxy`（默认取配置里的 `[llm] proxy`）。登录覆盖什么、令牌存在哪里：[own-key.md](own-key.md#sign-in-with-a-plan-you-already-pay-for)。
 
 ## 手机 {#phone}
 
