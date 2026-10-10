@@ -59,7 +59,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 | **浏览器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：一台模拟手机上的 nanoMuse，登录后体验。这是演示；下面的客户端才是正式的 |
 | **Android** 8.0 以上，arm64 | [nanoMuse-1.0.1-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-1.0.1-arm64.apk)：每个版本同一把签名，覆盖安装即可升级 |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc)：测试版，已通过 Apple 的 beta 审核；从这个链接安装 · [iOS](../ios.md) |
-| **macOS** 12 以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-x64.dmg)：没有公证：第一次右键 → 打开 |
+| **macOS** 12 以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-x64.dmg)。没有公证：第一次右键 → 打开 |
 | **Windows** 10 以上 | [nanoMuse-Desktop-1.0.1-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-win-x64.exe)：点一次「仍要运行」 |
 | **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` 搭自己的中继；`docker compose up -d app` 在自己的服务器上跑网页版；见[自己部署](../self-hosting.md) |
@@ -83,7 +83,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
   </tr>
   <tr>
     <td width="50%" valign="top"><b>有自己的形象。</b><br>描述一句，你的图像模型来画，视频模型让它动起来。默认是一只小龙。</td>
-    <td width="50%" valign="top"><b>任何模型。</b><br>中继的额度；自己在十九家服务商（百炼、OpenRouter、OpenAI、Gemini、DeepSeek 等）任意一家的 key；或者你已经在付费的套餐：ChatGPT、Claude、Kimi。服务商没有图片或视频模型，这两项就不开，app 会直说。</td>
+    <td width="50%" valign="top"><b>任何模型。</b><br>中继的额度；自己在十九家服务商（百炼、OpenRouter、OpenAI、Gemini、DeepSeek 等）任意一家的 key；或者你已经在付费的套餐：ChatGPT、Claude、Kimi。服务商没有图片或视频模型，这两项就不开，App 会直说。</td>
   </tr>
 </table>
 
