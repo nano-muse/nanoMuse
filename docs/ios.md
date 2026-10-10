@@ -520,25 +520,30 @@ Ours, in `NanoMuse/`:
 
 ## Voice prompts from the Action Button
 
-`VoicePromptIntent` (`Agent/Intents/VoicePromptIntent.swift`) opens the app straight into voice
-input, so a prompt can be spoken instead of typed. Register it once in Shortcuts and bind it to
-the Action Button, Back Tap, or a widget; pressing it lands you in the composer listening, and
-the transcript is written there ready to send.
+*Voice Prompt* is a Shortcut the app registers (`NanoMuse/VoicePromptIntent.swift`): it opens
+nanoMuse and starts listening, so a prompt can be spoken instead of typed. Bind it once in the
+Shortcuts app, to the Action Button (Settings › Action Button › Shortcut), to Back Tap or to a
+widget; one press and the composer is in voice mode with the mic running, and what you say
+appears in the composer as it is recognised. Sending stays a tap on the send button: a sentence
+the recogniser misheard must not start the agent on a pause. The Shortcut takes an optional
+*Session*; left empty, the prompt goes to the chat that is open, which in the Muse layout is the
+main chat (a side chat pushed over it is popped first). The first press asks for the microphone
+and for speech recognition the way the mic button does; a refusal shows in the panel, nothing is
+recorded.
 
-Sending stays a deliberate tap. A spoken pause does not fire the agent: the same "ask before
-anything you cannot undo" rule the rest of the app follows applies to a misheard sentence too.
-
-The intent is a trigger, not a second recorder. It leaves a request
-(`NanoMuse/VoicePromptRequestStore.swift`) that the chat surface picks up
-(`NanoMuse/VoicePromptModifier.swift`) and turns into a live session on the same voice panel the
-composer's mic button opens — one recording path, one transcription stack. Only the counting is
-shared: the panel writes the final transcript, nanoMuse puts it in the composer.
-
-The Action Button cannot pass free-form speech to an App Intent, which is why this is a voice
-*entry* rather than "ask nanoMuse <something>" in one breath: iOS gives an intent no way to
-capture the rest of a phrase, and a headless intent that opened the microphone with nothing on
-screen would read as a fault. Opening the app also means the transcript is visible and fixable
-before it is sent.
+How it is built: the intent cannot drive the voice panel itself (on a cold start it runs before
+the window exists, and SwiftUI owns the panel), so it leaves a request in `NanoMuseVoicePrompt`
+and, when a session is named, routes to it the way a notification tap does
+(`NotificationNavigationStore`, `.openSessionFromIntent`). The chat's hooks
+(`NanoMuseChatHooks`) take the request addressed to their chat, switch the composer into the
+inline voice panel on the mic button's path and press the panel's mic once it is up, through
+`VoiceInputViewModel.handleMainButtonTap` and its permission flow. One recording path, one
+transcription stack; the transcript reaches `inputText` the way it always does. A request older
+than 30 seconds is dropped. iOS gives an App Intent no way to take free-form speech, which is
+why this is a voice entry rather than "ask nanoMuse something" in one breath, and why the app
+opens: a microphone running with nothing on screen would read as a fault. The Siri phrases are
+in the three `AppShortcuts.strings` tables (English, 简体中文, 繁體中文), the intent's own strings
+in `Localizable.xcstrings` (#296, #298).
 
 ## Building on a Mac
 

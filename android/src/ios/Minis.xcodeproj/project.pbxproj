@@ -377,7 +377,6 @@
 		E5T000001 /* SessionEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T000011 /* SessionEntity.swift */; };
 		E5T000002 /* ListSessionsIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T000012 /* ListSessionsIntent.swift */; };
 		E5T000003 /* SendPromptIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T000013 /* SendPromptIntent.swift */; };
-		E5VP0001 /* VoicePromptIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VP0002 /* VoicePromptIntent.swift */; };
 		E5T000004 /* OpenSessionIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T000014 /* OpenSessionIntent.swift */; };
 		E5T000005 /* MinisShortcutsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T000015 /* MinisShortcutsProvider.swift */; };
 		E5T000006 /* SendPromptResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T000016 /* SendPromptResult.swift */; };
@@ -1062,7 +1061,6 @@
 		E5T000011 /* SessionEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEntity.swift; sourceTree = "<group>"; };
 		E5T000012 /* ListSessionsIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSessionsIntent.swift; sourceTree = "<group>"; };
 		E5T000013 /* SendPromptIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendPromptIntent.swift; sourceTree = "<group>"; };
-		E5VP0002 /* VoicePromptIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePromptIntent.swift; sourceTree = "<group>"; };
 		E5T000014 /* OpenSessionIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSessionIntent.swift; sourceTree = "<group>"; };
 		E5T000015 /* MinisShortcutsProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinisShortcutsProvider.swift; sourceTree = "<group>"; };
 		E5T000016 /* SendPromptResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendPromptResult.swift; sourceTree = "<group>"; };
@@ -1912,7 +1910,6 @@
 				E5T000011 /* SessionEntity.swift */,
 				E5T000012 /* ListSessionsIntent.swift */,
 				E5T000013 /* SendPromptIntent.swift */,
-				E5VP0002 /* VoicePromptIntent.swift */,
 				E5T0000A2 /* AskMinisIntent.swift */,
 				E5F200016 /* ModelSelectionEntity.swift */,
 				E5T000014 /* OpenSessionIntent.swift */,
@@ -2783,7 +2780,6 @@
 				E5T000001 /* SessionEntity.swift in Sources */,
 				E5T000002 /* ListSessionsIntent.swift in Sources */,
 				E5T000003 /* SendPromptIntent.swift in Sources */,
-				E5VP0001 /* VoicePromptIntent.swift in Sources */,
 				E5T0000A1 /* AskMinisIntent.swift in Sources */,
 				E5F200006 /* ModelSelectionEntity.swift in Sources */,
 				E5T000004 /* OpenSessionIntent.swift in Sources */,

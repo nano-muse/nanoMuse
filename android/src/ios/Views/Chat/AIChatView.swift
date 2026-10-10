@@ -666,7 +666,7 @@ struct AIChatView: View {
         .environment(\.chatSessionId, vm.sessionId)
         // nanoMuse: the Muse header's ••• menu, the composer's expectation around a turn and the C9
         // presence line, as one link (NanoMuseChatHooks) — four links here overflowed the stack in 0.1.38
-        .modifier(NanoMuseChatHooks(vm: vm, processing: vm.isProcessing, composer: nmComposer, readOnly: isReadOnly, perform: { nmPerform($0) })) // nanoMuse:
+        .modifier(NanoMuseChatHooks(vm: vm, processing: vm.isProcessing, composer: nmComposer, readOnly: isReadOnly, perform: { nmPerform($0) }, voice: voiceVM, enterVoice: { nmEnterVoice() })) // nanoMuse:
         .modifier(NavBarStyleModifier(topSafeAreaInset: $topSafeAreaInset))
         .navigationBarTitleDisplayMode(.inline)
         // [T-ios-navbar-toolbar-host] The ENTIRE toolbar now lives inside an

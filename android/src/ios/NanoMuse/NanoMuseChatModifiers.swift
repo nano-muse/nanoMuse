@@ -58,8 +58,9 @@ struct NanoMuseComposerHost: ViewModifier {
 }
 
 /// The chat's listeners of ours, one link of the chain: the Muse header's ••• menu, the
-/// composer's expectation when a message goes out or a turn ends, and presence (C9 — the
-/// "{device} is working…" line under the last remote row, cleared when the reply arrives).
+/// composer's expectation when a message goes out or a turn ends, presence (C9 — the
+/// "{device} is working…" line under the last remote row, cleared when the reply arrives),
+/// and the Action Button's voice prompt (#296).
 struct NanoMuseChatHooks: ViewModifier {
     let vm: AIChatViewModel
     /// `vm.isProcessing`, passed as a value so a change re-runs this body and `onChange` sees it.
@@ -67,12 +68,24 @@ struct NanoMuseChatHooks: ViewModifier {
     let composer: NanoMuseComposerWatch
     let readOnly: Bool
     let perform: (NanoMuseChatAction) -> Void
+    /// The composer's voice panel model, and the chat's switch into voice mode (the mic
+    /// button's path), for a voice prompt the Action Button asked for.
+    let voice: VoiceInputViewModel
+    let enterVoice: () -> Void
 
     func body(content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .nanoMuseChatAction)) { note in
                 guard let action = NanoMuseChatAction.from(note, for: vm.nmSessionKey) else { return }
                 perform(action)
+            }
+            .onReceive(NanoMuseVoicePrompt.shared.$pending) { _ in
+                // A request for this chat, or for the chat that is open when the Muse shell is
+                // off (with it on, the shell aims the request at the main chat first). A chat
+                // that cannot be typed in cannot be spoken to either; the press is dropped.
+                let mine = NanoMuseVoicePrompt.shared.take(for: vm.nmSessionKey, unaddressed: !NanoMuseShellPrefs.shell)
+                guard mine, !readOnly else { return }
+                NanoMuseVoicePrompt.listen(with: voice, enterVoice: enterVoice)
             }
             .nmOnChange(of: processing) { running in
                 // a message went out (any path: the pill, a card's pick, a flow) or a turn ended —
