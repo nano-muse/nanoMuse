@@ -4,9 +4,9 @@ nanoMuse is one agent on your own devices, and nothing in it has to go through a
 
 | | What you run | What it gives you |
 |---|---|---|
-| [1. No server, your own key](#1-no-server-your-own-key) | nothing | the apps talk to a model provider directly; the community relay is still used for sign-in and for the devices to find each other |
-| [2. Your own relay](#2-your-own-relay) | nanoMuse Cloud on a small VPS or a home server | your own accounts, sign-in codes, hub and conversation sync; nothing about your account touches nanomuse.cn |
-| [3. A runtime of your own](#3-a-runtime-of-your-own-for-the-web-app) | the Python runtime in Docker | the web app and the hands on a computer that is always on |
+| [1. No server, your own key](#_1-no-server-your-own-key) | nothing | the apps talk to a model provider directly; the community relay is still used for sign-in and for the devices to find each other |
+| [2. Your own relay](#_2-your-own-relay) | nanoMuse Cloud on a small VPS or a home server | your own accounts, sign-in codes, hub and conversation sync; nothing about your account touches nanomuse.cn |
+| [3. A runtime of your own](#_3-a-runtime-of-your-own-for-the-web-app) | the Python runtime in Docker | the web app and the hands on a computer that is always on |
 
 ## 1. No server, your own key
 
