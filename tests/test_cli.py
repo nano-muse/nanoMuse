@@ -74,7 +74,9 @@ def test_config_path_follows_the_data_dir_variable(tmp_path, monkeypatch):
     monkeypatch.setattr(config_module, "DEFAULT_DATA_DIR", tmp_path / "home")
     monkeypatch.setenv("NANOMUSE_DATA_DIR", str(tmp_path / "elsewhere"))
     out = plain(runner.invoke(app, ["config", "path"]).output)
-    assert "none found" in out and str(tmp_path / "elsewhere") in out
+    # rich wraps a long path (the macOS runner's temp dir) at 80 columns; compare without
+    unwrapped = re.sub(r"\s", "", out)
+    assert "nonefound" in unwrapped and re.sub(r"\s", "", str(tmp_path / "elsewhere")) in unwrapped
 
 
 def test_every_option_has_a_help_text():
