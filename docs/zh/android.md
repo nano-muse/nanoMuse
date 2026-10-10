@@ -8,7 +8,11 @@
 OpenMinis 时，不会有两个 App 抢同一个 scheme；App 内部的链接仍是 `minis://…`（上游的词汇，沙箱、
 系统提示词和模型都用它），从系统进来的 `nanomuse://` 链接按它的 `minis://` 形式读，App 自己打开
 自己的链接时一律按名字指向 `MainActivity`，不交给系统去解析
-（`io.github.nanomuse.deeplink.OwnScheme`）。这个选择的来龙去脉
+（`io.github.nanomuse.deeplink.OwnScheme`）。沙箱的 offload 套接字（proot 和 App 之间通信的
+抽象套接字）也是 App 自己的：叫 `io.github.nanomuse.app.native-offload`，不用上游的
+`native-offload`，因为抽象套接字在整台设备上只有一个命名空间，两个 App 用同一个名字，后启动的那个
+会在启动时直接死掉；如果连这个名字都还被我们自己上一个进程占着，服务端就改绑一个带进程号的名字，
+并把它告诉 proot（`io.github.nanomuse.sandbox.OffloadSocketName`）。这个选择的来龙去脉
 在 [roadmap.md](roadmap.md)；它之前的方案（包着一个 Python 服务器的 WebView，两个 APK 变体）
 作为设计记录保留在 [archive/android-python-line.md](../archive/android-python-line.md)，不是你今天
 下载到的东西。
