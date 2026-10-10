@@ -1,13 +1,15 @@
 """Sentinel policy engine – decides *allow / ask / deny* for a tool call.
 
-Evaluation order (first hit wins for 1–4, 5 can only escalate):
+Evaluation order (first hit wins for 1–4, 5 and 6 are then checked against
+every decision and can only escalate it to ASK):
 
 1. ``deny_tools``
 2. explicit ``[[sentinel.rules]]`` (tool glob + argument globs)
 3. ``always_allow_tools`` / ``always_ask_tools``
 4. risk level × mode  (``ask`` / ``strict`` / ``auto``)
 5. taint tracking: after private data has been read, network egress to a
-   destination that is not on ``egress_allowlist`` requires approval.
+   destination that is not on ``egress_allowlist`` requires approval,
+   whatever step 1–4 said and whatever the mode.
 """
 
 from __future__ import annotations
@@ -120,10 +122,12 @@ class Policy:
             if decision == Decision.ASK:
                 reasons.append(f"risk level is '{risk.value}' (mode={s.mode})")
 
-        # 5. taint tracking – can only escalate ALLOW → ASK
+        # 5. taint tracking – can only escalate to ASK, whatever set the decision so far
+        #    (mode, always_allow_tools, always_ask_tools or a rule): an ASK it taints
+        #    carries `tainted_ask`, so a mode that skips questions does not wave it
+        #    through (step 6's warnings work the same way)
         if (
-            decision == Decision.ALLOW
-            and s.taint_tracking
+            s.taint_tracking
             and tainted
             and assessment.egress
             and not assessment.egress_configured
