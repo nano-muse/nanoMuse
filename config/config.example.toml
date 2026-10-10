@@ -71,6 +71,10 @@ vision = "auto"
 # Some DeepSeek thinking endpoints want reasoning_content echoed back with tool calls.
 pass_reasoning = false
 # extra_body = { "thinking" = { "type" = "enabled" } }
+# An HTTP(S) or SOCKS proxy for this slot's requests only, when this machine's network
+# cannot reach the provider directly; empty, the environment's HTTPS_PROXY applies.
+# Honoured by the ChatGPT sign-in too; never used for nanoMuse Cloud.
+# proxy = "http://127.0.0.1:7890"
 
 # ------------------------------------------------------------------------------
 [agent]
@@ -230,6 +234,18 @@ device_timeout_s = 20.0  # how long to wait for the phone to answer one request
 reconnect_grace_s = 30.0  # how long a running task waits for a phone whose connection dropped to come back; 0 = give up at once
 
 # ------------------------------------------------------------------------------
+# Hands on this computer: the screen and the mouse of the machine the runtime runs on
+# (docs/every-device.md). The model, the step cap and the sensitive words are [gui]'s.
+# ------------------------------------------------------------------------------
+[hands]
+enabled = false          # the switch is Devices → Hands on this computer in the app
+backend = "auto"         # auto | desktop | pyautogui | xdotool; auto takes the desktop app's hands when it started this runtime
+mode = "auto"            # auto | screen | window; window = one app's window on macOS, your own mouse untouched
+coords = "pixels"        # pixels | norm1000: what the model's x, y mean (pixels of the picture it saw, or a 0–1000 grid)
+max_image_width = 1600   # widest picture handed to the model; the screen itself is operated at full size
+settle_s = 0.6           # pause after each action before the next screenshot
+
+# ------------------------------------------------------------------------------
 # Pictures and clips: where the avatar studio draws when it is not the chat model's
 # host. All empty (the default): the chat provider's own picture model when it has one,
 # else the account's when signed in, else none. `provider` is a catalogue id
@@ -323,6 +339,7 @@ side_chats = false
 [cloud]
 base_url = "https://cloud.nanomuse.cn"   # a relay you run yourself: its public address (docs/self-hosting.md)
 required = true          # the first run does not finish without an account; false for a runtime with no relay at all
+models = true            # the account's models as a source (the apps' "Use nanoMuse Cloud models" switch); false keeps the sign-in for sync and the devices only
 sync = true              # default for the account-wide Data controls → Sync switch (the person's choice, once made, counts)
 
 # ------------------------------------------------------------------------------

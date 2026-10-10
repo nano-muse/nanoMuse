@@ -32,6 +32,8 @@ These win over the file. They cover the settings people change most often and wh
 | `NANOMUSE_VAULT_KEY` | Fernet key for the vault (default: `<data_dir>/vault.key`) |
 | `NANOMUSE_CLOUD_BASE_URL`, `NANOMUSE_CLOUD_REQUIRED`, `NANOMUSE_CLOUD_SYNC` | `[cloud]`: the relay a hosted runtime signs in against, whether a nanoMuse Cloud account is required, and the default for *Sync conversations between my devices* (`sync`, on unless set to `0`; the person's switch in *Settings → Data controls*, once touched, is what counts; [every-device.md](every-device.md#the-same-conversations-everywhere)) ([cloud.md](cloud.md); the relay's own variables are in [cloud/README.md](../cloud/README.md)) |
 | `NANOMUSE_HUB_NAME` | `hub.name`, what this device is called on the other devices |
+| `NANOMUSE_CLOUD_KEY`, `NANOMUSE_CLOUD_HINT`, `NANOMUSE_CLOUD_CHANNEL`, `NANOMUSE_ONBOARDED` | a hosted runtime (nanoMuse Web) starts signed in: the gateway that made the container hands over the account key (it goes into the vault like one typed in), the masked identifier and channel for the account page, and whether the first run is already done; nothing happens when the vault already holds a key |
+| `NANOMUSE_IN_CONTAINER=1` | says the runtime is inside a container (the image sets it; `/.dockerenv` is read too), so `sandbox.mode = auto` treats the container as the box instead of reporting bubblewrap missing |
 | `NANOMUSE_CODING_HOME` | where the coding CLIs' own homes (`~/.codex`, `~/.claude`, …) are looked for, default the user's home ([coding-agents.md](coding-agents.md)) |
 | `NANOMUSE_LOG_LEVEL` | `log_level` |
 
@@ -55,6 +57,9 @@ pass_reasoning = false             # send reasoning_content back with assistant 
 extra_headers = {}                 # e.g. { "X-End-User-Id" = "nanomuse" }
 extra_body    = {}                 # e.g. { "thinking" = { "type" = "enabled" } }
 proxy         = ""                 # an HTTP(S) or SOCKS proxy for this slot only, e.g. "http://127.0.0.1:7890"
+image_model   = ""                 # the older way to name the avatar studio's picture model on this host; see [image] below
+video_model   = ""                 # the same for clips
+video_base_url = ""                # the asynchronous video API when it is not on this host (a relaying gateway)
 ```
 
 `proxy` sends this slot's requests (and, for a `chatgpt` slot, the sign-in's token refresh) through that proxy and ignores the environment's `HTTPS_PROXY` for them; empty, the environment decides. It never applies to nanoMuse Cloud or the hub. (The phones have the same switch under *Settings → Network*; [own-key.md](own-key.md#when-the-provider-cannot-be-reached).)
@@ -157,6 +162,7 @@ The app layer sets the same slots: `PUT /api/connections/image` and `PUT /api/co
 name                 = "nanoMuse"      # what the agent calls itself (the app's profile overrides this)
 max_steps            = 30              # tool calls per turn before it must wrap up
 # workspace          = "./workspace"   # the only directory the files tool can touch; default ./workspace if present here, else <data_dir>/workspace
+extra_roots          = []              # directories outside the workspace the files tool may read and write, e.g. ["~/Documents/notes"]; writable inside the sandbox too
 language             = "auto"          # or a fixed language: "English", "中文", ...
 max_context_messages = 80
 max_context_images   = 4               # screenshots kept in the request: the newest N; 0 keeps all
