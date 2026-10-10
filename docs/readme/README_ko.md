@@ -172,5 +172,5 @@ nanoMuse는 독립적인 커뮤니티 프로젝트로, Meta Platforms, Inc.와 �
 
 <p align="center">
   <em>방문해 주셔서 감사합니다 ✨ nanoMuse!</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse&left_text=visitors&left_color=%23555&right_color=%230a66e4" alt="Visitors">
+  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
 </p>

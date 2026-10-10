@@ -107,5 +107,5 @@ def test_the_ten_readmes_carry_the_block_and_the_maintainer_card(script: ModuleT
         assert text.count(script.START) == 1 and text.count(script.END) == 1, path.name
         assert text.index(script.START) < text.index(script.END), path.name
         assert 'href="https://github.com/lgy0404"' in text, path.name
-        assert "visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse" in text, path.name
+        assert "komarev.com/ghpvc/?username=nano-muse-nanomuse" in text, path.name
         assert "lgy0404" not in text[text.index(script.START) : text.index(script.END)], path.name

@@ -172,5 +172,5 @@ nanoMuse — независимый проект сообщества, не св
 
 <p align="center">
   <em>Спасибо, что заглянули ✨ nanoMuse!</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse&left_text=visitors&left_color=%23555&right_color=%230a66e4" alt="Visitors">
+  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
 </p>
