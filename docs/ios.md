@@ -657,10 +657,12 @@ certificate); the lane makes them again if they are missing.
 
 ### Does it compile?
 
-*Actions → iOS · build check → Run workflow* (`.github/workflows/ios-check.yml`) builds the app
-for a device on a Mac runner with signing turned off: no Apple account, no secrets. It shares
-the native-dependency cache with the TestFlight workflow, so run it first: a compile error costs
-minutes there, not an upload. The full `xcodebuild` log is attached to the run. The run fails
+*iOS · build check* (`.github/workflows/ios-check.yml`) builds the app for a device on a Mac
+runner with signing turned off: no Apple account, no secrets. It runs on every pull request
+that touches `android/src/ios/`, and *Actions → iOS · build check → Run workflow* starts it by
+hand for anything else (a change under `android/deps/`, a branch without a pull request). It
+shares the native-dependency cache with the TestFlight workflow, so let it go green first: a
+compile error costs minutes there, not an upload. The full `xcodebuild` log is attached to the run. The run fails
 when a warning is reported in a file under `NanoMuse/` (upstream's files are not held to this),
 so the zero-warnings rule above is checked, not just asked for.
 

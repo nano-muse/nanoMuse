@@ -555,9 +555,11 @@ gh secret set IOS_DIST_P12_PASSWORD -R nano-muse/nanoMuse < dist.p12.pass
 
 ### 能编译吗？ {#does-it-compile}
 
-*Actions → iOS · build check → Run workflow*（`.github/workflows/ios-check.yml`）在 Mac runner
-上关闭签名，面向真机构建这个 App：不要 Apple 账号，不要 secrets。它和 TestFlight 工作流
-共用原生依赖的缓存，所以先跑它：一个编译错误在这里只花几分钟，不用浪费一次上传。完整的
+*iOS · build check*（`.github/workflows/ios-check.yml`）在 Mac runner 上关闭签名，面向真机构建
+这个 App：不要 Apple 账号，不要 secrets。凡是改到 `android/src/ios/` 的 pull request 都会跑它；
+其他情况（改了 `android/deps/` 下的脚本、还没开 pull request 的分支）用 *Actions → iOS · build
+check → Run workflow* 手动启动。它和 TestFlight 工作流共用原生依赖的缓存，所以先让它变绿：
+一个编译错误在这里只花几分钟，不用浪费一次上传。完整的
 `xcodebuild` 日志附在运行记录上。`NanoMuse/` 下的文件只要报出一个警告，这次运行就算失败
 （上游的文件不算），所以上面「零警告」的规矩是被检查的，不只是写在这里。
 
