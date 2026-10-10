@@ -111,8 +111,10 @@ object NativeOffloadServer {
         // 100-300ms window.
         val s = bindWithRetry()
             ?: throw java.io.IOException(
-                "failed to bind abstract socket '$SOCKET_NAME' after retries — " +
-                "previous process holding the namespace?",
+                // nanoMuse: the socket that failed last is the per-process fallback, so name it (#288)
+                "failed to bind abstract socket " +
+                "'${OffloadSocketName.forProcess(BuildConfig.APPLICATION_ID, android.os.Process.myPid())}' " +
+                "after retries and the per-process fallback; another process may hold the namespace",
             )
         serverSocket = s
         acceptThread = thread(name = "native-offload-accept", isDaemon = true) {

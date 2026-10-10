@@ -23,6 +23,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Android
 
 - **The app starts beside OpenMinis.** Both apps bound the same Linux abstract socket, `native-offload`, for the sandbox's calls back into the app, and abstract sockets are one namespace for every app on the device, so whichever app started second failed to bind and died before its first screen. nanoMuse's socket is now `io.github.nanomuse.app.native-offload`; when even that is still held by a previous process of ours, the app binds a per-process name and tells proot that one instead of crashing (#271).
+- **When even the per-process socket cannot be bound, the crash names that socket.** The message used to blame the app's own socket name whatever had failed, and carried a dash; it now names the per-process socket that failed last and says that another process may hold the namespace (#288).
 
 ### iOS
 
