@@ -390,6 +390,23 @@
       }
     },
     {
+      "id": "opencode-zen",
+      "name": "OpenCode Zen",
+      "name_zh": "OpenCode Zen",
+      "protocol": "openai",
+      "base_url": "https://opencode.ai/zen/v1",
+      "key_url": "https://opencode.ai/auth",
+      "auth": ["key"],
+      "regions": ["global"],
+      "capabilities": ["chat"],
+      "defaults": {
+        "chat": "deepseek-v4.1-flash"
+      },
+      "note": "OpenCode's own gateway: pay per request from a balance, a key made in the OpenCode console, and a few free models beside the paid ones. Chat answers on the OpenAI shape; the GPT, Claude and Gemini ids on the same host speak the Responses, Messages and Google shapes, which this entry does not reach, and the vision model OpenCode lists is deepseek-v4-flash-vision-exp, the id DeepSeek has retired on its own platform, so the hands are not claimed here. OpenCode publishes no plan sign-in, only a key.",
+      "note_zh": "OpenCode 自己的网关：按请求从余额里扣费，key 在 OpenCode 控制台申请，付费模型之外还有几个免费的。对话走 OpenAI 格式；同一域名上的 GPT、Claude、Gemini 走 Responses、Messages 和 Google 格式，本条目到不了；它列的视觉模型是 deepseek-v4-flash-vision-exp，这个 id 在 DeepSeek 自家平台上已经退役，所以「动手」不列入。OpenCode 没有套餐登录，只有 key。",
+      "verified": "2026-10"
+    },
+    {
       "id": "ollama",
       "name": "Ollama",
       "name_zh": "Ollama（本机）",

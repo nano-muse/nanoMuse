@@ -8,6 +8,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **A catalogue lookup no longer confuses two providers that share one host.** `by_base_url` matched on the host alone, so two entries on one host could only ever resolve to the first. The whole address is tried first now, and the host stays the fallback so a key pasted with or without `/v1` still finds its vendor (thanks @PovedaAqui).
+- **One more provider in the own-key catalogue: OpenCode Zen.** A key from [opencode.ai/auth](https://opencode.ai/auth); pay per request from a balance, a few of its models free. Chat only, on the OpenAI shape (`deepseek-v4.1-flash`): the GPT, Claude and Gemini ids on the same host speak the Responses, Messages and Google shapes, which the entry does not reach, and the one vision model OpenCode lists, `deepseek-v4-flash-vision-exp`, is an id DeepSeek has retired on its own platform, so the hands are left out rather than claimed on a name. OpenCode Go, the subscription on the same host, stays out for now: OpenCode means it for coding agents and asks a client to identify itself and send `x-opencode-session` on each request, which nanoMuse does not do yet (thanks @PovedaAqui).
 - **The memory tidy-up judges every script, and refuses what it cannot judge.** Its tokenizer knew Latin letters and CJK only, so a Russian (or Greek, Arabic, Hebrew) merge had no words to compare and the guard against invented facts approved anything, while recall between two Russian lines scored zero. Words are now Unicode words in any alphabet; a word that only differs from a source's by its ending (`Пекин`, `Пекине`) counts as the same; and when there is nothing to compare, the merge is refused rather than waved through (#270).
 
 ### Web
