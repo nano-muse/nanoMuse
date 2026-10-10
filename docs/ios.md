@@ -518,6 +518,28 @@ Ours, in `NanoMuse/`:
   on its page keeps upstream's path: the chat re-resolves through the default group and, when
   nothing is left, says *No model configured. Add a provider in Settings.*
 
+## Voice prompts from the Action Button
+
+`VoicePromptIntent` (`Agent/Intents/VoicePromptIntent.swift`) opens the app straight into voice
+input, so a prompt can be spoken instead of typed. Register it once in Shortcuts and bind it to
+the Action Button, Back Tap, or a widget; pressing it lands you in the composer listening, and
+the transcript is written there ready to send.
+
+Sending stays a deliberate tap. A spoken pause does not fire the agent: the same "ask before
+anything you cannot undo" rule the rest of the app follows applies to a misheard sentence too.
+
+The intent is a trigger, not a second recorder. It leaves a request
+(`NanoMuse/VoicePromptRequestStore.swift`) that the chat surface picks up
+(`NanoMuse/VoicePromptModifier.swift`) and turns into a live session on the same voice panel the
+composer's mic button opens — one recording path, one transcription stack. Only the counting is
+shared: the panel writes the final transcript, nanoMuse puts it in the composer.
+
+The Action Button cannot pass free-form speech to an App Intent, which is why this is a voice
+*entry* rather than "ask nanoMuse <something>" in one breath: iOS gives an intent no way to
+capture the rest of a phrase, and a headless intent that opened the microphone with nothing on
+screen would read as a fault. Opening the app also means the transcript is visible and fixable
+before it is sent.
+
 ## Building on a Mac
 
 Requirements are upstream's, in [android/BUILDING.md](../android/BUILDING.md): a recent Xcode

@@ -28,6 +28,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
+- **A voice prompt starts from the Action Button.** A new *Voice Prompt* shortcut opens the app straight into voice input, so a prompt can be spoken instead of typed: press the Action Button (or Back Tap, or a Shortcuts widget), speak, and the transcript lands in the composer ready to send. It reuses the same voice panel the composer's mic button opens, and sending stays a deliberate tap — a spoken pause does not fire the agent (#296).
 - **The app's own pages read in German, Spanish, French, Japanese, Korean and Russian too.** Thirty-eight of nanoMuse's strings on iPhone (the account page, the About credits, the feed and goal prompts, the chats drawer) had English and Chinese only and fell back to English elsewhere; they now carry all nine languages, and a test holds every string the app's own views use to that.
 
 ### Project

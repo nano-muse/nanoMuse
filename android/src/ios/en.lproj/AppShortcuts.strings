@@ -19,3 +19,6 @@
 "Follow up a ${applicationName} session" = "Follow up a ${applicationName} session";
 "Continue a ${applicationName} session" = "Continue a ${applicationName} session";
 "Open a ${applicationName} session" = "Open a ${applicationName} session";
+
+"Voice prompt to ${applicationName}" = "Voice prompt to ${applicationName}";
+"Talk to ${applicationName} by voice" = "Talk to ${applicationName} by voice";
