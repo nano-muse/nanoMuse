@@ -472,6 +472,17 @@ helper, on the pre-0.1.38 path.
   falls back to an XEmbed tray GNOME Shell does not show — the app is in the tray, invisibly.
   Ubuntu 22.04 and newer show it. On 20.04 use Ctrl+Q, or switch the menu-bar option off so
   that closing the window quits.
+- **Pictures go through WebAssembly.** The harness reads and resizes pictures (what the
+  model is shown, the hands' screenshots) with sharp, whose native build carries its own
+  GLib; Electron's Linux binary links the system's GLib and leaks its symbols into the same
+  process (electron/electron#46323), which printed `GLib-GObject-CRITICAL` on every picture
+  and, on some systems, ended the harness with a SIGSEGV on the first picture it decoded, so
+  a *read image* call got no answer and the turn was lost. The Linux package therefore ships
+  sharp's WebAssembly build and not the native one; a picture takes about twice as long
+  (some 50 ms for a 2560×1440 screenshot) and nothing else changes. A copy from 1.0.1 or
+  earlier can be fixed by hand: in `resources/dsh/node_modules` run
+  `npm install @img/sharp-wasm32@0.35.5` and delete `@img/sharp-linux-x64` and
+  `@img/sharp-libvips-linux-x64`; sharp then loads the WebAssembly build.
 - **Wayland.** The hands drive the mouse and read the screen through X11; on a Wayland
   session they say so and stay off — Settings → Computer use's *Take a test shot* and the
   first "what is on my screen?" both answer *the hands are off on this computer: Wayland

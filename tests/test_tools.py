@@ -144,7 +144,10 @@ async def test_shell_timeout_stops_the_whole_tree(tmp_path: Path):
             return False
         stat = Path(f"/proc/{pid}/stat")
         if stat.is_file():
-            return stat.read_text().rsplit(")", 1)[-1].split()[0] != "Z"
+            try:
+                return stat.read_text().rsplit(")", 1)[-1].split()[0] != "Z"
+            except (FileNotFoundError, ProcessLookupError):
+                return False  # reaped between the two calls
         ps = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True)
         state = ps.stdout.strip()
         return bool(state) and not state.startswith("Z")

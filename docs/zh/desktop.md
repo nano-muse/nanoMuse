@@ -371,6 +371,14 @@ bundle——同一身份、hardened runtime、它自己的标识符 `io.github.n
   的注册（总线名后面附了对象路径），于是图标退回到 GNOME Shell 不显示的 XEmbed 托盘——应用在
   托盘里，只是看不见。Ubuntu 22.04 及更新的版本能显示。在 20.04 上用 Ctrl+Q，或者关掉菜单栏
   选项，让关窗口就退出。
+- **图片走 WebAssembly。** harness 用 sharp 读取和缩放图片（给模型看的图、手的截图），sharp 的原生
+  版本自带一份 GLib；Electron 的 Linux 二进制链接的是系统的 GLib，并把符号泄漏到同一个进程里
+  （electron/electron#46323），结果每处理一张图就打一行 `GLib-GObject-CRITICAL`，在某些系统上
+  解码第一张图时 harness 直接 SIGSEGV 退出，「读图」调用没有任何回答，这一轮就丢了。所以 Linux 包
+  带的是 sharp 的 WebAssembly 版本，不带原生版本；一张图大约多花一倍时间（2560×1440 的截图约
+  50 毫秒），其他不变。1.0.1 及更早的副本可以手工修：在 `resources/dsh/node_modules` 里运行
+  `npm install @img/sharp-wasm32@0.35.5`，再删掉 `@img/sharp-linux-x64` 和
+  `@img/sharp-libvips-linux-x64`，sharp 就会改用 WebAssembly 版本。
 - **Wayland。** 手通过 X11 操作鼠标、读取屏幕；在 Wayland 会话里它们会说明情况并保持关闭——
   「设置 → 电脑操作」里的「截一张测试图」和第一句「我屏幕上是什么？」都会回答*这台电脑上手是
   关着的：Wayland 会话：…用 Xorg 登录…*——运行时也不会背着应用去试 `xdotool` 或 `pyautogui`

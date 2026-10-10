@@ -153,7 +153,7 @@ function log(line: string): void {
   }
 }
 
-type Shipped = { dsh?: string; bundle?: string; platform?: string; arch?: string };
+type Shipped = { dsh?: string; bundle?: string; platform?: string; arch?: string; sharp?: "native" | "wasm" };
 
 /** What scripts/prepare-dsh.mjs wrote next to the staged dsh: the versions for About. */
 function shipped(): Shipped {
@@ -446,12 +446,14 @@ let glibCriticals = 0;
 const GLIB_CRITICAL = /GLib-GObject-CRITICAL \*\*: .*g_object_(un)?ref: assertion 'G_IS_OBJECT \(object\)' failed/;
 
 /**
- * Linux: whether a Host stderr line is the GLib assertion that sharp's libvips raises on
- * every picture it touches inside Electron — the harness resizes the hands' screenshots
- * with sharp, whose prebuilt libvips carries its own GLib, while Electron's binary links
- * the system's and leaks its symbols into the process (electron/electron#46323; sharp's
- * install notes, "Electron and Linux"). Harmless to the picture, 65 000 lines a session
- * in the log. The first one is logged with this explanation; the rest are counted.
+ * Linux: whether a Host stderr line is the GLib assertion that sharp's prebuilt libvips
+ * raised on every picture it touched inside Electron, whose binary links the system's GLib
+ * and leaks its symbols into the process (electron/electron#46323; sharp's install notes,
+ * "Electron and Linux"); on some systems the clash was a SIGSEGV on the first decode (#274).
+ * The Linux package now carries sharp's WebAssembly build (scripts/prepare-dsh.mjs) and
+ * the line should not appear at all; the filter stays for a copy whose dsh was staged
+ * by hand with the native one. The first line is logged with this explanation; the rest
+ * are counted.
  */
 function glibCritical(line: string): boolean {
   if (!GLIB_CRITICAL.test(line)) return false;
