@@ -109,6 +109,26 @@ VPS 한 대, 한 시간: [docs/self-hosting.md](../self-hosting.md). 세 가지 
 
 실제 일에 써 보고, 어디가 고장 났는지 알리고, 그다음 작고 구체적인 것 하나를 고르세요. [CONTRIBUTING.md](../../CONTRIBUTING.md)에 설정과 규약이, [AGENTS.md](../../AGENTS.md)에 이 트리에서 코딩 에이전트가 따르는 규칙이, [로드맵](../roadmap.md)에 어디서 시작할지가 있습니다. [Issues](https://github.com/nano-muse/nanoMuse/issues) · [Discussions](https://github.com/nano-muse/nanoMuse/discussions) · [Discord](https://discord.gg/bkTySmm28X).
 
+## 메인테이너
+
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/lgy0404"><img src="https://avatars.githubusercontent.com/u/63797388?v=4&s=80" width="80" height="80" alt="Guangyi Liu"><br><strong>Guangyi Liu</strong></a><br><a href="mailto:guangyiliu@zju.edu.cn"><img src="https://img.shields.io/badge/e--mail-guangyiliu%40zju.edu.cn-0a66e4" alt="guangyiliu@zju.edu.cn"></a></td>
+  </tr>
+</table>
+
+## 커뮤니티 기여자
+
+`main`에 변경이 반영된 모든 분, GitHub 기여자 목록 기준입니다.
+
+<!-- contributors:start -->
+<p>
+<a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
+<a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
+</p>
+<!-- contributors:end -->
+
 ## ⭐️ 인용
 
 nanoMuse가 도움이 되었다면 논문을 인용해 주세요.
@@ -141,3 +161,8 @@ nanoMuse는 독립적인 커뮤니티 프로젝트로, Meta Platforms, Inc.와 �
 ## 라이선스
 
 [GPL-3.0-or-later](../../LICENSE). 휴대폰 앱은 OpenMinis 1.13(GPL-3.0)을 바탕으로 2026-09-24부터 수정했습니다. [NOTICE](../../NOTICE) 참고. 그 이전 Python 계열 버전은 MIT였습니다(태그 `pre-openminis`).
+
+<p align="center">
+  <em>방문해 주셔서 감사합니다 ✨ nanoMuse!</em><br><br>
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse&left_text=visitors&left_color=%23555&right_color=%230a66e4" alt="Visitors">
+</p>

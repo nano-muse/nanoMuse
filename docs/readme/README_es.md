@@ -109,6 +109,26 @@ Un VPS, una hora: [docs/self-hosting.md](../self-hosting.md). Tres caminos: sin 
 
 Úsalo para una tarea real, cuenta qué se rompió y luego elige algo concreto: [CONTRIBUTING.md](../../CONTRIBUTING.md) tiene la configuración y las convenciones, [AGENTS.md](../../AGENTS.md) las reglas que sigue un agente de programación en este repositorio, y la [hoja de ruta](../roadmap.md) dice por dónde empezar. [Issues](https://github.com/nano-muse/nanoMuse/issues) · [Discussions](https://github.com/nano-muse/nanoMuse/discussions) · [Discord](https://discord.gg/bkTySmm28X).
 
+## Mantenedores
+
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/lgy0404"><img src="https://avatars.githubusercontent.com/u/63797388?v=4&s=80" width="80" height="80" alt="Guangyi Liu"><br><strong>Guangyi Liu</strong></a><br><a href="mailto:guangyiliu@zju.edu.cn"><img src="https://img.shields.io/badge/e--mail-guangyiliu%40zju.edu.cn-0a66e4" alt="guangyiliu@zju.edu.cn"></a></td>
+  </tr>
+</table>
+
+## Colaboradores de la comunidad
+
+Todas las personas con un cambio integrado en `main`, según la lista de colaboradores de GitHub.
+
+<!-- contributors:start -->
+<p>
+<a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
+<a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
+</p>
+<!-- contributors:end -->
+
 ## ⭐️ Cita
 
 Si nanoMuse te resulta útil, te agradecemos que cites el artículo.
@@ -141,3 +161,8 @@ nanoMuse es un proyecto comunitario independiente, no afiliado a Meta Platforms,
 ## Licencia
 
 [GPL-3.0-or-later](../../LICENSE). La app del teléfono se basa en OpenMinis 1.13 (GPL-3.0), modificada desde el 2026-09-24; véase [NOTICE](../../NOTICE). Las versiones anteriores de la línea Python eran MIT (etiqueta `pre-openminis`).
+
+<p align="center">
+  <em>¡Gracias por visitar ✨ nanoMuse!</em><br><br>
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse&left_text=visitors&left_color=%23555&right_color=%230a66e4" alt="Visitors">
+</p>
