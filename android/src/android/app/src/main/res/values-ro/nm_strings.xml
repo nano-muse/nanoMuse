@@ -654,8 +654,8 @@
     <string name="nm_cloud_server_now">Server: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s a răspuns: relay %2$s.</string>
     <string name="nm_cloud_server_bad_url">Introdu adresa relay-ului, de exemplu https://relay.example.org.</string>
-    <string name="nm_cloud_server_https">Folosește https pentru un server din afara propriei rețele. http e în regulă pentru o adresă privată (10.x, 192.168.x, 172.16–31.x, localhost, un nume .local sau .ts.net).</string>
-    <string name="nm_lan_only_https">http:// necriptat funcționează doar pentru adrese din propria rețea (10.x, 172.16–31.x, 192.168.x, nume .local); folosește https:// pentru %1$s.</string>
+    <string name="nm_cloud_server_https">Folosește https pentru un server din afara propriei rețele. http e în regulă pentru o adresă privată (10.x, 192.168.x, 172.16-31.x, localhost, un nume .local sau .ts.net).</string>
+    <string name="nm_lan_only_https">http:// necriptat funcționează doar pentru adrese din propria rețea (10.x, 172.16-31.x, 192.168.x, nume .local); folosește https:// pentru %1$s.</string>
     <string name="nm_cloud_server_unreachable">Niciun relay nu a răspuns la %1$s. Verifică adresa și dacă relay-ul rulează.</string>
     <string name="nm_cloud_server_default">Înapoi la nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">Server</string>

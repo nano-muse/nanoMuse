@@ -651,8 +651,8 @@
     <string name="nm_cloud_server_now">Server: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s hat geantwortet: Relay %2$s.</string>
     <string name="nm_cloud_server_bad_url">Gib die Adresse des Relays ein, etwa https://relay.example.org.</string>
-    <string name="nm_cloud_server_https">Für einen Server außerhalb deines eigenen Netzes https verwenden. http reicht bei einer privaten Adresse (10.x, 192.168.x, 172.16–31.x, localhost, ein .local- oder .ts.net-Name).</string>
-    <string name="nm_lan_only_https">Unverschlüsseltes http:// funktioniert nur für Adressen in deinem eigenen Netzwerk (10.x, 172.16–31.x, 192.168.x, .local-Namen); verwende https:// für %1$s.</string>
+    <string name="nm_cloud_server_https">Für einen Server außerhalb deines eigenen Netzes https verwenden. http reicht bei einer privaten Adresse (10.x, 192.168.x, 172.16-31.x, localhost, ein .local- oder .ts.net-Name).</string>
+    <string name="nm_lan_only_https">Unverschlüsseltes http:// funktioniert nur für Adressen in deinem eigenen Netzwerk (10.x, 172.16-31.x, 192.168.x, .local-Namen); verwende https:// für %1$s.</string>
     <string name="nm_cloud_server_unreachable">Unter %1$s hat kein Relay geantwortet. Prüfe die Adresse und ob das Relay läuft.</string>
     <string name="nm_cloud_server_default">Zurück zu nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">Server</string>

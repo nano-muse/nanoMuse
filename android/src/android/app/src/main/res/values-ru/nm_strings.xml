@@ -657,8 +657,8 @@
     <string name="nm_cloud_server_now">Сервер: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s ответил: релей %2$s.</string>
     <string name="nm_cloud_server_bad_url">Введите адрес релея, например https://relay.example.org.</string>
-    <string name="nm_cloud_server_https">Для сервера вне вашей собственной сети используйте https. Для частного адреса (10.x, 192.168.x, 172.16–31.x, localhost, имя .local или .ts.net) подойдёт и http.</string>
-    <string name="nm_lan_only_https">Незашифрованный http:// работает только для адресов в вашей собственной сети (10.x, 172.16–31.x, 192.168.x, имена .local); для %1$s используйте https://.</string>
+    <string name="nm_cloud_server_https">Для сервера вне вашей собственной сети используйте https. Для частного адреса (10.x, 192.168.x, 172.16-31.x, localhost, имя .local или .ts.net) подойдёт и http.</string>
+    <string name="nm_lan_only_https">Незашифрованный http:// работает только для адресов в вашей собственной сети (10.x, 172.16-31.x, 192.168.x, имена .local); для %1$s используйте https://.</string>
     <string name="nm_cloud_server_unreachable">По адресу %1$s релей не ответил. Проверьте адрес и что релей запущен.</string>
     <string name="nm_cloud_server_default">Вернуться к nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">Сервер</string>
