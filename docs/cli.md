@@ -44,7 +44,7 @@ Advance every active goal, sleep, repeat. Runs in Sentinel `auto` mode, so pair 
 ## Goals
 
 ```bash
-nanomuse goals list [--status active|paused|done] [--category health|finance|career|learning|…]
+nanomuse goals list [--status active|paused|done|cancelled] [--category health|finance|career|learning|…]
 nanomuse goals show g_1a2b3c
 nanomuse goals add "Learn Rust" -s "Read the book, ch. 1–4" -s "Build a CLI" -s "Publish a crate" \
     --category learning --due 2026-12-31 --check-in "weekly sun 19:00"
@@ -142,6 +142,31 @@ nanomuse vault delete EMAIL_PASSWORD
 ```
 
 Reference secrets as `{{vault:EMAIL_PASSWORD}}` in the config (connectors only; a command never receives a secret). See [sentinel.md](sentinel.md#credential-vault).
+
+## Chat apps
+
+```bash
+nanomuse channels status [--json]              # what is switched on, connected, and who is paired
+nanomuse channels pending                      # pairing codes people were shown and that wait for a yes
+nanomuse channels approve 482913               # let the person who got this code talk to the Muse
+nanomuse channels deny 482913
+nanomuse channels login feishu [--lark]        # create the Feishu bot by scanning a QR code
+nanomuse channels test feishu [--chat <id>]    # send a test message (default: the first paired chat)
+```
+
+With `nanomuse serve` running, these commands go through its API; otherwise they edit the files under the data directory and the server picks them up when it starts. The apps, pairing and what each one needs: [channels.md](channels.md).
+
+## ChatGPT sign-in
+
+```bash
+nanomuse chatgpt login [--no-browser] [--port 1455] [--timeout 600]   # the browser opens OpenAI's sign-in page
+nanomuse chatgpt status                        # who is signed in and until when; never touches the network
+nanomuse chatgpt usage                         # what is left of the plan's usage windows
+nanomuse chatgpt logout                        # forget the sign-in; nothing is revoked upstream
+nanomuse chatgpt proxy [--port 0] [--token …]  # an OpenAI-compatible server on the loopback interface
+```
+
+Every subcommand takes `--json` (one JSON object per line) and, where it reaches chatgpt.com, `--proxy` (default: `[llm] proxy` from the config). What the sign-in covers and where the tokens live: [own-key.md](own-key.md#sign-in-with-a-plan-you-already-pay-for).
 
 ## Phone
 
