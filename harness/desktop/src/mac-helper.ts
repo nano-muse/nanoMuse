@@ -137,7 +137,7 @@ export interface QuarantineOutcome {
 }
 
 /** The text of a flag that could not be removed — the one case where the person has to act. */
-export const QUARANTINE_KEPT_TEXT = "the helper bundle carries macOS's quarantine flag and it could not be removed — move nanoMuse to the Applications folder and open it again";
+export const QUARANTINE_KEPT_TEXT = "the helper bundle carries macOS's quarantine flag and it could not be removed; move nanoMuse to the Applications folder and open it again";
 
 /** A path under Gatekeeper's App Translocation: a read-only copy with a random name, different on every launch. */
 export function translocated(path: string): boolean {
@@ -326,7 +326,7 @@ export class MacHelper {
       // the app itself under App Translocation: the helper inside it is read-only and
       // quarantined too, and would start translocated in turn — grants to a path that changes
       // every launch are no grants; better the plain reason than a helper that half works
-      if (translocated(appPath)) throw new Error("nanoMuse is running from a temporary copy macOS made of it (App Translocation) — move it to the Applications folder and open it again");
+      if (translocated(appPath)) throw new Error("nanoMuse is running from a temporary copy macOS made of it (App Translocation); move it to the Applications folder and open it again");
       const quarantine = (this.options.quarantine ?? clearQuarantine)(appPath);
       if (quarantine.result === "removed") this.log("removed the quarantine flag from the bundled helper, so macOS starts it in place and the privacy panes list it");
       else if (quarantine.result === "kept") throw new Error(`${QUARANTINE_KEPT_TEXT}${quarantine.detail ? ` (${quarantine.detail})` : ""}`);

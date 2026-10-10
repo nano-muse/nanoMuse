@@ -9,7 +9,7 @@
 
 Python 线的 Android App 有两个变体。**connect** 是你电脑上那个 `nanomuse serve` 的遥控器（[archive/android-python-line.md](../archive/android-python-line.md)）。**local** 是完整的一套：同一个 Python 服务器、它的工具和它的 Linux 沙箱，全在手机上运行，别的什么都不用装。这一页讲的是第二个。
 
-一句话说清这个想法：APK 带一个小小的 Alpine Linux 根文件系统，里面有 Python 和 `nanomuse`；第一次启动时 App 把它解压到自己的私有存储，在 [PRoot](https://proot-me.github.io/)——一个不需要 root 的用户态 `chroot`——下面运行 `nanomuse serve`；然后 App 的 WebView 打开 `http://127.0.0.1:<port>/`。大脑没变。Kotlin 只是托着它。
+一句话说清这个想法：APK 带一个小小的 Alpine Linux 根文件系统，里面有 Python 和 `nanomuse`；第一次启动时 App 把它解压到自己的私有存储，在 [PRoot](https://proot-me.github.io/)（一个不需要 root 的用户态 `chroot`）下面运行 `nanomuse serve`；然后 App 的 WebView 打开 `http://127.0.0.1:<port>/`。大脑没变。Kotlin 只是托着它。
 
 ```
 ┌─ nanoMuse.apk ───────────────────────────────────────────────────┐
@@ -86,9 +86,9 @@ libproot.so -0 --kill-on-exit --link2symlink
 
 屏幕关着时，Doze 会在维护窗口之间冻结 App 的进程，而一个睡到 07:30 的 Python 调度器不知道自己睡过了 07:30。所以两边共用一份日程，而不是各自计时：
 
-- Python 调度器在一个 `asyncio.Event` 上打盹，不用固定定时器，并且知道最早有事要做的时刻——`Service.next_wake_at()`：下一个提醒、下一次目标检查（推到安静时段之后）、智能体主动时的下一次后台巡查。它一变，就作为 `schedule` 事件发布到 `/ws`，并在 `GET /api/upcoming` 里以 `next_wake_at` 报告。
-- `RuntimeService` 读它——连接建立后先从 `/api/upcoming`，之后从每个 `schedule` 事件——并为它设一个闹钟（`WakeAlarms`）：App 被允许设精确闹钟时用 `setExactAndAllowWhileIdle`，否则 `setAndAllowWhileIdle`。Android 14 不给新装的 App `SCHEDULE_EXACT_ALARM`，所以在用户到「设置 → 保持运行」里授权之前，走的多半是不精确那条路；不精确意味着落在 Android 的批处理窗口之内，最多晚几分钟，从不提前。
-- 闹钟响时，`WakeReceiver` 捅一下服务：它拿起唤醒锁最多 45 秒，调用 `POST /api/tick`，再按运行时接下来宣布的时刻重新上闹钟。`tick` 置位事件，调度器醒来，看什么到期了就跑——运行期间的 `status` 事件让唤醒锁一直持有到任务结束，和用户亲自启动时完全一样。
+- Python 调度器在一个 `asyncio.Event` 上打盹，不用固定定时器，并且知道最早有事要做的时刻（`Service.next_wake_at()`）：下一个提醒、下一次目标检查（推到安静时段之后）、智能体主动时的下一次后台巡查。它一变，就作为 `schedule` 事件发布到 `/ws`，并在 `GET /api/upcoming` 里以 `next_wake_at` 报告。
+- `RuntimeService` 读它（连接建立后先从 `/api/upcoming`，之后从每个 `schedule` 事件），并为它设一个闹钟（`WakeAlarms`）：App 被允许设精确闹钟时用 `setExactAndAllowWhileIdle`，否则 `setAndAllowWhileIdle`。Android 14 不给新装的 App `SCHEDULE_EXACT_ALARM`，所以在用户到「设置 → 保持运行」里授权之前，走的多半是不精确那条路；不精确意味着落在 Android 的批处理窗口之内，最多晚几分钟，从不提前。
+- 闹钟响时，`WakeReceiver` 捅一下服务：它拿起唤醒锁最多 45 秒，调用 `POST /api/tick`，再按运行时接下来宣布的时刻重新上闹钟。`tick` 置位事件，调度器醒来，看什么到期了就跑；运行期间的 `status` 事件让唤醒锁一直持有到任务结束，和用户亲自启动时完全一样。
 
 没有事到期 → 没有闹钟，运行时闲着，直到 WebView 或某个通知动作唤醒它。在电脑上同一个 `next_wake_at` 只是信息（`nanomuse serve` 从不睡觉），`POST /api/tick` 无害：提前结束当前这一觉，仅此而已。
 
@@ -102,18 +102,18 @@ libproot.so -0 --kill-on-exit --link2symlink
 
   | CLI | 作用 |
   | --- | --- |
-  | `nanomuse-device <capability> [action] [k=v …]` | 设备工具：`clipboard read`、`calendar list from=2026-09-24`、`alarm set hour=7 minute=30 message=Train`、`contacts search query=张`、`notify title=Done body=Booked`、`location`、`photo pick`——`nanomuse-device list` 显示这台手机有什么（[device.md](device.md)） |
-  | `nanomuse-browser <action> [k=v …]` | `browser` 工具：`navigate` / `extract` / `click` / `type` / `key` / `scroll` / `back` / `wait` / `screenshot` / `fetch URL [--post BODY]`（带浏览器的 cookie）/ `profile mobile\|desktop` / `close`——[browser.md](browser.md) |
+  | `nanomuse-device <capability> [action] [k=v …]` | 设备工具：`clipboard read`、`calendar list from=2026-09-24`、`alarm set hour=7 minute=30 message=Train`、`contacts search query=张`、`notify title=Done body=Booked`、`location`、`photo pick`；`nanomuse-device list` 显示这台手机有什么（[device.md](device.md)） |
+  | `nanomuse-browser <action> [k=v …]` | `browser` 工具：`navigate` / `extract` / `click` / `type` / `key` / `scroll` / `back` / `wait` / `screenshot` / `fetch URL [--post BODY]`（带浏览器的 cookie）/ `profile mobile\|desktop` / `close`（[browser.md](browser.md)） |
   | `nanomuse-open <url>` | 在 App 内的接管面板里打开页面；rootfs 把它设为 `BROWSER` |
 
-  服务器把请求当作嵌套的工具调用，在发起命令的那个上下文里运行——同一个哨兵、同一套权限、同一条时间线（`tool` 事件带 `via: "shell"`），所以脚本和模型一样逃不出规则。不在手机上时（环境里没有 `NANOMUSE_BRIDGE`）这些 CLI 以 2 退出并留一行说明；在电脑上这些事反正是从桌面做的。
+  服务器把请求当作嵌套的工具调用，在发起命令的那个上下文里运行：同一个哨兵、同一套权限、同一条时间线（`tool` 事件带 `via: "shell"`），所以脚本和模型一样逃不出规则。不在手机上时（环境里没有 `NANOMUSE_BRIDGE`）这些 CLI 以 2 退出并留一行说明；在电脑上这些事反正是从桌面做的。
 
 ## 局限 {#limits}
 
 - **PRoot 是用户态的。** 没有真正的 root，不能挂载，没有原始套接字，里面不能 `ptrace`（PRoot 自己已经在用它）。读 `/proc/self/…` 或 `/proc/stat` 的程序拿到的是真实的 Android 值或替身。任何想要 Android 不授予 App 的能力的事（绑定 1024 以下的端口、改 uid）都会失败，和在 Termux 里一样。
 - **系统调用更慢。** PRoot 靠 `ptrace` 每一个系统调用工作。计算密集的 Python 几乎不受影响；系统调用密集的工作（`git clone` 一棵大树、`pip install` 很多小文件、`find /`）比原生慢 2–5 倍。`nanomuse serve` 本身大部分时间是空闲的。
 - **musl，不是 glibc。** Alpine 用 musl。大多数 Python wheel 有 `musllinux` 版本；假定 glibc 的预编译二进制需要 `apk add gcompat`。Node 是 Alpine 的构建。
-- **rootfs 里没有 Chromium。** Playwright 在这里跑不起浏览器；浏览器始终是 App 自己的 WebView（`Browser` 工具的设备后端，脚本里用 `nanomuse-browser`——[browser.md](browser.md)）。`apk add chromium` 装得上，但在 Android 的 PRoot 下启动不了。
+- **rootfs 里没有 Chromium。** Playwright 在这里跑不起浏览器；浏览器始终是 App 自己的 WebView（`Browser` 工具的设备后端，脚本里用 `nanomuse-browser`；[browser.md](browser.md)）。`apk add chromium` 装得上，但在 Android 的 PRoot 下启动不了。
 - **存储。** 解压后约 330 MB，加上用户自己装的东西。压缩的 rootfs 不到 70 MB；APK 略多一点。
 - **后台限制。** 在内存紧张或厂商激进的电池管理下，Android 仍可能杀掉服务（各厂商的电池放行设置在 [archive/android-python-line.md](../archive/android-python-line.md#keeping-it-running)）。服务是 `START_STICKY`，会重启；上面说的闹钟在进程之外存活，调度器回来后补上错过的例程。
 - **箱子里有什么。** Alpine 的 `apk`、`git`、`curl`、`jq`、`bash`、`openssh-client`、带 `pip` 的 `python3`，以及带 `npm` 的 Node。`uv` 没有（35 MB）；`pip install uv` 能装上。`nanomuse-mirror cn|default` 在上游服务器和中国大陆的镜像之间切换 apk、pip 和 npm；第一次启动按手机的地区选。

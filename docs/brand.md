@@ -7,20 +7,20 @@ is derived from the icon so the whole app matches the tile on the home screen.
 
 One continuous pen stroke that reads as an **N**: a hooked entry, one rounded peak, a long
 diagonal, a tight valley, and an upward exit. It follows the same visual grammar as Muse's
-single-stroke mark (Muse's is an M with three arches; ours is an N with one) — the same way
+single-stroke mark (Muse's is an M with three arches; ours is an N with one), the same way
 OpenManus rhymes with Manus while being a different gesture. The mark is abstract on purpose:
 it is a gesture first and a letter second.
 
 - Source of truth: `assets/brand/nanomuse-icon-source-1024.png` (final render, white squircle on
   brand blue). Everything else is derived from it.
-- `assets/brand/nanomuse-mark.svg` — the stroke alone, traced as a single filled path, viewBox
+- `assets/brand/nanomuse-mark.svg`: the stroke alone, traced as a single filled path, viewBox
   `0 0 100 100` in tile coordinates, gradient fill.
-- `assets/brand/nanomuse-icon.svg` — white squircle tile (`rx=27`) + mark. This is the app icon.
-- `assets/brand/nanomuse-icon-on-blue.svg` — the icon on the brand-blue backdrop, for
-  store listings and the splash only. Wherever the icon stands for the app — README, site,
-  social card, favicon — it is the plain tile: white, the mark, a hairline edge, no backdrop.
-- `assets/brand/nanomuse-mark-rgba-688.png` — the stroke with alpha, 688 px, raster fallback.
-- `docs/app-icon.png` — the tile rendered with rounded corners (27 % radius, transparent
+- `assets/brand/nanomuse-icon.svg`: white squircle tile (`rx=27`) + mark. This is the app icon.
+- `assets/brand/nanomuse-icon-on-blue.svg`: the icon on the brand-blue backdrop, for
+  store listings and the splash only. Wherever the icon stands for the app (README, site,
+  social card, favicon) it is the plain tile: white, the mark, a hairline edge, no backdrop.
+- `assets/brand/nanomuse-mark-rgba-688.png`: the stroke with alpha, 688 px, raster fallback.
+- `docs/app-icon.png`: the tile rendered with rounded corners (27 % radius, transparent
   outside, a hairline `#D9D9DE` edge so it keeps its shape on white), 512 px: the icon as it
   sits on a home screen. This is the README hero and the picture to use wherever
   the app is shown as an app.

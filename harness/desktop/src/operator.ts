@@ -345,10 +345,11 @@ export class Operator {
       };
     } catch (exc) {
       if (exc instanceof MacHelperError && exc.status === 403) throw new OperatorError(`no screenshot: ${HELPER_SCREEN_PERMISSION_TEXT}`, 403);
-      const why = String((exc as Error).message ?? exc);
+      // the helper's own text already opens with "no screenshot:"; said once
+      const why = String((exc as Error).message ?? exc).replace(/^no screenshot:\s*/, "");
       this.log(`helper screenshot failed (${why}) — not falling back to desktopCapturer`);
       // 503 when the helper itself is gone (the next call starts it again), 500 when it answered that the capture failed
-      throw new OperatorError(`no screenshot: ${HELPER_NAME} could not take the picture — ${why}`, exc instanceof MacHelperError && exc.code === "not_running" ? 503 : 500);
+      throw new OperatorError(`no screenshot: ${HELPER_NAME} could not take the picture: ${why}`, exc instanceof MacHelperError && exc.code === "not_running" ? 503 : 500);
     }
   }
 
@@ -392,7 +393,7 @@ export class Operator {
       if (exc.status === 403) return new OperatorError(`${what}: ${HELPER_SCREEN_PERMISSION_TEXT}`, 403);
       if (exc.status === 404) return new OperatorError(`${what}: ${exc.message}`, 404);
       this.log(`helper window capture failed (${exc.message})`);
-      return new OperatorError(`${what}: ${HELPER_NAME} — ${exc.message}`, exc.code === "not_running" ? 503 : exc.status);
+      return new OperatorError(`${what}: ${HELPER_NAME}: ${exc.message}`, exc.code === "not_running" ? 503 : exc.status);
     }
     return new OperatorError(`${what}: ${String((exc as Error).message ?? exc)}`, 500);
   }
@@ -413,7 +414,7 @@ export class Operator {
       const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: space.width, height: space.height } });
       const primary = sources.find((s) => s.display_id === String(space.id)) ?? sources[0];
       if (primary && !primary.thumbnail.isEmpty()) {
-        if (mac && isBlackImage(primary.thumbnail)) throw new OperatorError(`no screenshot: the picture is black — ${SCREEN_PERMISSION_TEXT}`, 403);
+        if (mac && isBlackImage(primary.thumbnail)) throw new OperatorError(`no screenshot: the picture is black. ${SCREEN_PERMISSION_TEXT}`, 403);
         return primary.thumbnail;
       }
       this.log(`desktopCapturer: no picture of display ${space.id} (${sources.length} sources)`);
@@ -429,7 +430,7 @@ export class Operator {
     if (grabbed.channels !== 4) throw new OperatorError(`no screenshot: libnut returned ${grabbed.channels}-channel pixels`, 500);
     const bitmap = nativeImage.createFromBitmap(Buffer.from(grabbed.data), { width: grabbed.width, height: grabbed.height });
     if (bitmap.isEmpty()) throw new OperatorError("no screenshot: the capture came back empty", 500);
-    if (mac && isBlackImage(bitmap)) throw new OperatorError(`no screenshot: the picture is black — ${SCREEN_PERMISSION_TEXT}`, 403);
+    if (mac && isBlackImage(bitmap)) throw new OperatorError(`no screenshot: the picture is black. ${SCREEN_PERMISSION_TEXT}`, 403);
     return bitmap;
   }
 

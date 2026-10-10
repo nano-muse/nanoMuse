@@ -2,7 +2,7 @@
 
 Your nanoMuse inside the chat apps you already use: Feishu (飞书 / Lark), DingTalk
 (钉钉), WeCom (企业微信) and Telegram. Write to the bot from your phone and the same
-Muse answers — one conversation per chat, the reply typed out as it comes, tool work
+Muse answers: one conversation per chat, the reply typed out as it comes, tool work
 shown as a status line, approvals answered with a word or a button. Chats you mark
 *deliver here* also get what the Muse does on its own: check-ins, reminders, the result
 of a background task, the question it needs you to answer.
@@ -23,19 +23,19 @@ and leaves the switch alone.
 
 ## Where to find it
 
-* **App** — Settings → *Chat apps* (「聊天入口」). One card per app: the switch, the
+* **App**: Settings → *Chat apps* (「聊天入口」). One card per app: the switch, the
   credentials, who may talk to it, the paired chats and their *deliver here* switch,
   a *Send a test message* button and the setup steps with a link to the vendor console.
-* **Terminal** — `nanomuse channels status | pending | approve <code> | deny <code> |
+* **Terminal**: `nanomuse channels status | pending | approve <code> | deny <code> |
   login feishu [--lark] | test <name>`. With `nanomuse serve` running the commands go
   through its API; otherwise they edit the files under `<data_dir>/channels/` and the
   server picks them up when it starts (or on *Reload*).
-* **API** — `GET /api/channels`, `PUT /api/channels/<name>`, `POST
+* **API**: `GET /api/channels`, `PUT /api/channels/<name>`, `POST
   /api/channels/pairing/<code>/approve|deny`, `PUT|DELETE
   /api/channels/<name>/chats/<sender>`, `POST /api/channels/<name>/test`, `POST
   /api/channels/deliver {text}`, `POST /api/channels/reload`, and for Feishu `POST
   /api/channels/feishu/login` + `GET /api/channels/feishu/login/<device_code>`.
-* **config.toml** — a `[channels.<name>]` table works too, for a server set up by hand:
+* **config.toml**: a `[channels.<name>]` table works too, for a server set up by hand:
 
   ```toml
   [channels.telegram]
@@ -47,7 +47,7 @@ and leaves the switch alone.
 
   What the app saves wins per field. Secrets set in the app go to the vault
   (`{{vault:CHANNEL_TELEGRAM_BOT_TOKEN}}` stays in the file) and are never shown
-  again — a secret field only says whether something is set.
+  again; a secret field only says whether something is set.
 
 ## Setting up each app
 
@@ -57,7 +57,7 @@ The console names below are as of 2026; vendors move things around.
 
 The short way: in the app press **Create the bot by QR code** (or run `nanomuse
 channels login feishu`, `--lark` for the international edition), scan with Feishu,
-confirm, done — the App ID and Secret are saved and the channel switches on. This is
+confirm, done: the App ID and Secret are saved and the channel switches on. This is
 Feishu's own scan-to-create flow for personal agents; it makes an app with the bot
 capability and the long-connection events already set.
 
@@ -124,12 +124,12 @@ limit splits long ones). Approvals are two inline buttons.
 Anyone who finds the bot can write to it; the Muse answers only people you let in.
 
 * The first direct message from an unknown person gets a **pairing code** (six
-  letters and digits, no 0/O/1/I, good for ten minutes) and nothing else — the
+  letters and digits, no 0/O/1/I, good for ten minutes) and nothing else; the
   message does not reach the Muse. Approve the code under Settings → Chat apps, or
   `nanomuse channels approve <code>`. The person is told, and from then on their
   messages go through.
 * **Always allowed** (`allow_from`): vendor user ids that never need a code. A lone
-  `*` lets everyone in — only for a bot nobody else can reach.
+  `*` lets everyone in, only for a bot nobody else can reach.
 * **Groups**: unknown people in a group are ignored quietly (no codes in groups). An
   approved person's group message is answered when the bot is @-mentioned
   (`group_policy = "mention"`), or on every message (`"open"`). The group is its own
@@ -137,15 +137,15 @@ Anyone who finds the bot can write to it; the Muse answers only people you let i
 * **Remove** a paired chat in the app (or delete it from `pairing.json`); the next
   message gets a new code.
 
-Pairings and codes live in `<data_dir>/channels/pairing.json` — the data directory,
-not the workspace, so the agent's own file tools cannot change who may talk to it.
+Pairings and codes live in `<data_dir>/channels/pairing.json` (the data directory,
+not the workspace), so the agent's own file tools cannot change who may talk to it.
 
 ## How a chat maps to the Muse
 
 Each chat is one conversation of the agent, with the id
 `channel-<app>-<chat id>` and the title *Feishu · Ann* / *Telegram · Team* in the app's
 drawer. A message from the chat goes through the same entry point as a message typed in
-the app, so everything else — memory, goals, the Sentinel, skills — is the same Muse.
+the app, so everything else (memory, goals, the Sentinel, skills) is the same Muse.
 Attachments (photos, files, voice notes) are saved under the workspace's `attachments/`
 and attached to the message.
 
@@ -167,11 +167,11 @@ both.
 ## Deliver here
 
 Switch *Deliver here* on for a paired chat and it also receives what the Muse does
-without being asked — the same events the phone app turns into notifications: a
+without being asked, the same events the phone app turns into notifications: a
 background run's final words (quiet ones excepted), an approval that is waiting (answer
 it from the chat), a question that needs you. One Muse may deliver to several chats;
 each decides for itself. `POST /api/channels/deliver {"text": …}` sends a line to all
-of them — useful from a script or a reminder.
+of them, useful from a script or a reminder.
 
 ## Security
 
@@ -180,7 +180,7 @@ of them — useful from a script or a reminder.
 * Only paired or allow-listed people reach the Muse; unknown people get a code, or
   silence in a group. A button press on an approval card is honoured only from a
   paired person.
-* An approval from a chat is a *once* decision with the reason "from Feishu" (etc.) —
+* An approval from a chat is a *once* decision with the reason "from Feishu" (etc.);
   nothing is remembered from a chat.
 * The channel data lives in the data directory, outside the agent's reach.
 * The connections are outbound only; no port is opened and no public URL is involved.

@@ -62,7 +62,7 @@ nanomuse reminders add "Summarise unread email" --repeat "weekdays 07:30" --task
 nanomuse reminders cancel r_1a2b3c
 ```
 
-A reminder says one thing at the time you named; a routine (`--task`) is work the agent does at that time with its tools. Both fire from the running `nanomuse serve` — those set from the terminal land in the main chat, those set in a side chat stay there. Cadence grammar as for goal check-ins: `daily HH:MM`, `weekdays HH:MM`, `weekly <mon…sun> HH:MM`, `monthly <day> HH:MM`.
+A reminder says one thing at the time you named; a routine (`--task`) is work the agent does at that time with its tools. Both fire from the running `nanomuse serve`: those set from the terminal land in the main chat, those set in a side chat stay there. Cadence grammar as for goal check-ins: `daily HH:MM`, `weekdays HH:MM`, `weekly <mon…sun> HH:MM`, `monthly <day> HH:MM`.
 
 ## Triggers
 
@@ -74,7 +74,7 @@ nanomuse triggers add hook  "Check that the site is up"      --match "deploy"   
 nanomuse triggers cancel t_1a2b3c
 ```
 
-A trigger fires when something happens rather than at a time: `mail` needs the email connector (the running server looks at the inbox every `triggers.mail_poll_minutes`, by IMAP UID, so nothing is replayed and nothing fires twice), `event` needs a calendar feed, `hook` is a URL with a key that any program can `POST` to — the body becomes the agent's context. Each firing is a background run in the chat the trigger was set from, shown in the Feed as *New mail: …*, *Coming up: …* or *Webhook: …*. The mail or the request is handed to the model as data, with the instruction that only your standing text says what to do.
+A trigger fires when something happens rather than at a time: `mail` needs the email connector (the running server looks at the inbox every `triggers.mail_poll_minutes`, by IMAP UID, so nothing is replayed and nothing fires twice), `event` needs a calendar feed, `hook` is a URL with a key that any program can `POST` to; the body becomes the agent's context. Each firing is a background run in the chat the trigger was set from, shown in the Feed as *New mail: …*, *Coming up: …* or *Webhook: …*. The mail or the request is handed to the model as data, with the instruction that only your standing text says what to do.
 
 ## Calendar
 
@@ -87,7 +87,7 @@ nanomuse calendar feeds                                                         
 nanomuse calendar remove Family
 ```
 
-Feeds are re-read every `refresh_minutes` by the running server; `agenda --refresh` fetches now. The agent has the same view through its `calendar` tool, plus `draft`, which writes an `.ics` the app shows as an *Add to calendar* card — it never writes to your calendar directly.
+Feeds are re-read every `refresh_minutes` by the running server; `agenda --refresh` fetches now. The agent has the same view through its `calendar` tool, plus `draft`, which writes an `.ics` the app shows as an *Add to calendar* card; it never writes to your calendar directly.
 
 ## Contacts
 
@@ -131,7 +131,7 @@ nanomuse memory changes                # the log, newest first
 nanomuse memory restore c_1a2b3c4d     # undo one change
 ```
 
-`memory recall` shows the ranking the agent would get for a message: keyword hits and, when an embedding endpoint is set up ([configuration → memory](configuration.md#memory)), hits by meaning fused in, each with its cosine closeness — the way to see whether "写邮件给房东" finds "the landlord is Bob Li" before relying on it. `doctor` says whether recall by meaning is on, with which model, and how many memories are indexed.
+`memory recall` shows the ranking the agent would get for a message: keyword hits and, when an embedding endpoint is set up ([configuration → memory](configuration.md#memory)), hits by meaning fused in, each with its cosine closeness, the way to see whether "写邮件给房东" finds "the landlord is Bob Li" before relying on it. `doctor` says whether recall by meaning is on, with which model, and how many memories are indexed.
 
 ## Vault
 
@@ -165,6 +165,6 @@ nanomuse version                       # also: nanomuse --version / -V
 nanomuse mcp                           # this computer's screen and hands as an MCP server on stdio, for another host
 ```
 
-`nanomuse mcp` is for a host that is not our runtime — [nanoMuse on DeepSeek Harness](harness.md) — and serves `computer_screen` and `computer_act` with the runtime's descriptions; a step the Sentinel would ask about (Enter, a submit, a heavy shortcut, a click on a sensitive word) is refused with the reason until the call carries `confirmed: true`, which the model may set only after the person agreed in the conversation.
+`nanomuse mcp` is for a host that is not our runtime ([nanoMuse on DeepSeek Harness](harness.md)) and serves `computer_screen` and `computer_act` with the runtime's descriptions; a step the Sentinel would ask about (Enter, a submit, a heavy shortcut, a click on a sensitive word) is refused with the reason until the call carries `confirmed: true`, which the model may set only after the person agreed in the conversation.
 
 `nanomuse doctor` is the first thing to run when something is off, and what to paste into a bug report: which config file is in use, where the data lives, which model and endpoint are configured and whether a key is set, whether recall by meaning is on and how many memories are indexed, which web search provider answers and whether it has its key or URL, whether commands run in the sandbox (and why not, if not), the tools the agent has, connector state (mailbox, calendar feeds, address books), and a one-line call to the model with its latency (`--no-model` skips that). It exits non-zero when something needs fixing and says what.

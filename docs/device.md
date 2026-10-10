@@ -22,7 +22,7 @@ The rule of the design: **the model gets tools, the user gets Android's own dial
 
 ## How the tools reach the model
 
-The app starts an MCP server on `127.0.0.1` (a random port, a random token, both handed to the runtime as `NANOMUSE_HOST_URL` and `NANOMUSE_HOST_TOKEN`). `nanomuse serve` sees them and adds the server as `device` — no configuration, nothing to install — so the tools appear like any other MCP server's, named `device__<tool>` (`device__calendar_list`, `device__clipboard_read` …). The system prompt gets a short *This phone* section listing them, with the ground rules the model has to know: the first use of a capability makes Android ask the user, and the clipboard can only be read while the app is on screen.
+The app starts an MCP server on `127.0.0.1` (a random port, a random token, both handed to the runtime as `NANOMUSE_HOST_URL` and `NANOMUSE_HOST_TOKEN`). `nanomuse serve` sees them and adds the server as `device` (no configuration, nothing to install), so the tools appear like any other MCP server's, named `device__<tool>` (`device__calendar_list`, `device__clipboard_read` …). The system prompt gets a short *This phone* section listing them, with the ground rules the model has to know: the first use of a capability makes Android ask the user, and the clipboard can only be read while the app is on screen.
 
 The endpoint speaks [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports): `POST /mcp` with JSON-RPC; `tools/call` answers as an SSE stream with a `: keep-alive` line every 8 s, because a call may wait minutes for the user to answer a dialog; `GET /mcp` is `405`; the token is a `Bearer` header or `?token=`; the `Mcp-Session-Id` header is issued on `initialize` and the client's `protocolVersion` is echoed back. Only `/mcp` exists. It is bound to the loopback interface and refuses anything without the token (compared in constant time).
 
@@ -44,7 +44,7 @@ Scripts the agent runs inside the sandbox reach the same tools through the CLI b
 | `location` | coordinates, accuracy, address when it can be looked up | `accuracy` (`fine`/`coarse`), `max_age_seconds` | `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | moderate, private | no |
 | `alarm_set` | an alarm in the clock app | `hour`, `minute`, `message`, `days`, `vibrate` | `SET_ALARM` (granted at install) | moderate | no |
 | `timer_set` | a countdown in the clock app | `seconds` or `minutes`, `message` | `SET_ALARM` | moderate | no |
-| `photo_pick` | the user chooses photos in the system picker; copies land in the workspace | `max` (≤ 10), `why` | none — the Photo Picker needs no permission | safe, private | no |
+| `photo_pick` | the user chooses photos in the system picker; copies land in the workspace | `max` (≤ 10), `why` | none: the Photo Picker needs no permission | safe, private | no |
 
 *Risk* and *private* are the Sentinel defaults from `DEVICE_TOOLS` in `nanomuse/runtime.py`, applied per tool through the `tools` map of the MCP server entry ([configuration.md](configuration.md#mcp-servers)). "Asks" is the `ask` mode column of [sentinel.md](sentinel.md); in `strict` mode every moderate tool asks too. *Private* tools taint the conversation: after `contacts_search` or `location`, anything that sends data to an unknown host asks. Times are phone-local (`YYYY-MM-DD HH:MM`, or a date for all-day); the end of an all-day event is shown as its last day. The address in `location` comes from the platform geocoder when the phone has one; without it the tool returns coordinates only.
 
@@ -57,12 +57,12 @@ Everything the tools need from the user is an Android dialog, opened by an invis
 - **The app is on screen** → the dialog appears right away over it.
 - **The app is in the background** → a notification (*nanoMuse needs a permission* / *nanoMuse wants to read the clipboard* / *… wants a photo*) with one line on why; tapping it brings up the dialog. The tool call waits in the meantime (2 min for a permission, 1.5 min for the clipboard, 4 min for photos), the model is told what happened either way.
 
-Three outcomes reach the model, in words it can pass on: granted (the tool runs); *the user did not allow it — do not ask again now, it can be allowed later in Android's settings*; *nobody answered — ask the user to open nanoMuse and try again*.
+Three outcomes reach the model, in words it can pass on: granted (the tool runs); *the user did not allow it: do not ask again now, it can be allowed later in Android's settings*; *nobody answered: ask the user to open nanoMuse and try again*.
 
 Specific rules, each from the platform rather than from us:
 
 - **Clipboard.** Since Android 10 only the app with the focus may read the clipboard. `clipboard_read` from the background therefore goes through the notification route; the read happens the moment the user taps it. Writing works any time.
-- **Alarms and timers.** They are handed to the clock app with the standard `AlarmClock` intents, skipping its UI (the alarm appears in the clock as if set by hand). From the foreground — or when the app has the *display over other apps* permission — the hand-off is immediate; from the background Android forbids starting another app, so a notification is posted and the alarm is set when the user taps it. The clock app is the one the user has; on a phone without one the tool says so.
+- **Alarms and timers.** They are handed to the clock app with the standard `AlarmClock` intents, skipping its UI (the alarm appears in the clock as if set by hand). From the foreground (or when the app has the *display over other apps* permission), the hand-off is immediate; from the background Android forbids starting another app, so a notification is posted and the alarm is set when the user taps it. The clock app is the one the user has; on a phone without one the tool says so.
 - **Photos.** Only the [Photo Picker](https://developer.android.com/training/data-storage/shared/photopicker): the user picks, the app receives exactly those items, copies them into `workspace/attachments/<date>/` and returns the paths. Nothing else in the library is readable, no `READ_MEDIA_IMAGES` is requested, and the picker itself says so on screen.
 - **Location.** Uses the platform `LocationManager`, no Play services; the last known fix when it is fresh enough (`max_age_seconds`, default 2 min), otherwise a new one with up to 25 s to arrive. `coarse` asks for the approximate permission only.
 - **Contacts** are read-only. **Calendars** are read and written through the platform provider; deleting is the one action that always asks.
@@ -74,7 +74,7 @@ The local build registers a `DocumentsProvider`: the agent's workspace appears a
 
 ## Sharing into nanoMuse
 
-nanoMuse is in the system share sheet for text, links and files. A share becomes a **new conversation**: files are uploaded to the workspace (`attachments/<date>/…`), the thread is named after the subject or the first file, and the chat opens with the shared text as a draft and the files as attachment chips, waiting for what to do with them — nothing is sent to the model until the user says so. Both builds do this (the connect build uploads to the computer).
+nanoMuse is in the system share sheet for text, links and files. A share becomes a **new conversation**: files are uploaded to the workspace (`attachments/<date>/…`), the thread is named after the subject or the first file, and the chat opens with the shared text as a draft and the files as attachment chips, waiting for what to do with them; nothing is sent to the model until the user says so. Both builds do this (the connect build uploads to the computer).
 
 ## Connect mode
 

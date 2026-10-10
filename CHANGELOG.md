@@ -30,6 +30,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
+- **The documentation reads without em dashes.** Every page under `docs/`, English and Chinese, now uses commas, colons, parentheses and full stops where an em dash stood (about 1 900 lines across 68 pages); code, tables' "none" cells and quoted log lines are untouched. The desktop's macOS permission dialogs, the hands' error reasons, the installers' descriptions and the release-notes template follow.
 - **The READMEs carry the Trendshift badge.** nanoMuse was number seven on GitHub Trending's Swift list for a day (2026-10-10); the badge under the language links shows the current rank and links to the repository's Trendshift page.
 - **The READMEs name the maintainer and show who has contributed.** A *Maintainers* card with a contact address, a *Community Contributors* row of avatars that `scripts/readme-contributors.py` refreshes from GitHub's list (maintainers and bots left out), and a visitor counter at the end, in all ten languages.
 

@@ -861,7 +861,7 @@ async function reportBug(): Promise<{ screenshot: string; url: string }> {
     surface: "Desktop app",
     version: app.getVersion(),
     os: facts.join(" · "),
-    what: screenshot ? `\n\n(Drag the screenshot nanoMuse saved to Downloads — ${screenshot.split(/[\\/]/).pop()} — in here.)` : "",
+    what: screenshot ? `\n\n(Drag the screenshot nanoMuse saved to Downloads, ${screenshot.split(/[\\/]/).pop()}, in here.)` : "",
   });
   const url = `${ISSUES_PAGE}/new?${params.toString()}`;
   void shell.openExternal(url);
@@ -1513,10 +1513,10 @@ async function guidePermissions(): Promise<Record<PermissionKind, PermissionStat
       message: zh ? "nanoMuse 需要「辅助功能」权限" : "nanoMuse needs Accessibility",
       detail: zh
         ? viaHelper
-          ? `动手操作电脑要靠它移动鼠标和输入。系统会弹出请求；在「系统设置 → 隐私与安全性 → 辅助功能」里打开 ${target} 即可——这是 nanoMuse 自带的一个小程序，专门负责截图和操作，权限只给它。`
-          : "动手操作电脑要靠它移动鼠标和输入。系统会弹出请求；在「系统设置 → 隐私与安全性 → 辅助功能」里打开 nanoMuse Desktop 即可——它附带的运行时作为应用的一部分运行，不会单独出现在列表里。"
+          ? `动手操作电脑要靠它移动鼠标和输入。系统会弹出请求；在「系统设置 → 隐私与安全性 → 辅助功能」里打开 ${target} 即可。这是 nanoMuse 自带的一个小程序，专门负责截图和操作，权限只给它。`
+          : "动手操作电脑要靠它移动鼠标和输入。系统会弹出请求；在「系统设置 → 隐私与安全性 → 辅助功能」里打开 nanoMuse Desktop 即可。它附带的运行时作为应用的一部分运行，不会单独出现在列表里。"
         : viaHelper
-          ? `The hands move the mouse and type through it. The system asks next; in System Settings → Privacy & Security → Accessibility, switch on ${target} — the small program nanoMuse brings along for the screenshots and the input. Only it needs the permission.`
+          ? `The hands move the mouse and type through it. The system asks next; in System Settings → Privacy & Security → Accessibility, switch on ${target}, the small program nanoMuse brings along for the screenshots and the input. Only it needs the permission.`
           : "The hands move the mouse and type through it. The system asks next; in System Settings → Privacy & Security → Accessibility, switch on nanoMuse Desktop. The runtime it bundles runs as part of the app and does not appear separately.",
       buttons: [zh ? "继续" : "Continue", zh ? "以后再说" : "Later"],
       defaultId: 0,
@@ -1531,10 +1531,10 @@ async function guidePermissions(): Promise<Record<PermissionKind, PermissionStat
       detail: zh
         ? viaHelper
           ? `它靠截图看到屏幕上有什么。点「继续」后系统会询问一次；在「屏幕录制」面板里打开 ${target}（只需要这一项）。打开后它会自己重新启动，应用本身不用重启。`
-          : "它靠截图看到屏幕上有什么。点「继续」后系统会询问一次；在「屏幕录制」面板里打开 nanoMuse Desktop（只需要这一项），然后重新启动应用——macOS 的这项权限只对重新启动后的应用生效。"
+          : "它靠截图看到屏幕上有什么。点「继续」后系统会询问一次；在「屏幕录制」面板里打开 nanoMuse Desktop（只需要这一项），然后重新启动应用：macOS 的这项权限只对重新启动后的应用生效。"
         : viaHelper
           ? `It sees the screen through screenshots. After Continue the system asks once; switch on ${target} in the Screen Recording pane (that one entry is all). It restarts by itself once the switch is on; the app does not need to.`
-          : "It sees the screen through screenshots. After Continue the system asks once; switch on nanoMuse Desktop in the Screen Recording pane (that one entry is all), then relaunch the app — macOS applies this permission to freshly started apps only.",
+          : "It sees the screen through screenshots. After Continue the system asks once; switch on nanoMuse Desktop in the Screen Recording pane (that one entry is all), then relaunch the app: macOS applies this permission to freshly started apps only.",
       buttons: [zh ? "继续" : "Continue", zh ? "以后再说" : "Later"],
       defaultId: 0,
       cancelId: 1,

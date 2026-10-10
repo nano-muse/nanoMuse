@@ -1,6 +1,6 @@
 # 各客户端的功能对照
 
-nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android、iOS）、电脑（nanoMuse 桌面版——Electron 外壳里的 `dsh-nanomuse` harness 包）和浏览器（nanoMuse Web，由运行时提供）。从 0.1.32 起的规则是**取并集**：一个客户端能做的，每个客户端都要能做，除非平台本身不允许（电脑不会像手机那样搭一个迷你 Linux；iOS 不让一个 App 操控另一个）。这一页是账本——每个客户端有什么，哪些是有意为之的平台差异，哪些还等着拍板。
+nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android、iOS）、电脑（nanoMuse 桌面版，即 Electron 外壳里的 `dsh-nanomuse` harness 包）和浏览器（nanoMuse Web，由运行时提供）。从 0.1.32 起的规则是**取并集**：一个客户端能做的，每个客户端都要能做，除非平台本身不允许（电脑不会像手机那样搭一个迷你 Linux；iOS 不让一个 App 操控另一个）。这一页是账本：每个客户端有什么，哪些是有意为之的平台差异，哪些还等着拍板。
 
 图例：**✓** 已做 · **◐** 部分（缺什么写在备注里）· **—** 这个客户端上没有 · **n/a** 平台特有，本来就不打算做。
 
@@ -31,13 +31,13 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 | 有自己的 key，App 不登录也能用（对话、动手、图片、短片）；第一屏给出「改用自己的 API key」，登录留给 Cloud 模型、同步和设备 | ✓ | ✓ | ✓ 登录从来不是墙 | ✓ 有模型就绪或按过那个按钮后登录页让开 |
 | 不悄悄回退：自有模型失败的一轮给「这次改用 nanoMuse Cloud」（登录时），只这一轮走账号，不改任何一行 | ✓ 0.1.41 `CloudRetry` | ✓ 0.1.41 `NanoMuseCloudOnce` | ✓ 0.1.41 形象工作室的一轮失败和一组短视频失败之后也有 | — 显示失败；各行保持原样 *(40)* |
 | 「继续用的办法」按地区排序（中国大陆百炼在前，其他地区 OpenRouter 在前） | ✓ 0.1.34 | ✓ 0.1.34 | ✓ 0.1.34 | ✓ 0.1.34 |
-| 自己的 key 的目录（`providers.json`：19 家服务商，各家覆盖什么——对话 · 屏幕 · 图片 · 短视频——拿 key 的页面、地区；一个文件，为每个客户端生成） | ✓ 0.1.39 | ✓ 0.1.40 `NanoMuseCatalogue` *(32)* | ✓ 0.1.39 | ✓ 0.1.39 |
+| 自己的 key 的目录（`providers.json`：19 家服务商，各家覆盖什么（对话 · 屏幕 · 图片 · 短视频）、拿 key 的页面、地区；一个文件，为每个客户端生成） | ✓ 0.1.39 | ✓ 0.1.40 `NanoMuseCatalogue` *(32)* | ✓ 0.1.39 | ✓ 0.1.39 |
 | 从目录生成「继续用的办法」：先是本地区的首选，再「更多服务商」，可以直接登录的套餐，key 就地填 | ✓ 0.1.39 | ✓ 0.1.40 置顶卡片、设置 → nanoMuse Cloud 和自己的 key 面板，同一个列表（`NanoMuseWaysList`）*(32)* | ✓ 0.1.39 设置 → nanoMuse Cloud，自己的 key 的首次运行步骤 | ✓ 0.1.39 |
 | 办法读自中继的 `spend.guidance`（本地区的服务商、套餐、注意事项、文档），而不是 App 里写死的列表；只有中继没给时才用内置目录 | ✓ 0.1.40 先用 `guidance`，没有时用目录 *(34)* | ✓ 0.1.40 相同（`NanoMuseWays`）*(32)* | ✓ 0.1.40 聊天卡片和设置 → nanoMuse Cloud，同一个组件 | ✓ 0.1.39 |
-| 被拒的一轮（`429 allowance_exhausted`）在聊天里是它下面的一张卡片：一句话、三个继续用的办法、「打开设置」「再试一次」——绝不把中继的回复当文字显示 | ✓ 0.1.39 `AllowanceWaysCard` | ✓ 0.1.40 像 Star 卡片一样钉在页眉下（`NanoMuseAllowanceCard`）*(33)* | ✓ 0.1.40 *（之前：显示 JSON，重试五次后当成限流）* | ✓ 0.1.39 带办法的提示 |
+| 被拒的一轮（`429 allowance_exhausted`）在聊天里是它下面的一张卡片：一句话、三个继续用的办法、「打开设置」「再试一次」；绝不把中继的回复当文字显示 | ✓ 0.1.39 `AllowanceWaysCard` | ✓ 0.1.40 像 Star 卡片一样钉在页眉下（`NanoMuseAllowanceCard`）*(33)* | ✓ 0.1.40 *（之前：显示 JSON，重试五次后当成限流）* | ✓ 0.1.39 带办法的提示 |
 | 中继的其他拒绝是一句话加一个按钮：413 *太大* → 「新对话」，401 → 「登录」，403，429 忙（附等待时间），每日上限，404 模型，5xx / 没有回应 → 「再试一次」；绝不显示状态码或 JSON | ✓ 0.1.40 `RelayRefusal` + `RelayRefusalCard`，17 种语言 *(35)* | ✓ 0.1.40 `NanoMuseRelayRefusal` + `NanoMuseRelayRefusalCard`，9 种语言；被拒的聊天轮次经过 `describe` *(35)* | ✓ 0.1.40 | ✓ 0.1.40 `failures.py`（新增 413、`not_invited`、`too_many_in_flight`、`provider_busy`） |
 | 运营者的开关（中继 0.22，[cloud.md](cloud.md#controls)）显示为平白的句子：额度*已暂停，不是用完了*（同一张卡片）、`service_paused`、`sync_paused`、`hub_paused`，登录时的 `signup_closed` | ✓ 0.1.40 *(35)* | ✓ 0.1.40 *(35)* | ✓ 0.1.40 | ✓ 0.1.40 |
-| 用 ChatGPT 套餐登录——只有对话和手看屏幕这两项，附一行关于 OpenAI 条款的话 | ✓ 0.1.39 上游的登录方式（还有 Claude、Kimi、OpenRouter） | ✓ 0.1.40 从「继续用的办法」走上游的 Codex OAuth（还有 Claude、Kimi、OpenRouter）*(32)* | ✓ 0.1.39 通过内置的运行时 | ✓ 0.1.39 运行时的 `nanomuse chatgpt login` |
+| 用 ChatGPT 套餐登录：只有对话和手看屏幕这两项，附一行关于 OpenAI 条款的话 | ✓ 0.1.39 上游的登录方式（还有 Claude、Kimi、OpenRouter） | ✓ 0.1.40 从「继续用的办法」走上游的 Codex OAuth（还有 Claude、Kimi、OpenRouter）*(32)* | ✓ 0.1.39 通过内置的运行时 | ✓ 0.1.39 运行时的 `nanomuse chatgpt login` |
 | 没有任何已配置服务商能提供的能力，显示为一句话，点明谁能提供（图片、短视频、屏幕），绝不是原始错误 | ✓ 0.1.39 | ✓ 0.1.41 模型页上空的一行写明缺什么，并给「添加服务商」 *(32)* | ✓ 0.1.39 | ✓ 0.1.39 |
 | 对话属于同步它们的那个账号：另一个账号的留在设备上，隐藏，绝不用新 key 推上去；切换账号会重新开始拉取（约定 C10） | ✓ 0.1.39 | ✓ 0.1.39 | ✓ 0.1.39 | ✓ 0.1.39 运行时的列表 |
 
@@ -50,10 +50,10 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 | 「显示执行步骤」，0.1.37 起默认开（存过的关闭保持关闭） | ✓ 0.1.37（`nm.show_steps`） | ✓ 0.1.37（`nanomuse.show_steps`）*(2)* | ✓ 0.1.37 | ✓ 0.1.37 |
 | 按中继定的时机请求点 Star（`/v1/nudges`：登录 · 第 3 / 10 / 30 个任务 · 第 7 / 30 天 · 达成一个目标 · 换了新形象 · 额度用完；间隔 7 天，每台设备 4 次；第一次对话里绝不问）。每张卡片在「去 GitHub 点亮 Star」旁边都有「已经点过了」，点哪个这台设备都不再问 | ✓ 0.1.35 | ✓ 0.1.35 *(3)* | ✓ 0.1.35 | ✓ 0.1.35 |
 | 第一次对话：App 先开口，问该怎么称呼你，模型的 `nanomuse-naming` 围栏变成起名卡片 | ✓ | ✓ 0.1.34 | ✓ 0.1.35 *(25)* | ✓ *(39)* |
-| 第一次打开：先于一切的「登录——免费」 | ✓ | ✓ 0.1.32 *(4)* | ✓ | ✓ |
+| 第一次打开：先于一切的「登录（免费）」 | ✓ | ✓ 0.1.32 *(4)* | ✓ | ✓ |
 | 审批卡片，三个层级，记住的授权 | ✓ | 上游的 | ✓ | ✓ |
 | 手在干活时，在 App 外面回答审批 | ✓ 0.1.33 胶囊上的「允许 / 拒绝」 | n/a *(10)* | ✓ 0.1.34 舞台上的「允许一次 / 在这个 App 里始终允许 / 拒绝」，主窗口被挡住时在胶囊上 *(17)* | n/a |
-| 交接：登录 / 验证码 / 付款 / 人机验证交回给人，智能体等着再接着做（hold） | ✓ 0.1.33 `hand_over` | — *(16)* | ✓ 0.1.34 「该你了——好了」「我来接手」*(16)* | ✓ 0.1.34 可以操作的浏览器视图、hold 卡片 *(16)* |
+| 交接：登录 / 验证码 / 付款 / 人机验证交回给人，智能体等着再接着做（hold） | ✓ 0.1.33 `hand_over` | — *(16)* | ✓ 0.1.34 「该你了」（带「好了」）、「我来接手」*(16)* | ✓ 0.1.34 可以操作的浏览器视图、hold 卡片 *(16)* |
 | 点形象打开智能体页（换形象 · 改名字 · 工作室；动态 · 审批 · 日记 · SOUL 与记忆；分享卡片） | ✓ | ✓ 0.1.34 | ✓ 0.1.34 | ✓ Muse 页 |
 | 在聊天里换形象（同样的话、四个候选、用话挑、重画） | ✓ | ✓ 0.1.34 | ✓ 0.1.34 | ✓ 工作室拦截，参考图 0.1.34 |
 
@@ -69,14 +69,14 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 | 技能 | ✓ 上游 | ✓ 上游 | — *(8)* | ✓ |
 | 编程助手（电脑上的 Cursor、Codex、Claude Code） | ✓ | ✓ 0.1.34 经 hub *(9)* | ✓ 「设置 → 编程助手」，先这台电脑；自己声明并应答 `coding.*` *(8)* | ✓ |
 | 账号的设备：远程控制、改名、忘记 | ✓ | ◐ 列表，Reach 面板 0.1.33 | ✓ | ✓ |
-| hub，出站：模型够得到账号的其他设备（`devices`、`device_*`、`delegate`、`@<device>`） | ✓ 「电脑」，Reach 的转派 | ◐ 手动的 Reach 面板，`@device` 发到 hub——第 9 轮起，在账号的设备列表里点一台在线设备也行，和 Android 一样；模型手里没有工具 *(29)* | ✓ `reach.ts` | ✓ 运行时的 `tools/devices.py` |
+| hub，出站：模型够得到账号的其他设备（`devices`、`device_*`、`delegate`、`@<device>`） | ✓ 「电脑」，Reach 的转派 | ◐ 手动的 Reach 面板，`@device` 发到 hub；第 9 轮起，在账号的设备列表里点一台在线设备也行，和 Android 一样；模型手里没有工具 *(29)* | ✓ `reach.ts` | ✓ 运行时的 `tools/devices.py` |
 | hub，入站：这台设备回应别的设备（shell · 文件 · 打开 · 屏幕 · 通知 · 任务） | ✓ `HubActions` | ◐ 信息 · 打开 · 通知 · 任务；shell、文件和屏幕回答*不支持* *(10)* | ✓ `actions.ts` | ✓ 运行时；浏览器标签页不算一台设备 |
-| 手——这台设备自己的屏幕当手 | ✓ | n/a *(10)* | ✓ Linux X11（Wayland *(21)*）；macOS 上一次一个窗口、鼠标仍归人、按 App 授权、光晕和胶囊不进截图 *(19)*；Windows 待试 *(31)* | n/a |
+| 手：这台设备自己的屏幕当手 | ✓ | n/a *(10)* | ✓ Linux X11（Wayland *(21)*）；macOS 上一次一个窗口、鼠标仍归人、按 App 授权、光晕和胶囊不进截图 *(19)*；Windows 待试 *(31)* | n/a |
 | 反馈问题：点一下打开一个 GitHub issue | ✓ 设置 → 账号 | ✓ 关于 → 「报告问题」 | ✓ 角落菜单；在外壳里截图存到「下载」，issue 带着内容打开 | ✓ 设置 → 反馈 |
 | 已安装和最新版本并排显示（先 `nanomuse.cn/dl/index.json`，再 GitHub，缓存一天） | ✓ 0.1.35 设置 → 版本 | ✓ 0.1.35 设置 → 版本 | ✓ 0.1.35 关于，设置里一行 | ✓ 0.1.35 设置 |
 | 全黑的截图是一个带修法的错误（录屏、Wayland），绝不是一张图 | n/a | n/a | ✓ 0.1.33 | n/a |
 | macOS 权限实时读回；询问后「打开系统设置」；录屏需要重启的提示 | n/a | n/a | ✓ 0.1.33；0.1.35：只需打开一项，「试一下」行，录屏打开时弹重启对话框；0.1.38 起那一项是辅助应用「nanoMuse Computer Use」 *(26)* | n/a |
-| 设备上的迷你 Linux 沙箱 | ✓ | ✓ 上游（iSH） | n/a——运行时有自己的沙箱 | n/a |
+| 设备上的迷你 Linux 沙箱 | ✓ | ✓ 上游（iSH） | n/a（运行时有自己的沙箱） | n/a |
 
 ## 形象、房间、外观 {#face-rooms-look}
 
@@ -106,44 +106,44 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 
 ## 等着拍板的（「下下步」清单） {#open-for-a-decision-the-next-next-list}
 
-这些是 0.1.32 起有意留着的缺口——要么平台决定了它得是另一种设计，要么它大到该由维护者来定。编号和上面备注里的一致；已经定下来的项保留编号，并写明结果。
+这些是 0.1.32 起有意留着的缺口：要么平台决定了它得是另一种设计，要么它大到该由维护者来定。编号和上面备注里的一致；已经定下来的项保留编号，并写明结果。
 
-1. **iOS · 数据控制**——0.1.33 做完（`NanoMuseDataControls.swift`）。
+1. **iOS · 数据控制。** 0.1.33 做完（`NanoMuseDataControls.swift`）。
 2. **iOS · 步骤。** 页眉那一行（和形象）0.1.33 起就有了；正在运行的那条消息的步骤在设置关着时仍然可见，已完成的消息则把它们藏起来。*既然状态行已经说明在做什么，这些也一起藏起来？*
-3. **iOS · 第一个任务后请求点 Star**——0.1.33 做完，做成钉在页眉下面的一张卡片（消息列表是一个 UICollectionView；最后一条消息下面放不了东西）。取消的一轮算作完成，流里没有取消信号。0.1.35 起这张卡片和其他客户端一样跟着中继的策略走（28）：第一次对话里不问，第 3 个任务是第一个时机。
-4. **iOS · 第一次打开**——0.1.34 做完（`NanoMuseFirstRun.swift`，Android 的 `needed / stage` 逻辑）。凡是没有 Cloud 账号的人都会看到，所以一个只用过自己的 key 的人升级后会看到一次；「全部设置」可以跳过它。
+3. **iOS · 第一个任务后请求点 Star。** 0.1.33 做完，做成钉在页眉下面的一张卡片（消息列表是一个 UICollectionView；最后一条消息下面放不了东西）。取消的一轮算作完成，流里没有取消信号。0.1.35 起这张卡片和其他客户端一样跟着中继的策略走（28）：第一次对话里不问，第 3 个任务是第一个时机。
+4. **iOS · 第一次打开。** 0.1.34 做完（`NanoMuseFirstRun.swift`，Android 的 `needed / stage` 逻辑）。凡是没有 Cloud 账号的人都会看到，所以一个只用过自己的 key 的人升级后会看到一次；「全部设置」可以跳过它。
 5. **Android · OAuth 连接器需要真机测试。** 发现、动态客户端注册、PKCE，以及写进条目 `Authorization` 头的令牌，都能编译，而且和桌面的流程逐行一致，但 0.1.32 之前没有在真机上登录过任何一个连接器（构建机上没有模拟器）；0.1.33 的 client-id 路径（GitHub、Slack……）和浏览器交接也一样。key 式和开放式的连接器就是普通的 MCP 条目，不需要新东西。令牌最终和 API key 一起放在 `servers.json` 里，因为沙箱里的客户端读它；刷新在 App 启动和打开页面时跑，不在后台跑。
-6. **iOS · 连接器**——0.1.33 做完（`NanoMuseConnectors.swift`，移植了 Android 的流程），和第 5 条一样的保留：编译通过，还没在真机上登录过。
+6. **iOS · 连接器。** 0.1.33 做完（`NanoMuseConnectors.swift`，移植了 Android 的流程），和第 5 条一样的保留：编译通过，还没在真机上登录过。
 7. **网页 · 连接器。** 运行时得自己跑 OAuth 流程并保管令牌（桌面在 harness 宿主里做这件事）。网页版有手动添加的 MCP 服务器。*决定：在运行时里跑这个流程（`nanomuse mcp` 已经在桥接连接器），还是让网页版指向账号上的一台桌面？*
 8. **桌面 · 技能页和编程助手页。** harness 有自己的技能，技能页会和它们重复：不做。编程助手页做完了：「设置 → 编程助手」先显示这台电脑的 CLI 和聊天，再是账号下的其他电脑，而且桌面版自己声明并应答 `coding.*` hub 动作（`src/coding.ts`），所以手机把只装了桌面版的电脑也看作一台编程电脑。
-9. **iOS · 编程助手**——0.1.34 做完（`NanoMuseCoding.swift`，hub 的 `coding.*`）。
-10. **iOS · 手。** iOS 不让一个 App 操控另一个；App Intents / 快捷指令是那扇门。不打算做成「手」。0.1.36 定下：设置里有那一行（「Hands——iPhone 上不可用」），点开是一页，说明为什么，以及账号上的一台电脑能做什么；App 开着时，iPhone 自己的 Muse 接受其他设备发来的 `task` 调用（`@iPhone …`）。
-11. **iOS · Muse 外壳**——0.1.33 在 iPhone 上做完；0.1.34 起动态和目标是真的（`NanoMuseScheduler.swift`：回到前台时补跑、`BGAppRefreshTask`、到点的本地通知），iPad 也跑这个外壳，外壳和页眉的开关在 nanoMuse 设置页里，工作室通过中继或你自己的百炼 key 画图。还剩的：例程只在 iOS 给刷新任务分到时间片时才在后台跑——文案就是这么写的（*到点时手机提醒你打开它*）；hub 这条路（账号上的一台电脑替它跑）仍然是稳妥的那条。iPad 的布局就是放大的 iPhone 布局——0.1.35 定下：不单独做分栏布局。
+9. **iOS · 编程助手。** 0.1.34 做完（`NanoMuseCoding.swift`，hub 的 `coding.*`）。
+10. **iOS · 手。** iOS 不让一个 App 操控另一个；App Intents / 快捷指令是那扇门。不打算做成「手」。0.1.36 定下：设置里有那一行（「Hands：iPhone 上不可用」），点开是一页，说明为什么，以及账号上的一台电脑能做什么；App 开着时，iPhone 自己的 Muse 接受其他设备发来的 `task` 调用（`@iPhone …`）。
+11. **iOS · Muse 外壳。** 0.1.33 在 iPhone 上做完；0.1.34 起动态和目标是真的（`NanoMuseScheduler.swift`：回到前台时补跑、`BGAppRefreshTask`、到点的本地通知），iPad 也跑这个外壳，外壳和页眉的开关在 nanoMuse 设置页里，工作室通过中继或你自己的百炼 key 画图。还剩的：例程只在 iOS 给刷新任务分到时间片时才在后台跑；文案就是这么写的（*到点时手机提醒你打开它*）；hub 这条路（账号上的一台电脑替它跑）仍然是稳妥的那条。iPad 的布局就是放大的 iPhone 布局。0.1.35 定下：不单独做分栏布局。
 12. **Android 和 iOS · Emoji 形象。** 在网页或桌面上把形象设成 emoji，手机上显示的是小龙。小问题。
-13. **主题色色块**——0.1.33 定下：从桌面移除；到处一条规则，强调色跟着形象走。
+13. **主题色色块。** 0.1.33 定下：从桌面移除；到处一条规则，强调色跟着形象走。
 14. **Android · 记忆作为一个房间。** 手机上它是一个设置页，别处是一个房间。设计上的取舍。
 15. **桌面上的浏览器视图。** 聊天里的轨迹展示手的动作；像网页版那样的页面视图没有。设计上的取舍。
-16. **桌面和网页上的交接**——0.1.34 两边都定下：运行时里的 *hold*（`nanomuse/agent/holds.py`；`browser`、`computer_act`、`phone_act` 上的 `hand_over`；`POST /api/holds`、`/done`；`hold` 事件；智能体最多等十分钟，然后再看一眼）。桌面的舞台显示「该你了——好了」和「我来接手」；网页的浏览器视图可以操作（「接管」、点击、输入、滚动、URL、「完成」）。还剩的：iOS 没有手，所以那里没有可交接的（10）。
-17. **桌面 · 窗口外的审批**——0.1.34 定下：实时舞台带着「允许一次 / 在 <app> 里始终允许 / 拒绝」，主窗口不在最前时，一个总在最上层的小胶囊显示同一张卡片。还要在 Mac 上查：胶囊的 `showInactive` 不能从被操作的 App 那里抢走焦点——在 Mac 任务单上（`docs/tasks/mac-check-0.1.36.md`，D）。
-18. **连接在设备间共享**——0.1.34 定下：档案的 `connectors`（中继 0.17；按设备合并，最多 64 条，像 key 的字段名返回 400），四个客户端都读写它，其他设备的条目显示为「已在 <device> 上连接——在这里登录」。凭据绝不离开签发它的那台设备。
-19. **桌面 · 不和人抢的手**——macOS 上 0.1.34 定下，照 Codex 应用的做法：*窗口模式*（`nanomuse/computer/mac_window.py`；`[hands] mode = auto`）只截取一个应用的窗口，并把事件发给它的进程，所以鼠标仍归人；每个应用问一次（「让 <Muse> 使用 <App>？」）。别的地方是共享整个屏幕，带 UI-TARS 式的光晕，叠加层不进截图。还剩的：Linux 和 Windows 没有窗口模式（虚拟显示器或第二个会话会是移植的路——Linux 先做，最便宜）；macOS 这条路是对着 Quartz API 写的，必须在 Mac 上试（录屏回退、不走 AX 的点击、Retina 映射、滚动方向）。0.1.35 定下：`auto` 仍是默认，并加了一道保险——当 Quartz 层本身失败时（不是「窗口没了」，那个每次看屏幕都会重试），手在这个目标余下的时间里退回整个屏幕，并说一次；显式的 `window` 模式则一直尝试。0.1.36 对指针本身定下：桌面的手就是 UI-TARS-desktop 的操作器搬进了 Electron 主进程（`harness/desktop/src/operator.ts`、`@computer-use/nut-js`，经回环 HTTP 连到运行时的 `desktop` 后端），模型给的坐标是它看到的那张图的像素，一次性映射到操作器的屏幕（`nanomuse/computer/coords.py`）——在缩放显示器上点到目标旁边的那些点击没有了（4K 显示器、缩放 2 时 ≤1 px）。还要在 Mac 和 Windows 上试：打包后的应用里的原生插件、坐标空间（Mac 上是 point）、滚动单位、`ctrl` 对应 ⌘、内容保护——Mac 任务单，F。
-20. **没有公开远程 MCP 服务器的服务**——聊天应用在 0.1.34 定下，照 nanobot 的做法：飞书、钉钉、企业微信和 Telegram 是智能体在其中回复的*聊天入口*（`nanomuse/channels/`，各家的长连接 SDK，不需要公网地址，配对码），大多数人想从它们那里得到的就是这个。作为*连接器*（智能体读取服务里的内容或在里面操作）仍然悬着：Zoom、LinkedIn、Zoho Invoice、WHOOP、腾讯文档、滴答清单、网易邮箱、QQ 邮箱、微信读书——每一个都得单独在各家的 REST API 上搭一座桥，每家一个开发者账号。*决定：有哪些值得搭桥？还是一个都不值得？*
+16. **桌面和网页上的交接。** 0.1.34 两边都定下：运行时里的 *hold*（`nanomuse/agent/holds.py`；`browser`、`computer_act`、`phone_act` 上的 `hand_over`；`POST /api/holds`、`/done`；`hold` 事件；智能体最多等十分钟，然后再看一眼）。桌面的舞台显示「该你了」（带「好了」）和「我来接手」；网页的浏览器视图可以操作（「接管」、点击、输入、滚动、URL、「完成」）。还剩的：iOS 没有手，所以那里没有可交接的（10）。
+17. **桌面 · 窗口外的审批。** 0.1.34 定下：实时舞台带着「允许一次 / 在 <app> 里始终允许 / 拒绝」，主窗口不在最前时，一个总在最上层的小胶囊显示同一张卡片。还要在 Mac 上查：胶囊的 `showInactive` 不能从被操作的 App 那里抢走焦点；在 Mac 任务单上（`docs/tasks/mac-check-0.1.36.md`，D）。
+18. **连接在设备间共享。** 0.1.34 定下：档案的 `connectors`（中继 0.17；按设备合并，最多 64 条，像 key 的字段名返回 400），四个客户端都读写它，其他设备的条目显示为「已在 <device> 上连接，在这里登录」。凭据绝不离开签发它的那台设备。
+19. **桌面 · 不和人抢的手。** macOS 上 0.1.34 定下，照 Codex 应用的做法：*窗口模式*（`nanomuse/computer/mac_window.py`；`[hands] mode = auto`）只截取一个应用的窗口，并把事件发给它的进程，所以鼠标仍归人；每个应用问一次（「让 <Muse> 使用 <App>？」）。别的地方是共享整个屏幕，带 UI-TARS 式的光晕，叠加层不进截图。还剩的：Linux 和 Windows 没有窗口模式（虚拟显示器或第二个会话会是移植的路；Linux 先做，最便宜）；macOS 这条路是对着 Quartz API 写的，必须在 Mac 上试（录屏回退、不走 AX 的点击、Retina 映射、滚动方向）。0.1.35 定下：`auto` 仍是默认，并加了一道保险：当 Quartz 层本身失败时（不是「窗口没了」，那个每次看屏幕都会重试），手在这个目标余下的时间里退回整个屏幕，并说一次；显式的 `window` 模式则一直尝试。0.1.36 对指针本身定下：桌面的手就是 UI-TARS-desktop 的操作器搬进了 Electron 主进程（`harness/desktop/src/operator.ts`、`@computer-use/nut-js`，经回环 HTTP 连到运行时的 `desktop` 后端），模型给的坐标是它看到的那张图的像素，一次性映射到操作器的屏幕（`nanomuse/computer/coords.py`）；在缩放显示器上点到目标旁边的那些点击没有了（4K 显示器、缩放 2 时 ≤1 px）。还要在 Mac 和 Windows 上试：打包后的应用里的原生插件、坐标空间（Mac 上是 point）、滚动单位、`ctrl` 对应 ⌘、内容保护（Mac 任务单，F）。
+20. **没有公开远程 MCP 服务器的服务。** 聊天应用在 0.1.34 定下，照 nanobot 的做法：飞书、钉钉、企业微信和 Telegram 是智能体在其中回复的*聊天入口*（`nanomuse/channels/`，各家的长连接 SDK，不需要公网地址，配对码），大多数人想从它们那里得到的就是这个。作为*连接器*（智能体读取服务里的内容或在里面操作）仍然悬着：Zoom、LinkedIn、Zoho Invoice、WHOOP、腾讯文档、滴答清单、网易邮箱、QQ 邮箱、微信读书：每一个都得单独在各家的 REST API 上搭一座桥，每家一个开发者账号。*决定：有哪些值得搭桥？还是一个都不值得？*
 21. **Linux 上 Wayland 下的手。** 截图和指针今天需要 X11 或 XWayland；Wayland 会话给出一张黑帧（现在是带提示的错误）。0.1.36 起操作器自己会说（`/info` → `available: false`，*Wayland 会话……请用 Xorg 登录*），Hands 卡片显示原因；UI-TARS-desktop 也没有 Wayland 路径。portal 这条路（`xdg-desktop-portal` ScreenCast + `libei`）能让它原生工作，代价是每个会话弹一次权限对话框。*决定：在 Linux 桌面被推上台面之前值得做吗？*
-22. **手机上的聊天入口。** 聊天入口住在运行时里；网页版（因此桌面也）有设置页面。Android 和 iOS 需要一个 `/api/channels` 客户端和同样的卡片列表（开关、字段、配对码、已配对的聊天、飞书二维码）——API 和字符串都准备好了。*决定：下一版？* 另外还悬着的：没有一家服务商是从构建机上端到端连通的（SDK 调用是离线对着真实的包检查的）——宣布之前每家一个测试机器人；飞书的发送者名字需要 `contact:user.base:readonly`；来自聊天的审批永远是*一次*。
+22. **手机上的聊天入口。** 聊天入口住在运行时里；网页版（因此桌面也）有设置页面。Android 和 iOS 需要一个 `/api/channels` 客户端和同样的卡片列表（开关、字段、配对码、已配对的聊天、飞书二维码）；API 和字符串都准备好了。*决定：下一版？* 另外还悬着的：没有一家服务商是从构建机上端到端连通的（SDK 调用是离线对着真实的包检查的），所以宣布之前每家一个测试机器人；飞书的发送者名字需要 `contact:user.base:readonly`；来自聊天的审批永远是*一次*。
 23. **自己的 key 预设和对话默认模型。** 保存百炼或 OpenRouter 的 key 之后，由服务商的 `/models` 列表决定提供哪些；`deepseek-v4.1-flash` 不会自动排到最前（只有 Cloud 模型组有 `followPick`）。*建议：列表里有它时就把它提到前面。*
 24. **中继对推理 token 的计费。** 算作补全 token；当服务商单独报告推理 token 且数量超过补全数时相加，否则视为已包含。一家单独报告*且*数量更小的服务商会被少算。*决定：保留这个启发式，还是按服务商分别处理？*
-25. **桌面 · 第一次打开和第一次对话**——0.1.35 照手机定下：宿主保存 `firstrun.json`，全新安装绝不跳过那几页；App 先开口（三句写好的话，不花 token），问该怎么称呼你，模型的 `nanomuse-naming` 围栏变成起名卡片（`take_name` / `ask_user_question` 去掉了）。有意留下的：那几句写好的话是客户端叠上去的，不是存下来的消息；称呼是一条记忆，而不是对 `GLOBAL.md` 的修改；第一次打开那几页上的齿轮只在本次会话里关掉它们。
-26. **桌面 · macOS 权限**——0.1.35 重新审过：TCC 把内置的运行时归到负责的进程名下，所以只需打开「nanoMuse Desktop」一项（现在文案就这么说；运行时不再作为第二个条目出现让人去找）。0.1.38 起这两项授权改归辅助应用「nanoMuse Computer Use」（见 [desktop.md](desktop.md#macos-permissions)）。还要在 Mac 上试：刚授权后的「试一下」行、录屏打开时的重启对话框、胶囊的 `showInactive`（17）、窗口模式里不走 AX 的点击和 Retina 映射（19）、0.1.36 改动后点形象是否正常（形象下面完全没有拖动区域；形象在标题栏带之下）——都在 Mac 任务单 `docs/tasks/mac-check-0.1.36.md` 上，写法让一个在 Mac 上的智能体可以从头跑到尾，把修复发回来。
+25. **桌面 · 第一次打开和第一次对话。** 0.1.35 照手机定下：宿主保存 `firstrun.json`，全新安装绝不跳过那几页；App 先开口（三句写好的话，不花 token），问该怎么称呼你，模型的 `nanomuse-naming` 围栏变成起名卡片（`take_name` / `ask_user_question` 去掉了）。有意留下的：那几句写好的话是客户端叠上去的，不是存下来的消息；称呼是一条记忆，而不是对 `GLOBAL.md` 的修改；第一次打开那几页上的齿轮只在本次会话里关掉它们。
+26. **桌面 · macOS 权限。** 0.1.35 重新审过：TCC 把内置的运行时归到负责的进程名下，所以只需打开「nanoMuse Desktop」一项（现在文案就这么说；运行时不再作为第二个条目出现让人去找）。0.1.38 起这两项授权改归辅助应用「nanoMuse Computer Use」（见 [desktop.md](desktop.md#macos-permissions)）。还要在 Mac 上试：刚授权后的「试一下」行、录屏打开时的重启对话框、胶囊的 `showInactive`（17）、窗口模式里不走 AX 的点击和 Retina 映射（19）、0.1.36 改动后点形象是否正常（形象下面完全没有拖动区域；形象在标题栏带之下），都在 Mac 任务单 `docs/tasks/mac-check-0.1.36.md` 上，写法让一个在 Mac 上的智能体可以从头跑到尾，把修复发回来。
 27. **网页 · 短视频。** 短视频是每台设备各自的（在形象所在的地方画：手机、iPhone、桌面）。网页版显示静止的形象。*决定：也在运行时里画，还是让网页保持静止？*
 28. **请求点 Star · 什么算数。** 策略是中继的（`/v1/admin/nudges`，控制台 → 请求点 Star），一天之内不用更新就能到达每个客户端。还剩两处小差异：额度用完时 Android 每台手机问一次（其他客户端相同）；起名对话期间换了形象的话，第一天的动态不会写（第一次打开永远到不了 *done*）。小问题。
-29. **每台设备上同一条对话**——0.1.36 定下（`docs/cloud.md` 里的约定 C7）：聊天的文字住在中继上（`/v1/sync/*`，中继 0.19），登录后默认开，每个客户端的数据控制下都有开关和删除；每个账号一条主要聊天；设备自己发起的（例程、目标、动态、替另一台设备干的活）留在它自己那里。0.1.37 起是一条线（约定 C8）：每台设备上的主要聊天是所有设备上说过的话按时间顺序的并集，其他设备的轮次是只读气泡（*来自 Pixel 8*），模型也读；别处的旁聊到了这台设备上立刻就是一条聊天；这个人的消息一发出就上传，回复在这一轮结束时上传；登录时整段历史回填。桌面把其他设备的轮次追加到 dsh 会话日志里（`user/message`，来源 `nanomuse-sync`），在浏览器里给它们穿上样子。还剩的：dsh 插件没有删除，所以归档的会话不是墓碑，在别处删掉的消息是隐藏而不是从日志里移除；在一台设备上关掉同步，要到其他设备下一次推或拉时（一个 `409`）才传到，不是立刻；iOS 上晚到的拉取消息排在本地消息之后（OpenMinis 的存储是追加式的）。`@<device name>` 在另一台设备上跑一轮——电脑只要在线就行，手机要 App 开着；iOS 上这个提及直接发到 hub（那里没有 `delegate` 工具），iPhone 自己回应 `task` 调用。
-30. **iOS · 输入框、气泡、页眉**——0.1.36 照手机定下：单行药丸形输入框、这个人的消息是扁平的灰色气泡、悬浮的半透明页眉。还剩的：iOS 16–18 上，对话从页眉边缘下方开始，而不是滚到它下面去（UIKit 列表需要把内边距传下去；要在真机上试——盲改有盖住第一条消息的风险，不值得）。
+29. **每台设备上同一条对话。** 0.1.36 定下（`docs/cloud.md` 里的约定 C7）：聊天的文字住在中继上（`/v1/sync/*`，中继 0.19），登录后默认开，每个客户端的数据控制下都有开关和删除；每个账号一条主要聊天；设备自己发起的（例程、目标、动态、替另一台设备干的活）留在它自己那里。0.1.37 起是一条线（约定 C8）：每台设备上的主要聊天是所有设备上说过的话按时间顺序的并集，其他设备的轮次是只读气泡（*来自 Pixel 8*），模型也读；别处的旁聊到了这台设备上立刻就是一条聊天；这个人的消息一发出就上传，回复在这一轮结束时上传；登录时整段历史回填。桌面把其他设备的轮次追加到 dsh 会话日志里（`user/message`，来源 `nanomuse-sync`），在浏览器里给它们穿上样子。还剩的：dsh 插件没有删除，所以归档的会话不是墓碑，在别处删掉的消息是隐藏而不是从日志里移除；在一台设备上关掉同步，要到其他设备下一次推或拉时（一个 `409`）才传到，不是立刻；iOS 上晚到的拉取消息排在本地消息之后（OpenMinis 的存储是追加式的）。`@<device name>` 在另一台设备上跑一轮（电脑只要在线就行，手机要 App 开着）；iOS 上这个提及直接发到 hub（那里没有 `delegate` 工具），iPhone 自己回应 `task` 调用。
+30. **iOS · 输入框、气泡、页眉。** 0.1.36 照手机定下：单行药丸形输入框、这个人的消息是扁平的灰色气泡、悬浮的半透明页眉。还剩的：iOS 16–18 上，对话从页眉边缘下方开始，而不是滚到它下面去（UIKit 列表需要把内边距传下去；要在真机上试，因为盲改有盖住第一条消息的风险，不值得）。
 31. **桌面 · Mac 和 Windows 上的操作器。** 从 UI-TARS-desktop 移植，在 Linux X11 上验证过；原生插件、坐标空间（Mac 上是 point，Windows 上是物理像素）、滚动单位、`ctrl` 对应 ⌘、光晕的内容保护都在 Mac 任务单上（`docs/tasks/mac-check-0.1.36.md`，F）。Wayland 仍是第 21 条。
 32. **iOS · 基于目录的办法卡片。** 0.1.39 给了 iPhone 按账号区分的对话（约定 C10，`NanoMuseSync`）和内置的 `providers.json`，但额度卡片仍然提供 0.1.34 的预设，也没有套餐登录；Android 的 `AllowanceWaysCard` 是样板（本地区的首选、「更多服务商」、套餐、选择器为空时的一句话）。*0.1.40 定下：* `NanoMuseCatalogue` 读内置的 `providers.json`（或中继的 guidance），`NanoMuseWaysList` 是置顶卡片、账号页和自己的 key 面板上共用的那一个列表，`NanoMuseVendorSheet` 收 key 或跑套餐登录（ChatGPT 走上游的 Codex OAuth，Claude、OpenRouter，Kimi 的设备码），以及本地服务器的地址。选择器（图片、短视频）为空时的那一句话随 0.1.41 的模型页到了：空的一行写明缺什么，并给「添加服务商」。
 33. **iOS · 额度卡片和聊天里的提醒。** 中继以 `allowance_exhausted` 拒绝的一轮，在 iOS 上以上游的错误文字结束；办法只在账号页上，`spend.warn` 只给那里的进度条上色，聊天里没有一行。*提议：*流以这个代码结束时，像 Star 卡片（3）那样在页眉下钉一张卡片，办法取自 `spend.guidance`（和 32 一起）；80 % 时输入框上方一行，每个额度池一次，和其他三个客户端一样。*0.1.40 定下：* `NanoMuseAllowance` 两者都管；外壳钉上 `NanoMuseAllowanceCard`（带「再试一次」），`NanoMuseChatCardsHost` 显示提醒；`AIChatView.body` 上没有新的链接。
-34. **Android · 从中继的 guidance 取办法。** `AllowanceWaysCard` 读内置的 `providers.json`；`/v1/me` 带着 `spend.guidance`（本地区的服务商、套餐、注意事项），卡片却不理它。*提议：*中继给了 `guidance` 就优先用，没有再退回目录——网页和桌面已经这么做了；`AllowanceWaysCard.kt` 和 `NanoMuseCloud.kt` 里几十行。*0.1.40 定下：* `Guidance.kt` 解析它，`Ways.resolve` 优先用它，卡片和设置 → nanoMuse Cloud 都读它。
-35. **手机 · 413、其余的拒绝和运营者的开关。** 手机的 `describe` 认得额度、每日上限、限流、坏 key、停用的账号和上游出问题，但不认得 `too_large`（413）、`not_invited`、`too_many_in_flight` 或 `provider_busy`，也不认得中继 0.22 的 `service_paused`、`sync_paused`、`hub_paused`、`signup_closed` 和带 `paused: true` 的 `allowance_exhausted`（中继说*已暂停*，额度卡片却说*已用完*）——这些到人眼前时是上游的文字或中继的英文句子。网页和桌面在 0.1.40 定下（`nanomuse/server/failures.py`、`harness/dsh-nanomuse/src/refusals.ts`——参考句子，en 和 zh）。*提议：*两个 `describe` 都加上这九个代码和那些句子，413 那条指向「新对话」，暂停的额度在同一张卡片上换一个开头；iOS 上被拒的聊天轮次也经过 `describe`。手机上每种语言都要有字符串。*0.1.40 定下*，两台手机都做了：`RelayRefusal` / `NanoMuseRelayRefusal` 给回复分类，`describe` 认得每一个代码，聊天里的卡片带着按钮（「新对话」·「登录」·「打开设置」·「再试一次」）。
-36. **桌面和网页上的语音。** 听写靠 Web Speech API，而 Electron 外壳不带它（那是 Chrome 里 Google 的服务），所以桌面打开听写页，网页只在有它的浏览器里能用；两者都不朗读回复。*提议：*语音进出都走运行时（`/api/speech`），用已配置服务商的模型（百炼的 `paraformer` / `cosyvoice`，OpenAI 的 `whisper` / `tts`），用这个人自己的 key 或中继——两个客户端一份实现；手机继续用系统的引擎。
+34. **Android · 从中继的 guidance 取办法。** `AllowanceWaysCard` 读内置的 `providers.json`；`/v1/me` 带着 `spend.guidance`（本地区的服务商、套餐、注意事项），卡片却不理它。*提议：*中继给了 `guidance` 就优先用，没有再退回目录，网页和桌面已经这么做了；`AllowanceWaysCard.kt` 和 `NanoMuseCloud.kt` 里几十行。*0.1.40 定下：* `Guidance.kt` 解析它，`Ways.resolve` 优先用它，卡片和设置 → nanoMuse Cloud 都读它。
+35. **手机 · 413、其余的拒绝和运营者的开关。** 手机的 `describe` 认得额度、每日上限、限流、坏 key、停用的账号和上游出问题，但不认得 `too_large`（413）、`not_invited`、`too_many_in_flight` 或 `provider_busy`，也不认得中继 0.22 的 `service_paused`、`sync_paused`、`hub_paused`、`signup_closed` 和带 `paused: true` 的 `allowance_exhausted`（中继说*已暂停*，额度卡片却说*已用完*）；这些到人眼前时是上游的文字或中继的英文句子。网页和桌面在 0.1.40 定下（`nanomuse/server/failures.py`、`harness/dsh-nanomuse/src/refusals.ts`：参考句子，en 和 zh）。*提议：*两个 `describe` 都加上这九个代码和那些句子，413 那条指向「新对话」，暂停的额度在同一张卡片上换一个开头；iOS 上被拒的聊天轮次也经过 `describe`。手机上每种语言都要有字符串。*0.1.40 定下*，两台手机都做了：`RelayRefusal` / `NanoMuseRelayRefusal` 给回复分类，`describe` 认得每一个代码，聊天里的卡片带着按钮（「新对话」·「登录」·「打开设置」·「再试一次」）。
+36. **桌面和网页上的语音。** 听写靠 Web Speech API，而 Electron 外壳不带它（那是 Chrome 里 Google 的服务），所以桌面打开听写页，网页只在有它的浏览器里能用；两者都不朗读回复。*提议：*语音进出都走运行时（`/api/speech`），用已配置服务商的模型（百炼的 `paraformer` / `cosyvoice`，OpenAI 的 `whisper` / `tts`），用这个人自己的 key 或中继，两个客户端一份实现；手机继续用系统的引擎。
 37. **网页 · 数据导出。** 桌面的房间宿主把智能体数据的 zip（`/data/export`）写到「下载」；网页版能分享形象卡片，也有数据控制，但没有文件。*提议：*运行时里加 `GET /api/data/export` 写同一个 zip，数据控制下加一行「下载你的智能体数据」。
 38. **界面语言。** 手机跟随系统（17 和 9 种语言），网页有应用内切换（自动 · en · zh-CN），桌面通过 harness 的语言行有英文和中文。*提议：*桌面的 `locales.ts` 随着大家的要求加上手机的那些语言，de 和 ja 先；手机上的应用内覆盖由上游决定。
 39. **网页 · 第一次对话。** 已按手机的做法做完，状态由运行时掌握：阶段机、提示词附加段和保存都在 `nanomuse/server/firstrun.py`（状态存在资料旁边的 `firstrun.json`），围栏的解析在 `nanomuse/fences.py`，路由是 `/api/firstrun*`，socket 帧是 `firstrun`；聊天说出那三句并画起名卡片（`web/src/components/FirstConversation.tsx`），首次运行的清单去掉了「认识你的 nanoMuse」那一页。称呼写进资料，也作为「Call them: …」写进记忆（运行时没有 USER.md）。身份表单留在「设置」里供以后修改。对约定的一处补充：运行时记下按「开始」时的语言（`lang`），附加段里引用的开场就是这个人看到的那几句。[web.md](web.md#the-first-run-and-the-chats-opening) 有完整的流程。
@@ -154,8 +154,8 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 - 桌面的连接器目录是源头（`harness/dsh-nanomuse/src/connectors-catalogue.ts`）；`node scripts/connectors-json.mjs` 写出 Android 的资源文件和 iPhone 的内置副本，`--check`（在 harness 工作流里）在任一份过期时失败。
 - 自己的 key 的服务商目录是 `nanomuse/llm/providers.json`；`node scripts/providers-json.mjs` 写出桌面、中继和手机的副本，`--check` 在某一份过期时失败。新服务商、改了的端点或某项能力只落在那里，别处不写。
 - 面向中继的代码在每个客户端上用同一个线路格式：`nanomuse/cloud.py`（运行时）、`harness/dsh-nanomuse/src/relay.ts`（桌面）、`io.github.nanomuse.cloud.NanoMuseCloud`（Android）、`NanoMuse/NanoMuseCloud.swift` + `NanoMuseAccount.swift`（iOS）。中继的新字段四处都要落。
-- 中继的拒绝代码（`docs/cloud.md`）在四个地方变成句子：`nanomuse/server/failures.py`（运行时和网页）、`harness/dsh-nanomuse/src/refusals.ts`（桌面——宿主改写失败，客户端画卡片）、Android 和 iOS 上的 `NanoMuseCloud.describe`。新代码四处都要落，句子在该客户端的每种语言里都要有；桌面的 `tests/refusals.test.mjs` 和 `tests/refusal-card.test.mjs` 是可以照抄的测试形状。
-- 请求点 Star 到处都遵循一个策略——中继的 `/v1/nudges`（`docs/cloud.md` 里的约定 C1），每个客户端内置同样的默认值：一个*任务*是这个人发起并得到回复的一轮，第一次对话、例程、动态和目标检查都不算；每个时机一次，间隔 `cooldown_days`，每台设备 `max_asks` 次，点了「去 GitHub 点亮 Star」之后永远不再问（`nm.star.*` / `nanomuse.star.*`）。每张卡片还有「已经点过了」，写的是同一个标记，之后这台设备不管冷却期和剩余次数都不再问；设置页和关于页里的「去 GitHub 点 Star」一行也算点过。这个标记只在本机：账号没有同步小设置的地方，所以另一台设备要单独告诉它一次。客户端：`nanomuse/nudges.py`、`harness/dsh-nanomuse/src/nudges.ts`、`web/src/nudges.ts`、`io.github.nanomuse.community.Nudges`、`NanoMuse/NanoMuseNudges.swift`。
+- 中继的拒绝代码（`docs/cloud.md`）在四个地方变成句子：`nanomuse/server/failures.py`（运行时和网页）、`harness/dsh-nanomuse/src/refusals.ts`（桌面：宿主改写失败，客户端画卡片）、Android 和 iOS 上的 `NanoMuseCloud.describe`。新代码四处都要落，句子在该客户端的每种语言里都要有；桌面的 `tests/refusals.test.mjs` 和 `tests/refusal-card.test.mjs` 是可以照抄的测试形状。
+- 请求点 Star 到处都遵循一个策略，即中继的 `/v1/nudges`（`docs/cloud.md` 里的约定 C1），每个客户端内置同样的默认值：一个*任务*是这个人发起并得到回复的一轮，第一次对话、例程、动态和目标检查都不算；每个时机一次，间隔 `cooldown_days`，每台设备 `max_asks` 次，点了「去 GitHub 点亮 Star」之后永远不再问（`nm.star.*` / `nanomuse.star.*`）。每张卡片还有「已经点过了」，写的是同一个标记，之后这台设备不管冷却期和剩余次数都不再问；设置页和关于页里的「去 GitHub 点 Star」一行也算点过。这个标记只在本机：账号没有同步小设置的地方，所以另一台设备要单独告诉它一次。客户端：`nanomuse/nudges.py`、`harness/dsh-nanomuse/src/nudges.ts`、`web/src/nudges.ts`、`io.github.nanomuse.community.Nudges`、`NanoMuse/NanoMuseNudges.swift`。
 - 版本检查在每个客户端上按同样的顺序读同样的两个来源：`https://nanomuse.cn/dl/index.json`，然后 GitHub 的 `releases/latest`；缓存一天；那一行永远也显示已安装的版本。
-- 对话同步从四个客户端和一个中继说同一种线路格式（`docs/cloud.md` 里的约定 C7）：`cloud/nanomuse_cloud/sync.py`、`nanomuse/sync/`（运行时和网页）、`harness/dsh-nanomuse/src/sync.ts`（桌面）、`io.github.nanomuse.sync`（Android）、`NanoMuse/NanoMuseSync.swift`（iOS）。每个客户端都先应用一页的对话再应用它的消息，只在拉取时移动游标；每个客户端只推送这个人的话和最终答复——绝不推送工具步骤、工具结果或系统提示——例程、目标、动态和替另一台设备干的活都留在家里。
+- 对话同步从四个客户端和一个中继说同一种线路格式（`docs/cloud.md` 里的约定 C7）：`cloud/nanomuse_cloud/sync.py`、`nanomuse/sync/`（运行时和网页）、`harness/dsh-nanomuse/src/sync.ts`（桌面）、`io.github.nanomuse.sync`（Android）、`NanoMuse/NanoMuseSync.swift`（iOS）。每个客户端都先应用一页的对话再应用它的消息，只在拉取时移动游标；每个客户端只推送这个人的话和最终答复（绝不推送工具步骤、工具结果或系统提示），例程、目标、动态和替另一台设备干的活都留在家里。
 - `ideas.en.json` / `ideas.zh.json` 是同一个文件存四份（Android 资源、iOS Resources、`harness/dsh-nanomuse/assets`、`web/src/ideas`）；某一份漂移时 harness 和网页的测试会失败。

@@ -2,15 +2,15 @@
 
 The fourth thing that defines nanoMuse ([roadmap](roadmap.md)): one agent, and
 every device you own is a pair of hands and a front door for it. This page is
-the design for that stage — what every device's app looks like, what each one
+the design for that stage: what every device's app looks like, what each one
 can do on its own and for the others, how a task travels, and which existing
 pieces each part is built from. The protocol itself is in [hub.md](hub.md);
 this page is about the product shape and the code around it.
 
 ## One Muse per device, one shape
 
-Every device runs its own Muse — the phone its OpenMinis-based agent, the
-computer nanoMuse Desktop with the Python runtime for the hands — and every one of them shows the same app. The
+Every device runs its own Muse (the phone its OpenMinis-based agent, the
+computer nanoMuse Desktop with the Python runtime for the hands) and every one of them shows the same app. The
 Android app is the reference; the others follow its shape, not its pixels:
 
 | On every device | Android today | Computer (this stage) |
@@ -31,12 +31,12 @@ Each device plays both, at the same time.
 
 **An agent of its own.** It climbs the same ladder everywhere ([gui.md](gui.md)):
 a skill, a CLI or an MCP server first; a page fetched with your login; the
-browser; and last, when you allowed it, the device's own screen — looking at a
+browser; and last, when you allowed it, the device's own screen, looking at a
 screenshot, deciding one action, doing it, looking again. On the phone the
 shell is the app's Linux sandbox and the screen is *Hands*. On the computer the
 shell is the real shell (sandboxed where the runtime can), the browser is
 Playwright or the system browser, and the screen is *Hands on this computer*:
-`computer_screen`, `computer_act`, `computer_task` — the phone operator's loop
+`computer_screen`, `computer_act`, `computer_task`, the phone operator's loop
 with a computer under it. A click is assessed by the words under the cursor
 (`label`), exactly as a tap is, and the same words (pay, transfer, send,
 delete…) make it a highest-tier approval that no standing permission covers.
@@ -46,7 +46,7 @@ devices meet over the hub and each one exposes what it can do as actions
 (`shell`, `files`, `file.get`, `file.put`, `open`, `screen`, `notify`) and as a
 target for whole tasks (`task`). Any device's agent has the others as tools:
 `devices`, `device_shell`, `device_files`, `device_get`, `device_put`,
-`device_open`, `device_screen`, `device_notify`, and `delegate` — a job in
+`device_open`, `device_screen`, `device_notify`, and `delegate`, a job in
 words for the other device's Muse. So "find the order number on my phone, then
 put it in the spreadsheet on my Mac" is one conversation: the phone's Muse
 finds it with Hands, the Mac's puts it in the file, and the person who asked
@@ -55,7 +55,7 @@ sees both halves in the chat they typed in.
 A device decides what it lets the others do: **Remote control** off makes it
 answer `info` and nothing else, while it still drives the rest. With it on, the
 person *at* the device still agrees before another device runs, reads or writes
-something there — a card on that screen, *once* or *always for that device*
+something there: a card on that screen, *once* or *always for that device*
 (a standing permission listed under Permissions like any other, revocable there).
 A `task` runs under the device's own Sentinel instead; `notify` never asks. On
 nanoMuse Desktop the switch is off by default and means "each device asks here";
@@ -95,8 +95,8 @@ you, on the phone ──"编译一下项目，把日志发我"──▶ phone's 
 
 Since 0.1.36 the chats themselves follow the account. Signed in, each device
 sends the text of its turns to the relay's sync store
-([cloud.md](cloud.md#conversation-sync)) and pulls what the others sent — at
-launch, when the hub says `sync`, and once a minute — so a chat begun on the
+([cloud.md](cloud.md#conversation-sync)) and pulls what the others sent (at
+launch, when the hub says `sync`, and once a minute), so a chat begun on the
 phone in the morning is on the computer at the desk, and continuing it there
 runs the turn on *that* device with the synced transcript as its history; what
 it answers goes back the same way. Chats addressed to a device, or run on this
@@ -107,28 +107,28 @@ device they were made on, and a synced message shows their names and sizes.
 Since 0.1.37 it is **one thread**. The main chat is one conversation across
 all devices: what you say to the muse on the phone is in the main chat on the
 computer and in the web app, in time order among what was said there, as a
-read-only bubble with *From Pixel 8* (来自 Pixel 8) under it — and the muse,
+read-only bubble with *From Pixel 8* (来自 Pixel 8) under it; and the muse,
 wherever it answers next, has read it. A side chat from another device is a
 chat on this one from the moment it is pulled, with its title, and continues
 here under the same conversation; nothing in the chat list says where a chat
 was written, the bubbles do. The person's message is on the other devices as
 soon as it is sent, the reply when the turn ends; signing in sends the device's
-whole history, oldest first. Rename the muse anywhere — the first
-conversation's naming included — and the name follows on the next pull.
+whole history, oldest first. Rename the muse anywhere (the first
+conversation's naming included) and the name follows on the next pull.
 
 Since 0.1.38 it is **main first**. Only the main conversation travels unless a
 device asks for more: side chats stay on the device that made them, and no other
 device's side chats arrive. *Also sync side chats* (同时同步旁聊), under the sync
-switch in *Data controls*, is per device and off by default — *Off: side chats
+switch in *Data controls*, is per device and off by default. *Off: side chats
 stay on this device. On: this device's side chats go to the account and the
 other devices' side chats come here.* Turning it on sends this device's side
 chats up and pulls the others' down once from the start. A fresh sign-in pulls
 the newest 300 messages first so a long history is readable at once instead of
 arriving oldest-first. While another device is answering, the chat shows *kwai
-is working…* (kwai 正在处理…) under the last message — a presence note the relay
+is working…* (kwai 正在处理…) under the last message, a presence note the relay
 passes on and never stores; it goes when the reply lands, when the device says
 it is done, or after ten minutes. A message that arrived from another device is
-never shown as interrupted and never offers *Continue* — only the device that
+never shown as interrupted and never offers *Continue*, since only the device that
 ran the turn knows how it ended.
 
 The switch is *Settings → Data controls → Sync conversations between my
@@ -137,7 +137,7 @@ every other device's switch follows. *Delete synced conversations* empties the
 store and keeps the switch. The phone and the web app map each local chat to a
 conversation id and apply the other devices' changes straight into their chat
 lists. **nanoMuse Desktop (the dsh plugin)** keeps another device's turns in
-its own store (`$DSH_HOME/nanomuse/sync-remote.json`, by session — a dsh session
+its own store (`$DSH_HOME/nanomuse/sync-remote.json`, by session; a dsh session
 log is append-only and owned by its agent loop, and a row written into it
 outside a turn is neither shown nor safe), shows them in the browser as the
 other device's bubbles (`client/RemoteBubbles.ts`), placed by time among the
@@ -154,7 +154,7 @@ the push, and a side row that still arrives makes no session), asks the relay
 for `scope=main` and, on the first pull and when the side switch goes on, for
 the tail; the other device's *kwai is working…* line is drawn under its last
 bubble from the hub's `working` frame and cleared by its reply, by
-`working: false` or after ten minutes — the remote rows are never in the
+`working: false` or after ten minutes; the remote rows are never in the
 session log, so the harness cannot take one for an unfinished turn. The host
 reads a session's log once per change (title, lines and prompt positions are
 kept until the session's next event) and turns a burst of `sync` frames into
@@ -167,17 +167,17 @@ Code: the runtime's [`nanomuse/sync/`](../nanomuse/sync/)
 
 **Work on another device.** The default is always the device you are typing
 on. To send one message elsewhere, start it with `@` and the device's name as
-the hub lists it — `@Desk compile the project and send me the log` — a prefix
+the hub lists it (`@Desk compile the project and send me the log`), a prefix
 match, case-insensitive; the composer offers the names as you type, the mention
 is taken off the text, the bubble says *to Desk*, and a one-line note in front
 of the turn tells this device's agent to hand it to that device with `delegate`
 (`nanomuse-pc task … --on` on the phone) and report what it did; the Devices
 page's *Ask this device* does the same. On the iPhone, which has no delegate
-tool, the mention goes to the hub directly — `task` to that device, its answer
-shown as a turn in the chat — and only devices that are online are matched.
-Which devices can be a target: **computers** — nanoMuse Desktop, a runtime —
-whenever they are online, since their hub socket stays up; **phones** — Android
-and the iPhone — only while the nanoMuse app is open, because the socket lives
+tool, the mention goes to the hub directly (`task` to that device, its answer
+shown as a turn in the chat) and only devices that are online are matched.
+Which devices can be a target: **computers** (nanoMuse Desktop, a runtime)
+whenever they are online, since their hub socket stays up; **phones** (Android
+and the iPhone) only while the nanoMuse app is open, because the socket lives
 in the app and neither keeps it in the background. A device that is not online
 is offered as a target all the same on the web and the desktop and answers
 `device_offline`; the web console is never one. The session a device runs for
@@ -185,21 +185,21 @@ another is kept on that device and is not synced.
 
 ## Whose conversations a device shows
 
-A device can be signed in as one account today and another tomorrow — a
+A device can be signed in as one account today and another tomorrow: a
 family's tablet, a work laptop with a personal account on it, a phone handed
 on. Since 0.1.39 every conversation on a device remembers **whose** it is: the
 account that was signed in when it first went up to the relay or first arrived
 from it. The rule is then the same on the phone, the computer, the desktop app
 and the web console:
 
-- **Signed in as B, you see B's conversations** — and the ones that belong to
+- **Signed in as B, you see B's conversations**, and the ones that belong to
   nobody: chats made while signed out, before anyone had signed in on this
   device. A's chats are not in the list.
 - **A's chats are hidden, not deleted.** They stay on the device, with their
   files and images, and are back the moment A signs in again. Signing out on
   its own hides nothing; deleting a chat still deletes it.
 - **Nothing crosses accounts.** A conversation of A's is never sent up to B's
-  account, and B's conversations never land in A's — not by sync, not by a
+  account, and B's conversations never land in A's: not by sync, not by a
   turn run on this device for another device of the account.
 - **A different account starts fresh.** When the signed-in account changes, the
   device forgets where it was in the other account's sync (the next pull is
@@ -211,8 +211,8 @@ and the web console:
   same.
 
 The muse's name and look follow the account as before. Since 0.1.40 the phones
-go further (contract C12): every chat has an owner — a chat that was never
-synced included — and a sign-out takes the account's chats, memory, feed, goals,
+go further (contract C12): every chat has an owner (a chat that was never
+synced included) and a sign-out takes the account's chats, memory, feed, goals,
 routines and face off the phone unless *Keep this account's chats on this
 device* is turned on; deleting the account removes all of it; a key the relay
 refuses keeps it aside for the account's return. The table of every piece of
@@ -225,7 +225,7 @@ Android's `io.github.nanomuse.sync.*`, the iPhone's `NanoMuse/NanoMuseSync.swift
 ## The computer: nanoMuse Desktop
 
 The desktop is the Python runtime (`nanomuse serve`) with three front doors on
-the same local service — the terminal (`nanomuse chat`), the browser (the web
+the same local service: the terminal (`nanomuse chat`), the browser (the web
 app it serves, also reachable from the phone on the same network) and a
 window. That is the shape OpenCode v2 and Codex take (a local service, a CLI
 and a desktop app over it) and it is what the runtime already was; this stage
@@ -241,7 +241,7 @@ adds the hub, the Cloud account and the hands to it.
 
 - **Runtime** (`nanomuse/`): `cloud.py` signs in to nanoMuse Cloud with an
   e-mail (or phone) code, keeps the key in the vault and can make the relay the
-  model provider — the same *Sign in — free* first step as on the
+  model provider, the same *Sign in (free)* first step as on the
   phone. `hub/` is the async port of the desktop binary's hub client: one
   socket kept up, incoming actions answered by `hub/actions.py`, incoming
   `task`s run in a visible side chat with their approvals relayed, outgoing
@@ -256,10 +256,10 @@ adds the hub, the Cloud account and the hands to it.
   DeepSeek Harness (`harness/`): the harness's Host and web app in an Electron
   shell of ours, nanoMuse's account, face, Hands and Reach as plugins, and this
   runtime bundled for the hands (`nanomuse mcp` over stdio). The Electron shell
-  around this runtime and the web app (`desktop/app`, 0.1.19–0.1.29) — the
+  around this runtime and the web app (`desktop/app`, 0.1.19–0.1.29; the
   tray, the transparent stage window that drew the ring where the hands were
   about to click, the global Stop and quick-chat shortcuts, *Start with the
-  computer* — is retired; those come back on the harness's seams
+  computer*) is retired; those come back on the harness's seams
   ([harness.md](harness.md), phase 7). The web app still lays itself out the
   Muse way on a wide window for anyone who opens `nanomuse serve` in a browser.
 - **The standard-library binary** (`desktop/nanomuse_desktop`) was the
@@ -272,10 +272,10 @@ adds the hub, the Cloud account and the hands to it.
 (look, decide one action, act through the Sentinel, look again), the same
 report, the same Stop. What differs is the dialect and the device:
 
-- **Dialect.** The model speaks Qwen's `computer_use` shape — `left_click`,
+- **Dialect.** The model speaks Qwen's `computer_use` shape (`left_click`,
   `double_click`, `right_click`, `left_click_drag`, `mouse_move`, `scroll`,
   `type`, `key`, `wait`, plus `open` (an app by name), `answer`, `ask_user` and
-  `terminate` — with coordinates on the 0–999 grid the phone uses, so one
+  `terminate`) with coordinates on the 0–999 grid the phone uses, so one
   vision model serves both. The reply format (Thought / Action / one
   `<tool_call>`) and the parser are the phone's.
 - **Device.** Screenshots through `mss` (every platform, scaled for the
@@ -291,13 +291,13 @@ report, the same Stop. What differs is the dialect and the device:
   attributed to whatever started it (the terminal, say). Linux
   needs X11 (Wayland has no portable way to move the pointer yet; the page
   says so). Windows needs nothing.
-- **Per app.** The first action in an application in a conversation asks:
-  *Let Nova use Safari?* — once, for this conversation, or always. The answer
+- **Per app.** The first action in an application in a conversation asks
+  *Let Nova use Safari?*: once, for this conversation, or always. The answer
   is a Sentinel grant under `computer_app:<bundle id or name>`, so Settings →
   Permissions lists it and can take it back. `[sentinel] mode = "auto"` skips
   it like every other ask.
 - **Never** typed by the hands: passwords, PINs, card numbers, one-time codes.
-  The operator hands the screen over instead — a *Your turn* card with the
+  The operator hands the screen over instead: a *Your turn* card with the
   reason; the person types, presses **Done**, and the operator looks again.
 
 #### Window mode (macOS)
@@ -306,14 +306,14 @@ On a Mac the hands can work in **one application's window** instead of the
 whole screen (`[hands] mode`, and *Where* on the Hands card: *Auto* / *One
 window* / *Whole screen*; `nanomuse/computer/mac_window.py`):
 
-- the picture the model sees is that window only — taken by the desktop app's
+- the picture the model sees is that window only, taken by the desktop app's
   helper *nanoMuse Computer Use* with ScreenCaptureKit on macOS 14 and later
-  (`POST /window` of the operator, [gui.md](gui.md#hands-on-the-computer-the-picture-is-the-unit));
-  by the runtime's own `CGWindowListCreateImage` when there is no helper —
-  scaled for the model; coordinates are pixels of that picture and are mapped
+  (`POST /window` of the operator, [gui.md](gui.md#hands-on-the-computer-the-picture-is-the-unit)),
+  or by the runtime's own `CGWindowListCreateImage` when there is no helper,
+  and scaled for the model; coordinates are pixels of that picture and are mapped
   back to the window's place on the screen;
 - clicks, drags, scrolls and keys are delivered to the application's process
-  (`CGEventPostToPid`), not to the system cursor — the person keeps the mouse
+  (`CGEventPostToPid`), not to the system cursor, so the person keeps the mouse
   and can work in another window meanwhile; text goes in as unicode keyboard
   events, so 中文 and emoji arrive as typed; when Accessibility is granted, a
   button under the point is pressed through the accessibility tree (`AXPress`)
@@ -327,12 +327,12 @@ What the person sees: the Hands card says *Working in Safari's window; the
 mouse stays yours*, the desktop stage draws the cursor where the click lands
 (the hands' events carry `x`/`y` in screen pixels), and the approval cards
 name the application. A window that cannot be found, captured (the helper's
-Screen Recording row off — the operator's `403`, in its words) or driven drops
+Screen Recording row off: the operator's `403`, in its words) or driven drops
 back to the whole screen with a note in the observation; nothing stops. When
 the layer itself fails (the helper not there, pyobjc, the window server) *Auto* parks the hands on the whole
 screen for the rest of that target, says so once, and tries the window again
-when the next application is named; *One window* keeps trying, as asked —
-the Hands card's *Where* line shows the reason either way. Linux and Windows stay
+when the next application is named; *One window* keeps trying, as asked.
+The Hands card's *Where* line shows the reason either way. Linux and Windows stay
 on the shared screen; `pip install "nanomuse[hands]"` brings the pyobjc
 frameworks on macOS only.
 
@@ -348,9 +348,9 @@ Hands events shown while it works. None of it blocks the desktop work.
 ## The browser: a demo on a simulated phone
 
 [nanomuse.cn/web](https://nanomuse.cn/web/) leads to the showcase: a simulated
-phone in the browser (MobileGym, with the nanoMuse app brought to the front —
+phone in the browser (MobileGym, with the nanoMuse app brought to the front:
 `demo/mobilegym/apps/nanoMuse`) and, behind it, a private nanoMuse of the
-visitor's own that the showcase gateway starts for the visit — the
+visitor's own that the showcase gateway starts for the visit, the
 `ghcr.io/nano-muse/nanomuse` image on a network with no way out but the
 gateway, talking with the showcase's model, gone when the visit ends. A visitor
 signs in to nanoMuse Cloud first (a code to a phone or an inbox, or the
@@ -364,9 +364,9 @@ once the page has reason to think a person is looking (a few seconds in view,
 or a pointer, key or wheel), never for a scripted browser, and never before the
 sign-in the showcase asks for.
 
-The earlier shape of the web — a kept Muse per Cloud account, with named
-volumes and a seat on the hub like any other device (`accounts.py`,
-`WEB_ENABLED=1`) — is still in the gateway for anyone who runs one, and off on
+The earlier shape of the web (a kept Muse per Cloud account, with named
+volumes and a seat on the hub like any other device; `accounts.py`,
+`WEB_ENABLED=1`) is still in the gateway for anyone who runs one, and off on
 the project's server since 0.1.26. Details and the settings in
 [demo/showcase/README.md](../demo/showcase/README.md).
 
@@ -375,12 +375,12 @@ the project's server since 0.1.26. Details and the settings in
 iOS speaks the hub (`info`, `open`, `notify`, `task`) and has had the shape
 since 0.1.34 ([ios.md](ios.md)). The cloud console (`/app/`) is a front door with no hands
 of its own and stays that way. Glasses are a sentence in and a sentence back,
-the hands elsewhere — the hub is already enough for them.
+the hands elsewhere; the hub is already enough for them.
 
 ## What is reused, and from where
 
-- **UI-TARS-desktop** (Apache-2.0): the operator pattern — screenshot in,
-  parsed action out, an `execute` per device — and the on-screen marker while
+- **UI-TARS-desktop** (Apache-2.0): the operator pattern (screenshot in,
+  parsed action out, an `execute` per device) and the on-screen marker while
   the agent works. Not its Electron app or its model: its action space is the
   UI-TARS model's, ours is Qwen's `mobile_use` / `computer_use`.
 - **OpenCode v2** (MIT): the desktop as a thin Electron shell that starts a
@@ -388,7 +388,7 @@ the hands elsewhere — the hub is already enough for them.
   electron-builder, a tray, deep links later). Not its agent: it is a coding
   agent around a project directory; nanoMuse is a personal one around a person.
 - **Codex** (Apache-2.0): the CLI as a first-class front door to the same
-  agent, approvals in the terminal, a sandbox for commands — the runtime's
+  agent, approvals in the terminal, a sandbox for commands; the runtime's
   `nanomuse chat` and the Sentinel already have that shape.
 - **Qwen-Agent / MemGUI-Bench** (MIT): the `mobile_use` and `computer_use`
   dialects and the reply parser, already in `nanomuse/phone/operator.py`.
