@@ -3,7 +3,7 @@
 A page anyone can open: a phone in the browser with 微信, 支付宝, 铁路12306 and the other
 [MobileGym](https://github.com/Purewhiter/mobilegym) apps on it, and nanoMuse installed. The
 page opens on the nanoMuse app, and a **private nanoMuse is started for you** on the showcase
-server — your own container, your own token, phone operation on — for thirty minutes and
+server (your own container, your own token, phone operation on) for thirty minutes and
 within a model budget. Beside the phone are a few lines to try, one set per language ([The
 lines](#the-lines)): a new look for the Muse (it draws itself), the apps on the phone operated
 for you ("打开微信，看看张伟最新发来的消息说了什么"; "Open Spotify and play Bad Habits by Ed
@@ -17,22 +17,22 @@ same origin as `/phone.html`; it talks to the nanoMuse app on the phone through
 `window.__NANOMUSE__` on that frame (open, draft, start, reset, state, subscribe; see
 `demo/mobilegym/README.md`) and the app passes drafts on to the web app over `postMessage`.
 On a hosted session the web app runs lite (`?ui=lite`): the phone layout at any width, drawn
-the way the Android app draws it — the face on its disc with the name tag under it, the round
+the way the Android app draws it: the face on its disc with the name tag under it, the round
 hamburger and ••• menu, the chats drawer, the five tabs (chat, feed, ideas, goals, library) and
 their pages, Settings as the phone's list of rows, the agent page behind the face, the
-approval card — and no first-run setup.
+approval card; and no first-run setup.
 
 **The phone keeps MobileGym's own chrome.** Around the frame are the pieces of
 [mobilegym.dev](https://mobilegym.dev/)'s page, nothing cut down: the Gesture Guide on the
-left (Back, Home and Recents as keys — the simulator is gesture-only — and a legend of the
+left (Back, Home and Recents as keys, since the simulator is gesture-only, and a legend of the
 gestures), the State Builder dock on the right with its drawer (session snapshots, the phone's
 language, device time / battery / location, a WeChat message or contact, an Alipay balance or
-bill, an SMS, a 12306 order, the weather — patched into the running phone), and *Power off*.
+bill, an SMS, a 12306 order, the weather, patched into the running phone), and *Power off*.
 They are not copied into this repository: `site/compose.mjs` lifts the markup from the
 checkout's `web/index.html` at build time and takes its `styles.css`, `state-builder.js`,
 `boot-hero.js` and icons as they are (one default changed: the phone's address is
 `/phone.html`), so an upstream change arrives with the next build. One thing is added to the
-dock, first in it: nanoMuse's launcher icon, a shortcut — a tap brings the app to the front
+dock, first in it: nanoMuse's launcher icon, a shortcut: a tap brings the app to the front
 (or turns the phone on), and it is lit while nanoMuse is the app on the screen; it carries no
 State Builder tab, so their script leaves it alone (`page.js` handles it, reading `front` from
 `window.__NANOMUSE__.state()`). Our panel sits beside the phone, two columns wide: the words
@@ -155,7 +155,7 @@ phone lives in the visitor's tab (~400 MB of *their* memory). The server runs th
 |---|---|
 | **Caddy** | HTTPS, the static site (the page at `/`, MobileGym + the nanoMuse app at `/phone.html`), `/api/demo/*` to the gateway, and one hostname per session |
 | **gateway** (`gateway/`) | Starts a nanoMuse container per visitor, relays the phone's HTTP and WebSocket to it, proxies the container's model calls to the provider with the demo key, keeps the books |
-| **sessions** | `ghcr.io/nano-muse/nanomuse` containers on an internal Docker network with no way out — the gateway is the only thing they can reach |
+| **sessions** | `ghcr.io/nano-muse/nanomuse` containers on an internal Docker network with no way out; the gateway is the only thing they can reach |
 
 ```
 visitor's browser ──HTTPS──▶ Caddy ── demo.nanomuse.dev ──▶ /srv/site (the page; /phone.html = MobileGym + nanoMuse app)
@@ -194,12 +194,13 @@ httpx's) carries the value: it is rewritten to `token=[redacted]` before it is w
 - **Per visitor (IP):** `PER_IP_ACTIVE` sessions at once, `PER_IP_DAILY` a day. `MAX_SESSIONS`
   overall.
 - **Who is trying it** (`DEMO_SIGNIN_REQUIRED=1`, the default): before the phone starts a Muse,
-  the visitor signs in to nanoMuse Cloud — the Android app's door, a code to a phone or an
-  inbox or the account's password — on the phone's own pages (`demo/mobilegym`,
+  the visitor signs in to nanoMuse Cloud (the Android app's door: a code to a phone or an
+  inbox, or the account's password) on the phone's own pages (`demo/mobilegym`,
   `SetupPage.tsx`). The gateway puts the sign-in to the relay (`POST /v1/auth/code`,
-  `/verify`, `/login`, the visitor's address forwarded), notes the account — its opaque id, the
-  relay's masked identifier (`195****0404`, `g…@gmail.com`), the channel; never the identifier
-  itself — in `VISITOR_DB` (SQLite on the `gateway-data` volume), revokes the device key the
+  `/verify`, `/login`, the visitor's address forwarded), notes the account in `VISITOR_DB`: its
+  opaque id, the relay's masked identifier (the first three and last four digits of a
+  number, `g…@gmail.com` for an address), the channel, and never the identifier itself
+  (`VISITOR_DB` is SQLite on the `gateway-data` volume); revokes the device key the
   relay issued for the sign-in (the demo talks to the showcase's model, not to the account's
   allowance) and hands the browser a ticket good for `VISITOR_TTL_S` (thirty days).
   `POST /api/demo/session` wants the ticket as a bearer; without one it answers
@@ -209,19 +210,19 @@ httpx's) carries the value: it is rewritten to `token=[redacted]` before it is w
   once, `PER_ACCOUNT_DAILY` a day, on top of the address limits. The session log names the
   visitor by the masked identifier; `GET /api/demo/info` → `signin` counts them. The book
   also keeps, per visitor, the address and browser string of the first and the latest
-  sign-in or demo and how many sign-ins, and one *visit* row per demo started — when, from
+  sign-in or demo and how many sign-ins, and one *visit* row per demo started: when, from
   which address, with which browser, whether it brought its own key, and when it ended with
   what it used (requests, tokens, pictures, clips) and why (gateway 0.3). With
   `SHOWCASE_ADMIN_TOKEN` set, `GET /api/demo/admin` (header `X-Admin-Token`) hands all of it
-  to the operator — `?account=<id>` for one visitor's — and the relay's admin page shows it
+  to the operator (`?account=<id>` for one visitor's), and the relay's admin page shows it
   (`WEB_ADMIN_URL` / `WEB_ADMIN_TOKEN` there) next to the account; without the token the
   route is not there.
 - **Bring your own key:** the visitor can enter a provider URL, model and key on the setup page.
   The gateway keeps them in memory for the session and forwards with them (no budget of ours);
   the container never sees the key. Only `https://` to hosts in `BYOK_ALLOWED_HOSTS` (the usual
   providers), never to an address inside the server's network. The model they name is the chat
-  model; the hands get their own on the same key — `qwen/qwen3.8-27b` on OpenRouter,
-  `qwen3.8-27b` on 阿里云百炼 — and on any other provider the one model does both lanes (a
+  model; the hands get their own on the same key (`qwen/qwen3.8-27b` on OpenRouter,
+  `qwen3.8-27b` on 阿里云百炼), and on any other provider the one model does both lanes (a
   text-only model there, DeepSeek's own API say, leaves the hands with nothing to look with).
 
 Two lanes, two models, both set by the operator in the gateway's `.env` (`.env.example` lists
@@ -230,7 +231,7 @@ whatever `MAIN_MODEL` names on `MAIN_BASE_URL` with `MAIN_API_KEY`, and empty me
 gateway's own default, the chat model every nanoMuse client starts with (`deepseek-v4.1-flash`
 on 阿里云百炼 at the time of writing); `gui` (the one that reads screens and taps; many small
 calls with a screenshot each) is `GUI_MODEL`, and empty means `qwen3.8-27b` on the main lane's
-host and key — a fixed default, not derived from the chat model; set `GUI_*` to change it or to
+host and key, a fixed default not derived from the chat model; set `GUI_*` to change it or to
 split the lanes across keys or providers. A chat model that takes no images (DeepSeek before
 V4.1: `deepseek-v4-pro`, `deepseek-v4-flash`) is kept away from screenshots
 (`NANOMUSE_LLM_VISION=off`); the operator lane still looks. What a running showcase actually
@@ -240,12 +241,12 @@ uses is what `GET /api/demo/info` says (`demo_model`, `gui_model`), not this pag
 raises (a tap on *Pay*, *Send*, *Delete*…) is shown on the capsule over the operated app with
 **Allow once / Deny**, answered from there (`POST /api/approvals/{id}`, `scope: once`); the
 visitor is not sent back into the nanoMuse app for it, and the shade gets no notification on
-top of the card. A hold — the agent handing the phone over (*Your turn — <reason>*) or the
-visitor taking it from the chat (*You have the phone*) — is a card with **Done**
+top of the card. A hold, whether the agent hands the phone over (*Your turn*, the reason under it) or the
+visitor takes it from the chat (*You have the phone*), is a card with **Done**
 (`POST /api/holds/{id}/done`). Only a question a finished task left offers *Open*.
 
 **Pictures for a new look** (`gateway/showcase_gateway/images.py`): "换个形象：一只橘猫" in the
-chat is the avatar studio's ([docs/avatar.md](../../docs/avatar.md)) — eight pictures: four
+chat is the avatar studio's ([docs/avatar.md](../../docs/avatar.md)): eight pictures, four
 candidates, then the chosen one's poses. The container speaks the OpenAI images API at its
 model's address (`…/images/generations`, `…/images/edits`); the gateway answers those two
 calls itself, on Model Studio's native multimodal endpoint with the demo key, the way
@@ -257,13 +258,13 @@ through the gateway; `/api/demo/info` says `image_model: null` and the page grey
 out.
 
 **Clips of the chosen face** (`gateway/showcase_gateway/clips.py`): after the stills the
-studio animates the face — four short clips, one per mood — through the asynchronous video
+studio animates the face (four short clips, one per mood) through the asynchronous video
 API, which it looks for at `[llm] video_base_url`; the gateway names the session's own model
 address there (`NANOMUSE_LLM_VIDEO_BASE_URL`), so the four calls of a clip land on it: the
 upload policy, the first frame, the task, the polling. Model Studio wants the frame in its
 storage or at a public URL, neither of which a container without internet can manage, so the
-gateway stands in for the storage — the policy points back at it, the frame is kept a few
-minutes and goes up with the task inline — and the finished MP4 comes back through it too.
+gateway stands in for the storage (the policy points back at it, the frame is kept a few
+minutes and goes up with the task inline), and the finished MP4 comes back through it too.
 `VIDEO_MODEL` (`wan2.2-i2v-flash` on a Model Studio host, empty for stills only),
 `CLIPS_PER_SESSION` (4, one face) and `DAILY_CLIPS` (120).
 
@@ -271,7 +272,7 @@ minutes and goes up with the task inline — and the finished MP4 comes back thr
 
 The same proxy can hand a new phone its first model. With `TRIAL_ENABLED=1`, `POST /api/trial`
 with `{"device": "<a random id the app keeps>"}` answers with a key (`nmt_…`) and two
-addresses — `https://<SITE_HOST>/llm/trial/<id>/main` and `…/gui` — that go straight into the
+addresses (`https://<SITE_HOST>/llm/trial/<id>/main` and `…/gui`) that go straight into the
 app's `[llm]` and `[gui]` settings. Every call through them is metered against the trial's
 lifetime budget, `TRIAL_TOKENS` (a million); spent, the proxy answers 429 `trial_exhausted` and
 the app asks for the user's own key. One trial per device: asking again with the same id
@@ -284,52 +285,52 @@ with the key shows what is left, and `/api/demo/info` carries the totals.
 ### nanoMuse Web: a kept Muse per Cloud account
 
 The showcase gives a visitor a Muse for half an hour. With `WEB_ENABLED=1` the same gateway
-gives a *person* one that stays — a kept Muse per account, for anyone who would rather not
+gives a *person* one that stays: a kept Muse per account, for anyone who would rather not
 install anything. With it off (the default, and what nanomuse.cn runs since 0.1.26: the
 phone in the browser, with its sign-in, took the web version's place), `/web/` redirects to
-the showcase site — the phone — so [nanomuse.cn/web/](https://nanomuse.cn/web/), which the
+the showcase site, the phone, so [nanomuse.cn/web/](https://nanomuse.cn/web/), which the
 project site's Caddy block hands to the gateway, stays the web entry either way. On, `/web/`
 is a sign-in page (served by the gateway; the site's Caddy block hands `/web/*` and
 `/api/web/*` over to it): an e-mail or a mobile number, then the six-digit code.
 The gateway asks nanoMuse Cloud for the code and checks it (`POST /v1/auth/code`,
 `/v1/auth/verify`, the visitor's address forwarded so the relay's per-address limits still
-count the right person), gets the account's key back, and starts — or wakes — the account's
+count the right person), gets the account's key back, and starts, or wakes, the account's
 container: `nmw-<slug>` with three named volumes (`/data`, `/workspace`, `/home/muse`), on the
 `nanomuse-web` network (a way out, and the relay next to it), signed in from the environment
 (`NANOMUSE_CLOUD_KEY`, `NANOMUSE_CLOUD_BASE_URL=http://nanomuse-relay:8787`,
 `NANOMUSE_HUB_NAME=Web`, `NANOMUSE_ONBOARDED=1`; `nanomuse/hub/service.py`,
 `_seed_from_env`). The browser is sent to `https://<slug>.<SESSION_DOMAIN>/#token=…`, the same
 door the phone's QR code opens, and the runtime there makes the Cloud its model on first
-start and takes its place on the hub as one of the account's devices — so the phone can ask
+start and takes its place on the hub as one of the account's devices, so the phone can ask
 it for things and it can ask the phone.
 
 What the gateway keeps is small (`WEB_DB`, SQLite on the `gateway-data` volume): account id →
 slug, access token, and when the key the container was started with runs out. The key itself
 is a *session key* the relay issues to lapse on its own (`POST /v1/auth/session-key`,
 `WEB_KEY_TTL_S`, 30 days); it goes into the container's environment at creation and is kept
-nowhere else — the standing key the sign-in produced is signed out again at once. The slug is
+nowhere else; the standing key the sign-in produced is signed out again at once. The slug is
 an HMAC of the relay's opaque account id, so signing in from another browser lands in the same
 Muse (with a fresh key: the container is recreated around the same volumes); once the key has
-lapsed, the Muse is not woken — the person signs in again, which does the same. A container
+lapsed, the Muse is not woken; the person signs in again, which does the same. A container
 that has been quiet for `WEB_IDLE_STOP_S` (six hours) is stopped, not removed; the next
 request on its host that carries the account's token (the bearer header, the socket's first
-frame, a signed link) starts it again, which takes a few seconds — a browser arriving with
+frame, a signed link) starts it again, which takes a few seconds; a browser arriving with
 only the address gets a small page that takes the token from the app's storage and asks for
 the wake, so a bookmark still works and a stranger typing the address starts nothing.
-`WEB_MAX_RUNNING` containers run at once — when
+`WEB_MAX_RUNNING` containers run at once (when
 every place is taken the quietest sleeps to make room, unless it was used in the last five
-minutes (`503 web_busy`) — and `WEB_MAX_ACCOUNTS` may exist at all (`503 web_full`). Model
+minutes: `503 web_busy`), and `WEB_MAX_ACCOUNTS` may exist at all (`503 web_full`). Model
 use is the account's own allowance on the relay; the gateway meters nothing here.
 
 ## Deploying
 
-You need: a Linux box with Docker (4 cores / 8 GB is plenty for `MAX_SESSIONS=20` — a session
+You need: a Linux box with Docker (4 cores / 8 GB is plenty for `MAX_SESSIONS=20`; a session
 idles at ~150 MB), a domain on Cloudflare, and a 百炼 key (or any OpenAI-compatible provider
 that takes images).
 
 ```bash
 # 1. DNS on Cloudflare:   demo.nanomuse.dev  A  <server>   DNS only (see the note on the proxy)
-#                         *.s.nanomuse.dev   A  <server>   DNS only — sessions are WebSockets to Caddy
+#                         *.s.nanomuse.dev   A  <server>   DNS only; sessions are WebSockets to Caddy
 #    Cloudflare → My Profile → API Tokens: Zone → DNS → Edit and Zone → Zone → Read on the zone.
 
 # 2. the code
@@ -342,9 +343,9 @@ docker pull ghcr.io/nano-muse/nanomuse:latest  # or: docker build -t nanomuse:la
 # 4. (optional, 1.9 GB) MobileGym's companion data: app media and home-screen widgets.
 #    Without it the phone works but media apps render empty and two home widgets show an error.
 mkdir -p data && curl -L https://github.com/Purewhiter/mobilegym/releases/download/data-v0.1.0/mobilegym-data-v0.1.0.tar.gz | tar -xz -C data
-#    CC BY-NC 4.0 — non-commercial use only (see MobileGym's LICENSE-DATA).
+#    CC BY-NC 4.0: non-commercial use only (see MobileGym's LICENSE-DATA).
 
-# 5. up — the published images (.github/workflows/showcase.yml builds them from main) …
+# 5. up: the published images (.github/workflows/showcase.yml builds them from main) …
 docker compose pull && docker compose up -d
 #    … or build them here (clones MobileGym and compiles Caddy; a few minutes):
 docker compose up -d --build
@@ -360,7 +361,7 @@ has ended* and a button for a new one.
 
 Both certificates are obtained through Cloudflare's DNS API (`CLOUDFLARE_API_TOKEN`); the
 records themselves stay "DNS only". Cloudflare's proxy can be switched on for `SITE_HOST`
-when the site is under attack — Caddy is built with the
+when the site is under attack: Caddy is built with the
 [cloudflare-ip](https://github.com/WeidiDeng/caddy-cloudflare-ip) module and trusts
 `X-Forwarded-For` from Cloudflare's ranges only, so `PER_IP_*` keeps counting visitors rather
 than edges (set the zone's SSL/TLS mode to *Full (strict)*: the origin has a real certificate).
@@ -372,13 +373,13 @@ through the proxy in our measurements. The audience this is for reaches the orig
 
 The Caddyfile ends with `import /etc/caddy/sites.d/*.caddy`, and `docker-compose.yml` mounts
 `sites.d/` there and `www/` (or `WWW_ROOT`) at `/srv/www`, both read-only and both ignored by
-git. One file per site, its files under `www/<name>/`, then `docker compose up -d caddy` — a box
+git. One file per site, its files under `www/<name>/`, then `docker compose up -d caddy`; a box
 that has no such sites is unchanged.
 
 The project site is served this way at [nanomuse.cn](https://nanomuse.cn): `mirror/` holds the
 site block and `sync.sh`, which a systemd timer runs every minute to pull
-[nano-muse.github.io](https://github.com/nano-muse/nano-muse.github.io) into `www/nanomuse.cn/`
-— a push to that repository is on the mirror within the minute, with no key or webhook anywhere.
+[nano-muse.github.io](https://github.com/nano-muse/nano-muse.github.io) into `www/nanomuse.cn/`;
+a push to that repository is on the mirror within the minute, with no key or webhook anywhere.
 `sudo mirror/install.sh` sets up all of it and is safe to run again after `git pull`. What is not
 in the repository: two A records at the registrar (`nanomuse.cn`, `www.nanomuse.cn` → this box).
 A server outside mainland China needs no ICP filing for a `.cn` name; one inside does.
@@ -394,7 +395,7 @@ listing, and the site's download switch ("GitHub / 国内镜像") rewrites its l
 starts the first fetch in the background (`journalctl -u nanomuse-release-mirror` to watch it).
 
 And it counts: the site block writes a JSON access log (`logs/caddy/`, rolled, kept seven days),
-and `mirror/traffic.py` — `nanomuse-traffic`, every ten minutes — turns what was added since the
+and `mirror/traffic.py` (`nanomuse-traffic`, every ten minutes) turns what was added since the
 last run into daily counts in `/var/lib/nanomuse-traffic/traffic.db`: page views, visitors (a
 hash of address and browser under a salt made for the day and dropped two days later; no address
 is ever written), crawlers, downloads per file from `/dl/`, referring sites, the pages; once a run
@@ -422,7 +423,7 @@ needs no bundler: edit `site/page/` and run `build.sh` again, or just
 `node site/compose.mjs /path/to/mobilegym site/page site/dist` to recompose it with
 MobileGym's chrome. The phone's media is MobileGym's companion data at `/cdn` (`CDN_DIR`, or
 `./data/mobilegym-data` in the compose file); without it the launcher's theme widgets show their
-error cards and the media apps render empty, as on an upstream checkout without it — or build
+error cards and the media apps render empty, as on an upstream checkout without it; or build
 with `MOBILEGYM_CDN_BASE=https://cdn.mobilegym.dev` (a build arg of the same name in the compose
 file) and the phone takes it from MobileGym's CDN, as their own site does.
 
@@ -437,7 +438,7 @@ day, `IMAGE_PER_SESSION` (12) at one face and half a redraw per visitor. The fou
 chosen face are about ¥2 more with wan2.2-i2v-flash (4 s, 480P); `DAILY_CLIPS` (120) bounds
 that at ¥60 a day, `CLIPS_PER_SESSION` (4) at one face per visitor. The daily caps in
 `.env.example` (3,000 calls / 6M tokens) bound the chat's worst day at a few tens of yuan;
-lower them if you like. Put a spending alert on the provider accounts too — the gateway's
+lower them if you like. Put a spending alert on the provider accounts too: the gateway's
 counters live in memory and start from zero when it restarts.
 
 ## Known limits
@@ -446,14 +447,14 @@ counters live in memory and start from zero when it restarts.
   fine for a showcase and would need a shared store to scale out.
 - The gateway starts and stops containers, which is a lot of power over the host. It reaches
   Docker through `docker-proxy` (compose: `tecnativa/docker-socket-proxy`), which passes the
-  container and network calls and refuses the rest — no exec, images, volumes or build — and
+  container and network calls and refuses the rest (no exec, images, volumes or build), and
   holds the socket itself read-only on a network of its own; the gateway container has no
   socket. It is still the trusted part; keep it off the public network (compose does: only
   Caddy is published).
 - A visitor's own provider (BYOK) is resolved and checked once, when the session starts, and
-  the session's calls are pinned to the addresses found then — the name travels only as SNI
-  and `Host`, the certificate is checked against it as usual — so a name that answered with a
+  the session's calls are pinned to the addresses found then (the name travels only as SNI
+  and `Host`, the certificate is checked against it as usual), so a name that answered with a
   public address cannot be re-pointed at one inside our network later (DNS rebinding).
 - No egress from sessions means the search, fetch and browser tools fail inside a demo. That is
-  the point of the demo — the phone — but say so if visitors ask.
+  the point of the demo, the phone, but say so if visitors ask.
 - The MobileGym data set is CC BY-NC 4.0; the showcase is non-commercial.
