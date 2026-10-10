@@ -42,7 +42,7 @@ nanomuse serve --port 9000 --no-qr
 
 1. **添加模型**：服务商按协议分组（OpenAI 兼容的 Chat Completions · Responses API · 本地或你自己的端点），每家带一行厂商小字：DeepSeek、Kimi、Qwen、GLM、豆包、MiniMax、OpenAI、OpenRouter、Ollama，或者任何 OpenAI 兼容端点。key 默认遮住，有个开关可以显示出来，每家厂商都有一个「去申请 key」的链接；key 进的是服务器上的保险库，模型永远看不到它。Base URL 没有路径时会补上 `/v1`；Ollama 和自定义端点可以没有 key。模型列表由端点自己的 `/models` 填上（连不上时用一份内置目录顶替）；你手动输入的模型永远不会被替换。
 2. **连接邮箱、日历、通讯录**：可选。
-3. **开始**：打开聊天，智能体先开口，问你的名字，再和你一起给自己起名，也就是第一次对话（[web.md](web.md#the-first-run-and-the-chats-opening)）。
+3. **开始**：打开聊天，智能体先开口，问你的名字，再和你一起给自己起名，也就是第一次对话（[web.md](web.md#the-first-run-and-the-chat-s-opening)）。
 
 「开始」在存下一个模型之前一直锁着；「跳过设置」始终都在，它也跳过第一次对话。刷新页面不会丢掉已经打的勾。名字、形象、标语和语气以后都能在形象下面改（「设置」里有身份表单）。设置流程完成以后，或者已经有了对话以后，就不会再出现。「开始」把设置标记为完成（`POST /api/firstrun/start`，等同于 `POST /api/onboarded`）；那时已经有对话，或者第一次对话结束时，动态的第一天会在后台写好，这样第一次打开那个房间时不是空的；否则动态打开的是它的介绍卡片，告诉你它的每日例程什么时候跑。
 
@@ -195,7 +195,7 @@ Meta 的 Muse「自己会做事，但不会做太多」。「设置」里的*主
 | POST | `/api/skills/import` `{url}` | 抓取一个 `SKILL.md`（原始链接，或者 GitHub 的文件夹页或文件页），然后保存 |
 | GET · PUT · DELETE | `/api/vault` · `/api/vault/{name}` `{value}` | 列出密钥名 / 存入 / 删除。值永远不会返回 |
 | POST | `/api/onboarded` `{done}` | 标记第一次打开的设置已完成；配好了模型的话，动态的第一天当时就在后台写好（`feed_started`） |
-| GET | `/api/firstrun`（`?lang=`） | 第一次对话（[web.md](web.md#the-first-run-and-the-chats-opening)）：`{phase (none · ask_user_name · ask_agent_name · named · done), session_id, user_address, suggestions, chips, chosen, lang, running, started_at, finished_at, intro[]}`；`chips` 是起名卡片提供的名字，`intro` 是用 `lang` 说的三句开场白 |
+| GET | `/api/firstrun`（`?lang=`） | 第一次对话（[web.md](web.md#the-first-run-and-the-chat-s-opening)）：`{phase (none · ask_user_name · ask_agent_name · named · done), session_id, user_address, suggestions, chips, chosen, lang, running, started_at, finished_at, intro[]}`；`chips` 是起名卡片提供的名字，`intro` 是用 `lang` 说的三句开场白 |
 | POST | `/api/firstrun/start` `{lang}` | 「开始」：把对话绑定到主聊天，标记设置已完成，`none → ask_user_name`；已经有对话时跳过这套开场（`done`）。返回带 `intro` 的视图 |
 | POST | `/api/firstrun/pick` `{name}` | 在 `ask_agent_name` 阶段点了一个名字：名字立刻存进资料，阶段变为 `named`；不该选的时候 409，名字为空 400 |
 | POST | `/api/firstrun/dismiss` | 撤掉起名卡片，开场结束（`done`） |
