@@ -8,8 +8,8 @@
 > bundle alone, `dsh-nanomuse-<v>.tgz`, for people who already run DeepSeek Harness
 > Desktop and want the Muse in it (below, *In dsh's desktop app*). From 0.1.30 this is the
 > one desktop app; the Electron shell around the Python runtime (`desktop/app`, 0.1.19 to
-> 0.1.29) is retired, and the terminal binary in [`desktop/`](../desktop/) stays the
-> zero-install fallback. Why and where it goes: [docs/harness.md](../docs/harness.md);
+> 0.1.29) and the terminal binary that followed it (0.1.30 to 0.1.38) are retired, and the
+> Python runtime stays for self-hosting and the web console. Why and where it goes: [docs/harness.md](../docs/harness.md);
 > what it has of Muse's and what it still lacks: [docs/desktop-muse.md](../docs/desktop-muse.md).
 
 `dsh-nanomuse/` is one **bundle** — a package dsh loads into a profile, carrying a patch

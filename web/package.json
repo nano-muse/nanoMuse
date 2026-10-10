@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.1",
   "description": "nanoMuse mobile-first web app (chat, goals, ideas, memory, approvals)",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "engines": {
     "node": ">=22"

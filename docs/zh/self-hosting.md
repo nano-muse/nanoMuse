@@ -55,7 +55,7 @@ bash scripts/self-host.sh --local --bind 0.0.0.0   # reachable from the phones o
 
 每个 App 默认都在 `https://cloud.nanomuse.cn` 上登录，除非你另外告诉它。同一个账号的设备必须都指向同一个中继；hub 和对话都在那里。
 
-- **Android**（0.1.38）。登录表单下面的「使用其他服务器」填中继地址；「检查」会访问它的 `/healthz` 并显示版本，「使用这个服务器」让这个地址在重启 App 之后也保留。在你自己的网络之外必须用 `https://`；私有地址（`10.x`、`172.16–31.x`、`192.168.x`、`localhost`、`.local` 或 `.ts.net` 名字）接受明文 `http://`。「设置 → 账号」显示当前服务器和「更换」，更换会先把手机退出登录（[android.md](android.md)）。
+- **Android**（0.1.38）。登录表单下面的「使用其他服务器」填中继地址；「检查」会访问它的 `/healthz` 并显示版本，「使用这个服务器」让这个地址在重启 App 之后也保留。在你自己的网络之外必须用 `https://`；私有地址（`10.x`、`172.16-31.x`、`192.168.x`、`localhost`、`.local` 或 `.ts.net` 名字）接受明文 `http://`。「设置 → 账号」显示当前服务器和「更换」，更换会先把手机退出登录（[android.md](android.md)）。
 - **iPhone / iPad。** 登录页上同样的链接，同样的规则。
 - **nanoMuse 桌面版。** 中继就是插件 cloud 一行的 `baseURL`。把下面这段加进桌面版配置档 `~/.nanomuse/desktop/profiles/nanomuse/`（Windows 上是 `%USERPROFILE%\.nanomuse\desktop\profiles\nanomuse\`；`NANOMUSE_DESKTOP_HOME` 可以把它挪走）里的 `cordis.patch.yml`，然后重启应用：
 
