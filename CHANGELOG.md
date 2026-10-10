@@ -235,6 +235,7 @@ Keel: the first stable version. What has been a preview since 2026-09-25 is now 
 - **The Hands page follows its switch wherever it is flipped**: a change made while the page is open shows at once instead of after reopening it.
 - **Another device can stop a task it asked this phone to run.** The hub's `stop {call}` / `stop {conversation}` ends the run after the step in flight and the task answers `cancelled`; it used to answer `stopped: false` and let the task run on. Only the device that asked may stop it.
 - **The bottom bar is a floating frosted-glass pill.** The five tabs sit in a rounded pill that blurs whatever is behind it, icons only; the current tab shows a filled glyph on a soft indicator that springs in.
+- **Debug builds install next to the release app** (`io.github.nanomuse.app.debug`), so a test APK never replaces the installed nanoMuse.
 
 ### iOS
 

@@ -92,6 +92,11 @@ android {
     }
 
     buildTypes {
+        // nanoMuse: debug builds install next to the release app (io.github.nanomuse.app.debug),
+        // so a CI APK never replaces the store version on a test phone.
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
