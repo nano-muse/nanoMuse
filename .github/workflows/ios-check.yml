@@ -2,12 +2,17 @@ name: iOS · build check
 
 # Compiles the iOS app on a Mac runner without signing and without Apple credentials: the way
 # to find out whether android/src/ios still builds (the tree is written on Linux) before
-# spending an App Store Connect upload on it. Manual only: the native dependencies take the
-# better part of an hour the first time, and macOS minutes are dear on a private repository.
-# Shares the dependency cache with ios-testflight.yml, so a green check makes the next
-# TestFlight run cheap.
+# spending an App Store Connect upload on it. Runs on every pull request that touches the iOS
+# tree, and by hand from the Actions tab for anything else (a dependency script under
+# android/deps/, say). The native dependencies take the better part of an hour the first time;
+# the cache is shared with ios-testflight.yml, so a green check makes the next TestFlight run
+# cheap. No secrets: CODE_SIGNING_ALLOWED=NO, so a fork's pull request can run it too.
 
 on:
+  pull_request:
+    paths:
+      - 'android/src/ios/**'
+      - '.github/workflows/ios-check.yml'
   workflow_dispatch:
 
 concurrency:
