@@ -41,6 +41,12 @@ class OffloadSocketNameTest {
         assertTrue(server.contains("OffloadSocketName.forProcess(BuildConfig.APPLICATION_ID"))
         assertFalse("upstream's bare name must never be bound", server.contains("LocalServerSocket(\"native-offload\")"))
         assertFalse("the bound name is a runtime value", server.contains("const val socketName"))
+        // The bind failure (#288) names the socket that failed last, the per-process fallback,
+        // not the app's own name, and reads as a plain sentence.
+        val failure = server.substringAfter("?: throw java.io.IOException(").substringBefore("serverSocket = s")
+        assertTrue(failure, failure.contains("OffloadSocketName.forProcess(BuildConfig.APPLICATION_ID"))
+        assertFalse(failure, failure.contains("'\$SOCKET_NAME'"))
+        assertFalse(failure, failure.contains("\u2014"))
         for (rel in listOf(
             "src/main/java/com/openminis/app/sandbox/PersistentShell.kt",
             "src/main/java/com/openminis/app/sandbox/TerminalSession.kt",
