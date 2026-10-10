@@ -1,6 +1,8 @@
 # Roadmap
 
-nanoMuse is an open-source personal agent for every device you own. This page is a map for people who want to help: what we are working on now, what comes after, and where to put your hands first in each area. No dates: a thing ships when it works on a real phone and a real computer.
+A personal agent should not live only in someone else's cloud, so nanoMuse is the open-source, low-cost alternative: on your own devices, with a model you choose and a relay you can host yourself. We want to build it with developers and users everywhere, so that each person truly owns a personal agent. Open an [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) or send a [pull request](../CONTRIBUTING.md); either one helps nanoMuse get better.
+
+This page is a map for people who want to help: what we are working on now, what comes after, and where to put your hands first in each area. No dates: a thing ships when it works on a real phone and a real computer.
 
 The 0.1 versions were a preview; 1.0.0 is the first stable version. We use the phone, the desktop, the web and the relay every day and still know where they are rough; the list below is honest about it. What does not change: one agent rather than a framework, an approval between it and anything irreversible, secrets that never reach the model, memory you can read and edit, any OpenAI-compatible model, free software.
 

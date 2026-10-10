@@ -36,6 +36,10 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
 
+> ### nanoMuse は進化しつづけます
+>
+> パーソナルエージェントは、誰かのクラウドの中だけで育つべきものではありません。だから nanoMuse は、オープンソースで低コストの代わりになるものを目指します。自分のデバイスに入れ、モデルは自分で選び、リレーも自分で立てられます。世界中の開発者や利用者といっしょに作り、一人ひとりが本当に自分のパーソナルエージェントを持てるようにしたいと考えています。[issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) を立てるのも、[プルリクエスト](../../CONTRIBUTING.md) を送るのも、どちらも nanoMuse をよくすることにつながります。
+
 ## 🗞️ ニュース
 
 - `2026-10-09` 🚀 バージョン [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) を公開しました。スマートフォン、デスクトップ、ブラウザのすべてに対応し、前の版の上にそのままインストールしてデータを引き継ぎます。変更点はリリースノートにすべて記載しています。

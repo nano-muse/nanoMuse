@@ -36,6 +36,10 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
 
+> ### nanoMuse는 계속 진화합니다
+>
+> 개인 에이전트가 남의 클라우드 안에서만 자라서는 안 됩니다. 그래서 nanoMuse는 오픈소스이고 비용이 낮은 대안이 되려 합니다. 자기 기기에 설치하고, 모델은 직접 고르고, 릴레이도 직접 세울 수 있습니다. 전 세계의 개발자, 사용자와 함께 만들어서 모든 사람이 진짜 자기만의 개인 에이전트를 갖게 하고 싶습니다. [이슈](https://github.com/nano-muse/nanoMuse/issues/new/choose)를 열거나 [풀 리퀘스트](../../CONTRIBUTING.md)를 보내는 것, 어느 쪽이든 nanoMuse를 더 낫게 만드는 데 보탬이 됩니다.
+
 ## 🗞️ 소식
 
 - `2026-10-09` 🚀 버전 [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0)이 나왔습니다. 휴대폰과 데스크톱과 브라우저 모두를 위한 버전입니다; 이전 버전 위에 설치되어 데이터가 그대로 남고, 릴리스 노트에 모든 변경 사항이 적혀 있습니다.

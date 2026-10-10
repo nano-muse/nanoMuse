@@ -36,6 +36,10 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
 
+> ### nanoMuse terus berkembang
+>
+> Agen pribadi seharusnya tidak hanya hidup di cloud milik orang lain, maka nanoMuse menjadi alternatif sumber terbuka yang murah: berjalan di perangkatmu sendiri, dengan model pilihanmu dan relay yang bisa kamu pasang sendiri. Kami ingin membangunnya bersama pengembang dan pengguna di seluruh dunia, supaya setiap orang benar-benar memiliki agen pribadinya sendiri. Buka sebuah [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) atau kirim [pull request](../../CONTRIBUTING.md); keduanya membantu nanoMuse menjadi lebih baik.
+
 ## 🗞️ Kabar
 
 - `2026-10-09` 🚀 Versi [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) sudah tersedia, untuk ponsel, desktop, dan peramban; dipasang di atas versi sebelumnya dengan data tetap utuh, dan catatan rilisnya memuat setiap perubahan.

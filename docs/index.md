@@ -46,6 +46,10 @@ Every download is on the [latest release](https://github.com/nano-muse/nanoMuse/
 
 74 seconds: what nanoMuse does on your phone, your computer and the web. Also in [Chinese](https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4).
 
+::: info nanoMuse keeps evolving
+A personal agent should not live only in someone else's cloud, so nanoMuse is the open-source, low-cost alternative: on your own devices, with a model you choose and a relay you can host yourself. We want to build it with developers and users everywhere, so that each person truly owns a personal agent. Open an [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) or send a [pull request](../CONTRIBUTING.md); either one helps nanoMuse get better.
+:::
+
 ## Citation
 
 The report *nanoMuse: An Open-Source Personal Agent for Every Device You Own* is on arXiv as [2610.08699](https://arxiv.org/abs/2610.08699): what a personal agent is, how Muse is built, and how nanoMuse answers it in the open. If you find nanoMuse useful, please cite the paper.

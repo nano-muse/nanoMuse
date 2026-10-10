@@ -36,6 +36,10 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
 
+> ### nanoMuse continue d'évoluer
+>
+> Un agent personnel ne devrait pas vivre seulement dans le cloud de quelqu'un d'autre, alors nanoMuse est l'alternative open source et à bas coût : sur vos propres appareils, avec le modèle que vous choisissez et un relais que vous pouvez héberger vous-même. Nous voulons le construire avec des développeurs et des utilisateurs du monde entier, pour que chacun possède vraiment un agent personnel à lui. Ouvrez une [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) ou envoyez une [pull request](../../CONTRIBUTING.md) ; l'une comme l'autre aide nanoMuse à s'améliorer.
+
 ## 🗞️ Actualités
 
 - `2026-10-09` 🚀 La version [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) est sortie, pour le téléphone, l'ordinateur et le navigateur ; elle s'installe par-dessus la précédente en gardant vos données, et ses notes de version listent chaque changement.
