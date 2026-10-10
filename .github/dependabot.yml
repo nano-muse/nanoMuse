@@ -18,7 +18,9 @@ updates:
   # the desktop app: minors and patches in one PR; Electron and electron-builder majors as
   # their own PRs, since an Electron line is supported for about eight months and the app
   # should not sit on one past its end of life again. @types/node follows Electron's Node,
-  # Vite follows electron-vite's peer range, TypeScript's majors are a hand upgrade.
+  # Vite follows electron-vite's peer range, TypeScript's majors are a hand upgrade. The
+  # plugin's React is a dev dependency that follows the React dsh ships at runtime (18), so
+  # a React major is not ours to take here.
   - package-ecosystem: npm
     # the Electron shell (npm), the dsh plugin (pnpm) and the docs site (npm)
     directories: ["/harness/desktop", "/harness/dsh-nanomuse", "/website"]
@@ -34,6 +36,14 @@ updates:
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
         update-types: ["version-update:semver-major"]
     labels: ["dependencies"]
     commit-message:
