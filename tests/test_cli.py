@@ -102,6 +102,22 @@ def test_every_option_has_a_help_text():
     assert seen > 60
 
 
+def test_doctor_names_config_keys_nothing_reads(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("NANOMUSE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("NANOMUSE_WORKSPACE", str(tmp_path / "ws"))
+    (tmp_path / "ws").mkdir()
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(
+        '[llm]\nbase_url = "http://localhost:11434/v1"\nmodel = "qwen3:8b"\nmodle = "typo"\n'
+    )
+    result = runner.invoke(app, ["doctor", "--no-model", "--config", str(cfg)])
+    out = plain(result.output)
+    assert result.exit_code == 1, out
+    assert "config keys nothing reads (ignored): llm.modle" in out
+    assert "a typo" in out  # the problems list under the summary
+
+
 def test_triggers_commands(tmp_path, monkeypatch):
     for var in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "NANOMUSE_CONFIG"):
         monkeypatch.delenv(var, raising=False)
