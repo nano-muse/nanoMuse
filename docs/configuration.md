@@ -12,6 +12,8 @@ Any string value may contain `${VAR}` or `${VAR:-default}`; it is replaced with 
 
 Three layers, later ones win: the file, then environment overrides, then whatever was changed in the app's *Connections* screen (`<data_dir>/app-settings.json`: model, email servers, browser switch, MCP servers added from the phone). That last file only ever refers to secrets as `{{vault:NAME}}`.
 
+A key the runtime has no setting for (a misspelt `modle`, a key from another version) is ignored and the default applies; the loader says so in the log with the key's path (`llm.modle`), and `nanomuse doctor` lists such keys as a problem. Free-form tables (`[llm.extra_headers]`, an MCP server's `env`) and the `[channels.<name>]` tables of [channels.md](channels.md) take any key.
+
 ## Environment overrides
 
 These win over the file. They cover the settings people change most often and what Docker needs.

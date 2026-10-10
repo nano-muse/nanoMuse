@@ -22,7 +22,13 @@ from rich.table import Table
 from nanomuse import __version__
 from nanomuse.channels.cli import channels_app
 from nanomuse.chatgpt_cli import chatgpt_app
-from nanomuse.config import DEFAULT_DATA_DIR, Settings, find_config_file, load_settings
+from nanomuse.config import (
+    DEFAULT_DATA_DIR,
+    Settings,
+    find_config_file,
+    load_settings,
+    unknown_keys,
+)
 
 app = typer.Typer(
     name="nanomuse",
@@ -1620,6 +1626,19 @@ async def _doctor(settings: Settings, check_model: bool) -> None:
         f"{platform.system()} {platform.release()} · {sys.executable}"
     )
     line(settings.source != "defaults+env" or None, f"config: {settings.source}")
+    if settings.source and settings.source != "defaults+env":
+        try:
+            with open(settings.source, "rb") as fh:
+                stray = unknown_keys(tomllib.load(fh))
+        except (OSError, tomllib.TOMLDecodeError):
+            stray = []
+        if stray:
+            shown = ", ".join(stray[:6]) + (" …" if len(stray) > 6 else "")
+            line(
+                False,
+                f"config keys nothing reads (ignored): {shown}",
+                f"config.toml has keys nothing reads: {shown} (a typo, or from another version)",
+            )
     data_ok = os.access(settings.data_dir, os.W_OK)
     line(data_ok, f"data dir: {settings.data_dir}", "data dir is not writable")
     ws = settings.agent.workspace

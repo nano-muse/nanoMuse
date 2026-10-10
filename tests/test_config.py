@@ -129,3 +129,61 @@ def test_workspace_defaults_under_the_data_dir(tmp_path: Path, monkeypatch: pyte
         f'data_dir = "{(tmp_path / "data").as_posix()}"\n[agent]\nworkspace = "./mine"\n'
     )
     assert load_settings(cfg).agent.workspace == Path("./mine")
+
+
+def test_unknown_keys_are_named_and_the_rest_still_loads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Pydantic drops a key it has no field for without a word; a misspelt key would read as
+    "not set". The loader names each one, with its path, and the free-form tables and the
+    tables other modules read (``[channels.<name>]``) are not mistaken for typos."""
+    from nanomuse.config import unknown_keys
+
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(
+        f'''
+data_dir = "{(tmp_path / "data").as_posix()}"
+dat_dir = "typo"
+[llm]
+modle = "x"
+model = "deepseek-chat"
+[llm.extra_headers]
+X-Anything = "goes"
+[[sentinel.rules]]
+tool = "shell"
+matc = {{}}
+[[mcp.servers]]
+name = "s"
+urll = "http://localhost:1"
+[mcp.servers.env]
+ANY = "1"
+[mcp.servers.tools.read]
+risk = "safe"
+rsk = "x"
+[channels.telegram]
+enabled = true
+anything = 1
+'''
+    )
+    with cfg.open("rb") as fh:
+        import tomllib
+
+        assert unknown_keys(tomllib.load(fh)) == [
+            "dat_dir",
+            "llm.modle",
+            "sentinel.rules[0].matc",
+            "mcp.servers[0].urll",
+            "mcp.servers[0].tools.read.rsk",
+        ]
+
+    warnings: list[str] = []
+    from nanomuse.logger import logger
+
+    sink = logger.add(lambda m: warnings.append(m.record["message"]), level="WARNING")
+    try:
+        settings = load_settings(cfg)
+    finally:
+        logger.remove(sink)
+    assert settings.llm.model == "deepseek-chat"  # the known keys are read as before
+    assert [w for w in warnings if "llm.modle" in w and "ignored" in w]
+    assert not [w for w in warnings if "channels" in w]
