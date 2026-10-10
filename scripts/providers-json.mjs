@@ -126,4 +126,7 @@ for (const target of targets) {
     console.log(`${target}: ${catalogue.providers.length} providers`)
   }
 }
-if (stale) process.exit(1)
+if (stale) {
+  console.error(`run \`node scripts/providers-json.mjs\` and commit the result`)
+  process.exit(1)
+}
