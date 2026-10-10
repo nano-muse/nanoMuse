@@ -134,3 +134,20 @@ def test_with_a_server_the_api_is_called(
     assert seen[-1][1] == "/api/channels/pairing/ABCDEF/approve"
     r = run("test", "telegram", "--config", str(config))
     assert r.exit_code == 1 and "switch it on" in r.output
+
+
+def test_a_bad_setting_is_named(tmp_path: Path):
+    """The same sentence as the main CLI's: each setting pydantic refused, with its path,
+    not a count of problems the person has to go and find."""
+    path = tmp_path / "config.toml"
+    path.write_text('[sentinel]\nmode = "loose"\n[agent]\nmax_steps = "many"\n', "utf-8")
+    result = run("status", "--config", str(path))
+    assert result.exit_code == 1
+    assert "2 setting(s)" in result.output
+    assert "sentinel.mode" in result.output and "agent.max_steps" in result.output
+
+    from nanomuse.cli import app
+
+    result = CliRunner().invoke(app, ["chatgpt", "status", "--config", str(path)])
+    assert result.exit_code == 1
+    assert "sentinel.mode" in result.output and "agent.max_steps" in result.output

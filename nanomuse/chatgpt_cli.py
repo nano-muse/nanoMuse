@@ -62,9 +62,11 @@ def _settings(config: Path | None) -> Settings:
         raise typer.Exit(1) from exc
     except ValidationError as exc:
         err.print(
-            f"[red]config.toml has settings nanoMuse does not understand[/red] "
-            f"({find_config_file(config)}): {exc.error_count()} problem(s)"
+            f"[red]config.toml has {exc.error_count()} setting(s) nanoMuse does not understand[/red] "
+            f"({find_config_file(config)}):"
         )
+        for e in exc.errors():
+            err.print(f"  [bold]{'.'.join(str(x) for x in e['loc'])}[/bold]: {e['msg']}")
         raise typer.Exit(1) from exc
 
 
