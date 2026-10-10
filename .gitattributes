@@ -1,0 +1,5 @@
+# Shell scripts are run from a checkout on Windows too (Git Bash, WSL, the desktop's build);
+# a CRLF checkout breaks them, so they keep LF whatever core.autocrlf says. Nothing else is
+# normalised: android/ is an upstream subtree and carries a few vendored files as they came.
+*.sh text eol=lf
+gradlew text eol=lf

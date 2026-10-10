@@ -1,4 +1,4 @@
-# nanoMuse on DeepSeek Harness — the bundle (harness/dsh-nanomuse) as a package:
+# nanoMuse on DeepSeek Harness: the bundle (harness/dsh-nanomuse) as a package:
 #
 #   dsh-nanomuse-<v>.tgz            what `dsh plugin --profile desktop add <file>` installs
 #                                   into a DeepSeek Harness Desktop someone already has
@@ -7,7 +7,7 @@
 #
 # A push or pull request that touches harness/ builds, typechecks and tests the bundle; a
 # release tag `v*` also packs it and attaches the tarball and its checksum to the release of
-# the same name — the one scripts/release-apk.sh creates with the APK — retrying until it
+# the same name (the one scripts/release-apk.sh creates with the APK), retrying until it
 # exists. "Run workflow" with a release tag does the same for a release that already exists.
 # The bundle's version must be the tag's: the release recipe bumps harness/dsh-nanomuse/package.json.
 name: harness bundle
@@ -66,7 +66,7 @@ jobs:
       - name: Lock files resolve against the public registry only
         run: |
           if grep -hoE '"resolved": "https?://[^/]+' harness/desktop/package-lock.json web/package-lock.json | grep -v 'registry.npmjs.org'; then
-            echo "a package-lock.json resolves packages from a host other than registry.npmjs.org (a private mirror leaked in) — regenerate it against the public registry" >&2
+            echo "a package-lock.json resolves packages from a host other than registry.npmjs.org (a private mirror leaked in); regenerate it against the public registry" >&2
             exit 1
           fi
       - name: Pack
@@ -76,7 +76,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ -n "$TAG" ] && [ "v$VERSION" != "$TAG" ]; then
-            echo "harness/dsh-nanomuse/package.json says $VERSION, the release is $TAG — bump it first" >&2
+            echo "harness/dsh-nanomuse/package.json says $VERSION, the release is $TAG; bump it first" >&2
             exit 1
           fi
           mkdir -p ../../packages

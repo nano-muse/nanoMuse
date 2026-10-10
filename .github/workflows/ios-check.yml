@@ -2,7 +2,7 @@ name: iOS · build check
 
 # Compiles the iOS app on a Mac runner without signing and without Apple credentials: the way
 # to find out whether android/src/ios still builds (the tree is written on Linux) before
-# spending an App Store Connect upload on it. Manual only — the native dependencies take the
+# spending an App Store Connect upload on it. Manual only: the native dependencies take the
 # better part of an hour the first time, and macOS minutes are dear on a private repository.
 # Shares the dependency cache with ios-testflight.yml, so a green check makes the next
 # TestFlight run cheap.

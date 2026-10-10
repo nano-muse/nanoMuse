@@ -1,4 +1,4 @@
-# nanoMuse Desktop — the desktop built on DeepSeek Harness (harness/desktop, Electron), with
+# nanoMuse Desktop: the desktop built on DeepSeek Harness (harness/desktop, Electron), with
 # dsh and the nanoMuse bundle staged inside and the runtime for the hands bundled:
 #
 #   Windows  nanoMuse-Desktop-<v>-win-x64.exe        (NSIS installer)
@@ -6,7 +6,7 @@
 #   Linux    nanoMuse-Desktop-<v>-linux-x64.AppImage / .deb / .tar.gz
 #
 # Each platform builds the bundle (harness/dsh-nanomuse: pnpm build, test, pack), stages dsh
-# next to it with npm (scripts/prepare-dsh.mjs — the platform's own native prebuilds), builds
+# next to it with npm (scripts/prepare-dsh.mjs, the platform's own native prebuilds), builds
 # the runtime (scripts/desktop-app/build-runtime.py --target harness/desktop/runtime, a
 # PyInstaller build), wraps it all with electron-builder, and
 # then boots the unpacked app's harness once in Node mode (scripts/smoke.mjs) to see the Host
@@ -18,8 +18,8 @@
 # No Windows certificate: Windows asks for "Run anyway"; without the Apple secrets the macOS
 # bundle is ad-hoc signed and macOS asks for Open Anyway in System Settings → Privacy & Security.
 # A push that touches harness/desktop builds Linux only; "Run workflow" and the release tags
-# `v*` build all four, and a tag uploads the installers to the release of the same name — the
-# one scripts/release-apk.sh creates with the APK — retrying until it exists. "Run workflow"
+# `v*` build all four, and a tag uploads the installers to the release of the same name (the
+# one scripts/release-apk.sh creates with the APK), retrying until it exists. "Run workflow"
 # with a release tag does the same for a release that already exists (a platform fixed afterwards).
 name: desktop app
 
@@ -108,7 +108,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           SHELL_VERSION=$(node -p "require('../desktop/package.json').version")
           if [ "$VERSION" != "$SHELL_VERSION" ]; then
-            echo "harness/dsh-nanomuse is $VERSION, harness/desktop is $SHELL_VERSION — the release recipe bumps both" >&2
+            echo "harness/dsh-nanomuse is $VERSION, harness/desktop is $SHELL_VERSION; the release recipe bumps both" >&2
             exit 1
           fi
       - name: The harness, staged
@@ -126,7 +126,7 @@ jobs:
           if [ "${{ matrix.label }}" = "macos-x64" ]; then python -m pip install "cryptography<49"; fi
           python -m pip install -e ".[hands]" pyinstaller
           python scripts/desktop-app/build-runtime.py --check --target harness/desktop/runtime
-      - name: The runtime for the hands (Linux — inside Debian 11, so it runs on glibc 2.31 and newer)
+      - name: The runtime for the hands (Linux, inside Debian 11, so it runs on glibc 2.31 and newer)
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -145,13 +145,13 @@ jobs:
           npm ci
           npm run typecheck
           npm run dist
-      - name: The helper that holds the hands' permissions (macOS — nanoMuse Computer Use.app, Swift)
+      - name: The helper that holds the hands' permissions (macOS, nanoMuse Computer Use.app, Swift)
         if: runner.os == 'macOS'
         shell: bash
         # a universal bundle (arm64 + x86_64) under harness/desktop/mac/computer-use/build/,
         # which electron-builder.yml copies into nanoMuse.app/Contents/Helpers
         run: harness/desktop/mac/computer-use/build.sh
-      - name: The app (macOS — signed and notarized with the Apple secrets, ad-hoc without; zip and APFS dmg by hand)
+      - name: The app (macOS, signed and notarized with the Apple secrets, ad-hoc without; zip and APFS dmg by hand)
         if: runner.os == 'macOS'
         working-directory: harness/desktop
         env:
