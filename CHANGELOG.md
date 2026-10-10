@@ -25,6 +25,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
+- **The app's own pages read in German, Spanish, French, Japanese, Korean and Russian too.** Thirty-eight of nanoMuse's strings on iPhone (the account page, the About credits, the feed and goal prompts, the chats drawer) had English and Chinese only and fell back to English elsewhere; they now carry all nine languages, and a test holds every string the app's own views use to that.
+
 ### Project
 
 - **The READMEs carry the Trendshift badge.** nanoMuse was number seven on GitHub Trending's Swift list for a day (2026-10-10); the badge under the language links shows the current rank and links to the repository's Trendshift page.
