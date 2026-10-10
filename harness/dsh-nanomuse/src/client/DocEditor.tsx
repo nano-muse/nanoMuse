@@ -57,7 +57,7 @@ function Editor({ t, toggleSidebar, doc }: DocEditorProps & { doc: OpenDoc }): R
           if (!res.ok) throw new Error(json.error?.message ?? `${res.status}`)
           return json.text ?? ''
         })
-    load.then((value) => { if (alive) { latest.current = value; setText(value) } }).catch((err: unknown) => { if (alive) setError((err as Error).message) })
+    load.then((value) => { if (alive) { latest.current = value; setText(value) } }).catch((err: unknown) => { if (alive) setError(failureText(t, err)) })
     return () => { alive = false }
   }, [doc])
 

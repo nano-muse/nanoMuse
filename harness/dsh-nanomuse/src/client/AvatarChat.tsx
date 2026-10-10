@@ -10,7 +10,7 @@
  */
 import { createElement as h, useEffect, useSyncExternalStore, type ReactNode } from 'react'
 import { parseAvatarChoice, parseAvatarRequest } from '../avatar-flow.ts'
-import { call, errorCode, type Translate } from './api.ts'
+import { call, errorCode, failureText, type Translate } from './api.ts'
 import { buildPrompt, KEEP, MOOD_INSTRUCTIONS, png, still, type Estimate } from './AvatarStudio.tsx'
 import { AvatarShareSheet } from './AvatarShare.tsx'
 import { composerCard, composerEditable } from './composer.ts'
@@ -30,7 +30,8 @@ interface FlowState {
   /** Four slots: a PNG as base64, `null` while drawing, `''` when that one failed. */
   candidates: (string | null)[]
   picked: number | null
-  error?: string | undefined
+  /** The failed `call` as it came; the view words it with `failureText` in the UI language. */
+  error?: unknown
   share: boolean
 }
 
@@ -79,7 +80,7 @@ export const avatarChat = {
         if (round === mine) set({ candidates: state.candidates.map((v, i) => (i === index ? r.image : v)) })
       } catch (err: unknown) {
         failures++
-        if (round === mine) set({ candidates: state.candidates.map((v, i) => (i === index ? '' : v)), error: (err as Error).message })
+        if (round === mine) set({ candidates: state.candidates.map((v, i) => (i === index ? '' : v)), error: err })
       }
     }
     void (async () => {
@@ -95,7 +96,7 @@ export const avatarChat = {
     set({ candidates: state.candidates.map((v, i) => (i === index ? null : v)) })
     call<{ image: string }>('studio/draw', { prompt: buildPrompt(state.desc, index, 'muse') })
       .then((r) => { if (round === mine) set({ candidates: state.candidates.map((v, i) => (i === index ? r.image : v)) }) })
-      .catch((err: unknown) => { if (round === mine) set({ candidates: state.candidates.map((v, i) => (i === index ? '' : v)), error: (err as Error).message }) })
+      .catch((err: unknown) => { if (round === mine) set({ candidates: state.candidates.map((v, i) => (i === index ? '' : v)), error: err }) })
   },
   /** Keep candidate `index` (0-based): the poses, the account, the agent's word. */
   async choose(index: number): Promise<void> {
@@ -123,7 +124,7 @@ export const avatarChat = {
       set({ phase: 'done' })
       void fetch('nanomuse/rooms/avatar/adopted', { method: 'POST', headers: { 'content-type': 'application/json', 'x-nanomuse': '1' }, body: JSON.stringify({ desc: state.desc, chosen: index + 1, files: Object.keys(stills).map((m) => `${m}.webp`), sessionId: state.sessionId }) }).catch(() => undefined)
     } catch (err: unknown) {
-      if (round === mine) set({ phase: 'pick', picked: null, error: (err as Error).message })
+      if (round === mine) set({ phase: 'pick', picked: null, error: err })
     }
   },
   close(): void {
@@ -261,7 +262,7 @@ function Options({ t, flow, quoted }: { t: Translate; flow: FlowState; quoted: s
         ? h('button', { key: i, type: 'button', className: 'nm-ac-tile nm-ac-tile-retry', disabled: drawing, onClick: () => avatarChat.retry(i) }, t('acRetry'))
         : h('div', { key: i, className: 'nm-ac-tile nm-ac-tile-wait' }, h(IconSpinner, { size: 18 })))),
     drawing ? h('div', { className: 'nm-ac-status nm-live' }, h(IconSpinner, { size: 14 }), t('acGenerating')) : h('p', { className: 'nm-ac-hint' }, t('acPickHint')),
-    flow.error && !drawing ? h('p', { className: 'nm-ac-err' }, flow.error) : null,
+    flow.error && !drawing ? h('p', { className: 'nm-ac-err' }, failureText(t, flow.error)) : null,
     h('div', { className: 'nm-ac-actions' },
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: drawing, onClick: avatarChat.draw }, t('acAgain')),
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: avatarChat.close }, t('acKeep'))))

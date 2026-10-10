@@ -10,7 +10,7 @@
  * stills only.
  */
 import { createElement as h, useCallback, useEffect, useState, type ReactNode } from 'react'
-import { call, errorStyle, type Translate } from './api.ts'
+import { call, errorStyle, failureText, type Translate } from './api.ts'
 import { motionStatus } from './Avatar.tsx'
 import { IconCheck, IconImage, IconVideo } from './icons.tsx'
 import { useLive, type LiveMotion, type MotionMood } from './live.ts'
@@ -50,7 +50,7 @@ export function makeMediaSection(t: Translate) {
     const reload = useCallback(() => {
       void call<MediaView>('media')
         .then(setView)
-        .catch((err: unknown) => setError((err as Error).message))
+        .catch((err: unknown) => setError(failureText(t, err)))
     }, [])
     useEffect(() => reload(), [reload])
     // the model list and the source follow the account and the own keys: re-read when sign-in, a key row or the face changes
@@ -68,7 +68,7 @@ export function makeMediaSection(t: Translate) {
       // `auto` drops the stored choice (an empty model); the slot follows the order again
       void call<MediaView>('media', id === 'off' ? { videoModel: 'off' } : id === 'auto' ? { videoModel: '' } : { videoModel: id, videoProvider: provider })
         .then((v) => { setView(v); models.reload() })
-        .catch((err: unknown) => setError((err as Error).message))
+        .catch((err: unknown) => setError(failureText(t, err)))
         .finally(() => setBusy(null))
     }
     const setImage = (provider: string, id: string) => {
@@ -76,21 +76,21 @@ export function makeMediaSection(t: Translate) {
       setError('')
       void call('image-model', id === 'auto' ? { model: '' } : { model: id, provider })
         .then(() => { reload(); models.reload() })
-        .catch((err: unknown) => setError((err as Error).message))
+        .catch((err: unknown) => setError(failureText(t, err)))
         .finally(() => setBusy(null))
     }
     const setAnimate = (on: boolean) => {
       setBusy('animate')
       void call<MediaView>('media', { animate: on })
         .then(setView)
-        .catch((err: unknown) => setError((err as Error).message))
+        .catch((err: unknown) => setError(failureText(t, err)))
         .finally(() => setBusy(null))
     }
     const animate = (force: boolean, cloud = false) => {
       setBusy('clips')
       setError('')
       void call('media/animate', cloud ? { force, cloud: true } : { force })
-        .catch((err: unknown) => setError((err as Error).message))
+        .catch((err: unknown) => setError(failureText(t, err)))
         .finally(() => setBusy(null))
     }
     const check = () => {
@@ -101,7 +101,7 @@ export function makeMediaSection(t: Translate) {
           setChecked(r.models.length)
           reload()
         })
-        .catch((err: unknown) => setError((err as Error).message))
+        .catch((err: unknown) => setError(failureText(t, err)))
         .finally(() => setBusy(null))
     }
 

@@ -35,7 +35,7 @@
   登录把两样都删掉。一个回环 API（`/nanomuse/cloud/{status,code,verify,refresh,sign-out}`，仅限同源）
   给设置里的那一节供数据。
 - **形象和名字。** 浏览器这一半填上 dsh 的插槽：侧边栏品牌位和主视觉里的小龙、*nanoMuse* 字标，以及
-  设置里的 *nanoMuse 账号* 一节（手机号或邮箱 → 验证码 → 已登录，显示打了码的标识、额度和模型）。
+  设置里的 *nanoMuse Cloud* 一节（手机号或邮箱 → 验证码 → 已登录，显示打了码的标识、额度和模型）。
   原装的品牌插件被 patch 关掉；静态图由宿主这一半提供。
 - **口吻。** dsh 的网页会话由一个*智能体预设*组合而成，预设里的人设优先于全局的，所以 bundle 声明了
   一个预设 `nanomuse`（插件列表和 dsh 的 *Standard* 一样，人设换成 nanoMuse 的），并把它设为默认。
@@ -75,7 +75,7 @@
   `dsh-nanomuse/reach` 注册手机和运行时都有的那些工具：`devices`、`device_screen`（模型接受图片时，
   静态图作为图片送入）、`device_shell` 和 `device_open`（先出 dsh 的审批卡片，命令或 URL 写在里面）、
   `device_files`、`device_notify`，以及 `delegate`：由另一台设备自己的 Muse 来跑任务，当*它*要求
-  审批时，问题以审批卡片的形式回到这里，答复再经 hub 传回去。「设置 → *nanoMuse 账号*」列出各设备，
+  审批时，问题以审批卡片的形式回到这里，答复再经 hub 传回去。「设置 → *nanoMuse Cloud*」列出各设备，
   带在线圆点，可以给这台电脑改名、忘掉离线的设备。
 - **胶囊。** 手或 Reach 工作时，窗口顶部的一个小条显示形象、跳动的竖条、*双手 · 第 N 步* 或
   *多端 · 第 N 步*、它在做什么（「on Laptop B: uname -a」「asking Laptop B's Muse」），以及*停止*，
@@ -95,7 +95,7 @@ Laptop B 上设置的名字和 emoji 几秒内就出现在桌面版的品牌标�
   `force`、`.nanomuse-part` 改名）、`open` 和 `screen`（依次尝试 `screencapture`、PowerShell、
   `gnome-screenshot` / `spectacle` / `grim` / `scrot` / `import`）。同样的名字、同样的形状、同样的
   错误码，所以手机分不出对面是运行时还是 dsh 桌面版。
-- **远程控制开关。** 「设置 → *nanoMuse 账号* → *这台电脑*」下面，和运行时一样的开关：打开，设备在
+- **远程控制开关。** 「设置 → *nanoMuse Cloud* → *这台电脑*」下面，和运行时一样的开关：打开，设备在
   `hello` 里声明六个动作；关闭，只声明 `info` 和 `notify`，其余一律以 `not_allowed` 拒绝（手机看到的
   提示和运行时给的一样）。拨动它会重新向 hub 打招呼，账号的设备表立刻更新。约定不变：发出请求的设备
   在发送前先判断命令（手机和运行时上是哨兵，这里是审批卡片）；目标设备不再问第二遍。

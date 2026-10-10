@@ -17,6 +17,7 @@ let zh
 
 /** Entries whose Chinese is, on purpose, the English: names, a URL, a field label the vendors use. */
 const SAME_ON_PURPOSE = new Set([
+  'title',
   'nav',
   'brand',
   'railLabel',

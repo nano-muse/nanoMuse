@@ -138,7 +138,7 @@ export function AvatarStudioSheet({ t, initial, style: initialStyle, onClose }: 
   const providers = useProviders(t)
   useEffect(() => () => { alive.current = false }, [])
   useEffect(() => {
-    call<Estimate>('studio/estimate').then((e) => { if (alive.current) setEstimate(e) }).catch((err: unknown) => { if (alive.current) setEstimateError(errorCode(err) === 'signed_out' ? t('stSignedOut') : (err as Error).message) })
+    call<Estimate>('studio/estimate').then((e) => { if (alive.current) setEstimate(e) }).catch((err: unknown) => { if (alive.current) setEstimateError(errorCode(err) === 'signed_out' ? t('stSignedOut') : failureText(t, err)) })
   }, [])
 
   const draw = (cloud = viaCloud) => {

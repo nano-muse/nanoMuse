@@ -7,7 +7,7 @@
  * stream carries it without the texts.
  */
 import { createElement as h, useEffect, useState, type ReactNode } from 'react'
-import type { Translate } from './api.ts'
+import { failureText, type Translate } from './api.ts'
 import { IconCheck, IconCheckCircle, IconClose, IconCpu, IconFile, IconGlobe, IconSparkle, IconSpinner } from './icons.tsx'
 import type { ChatListState } from './MuseChats.tsx'
 import { nav, roomsCall, useRooms, type ActivityRecord, type ActivityStep } from './rooms.ts'
@@ -33,7 +33,7 @@ export function TaskDetail({ t, sessionId, useSessions, onClose }: TaskDetailPro
     let alive = true
     roomsCall<ActivityRecord>(`activity?session=${encodeURIComponent(sessionId)}`)
       .then((r) => { if (alive) setRecord(r) })
-      .catch((err: unknown) => { if (alive) setError((err as Error).message) })
+      .catch((err: unknown) => { if (alive) setError(failureText(t, err)) })
     return () => { alive = false }
   }, [sessionId, live?.updatedAt])
   useEffect(() => {
