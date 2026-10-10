@@ -32,6 +32,8 @@ from nanomuse.schema import ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment
 
 _NAME_RE = re.compile(r"[^a-zA-Z0-9_-]")
+#: ``?key=value`` and ``&token=value`` inside a URL quoted in an error message
+_QUERY_VALUE = re.compile(r"([?&])([^=&\s'\"]+)=([^&\s'\"]+)")
 
 
 def _attr(obj: Any, *names: str, default: Any = None) -> Any:
@@ -94,10 +96,14 @@ class MCPManager:
     """
 
     def __init__(
-        self, servers: list[MCPServerSettings], resolve: Callable[[Any], Any] | None = None
+        self,
+        servers: list[MCPServerSettings],
+        resolve: Callable[[Any], Any] | None = None,
+        redact: Callable[[str], str] | None = None,
     ):
         self.servers = servers
         self._resolve = resolve
+        self._redact = redact
         self._stack = AsyncExitStack()
         self.tools: list[MCPTool] = []
 
@@ -111,6 +117,13 @@ class MCPManager:
                 "env": {k: str(v) for k, v in self._resolve(dict(cfg.env)).items()},
             }
         )
+
+    def _scrub(self, text: str) -> str:
+        """A log line with no credential in it: the value of every URL query parameter is
+        masked (an MCP server's key rides there, ``?key=…``, and httpx names the full URL
+        in a 4xx error), then the vault's own secrets (an ``env`` or ``args`` value)."""
+        text = _QUERY_VALUE.sub(r"\1\2=***", text)
+        return self._redact(text) if self._redact else text
 
     async def connect(self) -> list[MCPTool]:
         """Connect every server; one that is down is logged and skipped.
@@ -129,13 +142,18 @@ class MCPManager:
                     session, listed = await self._open(resolved, transport, stack)
                 except BaseException as exc:  # noqa: BLE001 — see the docstring
                     unwound = await _close_quietly(stack)
+                    if unwound is not None:
+                        logger.debug("MCP transport shutdown: {}", self._scrub(_reason(unwound)))
                     if _this_task_is_cancelled():
                         raise
                     # a cancellation says nothing by itself; the transport's own error
                     # comes out when its task group is closed
                     reason = _reason(unwound if isinstance(exc, asyncio.CancelledError) else exc)
                     logger.warning(
-                        "MCP server '{}' unavailable over {}: {}", cfg.name, transport, reason
+                        "MCP server '{}' unavailable over {}: {}",
+                        cfg.name,
+                        transport,
+                        self._scrub(reason),
                     )
                     continue
                 await self._stack.enter_async_context(stack)
@@ -216,7 +234,7 @@ class MCPManager:
         try:
             await self._stack.aclose()
         except Exception as exc:  # noqa: BLE001
-            logger.debug("MCP shutdown: {}", exc)
+            logger.debug("MCP shutdown: {}", self._scrub(_reason(exc)))
 
 
 def _this_task_is_cancelled() -> bool:
@@ -229,11 +247,10 @@ def _this_task_is_cancelled() -> bool:
 
 async def _close_quietly(stack: AsyncExitStack) -> BaseException | None:
     """Close a failed attempt's stack; what it raised while unwinding (the transport's
-    real error, usually) is returned rather than thrown."""
+    real error, usually) is returned rather than thrown, for the caller to log scrubbed."""
     try:
         await stack.aclose()
     except BaseException as exc:  # noqa: BLE001 — a failed transport may unwind noisily
-        logger.debug("MCP transport shutdown: {}: {}", type(exc).__name__, exc)
         return exc
     return None
 

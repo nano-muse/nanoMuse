@@ -123,3 +123,46 @@ async def test_an_unreachable_url_server_is_skipped_not_cancelled():
     await manager.close()
     # the task is still usable
     await asyncio.sleep(0)
+
+
+async def test_a_refused_key_is_not_written_to_the_log():
+    """httpx names the full URL in a 4xx error, and an MCP server's key rides in the query
+    (``?key=…``): the warning masks every query value, and the vault's redaction runs on the
+    rest (a secret an ``args`` or ``env`` value carried)."""
+    import http.server
+    import threading
+
+    from nanomuse.logger import logger
+
+    class Refuse(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(401)
+            self.end_headers()
+
+        do_POST = do_GET
+
+        def log_message(self, *_: object) -> None:
+            pass
+
+    httpd = http.server.HTTPServer(("127.0.0.1", 0), Refuse)
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    lines: list[str] = []
+    sink = logger.add(lambda m: lines.append(m.record["message"]), level="DEBUG")
+    try:
+        manager = MCPManager(
+            [MCPServerSettings(name="paid", url=f"http://127.0.0.1:{port}/mcp?key=k-123&v=2")],
+            redact=lambda text: text.replace("k-123", "[REDACTED:MCP_KEY]"),
+        )
+        tools = await asyncio.wait_for(manager.connect(), timeout=30)
+        await manager.close()
+    finally:
+        logger.remove(sink)
+        httpd.shutdown()
+    assert tools == []
+    joined = "\n".join(lines)
+    assert "unavailable over sse" in joined and "401" in joined, joined
+    assert "k-123" not in joined, joined
+    assert "?key=***&v=***" in joined, joined
+    # the vault's redaction is applied too, for a secret outside the query
+    assert manager._scrub("spawn failed: k-123 x") == "spawn failed: [REDACTED:MCP_KEY] x"

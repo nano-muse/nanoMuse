@@ -117,7 +117,11 @@ class NanoMuseApp:
         if self.device is not None and self.device.has_host:
             mcp_servers.append(device_mcp_server(self.device))
         self.mcp = (
-            MCPManager(mcp_servers, resolve=lambda v: self.vault.resolve(v, strict=False))
+            MCPManager(
+                mcp_servers,
+                resolve=lambda v: self.vault.resolve(v, strict=False),
+                redact=self.vault.redact,
+            )
             if mcp_servers
             else None
         )

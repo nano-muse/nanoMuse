@@ -1495,7 +1495,10 @@ class Connections:
         self.data["mcp"] = {"servers": servers}
         self._save()
         apply_app_settings(self.settings, {"mcp": {"servers": [cfg.model_dump(mode="json")]}})
-        manager = MCPManager([cfg])
+        # placeholders typed in the app resolve like the file's; a refused key is logged masked
+        manager = MCPManager(
+            [cfg], resolve=lambda v: self.vault.resolve(v, strict=False), redact=self.vault.redact
+        )
         tools = await manager.connect()
         if not tools:
             await manager.close()
