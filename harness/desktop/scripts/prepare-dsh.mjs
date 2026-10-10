@@ -9,11 +9,13 @@
 //   node scripts/prepare-dsh.mjs --out dsh            # where to stage (default: ./dsh)
 //
 // Run on the platform being packaged: npm picks that platform's native prebuilds
-// (node-pty, sharp, koffi, the harness's own require-builtin addon). Only the public
-// registry is used, whatever ~/.npmrc says.
+// (node-pty, sharp, koffi, the harness's own require-builtin addon); on Linux sharp's
+// native build is then swapped for its WebAssembly one (see "sharp on Linux" below). Only
+// the public registry is used, whatever ~/.npmrc says.
 
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,6 +88,39 @@ if (process.platform !== "win32") {
   }
 }
 
+// ---------------------------------------------------------------- sharp on Linux
+// The Host runs inside the Electron binary (ELECTRON_RUN_AS_NODE), and Electron's Linux
+// build links the system's GLib and leaks its symbols into the process; sharp's prebuilt
+// libvips carries a GLib of its own, and the two meet in one process (electron/electron#46323;
+// sharp's install notes, "Electron and Linux"). On most systems that is a GLib-GObject-CRITICAL
+// line for every picture; on some it is a SIGSEGV on the first decode, which kills the Host
+// mid-turn (#274). So the Linux package carries sharp's WebAssembly build and not the native
+// one: sharp's loader falls through to @img/sharp-wasm32 when the platform's prebuild is
+// absent, and the wasm build has no GLib to clash with. About twice the time per picture
+// (50 ms for a 2560x1440 screenshot against 22 ms), half the size on disk.
+const imgDir = join(out, "node_modules", "@img");
+if (process.platform === "linux") {
+  const sharpVersion = JSON.parse(readFileSync(join(out, "node_modules", "sharp", "package.json"), "utf8")).version;
+  const wasm = join(imgDir, "sharp-wasm32");
+  const wasmVersion = existsSync(wasm) ? JSON.parse(readFileSync(join(wasm, "package.json"), "utf8")).version : null;
+  if (wasmVersion !== sharpVersion) {
+    run(
+      npm,
+      ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-package-lock", "--ignore-scripts", `--registry=${REGISTRY}`, `@img/sharp-wasm32@${sharpVersion}`],
+      { cwd: out, shell, env: { ...process.env, npm_config_registry: REGISTRY } },
+    );
+  }
+  try {
+    createRequire(join(out, "package.json")).resolve("@img/sharp-wasm32/sharp.node");
+  } catch {
+    throw new Error(`@img/sharp-wasm32 ${sharpVersion} did not install into ${wasm}, or does not export sharp.node`);
+  }
+  for (const entry of readdirSync(imgDir)) {
+    if (/^sharp-(libvips-)?linux/.test(entry)) rmSync(join(imgDir, entry), { recursive: true, force: true });
+  }
+}
+const sharpBuild = process.platform === "linux" ? "wasm" : "native";
+
 // ---------------------------------------------------------------- the trim
 // prebuilds for the other platforms, and source maps nobody opens in a packaged app
 const platformTag = `${process.platform}-${process.arch}`;
@@ -143,9 +178,10 @@ const record = {
   bundle: bundled.version,
   platform: process.platform,
   arch: process.arch,
+  sharp: sharpBuild,
   files,
   megabytes: Math.round(bytes / 1024 / 1024),
   stagedAt: new Date().toISOString(),
 };
 writeFileSync(join(out, "dsh.json"), `${JSON.stringify(record, null, 2)}\n`);
-console.log(`staged ${out}: dsh ${record.dsh}, ${bundled.name} ${record.bundle}, ${files} files, ${record.megabytes} MB (${maps} source maps dropped)`);
+console.log(`staged ${out}: dsh ${record.dsh}, ${bundled.name} ${record.bundle}, sharp ${sharpBuild}, ${files} files, ${record.megabytes} MB (${maps} source maps dropped)`);
