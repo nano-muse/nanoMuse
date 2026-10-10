@@ -34,13 +34,14 @@
 
 *nano* は、自分で動かして自分でデプロイできるほど小さな、ひとそろいのセットという意味です。スマホアプリ、デスクトップアプリ、ウェブコンソール、そしてそれらをつなぐリレーが、すべてこのリポジトリに GPL-3.0-or-later で入っています。**[無料、オープンソース、非営利。いっしょに作っていきましょう。](../../CONTRIBUTING.md)** サインインするとコミュニティのリレーでモデルを使える無料枠がもらえます。費用は開発者が負担しています。使い切ったら[自分のキーに切り替えて](../own-key.md)ください。同じリレーは自分のサーバーでも動くので、データを外に出さないこともできます。最新版は **1.0.1 Ballast**、[リリースノート](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [ブラウザで試す](https://demo.nanomuse.dev/)。
 
+> [!NOTE]
+> **nanoMuse は進化しつづけます**
+>
+> パーソナルエージェントは、誰かのクラウドの中だけで育つべきものではありません。だから nanoMuse は、オープンソースで低コストの代わりになるものを目指します。自分のデバイスに入れ、モデルは自分で選び、リレーも自分で立てられます。世界中の開発者や利用者といっしょに作り、一人ひとりが本当に自分のパーソナルエージェントを持てるようにしたいと考えています。[issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) を立てるのも、[プルリクエスト](../../CONTRIBUTING.md) を送るのも、どちらも nanoMuse をよくすることにつながります。
+
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
-
-> ### nanoMuse は進化しつづけます
->
-> パーソナルエージェントは、誰かのクラウドの中だけで育つべきものではありません。だから nanoMuse は、オープンソースで低コストの代わりになるものを目指します。自分のデバイスに入れ、モデルは自分で選び、リレーも自分で立てられます。世界中の開発者や利用者といっしょに作り、一人ひとりが本当に自分のパーソナルエージェントを持てるようにしたいと考えています。[issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) を立てるのも、[プルリクエスト](../../CONTRIBUTING.md) を送るのも、どちらも nanoMuse をよくすることにつながります。
 
 ## 🗞️ ニュース
 

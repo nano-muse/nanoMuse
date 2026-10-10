@@ -34,13 +34,14 @@
 
 *nano* nghĩa là trọn bộ nhưng đủ nhỏ để bạn tự chạy và tự triển khai: ứng dụng điện thoại, ứng dụng máy tính, bảng điều khiển web và relay nối chúng lại đều nằm trong kho này, theo giấy phép GPL-3.0-or-later. **[Miễn phí, mã nguồn mở, phi lợi nhuận. Cùng nhau xây dựng.](../../CONTRIBUTING.md)** Đăng nhập là bạn có một khoản miễn phí để dùng mô hình qua relay của cộng đồng (do người phát triển trả); dùng hết thì [chuyển sang khóa của riêng bạn](../own-key.md). Cùng relay đó chạy được trên máy chủ của bạn, nên dữ liệu không cần rời khỏi nhà bạn. Phiên bản mới nhất: **1.0.1 Ballast**, [ghi chú phát hành](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [dùng thử trên trình duyệt](https://demo.nanomuse.dev/).
 
+> [!NOTE]
+> **nanoMuse không ngừng phát triển**
+>
+> Trợ lý cá nhân không nên chỉ sống trong đám mây của người khác, nên nanoMuse muốn là lựa chọn thay thế mã nguồn mở, chi phí thấp: chạy trên thiết bị của chính bạn, mô hình do bạn chọn, relay cũng có thể tự dựng. Chúng tôi muốn cùng các nhà phát triển và người dùng khắp nơi xây dựng nó, để mỗi người thật sự có một trợ lý cá nhân của riêng mình. Mở một [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) hay gửi một [pull request](../../CONTRIBUTING.md), cách nào cũng giúp nanoMuse tốt hơn.
+
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 <p align="center"><a href="https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4">English</a> · <a href="https://nanomuse.cn/media/film/nanomuse-film-zh-web.mp4">中文</a> · <a href="https://nanomuse.cn/#film">nanomuse.cn</a></p>
-
-> ### nanoMuse không ngừng phát triển
->
-> Trợ lý cá nhân không nên chỉ sống trong đám mây của người khác, nên nanoMuse muốn là lựa chọn thay thế mã nguồn mở, chi phí thấp: chạy trên thiết bị của chính bạn, mô hình do bạn chọn, relay cũng có thể tự dựng. Chúng tôi muốn cùng các nhà phát triển và người dùng khắp nơi xây dựng nó, để mỗi người thật sự có một trợ lý cá nhân của riêng mình. Mở một [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) hay gửi một [pull request](../../CONTRIBUTING.md), cách nào cũng giúp nanoMuse tốt hơn.
 
 ## 🗞️ Tin mới
 
