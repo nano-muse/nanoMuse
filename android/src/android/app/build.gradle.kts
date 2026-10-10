@@ -51,6 +51,16 @@ android {
                 keyPassword = props.getProperty("keyPassword")
             }
         }
+        // nanoMuse: committed CI debug key. Every CI runner mints its own throwaway
+        // debug key, so consecutive CI APKs carry different signatures and Android
+        // refuses to install one over the other ("update incompatible"). This key
+        // uses the stock public debug credentials (android/android) and is debug-only.
+        create("ciDebug") {
+            storeFile = file("ci-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     defaultConfig {
@@ -96,6 +106,9 @@ android {
         // so a CI APK never replaces the store version on a test phone.
         debug {
             applicationIdSuffix = ".debug"
+            // nanoMuse: sign with the committed CI key so consecutive CI builds
+            // share one signature and install over each other (see signingConfigs).
+            signingConfig = signingConfigs.getByName("ciDebug")
         }
         release {
             isMinifyEnabled = true
