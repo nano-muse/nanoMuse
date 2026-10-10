@@ -45,6 +45,9 @@ fun MuseBottomBar(
     hazeState: HazeState,
     modifier: Modifier = Modifier,
 ) {
+    // Hoisted out of the hazeEffect block: Haze 1.x's block is not a @Composable scope,
+    // so MaterialTheme lookups cannot happen inside it.
+    val barBackground = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -56,9 +59,11 @@ fun MuseBottomBar(
             modifier = Modifier
                 .hazeEffect(state = hazeState) {
                     style = HazeStyle(
-                        backgroundColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
+                        backgroundColor = barBackground,
                         blurRadius = 28.dp,
                         noiseFactor = 0.08f,
+                        // tints named explicitly: HazeStyle has a twin constructor taking tint: HazeTint?
+                        tints = emptyList(),
                     )
                 }
                 .clip(CircleShape)
