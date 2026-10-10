@@ -35,6 +35,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### iOS
 
 - **The app's own pages read in German, Spanish, French, Japanese, Korean and Russian too.** Thirty-eight of nanoMuse's strings on iPhone (the account page, the About credits, the feed and goal prompts, the chats drawer) had English and Chinese only and fell back to English elsewhere; they now carry all nine languages, and a test holds every string the app's own views use to that.
+- **Two Russian sentences lose their dashes, and the Chinese lines that name a device or the agent put a space around the name.** The About credits and the Muse home description used the dash Russian likes as a copula; they are written out now. In Chinese and Traditional Chinese, *Connected on another device* under Connectors, the agent page's greeting and the new-look reply put a space on each side of the inserted name.
 
 ### Project
 
