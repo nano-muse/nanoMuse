@@ -324,6 +324,8 @@ html[data-theme="dark"] .nm-dock-app[aria-pressed="true"] { background: #e8e8e8;
 .group:last-child { margin-bottom: 0; }
 .group h2 { margin: 0 0 4px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
 .group .why { margin: 0 0 6px; color: var(--fg-2); font-size: 12.5px; }
+/* a note under the lines: what the visitor does at that point */
+.group .chip + .why { margin: 7px 0 0; }
 .group.off { opacity: 0.55; }
 .chip {
   display: block;

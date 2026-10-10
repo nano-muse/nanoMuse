@@ -37,6 +37,21 @@ def test_relay_refusals_are_named_by_code():
     assert describe_failure(exc)[0] == "provider"
 
 
+def test_the_showcase_gateways_shares_are_named():
+    """The showcase's gateway answers 429 ``session_budget`` / ``daily_budget`` when a demo
+    Muse's share of the model is used up; that is not a provider rate-limiting a key."""
+    exc = _status_error(
+        openai.RateLimitError, 429, {"code": "session_budget", "message": "used up"}
+    )
+    code, text = describe_failure(exc)
+    assert code == "allowance" and "this visit" in text and "rate-limit" not in text
+    exc = _status_error(openai.RateLimitError, 429, {"code": "daily_budget", "message": "today"})
+    code, text = describe_failure(exc)
+    assert code == "allowance" and "tomorrow" in text
+    # the notice carries no allowance card: there is no account behind a demo Muse
+    assert "allowance" not in failure_notice(exc, "main")
+
+
 def test_an_exhausted_allowance_carries_the_ways_on():
     """relay 0.9: ``429 allowance_exhausted`` says what is left and where an invitation
     (+¥5 for both sides) and one's own key lead; the notice passes that on for the card.

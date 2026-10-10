@@ -26,7 +26,7 @@ hero:
 
 | | |
 |---|---|
-| **浏览器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：登录之后，一台模拟手机里的 nanoMuse。这是演示；下面的 App 才是正式版 |
+| **浏览器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：登录之后，一台模拟手机里的 nanoMuse，旁边有中英文各一组可以点的例句。这是演示；下面的 App 才是正式版 |
 | **Android** 8.0 以上，arm64 | [nanoMuse-1.0.1-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-1.0.1-arm64.apk) · [怎么装](/zh/android) |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc)：测试版，已通过 Apple 的 beta 审核；从这个链接安装 · [iOS](/zh/ios) |
 | **macOS** 12 以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-x64.dmg) · [桌面版](/zh/desktop) |
