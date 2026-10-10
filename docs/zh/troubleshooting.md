@@ -6,6 +6,8 @@
 
 **启动时提示「web app not built」。** 你是在一个没有构建前端的检出目录里运行。`cd web && npm install && npm run build`，或者改为安装软件包。
 
+**启动时提示「port 8787 on 127.0.0.1 is already in use by nanoMuse 1.0.1」。** 这个端口上已经有一个 nanoMuse 在跑（更早的一次 `nanomuse serve`、daemon、一个容器），`serve` 在碰数据目录之前就停下了。在浏览器里打开那一个，或者先停掉它再启动；`--port 8790` 可以让这一个和它并存。提示里是「by another program」的话，是别的程序占着端口：停掉它，或者换一个端口。
+
 **回复的语言不对。** `agent.language = "auto"` 时，系统提示词会写明你最新一条消息的语言（按文字系统检测）。如果模型还是跑偏，在「你 → 回复语言」里设一个固定语言，或者 `agent.language = "English"`。
 
 **流式回复的开头缺了一截。** 有些代理把 `<think>…</think>` 内联进正文，在服务端会丢掉 `</think>` 之后的头几个 token。非流式的响应是完整的；在 `[llm]` 下设 `stream = false`。

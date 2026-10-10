@@ -6,6 +6,8 @@ Start with `nanomuse doctor`: it prints the config file in use, the data directo
 
 **"web app not built" on start.** You are running from a checkout without the built front-end. `cd web && npm install && npm run build`, or install the package instead.
 
+**"port 8787 on 127.0.0.1 is already in use by nanoMuse 1.0.1" on start.** A nanoMuse is already serving there (an earlier `nanomuse serve`, the daemon, a container), and `serve` stops before touching the data directory. Open that one in the browser, or stop it before starting another; `--port 8790` runs this one beside it. *By another program* means something else holds the port: stop it or choose another port.
+
 **Replies come back in the wrong language.** With `agent.language = "auto"` the system prompt names the language of your latest message (detected by script). If a model still drifts, set a fixed language in *You → Reply language* or `agent.language = "English"`.
 
 **The beginning of a streamed reply is missing.** Some proxies that inline `<think>…</think>` into the content drop the first tokens after `</think>` on the server side. Non-streaming responses are complete; set `stream = false` under `[llm]`.
