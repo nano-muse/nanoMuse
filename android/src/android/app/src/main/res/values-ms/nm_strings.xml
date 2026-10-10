@@ -648,8 +648,8 @@
     <string name="nm_cloud_server_now">Pelayan: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s menjawab: relay %2$s.</string>
     <string name="nm_cloud_server_bad_url">Masukkan alamat relay, contohnya https://relay.example.org.</string>
-    <string name="nm_cloud_server_https">Guna https untuk pelayan di luar rangkaian anda sendiri. http memadai untuk alamat peribadi (10.x, 192.168.x, 172.16–31.x, localhost, nama .local atau .ts.net).</string>
-    <string name="nm_lan_only_https">http:// biasa hanya berfungsi untuk alamat dalam rangkaian anda sendiri (10.x, 172.16–31.x, 192.168.x, nama .local); gunakan https:// untuk %1$s.</string>
+    <string name="nm_cloud_server_https">Guna https untuk pelayan di luar rangkaian anda sendiri. http memadai untuk alamat peribadi (10.x, 192.168.x, 172.16-31.x, localhost, nama .local atau .ts.net).</string>
+    <string name="nm_lan_only_https">http:// biasa hanya berfungsi untuk alamat dalam rangkaian anda sendiri (10.x, 172.16-31.x, 192.168.x, nama .local); gunakan https:// untuk %1$s.</string>
     <string name="nm_cloud_server_unreachable">Tiada relay menjawab di %1$s. Semak alamat dan pastikan relay sedang berjalan.</string>
     <string name="nm_cloud_server_default">Kembali ke nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">Pelayan</string>

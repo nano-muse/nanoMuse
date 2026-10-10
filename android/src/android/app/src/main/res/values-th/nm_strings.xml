@@ -648,8 +648,8 @@
     <string name="nm_cloud_server_now">เซิร์ฟเวอร์: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s ตอบกลับแล้ว: รีเลย์ %2$s</string>
     <string name="nm_cloud_server_bad_url">กรอกที่อยู่ของรีเลย์ เช่น https://relay.example.org</string>
-    <string name="nm_cloud_server_https">ใช้ https สำหรับเซิร์ฟเวอร์นอกเครือข่ายของคุณเอง ส่วนที่อยู่ส่วนตัว (10.x, 192.168.x, 172.16–31.x, localhost, ชื่อ .local หรือ .ts.net) ใช้ http ได้</string>
-    <string name="nm_lan_only_https">http:// แบบไม่เข้ารหัสใช้ได้เฉพาะที่อยู่ในเครือข่ายของคุณเอง (10.x, 172.16–31.x, 192.168.x, ชื่อ .local) สำหรับ %1$s ให้ใช้ https://</string>
+    <string name="nm_cloud_server_https">ใช้ https สำหรับเซิร์ฟเวอร์นอกเครือข่ายของคุณเอง ส่วนที่อยู่ส่วนตัว (10.x, 192.168.x, 172.16-31.x, localhost, ชื่อ .local หรือ .ts.net) ใช้ http ได้</string>
+    <string name="nm_lan_only_https">http:// แบบไม่เข้ารหัสใช้ได้เฉพาะที่อยู่ในเครือข่ายของคุณเอง (10.x, 172.16-31.x, 192.168.x, ชื่อ .local) สำหรับ %1$s ให้ใช้ https://</string>
     <string name="nm_cloud_server_unreachable">ไม่มีรีเลย์ตอบกลับที่ %1$s ตรวจสอบที่อยู่และดูว่ารีเลย์กำลังทำงานอยู่</string>
     <string name="nm_cloud_server_default">กลับไปใช้ nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">เซิร์ฟเวอร์</string>

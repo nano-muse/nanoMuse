@@ -543,7 +543,7 @@
     <string name="nm_hands_fx_open">開啟 %1$s</string>
     <string name="nm_hands_fx_wait">等 %1$d 秒</string>
     <!-- the approval card -->
-    <string name="nm_risk_desc_screen">%1$s 想在%3$s裡點「%2$s」。</string>
+    <string name="nm_risk_desc_screen">%1$s 想在 %3$s 裡點「%2$s」。</string>
     <string name="nm_risk_preview_screen">螢幕上</string>
 
     <!-- Reach (0.1.13): the phone drives your computer -->
@@ -627,8 +627,8 @@
     <string name="nm_cloud_server_now">伺服器：%1$s</string>
     <string name="nm_cloud_server_ok">%1$s 已回應：中繼服務 %2$s。</string>
     <string name="nm_cloud_server_bad_url">請填寫伺服器位址，例如 https://relay.example.org。</string>
-    <string name="nm_cloud_server_https">自家網路之外的伺服器請用 https。內網位址（10.x、192.168.x、172.16–31.x、localhost、.local 或 .ts.net 網域）可以用 http。</string>
-    <string name="nm_lan_only_https">明文 http:// 只能用於你自己網路裡的位址（10.x、172.16–31.x、192.168.x、.local 名字）；%1$s 請用 https://。</string>
+    <string name="nm_cloud_server_https">自家網路之外的伺服器請用 https。內網位址（10.x、192.168.x、172.16-31.x、localhost、.local 或 .ts.net 網域）可以用 http。</string>
+    <string name="nm_lan_only_https">明文 http:// 只能用於你自己網路裡的位址（10.x、172.16-31.x、192.168.x、.local 名字）；%1$s 請用 https://。</string>
     <string name="nm_cloud_server_unreachable">%1$s 沒有中繼服務回應。請檢查位址，並確認服務已在執行。</string>
     <string name="nm_cloud_server_default">改回 nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">伺服器</string>
@@ -942,8 +942,8 @@
     <string name="nm_connectors_own_row">MCP 伺服器</string>
     <string name="nm_connectors_own_sub">按位址或指令新增伺服器，或匯入 JSON 設定。</string>
     <string name="nm_connectors_elsewhere_title">你的其他裝置上</string>
-    <string name="nm_connectors_elsewhere_sign_in">已在%1$s上連接；在這支手機上登入一次，這裡也能用。</string>
-    <string name="nm_connectors_elsewhere_only">已在%1$s上連接。不在這支手機的目錄裡；需要的話到「你自己的伺服器」裡新增。</string>
+    <string name="nm_connectors_elsewhere_sign_in">已在 %1$s 上連接；在這支手機上登入一次，這裡也能用。</string>
+    <string name="nm_connectors_elsewhere_only">已在 %1$s 上連接。不在這支手機的目錄裡；需要的話到「你自己的伺服器」裡新增。</string>
     <string name="nm_connectors_elsewhere_device">另一台裝置</string>
     <string name="nm_connectors_own_n">已有 %1$d 個 · 按位址、指令或 JSON 新增</string>
     <string name="nm_connectors_how_client">%1$s 不支援自動註冊應用程式，所以需要一次性的小設定：在它的開發者設定裡建立一個你自己的 OAuth 應用程式，回呼位址填下面這個，然後把應用程式的用戶端 ID 貼到這裡（如有用戶端密鑰也一併填上）。兩者都只保存在這支手機上。</string>

@@ -648,8 +648,8 @@
     <string name="nm_cloud_server_now">サーバー: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s が応答しました: リレー %2$s。</string>
     <string name="nm_cloud_server_bad_url">リレーのアドレスを入力してください。例: https://relay.example.org</string>
-    <string name="nm_cloud_server_https">自分のネットワークの外にあるサーバーには https を使ってください。プライベートアドレス（10.x、192.168.x、172.16–31.x、localhost、.local や .ts.net の名前）なら http でかまいません。</string>
-    <string name="nm_lan_only_https">暗号化なしの http:// は自分のネットワーク内のアドレス（10.x、172.16–31.x、192.168.x、.local 名）にだけ使えます。%1$s には https:// を使ってください。</string>
+    <string name="nm_cloud_server_https">自分のネットワークの外にあるサーバーには https を使ってください。プライベートアドレス（10.x、192.168.x、172.16-31.x、localhost、.local や .ts.net の名前）なら http でかまいません。</string>
+    <string name="nm_lan_only_https">暗号化なしの http:// は自分のネットワーク内のアドレス（10.x、172.16-31.x、192.168.x、.local 名）にだけ使えます。%1$s には https:// を使ってください。</string>
     <string name="nm_cloud_server_unreachable">%1$s からリレーの応答がありません。アドレスと、リレーが動いているかを確認してください。</string>
     <string name="nm_cloud_server_default">nanoMuse Cloud に戻す</string>
     <string name="nm_cloud_server_row">サーバー</string>

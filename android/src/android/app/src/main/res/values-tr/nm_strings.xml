@@ -651,8 +651,8 @@
     <string name="nm_cloud_server_now">Sunucu: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s yanıt verdi: relay %2$s.</string>
     <string name="nm_cloud_server_bad_url">Relay’in adresini gir, örneğin https://relay.example.org.</string>
-    <string name="nm_cloud_server_https">Kendi ağının dışındaki bir sunucu için https kullan. Özel bir adres (10.x, 192.168.x, 172.16–31.x, localhost, bir .local ya da .ts.net adı) için http yeterli.</string>
-    <string name="nm_lan_only_https">Şifresiz http:// yalnızca kendi ağındaki adreslerde çalışır (10.x, 172.16–31.x, 192.168.x, .local adları); %1$s için https:// kullan.</string>
+    <string name="nm_cloud_server_https">Kendi ağının dışındaki bir sunucu için https kullan. Özel bir adres (10.x, 192.168.x, 172.16-31.x, localhost, bir .local ya da .ts.net adı) için http yeterli.</string>
+    <string name="nm_lan_only_https">Şifresiz http:// yalnızca kendi ağındaki adreslerde çalışır (10.x, 172.16-31.x, 192.168.x, .local adları); %1$s için https:// kullan.</string>
     <string name="nm_cloud_server_unreachable">%1$s adresinde yanıt veren bir relay yok. Adresi ve relay’in çalıştığını kontrol et.</string>
     <string name="nm_cloud_server_default">nanoMuse Cloud’a dön</string>
     <string name="nm_cloud_server_row">Sunucu</string>

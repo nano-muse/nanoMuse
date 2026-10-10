@@ -30,6 +30,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - **The app starts beside OpenMinis.** Both apps bound the same Linux abstract socket, `native-offload`, for the sandbox's calls back into the app, and abstract sockets are one namespace for every app on the device, so whichever app started second failed to bind and died before its first screen. nanoMuse's socket is now `io.github.nanomuse.app.native-offload`; when even that is still held by a previous process of ours, the app binds a per-process name and tells proot that one instead of crashing (#271).
 - **When even the per-process socket cannot be bound, the crash names that socket.** The message used to blame the app's own socket name whatever had failed, and carried a dash; it now names the per-process socket that failed last and says that another process may hold the namespace (#288).
+- **The private-address hint reads the same in every language.** The two sentences that list the addresses plain `http://` is accepted for (under *Use a different server* and in the LAN-only notice) wrote the `172.16` to `172.31` range with a dash in all seventeen languages; it is `172.16-31.x` now. The Chinese and Traditional Chinese Sentinel card for a tap and the two *Connected on another device* lines under Connectors put a space on each side of the device or app name they insert.
 
 ### iOS
 
