@@ -67,6 +67,10 @@ class ProviderIn(BaseModel):
 
 class SessionIn(BaseModel):
     provider: ProviderIn | None = None
+    # the visitor's time zone (an IANA name, what Intl gives the page), so the Muse's clock
+    # is the visitor's: a reminder "in 2 minutes" lands in 2 minutes and says the right time.
+    # Unset or unknown → the container's own (UTC).
+    time_zone: str = Field("", max_length=64, pattern=r"^[A-Za-z0-9_+\-]*(/[A-Za-z0-9_+\-]+)*$")
 
 
 class TrialIn(BaseModel):
@@ -470,6 +474,7 @@ def create_app(
                 byok,
                 account=visitor.id if visitor else "",
                 hint=visitor.hint if visitor else "",
+                time_zone=body.time_zone,
             )
         except Refused as exc:
             return _refused(exc)

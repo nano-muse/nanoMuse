@@ -4,11 +4,13 @@ A page anyone can open: a phone in the browser with 微信, 支付宝, 铁路123
 [MobileGym](https://github.com/Purewhiter/mobilegym) apps on it, and nanoMuse installed. The
 page opens on the nanoMuse app, and a **private nanoMuse is started for you** on the showcase
 server — your own container, your own token, phone operation on — for thirty minutes and
-within a model budget. Beside the phone are a few lines to try: a new look for the Muse
-(it draws itself), the apps on the phone operated for you ("打开微信，看看张伟最新发来的消息"),
-memory and reminders; a tap puts the line in the chat on the phone, and anything else can be
-typed there. This is nanoMuse's web entry — what [nanomuse.cn/web](https://nanomuse.cn/web/)
-leads to.
+within a model budget. Beside the phone are a few lines to try, one set per language ([The
+lines](#the-lines)): a new look for the Muse (it draws itself), the apps on the phone operated
+for you ("打开微信，看看张伟最新发来的消息说了什么"; "Open Spotify and play Bad Habits by Ed
+Sheeran"), a send that waits for the visitor's word, two apps read for one answer, memory and
+a reminder; a tap puts the line in the chat on the phone, and anything else can be typed
+there. This is nanoMuse's web entry, what [nanomuse.cn/web](https://nanomuse.cn/web/) leads
+to.
 
 The page (`site/page/`) is plain HTML and a little script, with MobileGym in a frame on the
 same origin as `/phone.html`; it talks to the nanoMuse app on the phone through
@@ -71,6 +73,69 @@ browser hands a scroll on to the parent when the frame has nowhere to go); over 
 screen the phone keeps it. Dark is the page's own surfaces in the site's dark tokens, the stage
 and MobileGym's guide and dock cards going dark with them.
 
+## The lines
+
+The column beside the phone is not one list translated twice: the English set stays on the
+apps of the phone an international visitor knows by name and the Chinese set on the ones a
+Chinese visitor uses, and three ideas (the look, the memory, the reminder) are the same in
+both. MobileGym's phone has 27 apps of its own (nanoMuse is the 28th) and every one of them
+has an English interface (`res/strings.en.ts`), but the seeded data is Chinese: the contacts,
+the chats, the bills, the SMS threads. So the English lines go where that shows least: Spotify, Weather, Reddit,
+X, and the Messages thread where the tap that sends is the point. The Chinese set keeps to
+what the simulator is for: 微信 and 铁路12306 as re-creations, no 支付宝 statements
+([docs/showcase.md](../../docs/showcase.md#never-in-public-material) says why). The texts are in
+`site/page/index.html` (`.chip.en` / `.chip.zh`, the text in `data-text`); the switch at the
+top shows one set, and the Muse answers in that language.
+
+Every line was run end to end on the showcase's models (deepseek-v4.1-flash for the chat,
+qwen3.8-27b for the hands) in a fresh session, and kept only when it finished. What each
+costs, measured; the session's share is `SESSION_LLM_REQUESTS` (60) calls, and a screenshot
+the operator reads is one call:
+
+| | line | what it shows | calls | time |
+|---|---|---|---|---|
+| en | Change your look to an orange cat with round glasses | the studio: four faces, then the poses and clips of the chosen one | 1, and 8 pictures | 10 s to the faces, 50 s more for the poses |
+| en | Open Spotify and play Bad Habits by Ed Sheeran | one app, a search, a tap on the result | 10 to 12 | 65 to 100 s |
+| en | Open the Weather app: will it rain in Beijing tomorrow? | a screen read and reported | 2 to 7 | 40 to 70 s |
+| en | In Messages, reply to the latest text with: Thanks, got it | typing, then the Sentinel's card before the send; *Allow once* on the phone | 9 to 10 | 55 to 65 s |
+| en | Look at the first post in the Reddit feed and what is trending on X, then tell me in two lines what people are talking about | two apps, one answer | 6 to 16 | 70 to 75 s |
+| en | Remember: I have an iced americano every morning / What do I usually drink in the morning? | memory kept and recalled | 2, then 1 or 2 | 12 to 15 s each |
+| en | Remind me in 2 minutes to stand up and stretch | a reminder that fires while the visitor is there | 3 | 12 to 25 s, the notice on the minute |
+| zh | 换个形象：一只戴圆框眼镜的橘猫 | the studio, as above | 1, and 8 pictures | 10 s, then 55 s |
+| zh | 打开微信，看看张伟最新发来的消息说了什么 | a chat read | 6 | 30 to 35 s |
+| zh | 在微信里回复张伟：好啊，几点？ | typing, then the Sentinel's card before 「发送」 | 6 to 7 | 40 s |
+| zh | 打开手机上的铁路12306，查一下明天上海到南京最早的一班车 | a date picked, a search, the list read | 7 to 8 | 65 to 70 s |
+| zh | 打开天气，看看北京明天会不会下雨 | a screen read and reported | 3 to 9 | 30 to 75 s |
+| zh | 先在微信看看张伟约了什么，再打开天气看看北京明天怎么样，告诉我去不去合适 | two apps, one answer | 16 in a fresh chat, 4 after the two reads above | 115 s, or 40 s |
+| zh | 记住：我每天早上要喝一杯冰美式 / 我早上一般喝什么？ | memory | 2, then 2 | 15 s each |
+| zh | 2 分钟后提醒我站起来活动一下 | the reminder | 2 | 15 s, the notice on the minute |
+
+Two runs of one line differ: the chat model sometimes hands the phone to the operator
+(`phone_task`, a context of its own that ends with the task) and sometimes drives it itself
+(`phone_act`, every step's screen list staying in the chat), and the second way costs more
+calls and far more tokens, since each later call carries every earlier step. The ranges above
+are what was seen. The session's tokens (`SESSION_LLM_TOKENS`, 300k) run out before its calls
+do on the second way: one such run spent 210k tokens on one line, and the fourth line of that
+session was refused.
+
+What the runs taught, for the next line anyone adds: name the app ("打开手机上的铁路12306",
+"in the Weather app"); without it the model tries the web first, which has no way out of a
+session, and asks the visitor to approve a fetch that cannot work; the old 12306 line went
+looking for an MCP server and asked a question instead of opening the app. Ask for what is on
+the first screen: the Weather app's home has tomorrow's line, and a goal that wants the
+"chance of rain" sends the operator digging for a detail page that is not there. A line that
+writes in Notes is 6 to 20 steps (the body field is slow to take focus), so none of the kept
+lines does. A new text from the compose page is fragile (the send arrow is at the screen's
+edge and the operator's taps land beside it); a reply inside a thread sends. One look per
+session: a look is eight pictures and four clips, and `IMAGE_PER_SESSION` (12) and
+`CLIPS_PER_SESSION` (4) are sized for one.
+
+The container's clock is the visitor's: the phone app sends the browser's IANA time zone
+with `POST /api/demo/session` (`time_zone`, the shape of a zone name or nothing), and the
+gateway sets `TZ` in the container, so "in 2 minutes" is due in 2 minutes and the Muse
+quotes the visitor's time, not UTC. Without it a Chinese reply took the server's `UTC+0000`
+for Beijing time and set the reminder eight hours out.
+
 Nothing about the phone runs on the server. MobileGym is a React app: the whole simulated
 phone lives in the visitor's tab (~400 MB of *their* memory). The server runs three things:
 
@@ -111,7 +176,9 @@ httpx's) carries the value: it is rewritten to `token=[redacted]` before it is w
   the budget counts.
 - **Budgets:** per session `SESSION_LLM_REQUESTS` / `SESSION_LLM_TOKENS`, per day (Asia/Shanghai)
   `DAILY_LLM_REQUESTS` / `DAILY_LLM_TOKENS`. Over budget, the model call gets an OpenAI-shaped
-  429 and the agent tells the visitor.
+  429 (`session_budget` / `daily_budget`) and the agent tells the visitor in those words
+  (`nanomuse/server/failures.py`): the demo's share is used up, start over or install the
+  app, not "the provider is rate-limiting this key".
 - **Per visitor (IP):** `PER_IP_ACTIVE` sessions at once, `PER_IP_DAILY` a day. `MAX_SESSIONS`
   overall.
 - **Who is trying it** (`DEMO_SIGNIN_REQUIRED=1`, the default): before the phone starts a Muse,

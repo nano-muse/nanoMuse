@@ -130,13 +130,22 @@ export async function startDemoSession(
 ): Promise<DemoSession> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (ticket) headers.authorization = `Bearer ${ticket}`;
+  // the visitor's time zone goes with the request: the Muse's clock (what "in 2 minutes"
+  // and "at 17:58" mean in its replies and reminders) is then the visitor's, not the server's
+  const body: { provider?: DemoProvider; time_zone?: string } = provider ? { provider } : {};
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (zone) body.time_zone = zone;
+  } catch {
+    // no Intl, or no zone to tell: the Muse keeps the server's clock
+  }
   const raw = await call<{ id: string; server_url: string; token: string; expires_at: number; byok: boolean }>(
     gateway,
     '/session',
     {
       method: 'POST',
       headers,
-      body: JSON.stringify(provider ? { provider } : {}),
+      body: JSON.stringify(body),
     },
   );
   return { id: raw.id, serverUrl: raw.server_url, token: raw.token, expiresAt: raw.expires_at, byok: raw.byok };

@@ -84,6 +84,7 @@ class Session:
     byok: Provider | None = None
     account: str = ""  # the visitor's account id, when the showcase asks for a sign-in
     hint: str = ""  # the masked identifier, for the log and the admin
+    time_zone: str = ""  # the visitor's IANA zone, the container's TZ; "" → UTC
     last_seen: float = field(default=0.0)
     requests: int = 0
     tokens: int = 0
@@ -317,11 +318,20 @@ class SessionManager:
             if s.video_model and s.video_api_key and s.video_base_url:
                 env["NANOMUSE_LLM_VIDEO_MODEL"] = s.video_model
                 env["NANOMUSE_LLM_VIDEO_BASE_URL"] = f"{base}/main"
+        # the visitor's clock: Python's local time in the container follows TZ (the image
+        # has the zone files); a name it does not know leaves the container on UTC
+        if sess.time_zone:
+            env["TZ"] = sess.time_zone
         env.update(s.extra_env)
         return env
 
     async def create(
-        self, ip: str, byok: Provider | None = None, account: str = "", hint: str = ""
+        self,
+        ip: str,
+        byok: Provider | None = None,
+        account: str = "",
+        hint: str = "",
+        time_zone: str = "",
     ) -> Session:
         if byok and not self.s.byok_enabled:
             raise Refused(400, "byok_off", "Bringing your own key is turned off on this showcase.")
@@ -346,6 +356,7 @@ class SessionManager:
                 byok=byok,
                 account=account,
                 hint=hint,
+                time_zone=time_zone,
                 last_seen=now,
             )
             self.sessions[sid] = sess

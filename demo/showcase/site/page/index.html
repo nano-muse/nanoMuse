@@ -28,6 +28,7 @@
           var l = s ? (s === "zh" ? "zh" : "en") : /^zh/i.test(navigator.language || "") ? "zh" : "en";
           document.documentElement.setAttribute("data-lang", l);
           document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
+          document.title = l === "zh" ? "nanoMuse · 在线体验" : "nanoMuse · Try it in the browser";
         } catch (e) {}
       })();
     </script>
@@ -143,28 +144,49 @@
             </p>
           </div>
 
+          <!-- The lines to try: one set per language, not translations of each other. The
+               English set stays on the phone's apps an international visitor knows (Spotify,
+               Weather, Messages, Reddit, X); the Chinese set on the ones a Chinese visitor uses
+               (微信, 铁路12306, 支付宝, 天气). The look, the memory and the reminder are the same
+               idea in both. Every line here was run end to end on the showcase's models and
+               finished within the session's share; a line that needs a tap from the visitor
+               says so under it. The texts are in demo/showcase/README.md (The lines). -->
           <div class="groups">
             <div class="group" id="group-look">
               <h2><i class="en">A new look</i><i class="zh">换个形象</i></h2>
               <p class="why hidden" id="look-why"></p>
-              <button class="chip" type="button" data-en="Change your look to an orange cat with round glasses" data-zh="换个形象：一只戴圆框眼镜的橘猫"><i class="en">Change your look to an orange cat with round glasses</i><i class="zh">换个形象：一只戴圆框眼镜的橘猫</i></button>
-              <button class="chip" type="button" data-en="Become a little robot made of blue clay" data-zh="变成一个蓝色黏土做的小机器人"><i class="en">Become a little robot made of blue clay</i><i class="zh">变成一个蓝色黏土做的小机器人</i></button>
+              <button class="chip en" type="button" data-text="Change your look to an orange cat with round glasses">Change your look to an orange cat with round glasses</button>
+              <button class="chip zh" type="button" data-text="换个形象：一只戴圆框眼镜的橘猫">换个形象：一只戴圆框眼镜的橘猫</button>
+              <p class="why"><i class="en">It draws four faces; pick one and it draws the rest of them from it.</i><i class="zh">它会画出四张脸，选一张，其余的表情都从这张画出来。</i></p>
             </div>
 
             <div class="group">
               <h2><i class="en">Let it use the phone</i><i class="zh">让它操作这台手机</i></h2>
-              <button class="chip" type="button" data-en="Open WeChat and tell me what Zhang Wei's latest message says" data-zh="打开微信，看看张伟最新发来的消息说了什么"><i class="en">Open WeChat and tell me what Zhang Wei's latest message says</i><i class="zh">打开微信，看看张伟最新发来的消息说了什么</i></button>
-              <button class="chip" type="button" data-en="Reply to Zhang Wei on WeChat: sure, what time?" data-zh="在微信里回复张伟：好啊，几点？"><i class="en">Reply to Zhang Wei on WeChat: sure, what time?</i><i class="zh">在微信里回复张伟：好啊，几点？</i></button>
-              <button class="chip" type="button" data-en="Use 12306 to find the earliest train from Shanghai to Nanjing tomorrow" data-zh="用 12306 查一下明天上海到南京最早的车次"><i class="en">Use 12306 to find the earliest train from Shanghai to Nanjing tomorrow</i><i class="zh">用 12306 查一下明天上海到南京最早的车次</i></button>
-              <button class="chip" type="button" data-en="Open the Weather app: will it rain in Beijing tomorrow?" data-zh="打开天气，看看北京明天会不会下雨"><i class="en">Open the Weather app: will it rain in Beijing tomorrow?</i><i class="zh">打开天气，看看北京明天会不会下雨</i></button>
-              <button class="chip" type="button" data-en="Make a note on this phone: meeting Friday at 3 pm" data-zh="在手机的笔记里新建一条：周五下午三点开会"><i class="en">Make a note on this phone: meeting Friday at 3 pm</i><i class="zh">在手机的笔记里新建一条：周五下午三点开会</i></button>
+              <button class="chip en" type="button" data-text="Open Spotify and play Bad Habits by Ed Sheeran">Open Spotify and play Bad Habits by Ed Sheeran</button>
+              <button class="chip en" type="button" data-text="Open the Weather app: will it rain in Beijing tomorrow?">Open the Weather app: will it rain in Beijing tomorrow?</button>
+              <button class="chip en" type="button" data-text="In Messages, reply to the latest text with: Thanks, got it">In Messages, reply to the latest text with: Thanks, got it</button>
+              <button class="chip zh" type="button" data-text="打开微信，看看张伟最新发来的消息说了什么">打开微信，看看张伟最新发来的消息说了什么</button>
+              <button class="chip zh" type="button" data-text="在微信里回复张伟：好啊，几点？">在微信里回复张伟：好啊，几点？</button>
+              <button class="chip zh" type="button" data-text="打开手机上的铁路12306，查一下明天上海到南京最早的一班车">打开手机上的铁路12306，查一下明天上海到南京最早的一班车</button>
+              <button class="chip zh" type="button" data-text="打开天气，看看北京明天会不会下雨">打开天气，看看北京明天会不会下雨</button>
+              <p class="why"><i class="en">Before anything is sent, it stops and asks; tap Allow once or Deny on the phone.</i><i class="zh">发出去之前它会停下来问你，在手机上点「允许一次」或「拒绝」。</i></p>
+            </div>
+
+            <div class="group">
+              <h2><i class="en">Two apps, one answer</i><i class="zh">两个应用，一个答案</i></h2>
+              <button class="chip en" type="button" data-text="Look at the first post in the Reddit feed and what is trending on X, then tell me in two lines what people are talking about">Look at the first post in the Reddit feed and what is trending on X, then tell me in two lines what people are talking about</button>
+              <button class="chip zh" type="button" data-text="先在微信看看张伟约了什么，再打开天气看看北京明天怎么样，告诉我去不去合适">先在微信看看张伟约了什么，再打开天气看看北京明天怎么样，告诉我去不去合适</button>
+              <p class="why"><i class="en">This one takes a minute or two.</i><i class="zh">这句要跑一两分钟。</i></p>
             </div>
 
             <div class="group">
               <h2><i class="en">Remember, remind</i><i class="zh">记住、提醒</i></h2>
-              <button class="chip" type="button" data-en="Remember: I have an iced americano every morning" data-zh="记住：我每天早上要喝一杯冰美式"><i class="en">Remember: I have an iced americano every morning</i><i class="zh">记住：我每天早上要喝一杯冰美式</i></button>
-              <button class="chip" type="button" data-en="What do I usually drink in the morning?" data-zh="我早上一般喝什么？"><i class="en">What do I usually drink in the morning?</i><i class="zh">我早上一般喝什么？</i></button>
-              <button class="chip" type="button" data-en="Remind me in 2 minutes to stand up and stretch" data-zh="2 分钟后提醒我站起来活动一下"><i class="en">Remind me in 2 minutes to stand up and stretch</i><i class="zh">2 分钟后提醒我站起来活动一下</i></button>
+              <button class="chip en" type="button" data-text="Remember: I have an iced americano every morning">Remember: I have an iced americano every morning</button>
+              <button class="chip en" type="button" data-text="What do I usually drink in the morning?">What do I usually drink in the morning?</button>
+              <button class="chip en" type="button" data-text="Remind me in 2 minutes to stand up and stretch">Remind me in 2 minutes to stand up and stretch</button>
+              <button class="chip zh" type="button" data-text="记住：我每天早上要喝一杯冰美式">记住：我每天早上要喝一杯冰美式</button>
+              <button class="chip zh" type="button" data-text="我早上一般喝什么？">我早上一般喝什么？</button>
+              <button class="chip zh" type="button" data-text="2 分钟后提醒我站起来活动一下">2 分钟后提醒我站起来活动一下</button>
             </div>
           </div>
         </aside>
