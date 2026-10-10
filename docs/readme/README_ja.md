@@ -109,6 +109,27 @@ VPS 1 台、1 時間：[docs/self-hosting.md](../self-hosting.md)。三つの道
 
 実際の用事に使い、壊れたところを報告し、それから小さく具体的なことをひとつ選んでください。[CONTRIBUTING.md](../../CONTRIBUTING.md) にセットアップと規約、[AGENTS.md](../../AGENTS.md) にこのツリーでコーディングエージェントが守るルール、[ロードマップ](../roadmap.md)にどこから始めるか。[Issues](https://github.com/nano-muse/nanoMuse/issues) · [Discussions](https://github.com/nano-muse/nanoMuse/discussions) · [Discord](https://discord.gg/bkTySmm28X)。
 
+## メンテナー
+
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/lgy0404"><img src="https://avatars.githubusercontent.com/u/63797388?v=4&s=80" width="80" height="80" alt="Guangyi Liu"><br><strong>Guangyi Liu</strong></a><br><a href="mailto:guangyiliu@zju.edu.cn"><img src="https://img.shields.io/badge/e--mail-guangyiliu%40zju.edu.cn-0a66e4" alt="guangyiliu@zju.edu.cn"></a></td>
+  </tr>
+</table>
+
+## コミュニティの貢献者
+
+`main` に変更が取り込まれた全員。GitHub のコントリビューター一覧から。
+
+<!-- contributors:start -->
+<p>
+<a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
+<a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
+<a href="https://github.com/PovedaAqui"><img src="https://avatars.githubusercontent.com/u/9494679?v=4&s=48" width="48" height="48" alt="PovedaAqui"></a>
+</p>
+<!-- contributors:end -->
+
 ## ⭐️ 引用
 
 nanoMuse が役に立ったら、論文を引用してください。
@@ -141,3 +162,8 @@ nanoMuse は独立したコミュニティプロジェクトで、Meta Platforms
 ## ライセンス
 
 [GPL-3.0-or-later](../../LICENSE)。スマホアプリは OpenMinis 1.13（GPL-3.0）をもとに 2026-09-24 以降改変しています。[NOTICE](../../NOTICE) を参照。それ以前の Python 系統のバージョンは MIT でした（タグ `pre-openminis`）。
+
+<p align="center">
+  <em>ご覧いただきありがとうございます ✨ nanoMuse！</em><br><br>
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse&left_text=visitors&left_color=%23555&right_color=%230a66e4" alt="Visitors">
+</p>

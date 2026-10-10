@@ -68,7 +68,7 @@ cd website && npm ci && npm run docs:build       # also the dead-link check; `np
 - **Docs accompany code.** A change that alters what a person sees or does updates the page under `docs/` in the same change, and adds a line under *Unreleased* in `CHANGELOG.md` (past tense, concrete, user-facing).
 - **No version bumps outside release commits.** `pyproject.toml`, `cloud/pyproject.toml`, the two `harness/*/package.json`, the Android `versionName`/`versionCode` and the iOS `MARKETING_VERSION` move together in the release commit only.
 - **Commits** follow Conventional Commits (`feat(android): …`, `fix(relay): …`), carry a DCO sign-off (`git commit -s`), and are merged by rebase or merge commit, never squash.
-- **No secrets, ever.** No keys, tokens, phone numbers, e-mail addresses or private hosts in code, docs, tests or fixtures. `config/config.toml` and `cloud/.env` are git-ignored; secrets reach the model as `{{vault:NAME}}` and nothing else.
+- **No secrets, ever.** No keys, tokens, phone numbers, e-mail addresses or private hosts in code, docs, tests or fixtures; the one address allowed is the maintainer's contact in the READMEs' *Maintainers* table, there at his request. `config/config.toml` and `cloud/.env` are git-ignored; secrets reach the model as `{{vault:NAME}}` and nothing else.
 - **Everything that acts goes through the Sentinel** with an honest `risk`; tests use `MockLLM`; Ruff line length 100; type hints everywhere.
 
 ## Wire contracts
