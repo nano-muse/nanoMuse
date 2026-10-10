@@ -148,7 +148,7 @@ Every feature, number and count in a README, a docs page or a release note is so
 
 ## Releasing (maintainers)
 
-A version is a plain number (`0.1.41`, `1.0.0`, …) because the apps' update check compares them; each release also carries a codename, one capitalised English word that no earlier release used (Foundation, Identity, Home, … Keel, Ballast; `CHANGELOG.md` has the list), and its title is `nanoMuse <version> · <Codename>`. The apps, the runtime, the web console and the desktop app share one version; the relay has its own (`cloud/pyproject.toml`) and moves only when it changed. Versions move in the release commit and nowhere else.
+A version is a plain number (`0.1.41`, `1.0.0`, …) because the apps' update check compares them; each release also carries a codename, one capitalised English word that no earlier release used (Foundation, Identity, Home, … Ballast, Trim; `CHANGELOG.md` has the list), and its title is `nanoMuse <version> · <Codename>`. The apps, the runtime, the web console and the desktop app share one version; the relay has its own (`cloud/pyproject.toml`) and moves only when it changed. Versions move in the release commit and nowhere else.
 
 A release goes out as soon as a fix people are waiting for is on `main` (a crash, a security issue, an app that will not install), and otherwise every few days, when the *Unreleased* block has something worth a version. What ships: the APK, the TestFlight build, the desktop installers for Windows, macOS and Linux, the harness tarball and the Docker image; no terminal builds and no pre-releases, every release is *Latest*. Before tagging, a maintainer installs the build that will ship on a phone and taps through the main flows.
 
