@@ -24,7 +24,7 @@ from nanomuse.config import DEFAULT_DATA_DIR, Settings, find_config_file, load_s
 
 app = typer.Typer(
     name="nanomuse",
-    help="nanoMuse: an open-source personal AI agent with a Sentinel gatekeeper.",
+    help="nanoMuse: an open-source personal agent for every device you own. This is its runtime: the agent, the Sentinel that decides what may run, and the web app.",
     no_args_is_help=True,
     rich_markup_mode="rich",
     pretty_exceptions_show_locals=False,
@@ -83,7 +83,7 @@ def _root(
         is_eager=True,
     ),
 ) -> None:
-    """nanoMuse: an open-source personal AI agent with a Sentinel gatekeeper."""
+    """nanoMuse: an open-source personal agent for every device you own. This is its runtime: the agent, the Sentinel that decides what may run, and the web app."""
     from nanomuse import loopback
 
     loopback.install()  # Windows: a self-pipe that fails with a reason instead of hanging
@@ -1575,9 +1575,13 @@ async def _doctor(settings: Settings, check_model: bool) -> None:
 
     from nanomuse.app import NanoMuseApp
     from nanomuse.console import ConsoleUI
+    from nanomuse.logger import setup_logging
     from nanomuse.schema import Message
     from nanomuse.tools.browser import playwright_available
 
+    # the report says each thing once: the INFO lines the app logs while it starts (the
+    # embeddings probe, the tools) would repeat the rows below in another shape
+    setup_logging("WARNING", settings.data_dir / "logs")
     problems: list[str] = []
 
     def line(ok: bool | None, text: str, problem: str | None = None) -> None:
