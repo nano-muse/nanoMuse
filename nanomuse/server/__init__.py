@@ -23,7 +23,7 @@ from nanomuse.config import Settings
 from nanomuse.server.api import STATIC_DIR, create_app
 from nanomuse.server.service import MuseService
 
-__all__ = ["MuseService", "STATIC_DIR", "bridge_url", "create_app", "lan_ip", "serve"]
+__all__ = ["MuseService", "STATIC_DIR", "bridge_url", "create_app", "lan_ip", "port_taken", "serve"]
 
 
 def bridge_url(host: str, port: int) -> str:
@@ -44,6 +44,32 @@ def lan_ip() -> str | None:
             return s.getsockname()[0]
     except OSError:
         return None
+
+
+def port_taken(host: str, port: int, timeout: float = 0.5) -> str | None:
+    """What already answers on ``host:port``, if anything: ``"nanoMuse <version>"`` when it
+    is one of ours (its ``/api/health`` says so), ``"another program"`` otherwise, ``None``
+    when nothing listens there. A connect, not a bind: a bind would mistake the previous
+    run's closing connections for a listener."""
+    probe_host = {"": "127.0.0.1", "0.0.0.0": "127.0.0.1", "localhost": "127.0.0.1", "::": "::1"}
+    where = probe_host.get(host, host)
+    try:
+        with socket.create_connection((where, port), timeout=timeout):
+            pass
+    except OSError:
+        return None
+    import json
+    import urllib.request
+
+    base = f"http://[{where}]:{port}" if ":" in where else f"http://{where}:{port}"
+    try:
+        with urllib.request.urlopen(f"{base}/api/health", timeout=timeout * 4) as response:  # noqa: S310
+            health = json.loads(response.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001 - not HTTP, not JSON, not answering: not ours
+        return "another program"
+    if isinstance(health, dict) and health.get("ok") is True and health.get("version"):
+        return f"nanoMuse {health['version']}"
+    return "another program"
 
 
 def serve(
@@ -67,6 +93,21 @@ def serve(
         raise SystemExit(78)
     host = host or settings.server.host
     port = port or settings.server.port
+    taken = port_taken(host, port)
+    if taken:
+        # before the service starts: a second `nanomuse serve` used to open the data directory,
+        # announce itself as ready, link included, and only then die on uvicorn's bind error
+        advice = (
+            "That one keeps running: open it in the browser, or stop it before starting another."
+            if taken.startswith("nanoMuse")
+            else "Stop it, or choose another port with --port."
+        )
+        print(
+            f"nanoMuse: port {port} on {host} is already in use by {taken}. {advice}",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(98)
     service = MuseService(settings)
     service.bridge.base_url = bridge_url(host, port)
     app = create_app(settings, service)

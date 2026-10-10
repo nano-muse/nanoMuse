@@ -123,6 +123,47 @@ def test_the_startup_watchdog_writes_where_every_thread_is(capsys):
     assert "still not serving" not in capsys.readouterr().err
 
 
+def test_a_taken_port_is_named_before_the_service_starts():
+    """A second ``nanomuse serve`` on a busy port says who holds it, instead of announcing
+    itself as ready and dying on the bind: another nanoMuse by its /api/health, anything
+    else as another program; a free port is None."""
+    import http.server
+    import socket
+
+    from nanomuse.server import port_taken
+
+    with socket.socket() as free:
+        free.bind(("127.0.0.1", 0))
+        free_port = free.getsockname()[1]
+    assert port_taken("127.0.0.1", free_port) is None
+
+    class Health(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 - the handler's name
+            body = json.dumps({"ok": True, "version": "9.9.9", "auth": True}).encode()
+            self.send_response(200 if self.path == "/api/health" else 404)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    ours = http.server.HTTPServer(("127.0.0.1", 0), Health)
+    threading.Thread(target=ours.serve_forever, daemon=True).start()
+    try:
+        # "0.0.0.0" is probed on the loopback, the address a person's browser would use
+        assert port_taken("0.0.0.0", ours.server_address[1]) == "nanoMuse 9.9.9"
+    finally:
+        ours.shutdown()
+        ours.server_close()
+
+    with socket.socket() as other:
+        other.bind(("127.0.0.1", 0))
+        other.listen(1)
+        assert port_taken("127.0.0.1", other.getsockname()[1]) == "another program"
+
+
 # ----------------------------------------------------------------------------- chat
 def test_send_message_runs_agent_and_records_timeline(server):
     client, _, llm = server
