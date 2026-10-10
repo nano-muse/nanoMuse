@@ -143,6 +143,24 @@ _CONNECTIVE_CHARS = frozenset(
     "在从搬到现以前和与并且喜欢不的了是住工作用曾经后来已改为，、。；：（）"
 )
 _CJK_RE = re.compile(r"[\u3400-\u9fff]")
+_LETTER_RE = re.compile(r"[^\W\d_]")
+
+
+def _same_stem(word: str, allowed: set[str]) -> bool:
+    """An inflected form of a word a source had: ``Пекине`` next to ``Пекин``, ``работу``
+    next to ``работает``. Both words are at least five characters and share a prefix of
+    at least max(4, len(shorter) - 2); shorter words are never matched this way, since
+    unrelated short words collide. Long enough to tell ``предпочитает`` from
+    ``предпочтения``, short enough for a case ending on a five-letter noun."""
+    if len(word) < 5:
+        return False
+    for known in allowed:
+        if len(known) < 5:
+            continue
+        need = max(4, min(len(word), len(known)) - 2)
+        if word[:need] == known[:need]:
+            return True
+    return False
 
 
 def _no_new_words(merged: str, sources: list[MemoryItem]) -> bool:
@@ -150,17 +168,30 @@ def _no_new_words(merged: str, sources: list[MemoryItem]) -> bool:
 
     Short words and digits are let through (articles, "in", "a 10k"), and so is a
     handful of connective words the model needs to join two lines. CJK is checked by
-    character, since a bigram across a junction is new by construction.
+    character, since a bigram across a junction is new by construction. Words are
+    Unicode words, so a Russian or Greek line is judged like an English one, and a word
+    that only differs from a source's by its ending passes (``_same_stem``). When there
+    is nothing to compare, letters on one side that make no word we can read, the answer
+    is no: a guard that cannot judge must not approve (#270).
     """
     allowed: set[str] = set()
     allowed_chars: set[str] = set()
     for m in sources:
         allowed |= tokenize(m.content)
         allowed_chars.update(_CJK_RE.findall(m.content))
+    got = tokenize(merged)
+    if _LETTER_RE.search(merged) and not got:
+        return False
+    if not allowed and not allowed_chars and any(_LETTER_RE.search(m.content) for m in sources):
+        return False
     new_words = {
         t
-        for t in tokenize(merged) - allowed
-        if len(t) > 2 and not t.isdigit() and t not in _CONNECTIVE_WORDS and not _CJK_RE.search(t)
+        for t in got - allowed
+        if len(t) > 2
+        and not t.isdigit()
+        and t not in _CONNECTIVE_WORDS
+        and not _CJK_RE.search(t)
+        and not _same_stem(t, allowed)
     }
     new_chars = set(_CJK_RE.findall(merged)) - allowed_chars - _CONNECTIVE_CHARS
     return not new_words and not new_chars
