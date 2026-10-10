@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.openminis.app.R
 import com.openminis.app.agent.SoulStore
 import com.openminis.app.data.repository.ChatRepository
@@ -329,6 +331,8 @@ fun NanoMuseHome(
 
     // The drawer + tab shell, as a local composable so it can share every piece of state above
     // and still be one branch of the phase switch below.
+    // nanoMuse: the frosted pill bar blurs this shell's content — the shell is the haze source.
+    val hazeState = rememberHazeState()
     val homeShell: @Composable () -> Unit = {
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -360,7 +364,7 @@ fun NanoMuseHome(
             containerColor = ChatColors.background,
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
-                MuseBottomBar(selected = tab, onSelect = { picked ->
+                MuseBottomBar(selected = tab, hazeState = hazeState, onSelect = { picked ->
                     if (picked == HomeTab.CHAT && tab == HomeTab.CHAT && !isMainChat) {
                         showMain()
                     } else {
@@ -374,6 +378,7 @@ fun NanoMuseHome(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .hazeSource(hazeState)
                     .padding(bottom = bottom)
                     .consumeWindowInsets(PaddingValues(bottom = bottom)),
             ) {
