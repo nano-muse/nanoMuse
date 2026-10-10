@@ -1491,6 +1491,8 @@ const zhCN: Record<string, string> = {
 
   // -- reaching the runtime --
   "Cannot reach your nanoMuse right now.": "现在连不上你的 nanoMuse。",
+  "Your nanoMuse hit a problem; try again in a moment.": "你的 nanoMuse 出了点问题，稍后再试。",
+  "Your nanoMuse could not do that.": "你的 nanoMuse 没能完成这个操作。",
   "Could not reach your nanoMuse.": "连不上你的 nanoMuse。",
   "Connecting to your nanoMuse…": "正在连接你的 nanoMuse…",
   "Try again": "再试一次",

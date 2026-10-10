@@ -4,6 +4,9 @@
   "version": "1.0.1",
   "description": "nanoMuse mobile-first web app (chat, goals, ideas, memory, approvals)",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

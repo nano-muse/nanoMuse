@@ -1,5 +1,5 @@
 import { Shuffle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useT } from "../i18n";
 import type { Profile } from "../types";
 import { cx } from "../util";
@@ -64,6 +64,7 @@ export function IdentityForm({
   onStudio?: () => void;
 }) {
   const t = useT();
+  const ids = useId();
   const [seed, setSeed] = useState(7);
   const names = useMemo(() => pickSix(value.name, seed), [value.name, seed]);
   const set = (patch: Partial<Identity>) => onChange({ ...value, ...patch });
@@ -132,8 +133,9 @@ export function IdentityForm({
         </div>
       </div>
       <div>
-        <label className="text-[12px] text-muted">{t("Anything else about how it should be")}</label>
+        <label htmlFor={`${ids}-style`} className="text-[12px] text-muted">{t("Anything else about how it should be")}</label>
         <textarea
+          id={`${ids}-style`}
           value={value.style}
           onChange={(e) => set({ style: e.target.value })}
           rows={2}
@@ -143,8 +145,8 @@ export function IdentityForm({
       </div>
       {askUserName && (
         <div>
-          <label className="text-[12px] text-muted">{t("What it calls you")}</label>
-          <input value={value.user_name} onChange={(e) => set({ user_name: e.target.value })} maxLength={60} placeholder={t("Your name")} className={cx(inputCls, "mt-1 text-[14px]")} />
+          <label htmlFor={`${ids}-user`} className="text-[12px] text-muted">{t("What it calls you")}</label>
+          <input id={`${ids}-user`} value={value.user_name} onChange={(e) => set({ user_name: e.target.value })} maxLength={60} placeholder={t("Your name")} className={cx(inputCls, "mt-1 text-[14px]")} />
         </div>
       )}
     </div>

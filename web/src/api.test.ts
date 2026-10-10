@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeOutcome, connectWs, WS_GONE, WS_UNAUTHORIZED } from "./api";
+import { closeOutcome, connectWs, failureDetail, WS_GONE, WS_UNAUTHORIZED } from "./api";
 
 /** A WebSocket stand-in the test closes by hand. */
 class FakeSocket {
@@ -26,6 +26,23 @@ function stubWindow(location: { protocol: string; host: string }) {
   vi.stubGlobal("location", full);
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined });
 }
+
+describe("failureDetail", () => {
+  it("keeps the runtime's sentence", () => {
+    expect(failureDetail(409, { detail: "thread is busy" })).toBe("thread is busy");
+  });
+
+  it("never shows a validation list, a JSON body or the status number", () => {
+    const list = failureDetail(422, { detail: [{ loc: ["body", "text"], msg: "field required", type: "missing" }] });
+    expect(list).toBe("Your nanoMuse could not do that.");
+    expect(failureDetail(500, undefined)).toBe("Your nanoMuse hit a problem; try again in a moment.");
+    expect(failureDetail(502, { error: "upstream" })).toBe("Your nanoMuse hit a problem; try again in a moment.");
+    expect(failureDetail(404, { detail: "" })).toBe("Your nanoMuse could not do that.");
+    for (const text of [list, failureDetail(500, undefined)]) {
+      expect(text).not.toMatch(/\d{3}|\[object|\{/);
+    }
+  });
+});
 
 describe("closeOutcome", () => {
   it("sorts close codes into retry, auth and gone", () => {
