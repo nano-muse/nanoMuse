@@ -11,7 +11,12 @@ scheme; inside the app, links stay `minis://…` (upstream's vocabulary, shared 
 the system prompt and the model), a `nanomuse://` link arriving from the system is read as its
 `minis://` form, and every link of the app's own that the app opens itself is addressed to
 `MainActivity` by name, never resolved by the system
-(`io.github.nanomuse.deeplink.OwnScheme`). The
+(`io.github.nanomuse.deeplink.OwnScheme`). The sandbox's offload socket, the abstract socket
+proot talks to the app through, is the app's own too: `io.github.nanomuse.app.native-offload`
+rather than upstream's `native-offload`, since abstract sockets are one namespace for every
+app on the device and whichever app bound the shared name second would die at start; when
+even that name is still held by a previous process of ours, the server binds a per-process
+name and tells proot that one (`io.github.nanomuse.sandbox.OffloadSocketName`). The
 history of this choice is in [roadmap.md](roadmap.md); what came before it (a WebView
 around a Python server, two APK flavours) is kept as a design record in
 [archive/android-python-line.md](archive/android-python-line.md) and is not what you
