@@ -57,6 +57,9 @@ fun MuseBottomBar(
     ) {
         Row(
             modifier = Modifier
+                // Clip first: it must wrap the haze drawing, otherwise the
+                // blurred rect paints unclipped and the pill's ends look square.
+                .clip(CircleShape)
                 .hazeEffect(state = hazeState) {
                     style = HazeStyle(
                         backgroundColor = barBackground,
@@ -66,7 +69,6 @@ fun MuseBottomBar(
                         tints = emptyList(),
                     )
                 }
-                .clip(CircleShape)
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
