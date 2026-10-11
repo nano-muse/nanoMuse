@@ -58,7 +58,7 @@ body:
     id: os
     attributes:
       label: OS and runtime
-      description: e.g. macOS 15 / Python 3.12, Ubuntu 24.04 / Docker, Windows 11 / desktop 1.0.1, iOS 18 / iPhone 15
+      description: e.g. macOS 15 / Python 3.12, Ubuntu 24.04 / Docker, Windows 11 / desktop 1.0.2, iOS 18 / iPhone 15
   - type: textarea
     id: logs
     attributes:

@@ -8,6 +8,26 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+### Web
+
+### Desktop
+
+### Android
+
+### iOS
+
+### Project
+
+## [1.0.2] - 2026-10-11 · Trim
+
+Trim: a pass over every part of the project after the first two days of 1.0, with the reports and pull requests that came in. The Sentinel's taint rule now holds for `shell` and `send_email` in auto mode, so a tool on the always-ask list is never waved through after a private read ([#291](https://github.com/nano-muse/nanoMuse/pull/291) by @hobostay); the Android app starts beside OpenMinis, its sandbox socket carrying the application id, and the crash that remains names the socket that failed ([#271](https://github.com/nano-muse/nanoMuse/issues/271), [#288](https://github.com/nano-muse/nanoMuse/issues/288)); on the desktop the permission card comes up again when the runtime refuses a hands step ([#292](https://github.com/nano-muse/nanoMuse/pull/292) by @hobostay), reading a picture on Linux no longer kills the harness ([#274](https://github.com/nano-muse/nanoMuse/issues/274)), and on Windows the caption buttons no longer cover page buttons ([#273](https://github.com/nano-muse/nanoMuse/pull/273) by @jiangkaiqi2005); the memory tidy-up judges every script and refuses what it cannot judge ([#270](https://github.com/nano-muse/nanoMuse/issues/270)); a second `nanomuse serve` on a busy port says so and stops; `nanomuse doctor` names a config key nothing reads and ends on its summary, every CLI option has a help text, and an MCP server's key stays out of the log; a refused request in the web console and on the desktop's Media, Studio, Coding and Tasks pages says a sentence in your language; the iPhone's own pages read in all nine languages; OpenCode Zen joins the own-key catalogue (@PovedaAqui); the docs read without em dashes, the showcase's lines to try run end to end in both languages, and the READMEs say where nanoMuse is going. The relay is 0.24.1, carrying the catalogue; nothing changes on the wire.
+
+### Cloud
+
+- **The own-key guidance names OpenCode Zen.** The relay's copy of the provider catalogue, the one the apps draw the own-key card from (contract C11), carries the entry the runtime gained, so the card lists OpenCode Zen on every client. The relay is 0.24.1; nothing else changes on the wire, and a 1.0.1 client works against it unchanged.
+
+### Runtime
+
 - **A second `nanomuse serve` on a busy port says so and stops.** It used to start the whole service on the same data directory, print the ready banner with the link, and only then die on uvicorn's "address already in use". It now checks the port first and names who holds it, another nanoMuse (by its `/api/health`, with the version) or another program, before anything starts; exit code 98.
 - **`nanomuse doctor` says each thing once.** The INFO lines the app logs while it starts (the embeddings probe, the tools it loaded) no longer interleave with the report's rows; the log file keeps them. `nanomuse --help` opens with the project's own sentence, the one the README and the website use.
 - **A catalogue lookup no longer confuses two providers that share one host.** `by_base_url` matched on the host alone, so two entries on one host could only ever resolve to the first. The whole address is tried first now, and the host stays the fallback so a key pasted with or without `/v1` still finds its vendor (thanks @PovedaAqui).
