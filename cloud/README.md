@@ -452,9 +452,14 @@ and key page). `plans` are the subscriptions an app can sign in with instead
 of pasting a key — `{id: chatgpt | claude | kimi | openrouter, provider, name,
 auth, clients[], covers[]}`; the ChatGPT one covers chat and hands only, and
 `caveats.chatgpt` (`_zh`) is the honest line about it. `local` lists Ollama,
-LM Studio and vLLM. The facts come from `nanomuse_cloud/providers.json`, a
-copy of the runtime's `nanomuse/llm/providers.json` written by
-`node scripts/providers-json.mjs` (CI checks it); the relay only orders it,
+LM Studio and vLLM. A provider whose vendor wants one stable id per
+conversation (the catalogue's `session_header`, OpenCode Go) is not in
+`providers` but under `session_providers`, the same row plus that header's
+name: the apps of 1.0.1 and before send no such id and never see it; the ones
+that do append the list to `providers`. The facts come from
+`nanomuse_cloud/providers.json`, a copy of the runtime's
+`nanomuse/llm/providers.json` written by `node scripts/providers-json.mjs`
+(CI checks it); the relay only orders it,
 and the apps keep the words. Nothing is renamed: a client from before reads
 `ways` as it always did.
 

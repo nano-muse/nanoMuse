@@ -476,6 +476,8 @@ function ownProvidersOf(raw: Record<string, unknown>): Record<string, OwnProvide
         return { id: m.id, name: typeof m.name === 'string' && m.name ? m.name : m.id, vision: m.vision === true, kind: m.kind === 'image' || m.kind === 'video' ? m.kind : 'chat', ...(reasoning ? { reasoning } : {}) }
       }) : [],
       at: Number(p.at) || 0,
+      // kept, or the next start's refresh would write the row as a hand-declared route
+      ...(p.catalogRoute === true ? { catalogRoute: true } : {}),
     }
   }
   return out
