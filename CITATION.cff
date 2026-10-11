@@ -7,8 +7,8 @@ authors:
 repository-code: "https://github.com/nano-muse/nanoMuse"
 url: "https://nanomuse.cn/"
 license: GPL-3.0-or-later
-version: 1.0.1
-date-released: 2026-10-10
+version: 1.0.2
+date-released: 2026-10-11
 keywords:
   - personal agent
   - AI assistant

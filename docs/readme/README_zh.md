@@ -32,7 +32,7 @@
 
 **nanoMuse 是一个开源的个人智能体，面向你的每一台设备。** 一个有名字、有自己形象的智能体，和 Meta 的 [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) 是同一类东西：不只回答问题，而是动手做事；App 关了也继续干；记得你；遇到无法撤销的操作会先停下来问你。
 
-*nano* 的意思是完整的一套，小到你自己就能跑、能部署：手机 App、桌面 App、网页控制台，还有把它们连在一起的中继，都在这个仓库里，GPL-3.0-or-later。**[免费、开源、非营利。一起把它做好。](../../CONTRIBUTING.md)** 登录就有一份免费的模型额度，走社区中继，钱是开发者出的；用完可以[换自己的 key](../own-key.md)。同一套中继也能跑在你自己的服务器上，数据不用出门。最新版本：**1.0.1 Ballast**，[发布说明](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [在线体验](https://demo.nanomuse.dev/)。
+*nano* 的意思是完整的一套，小到你自己就能跑、能部署：手机 App、桌面 App、网页控制台，还有把它们连在一起的中继，都在这个仓库里，GPL-3.0-or-later。**[免费、开源、非营利。一起把它做好。](../../CONTRIBUTING.md)** 登录就有一份免费的模型额度，走社区中继，钱是开发者出的；用完可以[换自己的 key](../own-key.md)。同一套中继也能跑在你自己的服务器上，数据不用出门。最新版本：**1.0.2 Trim**，[发布说明](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.2) · [在线体验](https://demo.nanomuse.dev/)。
 
 > [!NOTE]
 > **nanoMuse 在持续进化**
@@ -57,11 +57,11 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 | | |
 |---|---|
 | **浏览器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：一台模拟手机上的 nanoMuse，登录后体验。这是演示；下面的客户端才是正式的 |
-| **Android** 8.0 以上，arm64 | [nanoMuse-1.0.1-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-1.0.1-arm64.apk)：每个版本同一把签名，覆盖安装即可升级 |
+| **Android** 8.0 以上，arm64 | [nanoMuse-1.0.2-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-1.0.2-arm64.apk)：每个版本同一把签名，覆盖安装即可升级 |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc)：测试版，已通过 Apple 的 beta 审核；从这个链接安装 · [iOS](../ios.md) |
-| **macOS** 12 以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-x64.dmg)。没有公证：第一次右键 → 打开 |
-| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.1-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-win-x64.exe)：点一次「仍要运行」 |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.tar.gz) |
+| **macOS** 12 以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-x64.dmg)。没有公证：第一次右键 → 打开 |
+| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.2-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-win-x64.exe)：点一次「仍要运行」 |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` 搭自己的中继；`docker compose up -d app` 在自己的服务器上跑网页版；见[自己部署](../self-hosting.md) |
 
 下载都来自 [GitHub 最新版本](https://github.com/nano-muse/nanoMuse/releases/latest)；GitHub 下不动时，同样的文件在 [nanomuse.cn/dl](https://nanomuse.cn/dl/)。打开 App，用邮箱或中国大陆手机号登录，它就有模型可用。手机、桌面和网页共用一个账号，看到的是同样的对话。

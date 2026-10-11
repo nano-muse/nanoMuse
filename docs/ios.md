@@ -8,8 +8,8 @@ the TestFlight pipeline needs, and what is still to be ported from the Android a
 were written on a Linux machine. The app **builds, signs and is on TestFlight**: the first build,
 0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, which
 passed Apple's beta review, so the public link
-(`https://testflight.apple.com/join/ZHexbDqc`) installs it; 1.0.1 is build 18, submitted to the
-review on 2026-10-10 (*Where it stands* below). The testers' reports have driven the fixes in the release
+(`https://testflight.apple.com/join/ZHexbDqc`) installs it; 1.0.1 is build 18 and 1.0.2 is build 19, both submitted to the review (2026-10-10 and
+2026-10-11; *Where it stands* below). The testers' reports have driven the fixes in the release
 notes (the composer, onboarding, sign-out); the Devices section and notifications from other
 devices still have the fewest hours on a real device. The first archive taught the pipeline
 that automatic signing wants a registered device, which is why it signs manually now.
@@ -587,7 +587,7 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
   2026-10-09 and passed it, so the public link installs it (build 14, 0.1.41, was what the link
   delivered before); build 17, 1.0.0 with the fixes merged after the tag, went to the internal
   testers only. **Build 18 (1.0.1)** was added to *nanoMuse Beta* and submitted to the review on
-  2026-10-10; the link installs build 16 until it passes. The public link delivers a build only
+  2026-10-10, **build 19 (1.0.2)** on 2026-10-11; the link installs build 16 until one passes. The public link delivers a build only
   once a review has passed, and each new version repeats the step (the review is per version;
   later builds of an approved version need none).
   Nothing towards the App Store: the app is not going there.
