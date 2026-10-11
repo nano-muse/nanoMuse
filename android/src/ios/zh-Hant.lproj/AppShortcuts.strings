@@ -16,3 +16,6 @@
 "Follow up a ${applicationName} session" = "跟進${applicationName}會話";
 "Continue a ${applicationName} session" = "繼續${applicationName}會話";
 "Open a ${applicationName} session" = "開啟${applicationName}會話";
+
+"Voice prompt to ${applicationName}" = "語音輸入到${applicationName}";
+"Talk to ${applicationName} by voice" = "用語音跟${applicationName}說話";
