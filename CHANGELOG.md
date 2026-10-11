@@ -24,6 +24,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
+- **A voice prompt from the Action Button.** A *Voice Prompt* Shortcut opens the app and starts listening, so a prompt can be spoken instead of typed: bind it to the Action Button, Back Tap or a widget, press, speak, and the words appear in the composer; sending stays a tap on the send button. It is the composer's own voice panel, started for you, with the same microphone and speech permissions; with no session named it lands in the chat that is open, the main chat in the Muse layout. Written by @cypggs (#296, #298).
 - **OpenCode Go works on the phone.** Chat and Responses requests to OpenCode's host carry `x-opencode-session`, the chat's prompt cache key (a hash of its first message, the same on every turn), beside the app's own `nanoMuse/<version>` user agent; the ways-on card lists Go from the relay's new `session_providers` (thanks @PovedaAqui).
 
 ### Project

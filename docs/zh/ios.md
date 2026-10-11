@@ -431,6 +431,26 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   错误上；现在经这个开关到不了*未设置*的状态。自有服务商在自己页面上关掉仍走上游的路：对话经
   默认分组重新解析，什么都不剩时说*未配置模型。请在设置中添加服务商。*
 
+## 用操作按钮说一句 {#voice-prompts-from-the-action-button}
+
+*语音提示*是 App 注册的一个快捷指令（`NanoMuse/VoicePromptIntent.swift`）：打开 nanoMuse 并开始
+聆听，一句话可以说出来而不用打字。在「快捷指令」App 里绑定一次，放到操作按钮（设置 › 操作按钮 ›
+快捷指令）、轻点背面或小组件上；按一下，输入框就进入语音模式、麦克风已在听，说的话一边识别一边
+出现在输入框里。发送仍然是点一下发送键：识别错的一句话不能因为一个停顿就让智能体跑起来。快捷
+指令带一个可选的*会话*参数；留空时送到当前打开的聊天，在 Muse 布局里就是主要聊天（压在它上面
+的侧聊天会先退出）。第一次按会像麦克风按钮一样请求麦克风和语音识别权限；被拒绝时面板里会显示，
+什么都不会录。
+
+实现：意图自己驱动不了语音面板（冷启动时它在窗口存在之前就运行，面板归 SwiftUI 管），所以它在
+`NanoMuseVoicePrompt` 里留下一个请求，指定了会话时按通知点击的路子跳过去
+（`NotificationNavigationStore`、`.openSessionFromIntent`）。聊天的钩子（`NanoMuseChatHooks`）
+取走发给自己这个聊天的请求，沿麦克风按钮的路把输入框切到内嵌语音面板，面板出现后再按下它的
+麦克风，走 `VoiceInputViewModel.handleMainButtonTap` 和它的权限流程。只有一条录音路径、一套识别
+栈；转写文字照常进入 `inputText`。超过 30 秒没人接的请求会被丢弃。iOS 不让 App Intent 接收自由
+语音，所以这是一个语音入口，而不是一口气说完的「问 nanoMuse 某件事」；App 之所以要打开，是因为
+屏幕上什么都没有而麦克风在转，看起来就像出了故障。Siri 的唤起短语在三张 `AppShortcuts.strings`
+表里（英文、简体中文、繁体中文），意图自己的字符串在 `Localizable.xcstrings`（#296、#298）。
+
 ## 在 Mac 上构建 {#building-on-a-mac}
 
 要求是上游的，写在 [android/BUILDING.md](../../android/BUILDING.md)：较新的 Xcode（项目用的是
