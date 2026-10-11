@@ -41,9 +41,19 @@ test('a grant 0.1.37 wrote for the mis-read head is dropped', async () => {
 })
 
 test('a hands refusal is recognised and confirmed with the ticket the runtime checks', async () => {
-  const { confirmTicket, confirmationOf, refusalOf } = await import('../lib/cloud.js')
+  const { confirmTicket, confirmationOf, declined, refusalOf } = await import('../lib/cloud.js')
+  // a runtime older than 1.0 wrote the refusal with an em dash; it is still recognised
   const refusal = { isError: true, error: { message: 'x' }, content: [{ type: 'text', text: 'Not done — press enter: Enter sends what is typed. The person has to agree to this step on their permission card first; the host asks them.' }] }
   assert.equal(refusalOf(refusal), 'press enter: Enter sends what is typed. The person has to agree to this step on their permission card first; the host asks them.')
+  // since 1.0 the runtime writes the same refusal with a colon (its sentences carry no
+  // dashes); the permission card has to come up for it just the same
+  const todays = { isError: true, error: { message: 'x' }, content: [{ type: 'text', text: 'Not done: computer_act(action=key, keys=[enter]): Enter sends what is typed. The person has to agree to this step on their permission card first; the host asks them.' }] }
+  assert.equal(refusalOf(todays), 'computer_act(action=key, keys=[enter]): Enter sends what is typed. The person has to agree to this step on their permission card first; the host asks them.')
+  // the plugin's own decline carries the colon mark too, and reads back the same way
+  const ours = declined('press enter', 'declined on the card')
+  assert.equal(ours.isError, true)
+  assert.match(ours.content[0].text, /^Not done: press enter\. The person did not approve this step/)
+  assert.equal(refusalOf(ours), ours.content[0].text.slice('Not done: '.length))
   assert.equal(refusalOf({ isError: true, error: { message: 'timeout' }, content: [{ type: 'text', text: 'timeout' }] }), undefined)
   // the model's own word is a confirmation we recognise but never make; the ticket is bound to the arguments
   assert.equal(confirmationOf({ action: 'key', confirmed: true }), true)

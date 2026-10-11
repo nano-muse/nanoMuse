@@ -1,6 +1,6 @@
 name: iOS · TestFlight
 
-# Archive the iOS app and hand it to TestFlight (internal testers — no App Review involved).
+# Archive the iOS app and hand it to TestFlight (internal testers; no App Review involved).
 # Manual, or on an `ios-*` tag. Needs six repository secrets, see docs/ios.md:
 #   APP_STORE_CONNECT_KEY_ID, APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_P8, APPLE_TEAM_ID
 #   IOS_DIST_P12_BASE64, IOS_DIST_P12_PASSWORD

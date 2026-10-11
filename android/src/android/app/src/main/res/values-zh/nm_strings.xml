@@ -548,7 +548,7 @@
     <string name="nm_hands_fx_open">打开 %1$s</string>
     <string name="nm_hands_fx_wait">等 %1$d 秒</string>
     <!-- the approval card -->
-    <string name="nm_risk_desc_screen">%1$s 想在%3$s里点「%2$s」。</string>
+    <string name="nm_risk_desc_screen">%1$s 想在 %3$s 里点「%2$s」。</string>
     <string name="nm_risk_preview_screen">屏幕上</string>
 
     <!-- Reach (0.1.13): the phone drives your computer -->
@@ -632,8 +632,8 @@
     <string name="nm_cloud_server_now">服务器：%1$s</string>
     <string name="nm_cloud_server_ok">%1$s 已响应：中继服务 %2$s。</string>
     <string name="nm_cloud_server_bad_url">请填写服务器地址，例如 https://relay.example.org。</string>
-    <string name="nm_cloud_server_https">本机网络之外的服务器请用 https。内网地址（10.x、192.168.x、172.16–31.x、localhost、.local 或 .ts.net 域名）可以用 http。</string>
-    <string name="nm_lan_only_https">明文 http:// 只能用于你自己网络里的地址（10.x、172.16–31.x、192.168.x、.local 名字）；%1$s 请用 https://。</string>
+    <string name="nm_cloud_server_https">本机网络之外的服务器请用 https。内网地址（10.x、192.168.x、172.16-31.x、localhost、.local 或 .ts.net 域名）可以用 http。</string>
+    <string name="nm_lan_only_https">明文 http:// 只能用于你自己网络里的地址（10.x、172.16-31.x、192.168.x、.local 名字）；%1$s 请用 https://。</string>
     <string name="nm_cloud_server_unreachable">%1$s 没有中继服务响应。请检查地址，并确认服务已经在运行。</string>
     <string name="nm_cloud_server_default">改回 nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">服务器</string>
@@ -928,8 +928,8 @@
     <string name="nm_connectors_own_row">MCP 服务器</string>
     <string name="nm_connectors_own_sub">按地址或命令添加服务器，或导入 JSON 配置。</string>
     <string name="nm_connectors_elsewhere_title">你的其他设备上</string>
-    <string name="nm_connectors_elsewhere_sign_in">已在%1$s上连接；在这台手机上登录一次，这里也能用。</string>
-    <string name="nm_connectors_elsewhere_only">已在%1$s上连接。不在这台手机的目录里；需要的话到「你自己的服务器」里添加。</string>
+    <string name="nm_connectors_elsewhere_sign_in">已在 %1$s 上连接；在这台手机上登录一次，这里也能用。</string>
+    <string name="nm_connectors_elsewhere_only">已在 %1$s 上连接。不在这台手机的目录里；需要的话到「你自己的服务器」里添加。</string>
     <string name="nm_connectors_elsewhere_device">另一台设备</string>
     <string name="nm_connectors_own_n">已有 %1$d 个 · 按地址、命令或 JSON 添加</string>
     <string name="nm_connectors_how_client">%1$s 不支持自动注册应用，所以需要一次性的小设置：在它的开发者设置里创建一个你自己的 OAuth 应用，回调地址填下面这个，然后把应用的客户端 ID 粘贴到这里（如果有客户端密钥也一并填上）。两者都只保存在这台手机上。</string>

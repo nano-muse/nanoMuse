@@ -7,7 +7,7 @@ Mac runner 上构建后交给 TestFlight。这一页说的是：源码树里有�
 **现状。** 源码树、品牌、nanoMuse Cloud 登录、hub 客户端和流水线都是在一台 Linux 机器上
 写的。这个 App **能构建、能签名、已经上了 TestFlight**：第一个构建 0.1.31 (2) 于 2026-10-03 走完
 *iOS · TestFlight* 工作流；1.0.0 是构建 16，已通过 Apple 的 beta 审核，公开链接
-（`https://testflight.apple.com/join/ZHexbDqc`）装的就是它；1.0.1 是构建 18，2026-10-10 提交了审核（见下文*现状*）。测试员的反馈推动了发布说明里的那些修复（输入框、引导、退出登录）；「设备」区
+（`https://testflight.apple.com/join/ZHexbDqc`）装的就是它；1.0.1 是构建 18，1.0.2 是构建 19，分别于 2026-10-10 和 2026-10-11 提交了审核（见下文*现状*）。测试员的反馈推动了发布说明里的那些修复（输入框、引导、退出登录）；「设备」区
 和来自其他设备的通知仍是真机上跑得最少的部分。第一次归档教会了流水线一件事：
 自动签名需要一台已注册的设备，这就是它现在改为手动签名的原因。
 
@@ -511,7 +511,7 @@ open src/ios/Minis.xcodeproj
   审核联系人和中继上的一个审核账号；
 - **构建 16（1.0.0）** 于 2026-10-09 加进 *nanoMuse Beta* 并提交 Apple 的 beta 审核，已经通过，公开链接装的就是它
   （在那之前链接给的是构建 14，0.1.41）；构建 17 是打标签之后合并的修复加上 1.0.0，只到了内部测试员手里。
-  **构建 18（1.0.1）** 于 2026-10-10 加进 *nanoMuse Beta* 并提交审核，通过之前链接装的仍是构建 16。公开链接只在审核
+  **构建 18（1.0.1）** 于 2026-10-10、**构建 19（1.0.2）** 于 2026-10-11 加进 *nanoMuse Beta* 并提交审核，有一个通过之前链接装的仍是构建 16。公开链接只在审核
   通过后才会给出构建，以后每个新版本都要重复这一步（审核按版本进行；已通过版本的后续构建不用再审）。任何通往 App Store 的事
   都没有：这个 App 不上架。
 
@@ -575,9 +575,11 @@ gh secret set IOS_DIST_P12_PASSWORD -R nano-muse/nanoMuse < dist.p12.pass
 
 ### 能编译吗？ {#does-it-compile}
 
-*Actions → iOS · build check → Run workflow*（`.github/workflows/ios-check.yml`）在 Mac runner
-上关闭签名，面向真机构建这个 App：不要 Apple 账号，不要 secrets。它和 TestFlight 工作流
-共用原生依赖的缓存，所以先跑它：一个编译错误在这里只花几分钟，不用浪费一次上传。完整的
+*iOS · build check*（`.github/workflows/ios-check.yml`）在 Mac runner 上关闭签名，面向真机构建
+这个 App：不要 Apple 账号，不要 secrets。凡是改到 `android/src/ios/` 的 pull request 都会跑它；
+其他情况（改了 `android/deps/` 下的脚本、还没开 pull request 的分支）用 *Actions → iOS · build
+check → Run workflow* 手动启动。它和 TestFlight 工作流共用原生依赖的缓存，所以先让它变绿：
+一个编译错误在这里只花几分钟，不用浪费一次上传。完整的
 `xcodebuild` 日志附在运行记录上。`NanoMuse/` 下的文件只要报出一个警告，这次运行就算失败
 （上游的文件不算），所以上面「零警告」的规矩是被检查的，不只是写在这里。
 

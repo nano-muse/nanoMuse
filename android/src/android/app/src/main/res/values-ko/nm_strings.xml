@@ -648,8 +648,8 @@
     <string name="nm_cloud_server_now">서버: %1$s</string>
     <string name="nm_cloud_server_ok">%1$s이(가) 응답했습니다: 릴레이 %2$s.</string>
     <string name="nm_cloud_server_bad_url">릴레이 주소를 입력하세요. 예: https://relay.example.org</string>
-    <string name="nm_cloud_server_https">내 네트워크 밖의 서버에는 https를 사용하세요. 사설 주소(10.x, 192.168.x, 172.16–31.x, localhost, .local 또는 .ts.net 이름)에는 http도 괜찮습니다.</string>
-    <string name="nm_lan_only_https">암호화되지 않은 http://는 내 네트워크 안의 주소(10.x, 172.16–31.x, 192.168.x, .local 이름)에만 쓸 수 있습니다. %1$s에는 https://를 사용하세요.</string>
+    <string name="nm_cloud_server_https">내 네트워크 밖의 서버에는 https를 사용하세요. 사설 주소(10.x, 192.168.x, 172.16-31.x, localhost, .local 또는 .ts.net 이름)에는 http도 괜찮습니다.</string>
+    <string name="nm_lan_only_https">암호화되지 않은 http://는 내 네트워크 안의 주소(10.x, 172.16-31.x, 192.168.x, .local 이름)에만 쓸 수 있습니다. %1$s에는 https://를 사용하세요.</string>
     <string name="nm_cloud_server_unreachable">%1$s에서 릴레이가 응답하지 않습니다. 주소와 릴레이가 실행 중인지 확인하세요.</string>
     <string name="nm_cloud_server_default">nanoMuse Cloud로 되돌리기</string>
     <string name="nm_cloud_server_row">서버</string>

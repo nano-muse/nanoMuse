@@ -1,6 +1,8 @@
 import json
 import re
+from typing import Any
 
+import typer
 from typer.testing import CliRunner
 
 from nanomuse import __version__
@@ -62,6 +64,58 @@ def test_doctor_reports_the_setup_without_calling_the_model(tmp_path, monkeypatc
     out = plain(result.output)
     assert result.exit_code == 1, out
     assert "no usable API key" in out
+    # the exit code is the whole message: click's Exit is a RuntimeError, and the
+    # async runner's catch-all once printed it as "error: Exit: 1" under the summary
+    assert "error:" not in out and "Exit" not in out
+
+
+def test_config_path_follows_the_data_dir_variable(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(config_module, "DEFAULT_DATA_DIR", tmp_path / "home")
+    monkeypatch.setenv("NANOMUSE_DATA_DIR", str(tmp_path / "elsewhere"))
+    out = plain(runner.invoke(app, ["config", "path"]).output)
+    # rich wraps a long path (the macOS runner's temp dir) at 80 columns; compare without
+    unwrapped = re.sub(r"\s", "", out)
+    assert "nonefound" in unwrapped and re.sub(r"\s", "", str(tmp_path / "elsewhere")) in unwrapped
+
+
+def test_every_option_has_a_help_text():
+    """`--help` of every command and subcommand explains each option; a bare column is a
+    gap someone has to guess at. Also catches rich markup eating a `[section]` name."""
+    # typer wraps click's classes (typer.core.TyperGroup is not a click.Group under
+    # typer 0.27), so groups and options are told apart by shape, not by isinstance
+    stack: list[tuple[list[str], Any]] = [([], typer.main.get_command(app))]
+    seen = 0
+    while stack:
+        path, c = stack.pop()
+        if isinstance(getattr(c, "commands", None), dict):
+            for name, sub in c.commands.items():
+                stack.append(([*path, name], sub))
+            continue
+        seen += 1
+        for p in c.params:
+            is_option = p.param_type_name == "option"
+            if is_option and not getattr(p, "hidden", False) and not getattr(p, "help", None):
+                raise AssertionError(f"{' '.join(path)}: option {p.opts} has no help text")
+        out = plain(runner.invoke(app, [*path, "--help"]).output)
+        assert "default:  proxy" not in out, " ".join(path)
+    assert seen > 60
+
+
+def test_doctor_names_config_keys_nothing_reads(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("NANOMUSE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("NANOMUSE_WORKSPACE", str(tmp_path / "ws"))
+    (tmp_path / "ws").mkdir()
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(
+        '[llm]\nbase_url = "http://localhost:11434/v1"\nmodel = "qwen3:8b"\nmodle = "typo"\n'
+    )
+    result = runner.invoke(app, ["doctor", "--no-model", "--config", str(cfg)])
+    out = plain(result.output)
+    assert result.exit_code == 1, out
+    assert "config keys nothing reads (ignored): llm.modle" in out
+    assert "a typo" in out  # the problems list under the summary
 
 
 def test_triggers_commands(tmp_path, monkeypatch):

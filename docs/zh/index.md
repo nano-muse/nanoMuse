@@ -26,17 +26,17 @@ hero:
 
 | | |
 |---|---|
-| **浏览器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：登录之后，一台模拟手机里的 nanoMuse。这是演示；下面的 App 才是正式版 |
-| **Android** 8.0 以上，arm64 | [nanoMuse-1.0.1-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-1.0.1-arm64.apk) · [怎么装](/zh/android) |
+| **浏览器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：登录之后，一台模拟手机里的 nanoMuse，旁边有中英文各一组可以点的例句。这是演示；下面的 App 才是正式版 |
+| **Android** 8.0 以上，arm64 | [nanoMuse-1.0.2-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-1.0.2-arm64.apk) · [怎么装](/zh/android) |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc)：测试版，已通过 Apple 的 beta 审核；从这个链接安装 · [iOS](/zh/ios) |
-| **macOS** 12 以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-x64.dmg) · [桌面版](/zh/desktop) |
-| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.1-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-win-x64.exe) |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.tar.gz) |
+| **macOS** 12 以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-x64.dmg) · [桌面版](/zh/desktop) |
+| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.2-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-win-x64.exe) |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` 搭自己的中继；`docker compose up -d app` 跑网页版 · [自己部署](/zh/self-hosting) |
 
 所有下载都在 [最新版本](https://github.com/nano-muse/nanoMuse/releases/latest)；GitHub 下不动的话，同样的文件在 [nanomuse.cn/dl](https://nanomuse.cn/dl/)。
 
-[1.0.1 Ballast 改了什么](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [每个客户端能做什么](/zh/parity) · [从哪儿开始参与](/zh/roadmap) · [中继保存什么](/zh/privacy) · [什么留在手机上，归谁](/zh/sync)
+[1.0.2 Trim 改了什么](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.2) · [每个客户端能做什么](/zh/parity) · [从哪儿开始参与](/zh/roadmap) · [中继保存什么](/zh/privacy) · [什么留在手机上，归谁](/zh/sync)
 
 ## 宣传片
 
@@ -45,6 +45,10 @@ hero:
 </video>
 
 74 秒，看 nanoMuse 在手机、电脑和网页上做什么。还有[英文版](https://nanomuse.cn/media/film/nanomuse-film-en-web.mp4)。
+
+::: info nanoMuse 在持续进化
+个人智能体不该只长在别人的云里，nanoMuse 想做一个开源、低成本的平替：装在自己的设备上，模型自己选，中继也能自己架。我们希望和全球的开发者、使用者一起，让每个人真正拥有自己的个人智能体。提个 [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) 或者发个 [PR](../../CONTRIBUTING.md) 都是在帮 nanoMuse 变得更好。
+:::
 
 ## 引用
 

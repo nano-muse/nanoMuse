@@ -20,17 +20,24 @@
 <p align="center">
   <a href="https://github.com/nano-muse/nanoMuse/stargazers"><img src="https://img.shields.io/github/stars/nano-muse/nanoMuse?style=flat&label=stars" alt="GitHub 스타"></a>
   <a href="https://github.com/nano-muse/nanoMuse/releases"><img src="https://img.shields.io/github/downloads/nano-muse/nanoMuse/total?label=downloads" alt="다운로드"></a>
+  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
   <a href="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml"><img src="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml/badge.svg?branch=main" alt="Test Suite"></a>
+  <a href="https://github.com/nano-muse/nanoMuse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nano-muse/nanoMuse?label=license" alt="GPL-3.0-or-later"></a>
+  <a href="https://arxiv.org/abs/2610.08699"><img src="https://img.shields.io/badge/arXiv-2610.08699-b31b1b" alt="arXiv 논문"></a>
+  <br>
   <a href="https://demo.nanomuse.dev/"><img src="https://img.shields.io/badge/%EC%8D%A8_%EB%B3%B4%EA%B8%B0-demo.nanomuse.dev-0a66e4" alt="브라우저에서 써 보기"></a>
   <a href="https://nanomuse.cn/"><img src="https://img.shields.io/badge/%EC%9B%B9%EC%82%AC%EC%9D%B4%ED%8A%B8-nanomuse.cn-0a66e4" alt="웹사이트"></a>
-  <a href="https://arxiv.org/abs/2610.08699"><img src="https://img.shields.io/badge/arXiv-2610.08699-b31b1b" alt="arXiv 논문"></a>
-  <a href="https://github.com/nano-muse/nanoMuse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nano-muse/nanoMuse?label=license" alt="GPL-3.0-or-later"></a>
   <a href="https://discord.gg/bkTySmm28X"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 **nanoMuse는 당신의 모든 기기를 위한 오픈소스 개인 에이전트입니다.** 이름과 모습을 가진 하나의 에이전트로, Meta의 [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/)와 같은 종류입니다. 질문에 답하는 대신 직접 일을 하고, 앱을 닫아도 계속 일하고, 당신을 기억하며, 되돌릴 수 없는 일을 하기 전에는 멈춰서 묻습니다.
 
-*nano*는 직접 돌리고 직접 배포할 수 있을 만큼 작은, 완전한 한 세트라는 뜻입니다. 휴대폰 앱, 데스크톱 앱, 웹 콘솔, 그리고 이들을 잇는 릴레이가 모두 이 저장소에 GPL-3.0-or-later로 들어 있습니다. **[무료, 오픈 소스, 비영리. 함께 만들어 갑시다.](../../CONTRIBUTING.md)** 로그인하면 커뮤니티 릴레이에서 모델을 쓸 수 있는 무료 사용량을 받습니다. 비용은 개발자가 부담합니다. 다 쓰면 [자신의 키로 바꾸세요](../own-key.md). 같은 릴레이를 자신의 서버에서 돌릴 수도 있어, 데이터가 집 밖으로 나갈 필요가 없습니다. 최신 버전: **1.0.1 Ballast**, [릴리스 노트](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [브라우저에서 써 보기](https://demo.nanomuse.dev/).
+*nano*는 직접 돌리고 직접 배포할 수 있을 만큼 작은, 완전한 한 세트라는 뜻입니다. 휴대폰 앱, 데스크톱 앱, 웹 콘솔, 그리고 이들을 잇는 릴레이가 모두 이 저장소에 GPL-3.0-or-later로 들어 있습니다. **[무료, 오픈 소스, 비영리. 함께 만들어 갑시다.](../../CONTRIBUTING.md)** 로그인하면 커뮤니티 릴레이에서 모델을 쓸 수 있는 무료 사용량을 받습니다. 비용은 개발자가 부담합니다. 다 쓰면 [자신의 키로 바꾸세요](../own-key.md). 같은 릴레이를 자신의 서버에서 돌릴 수도 있어, 데이터가 집 밖으로 나갈 필요가 없습니다. 최신 버전: **1.0.2 Trim**, [릴리스 노트](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.2) · [브라우저에서 써 보기](https://demo.nanomuse.dev/).
+
+> [!NOTE]
+> **nanoMuse는 계속 진화합니다**
+>
+> 개인 에이전트가 남의 클라우드 안에서만 자라서는 안 됩니다. 그래서 nanoMuse는 오픈소스이고 비용이 낮은 대안이 되려 합니다. 자기 기기에 설치하고, 모델은 직접 고르고, 릴레이도 직접 세울 수 있습니다. 전 세계의 개발자, 사용자와 함께 만들어서 모든 사람이 진짜 자기만의 개인 에이전트를 갖게 하고 싶습니다. [이슈](https://github.com/nano-muse/nanoMuse/issues/new/choose)를 열거나 [풀 리퀘스트](../../CONTRIBUTING.md)를 보내는 것, 어느 쪽이든 nanoMuse를 더 낫게 만드는 데 보탬이 됩니다.
 
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
@@ -50,11 +57,11 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 | | |
 |---|---|
 | **브라우저** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): 로그인하면 시뮬레이션된 휴대폰 위에서 nanoMuse가 돌아갑니다. 데모이고, 진짜는 아래의 앱들입니다 |
-| **Android** 8.0 이상, arm64 | [nanoMuse-1.0.1-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-1.0.1-arm64.apk): 모든 버전이 같은 키로 서명되어 있어 덮어 설치하면 됩니다 |
+| **Android** 8.0 이상, arm64 | [nanoMuse-1.0.2-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-1.0.2-arm64.apk): 모든 버전이 같은 키로 서명되어 있어 덮어 설치하면 됩니다 |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): Apple의 베타 심사를 통과한 베타. 이 링크로 설치합니다 · [iOS](../ios.md) |
-| **macOS** 12 이상 | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-x64.dmg): 공증되지 않음: 처음 한 번 우클릭 → 열기 |
-| **Windows** 10 이상 | [nanoMuse-Desktop-1.0.1-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-win-x64.exe): 실행을 한 번 눌러 주세요 |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.tar.gz) |
+| **macOS** 12 이상 | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-x64.dmg). 공증되지 않음: 처음 한 번 우클릭 → 열기 |
+| **Windows** 10 이상 | [nanoMuse-Desktop-1.0.2-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-win-x64.exe): 실행을 한 번 눌러 주세요 |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local`로 자신의 릴레이를, `docker compose up -d app`으로 자신의 서버에 웹 앱을. [직접 호스팅](../self-hosting.md) |
 
 모든 다운로드는 [GitHub 최신 릴리스](https://github.com/nano-muse/nanoMuse/releases/latest)에 있습니다. GitHub가 느린 곳이라면 같은 파일이 [nanomuse.cn/dl](https://nanomuse.cn/dl/)에 있습니다. 앱을 열고 이메일이나 중국 본토 휴대폰 번호로 로그인하면 에이전트가 쓸 모델이 준비됩니다. 휴대폰, 데스크톱, 웹은 하나의 계정을 공유하고 같은 대화를 보여 줍니다.
@@ -127,6 +134,7 @@ VPS 한 대, 한 시간: [docs/self-hosting.md](../self-hosting.md). 세 가지 
 <!-- contributors:start -->
 <p>
 <a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
+<a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
 <a href="https://github.com/PovedaAqui"><img src="https://avatars.githubusercontent.com/u/9494679?v=4&s=48" width="48" height="48" alt="PovedaAqui"></a>
 <a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
@@ -168,5 +176,5 @@ nanoMuse는 독립적인 커뮤니티 프로젝트로, Meta Platforms, Inc.와 �
 
 <p align="center">
   <em>방문해 주셔서 감사합니다 ✨ nanoMuse!</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse&left_text=visitors&left_color=%23555&right_color=%230a66e4" alt="Visitors">
+  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
 </p>

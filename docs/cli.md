@@ -44,7 +44,7 @@ Advance every active goal, sleep, repeat. Runs in Sentinel `auto` mode, so pair 
 ## Goals
 
 ```bash
-nanomuse goals list [--status active|paused|done] [--category health|finance|career|learning|…]
+nanomuse goals list [--status active|paused|done|cancelled] [--category health|finance|career|learning|…]
 nanomuse goals show g_1a2b3c
 nanomuse goals add "Learn Rust" -s "Read the book, ch. 1–4" -s "Build a CLI" -s "Publish a crate" \
     --category learning --due 2026-12-31 --check-in "weekly sun 19:00"
@@ -143,6 +143,31 @@ nanomuse vault delete EMAIL_PASSWORD
 
 Reference secrets as `{{vault:EMAIL_PASSWORD}}` in the config (connectors only; a command never receives a secret). See [sentinel.md](sentinel.md#credential-vault).
 
+## Chat apps
+
+```bash
+nanomuse channels status [--json]              # what is switched on, connected, and who is paired
+nanomuse channels pending                      # pairing codes people were shown and that wait for a yes
+nanomuse channels approve 482913               # let the person who got this code talk to the Muse
+nanomuse channels deny 482913
+nanomuse channels login feishu [--lark]        # create the Feishu bot by scanning a QR code
+nanomuse channels test feishu [--chat <id>]    # send a test message (default: the first paired chat)
+```
+
+With `nanomuse serve` running, these commands go through its API; otherwise they edit the files under the data directory and the server picks them up when it starts. The apps, pairing and what each one needs: [channels.md](channels.md).
+
+## ChatGPT sign-in
+
+```bash
+nanomuse chatgpt login [--no-browser] [--port 1455] [--timeout 600]   # the browser opens OpenAI's sign-in page
+nanomuse chatgpt status                        # who is signed in and until when; never touches the network
+nanomuse chatgpt usage                         # what is left of the plan's usage windows
+nanomuse chatgpt logout                        # forget the sign-in; nothing is revoked upstream
+nanomuse chatgpt proxy [--port 0] [--token …]  # an OpenAI-compatible server on the loopback interface
+```
+
+Every subcommand takes `--json` (one JSON object per line) and, where it reaches chatgpt.com, `--proxy` (default: `[llm] proxy` from the config). What the sign-in covers and where the tokens live: [own-key.md](own-key.md#sign-in-with-a-plan-you-already-pay-for).
+
 ## Phone
 
 ```bash
@@ -167,4 +192,4 @@ nanomuse mcp                           # this computer's screen and hands as an 
 
 `nanomuse mcp` is for a host that is not our runtime ([nanoMuse on DeepSeek Harness](harness.md)) and serves `computer_screen` and `computer_act` with the runtime's descriptions; a step the Sentinel would ask about (Enter, a submit, a heavy shortcut, a click on a sensitive word) is refused with the reason until the call carries `confirmed: true`, which the model may set only after the person agreed in the conversation.
 
-`nanomuse doctor` is the first thing to run when something is off, and what to paste into a bug report: which config file is in use, where the data lives, which model and endpoint are configured and whether a key is set, whether recall by meaning is on and how many memories are indexed, which web search provider answers and whether it has its key or URL, whether commands run in the sandbox (and why not, if not), the tools the agent has, connector state (mailbox, calendar feeds, address books), and a one-line call to the model with its latency (`--no-model` skips that). It exits non-zero when something needs fixing and says what.
+`nanomuse doctor` is the first thing to run when something is off, and what to paste into a bug report: which config file is in use (and any key in it nothing reads), where the data lives, which model and endpoint are configured and whether a key is set, whether recall by meaning is on and how many memories are indexed, which web search provider answers and whether it has its key or URL, whether commands run in the sandbox (and why not, if not), the tools the agent has, connector state (mailbox, calendar feeds, address books), and a one-line call to the model with its latency (`--no-model` skips that). It exits non-zero when something needs fixing and says what.

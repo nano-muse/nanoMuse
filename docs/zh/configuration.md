@@ -12,6 +12,8 @@ nanoMuse 只读一个 TOML 文件。`nanomuse config init` 把带注释的 [`con
 
 三层设置，后面的覆盖前面的：先是这个文件，然后是环境变量覆盖，最后是 App 里「连接」屏幕改过的东西（`<data_dir>/app-settings.json`：模型、邮件服务器、浏览器开关、从手机上添加的 MCP 服务器）。最后这个文件里提到机密，一律只写 `{{vault:NAME}}`。
 
+运行时没有对应设置的键（拼错的 `modle`、来自另一个版本的键）会被忽略，取默认值；加载时会在日志里带着键的路径（`llm.modle`）说明，`nanomuse doctor` 把这类键列为问题。自由格式的表（`[llm.extra_headers]`、MCP 服务器的 `env`）和 [channels.md](channels.md) 里的 `[channels.<name>]` 表接受任何键。
+
 ## 环境变量覆盖 {#environment-overrides}
 
 这些优先于文件。它们覆盖了人们最常改的设置，以及 Docker 需要的东西。
@@ -32,6 +34,8 @@ nanoMuse 只读一个 TOML 文件。`nanomuse config init` 把带注释的 [`con
 | `NANOMUSE_VAULT_KEY` | 保险库的 Fernet 密钥（默认：`<data_dir>/vault.key`） |
 | `NANOMUSE_CLOUD_BASE_URL`、`NANOMUSE_CLOUD_REQUIRED`、`NANOMUSE_CLOUD_SYNC` | `[cloud]`：托管运行时登录的那个中继、是否必须有 nanoMuse Cloud 账号，以及「在我的设备之间同步对话」的默认值（`sync`，除非设为 `0` 否则是开的；「设置 → 数据控制」里的开关只要动过一次，就以它为准；[every-device.md](every-device.md#the-same-conversations-everywhere)）（[cloud.md](cloud.md)；中继自己的变量在 [cloud/README.md](../../cloud/README.md)） |
 | `NANOMUSE_HUB_NAME` | `hub.name`，这台设备在其他设备上叫什么 |
+| `NANOMUSE_CLOUD_KEY`、`NANOMUSE_CLOUD_HINT`、`NANOMUSE_CLOUD_CHANNEL`、`NANOMUSE_ONBOARDED` | 托管的运行时（nanoMuse Web）一启动就是登录状态：创建容器的网关交来账号 key（和手动输入的一样进保险库）、账号页要显示的打码标识和渠道，以及首次运行是否已经完成；保险库里已经有 key 时什么都不做 |
+| `NANOMUSE_IN_CONTAINER=1` | 说明运行时在容器里（镜像会设置它；`/.dockerenv` 也会被读取），于是 `sandbox.mode = auto` 把容器当作箱子，而不是报告缺少 bubblewrap |
 | `NANOMUSE_CODING_HOME` | 到哪里找编程 CLI 各自的家目录（`~/.codex`、`~/.claude`……），默认是用户的家目录（[coding-agents.md](coding-agents.md)） |
 | `NANOMUSE_LOG_LEVEL` | `log_level` |
 
@@ -55,6 +59,9 @@ pass_reasoning = false             # send reasoning_content back with assistant 
 extra_headers = {}                 # e.g. { "X-End-User-Id" = "nanomuse" }
 extra_body    = {}                 # e.g. { "thinking" = { "type" = "enabled" } }
 proxy         = ""                 # an HTTP(S) or SOCKS proxy for this slot only, e.g. "http://127.0.0.1:7890"
+image_model   = ""                 # the older way to name the avatar studio's picture model on this host; see [image] below
+video_model   = ""                 # the same for clips
+video_base_url = ""                # the asynchronous video API when it is not on this host (a relaying gateway)
 ```
 
 `proxy` 让这个槽位的请求（`chatgpt` 槽位还包括登录的令牌刷新）走那个代理，并对它们忽略环境里的 `HTTPS_PROXY`；留空则由环境决定。它从不作用于 nanoMuse Cloud 和 hub。（手机上同样的开关在「设置 → 网络」；[own-key.md](own-key.md#when-the-provider-cannot-be-reached)。）
@@ -157,6 +164,7 @@ api_key  = "{{vault:VIDEO_API_KEY}}"
 name                 = "nanoMuse"      # what the agent calls itself (the app's profile overrides this)
 max_steps            = 30              # tool calls per turn before it must wrap up
 # workspace          = "./workspace"   # the only directory the files tool can touch; default ./workspace if present here, else <data_dir>/workspace
+extra_roots          = []              # directories outside the workspace the files tool may read and write, e.g. ["~/Documents/notes"]; writable inside the sandbox too
 language             = "auto"          # or a fixed language: "English", "中文", ...
 max_context_messages = 80
 max_context_images   = 4               # screenshots kept in the request: the newest N; 0 keeps all
@@ -418,6 +426,8 @@ reads_private_data = false
 ```
 
 `tools` 是可选的，按工具名（不带 `<server>__` 前缀）逐个写；没写的都回退到服务器的值。手机自带的工具就是这样拿到默认值的：在手机上，App 的能力不用任何配置就以 `device` 这个服务器的身份出现（[device.md](device.md)），逐工具的表来自 `nanomuse/runtime.py`。
+
+连不上的服务器会记一条日志然后跳过，智能体照常启动，只是没有它的工具；日志那一行写明服务器名和传输层的错误，URL 查询参数的值一律打码（`?key=***`），保险库里的机密也会被替换，所以被拒绝的 key 不会落进 `logs/`。
 
 内置技能认识的三个中国服务以 MCP 服务器的形式提供，`config/config.example.toml` 里每个都有一段：高德地图（托管，`AMAP_KEY` 放保险库）、12306（`npx -y 12306-mcp`，不要 key；火车票，只能查询）和快递100（托管，`KUAIDI100_KEY`；快递，按单号付费）。其中哪些真的在手机的根文件系统里跑过，外面还有些什么：[services.md](services.md)。
 

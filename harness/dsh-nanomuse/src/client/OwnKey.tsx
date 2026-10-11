@@ -80,7 +80,7 @@ export function useProviders(t: Translate): { view: ProvidersView | undefined; e
     let alive = true
     call<ProvidersView>(`providers?lang=${encodeURIComponent(t('langTag'))}`)
       .then((v) => { if (alive) { setView(v); setError(undefined) } })
-      .catch((err: unknown) => { if (alive) setError((err as Error).message) })
+      .catch((err: unknown) => { if (alive) setError(failureText(t, err)) })
     return () => { alive = false }
   }, [t, tick, key, signedIn])
   return { view, error, reload }

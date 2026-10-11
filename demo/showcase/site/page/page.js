@@ -105,6 +105,9 @@
         lookGroup.querySelectorAll(".chip").forEach(function (b) {
           b.disabled = true;
         });
+        lookGroup.querySelectorAll(".why:not(#look-why)").forEach(function (p) {
+          p.classList.add("hidden");
+        });
         var why = document.getElementById("look-why");
         if (why) {
           why.innerHTML =
@@ -377,9 +380,11 @@
   }
 
   // ---- the lines to try -----------------------------------------------------------------
+  // One set of lines per language (class en / zh, shown by the page's language as every other
+  // string is); the text handed to the phone is the chip's data-text.
   document.querySelectorAll(".chip").forEach(function (chip) {
     chip.addEventListener("click", function () {
-      var text = lang() === "zh" ? chip.getAttribute("data-zh") : chip.getAttribute("data-en");
+      var text = chip.getAttribute("data-text");
       if (!text) return;
       if (!phoneWindow()) {
         powerOn();

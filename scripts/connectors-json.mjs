@@ -33,4 +33,7 @@ for (const target of targets) {
     console.log(`${target}: ${CATALOGUE.length} connectors`)
   }
 }
-if (stale) process.exit(1)
+if (stale) {
+  console.error(`run \`node scripts/connectors-json.mjs\` and commit the result`)
+  process.exit(1)
+}

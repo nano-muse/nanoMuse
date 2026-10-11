@@ -651,8 +651,8 @@
     <string name="nm_cloud_server_now">Server: %1$s</string>
     <string name="nm_cloud_server_ok">Sumagot ang %1$s: relay %2$s.</string>
     <string name="nm_cloud_server_bad_url">Ilagay ang address ng relay, tulad ng https://relay.example.org.</string>
-    <string name="nm_cloud_server_https">Gumamit ng https para sa server na nasa labas ng sarili mong network. Puwede ang http para sa pribadong address (10.x, 192.168.x, 172.16–31.x, localhost, isang .local o .ts.net na pangalan).</string>
-    <string name="nm_lan_only_https">Gumagana lang ang plain http:// para sa mga address sa sarili mong network (10.x, 172.16–31.x, 192.168.x, mga .local na pangalan); gamitin ang https:// para sa %1$s.</string>
+    <string name="nm_cloud_server_https">Gumamit ng https para sa server na nasa labas ng sarili mong network. Puwede ang http para sa pribadong address (10.x, 192.168.x, 172.16-31.x, localhost, isang .local o .ts.net na pangalan).</string>
+    <string name="nm_lan_only_https">Gumagana lang ang plain http:// para sa mga address sa sarili mong network (10.x, 172.16-31.x, 192.168.x, mga .local na pangalan); gamitin ang https:// para sa %1$s.</string>
     <string name="nm_cloud_server_unreachable">Walang relay na sumagot sa %1$s. Suriin ang address at kung tumatakbo ang relay.</string>
     <string name="nm_cloud_server_default">Bumalik sa nanoMuse Cloud</string>
     <string name="nm_cloud_server_row">Server</string>

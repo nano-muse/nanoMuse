@@ -5,7 +5,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>io.github.nanomuse.app.liveactivity-refresh</string>
-		<string>io.github.nanomuse.app.scheduler</string>
+		<string>io.github.nanomuse.app.scheduler</string> <!-- nanoMuse: the routines' background refresh (NanoMuseScheduler) -->
 	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>

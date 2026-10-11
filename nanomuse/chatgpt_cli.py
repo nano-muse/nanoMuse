@@ -62,9 +62,11 @@ def _settings(config: Path | None) -> Settings:
         raise typer.Exit(1) from exc
     except ValidationError as exc:
         err.print(
-            f"[red]config.toml has settings nanoMuse does not understand[/red] "
-            f"({find_config_file(config)}): {exc.error_count()} problem(s)"
+            f"[red]config.toml has {exc.error_count()} setting(s) nanoMuse does not understand[/red] "
+            f"({find_config_file(config)}):"
         )
+        for e in exc.errors():
+            err.print(f"  [bold]{'.'.join(str(x) for x in e['loc'])}[/bold]: {e['msg']}")
         raise typer.Exit(1) from exc
 
 
@@ -82,7 +84,7 @@ def _proxy(config: Path | None, given: str | None) -> str | None:
 ProxyOpt = Annotated[
     str | None,
     typer.Option(
-        "--proxy", help="An HTTP(S) or SOCKS proxy for chatgpt.com; default: [llm] proxy."
+        "--proxy", help="An HTTP(S) or SOCKS proxy for chatgpt.com; default: \\[llm] proxy."
     ),
 ]
 
@@ -151,8 +153,8 @@ def login(
 ) -> None:
     """Sign in with a ChatGPT plan.
 
-    The browser opens OpenAI's sign-in page; when it comes back, the tokens are stored under
-    the data directory (mode 0600)."""
+    The browser opens OpenAI's sign-in page; when it comes back, the tokens are stored under the data directory (mode 0600).
+    """
     store = _store(config)
     err.print(f"[dim]{HONESTY_LINE}[/dim]")
 
@@ -303,14 +305,16 @@ def proxy(
     config: ConfigOpt = None,
     as_json: JsonOpt = False,
     port: Annotated[int, typer.Option("--port", help="0 = the OS picks one.")] = 0,
-    host: Annotated[str, typer.Option("--host")] = "127.0.0.1",
+    host: Annotated[
+        str, typer.Option("--host", help="Bind address; keep it on the loopback interface.")
+    ] = "127.0.0.1",
     token: Annotated[str | None, typer.Option("--token", help="The local bearer token.")] = None,
     proxy: ProxyOpt = None,
 ) -> None:
     """An OpenAI-compatible server on the loopback interface, answering with the ChatGPT sign-in.
 
-    GET /v1/models, POST /v1/chat/completions. Every request wants
-    `Authorization: Bearer <local token>`."""
+    GET /v1/models, POST /v1/chat/completions. Every request wants `Authorization: Bearer <local token>`.
+    """
     import uvicorn
 
     from nanomuse.llm.chatgpt_proxy import make_app

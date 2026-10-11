@@ -48,7 +48,7 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 
 ## 决策顺序 {#decision-order}
 
-每次调用，第 1 到第 4 步里第一个匹配的步骤给出决定；第 5、6 步随后对每个决定都会检查，只能把「允许」改成「询问」：
+每次调用，第 1 到第 4 步里第一个匹配的步骤给出决定；第 5、6 步随后对每个决定都会检查，只能把它改成「询问」（而且是会跳过问题的模式也不会放行的那种询问）：
 
 1. **`deny_tools`** → 拒绝。
 2. **`[[sentinel.rules]]`**：`tool`（glob，`*` 表示任意）加 `match`，一个参数名 → glob 模式的映射，拿 `str(value)` 来匹配。第一条匹配的规则生效，给出它的 `action`。
@@ -61,7 +61,7 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 | `strict` | 允许 | 询问 | 询问 |
 | `auto` | 允许 | 允许 | 允许 |
 
-5. **污点**：到这里的决定是允许，这段对话已被污染，**而且**这次调用外发到不在 `egress_allowlist` 里的主机（或目的地未知）→ 询问，不论这个允许来自模式、`always_allow_tools` 还是一条规则。目的地已知时审批卡片会显示它。
+5. **污点**：这段对话已被污染，**而且**这次调用外发到不在 `egress_allowlist` 里的主机（或目的地未知）→ 询问，不论第 1 到第 4 步给出的是什么（模式、`always_allow_tools`、`always_ask_tools` 或一条规则）。目的地已知时审批卡片会显示它。
 6. **警告**：带警告的调用（`rm -rf`、`sudo`、`curl | sh`、读环境变量或删文件的代码）绝不会被模式或 `always_allow_tools` 放行；它会问。只有一条明确的 `allow` 规则能覆盖这一点。
 
 `auto` 仍然遵守 `deny_tools`、deny 规则、第 5 步和第 6 步。污点规则在每种模式下都成立：一段对话读过邮件、日历、联系人或其他私密来源之后，要把数据发往 `egress_allowlist` 之外主机的调用会询问，`auto` 不会把这个问题改成放行。`nanomuse daemon`、`--auto` 和 App 里的「放手」设置用的就是它，后台的目标检查也是，所以无人值守的运行里出现危险命令或读过私密数据后的外发时，它变成动态里的一张卡片，而不是直接跑掉。`nanomuse daemon` 旁边没有人：仍需要审批的那一步会被拒绝并留下说明，模型继续做它能做的。

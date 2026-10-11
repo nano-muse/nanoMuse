@@ -1447,6 +1447,10 @@ const zhCN: Record<string, string> = {
   "Conversation sync is paused on this relay for now; what is stored is kept and your devices keep working on their own.": "这个中继暂时停止了对话同步，已存的内容保留着，各设备各自继续使用。",
   "The device hub is paused on this relay for now; each device keeps working on its own.": "这个中继暂时停止了设备互联，各设备各自继续使用。",
   "The free allowance is paused on this relay for now, not used up. Your own model key under Connections keeps you going; your sign-in, your devices and what is left stay as they are.": "这个中继暂时停发了免费额度，不是用完了。在「连接」里填上你自己的模型 key 就能继续；你的登录、设备和剩余额度都保持原样。",
+  "This demo Muse has used its share of the model for this visit. Start over for a new one, or install nanoMuse and use your own key.":
+    "这个演示 Muse 这一次的模型额度用完了。点「重新开始」再来一个，或者安装 nanoMuse，用你自己的 key。",
+  "The showcase has used today's share of the model; it comes back tomorrow. Install nanoMuse and use your own key to keep going.":
+    "在线体验今天的模型额度用完了，明天会恢复。安装 nanoMuse，用你自己的 key 可以继续。",
   "The model provider is having trouble; try again in a moment.": "模型服务商出了点问题，稍后再试。",
   "The model provider refused the API key. Check it under Connections.": "模型服务商拒绝了这个 API key，去「连接」里检查一下。",
   "The endpoint does not know this model. Pick another under Connections.": "这个接口不认识这个模型，在「连接」里换一个。",
@@ -1487,6 +1491,8 @@ const zhCN: Record<string, string> = {
 
   // -- reaching the runtime --
   "Cannot reach your nanoMuse right now.": "现在连不上你的 nanoMuse。",
+  "Your nanoMuse hit a problem; try again in a moment.": "你的 nanoMuse 出了点问题，稍后再试。",
+  "Your nanoMuse could not do that.": "你的 nanoMuse 没能完成这个操作。",
   "Could not reach your nanoMuse.": "连不上你的 nanoMuse。",
   "Connecting to your nanoMuse…": "正在连接你的 nanoMuse…",
   "Try again": "再试一次",

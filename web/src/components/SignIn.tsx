@@ -1,5 +1,5 @@
 import { KeyRound, Loader2, MessageSquareText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { api } from "../api";
 import { useT } from "../i18n";
 import { isMainland, looksLikeForeignNumber } from "../region";
@@ -57,6 +57,7 @@ export function SignIn({
   autoFocus?: boolean;
 }) {
   const t = useT();
+  const ids = useId();
   const cfg = useCloudConfig();
   const [mode, setMode] = useState<"code" | "password">("code");
   const [identifier, setIdentifier] = useState("");
@@ -158,8 +159,9 @@ export function SignIn({
         <ModeButton active={mode === "password"} onClick={() => setMode("password")} icon={<KeyRound size={14} />} label={t("With a password")} />
       </div>
       <div>
-        <label className="text-[12px] text-muted">{isMainland() ? t("Mainland China phone number or e-mail") : t("E-mail (or a mainland China phone number)")}</label>
+        <label htmlFor={`${ids}-id`} className="text-[12px] text-muted">{isMainland() ? t("Mainland China phone number or e-mail") : t("E-mail (or a mainland China phone number)")}</label>
         <input
+          id={`${ids}-id`}
           value={identifier}
           onChange={(e) => {
             setIdentifier(e.target.value);
@@ -177,8 +179,9 @@ export function SignIn({
       </div>
       {mode === "password" ? (
         <div>
-          <label className="text-[12px] text-muted">{t("Password")}</label>
+          <label htmlFor={`${ids}-password`} className="text-[12px] text-muted">{t("Password")}</label>
           <input
+            id={`${ids}-password`}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -191,8 +194,9 @@ export function SignIn({
         <>
           {sent && (
             <div>
-              <label className="text-[12px] text-muted">{t("The code you received")}</label>
+              <label htmlFor={`${ids}-code`} className="text-[12px] text-muted">{t("The code you received")}</label>
               <input
+                id={`${ids}-code`}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 inputMode="numeric"
@@ -205,8 +209,9 @@ export function SignIn({
           )}
           {inviteOpen ? (
             <div>
-              <label className="text-[12px] text-muted">{t("Invite code (optional)")}</label>
+              <label htmlFor={`${ids}-invite`} className="text-[12px] text-muted">{t("Invite code (optional)")}</label>
               <input
+                id={`${ids}-invite`}
                 value={invite}
                 onChange={(e) => setInvite(normalizeInvite(e.target.value))}
                 autoComplete="off"

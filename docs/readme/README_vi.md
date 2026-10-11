@@ -20,17 +20,24 @@
 <p align="center">
   <a href="https://github.com/nano-muse/nanoMuse/stargazers"><img src="https://img.shields.io/github/stars/nano-muse/nanoMuse?style=flat&label=stars" alt="Sao GitHub"></a>
   <a href="https://github.com/nano-muse/nanoMuse/releases"><img src="https://img.shields.io/github/downloads/nano-muse/nanoMuse/total?label=downloads" alt="Lượt tải"></a>
+  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
   <a href="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml"><img src="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml/badge.svg?branch=main" alt="Test Suite"></a>
+  <a href="https://github.com/nano-muse/nanoMuse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nano-muse/nanoMuse?label=license" alt="GPL-3.0-or-later"></a>
+  <a href="https://arxiv.org/abs/2610.08699"><img src="https://img.shields.io/badge/arXiv-2610.08699-b31b1b" alt="Bài báo trên arXiv"></a>
+  <br>
   <a href="https://demo.nanomuse.dev/"><img src="https://img.shields.io/badge/D%C3%B9ng_th%E1%BB%AD-demo.nanomuse.dev-0a66e4" alt="Dùng thử trên trình duyệt"></a>
   <a href="https://nanomuse.cn/"><img src="https://img.shields.io/badge/Trang_web-nanomuse.cn-0a66e4" alt="Trang web"></a>
-  <a href="https://arxiv.org/abs/2610.08699"><img src="https://img.shields.io/badge/arXiv-2610.08699-b31b1b" alt="Bài báo trên arXiv"></a>
-  <a href="https://github.com/nano-muse/nanoMuse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nano-muse/nanoMuse?label=license" alt="GPL-3.0-or-later"></a>
   <a href="https://discord.gg/bkTySmm28X"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 **nanoMuse là một trợ lý cá nhân mã nguồn mở cho mọi thiết bị của bạn.** Một trợ lý duy nhất có tên và hình dáng riêng, cùng loại với [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) của Meta: nó làm việc thay vì chỉ trả lời câu hỏi, tiếp tục làm khi ứng dụng đã đóng, nhớ bạn, và dừng lại hỏi trước bất cứ việc gì bạn không thể hoàn tác.
 
-*nano* nghĩa là trọn bộ nhưng đủ nhỏ để bạn tự chạy và tự triển khai: ứng dụng điện thoại, ứng dụng máy tính, bảng điều khiển web và relay nối chúng lại đều nằm trong kho này, theo giấy phép GPL-3.0-or-later. **[Miễn phí, mã nguồn mở, phi lợi nhuận. Cùng nhau xây dựng.](../../CONTRIBUTING.md)** Đăng nhập là bạn có một khoản miễn phí để dùng mô hình qua relay của cộng đồng (do người phát triển trả); dùng hết thì [chuyển sang khóa của riêng bạn](../own-key.md). Cùng relay đó chạy được trên máy chủ của bạn, nên dữ liệu không cần rời khỏi nhà bạn. Phiên bản mới nhất: **1.0.1 Ballast**, [ghi chú phát hành](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.1) · [dùng thử trên trình duyệt](https://demo.nanomuse.dev/).
+*nano* nghĩa là trọn bộ nhưng đủ nhỏ để bạn tự chạy và tự triển khai: ứng dụng điện thoại, ứng dụng máy tính, bảng điều khiển web và relay nối chúng lại đều nằm trong kho này, theo giấy phép GPL-3.0-or-later. **[Miễn phí, mã nguồn mở, phi lợi nhuận. Cùng nhau xây dựng.](../../CONTRIBUTING.md)** Đăng nhập là bạn có một khoản miễn phí để dùng mô hình qua relay của cộng đồng (do người phát triển trả); dùng hết thì [chuyển sang khóa của riêng bạn](../own-key.md). Cùng relay đó chạy được trên máy chủ của bạn, nên dữ liệu không cần rời khỏi nhà bạn. Phiên bản mới nhất: **1.0.2 Trim**, [ghi chú phát hành](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.2) · [dùng thử trên trình duyệt](https://demo.nanomuse.dev/).
+
+> [!NOTE]
+> **nanoMuse không ngừng phát triển**
+>
+> Trợ lý cá nhân không nên chỉ sống trong đám mây của người khác, nên nanoMuse muốn là lựa chọn thay thế mã nguồn mở, chi phí thấp: chạy trên thiết bị của chính bạn, mô hình do bạn chọn, relay cũng có thể tự dựng. Chúng tôi muốn cùng các nhà phát triển và người dùng khắp nơi xây dựng nó, để mỗi người thật sự có một trợ lý cá nhân của riêng mình. Mở một [issue](https://github.com/nano-muse/nanoMuse/issues/new/choose) hay gửi một [pull request](../../CONTRIBUTING.md), cách nào cũng giúp nanoMuse tốt hơn.
 
 https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
@@ -50,11 +57,11 @@ Mọi phiên bản: [releases](https://github.com/nano-muse/nanoMuse/releases).
 | | |
 |---|---|
 | **Trình duyệt** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): một nanoMuse trên điện thoại mô phỏng, sau khi đăng nhập. Đây là bản demo; các ứng dụng bên dưới mới là bản thật |
-| **Android** 8.0 trở lên, arm64 | [nanoMuse-1.0.1-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-1.0.1-arm64.apk): mọi phiên bản ký cùng một khóa, cài đè lên bản cũ là được |
+| **Android** 8.0 trở lên, arm64 | [nanoMuse-1.0.2-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-1.0.2-arm64.apk): mọi phiên bản ký cùng một khóa, cài đè lên bản cũ là được |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): bản beta đã qua vòng duyệt beta của Apple; cài từ liên kết này · [iOS](../ios.md) |
-| **macOS** 12 trở lên | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-mac-x64.dmg): chưa được công chứng: lần đầu nhấp chuột phải → *Mở* |
-| **Windows** 10 trở lên | [nanoMuse-Desktop-1.0.1-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-win-x64.exe): bấm *Vẫn chạy* một lần |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.1/nanoMuse-Desktop-1.0.1-linux-x64.tar.gz) |
+| **macOS** 12 trở lên | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-mac-x64.dmg). Chưa được công chứng: lần đầu nhấp chuột phải → *Mở* |
+| **Windows** 10 trở lên | [nanoMuse-Desktop-1.0.2-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-win-x64.exe): bấm *Vẫn chạy* một lần |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.2/nanoMuse-Desktop-1.0.2-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` để có relay của riêng bạn; `docker compose up -d app` để chạy ứng dụng web trên máy chủ của bạn; xem [tự lưu trữ](../self-hosting.md) |
 
 Mọi bản tải đều từ [bản phát hành mới nhất trên GitHub](https://github.com/nano-muse/nanoMuse/releases/latest); cùng các tệp đó có tại [nanomuse.cn/dl](https://nanomuse.cn/dl/) nếu GitHub chậm ở chỗ bạn. Mở ứng dụng, đăng nhập bằng e-mail hoặc số điện thoại Trung Quốc đại lục, và trợ lý đã có sẵn một mô hình để làm việc. Điện thoại, máy tính và web dùng chung một tài khoản và hiển thị cùng những cuộc trò chuyện.
@@ -127,6 +134,7 @@ Tất cả những ai có thay đổi đã vào `main`, theo danh sách người
 <!-- contributors:start -->
 <p>
 <a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
+<a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
 <a href="https://github.com/PovedaAqui"><img src="https://avatars.githubusercontent.com/u/9494679?v=4&s=48" width="48" height="48" alt="PovedaAqui"></a>
 <a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
@@ -168,5 +176,5 @@ nanoMuse là dự án cộng đồng độc lập, không liên kết với Meta
 
 <p align="center">
   <em>Cảm ơn bạn đã ghé thăm ✨ nanoMuse!</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=nano-muse.nanoMuse&left_text=visitors&left_color=%23555&right_color=%230a66e4" alt="Visitors">
+  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
 </p>

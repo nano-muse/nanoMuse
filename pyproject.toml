@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nanomuse"
-version = "1.0.1"
+version = "1.0.2"
 description = "nanoMuse: an open-source personal agent for every device you own. This is its runtime: the agent, the Sentinel that decides what may run, the hands that work a phone or a computer, and the web app. Bring your own model."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }

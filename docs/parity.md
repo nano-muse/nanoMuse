@@ -340,7 +340,7 @@ notes above; a settled item keeps its number and says how it went.
     …* (the runtime has no USER.md). The identity form stays under Settings for later changes.
     One addition to the contract: the runtime keeps the language *Start* was pressed in
     (`lang`), so the addendum quotes the opening in the words the person saw.
-    [web.md](web.md#the-first-run-and-the-chats-opening) has the walk-through.
+    [web.md](web.md#the-first-run-and-the-chat-s-opening) has the walk-through.
 40. **Models page, four slots (0.1.41).** Settled on Android, iOS and the desktop as one page
     with the *Use it for* card after a key is saved and *Use nanoMuse Cloud this time* on a
     failed own-key turn; the web console has the same four slots on *Connections* (the runtime's

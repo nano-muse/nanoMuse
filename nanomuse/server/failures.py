@@ -97,6 +97,16 @@ _RELAY: dict[str, tuple[str, str]] = {
         "relay",
         "The device hub is paused on this relay for now; each device keeps working on its own.",
     ),
+    # the showcase's gateway (demo/showcase/gateway, sessions.py): a demo Muse's share of the
+    # model for one visit, and the showcase's for the day, not a provider's rate limit
+    "session_budget": (
+        "allowance",
+        "This demo Muse has used its share of the model for this visit. Start over for a new one, or install nanoMuse and use your own key.",
+    ),
+    "daily_budget": (
+        "allowance",
+        "The showcase has used today's share of the model; it comes back tomorrow. Install nanoMuse and use your own key to keep going.",
+    ),
 }
 
 # relay 0.22: ``allowance_exhausted`` with ``paused: true`` — the free allowance switched off
