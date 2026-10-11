@@ -83,7 +83,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
   </tr>
   <tr>
     <td width="50%" valign="top"><b>자기만의 모습.</b><br>말로 묘사하면 이미지 모델이 그리고, 비디오 모델이 움직이게 합니다. 기본은 작은 용입니다.</td>
-    <td width="50%" valign="top"><b>어떤 모델이든.</b><br>릴레이의 무료 사용량, 열아홉 곳(Bailian, OpenRouter, OpenAI, Gemini, DeepSeek 등) 중 한 곳의 내 키, 또는 이미 결제 중인 요금제: ChatGPT, Claude, Kimi. 이미지나 영상 모델이 없는 제공자에서는 그 두 기능이 꺼지고, 앱이 그렇게 말해 줍니다.</td>
+    <td width="50%" valign="top"><b>어떤 모델이든.</b><br>릴레이의 무료 사용량, 스무 곳(Bailian, OpenRouter, OpenAI, Gemini, DeepSeek 등) 중 한 곳의 내 키, 또는 이미 결제 중인 요금제: ChatGPT, Claude, Kimi. 이미지나 영상 모델이 없는 제공자에서는 그 두 기능이 꺼지고, 앱이 그렇게 말해 줍니다.</td>
   </tr>
 </table>
 

@@ -47,7 +47,12 @@ data class Guidance(
 
         fun parse(o: JSONObject?): Guidance? {
             o ?: return null
-            val providers = providers(o.optJSONArray("providers"))
+            // `session_providers`: vendors that want a session id per conversation (OpenCode Go),
+            // which the relay lists apart for the apps of before this one; this app sends the id
+            // (io.github.nanomuse.net.OpenCodeSession), so they follow the relay's own list
+            val providers = providers(o.optJSONArray("providers")).let { main ->
+                if (main.isEmpty()) main else main + providers(o.optJSONArray("session_providers")).filter { s -> main.none { it.id == s.id } }
+            }
             if (providers.isEmpty()) return null
             val plans = (0 until (o.optJSONArray("plans")?.length() ?: 0)).mapNotNull { i ->
                 val p = o.optJSONArray("plans")?.optJSONObject(i) ?: return@mapNotNull null
@@ -104,6 +109,7 @@ data class Guidance(
                 note = p.optString("note"),
                 noteZh = p.optString("note_zh"),
                 verified = p.optString("verified"),
+                sessionHeader = p.optString("session_header").takeIf { it.isNotBlank() },
             )
         }
 

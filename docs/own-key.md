@@ -61,6 +61,7 @@ short videos.
 | Groq | ● | ● | | | outside mainland China | [console.groq.com](https://console.groq.com/keys) |
 | Mistral AI | ● | ● | | | outside mainland China | [console.mistral.ai](https://console.mistral.ai/api-keys) |
 | OpenCode Zen | ● | | | | outside mainland China | [opencode.ai/auth](https://opencode.ai/auth) |
+| OpenCode Go | ● | | | | outside mainland China | [opencode.ai/auth](https://opencode.ai/auth) |
 | Ollama / LM Studio / vLLM (on your machine) | ● | | | | both | no key |
 
 Only Bailian has a dot under *Clips* because nanoMuse's clip generation speaks
@@ -92,7 +93,8 @@ or paste it into a chat.**
 - **Anthropic.** [platform.claude.com](https://platform.claude.com/settings/keys). nanoMuse speaks Anthropic's own API; no compatibility layer is needed.
 - **Google Gemini.** [aistudio.google.com/apikey](https://aistudio.google.com/apikey), base URL `https://generativelanguage.googleapis.com/v1beta/openai`.
 - **xAI, Groq, Mistral.** A key from each console; base URLs `https://api.x.ai/v1`, `https://api.groq.com/openai/v1`, `https://api.mistral.ai/v1`.
-- **OpenCode Zen.** A key from [opencode.ai/auth](https://opencode.ai/auth); pay per request from a balance, a few models are free. Base URL `https://opencode.ai/zen/v1`. Only the models on the OpenAI shape are reached, so chat and no hands: the vision model OpenCode lists, `deepseek-v4-flash-vision-exp`, is an id DeepSeek has retired on its own platform. OpenCode publishes no plan sign-in, only a key, so there is nothing to sign in with here. OpenCode Go, the subscription on the same host, is not in the catalogue: OpenCode means it for coding agents and asks a client to identify itself and send a session id in `x-opencode-session` on each request, which nanoMuse does not do yet.
+- **OpenCode Zen.** A key from [opencode.ai/auth](https://opencode.ai/auth); pay per request from a balance, a few models are free. Base URL `https://opencode.ai/zen/v1`. Only the models on the OpenAI shape are reached, so chat and no hands: the vision model OpenCode lists, `deepseek-v4-flash-vision-exp`, is an id DeepSeek has retired on its own platform. OpenCode publishes no plan sign-in, only a key, so there is nothing to sign in with here.
+- **OpenCode Go.** The subscription on the same host: Go ($10 a month) or Go Plus ($40) in the OpenCode console, then a key from [opencode.ai/auth](https://opencode.ai/auth). Base URL `https://opencode.ai/zen/go/v1`. Usage is counted per model against monthly, weekly and five hour limits. OpenCode means Go for coding agents and asks a client to name itself and to send one stable id per conversation in `x-opencode-session` ([its docs](https://opencode.ai/docs/go/#where-can-i-use-it)). The runtime (and so the web console) sends `nanoMuse/<version>` as its user agent and the conversation's id in that header on every Go request; a call outside a conversation, such as the connection test, carries an id of its own. The desktop writes Go as its model adapter's own OpenCode Go route, which sends the same header and reaches each model on its own shape: the desktop offers the models that route's catalog lists, those on the Responses and Messages shapes included; elsewhere only the OpenAI shape is reached. The phone apps send it too, on chat and Responses requests to OpenCode's host: the id is the chat's prompt cache key, a hash of its first message that stays the same across its turns (two chats that open with the very same words share one). Chat only, for the same reason as Zen.
 
 **Paste it into nanoMuse.**
 

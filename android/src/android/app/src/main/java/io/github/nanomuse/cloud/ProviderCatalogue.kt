@@ -39,6 +39,11 @@ data class CatalogueProvider(
     val note: String,
     val noteZh: String,
     val verified: String,
+    /**
+     * The header the vendor wants one stable id per conversation in (OpenCode Go:
+     * `x-opencode-session`); [io.github.nanomuse.net.OpenCodeSession] sends it. Null for the rest.
+     */
+    val sessionHeader: String? = null,
 ) {
     fun displayName(chinese: Boolean): String = if (chinese && nameZh.isNotBlank()) nameZh else name
     fun note(chinese: Boolean): String = if (chinese && noteZh.isNotBlank()) noteZh else note
@@ -149,6 +154,7 @@ object ProviderCatalogue {
             note = o.optString("note"),
             noteZh = o.optString("note_zh"),
             verified = o.optString("verified"),
+            sessionHeader = o.optString("session_header").takeIf { it.isNotBlank() },
         )
     }
 
@@ -184,6 +190,9 @@ object ProviderCatalogue {
     fun match(list: List<CatalogueProvider>, inst: ProviderInstance): CatalogueProvider? {
         val host = inst.customBaseURL?.let { host(it) }
         if (host != null) {
+            // two vendors on one host (OpenCode Zen and Go) are told apart by the whole address
+            val url = inst.customBaseURL?.trim()?.trimEnd('/')
+            list.firstOrNull { p -> listOfNotNull(p.baseUrl, p.baseUrlGlobal).any { it.trimEnd('/') == url } }?.let { return it }
             list.firstOrNull { host in it.hosts() }?.let { return it }
             // the vendor's own host under a different path (an older /compatible-mode without /v1, a regional console)
             list.firstOrNull { p -> p.hosts().any { h -> host.endsWith(".$h") || h.endsWith(".$host") } }?.let { return it }

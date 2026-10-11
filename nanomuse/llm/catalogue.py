@@ -86,6 +86,9 @@ class Provider:
     verified: str = ""
     #: the person says what the endpoint can do (the `custom` row)
     user_capabilities: bool = False
+    #: the header the vendor's docs want one stable id per conversation in (OpenCode Go:
+    #: ``x-opencode-session``); empty for the vendors that ask for none
+    session_header: str = ""
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> Provider | None:
@@ -161,6 +164,7 @@ class Provider:
             "note_zh": self.note_zh,
             "verified": self.verified,
             "user_capabilities": self.user_capabilities,
+            "session_header": self.session_header,
         }
 
 

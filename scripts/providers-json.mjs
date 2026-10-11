@@ -23,6 +23,12 @@
 // one of them or `none` (the vendor thinks only when asked); `listed: true` when the endpoint's
 // model list names each model's levels (OpenRouter). A provider without the hint shows no
 // thinking control on the desktop; the phones ignore the field.
+// An optional `session_header` names the request header in which the vendor's docs ask a client
+// to send one stable id per conversation (OpenCode Go: `x-opencode-session`). The runtime sends
+// it with its own user agent; the desktop writes such an entry as its model adapter's catalog
+// route of the same id, which sends the header itself; the phones send it to OpenCode's host
+// (io.github.nanomuse.net.OpenCodeSession, NanoMuseOpenCodeSession.swift); the relay's guidance
+// lists such an entry apart, under `session_providers`, so the apps of before never offer it.
 // The copies are byte-identical to the source; the source is validated here so a typo never
 // reaches a client.
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -109,6 +115,7 @@ for (const p of catalogue.providers) {
     if (!(p.defaults ?? {})[c]) problems.push(`${where}: a ${c} capability needs defaults.${c}`)
   }
   if (p.reasoning !== undefined) problems.push(...reasoningProblems(where, p.protocol, p.reasoning))
+  if (p.session_header !== undefined && !/^x-[a-z0-9-]+$/.test(p.session_header)) problems.push(`${where}: session_header must be a lowercase x- header name`)
 }
 if (problems.length) {
   for (const line of problems) console.error(line)

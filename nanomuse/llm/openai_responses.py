@@ -30,6 +30,7 @@ from nanomuse.llm.base import (
     says_no_tools,
     split_think,
 )
+from nanomuse.llm.session import client_headers, new_fallback, session_id
 from nanomuse.llm.vision import content_parts, has_images, model_takes_images, without_images
 from nanomuse.logger import logger
 from nanomuse.schema import Function, LLMResponse, Message, Role, ToolCall, new_id
@@ -100,14 +101,18 @@ class OpenAIResponsesLLM(BaseLLM):
     name = "openai_responses"
     supports_native_tools = True
 
-    def __init__(self, settings: LLMSettings):
+    def __init__(self, settings: LLMSettings, session_header: str = ""):
         self.settings = settings
+        # a vendor that wants one id per conversation (the catalogue's `session_header`)
+        # also wants the client's own name rather than the SDK's
+        self.session_header = session_header
+        self._session_fallback = new_fallback()
         self.client = AsyncOpenAI(
             api_key=settings.api_key or "EMPTY",
             base_url=settings.base_url or None,
             timeout=settings.timeout,
             max_retries=0,
-            default_headers=settings.extra_headers or None,
+            default_headers=client_headers(settings.extra_headers, session_header) or None,
             http_client=proxied_http(settings.proxy, settings.timeout),
         )
         if settings.vision == "auto":
@@ -141,6 +146,8 @@ class OpenAIResponsesLLM(BaseLLM):
             params["tool_choice"] = tool_choice
         if self.settings.extra_body:
             params["extra_body"] = self.settings.extra_body
+        if self.session_header:
+            params["extra_headers"] = {self.session_header: session_id(self._session_fallback)}
 
         try:
             resp = await self._send(params, on_delta)

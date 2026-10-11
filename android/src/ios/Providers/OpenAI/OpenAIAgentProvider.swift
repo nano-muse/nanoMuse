@@ -165,7 +165,9 @@ final class OpenAIAgentProvider: AgentProvider {
             Self.injectThinkingParams(into: &body, model: model, level: thinkingLevel, isOpenRouter: provider.useOpenRouterCompat, maxTokens: maxTokens, offEffort: offEffort, unifiedReasoningEffort: provider.usesUnifiedReasoningEffort, isMistral: provider.isMistral, isXAI: provider.isXAI, isDashScope: provider.isDashScope, providerInstanceId: provider.providerInstanceId)
         }
 
-        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: false)
+        // nanoMuse: OpenCode Go wants one stable id per conversation (NanoMuseOpenCodeSession)
+        let opencodeSession = NanoMuseOpenCodeSession.wants(provider.customBaseURL) ? Self.derivePromptCacheKey(from: messages) : nil
+        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: false, opencodeSession: opencodeSession)
 
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -541,7 +543,9 @@ final class OpenAIAgentProvider: AgentProvider {
             body["service_tier"] = "priority"
         }
 
-        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: true)
+        // nanoMuse: OpenCode Go wants one stable id per conversation (NanoMuseOpenCodeSession)
+        let opencodeSession = NanoMuseOpenCodeSession.wants(provider.customBaseURL) ? Self.derivePromptCacheKey(from: messages) : nil
+        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: true, opencodeSession: opencodeSession)
 
         return AsyncThrowingStream { continuation in
             let task = Task {

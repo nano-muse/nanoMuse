@@ -407,6 +407,24 @@
       "verified": "2026-10"
     },
     {
+      "id": "opencode-go",
+      "name": "OpenCode Go",
+      "name_zh": "OpenCode Go",
+      "protocol": "openai",
+      "base_url": "https://opencode.ai/zen/go/v1",
+      "key_url": "https://opencode.ai/auth",
+      "auth": ["key"],
+      "regions": ["global"],
+      "capabilities": ["chat"],
+      "defaults": {
+        "chat": "deepseek-v4.1-flash"
+      },
+      "session_header": "x-opencode-session",
+      "note": "A subscription for coding agents: Go ($10 a month) or Go Plus ($40) in the OpenCode console, then a key made there; usage is counted per model against monthly, weekly and five hour limits. OpenCode asks every client to name itself and to send one stable id per conversation in x-opencode-session: the runtime sends both, the desktop reaches Go through its model adapter's own OpenCode Go route, which sends the id and speaks each model's shape, and the phone apps send an id per chat (a hash of its first message, the same on every turn). Outside the desktop only the OpenAI shape is reached, which is where the open coding models answer; the GPT, Grok, Claude, MiniMax and Qwen ids speak the Responses and Messages shapes. The one vision model OpenCode lists (deepseek-v4-flash-vision-exp) is an id DeepSeek has retired on its own platform, so the hands are not claimed here. OpenCode publishes no plan sign-in, only a key.",
+      "note_zh": "面向编程智能体的订阅：在 OpenCode 控制台订阅 Go（每月 10 美元）或 Go Plus（每月 40 美元），再在那里申请 key；用量按模型计，分每月、每周和每 5 小时三档上限。OpenCode 要求每个客户端说明自己是谁，并在 x-opencode-session 里为每个对话带上一个固定的 id：运行时两样都发；桌面版通过模型适配器自带的 OpenCode Go 路由访问，这条路由会带上 id，也按每个模型自己的格式说话；手机端为每个聊天带一个 id（由第一条消息算出，每一轮都一样）。桌面版以外只走 OpenAI 格式，开源编程模型都在这个格式上；GPT、Grok、Claude、MiniMax 和 Qwen 走 Responses 和 Messages 格式。它列的那个视觉模型（deepseek-v4-flash-vision-exp）在 DeepSeek 自家平台上已经退役，所以「动手」不列入。OpenCode 没有套餐登录，只有 key。",
+      "verified": "2026-10"
+    },
+    {
       "id": "ollama",
       "name": "Ollama",
       "name_zh": "Ollama（本机）",

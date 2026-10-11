@@ -110,6 +110,19 @@ test('models: the endpoint’s list sorted into chat, image and video by id; sig
   assert.deepEqual(row.models.map((m) => [m.id, m.input]), [['deepseek-v4.1-flash', ['text']], ['qwen3.8-27b', ['text', 'image']]])
   // a local server without a key names no credential
   assert.equal('apiKeyEnv' in ownProviderRow({ provider: 'ollama', label: 'Ollama', protocol: 'openai', baseURL: 'http://127.0.0.1:11434/v1', keyRef: '', capabilities: ['chat'], models: [], at: 1 }), false)
+  // a vendor that wants a session id per conversation is written as the adapter's catalog route
+  // of the same id (pi-ai's OpenCode Go provider sends x-opencode-session): no api, no base URL
+  const go = catalogue.find((p) => p.id === 'opencode-go')
+  assert.equal(go.session_header, 'x-opencode-session')
+  assert.equal(catalogue.find((p) => p.id === 'opencode-zen').session_header, undefined)
+  const goRow = ownProviderRow({ provider: 'opencode-go', label: 'OpenCode Go', protocol: 'openai', baseURL: go.base_url, keyRef: keyRefFor('opencode-go'), capabilities: go.capabilities, models: modelsOf(go, ['deepseek-v4.1-flash', 'grok-4.7']), at: 1, catalogRoute: true }, go.reasoning)
+  assert.deepEqual(goRow, {
+    displayName: 'OpenCode Go',
+    apiKeyEnv: 'NANOMUSE_KEY_OPENCODE_GO',
+    models: [{ id: 'deepseek-v4.1-flash', displayName: 'deepseek-v4.1-flash', input: ['text'] }, { id: 'grok-4.7', displayName: 'grok-4.7', input: ['text'] }],
+  })
+  // a session header that is no header name is not taken
+  assert.equal(parseCatalogue({ providers: [{ id: 'x', protocol: 'openai', capabilities: ['chat'], regions: ['global'], auth: ['key'], session_header: 'Bad Header' }] })[0].session_header, undefined)
   // protocols → pi-ai apis; Gemini's compatible layer is OpenAI's shape
   assert.equal(apiOf('anthropic'), 'anthropic-messages')
   assert.equal(apiOf('gemini', 'https://generativelanguage.googleapis.com/v1beta/openai'), 'openai-completions')

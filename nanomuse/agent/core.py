@@ -14,6 +14,7 @@ from nanomuse.calendar import CalendarFeeds
 from nanomuse.config import Settings
 from nanomuse.contacts import ContactBook
 from nanomuse.goals import GoalStore
+from nanomuse.llm import session as llm_session
 from nanomuse.llm.base import BaseLLM
 from nanomuse.llm.vision import keep_newest_images
 from nanomuse.logger import logger
@@ -81,6 +82,9 @@ class MuseAgent:
         # The conversation (thread) this agent is; approvals "for this conversation" are
         # bound to it and last as long as it does. Without one, each run stands alone.
         self.conversation_id = conversation_id
+        # The id model calls carry for a vendor that wants one per conversation (OpenCode Go):
+        # the thread's, else one of this agent's own for as long as it lives.
+        self.session_id = conversation_id or llm_session.new_fallback()
         self.messages: list[Message] = []
         self.state = AgentState.IDLE
         self.turns = 0
@@ -421,6 +425,7 @@ class MuseAgent:
         task_token = self.sentinel.begin_task(
             purpose or user_input, conversation=self.conversation_id
         )
+        session_token = llm_session.enter(self.session_id)
         try:
             while step < self.settings.agent.max_steps:
                 step += 1
@@ -542,6 +547,7 @@ class MuseAgent:
             self.state = AgentState.ERROR
             raise
         finally:
+            llm_session.leave(session_token)
             self.sentinel.end_task(task_token)
             self._save_session()
         return final or ""

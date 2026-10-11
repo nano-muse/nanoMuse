@@ -83,7 +83,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
   </tr>
   <tr>
     <td width="50%" valign="top"><b>有自己的形象。</b><br>描述一句，你的圖像模型來畫，影片模型讓它動起來。預設是一隻小龍。</td>
-    <td width="50%" valign="top"><b>任何模型。</b><br>中繼的額度；自己在十九家服務商（百煉、OpenRouter、OpenAI、Gemini、DeepSeek 等）任一家的 key；或者你已經在付費的方案：ChatGPT、Claude、Kimi。服務商沒有圖片或影片模型，這兩項就不開，App 會直說。</td>
+    <td width="50%" valign="top"><b>任何模型。</b><br>中繼的額度；自己在二十家服務商（百煉、OpenRouter、OpenAI、Gemini、DeepSeek 等）任一家的 key；或者你已經在付費的方案：ChatGPT、Claude、Kimi。服務商沒有圖片或影片模型，這兩項就不開，App 會直說。</td>
   </tr>
 </table>
 

@@ -801,7 +801,8 @@ final class OpenAIProvider: LLMProvider {
     /// Build and execute a streaming request, returning raw SSE lines for the agent provider to parse.
     func streamRaw(
         body: [String: Any],
-        isResponsesAPI: Bool
+        isResponsesAPI: Bool,
+        opencodeSession: String? = nil // nanoMuse: the conversation's id for OpenCode (NanoMuseOpenCodeSession)
     ) async throws -> (AsyncThrowingStream<String, Error>, Int) {
         let url: URL
         var request: URLRequest
@@ -871,6 +872,8 @@ final class OpenAIProvider: LLMProvider {
         for (key, value) in extraHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
+        // nanoMuse: OpenCode Go wants one stable id per conversation
+        if let opencodeSession { request.setValue(opencodeSession, forHTTPHeaderField: NanoMuseOpenCodeSession.header) }
         // [T-ios-openai-body-oom] Must run BEFORE serializing: an out-of-memory
         // inside JSONSerialization aborts the process and cannot be caught. This
         // is the agent loop's request path, where the body grows with every turn.

@@ -706,7 +706,8 @@ class OpenAIProvider private constructor(
                 memBefore, serStartNs, failure = null,
             )
         }
-        val request = buildRequest(bodyStr)
+        // nanoMuse: OpenCode Go wants one stable id per conversation (io.github.nanomuse.net.OpenCodeSession)
+        val request = buildRequest(bodyStr, if (io.github.nanomuse.net.OpenCodeSession.wants(basePath)) derivePromptCacheKey(messages) else null)
         val headerMap = mutableMapOf<String, String>()
         for (name in request.headers.names()) {
             headerMap[name] = request.headers[name] ?: ""
@@ -2389,7 +2390,7 @@ class OpenAIProvider private constructor(
      * the OAuth byte build, and the OkHttp RequestBody. Per-call peak heap
      * dropped by ~2× the body size (often tens of MB on long agent loops).
      */
-    private suspend fun buildRequest(bodyStr: String): Request {
+    private suspend fun buildRequest(bodyStr: String, opencodeSession: String? = null): Request { // nanoMuse: + opencodeSession
         val token = getToken()
 
         if (isOAuth && !forceChatCompletions) {
@@ -2458,6 +2459,8 @@ class OpenAIProvider private constructor(
         for ((key, value) in extraHeaders) {
             builder.header(key, value)
         }
+        // nanoMuse: the conversation's id for OpenCode, before the per-call overrides so those still win
+        opencodeSession?.let { builder.header(io.github.nanomuse.net.OpenCodeSession.HEADER, it) }
         // [T-android-model-use-passthrough-mode] Per-call chat header overrides,
         // applied AFTER the ctor extraHeaders → same-name REPLACE over any
         // default (incl. Authorization/Content-Type). Empty on normal calls.

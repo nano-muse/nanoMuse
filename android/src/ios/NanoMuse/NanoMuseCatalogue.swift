@@ -215,8 +215,14 @@ struct NanoMuseGuidance: Equatable, Sendable {
     /// The guidance in a `spend.guidance` / `error.guidance` object; nil when it has no providers.
     static func parse(_ o: [String: Any]?) -> NanoMuseGuidance? {
         guard let o else { return nil }
-        let providers = NanoMuseCatalogue.vendors(o["providers"] as? [[String: Any]])
+        var providers = NanoMuseCatalogue.vendors(o["providers"] as? [[String: Any]])
         if providers.isEmpty { return nil }
+        // `session_providers`: vendors that want a session id per conversation (OpenCode Go),
+        // which the relay lists apart for the apps of before this one; this app sends the id
+        // (NanoMuseOpenCodeSession), so they follow the relay's own list
+        for v in NanoMuseCatalogue.vendors(o["session_providers"] as? [[String: Any]]) where !providers.contains(where: { $0.id == v.id }) {
+            providers.append(v)
+        }
         func strings(_ v: Any?) -> [String] { (v as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty } }
         let plans = (o["plans"] as? [[String: Any]] ?? []).compactMap { p -> Plan? in
             guard let id = p["id"] as? String, !id.isEmpty else { return nil }

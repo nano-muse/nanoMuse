@@ -83,7 +83,7 @@ All downloads come from the [latest release](https://github.com/nano-muse/nanoMu
   </tr>
   <tr>
     <td width="50%" valign="top"><b>A look of its own.</b><br>Describe one, your image model draws it, a video model makes it move. A small dragon by default.</td>
-    <td width="50%" valign="top"><b>Any model.</b><br>The relay's allowance, your own key at one of nineteen providers (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek and more), or a plan you already pay for: ChatGPT, Claude, Kimi. A provider without picture or video models leaves those two off, and the app says so.</td>
+    <td width="50%" valign="top"><b>Any model.</b><br>The relay's allowance, your own key at one of twenty providers (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek and more), or a plan you already pay for: ChatGPT, Claude, Kimi. A provider without picture or video models leaves those two off, and the app says so.</td>
   </tr>
 </table>
 

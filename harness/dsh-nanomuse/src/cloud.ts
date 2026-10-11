@@ -476,6 +476,8 @@ function ownProvidersOf(raw: Record<string, unknown>): Record<string, OwnProvide
         return { id: m.id, name: typeof m.name === 'string' && m.name ? m.name : m.id, vision: m.vision === true, kind: m.kind === 'image' || m.kind === 'video' ? m.kind : 'chat', ...(reasoning ? { reasoning } : {}) }
       }) : [],
       at: Number(p.at) || 0,
+      // kept, or the next start's refresh would write the row as a hand-declared route
+      ...(p.catalogRoute === true ? { catalogRoute: true } : {}),
     }
   }
   return out
@@ -1441,11 +1443,16 @@ export default class NanomuseCloud extends Service {
       const said = (input.capabilities ?? []).filter((c): c is Capability => (CAPABILITIES as readonly string[]).includes(c))
       capabilities = CAPABILITIES.filter((c) => c === 'chat' || said.includes(c))
     }
-    const listed = await listModelRows(entry.protocol, baseURL, apiKey)
+    // A vendor that wants a session id per conversation (OpenCode Go) is reached through the
+    // model adapter's catalog route of the same id, which sends it: the models are the ones that
+    // route serves, and a typed id it does not know is left out (the adapter would refuse the row).
+    const catalogRoute = Boolean(entry.session_header)
+    const served = catalogRoute ? await this.catalogRouteModels(id) : []
+    const listed = catalogRoute ? served.map((m) => ({ id: m })) : await listModelRows(entry.protocol, baseURL, apiKey)
     // The ids the person typed (a gateway that does not answer `GET /models`, or one model
     // wanted out of hundreds): first in the list, the endpoint's own after them; a typed id the
     // list also has keeps what the list said about it (OpenRouter's thinking levels).
-    const typed = typedModelIds(input.models)
+    const typed = typedModelIds(input.models).filter((m) => !catalogRoute || served.includes(m))
     let models = modelsOf({ ...entry, capabilities }, [...typed.map((id) => listed.find((m) => m.id === id) ?? { id }), ...listed.filter((m) => !typed.includes(m.id))])
     if (entry.user_capabilities) models = models.map((m) => ({ ...m, vision: capabilities.includes('vision') }))
     // A row with no chat model cannot be served (the model adapter refuses a route that resolves
@@ -1454,7 +1461,7 @@ export default class NanomuseCloud extends Service {
     const keyRef = apiKey ? keyRefFor(id) : ''
     if (keyRef) await this.ctx.credentials.set(credentialRef(keyRef), apiKey)
     const label = (input.label ?? '').trim() || (input.lang?.toLowerCase().startsWith('zh') ? entry.name_zh : entry.name)
-    const row: OwnProvider = { provider: id, label, protocol: entry.protocol, baseURL, keyRef, capabilities, models, at: Date.now() }
+    const row: OwnProvider = { provider: id, label, protocol: entry.protocol, baseURL, keyRef, capabilities, models, at: Date.now(), ...(catalogRoute ? { catalogRoute } : {}) }
     await this.ctx.settings.update(LLM_ROW, { providers: { [id]: ownProviderRow(row, entry.reasoning) } })
     this.state = { ...this.state, providers: { ...this.state.providers, [id]: row } }
     await this.writeState()
@@ -2707,6 +2714,22 @@ export default class NanomuseCloud extends Service {
     await this.writeHands().catch(() => rm(join(this.dir(), 'hands.json'), { force: true }).catch(() => undefined))
     await this.profile.reset()
     this.broadcast()
+  }
+
+  /**
+   * The model ids the model adapter's catalog route `id` serves, as its catalog lists them (no
+   * network call: the adapter answers a route it describes from its own registry). Empty when
+   * the harness cannot say; the catalogue's default model is then the row's one model.
+   */
+  private async catalogRouteModels(id: string): Promise<string[]> {
+    const llm = (this.ctx as unknown as { get(name: string): unknown }).get('llm') as { discoverModels?: (ns: string, request: { provider: string }) => Promise<{ id: string }[]> } | undefined
+    try {
+      const found = (await llm?.discoverModels?.(LLM_ROW, { provider: id })) ?? []
+      return found.map((m) => m.id).filter((m) => typeof m === 'string' && m.length > 0)
+    } catch (error) {
+      this.ctx.logger.warn('nanomuse: the models of the %s route are not known: %s', id, message(error))
+      return []
+    }
   }
 
   /** The providers the model layer knows right now. */

@@ -9,10 +9,10 @@ from nanomuse.llm import catalogue
 from nanomuse.llm.factory import create_llm
 
 
-def test_the_packaged_file_is_read_once_and_has_the_nineteen_providers():
+def test_the_packaged_file_is_read_once_and_has_the_twenty_providers():
     cat = catalogue.load()
     assert cat.source.endswith("providers.json")
-    assert len(cat.providers) == 19
+    assert len(cat.providers) == 20
     assert cat.get("bailian").capabilities == ["chat", "vision", "image", "video"]
     assert cat.get("nowhere") is None
     # the same object on every call
@@ -64,6 +64,7 @@ def test_by_base_url_finds_the_entry_for_a_host_or_nothing():
     assert cat.by_base_url("https://opencode.ai/zen/v1").id == "opencode-zen"
     assert cat.by_base_url("https://opencode.ai/zen/v1/").id == "opencode-zen"
     assert cat.by_base_url("https://opencode.ai").id == "opencode-zen"
+    assert cat.by_base_url("https://opencode.ai/zen/go/v1").id == "opencode-go"
 
 
 def test_the_chatgpt_sign_in_maps_to_the_chatgpt_provider_with_chat_and_vision(tmp_path: Path):
