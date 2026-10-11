@@ -137,6 +137,8 @@ Ballast: the first day of 1.0 in people's hands, read back. The phone app has it
 
 ### Android
 
+- Removed the gap between the chat composer and its fade when scrolling through older messages. The fade now stays hidden while tool or browser controls are visible.
+- Fixed the chat composer and tool status bar overlapping the floating navigation pill. The latest messages, scroll controls and bottom fade now follow the measured footer height while the conversation still scrolls behind the pill for its frosted blur.
 - The sign-in page no longer calls a mainland-China number "outside the mainland" while it is still being typed: seven to ten digits that can still become `1xx xxxx xxxx` (with or without `+86`) show no sentence and keep *Send* on; the sentence comes once the number cannot be a mainland one any more.
 - The welcome page's *Reach* line says how a computer joins today: install nanoMuse Desktop and sign in with the same account (it said "pair", which left in 0.1.24); the Chinese line under the nanoMuse Cloud provider says 服务商 like every other.
 - The hands notice when they go round in circles: the same action a third time on a screen that did not change gets a line in the history so the model changes tack, and a sixth ends the run as *infeasible* with the action named. Before, a model repeating one tap kept calling the screen model, a screenshot each time, until the thirty-minute limit or *Stop*.
@@ -326,10 +328,15 @@ Keel: the first stable version. What has been a preview since 2026-09-25 is now 
 - **The connectors' background token refresh runs in one supervised scope**, and two cross-thread flags (the browser hand-over waiter, the profile sync timer) are marked volatile.
 - Copy buttons use the current Compose clipboard API and the open-in-new icon mirrors in right-to-left layouts; the Android build has no warnings in nanoMuse's code.
 - CI runs the Android unit tests (`io.github.nanomuse.*`) after building the debug APK.
+<<<<<<< HEAD
 - **The Library shows the signed-in account's files only.** On a phone two accounts share, the Library tab listed the workspaces of the other account's chats as well; it now follows the chat list's rule (the account's own sessions, or the local ones when signed out), and a workspace whose chat is gone is not listed.
 - **Connector keys and client secrets are masked while typed**, with the eye to show them, like the other key fields in the app.
 - **The Hands page follows its switch wherever it is flipped**: a change made while the page is open shows at once instead of after reopening it.
 - **Another device can stop a task it asked this phone to run.** The hub's `stop {call}` / `stop {conversation}` ends the run after the step in flight and the task answers `cancelled`; it used to answer `stopped: false` and let the task run on. Only the device that asked may stop it.
+- **The bottom bar is a floating frosted-glass pill.** The five tabs sit in a rounded pill that blurs whatever is behind it, icons only; the current tab shows a filled glyph on a soft indicator that springs in.
+- **Debug builds install next to the release app** (`io.github.nanomuse.app.debug`), so a test APK never replaces the installed nanoMuse.
+- **Chat goes Meta AI.** The conversation fades into the background at the top and above the composer instead of sliding under hard edges; your messages are white pills with black ink (black pills in the light theme) and the assistant's replies sit in soft off-black pills; the scroll-to-latest button is a centered white disc with a black arrow; the light theme is white like Meta AI's. The header fade starts at the top edge and melts down through the header; the lower fade appears only while scrolled up, never over the latest message; the send button is monochrome (white disc, black arrow in dark; inverted in light) with no blue accent.
+- **The nav bar's selected tab is a white disc with a black glyph** (inverted in the light theme); the frosted blur is unchanged.
 
 ### iOS
 
