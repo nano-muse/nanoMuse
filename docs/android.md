@@ -247,6 +247,9 @@ not taken for a private address. The same rule decides whether a relay of your o
 `http://`; nanoMuse Cloud and the hub to it are TLS only. The in-app web view is not exported
 to other apps.
 
+Canceling provider voice input ends its active capture and discards any short audio held
+for transcription. That held audio is not submitted to the provider.
+
 ## Building it yourself
 
 JDK 17 or 21 (CI uses 21) and the Android SDK (Android Studio installs both); `scripts/android/env.sh` sets

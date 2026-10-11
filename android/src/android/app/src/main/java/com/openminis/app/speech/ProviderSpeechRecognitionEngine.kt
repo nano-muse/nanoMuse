@@ -503,6 +503,9 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
     override fun cancel() {
         cancelled.set(true)
         recording.set(false)
+        // nanoMuse: VAD owns separate capture flags, so cancel its lifecycle too (#356).
+        detector?.let { runCatching { it.cancel() } }
+        detector = null
         transcribeJob?.cancel()
         holdFlushJob?.cancel()
         holdFlushJob = null

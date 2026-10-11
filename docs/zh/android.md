@@ -198,6 +198,9 @@ base URL（从不包括中继的，从不包括局域网地址）它回答代理
 hub 只走 TLS。App 内的
 web view 不对其他 App 导出。
 
+取消服务商语音输入时，会结束当前录音，并丢弃暂存的短语音片段。
+这些暂存片段不会再提交给服务商转写。
+
 ## 自己构建 {#building-it-yourself}
 
 JDK 17 或 21（CI 用 21）和 Android SDK（Android Studio 会把两个都装上）；`scripts/android/env.sh` 在一台空机器上
