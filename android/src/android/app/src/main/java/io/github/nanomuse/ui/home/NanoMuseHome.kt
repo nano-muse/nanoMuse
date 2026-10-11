@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.openminis.app.R
 import com.openminis.app.agent.SoulStore
 import com.openminis.app.data.repository.ChatRepository
@@ -329,13 +331,16 @@ fun NanoMuseHome(
 
     // The drawer + tab shell, as a local composable so it can share every piece of state above
     // and still be one branch of the phase switch below.
+    // nanoMuse: the frosted pill bar blurs this shell's content — the shell is the haze source.
+    val hazeState = rememberHazeState()
     val homeShell: @Composable () -> Unit = {
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = drawerState.isOpen || tab == HomeTab.CHAT,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = MuseTones.surface,
+                // nanoMuse: pure canvas like Muse's drawer, not the grey sheet.
+                drawerContainerColor = com.openminis.app.ui.theme.ChatColors.background,
                 drawerShape = androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
             ) {
                 SideChatDrawer(
@@ -360,7 +365,7 @@ fun NanoMuseHome(
             containerColor = ChatColors.background,
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
-                MuseBottomBar(selected = tab, onSelect = { picked ->
+                MuseBottomBar(selected = tab, hazeState = hazeState, onSelect = { picked ->
                     if (picked == HomeTab.CHAT && tab == HomeTab.CHAT && !isMainChat) {
                         showMain()
                     } else {
@@ -371,10 +376,16 @@ fun NanoMuseHome(
             },
         ) { padding ->
             val bottom = padding.calculateBottomPadding()
+            // Scaffold measures the entire bar, including its floating gap and
+            // navigation inset, before laying out this content. Use that same
+            // inset for placement and IME consumption, without a frame-late callback.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = bottom)
+                    .hazeSource(hazeState)
+                    // nanoMuse: no bottom inset — the pill bar is an overlay and the
+                    // content slides behind it for the frosted blur. Each tab pads
+                    // its own scrollable content above the pill.
                     .consumeWindowInsets(PaddingValues(bottom = bottom)),
             ) {
                 // Chat tab — always composed, hidden while another tab is on top.
@@ -415,6 +426,9 @@ fun NanoMuseHome(
                             },
                             onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
                             nmHome = NmHomeChrome(isMainChat = isMainChat, onOpenDrawer = { openDrawer() }),
+                            // nanoMuse: preserve the full-size blur source, but keep
+                            // the chat footer above the bar measured by Scaffold.
+                            nmBottomOverlay = bottom,
                         )
                     }
                 }
@@ -432,6 +446,9 @@ fun NanoMuseHome(
                 ) {
                     Surface(
                         color = ChatColors.background,
+                        // nanoMuse: no bottom padding — tab content flows behind
+                        // the pill overlay like the chat does. Tabs handle their
+                        // own bottom contentPadding internally.
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         // Pages cross-fade; the header sits at the same spot on every page,

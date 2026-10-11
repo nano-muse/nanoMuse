@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.repository.ChatRepository
+import com.openminis.app.ui.theme.ChatColors
 import java.text.DateFormat
 import java.util.Date
 
@@ -108,16 +110,22 @@ fun SideChatDrawer(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MuseTones.surface)
+            .background(ChatColors.background)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
+        // nanoMuse: Muse's drawer voice — the agent name big and plain, rows in
+        // quiet pills, everything monochrome.
+        val nmDark = ChatColors.isDark
+        val nmRowSelected = if (nmDark) Color.White.copy(alpha = 0.09f) else Color.Black.copy(alpha = 0.06f)
+        val nmInk = ChatColors.primaryText
+        val nmMuted = ChatColors.secondaryText
         Text(
             text = agentName,
-            fontSize = 24.sp,
+            fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 14.dp),
+            color = nmInk,
+            modifier = Modifier.padding(start = 20.dp, top = 22.dp, end = 20.dp, bottom = 18.dp),
         )
 
         // Main chat row — selected when it is what the chat tab shows.
@@ -127,18 +135,18 @@ fun SideChatDrawer(
             modifier = Modifier
                 .padding(horizontal = 12.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(if (mainSelected) MuseTones.fill else MuseTones.surface)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (mainSelected) nmRowSelected else Color.Transparent)
                 .clickable(onClick = onOpenMain)
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 13.dp),
         ) {
-            Icon(Icons.Outlined.Home, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
-            Spacer(Modifier.size(12.dp))
+            Icon(Icons.Outlined.Home, contentDescription = null, modifier = Modifier.size(22.dp), tint = nmInk)
+            Spacer(Modifier.size(14.dp))
             Text(
                 text = stringResource(R.string.nm_drawer_main_chat),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = nmInk,
             )
         }
 
@@ -149,17 +157,17 @@ fun SideChatDrawer(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .clickable(onClick = onDevices)
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
             ) {
-                Icon(Icons.Outlined.Devices, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
-                Spacer(Modifier.size(12.dp))
+                Icon(Icons.Outlined.Devices, contentDescription = null, modifier = Modifier.size(22.dp), tint = nmInk)
+                Spacer(Modifier.size(14.dp))
                 Text(
                     text = stringResource(R.string.nm_devices_title),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = nmInk,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
@@ -169,7 +177,7 @@ fun SideChatDrawer(
                         else -> pluralStringResource(R.plurals.nm_hub_service_devices, othersOnline, othersOnline)
                     },
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = nmMuted,
                 )
             }
         }
@@ -181,43 +189,44 @@ fun SideChatDrawer(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .clickable(onClick = onCoding)
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
             ) {
-                Icon(Icons.Outlined.Terminal, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
-                Spacer(Modifier.size(12.dp))
+                Icon(Icons.Outlined.Terminal, contentDescription = null, modifier = Modifier.size(22.dp), tint = nmInk)
+                Spacer(Modifier.size(14.dp))
                 Text(
                     text = stringResource(R.string.nm_coding_title),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = nmInk,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = codingComputers.toString(),
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = nmMuted,
                 )
             }
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 26.dp, end = 12.dp, top = 12.dp),
+            modifier = Modifier.padding(start = 26.dp, end = 12.dp, top = 14.dp),
         ) {
             Text(
-                text = stringResource(R.string.nm_drawer_side_chats),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = stringResource(R.string.nm_drawer_side_chats).uppercase(),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+                color = nmMuted,
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = onAllChats) {
                 Icon(
                     Icons.Outlined.Archive,
                     contentDescription = stringResource(R.string.nm_drawer_all_chats),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = nmMuted,
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -232,7 +241,7 @@ fun SideChatDrawer(
                 Icon(
                     Icons.Outlined.Forum,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = nmMuted,
                     modifier = Modifier.size(30.dp),
                 )
                 Spacer(Modifier.height(10.dp))
@@ -240,13 +249,13 @@ fun SideChatDrawer(
                     text = stringResource(R.string.nm_drawer_empty_title),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = nmInk,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.nm_drawer_empty_body),
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = nmMuted,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -256,6 +265,9 @@ fun SideChatDrawer(
                     SideChatRow(
                         session = session,
                         selected = session.id == currentSessionId,
+                        selectedFill = nmRowSelected,
+                        ink = nmInk,
+                        muted = nmMuted,
                         onClick = { onOpenSession(session.id) },
                         onSetMain = { onSetMain(session.id) },
                     )
@@ -263,37 +275,53 @@ fun SideChatDrawer(
             }
         }
 
-        // Bottom strip: settings · search · new
+        // Bottom strip: settings · search · new — Muse's circular buttons round a search pill.
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp, top = 6.dp),
+                .padding(start = 12.dp, end = 12.dp, bottom = 10.dp, top = 6.dp),
         ) {
-            IconButton(onClick = onSettings) {
-                Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.nm_drawer_settings), tint = MaterialTheme.colorScheme.onSurface)
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(nmRowSelected)
+                    .clickable(onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.nm_drawer_settings), tint = nmInk, modifier = Modifier.size(22.dp))
             }
             if (onSystemFiles != null) {
-                IconButton(onClick = onSystemFiles) {
-                    Icon(Icons.Outlined.Description, contentDescription = stringResource(R.string.nm_sysfiles_title), tint = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.size(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(nmRowSelected)
+                        .clickable(onClick = onSystemFiles),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Description, contentDescription = stringResource(R.string.nm_sysfiles_title), tint = nmInk, modifier = Modifier.size(22.dp))
                 }
             }
+            Spacer(Modifier.size(8.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .weight(1f)
-                    .height(40.dp)
+                    .height(44.dp)
                     .clip(CircleShape)
-                    .background(MuseTones.fill)
-                    .padding(horizontal = 12.dp),
+                    .background(nmRowSelected)
+                    .padding(horizontal = 14.dp),
             ) {
-                Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Search, contentDescription = null, tint = nmMuted, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Box(Modifier.weight(1f)) {
                     if (query.isEmpty()) {
                         Text(
                             stringResource(R.string.nm_drawer_search),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = nmMuted,
                             fontSize = 15.sp,
                         )
                     }
@@ -301,14 +329,22 @@ fun SideChatDrawer(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        textStyle = LocalTextStyle.current.copy(color = nmInk, fontSize = 15.sp),
+                        cursorBrush = SolidColor(nmInk),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
-            IconButton(onClick = onNewChat) {
-                Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.nm_drawer_new_chat), tint = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.size(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(nmRowSelected)
+                    .clickable(onClick = onNewChat),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.nm_drawer_new_chat), tint = nmInk, modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -319,6 +355,9 @@ fun SideChatDrawer(
 private fun SideChatRow(
     session: ChatSessionEntity,
     selected: Boolean,
+    selectedFill: androidx.compose.ui.graphics.Color,
+    ink: androidx.compose.ui.graphics.Color,
+    muted: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
     onSetMain: () -> Unit,
 ) {
@@ -330,7 +369,7 @@ private fun SideChatRow(
                 .padding(horizontal = 12.dp, vertical = 1.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (selected) MuseTones.fill else MuseTones.surface)
+                .background(if (selected) selectedFill else Color.Transparent)
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true })
                 .padding(horizontal = 14.dp, vertical = 11.dp),
         ) {
@@ -338,7 +377,7 @@ private fun SideChatRow(
                 Text(
                     text = session.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.nm_drawer_untitled),
                     fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -347,7 +386,7 @@ private fun SideChatRow(
             Text(
                 text = relativeDay(androidx.compose.ui.platform.LocalContext.current, session.updatedAt),
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = muted,
             )
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
