@@ -17,7 +17,7 @@ Android app is the reference; the others follow its shape, not its pixels:
 |---|---|---|
 | A face with a name pill and a status line at the top of the conversation | `HomeShell`, `AgentAvatarDisc` | the web app's chat header, dragon by default |
 | One main chat, side chats in a drawer | drawer | drawer on narrow windows, a sidebar on wide ones |
-| Feed · Ideas · Goals · Library | bottom bar | bottom bar / sidebar |
+| Feed · Ideas · Goals · Library | floating frosted-glass pill bar, icons only | bottom bar / sidebar |
 | Approval cards in the chat, three tiers, *remember* pills | `RiskApprovalCard`, `RiskTier` | the Sentinel's card with the same labels |
 | Settings → Permissions: what was remembered, by tier | `GrantsSection` | Permissions page, grants by tier |
 | Settings → Hands: the screen as a hand, off by default | `Hands` | Settings → Hands (this computer's screen) |
