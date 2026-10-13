@@ -27,6 +27,8 @@ describe("the model slots (the Models contract)", () => {
     expect(entryFor("openai", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")?.id).toBe("bailian");
     expect(entryFor("openai", "https://api.openai.com/v1")?.id).toBe("openai");
     expect(entryFor("openai", "https://gateway.example.com/v1")).toBeNull();
+    // an apex-domain catalogue entry claims its own subdomains, not every host under the TLD
+    expect(entryFor("openai", "https://intl.livepairai.com/v1")?.id).toBe("livepair");
     expect(entryFor("openai", "")).toBeNull();
   });
 

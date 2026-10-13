@@ -200,10 +200,15 @@ class Catalogue:
         for p in self.providers:
             if host in p.hosts():
                 return p
-        # a subdomain of a listed host (regional endpoints such as dashscope-intl)
+        # a subdomain of a listed host (regional endpoints such as dashscope-intl);
+        # an apex-domain entry has no first label to strip, so only a real
+        # subdomain of it counts, else every host under the TLD would match
         for p in self.providers:
-            if any(host.endswith("." + h.split(".", 1)[-1]) for h in p.hosts() if "." in h):
-                return p
+            for h in p.hosts():
+                if h.count(".") >= 2 and host.endswith("." + h.split(".", 1)[-1]):
+                    return p
+                if host.endswith("." + h):
+                    return p
         return None
 
     def providers_for(self, capability: str, region: str = "") -> list[Provider]:

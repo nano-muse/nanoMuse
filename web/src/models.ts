@@ -84,7 +84,10 @@ export function entryFor(provider: string, baseUrl: string, list: CatalogueProvi
     list.find((p) =>
       hosts(p).some((h) => {
         const dot = h.indexOf(".");
-        return dot > 0 && host.endsWith(h.slice(dot));
+        if (dot < 0) return false;
+        // an apex-domain entry has no first label to strip; only a real
+        // subdomain of it counts, else every host under the TLD would match
+        return h.slice(dot + 1).includes(".") ? host.endsWith(h.slice(dot)) : host.endsWith(`.${h}`);
       }),
     ) ?? null
   );
