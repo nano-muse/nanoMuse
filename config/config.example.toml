@@ -51,6 +51,9 @@ api_key = "${DEEPSEEK_API_KEY}"
 # The endpoint and the default model come from the catalogue; only the key is yours.
 # provider = "bailian"
 # api_key = "${DASHSCOPE_API_KEY}"
+#
+# provider = "livepair"               # one key for chat and pictures
+# api_key = "${LIVEPAIR_API_KEY}"
 
 max_tokens = 4096
 temperature = 0.3

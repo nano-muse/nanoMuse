@@ -390,6 +390,32 @@
       }
     },
     {
+      "id": "livepair",
+      "name": "LivePair",
+      "name_zh": "LivePair",
+      "protocol": "openai",
+      "base_url": "https://livepairai.com/v1/agent",
+      "key_url": "https://livepairai.com/settings",
+      "key_hint": "lp-…",
+      "auth": ["key"],
+      "regions": ["global"],
+      "capabilities": ["chat", "image"],
+      "defaults": {
+        "chat": "deepseek/deepseek-v4.1-flash",
+        "image": "qwen-image-3"
+      },
+      "note": "One key on prepaid credits, or per-call USDC over the x402 rail with no account at all. Chat is the OpenAI chat-completions shape with maker-prefixed ids (openai/gpt-6-astra, anthropic/claude-sonnet-5.5, deepseek/deepseek-v4.1-flash; GET /v1/agent/models lists them unauthenticated); pictures go through /v1/agent/images/generations on the OpenAI Images shape (qwen-image-3, seedream-5.0 and a private line). Chat takes string content only, no multimodal parts, so the hands are not claimed. Clips live on /v1/agent/videos in the Sora job shape, but the openai media path only speaks images, so video is not claimed either.",
+      "note_zh": "一把 key 用预付费额度，也可以用 x402 通道按次付 USDC，完全不用注册。对话是 OpenAI chat-completions 格式，模型 id 带厂商前缀（openai/gpt-6-astra、anthropic/claude-sonnet-5.5、deepseek/deepseek-v4.1-flash；GET /v1/agent/models 无需认证即可列出）；画图走 /v1/agent/images/generations 的 OpenAI Images 格式（qwen-image-3、seedream-5.0 及私有模型线）。对话只收字符串内容，不支持多模态输入，所以「动手」不列入。视频在 /v1/agent/videos 上是 Sora 任务格式，但 openai 媒体路径只走图像接口，所以视频也不列入。",
+      "verified": "2026-10",
+      "reasoning": {
+        "doc": "https://livepairai.com/docs/api",
+        "wire": "reasoning_effort",
+        "rules": [
+          { "models": "^(anthropic/claude-|deepseek/deepseek-(r1|v4-pro)|google/gemini-|minimax/minimax-m3|moonshotai/kimi-|openai/gpt-(5|6|oss)|qwen/qwen3|x-ai/grok-|z-ai/glm-)", "levels": ["low", "medium", "high"], "default": "none" }
+        ]
+      }
+    },
+    {
       "id": "opencode-zen",
       "name": "OpenCode Zen",
       "name_zh": "OpenCode Zen",
