@@ -24,6 +24,7 @@ class MockLLM(BaseLLM):
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str = "auto",
         on_delta: DeltaCallback | None = None,
+        on_reasoning_delta: DeltaCallback | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
         self.calls.append({"messages": list(messages), "tools": tools, "max_tokens": max_tokens})
@@ -34,6 +35,8 @@ class MockLLM(BaseLLM):
             resp = item(messages) if callable(item) else item
         if on_delta and resp.content:
             on_delta(resp.content)
+        if on_reasoning_delta and resp.reasoning:
+            on_reasoning_delta(resp.reasoning)
         return resp
 
 

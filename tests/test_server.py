@@ -568,11 +568,13 @@ class _GatedLLM(MockLLM):
         self.closed = False
         self.asking = False
 
-    async def ask(self, messages, tools=None, tool_choice="auto", on_delta=None, max_tokens=None):  # type: ignore[override]  # noqa: ANN001
+    async def ask(  # type: ignore[override]  # noqa: ANN001
+        self, messages, tools=None, tool_choice="auto", on_delta=None, on_reasoning_delta=None, max_tokens=None
+    ):
         self.asking = True
         while not self.gate.is_set():
             await asyncio.sleep(0.01)
-        return await super().ask(messages, tools, tool_choice, on_delta, max_tokens)
+        return await super().ask(messages, tools, tool_choice, on_delta, on_reasoning_delta, max_tokens)
 
     async def close(self) -> None:
         self.closed = True
@@ -649,6 +651,35 @@ def test_stream_that_was_not_a_reply_is_discarded(server):
         service.ui.bus.publish = real_publish  # type: ignore[method-assign]
         for t in service.threads.values():
             t.agent.llm = llm
+
+
+def test_reasoning_streams_to_the_bus(server):
+    """A model that exposes reasoning streams it live while thinking display is on:
+    the web sees reasoning_delta events under the same stream id, and the final
+    assistant event still carries the full reasoning for the fold."""
+    client, service, llm = server
+    service.ui.show_thinking = True
+    llm.script.append(LLMResponse(content="Answer.", reasoning="pondering the matter"))
+    published: list[dict[str, Any]] = []
+    real_publish = service.ui.bus.publish
+
+    def record(message: dict[str, Any]) -> None:
+        published.append(message)
+        real_publish(message)
+
+    service.ui.bus.publish = record  # type: ignore[method-assign]
+    try:
+        client.post("/api/threads/main/send", json={"text": "why?"})
+        wait_for(lambda: [e for e in events_of(client, kind="assistant") if e["text"] == "Answer."])
+    finally:
+        service.ui.bus.publish = real_publish  # type: ignore[method-assign]
+        service.ui.show_thinking = False
+    deltas = [m for m in published if m["kind"] == "reasoning_delta"]
+    assert [m["text"] for m in deltas] == ["pondering the matter"]
+    starts = [m for m in published if m["kind"] == "stream_start"]
+    assert deltas[0]["id"] == starts[-1]["id"], "reasoning shares the reply's stream id"
+    replies = [e for e in events_of(client, kind="assistant") if e["text"] == "Answer."]
+    assert replies[-1].get("reasoning") == "pondering the matter"
 
 
 def test_websocket_rejects_bad_token(server):

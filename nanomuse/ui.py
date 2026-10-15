@@ -44,6 +44,7 @@ class ApprovalDecision(BaseModel):
 
 class UI(Protocol):
     def on_text_delta(self, text: str) -> None: ...
+    def on_reasoning_delta(self, text: str) -> None: ...
     def on_assistant_message(self, content: str | None, reasoning: str | None) -> None: ...
     def on_tool_call(self, call: ToolCall, summary: str) -> None: ...
     def on_tool_result(self, call: ToolCall, result: ToolResult) -> None: ...
@@ -69,6 +70,9 @@ class HeadlessUI:
             print(f"[{kind}] {payload}")
 
     def on_text_delta(self, text: str) -> None:
+        pass
+
+    def on_reasoning_delta(self, text: str) -> None:
         pass
 
     def on_assistant_message(self, content: str | None, reasoning: str | None) -> None:

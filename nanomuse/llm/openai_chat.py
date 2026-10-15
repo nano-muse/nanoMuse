@@ -82,6 +82,7 @@ class OpenAIChatLLM(BaseLLM):
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str = "auto",
         on_delta: DeltaCallback | None = None,
+        on_reasoning_delta: DeltaCallback | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
         pictures = has_images(messages)
@@ -110,7 +111,7 @@ class OpenAIChatLLM(BaseLLM):
             lambda: sum(1 for m in params["messages"] if isinstance(m.get("content"), list)),
         )
         try:
-            resp = await self._send(params, on_delta)
+            resp = await self._send(params, on_delta, on_reasoning_delta)
         except openai.BadRequestError as e:
             if tools and says_no_tools(str(e)):
                 raise ToolsUnsupported(str(e)) from e
@@ -124,7 +125,7 @@ class OpenAIChatLLM(BaseLLM):
                 )
                 self.vision_available = False
                 params["messages"] = self._wire_messages(messages, False)
-                return await self._send(params, on_delta)
+                return await self._send(params, on_delta, on_reasoning_delta)
             raise
         if with_images and self.vision_available is None:
             self.vision_available = True
@@ -140,7 +141,10 @@ class OpenAIChatLLM(BaseLLM):
             out.append(d)
         return out
 
-    async def _send(self, params: dict[str, Any], on_delta: DeltaCallback | None) -> LLMResponse:
+    async def _send(
+        self, params: dict[str, Any], on_delta: DeltaCallback | None,
+        on_reasoning_delta: DeltaCallback | None = None,
+    ) -> LLMResponse:
         async for attempt in AsyncRetrying(
             retry=retry_if_exception_type(_RETRYABLE),
             stop=stop_after_attempt(max(1, self.settings.max_retries + 1)),
@@ -155,7 +159,7 @@ class OpenAIChatLLM(BaseLLM):
                         self.settings.max_retries,
                     )
                 if self.settings.stream:
-                    return await self._ask_stream(params, on_delta)
+                    return await self._ask_stream(params, on_delta, on_reasoning_delta)
                 return await self._ask_once(params)
         raise RuntimeError("unreachable")  # pragma: no cover
 
@@ -191,7 +195,8 @@ class OpenAIChatLLM(BaseLLM):
         )
 
     async def _ask_stream(
-        self, params: dict[str, Any], on_delta: DeltaCallback | None
+        self, params: dict[str, Any], on_delta: DeltaCallback | None,
+        on_reasoning_delta: DeltaCallback | None = None,
     ) -> LLMResponse:
         stream = await self.client.chat.completions.create(
             **params, stream=True, stream_options={"include_usage": True}
@@ -219,6 +224,8 @@ class OpenAIChatLLM(BaseLLM):
             rc = getattr(delta, "reasoning_content", None)
             if rc:
                 reasoning_parts.append(rc)
+                if on_reasoning_delta:
+                    on_reasoning_delta(rc)
             if delta.content:
                 visible = think.feed(delta.content)
                 if visible:
