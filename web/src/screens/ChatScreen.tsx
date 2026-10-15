@@ -284,11 +284,17 @@ export function ChatScreen() {
               onCloudRetry={cloudRetryFor(i)}
             />
           ))}
-          {stream && stream.text && (
-            <AssistantBubble text={stream.text} streaming files={files} onOpenFile={openFile} />
+          {stream && (stream.text || stream.reasoning) && (
+            <AssistantBubble
+              text={stream.text}
+              reasoning={stream.reasoning}
+              streaming
+              files={files}
+              onOpenFile={openFile}
+            />
           )}
           <LiveReply stream={stream} name={name} />
-          {(thread?.busy || status.state !== "idle") && !stream?.text && status.state !== "waiting" && (
+          {(thread?.busy || status.state !== "idle") && !(stream?.text || stream?.reasoning) && status.state !== "waiting" && (
             <TypingIndicator label={thread?.queued ? t("{n} queued", { n: thread.queued }) : undefined} />
           )}
           {/* the chooser for the agent's name, under the latest reply, until a pick or a typed name */}
@@ -520,7 +526,8 @@ function AssistantBubble({
   modelUsed?: string;
   onOpenFile?: (path: string) => void;
 }) {
-  const [showReasoning, setShowReasoning] = useState(false);
+  // live stream: thinking is open while it streams; a finished bubble keeps it folded
+  const [showReasoning, setShowReasoning] = useState(!!streaming);
   const t = useT();
   // the model's block for the app (the first conversation's names) is never shown — not even
   // the half of it a stream has delivered so far

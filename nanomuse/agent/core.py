@@ -438,7 +438,10 @@ class MuseAgent:
                     system_prompt = self.build_system_prompt(latest, await self.recall_for(latest))
                 context = [Message.system(system_prompt), *self.context_messages()]
                 response = await self.llm.ask(
-                    context, tools=tool_params, on_delta=self.ui.on_text_delta
+                    context,
+                    tools=tool_params,
+                    on_delta=self.ui.on_text_delta,
+                    on_reasoning_delta=self.ui.on_reasoning_delta,
                 )
                 if (
                     response.finish_reason == "length"
@@ -452,6 +455,7 @@ class MuseAgent:
                         context,
                         tools=tool_params,
                         on_delta=self.ui.on_text_delta,
+                        on_reasoning_delta=self.ui.on_reasoning_delta,
                         max_tokens=self.llm.roomier_max_tokens(),
                     )
                 if self.llm.vision_available is False and not self._told_no_vision:
@@ -540,7 +544,12 @@ class MuseAgent:
                 # Step budget exhausted: ask for a wrap-up without tools.
                 self.messages.append(Message.user(prompts.MAX_STEPS_PROMPT))
                 context = [Message.system(system_prompt), *self.context_messages()]
-                response = await self.llm.ask(context, tools=None, on_delta=self.ui.on_text_delta)
+                response = await self.llm.ask(
+                    context,
+                    tools=None,
+                    on_delta=self.ui.on_text_delta,
+                    on_reasoning_delta=self.ui.on_reasoning_delta,
+                )
                 self.messages.append(response.to_message())
                 self.ui.on_assistant_message(response.content, response.reasoning)
                 final = response.content or "(step limit reached)"

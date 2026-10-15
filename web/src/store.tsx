@@ -79,6 +79,8 @@ const SIGN_IN_SKIPPED_KEY = "nanomuse_sign_in_skipped";
 export interface Stream {
   id: string;
   text: string;
+  /** live reasoning, streamed this turn only; the final event carries the fold */
+  reasoning: string;
   ended: boolean;
 }
 
@@ -433,14 +435,22 @@ function applyWs(state: AppState, msg: WsMessage): AppState {
     case "stream_start":
       return {
         ...state,
-        streams: { ...state.streams, [msg.thread]: { id: msg.id, text: "", ended: false } },
+        streams: { ...state.streams, [msg.thread]: { id: msg.id, text: "", reasoning: "", ended: false } },
       };
     case "delta": {
       const current = state.streams[msg.thread];
       const stream: Stream =
         current && current.id === msg.id
           ? { ...current, text: current.text + msg.text }
-          : { id: msg.id, text: msg.text, ended: false };
+          : { id: msg.id, text: msg.text, reasoning: "", ended: false };
+      return { ...state, streams: { ...state.streams, [msg.thread]: stream } };
+    }
+    case "reasoning_delta": {
+      const current = state.streams[msg.thread];
+      const stream: Stream =
+        current && current.id === msg.id
+          ? { ...current, reasoning: current.reasoning + msg.text }
+          : { id: msg.id, text: "", reasoning: msg.text, ended: false };
       return { ...state, streams: { ...state.streams, [msg.thread]: stream } };
     }
     case "stream_end": {

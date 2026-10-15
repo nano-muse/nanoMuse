@@ -75,6 +75,23 @@ async def test_reasoning_content_field_and_tool_call_deltas():
     assert resp.finish_reason == "tool_calls"
 
 
+async def test_reasoning_content_streams_live():
+    """on_reasoning_delta sees each reasoning_content chunk as it arrives, in order,
+    while the final response still carries the whole reasoning for the fold."""
+    chunks = [
+        _chunk(reasoning="Hmm, "),
+        _chunk(reasoning="let me see."),
+        _chunk("answer", finish="stop"),
+    ]
+    seen: list[str] = []
+    resp = await _llm(chunks)._ask_stream(
+        {"model": "m", "messages": []}, None, seen.append
+    )
+    assert seen == ["Hmm, ", "let me see."]
+    assert resp.reasoning == "Hmm, let me see."
+    assert resp.content == "answer"
+
+
 async def test_tools_rejection_becomes_tools_unsupported():
     import httpx
     import openai

@@ -575,6 +575,7 @@ class CodexLLM(BaseLLM):
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str = "auto",
         on_delta: DeltaCallback | None = None,
+        on_reasoning_delta: DeltaCallback | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
         with_images = has_images(messages) and self.vision_available is not False
@@ -599,6 +600,8 @@ class CodexLLM(BaseLLM):
                     delta = chunk["choices"][0]["delta"]
                     if on_delta and delta.get("content"):
                         on_delta(str(delta["content"]))
+                    if on_reasoning_delta and delta.get("reasoning_content"):
+                        on_reasoning_delta(str(delta["reasoning_content"]))
                 if state.done:
                     break
         except UpstreamError as exc:

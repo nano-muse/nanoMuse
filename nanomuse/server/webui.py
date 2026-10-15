@@ -383,6 +383,20 @@ class WebUI:
         self._stream_buf[thread] = self._stream_buf.get(thread, "") + text
         self.bus.publish({"kind": "delta", "thread": thread, "id": sid, "text": text})
 
+    def on_reasoning_delta(self, text: str) -> None:
+        # live thinking, streamed to the bubble but never persisted on its own:
+        # the final assistant event carries the full reasoning for the "Show thinking" fold
+        if not text or not self.show_thinking:
+            return
+        thread = self.thread()
+        sid = self._stream_ids.get(thread)
+        if sid is None:
+            sid = new_id("a")
+            self._stream_ids[thread] = sid
+            self._stream_buf[thread] = ""
+            self.bus.publish({"kind": "stream_start", "thread": thread, "id": sid, "ts": now_iso()})
+        self.bus.publish({"kind": "reasoning_delta", "thread": thread, "id": sid, "text": text})
+
     def on_assistant_message(self, content: str | None, reasoning: str | None) -> None:
         thread = self.thread()
         sid = self._stream_ids.pop(thread, None)

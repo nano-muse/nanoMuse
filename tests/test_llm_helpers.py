@@ -199,11 +199,19 @@ async def test_auto_mode_switches_to_prompt_tools_when_the_endpoint_rejects_them
 
     class Rejecting(MockLLM):
         async def ask(
-            self, messages, tools=None, tool_choice="auto", on_delta=None, max_tokens=None
+            self,
+            messages,
+            tools=None,
+            tool_choice="auto",
+            on_delta=None,
+            on_reasoning_delta=None,
+            max_tokens=None,
         ):
             if tools:
                 raise ToolsUnsupported("model x does not support tools")
-            return await super().ask(messages, tools, tool_choice, on_delta, max_tokens)
+            return await super().ask(
+                messages, tools, tool_choice, on_delta, on_reasoning_delta, max_tokens
+            )
 
     inner = Rejecting(
         [LLMResponse(content='<tool_call>{"name": "echo", "arguments": {"x": 1}}</tool_call>')]

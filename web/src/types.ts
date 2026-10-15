@@ -1437,6 +1437,7 @@ export type WsMessage =
   | { kind: "update"; event: TimelineEvent }
   | { kind: "stream_start"; thread: string; id: string; ts: string }
   | { kind: "delta"; thread: string; id: string; text: string }
+  | { kind: "reasoning_delta"; thread: string; id: string; text: string }
   | { kind: "stream_end"; thread: string; id: string; discard?: boolean }
   | { kind: "status"; status: Status }
   | { kind: "thread"; thread: ThreadMeta }
