@@ -24,6 +24,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **The window's back navigation no longer lands on the starting screen.** The shell shows its own splash (`resources/loading.html`) before the Host's page, so the splash stayed in the window's history underneath it: the mouse's back button or alt+left returned to *Starting*, which has no way to load the Host again, and the only way out was to restart the app. A history navigation never goes through `will-navigate`, so the window now clears its history once the Host has answered (`loadHost`), at startup and when the tray brings the window back. For #491.
+
 - **Synced turns from another computer stay above a newer local prompt and arrive without a reload.** On the desktop, a hub `sync` frame that arrived while a pull was already running was dropped until the next minute tick, and a remote bubble inserted before this computer's first prompt or from a device with a skewed clock stayed below the new local prompt until the window was reloaded. An in-flight pull now runs a follow-up pull when a newer `sync` frame arrives, reconnecting the hub socket or bringing the window back to the front pulls as well, and remote bubbles record when they were received locally and reposition inside the chat flow as new prompts mount. For #395.
 
 - **Windows installed ready updates on a normal user quit and stayed closed.** Quit reused the restart update's integrity check and work protection, while restart still reopened the app. Without a ready update, the normal protected exit was unchanged. Closing to the tray, idling, a crash or system shutdown did not request installation, and a failed installer launch kept the app running.

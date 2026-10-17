@@ -835,7 +835,7 @@ function writePrefs(next: Prefs = prefs, strict = false): void {
 function showWindow(): BrowserWindow | null {
   if (!mainWindow && hostUrl) {
     mainWindow = createWindow();
-    void mainWindow.loadURL(hostUrl);
+    void loadHost(mainWindow, hostUrl);
   }
   if (!mainWindow) return null;
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1855,6 +1855,20 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+/**
+ * The Host in the window, with the splash taken out of the window's history behind it.
+ *
+ * `createWindow` shows the shell's own page first, so the Host's page lands on top of it in the
+ * history and a back navigation — the mouse's side button, alt+left — returns to the splash.
+ * A history navigation never goes through `will-navigate`, and `loading.html` has no way to
+ * load the Host again, so the window sat on *Starting* until the app was restarted (#491).
+ * Once the Host has answered, the history starts with it and there is nothing to go back to.
+ */
+async function loadHost(win: BrowserWindow, url: string): Promise<void> {
+  await win.loadURL(url);
+  win.webContents.navigationHistory.clear();
+}
+
 async function boot(): Promise<void> {
   if (!mainWindow) mainWindow = createWindow();
   try {
@@ -1867,7 +1881,7 @@ async function boot(): Promise<void> {
   log(`ready: ${hostUrl.replace(/token=\S+/, "token=…")}`);
   // the work routes the protected exit asks at quit time (an old plugin answers nothing usable)
   hostWork = new HostWork(hostUrl, { log });
-  await mainWindow?.loadURL(hostUrl);
+  if (mainWindow) await loadHost(mainWindow, hostUrl);
   if (screenshotFlag && mainWindow) {
     // the web app loads its plugins after the document; give it a moment
     await new Promise((r) => setTimeout(r, 8000));
