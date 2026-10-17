@@ -39,6 +39,13 @@ On the computer, in nanoMuse Desktop (or `nanomuse chat` in a terminal):
 In the web console (`/app`): pick a device, type. The task runs on that
 device's Muse; approvals show as cards in the page.
 
+Desktop `delegate` requests carry the source chat's id as `conversation`.
+If that id is missing or invalid, the task is refused before it is sent.
+On the target, tasks from different source chats stay in separate conversations;
+another task from the same chat on the same source device continues its conversation.
+After upgrading, the first delegation from each chat starts a separate conversation
+instead of continuing the old shared per-device history. That history is kept.
+
 Two kinds of request travel over the hub:
 
 - **Actions.** `info`, `shell`, `files`, `file.get`, `file.put`, `open`,

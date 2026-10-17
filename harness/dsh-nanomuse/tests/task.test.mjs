@@ -4,7 +4,10 @@
 // `stop {call}` cancelling the run, busy and timeout handling.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { getEventListeners } from 'node:events'
 import { TaskRunner, frame, preview, textOf } from '../lib/task.js'
+import { apply as applyReach } from '../lib/reach.js'
+import { HubError } from '../lib/hub.js'
 
 /** The slice of a dsh Context the runner touches. */
 function fakeContext() {
@@ -12,6 +15,7 @@ function fakeContext() {
   const sessions = new Map()
   const agents = new Map()
   const log = []
+  const hooks = { followup() {} }
   const ctx = {
     on(name, listener, prepend) {
       if (prepend) listeners[name].unshift(listener)
@@ -39,6 +43,7 @@ function fakeContext() {
           followup(message) {
             this.sent.push(message)
             this.status = 'running'
+            hooks.followup(this)
           },
           cancel(cause) {
             this.cancelled.push(cause)
@@ -67,7 +72,7 @@ function fakeContext() {
     const run = (i) => (i < chain.length ? chain[i](Object.assign({ agent: agents.get(sessionId) }, req), () => run(i + 1)) : Promise.resolve('unavailable'))
     return run(0)
   }
-  return { ctx, emit, ask, agents, log }
+  return { ctx, emit, ask, agents, log, hooks }
 }
 
 function fakeCall(id, from = { id: 'phone-1', name: 'Phone', kind: 'phone' }) {
@@ -83,6 +88,161 @@ function runner(h) {
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+/** Exercise the registered sender tool and the receiving runner together. */
+function delegation(h, r, language = 'en') {
+  const tools = new Map()
+  const calls = []
+  const replies = []
+  const destination = { id: 'desk', name: 'Desk', kind: 'computer', online: true }
+  h.hooks.followup = (agent) => queueMicrotask(() => {
+    agent.status = 'idle'
+    h.emit(agent.id, 'turn/end', { reason: { kind: 'completed' } })
+  })
+  const hub = {
+    connected: true,
+    deviceId: 'source-1',
+    devices: [destination],
+    find: () => destination,
+    nextId: () => `call-${calls.length + 1}`,
+    async call(to, action, args, options) {
+      assert.equal(to, destination.id)
+      assert.equal(action, 'task')
+      calls.push({ to, action, args })
+      const reply = await r.task(args, fakeCall(options.id, { id: this.deviceId, name: 'Source', kind: 'computer' }))
+      replies.push(reply)
+      return reply
+    },
+  }
+  applyReach({
+    nanomuseCloud: { hub, signedIn: true },
+    tools: { register(tool) { tools.set(tool.name, tool); return () => {} } },
+    effect(fn) { fn() },
+    inject() {},
+    get(name) { return name === 'nanomuseRooms' ? { lang: language } : undefined },
+    logger: { info() {}, warn() {} },
+  })
+  const send = (sessionId, task, execution = {}) => tools.get('delegate').execute(
+    { device: 'Desk', task },
+    { agent: sessionId === undefined ? undefined : { session: { id: sessionId } }, signal: new AbortController().signal, ...execution },
+  )
+  return { hub, calls, replies, send }
+}
+
+test('desktop delegation isolates chats and devices while continuing the same chat', { timeout: 5000 }, async (t) => {
+  const h = fakeContext()
+  const { r, off } = runner(h)
+  t.after(off)
+  const d = delegation(h, r)
+  await d.send('chat-a', 'first task in A')
+  await d.send('chat-b', 'first task in B')
+  await d.send('  chat-a  ', 'continue A')
+  d.hub.deviceId = 'source-2'
+  await d.send('chat-a', 'A on another device')
+
+  assert.deepEqual(d.replies.map((reply) => reply.thread), ['session-1', 'session-2', 'session-1', 'session-3'])
+  assert.deepEqual(d.calls.map((call) => call.args.conversation), ['chat-a', 'chat-b', 'chat-a', 'chat-a'])
+  assert.equal(h.ctx.sessionController.created.length, 3)
+  assert.deepEqual([...h.agents.values()].map((agent) => agent.sent.map((msg) => msg.content[0].text.split('\n').at(-1))), [
+    ['first task in A', 'continue A'], ['first task in B'], ['A on another device'],
+  ])
+})
+
+test('desktop delegation without a source chat refuses before sending a task', async (t) => {
+  const h = fakeContext()
+  const { r, off } = runner(h)
+  t.after(off)
+  const d = delegation(h, r)
+  for (const sessionId of [undefined, '', '   ', null, 42, {}]) {
+    await assert.rejects(d.send(sessionId, 'a task'), /source conversation/)
+  }
+  await assert.rejects(d.send('ignored', 'a task', { agent: {} }), /source conversation/)
+  assert.equal(d.calls.length, 0)
+  assert.equal(h.ctx.sessionController.created.length, 0)
+})
+
+test('desktop delegation reports missing conversations in Chinese', async (t) => {
+  const h = fakeContext()
+  const { r, off } = runner(h)
+  t.after(off)
+  const d = delegation(h, r, 'zh-CN')
+  await assert.rejects(d.send(undefined, 'a task'), /无法确定来源对话/)
+  assert.equal(d.calls.length, 0)
+})
+
+test('desktop delegations from different chats can run and finish independently', { timeout: 5000 }, async (t) => {
+  const h = fakeContext()
+  const { r, off } = runner(h)
+  t.after(off)
+  const d = delegation(h, r)
+  const started = []
+  let ready
+  const bothStarted = new Promise((resolve) => { ready = resolve })
+  h.hooks.followup = (agent) => {
+    started.push(agent)
+    if (started.length === 2) ready()
+  }
+  const pending = Promise.all([d.send('chat-a', 'task A'), d.send('chat-b', 'task B')])
+  await Promise.race([bothStarted, pending.then(() => { throw new Error('tasks finished before completion events') })])
+  assert.equal(r.running, 2)
+  assert.notEqual(started[0].id, started[1].id)
+  for (const agent of started.reverse()) {
+    const answer = agent.sent[0].content[0].text.split('\n').at(-1)
+    h.emit(agent.id, 'assistant/message', { message: { content: [{ type: 'text', text: answer }] } })
+    agent.status = 'idle'
+    h.emit(agent.id, 'turn/end', { reason: { kind: 'completed' } })
+  }
+  const results = await pending
+  assert.deepEqual(results.map((result) => result.answer), ['task A', 'task B'])
+  assert.equal(r.running, 0)
+})
+
+test('desktop delegation releases its abort listener after success and remote failure', { timeout: 5000 }, async (t) => {
+  const h = fakeContext()
+  const { r, off } = runner(h)
+  t.after(off)
+  const d = delegation(h, r)
+  const success = new AbortController()
+  await d.send('chat-a', 'a task', { signal: success.signal })
+  assert.equal(getEventListeners(success.signal, 'abort').length, 0)
+  success.abort()
+  assert.equal(d.calls.length, 1)
+
+  let requests = 0
+  d.hub.call = async () => { requests++; throw new HubError('offline', 'Target disconnected') }
+  const failure = new AbortController()
+  await assert.rejects(d.send('chat-a', 'a task', { signal: failure.signal }), /offline: Target disconnected/)
+  assert.equal(getEventListeners(failure.signal, 'abort').length, 0)
+  failure.abort()
+  assert.equal(requests, 1)
+})
+
+test('cancelling a desktop delegation stops its own remote call', async (t) => {
+  const h = fakeContext()
+  const { r, off } = runner(h)
+  t.after(off)
+  const d = delegation(h, r)
+  const controller = new AbortController()
+  const requests = []
+  d.hub.call = (to, action, args, options) => {
+    requests.push({ to, action, args, options })
+    if (action === 'stop') return Promise.resolve({ stopped: true })
+    assert.equal(action, 'task')
+    return new Promise((resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new HubError('aborted', 'The call was stopped')), { once: true })
+    })
+  }
+  const pending = d.send('chat-a', 'a task', { signal: controller.signal })
+  assert.equal(requests.length, 1)
+  controller.abort()
+  await assert.rejects(pending, /aborted: The call was stopped/)
+  assert.deepEqual(requests.map(({ to, action }) => ({ to, action })), [
+    { to: 'desk', action: 'task' }, { to: 'desk', action: 'stop' },
+  ])
+  assert.equal(requests[0].args.conversation, 'chat-a')
+  assert.deepEqual(requests[1].args, { call: requests[0].options.id })
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
+})
 
 test('frame, textOf and preview', () => {
   assert.ok(frame('Phone', 'Desk', 'tidy up').startsWith('[Asked from Phone'))

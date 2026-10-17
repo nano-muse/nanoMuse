@@ -317,6 +317,11 @@ export function apply(ctx: Context): void {
           },
           timeoutMs: 660_000,
           async execute(args, exec) {
+            const sourceId = exec.agent?.session?.id
+            const conversation = typeof sourceId === 'string' ? sourceId.trim() : ''
+            if (!conversation) throw new Error(uiLanguage(ctx).startsWith('zh')
+              ? '无法确定来源对话，任务未发送。'
+              : 'The source conversation is unavailable; the task was not sent.')
             const d = target(args.device)
             const steps: string[] = []
             const pending = new Set<Promise<void>>()
@@ -350,7 +355,12 @@ export function apply(ctx: Context): void {
             let body: Record<string, unknown>
             try {
               // `language` (runtime 1.0.0, `docs/hub.md`): the other end answers in this screen's language; an older runtime ignores the field
-              body = await hub.call(d.id, 'task', { text: args.task, from: cloud.hub.devices.find((x) => x.id === hub.deviceId)?.name ?? 'computer', language: uiLanguage(ctx) }, { id: callId, signal: exec.signal, timeoutMs: 600_000, onEvent }).catch(fail)
+              body = await hub.call(d.id, 'task', {
+                text: args.task,
+                conversation,
+                from: cloud.hub.devices.find((x) => x.id === hub.deviceId)?.name ?? 'computer',
+                language: uiLanguage(ctx),
+              }, { id: callId, signal: exec.signal, timeoutMs: 600_000, onEvent }).catch(fail)
             } finally {
               exec.signal.removeEventListener('abort', onAbort)
             }
