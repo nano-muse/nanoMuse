@@ -79,8 +79,9 @@ class Skill:
             if not root.is_dir():
                 continue
             for p in sorted(root.rglob("*")):
-                if p.is_file() and not any(part.startswith(".") for part in p.parts):
-                    out.append(p.relative_to(self.path))
+                rel = p.relative_to(self.path)
+                if p.is_file() and not any(part.startswith(".") for part in rel.parts):
+                    out.append(rel)
         return out
 
     def to_dict(self, body: bool = False) -> dict[str, Any]:
