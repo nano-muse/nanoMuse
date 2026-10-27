@@ -564,6 +564,51 @@ def test_abandoned_task_bounds_the_stop_send(monkeypatch: pytest.MonkeyPatch, ca
     asyncio.run(scenario())
 
 
+def test_a_dropped_call_is_retried_with_the_same_id(relay: FakeRelay) -> None:
+    """The socket dies after the call went out: with retries the client re-sends the
+    same call id after reconnecting, so a relay that kept the finished answer replays
+    it instead of running the action again. Without retries it fails at once."""
+
+    async def scenario(retries: int) -> tuple[list[str], list[bool], dict[str, Any] | None]:
+        seen: list[str] = []
+        flags: list[bool] = []
+
+        def handler(frame: dict[str, Any]) -> list[dict[str, Any]]:
+            seen.append(str(frame.get("id")))
+            flags.append(bool(frame.get("retry")))
+            if len(seen) == 1:
+                loop = asyncio.get_running_loop()
+                loop.create_task(relay.ws.close(1011, "chaos"))
+                return []
+            return [{"type": "result", "id": frame["id"], "ok": True, "body": {"stdout": "ok\n"}}]
+
+        relay.phone_handler = handler
+        client = HubClient(
+            hub_url(relay.base_url), "test-key", "pc-1", "Desk", actions=["info", "shell"]
+        )
+        client.start()
+        await asyncio.wait_for(client.connected.wait(), 5)
+        try:
+            body = await client.call(
+                "phone-1", "shell", {"command": "ls"}, retries=retries, call_id="fixed-id-1"
+            )
+            return seen, flags, body
+        except HubError:
+            return seen, flags, None
+        finally:
+            await client.stop()
+
+    seen, flags, body = asyncio.run(scenario(retries=2))
+    assert body is not None and body["stdout"] == "ok\n"
+    assert seen == ["fixed-id-1", "fixed-id-1"]
+    assert flags == [False, True]  # only the re-send says it is a retry
+
+    seen, flags, body = asyncio.run(scenario(retries=0))
+    assert body is None
+    assert seen == ["fixed-id-1"]
+    assert flags == [False]
+
+
 def test_client_refuses_to_hammer_on_bad_key(relay: FakeRelay) -> None:
     async def scenario() -> None:
         client = HubClient(hub_url(relay.base_url), "wrong", "pc-1", "Desk", actions=["info"])
