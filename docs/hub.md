@@ -346,12 +346,15 @@ most 256 finished calls across the relay) keyed by the account, the call id
 and the device that made the call. A caller that lost the connection after
 the answer reached the relay re-sends the `call` with the same id and
 `"retry": true` and gets the kept result back; the target never sees the
-call again. The flag matters: a plain re-send is a new call with a recycled
-id, as before, and it discards the kept answer. A different device reusing
-the id gets a fresh execution, and a call still waiting answers
-`duplicate_call` as before. The boundary is honest: an answer that never
-reached the relay cannot be replayed, so a caller that retries a call whose
-answer was lost on the way to the relay may run the action again. The
+call again. The same holds when the caller left before the answer
+arrived: the relay remembers the dropped call briefly, and a late answer
+from its target is kept for replay. The flag matters: a plain re-send is
+a new call with a recycled id, as before, and it discards the kept
+answer. A different device reusing the id gets a fresh execution, and a
+call still waiting answers `duplicate_call` as before. The boundary is
+honest: an answer that never reached the relay cannot be replayed, so a
+caller that retries a call whose answer was lost on the way to the relay
+may run the action again. The
 runtime's client retries a dropped call with the same id only when asked
 (`retries` on `HubClient.call`); by default a dropped call fails at once.
 `welcome.server.features` lists `result_replay` on a relay that keeps

@@ -958,7 +958,7 @@ def test_a_pushed_event_reaches_the_devices_that_can_answer_it(client, monkeypat
     with connect(client, a) as pc, connect(client, keys[0]) as phone, connect(client, keys[1]) as old, connect(client, b) as stranger:
         pc.send_json(hello("computer", "pc-1", "desk", actions=("info", "approve")))
         welcome = pc.receive_json()
-        assert welcome["server"]["features"] == ["event_push"]
+        assert welcome["server"]["features"] == ["event_push", "result_replay"]
         phone.send_json(hello("phone", "phone-1", "Pixel", actions=("info", "approve", "approve.any")))
         assert _skip_devices(phone)["type"] == "welcome"
         old.send_json(hello("phone", "phone-2", "Old", actions=("info", "approve")))
@@ -998,3 +998,160 @@ def test_a_pushed_event_reaches_the_devices_that_can_answer_it(client, monkeypat
         assert _skip_devices(phone)["body"] == card
         pc.send_json({"type": "event", "to": "*", "body": card})
         assert _skip_devices(pc)["code"] == "rate_limited"
+
+
+def _pair(client, phone_id="phone-1", pc_id="pc-1"):
+    """Two connected devices of one account, hellos exchanged, broadcasts drained."""
+    phone_key = sign_up(client, "13800138000")
+    pc_key = sign_up(client, "13800138000")
+    phone = connect(client, phone_key)
+    pc = connect(client, pc_key)
+    phone.__enter__()
+    pc.__enter__()
+    phone.send_json(hello("phone", phone_id, "Pixel"))
+    _skip_devices(phone)
+    pc.send_json(hello("computer", pc_id, "desk", actions=("info", "shell", "screen")))
+    _skip_devices(pc)
+    # Drain the arrival broadcasts on both sides with a ping each: whatever
+    # devices frames are still queued are skipped on the way to the pong,
+    # and nothing is left waiting when the test's first call goes out.
+    for ws in (phone, pc):
+        ws.send_json({"type": "ping"})
+        assert _skip_devices(ws)["type"] == "pong"
+    return phone, pc
+
+
+def _call_and_answer(phone, pc, call_id, body=None):
+    phone.send_json({"type": "call", "id": call_id, "to": "pc-1", "action": "shell", "args": {"command": "uname"}})
+    call = pc.receive_json()
+    assert call["type"] == "call" and call["id"] == call_id
+    pc.send_json({"type": "result", "id": call_id, "ok": True, "body": body or {"stdout": "Linux\n"}})
+    res = phone.receive_json()
+    assert res["type"] == "result" and res["ok"] is True
+    return res
+
+
+def test_a_finished_call_replays_instead_of_running_again(client):
+    phone, pc = _pair(client)
+    try:
+        first = _call_and_answer(phone, pc, "c1")
+        # The caller asks again with the same id (it dropped before reading the
+        # answer): the kept result comes back, and the target sees nothing.
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True})
+        replay = phone.receive_json()
+        assert replay["type"] == "result" and replay["body"] == first["body"]
+        phone.send_json({"type": "ping"})
+        assert _skip_devices(phone)["type"] == "pong"
+    finally:
+        phone.__exit__(None, None, None)
+        pc.__exit__(None, None, None)
+
+
+def test_a_replayed_call_belongs_to_its_caller(client):
+    phone, pc = _pair(client)
+    try:
+        _call_and_answer(phone, pc, "c1")
+        # Another device of the same account reusing the id gets a fresh execution,
+        # not the first caller's answer.
+        pc.send_json({"type": "call", "id": "c1", "to": "phone-1", "action": "info", "args": {}})
+        call = phone.receive_json()
+        assert call["type"] == "call" and call["id"] == "c1"
+        phone.send_json({"type": "result", "id": "c1", "ok": True, "body": {"name": "Pixel"}})
+        res = pc.receive_json()
+        assert res["type"] == "result" and res["body"] == {"name": "Pixel"}
+    finally:
+        phone.__exit__(None, None, None)
+        pc.__exit__(None, None, None)
+
+
+def test_a_call_still_waiting_is_still_a_duplicate(client):
+    phone, pc = _pair(client)
+    try:
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {}})
+        assert pc.receive_json()["type"] == "call"
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {}})
+        err = phone.receive_json()
+        assert err["code"] == "duplicate_call"
+        pc.send_json({"type": "result", "id": "c1", "ok": True, "body": {}})
+        assert phone.receive_json()["type"] == "result"
+    finally:
+        phone.__exit__(None, None, None)
+        pc.__exit__(None, None, None)
+
+
+def test_fifty_dropped_calls_never_run_twice(client):
+    """Chaos: 50 calls over one pair of connections, each dropped at a random
+    point, each re-sent with the same id. Every call whose answer reached the
+    relay runs exactly once on the target and reaches its caller exactly once.
+    One pair of keys serves all 50 calls: asking for a fresh sign-in code per
+    call would hit the relay's own rate limit, which the sign-in tests already
+    cover, and opening a fresh pair per call would hit its connection limit."""
+    import random
+
+    rng = random.Random(20261027)
+    phone_key = sign_up(client, "13800138000")
+    pc_key = sign_up(client, "13800138000")
+
+    def drain(ws):
+        ws.send_json({"type": "ping"})
+        assert _skip_devices(ws)["type"] == "pong"
+
+    phone = connect(client, phone_key)
+    pc = connect(client, pc_key)
+    phone.__enter__()
+    pc.__enter__()
+    try:
+        phone.send_json(hello("phone", "phone-1", "Pixel"))
+        _skip_devices(phone)
+        pc.send_json(hello("computer", "pc-1", "desk", actions=("info", "shell", "screen")))
+        _skip_devices(pc)
+        drain(phone)
+        drain(pc)
+
+        executions: dict[str, int] = {}
+        for i in range(50):
+            call_id = f"chaos-{i}"
+            mode = rng.choice(["clean", "drop-after-answer", "replay-twice", "drop-caller-first"])
+            phone.send_json({"type": "call", "id": call_id, "to": "pc-1", "action": "shell", "args": {"command": "uname"}})
+            call = pc.receive_json()
+            assert call["type"] == "call"
+            executions[call_id] = executions.get(call_id, 0) + 1
+            if mode == "drop-caller-first":
+                # The caller leaves before the answer; the answer is still kept, and
+                # the same device reconnecting with the same key and re-sending the
+                # id as a retry replays it.
+                phone.__exit__(None, None, None)
+                pc.send_json({"type": "result", "id": call_id, "ok": True, "body": {"n": i}})
+                phone = connect(client, phone_key)
+                phone.__enter__()
+                phone.send_json(hello("phone", "phone-1", "Pixel"))
+                _skip_devices(phone)
+                drain(phone)
+                drain(pc)
+                phone.send_json(
+                    {"type": "call", "id": call_id, "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True}
+                )
+                res = phone.receive_json()
+                assert res["type"] == "result" and res["body"] == {"n": i}
+            else:
+                pc.send_json({"type": "result", "id": call_id, "ok": True, "body": {"n": i}})
+                res = phone.receive_json()
+                assert res["type"] == "result" and res["body"] == {"n": i}
+                if mode in ("drop-after-answer", "replay-twice"):
+                    phone.send_json(
+                        {"type": "call", "id": call_id, "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True}
+                    )
+                    replay = phone.receive_json()
+                    assert replay["type"] == "result" and replay["body"] == {"n": i}
+                if mode == "replay-twice":
+                    phone.send_json(
+                        {"type": "call", "id": call_id, "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True}
+                    )
+                    replay = phone.receive_json()
+                    assert replay["type"] == "result" and replay["body"] == {"n": i}
+            # Nothing else is waiting for either side: no duplicate delivery.
+            drain(phone)
+        assert executions == {f"chaos-{i}": 1 for i in range(50)}
+    finally:
+        phone.__exit__(None, None, None)
+        pc.__exit__(None, None, None)

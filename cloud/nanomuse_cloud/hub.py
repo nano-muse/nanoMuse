@@ -57,6 +57,11 @@ log = logging.getLogger("nanomuse_cloud.hub")
 KINDS = ("phone", "computer", "web")
 HELLO_TIMEOUT_S = 15
 CALL_TTL_S = 15 * 60
+#: how long a finished call's result is kept for replay (docs/hub.md): a caller that
+#: lost the connection after the answer reached the relay re-sends the same call id
+#: and gets the kept answer instead of a second execution on the target
+ANSWER_CACHE_TTL_S = 300
+ANSWER_CACHE_MAX = 256
 _ID = re.compile(r"^[A-Za-z0-9._:-]{4,80}$")
 
 # What one socket may send: frames and bytes per second, sustained, with twice that as a
@@ -95,7 +100,7 @@ APPROVE_ANY = "approve.any"
 PUSHES_PER_MINUTE = 30
 PUSH_BODY_BYTES = 16 * 1024
 # what this relay understands beyond the frames every version has; `welcome.server.features`
-FEATURES = ["event_push"]
+FEATURES = ["event_push", "result_replay"]
 
 
 class Bucket:
@@ -229,6 +234,19 @@ class Pending:
     started: int = field(default_factory=now)
 
 
+@dataclass
+class Answered:
+    """A finished call's result, kept so a re-sent call id replays instead of
+    re-executing. Bounded and short-lived: the cache is an idempotency aid for a
+    caller that dropped, not a record of what happened."""
+
+    call_id: str
+    caller: str
+    account_id: str
+    frame: dict
+    stored: int = field(default_factory=now)
+
+
 class Hub:
     def __init__(self, cloud: Cloud, frame_limit: int = 16 * 1024 * 1024):
         self.cloud = cloud
@@ -237,6 +255,12 @@ class Hub:
         self.online: dict[str, dict[str, Connection]] = {}
         # keyed (account, call id): ids are the callers' own and only unique within an account
         self.pending: dict[tuple[str, str], Pending] = {}
+        # finished calls, for replay: the same key, plus the caller device that made it
+        self.answered: dict[tuple[str, str], Answered] = {}
+        # calls whose caller left before the answer: (account, call id) to the
+        # caller, the target and when it was dropped, so a late answer from that
+        # target is still kept for replay instead of refused as unknown
+        self.dropped: dict[tuple[str, str], tuple[str, str, int]] = {}
         # for the operator's self-check: frames dropped and sockets closed for flooding, ever
         self.dropped_total = 0
         self.flood_closes = 0
@@ -260,6 +284,7 @@ class Hub:
             "online": self.online_count(),
             "accounts_online": sum(1 for v in self.online.values() if v),
             "pending_calls": len(self.pending),
+            "answered_cache": len(self.answered),
             "dropped_frames": self.dropped_total,
             "flood_closes": self.flood_closes,
             "slow_closes": self.slow_closes,
@@ -595,6 +620,12 @@ class Hub:
                     )
             elif p.caller == gone.device_id:
                 del self.pending[key]
+                # The target may still answer: remember the call briefly so its
+                # late result is kept for the caller when it comes back.
+                self.dropped[key] = (p.caller, p.target, now())
+                while len(self.dropped) > ANSWER_CACHE_MAX:
+                    oldest = min(self.dropped.items(), key=lambda kv: kv[1][2])[0]
+                    del self.dropped[oldest]
 
     @staticmethod
     async def _close(ws: WebSocket, code: int, reason: str) -> None:
@@ -667,6 +698,20 @@ class Hub:
             await conn.send({"type": "error", "id": call_id, "code": "self_call", "message": "That is this device"})
             return
         await self._sweep()
+        # A new call with this id supersedes the dropped one: a late answer to
+        # the old call must not be kept as this call's result.
+        self.dropped.pop((conn.account_id, call_id), None)
+        answered = self.answered.get((conn.account_id, call_id))
+        if answered is not None:
+            if frame.get("retry") and answered.caller == conn.device_id and now() - answered.stored < ANSWER_CACHE_TTL_S:
+                # The caller says this is a retry of the call it lost: the answer
+                # already reached the relay, so replay the kept result and the
+                # target never sees the call a second time.
+                await conn.send(dict(answered.frame))
+                return
+            # A plain re-send is a new call with a recycled id (the old contract:
+            # an answered id is free again), and it supersedes the kept answer.
+            del self.answered[(conn.account_id, call_id)]
         if (conn.account_id, call_id) in self.pending:
             # the id of a call still waiting: a second one would take its place and the first
             # answer would land on the wrong call (or on none). Ids are the caller's to make
@@ -680,8 +725,28 @@ class Hub:
     async def _answer(self, conn: Connection, frame: dict) -> None:
         call_id = str(frame.get("id") or "")
         p = self.pending.get((conn.account_id, call_id))
-        if p is None or p.target != conn.device_id:
+        if p is None:
+            dropped = self.dropped.get((conn.account_id, call_id))
+            if (
+                dropped is not None
+                and frame.get("type") == "result"
+                and dropped[1] == conn.device_id
+                and now() - dropped[2] < ANSWER_CACHE_TTL_S
+            ):
+                # The caller left before this answer arrived: keep it, so the
+                # caller reconnecting and retrying the id gets it replayed.
+                del self.dropped[(conn.account_id, call_id)]
+                ghost = Pending(call_id=call_id, caller=dropped[0], target=dropped[1], account_id=conn.account_id)
+                out = {k: v for k, v in frame.items() if k in ("type", "id", "ok", "body", "error", "message")}
+                out["from"] = conn.brief()
+                self._remember_answer(ghost, out)
+                return
             # Unknown or not this device's call: nothing to deliver to. Tell the sender once.
+            await conn.send(
+                {"type": "error", "id": call_id, "code": "unknown_call", "message": "No call with that id is waiting on this device"}
+            )
+            return
+        if p.target != conn.device_id:
             await conn.send(
                 {"type": "error", "id": call_id, "code": "unknown_call", "message": "No call with that id is waiting on this device"}
             )
@@ -689,11 +754,33 @@ class Hub:
         caller = self.online.get(p.account_id, {}).get(p.caller)
         if frame.get("type") == "result":
             del self.pending[(conn.account_id, call_id)]
-        if caller is None:
-            return
         out = {k: v for k, v in frame.items() if k in ("type", "id", "ok", "body", "error", "message")}
         out["from"] = conn.brief()
+        if frame.get("type") == "result":
+            # Kept even when the caller has already left: it may come back and
+            # re-send the same id, and the kept answer is what stops a second run.
+            self._remember_answer(p, out)
+        if caller is None:
+            return
         await caller.send(out)
+
+    def _remember_answer(self, pending: Pending, frame: dict) -> None:
+        """Keep a finished result for replay, bounded in count and time. The frame is
+        copied: the caller's queue must not be able to mutate the kept answer."""
+        key = (pending.account_id, pending.call_id)
+        self.answered[key] = Answered(
+            call_id=pending.call_id,
+            caller=pending.caller,
+            account_id=pending.account_id,
+            frame=dict(frame),
+        )
+        cutoff = now() - ANSWER_CACHE_TTL_S
+        for old_key, old in list(self.answered.items()):
+            if old.stored < cutoff:
+                del self.answered[old_key]
+        while len(self.answered) > ANSWER_CACHE_MAX:
+            oldest = min(self.answered.items(), key=lambda kv: kv[1].stored)[0]
+            del self.answered[oldest]
 
     async def _push(self, conn: Connection, frame: dict) -> None:
         """An event with no call behind it, to one device or to every device of the account
@@ -736,6 +823,13 @@ class Hub:
                 caller = self.online.get(p.account_id, {}).get(p.caller)
                 if caller:
                     await caller.send({"type": "error", "id": p.call_id, "code": "timeout", "message": "the device did not answer in time"})
+        answer_cutoff = now() - ANSWER_CACHE_TTL_S
+        for key, answered in list(self.answered.items()):
+            if answered.stored < answer_cutoff:
+                del self.answered[key]
+        for key, (_, _, dropped_at) in list(self.dropped.items()):
+            if dropped_at < answer_cutoff:
+                del self.dropped[key]
 
 
 _LLM_ID = re.compile(r"^[A-Za-z0-9._:/ -]{1,80}$")
