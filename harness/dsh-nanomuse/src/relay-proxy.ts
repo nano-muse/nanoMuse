@@ -59,7 +59,12 @@ export class RelayProxy {
     return this.port ? `http://127.0.0.1:${this.port}/v1` : ''
   }
 
-  async listen(): Promise<void> {
+  /**
+   * Open the door — on `preferred` when that port is free (the one the last start had, so the
+   * provider row written then still points here and nothing has to be rewritten), else on a
+   * port of the system's choosing.
+   */
+  async listen(preferred = 0): Promise<void> {
     if (this.server) return
     const server = createServer((req, res) =>
       void this.handle(req, res).catch((error: unknown) => {
@@ -72,13 +77,21 @@ export class RelayProxy {
     server.requestTimeout = 0
     server.headersTimeout = 60_000
     server.keepAliveTimeout = 65_000
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject)
-      server.listen(0, '127.0.0.1', () => {
-        server.off('error', reject)
-        resolve()
+    const bind = (port: number): Promise<void> =>
+      new Promise<void>((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(port, '127.0.0.1', () => {
+          server.off('error', reject)
+          resolve()
+        })
       })
-    })
+    try {
+      await bind(Number.isInteger(preferred) && preferred > 0 && preferred < 65536 ? preferred : 0)
+    } catch (error) {
+      if (!preferred) throw error
+      this.options.log?.('info', `nanomuse relay door: port ${preferred} is taken (${error instanceof Error ? error.message : String(error)}); another is used`)
+      await bind(0)
+    }
     // the door is a side of the plugin, not a reason for the process to stay up
     server.unref()
     this.server = server

@@ -33,7 +33,7 @@ sequenceDiagram
 | 区域 | 文件 | 说明 |
 |---|---|---|
 | 组合根 | `nanomuse/app.py` | `NanoMuseApp` 把设置接到 LLM、工具、保险库、哨兵、记忆、目标、智能体上 |
-| 智能体循环 | `nanomuse/agent/core.py` | 组装提示、裁剪上下文、卡住检测、会话持久化、收件箱 |
+| 智能体循环 | `nanomuse/agent/core.py` | 组装提示、裁剪上下文、卡住检测、会话持久化、收件箱；可选的共享[任务预算](runtime-budgets.md)，缩短工具结果时写入日志 |
 | 提示 | `nanomuse/prompts.py` | 系统提示、语言规则和文字系统检测、推进目标的提示 |
 | 哨兵 | `nanomuse/sentinel/gate.py`、`policy.py`、`audit.py` | 守卫、决策顺序、审批、污点、保险库解析、脱敏、JSONL 审计 |
 | 保险库 | `nanomuse/vault/vault.py` | Fernet 存储，`{{vault:NAME}}` 占位符 |

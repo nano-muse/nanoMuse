@@ -353,6 +353,24 @@ CREATE TABLE IF NOT EXISTS turns (
 CREATE INDEX IF NOT EXISTS turns_account ON turns(account_id, ts);
 CREATE INDEX IF NOT EXISTS turns_ts ON turns(ts);
 CREATE INDEX IF NOT EXISTS turns_conversation ON turns(account_id, conversation, ts);
+-- 0.31.1: the figures of a turn run on a key of the person's own (source 'own'), one small
+-- row each, so the Usage page's table by provider and model never reads the turns
+-- themselves: the provider sits in `meta` and the cached count in a column added after the
+-- bodies, and summing them over a week of turns walked every body (a 40 GB file took
+-- minutes a call and held the console's reads behind it). Written with the turn; older own
+-- turns are filled in by the backfill after start. Deleted with the turn.
+CREATE TABLE IF NOT EXISTS own_figures (
+    turn_id       TEXT PRIMARY KEY,
+    account_id    TEXT NOT NULL,
+    ts            INTEGER NOT NULL,
+    provider      TEXT NOT NULL DEFAULT '',
+    model         TEXT NOT NULL DEFAULT '',
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    cached_tokens INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS own_figures_ts ON own_figures(ts);
+CREATE INDEX IF NOT EXISTS own_figures_account ON own_figures(account_id);
 -- 0.29: the files under MEDIA_DIR, one row each, and who may read which. A file is
 -- removed when its last reference goes (the account deleted its record) or when the
 -- store is over MEDIA_MAX_GB, oldest use first; the turn then keeps a reference to nothing.
@@ -1221,6 +1239,7 @@ class Database:
             # the record's rows go here; the files whose last reference this was are removed
             # by the service (Cloud.delete_account → purge_record) before it gets here
             c.execute("DELETE FROM turns WHERE account_id=?", (account_id,))
+            c.execute("DELETE FROM own_figures WHERE account_id=?", (account_id,))
             c.execute("DELETE FROM blob_refs WHERE account_id=?", (account_id,))
             c.execute("DELETE FROM client_events WHERE account_id=?", (account_id,))
             c.execute("DELETE FROM calls WHERE account_id=?", (account_id,))
@@ -1461,8 +1480,76 @@ class Database:
                     key,
                 ),
             )
+            # the figures row of an own turn (own_figures), replaced with the turn
+            c.execute("DELETE FROM own_figures WHERE turn_id=?", (row["id"],))
+            if row.get("source", "cloud") == "own":
+                self._add_own_figures(
+                    c,
+                    [
+                        {
+                            "id": row["id"],
+                            "account_id": row["account_id"],
+                            "ts": t,
+                            "model": row.get("model", ""),
+                            "prompt_tokens": int(row.get("prompt_tokens") or 0),
+                            "completion_tokens": int(row.get("completion_tokens") or 0),
+                            "cached_tokens": int(row.get("cached_tokens") or 0),
+                            "meta": row.get("meta", "{}"),
+                        }
+                    ],
+                )
             for m in media:
                 self._reference_blob(c, m, row["account_id"], "turn", t)
+
+    @staticmethod
+    def _add_own_figures(c: sqlite3.Cursor, rows: list[dict[str, Any]]) -> int:
+        """The figures rows of own turns, one each: the provider read from the turn's meta
+        (``{"provider": …}``), the rest as the turn has it. A row that is there already stays."""
+        n = 0
+        for r in rows:
+            try:
+                meta = json.loads(r.get("meta") or "{}")
+            except ValueError:
+                meta = {}
+            provider = str(meta.get("provider") or "")[:40] if isinstance(meta, dict) else ""
+            n += c.execute(
+                "INSERT OR IGNORE INTO own_figures(turn_id, account_id, ts, provider, model, prompt_tokens, completion_tokens, cached_tokens) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    str(r["id"]),
+                    str(r["account_id"]),
+                    int(r["ts"]),
+                    provider,
+                    str(r.get("model") or "")[:80],
+                    int(r.get("prompt_tokens") or 0),
+                    int(r.get("completion_tokens") or 0),
+                    int(r.get("cached_tokens") or 0),
+                ),
+            ).rowcount
+        return n
+
+    def own_unfigured_page(self, after_ts: int, after_rowid: int, limit: int) -> list[sqlite3.Row]:
+        """The next own turns of the record, oldest first, for the backfill that writes their
+        figures rows (0.31.1): the turns that are not own are told apart in the figures
+        index, so only an own turn's row — its meta and cached count sit past the bodies —
+        is read."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT rowid, id, account_id, ts, model, prompt_tokens, completion_tokens, cached_tokens, meta "
+                "FROM turns INDEXED BY turns_figures WHERE ts>=? AND source='own' AND (ts>? OR rowid>?) "
+                "ORDER BY ts, rowid LIMIT ?",
+                (after_ts, after_ts, after_rowid, max(1, limit)),
+            ).fetchall()
+
+    def add_own_figures(self, rows: list[sqlite3.Row] | list[dict[str, Any]]) -> int:
+        """The figures rows of own turns the backfill read (own_unfigured_page); answers how
+        many were new."""
+        with self.tx() as c:
+            return self._add_own_figures(c, [dict(r) for r in rows])
+
+    def own_figures_count(self) -> int:
+        with self._lock:
+            return int(self._conn.execute("SELECT COUNT(*) FROM own_figures").fetchone()[0])
 
     # -- 0.31: one question, many calls (provenance.turn_start) -------------------------------
 
@@ -1787,6 +1874,7 @@ class Database:
         with self.tx() as c:
             held = [r[0] for r in c.execute("SELECT DISTINCT sha256 FROM blob_refs WHERE account_id=?", (account_id,)).fetchall()]
             n = c.execute("DELETE FROM turns WHERE account_id=?", (account_id,)).rowcount
+            c.execute("DELETE FROM own_figures WHERE account_id=?", (account_id,))
             c.execute("DELETE FROM blob_refs WHERE account_id=?", (account_id,))
             return n, self._drop_orphans(c, held)
 
@@ -1802,6 +1890,7 @@ class Database:
             for i in range(0, len(ids), 500):
                 page = ids[i : i + 500]
                 n += c.execute(f"DELETE FROM turns WHERE id IN ({','.join('?' * len(page))})", page).rowcount
+                c.execute(f"DELETE FROM own_figures WHERE turn_id IN ({','.join('?' * len(page))})", page)
             if len(ids) >= limit:
                 return n, []  # more turns to go first; the files follow on the last page
             gone = [
@@ -3251,14 +3340,16 @@ class Database:
     def own_usage_by_provider(self, since: int) -> list[sqlite3.Row]:
         """The turns people ran on keys of their own and sent up (source 'own'), per provider
         and model: turns, accounts, tokens and the cached part of the prompts (0.31 on; older
-        turns count 0 cached). `source` sits before the conversation in the row, so the turns
-        the relay answered itself are skipped without reading their bodies."""
+        turns count 0 cached). From the figures rows (own_figures), never the turns: a turn's
+        provider sits in its meta and its cached count past the bodies, and reading them for a
+        week of own turns walked every body (0.31.0 did, and a call took minutes on a large
+        file). Own turns kept before 0.31.1 count once the backfill has written their rows."""
         with self._lock:
             return self._conn.execute(
-                """SELECT COALESCE(json_extract(meta, '$.provider'), '') AS provider, model, COUNT(*) AS turns,
-                          COUNT(DISTINCT account_id) AS accounts, SUM(prompt_tokens) AS prompt_tokens,
-                          SUM(completion_tokens) AS completion_tokens, SUM(cached_tokens) AS cached_tokens
-                   FROM turns WHERE ts>=? AND source='own' GROUP BY provider, model ORDER BY turns DESC""",
+                """SELECT provider, model, COUNT(*) AS turns, COUNT(DISTINCT account_id) AS accounts,
+                          SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens,
+                          SUM(cached_tokens) AS cached_tokens
+                   FROM own_figures WHERE ts>=? GROUP BY provider, model ORDER BY turns DESC""",
                 (since,),
             ).fetchall()
 

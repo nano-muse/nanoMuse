@@ -205,6 +205,25 @@ class MediaSettings(BaseModel):
         return (entry.base_url or None) if entry else None
 
 
+class TaskBudgetSettings(BaseModel):
+    """Per-task limits shared with nested screen operators. Zero disables a limit.
+
+    Prices are user-supplied upper rates across every model the task may use.
+    """
+
+    max_total_tokens: int = Field(default=0, ge=0)
+    max_cost_usd: float = Field(default=0, ge=0, allow_inf_nan=False)
+    max_seconds: float = Field(default=0, ge=0, allow_inf_nan=False)
+    input_usd_per_million: float = Field(default=0, ge=0, allow_inf_nan=False)
+    output_usd_per_million: float = Field(default=0, ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _priced_limit(self) -> TaskBudgetSettings:
+        if self.max_cost_usd and not (self.input_usd_per_million or self.output_usd_per_million):
+            raise ValueError("a cost budget needs input or output USD rates per million tokens")
+        return self
+
+
 class AgentSettings(BaseModel):
     name: str = "nanoMuse"
     max_steps: int = 30
@@ -219,6 +238,9 @@ class AgentSettings(BaseModel):
     # "auto" → answer in the user's language; or force e.g. "zh" / "en".
     language: str = "auto"
     max_context_messages: int = 80
+    # Approximate input tokens (4 UTF-8 bytes per text token), with tools and images. 0 = no cap.
+    max_context_tokens: int = Field(default=0, ge=0)
+    budget: TaskBudgetSettings = Field(default_factory=TaskBudgetSettings)
     # How many of the newest image-bearing messages keep their pictures in a model request.
     # A computer- or phone-hands session adds a screenshot or two per step, and the whole
     # conversation goes up again on every step: a dozen 4K screenshots passed the relay's
@@ -431,6 +453,8 @@ class GUISettings(BaseModel):
     """
 
     enabled: bool = False
+    # Standalone operators use this; inside an Agent turn the parent's budget wins.
+    budget: TaskBudgetSettings = Field(default_factory=TaskBudgetSettings)
     provider: str = "openai"
     model: str = ""
     base_url: str | None = None

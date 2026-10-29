@@ -12,17 +12,19 @@ from pathlib import Path
 from typing import Any
 
 from nanomuse import prompts
+from nanomuse.agent.context import fit_context
 from nanomuse.calendar import CalendarFeeds
 from nanomuse.config import Settings
 from nanomuse.contacts import ContactBook
 from nanomuse.goals import GoalStore
+from nanomuse.llm import budget as task_budget
 from nanomuse.llm import session as llm_session
 from nanomuse.llm.base import BaseLLM
 from nanomuse.llm.vision import keep_newest_images
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryItem, MemoryStore
 from nanomuse.runtime import device
-from nanomuse.schema import AgentState, Attachment, Message, Role, ToolResult
+from nanomuse.schema import AgentState, Attachment, Message, Role, ToolResult, new_id
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
@@ -104,6 +106,8 @@ class MuseAgent:
         # before the next model call instead of waiting for the current run to finish.
         self.inbox: asyncio.Queue[str | Incoming] | None = None
         self._told_no_vision = False
+        self.last_budget: dict[str, Any] = {}
+        self._task_start = 0
         # The language of the screens the person reads this conversation on, from the latest
         # message that said (a BCP-47 tag); the language rule names it ahead of the script
         # of one message. "" means no client has said, and the script decides.
@@ -141,7 +145,11 @@ class MuseAgent:
         """The user's message as the model gets it: the text, a line per attached file
         (path and what it is), and the pictures as images when the model takes them."""
         if not files:
-            return Message.user(text)
+            return Message(
+                role=Role.USER,
+                content=text,
+                meta={"user_request": True, "request_id": new_id("message")},
+            )
         lines = [f"- {a.path} ({a.describe()})" for a in files]
         note = "[Attached files]\n" + "\n".join(lines)
         if any(a.kind != "image" for a in files):
@@ -149,7 +157,12 @@ class MuseAgent:
         content = f"{text}\n\n{note}" if text.strip() else note
         workspace = Path(self.settings.agent.workspace).expanduser()
         images = [str(workspace / a.path) for a in files if a.kind == "image"]
-        return Message.user(content, images=images or None)
+        return Message(
+            role=Role.USER,
+            content=content,
+            images=images or None,
+            meta={"user_request": True, "request_id": new_id("message")},
+        )
 
     # ------------------------------------------------------------------ prompt
     def sandbox_note(self) -> str:
@@ -425,6 +438,66 @@ class MuseAgent:
         language: str = "",
         run: str = "person",
     ) -> str:
+        if self.state == AgentState.RUNNING:
+            raise RuntimeError("agent is already running")
+        token = task_budget.begin(self.settings.agent.budget, inherit=False)
+        budget = task_budget.current()
+        assert budget is not None
+        self._task_start = len(self.messages)
+        deadline = asyncio.timeout(self.settings.agent.budget.max_seconds or None)
+        try:
+            async with deadline:
+                return await self._run(
+                    user_input, purpose=purpose, files=files, language=language, run=run
+                )
+        except (task_budget.BudgetExceeded, TimeoutError) as exc:
+            if isinstance(exc, TimeoutError) and not deadline.expired():
+                raise
+            reason = exc.reason if isinstance(exc, task_budget.BudgetExceeded) else "time"
+            budget.stopped = reason
+            reply_language = language or self.ui_language or self.settings.agent.language
+            if reply_language in ("", "auto"):
+                reply_language = "zh" if prompts.detect_language(user_input) == "Chinese" else "en"
+            final = task_budget.BudgetExceeded(reason).message(reply_language)
+            self._repair_dangling_tool_calls(reason=final)
+            self.messages.append(Message.assistant(final))
+            self.ui.on_assistant_message(final, None)
+            self.state = AgentState.FINISHED
+            self._save_session()
+            return final
+        finally:
+            try:
+                self.last_budget = budget.snapshot()
+                # a line in the audit log when a budget is in force or was reached; a task
+                # with no limits set leaves the log as it was
+                if budget.limited or budget.stopped:
+                    self.audit.record("task_budget", **self.last_budget)
+            finally:
+                task_budget.end(token)
+
+    def _request_context(
+        self, system_prompt: str, tools: list[dict[str, Any]] | None
+    ) -> list[Message]:
+        window = self.context_messages()
+        protected = [m for m in self.messages[self._task_start :] if m.meta.get("user_request")]
+        if self.settings.agent.max_context_tokens:
+            present = {m.meta.get("request_id") for m in window}
+            window = [m for m in protected if m.meta.get("request_id") not in present] + window
+        return fit_context(
+            [Message.system(system_prompt), *window],
+            tools,
+            self.settings.agent.max_context_tokens,
+            protected,
+        )
+
+    async def _run(
+        self,
+        user_input: str,
+        purpose: str | None = None,
+        files: list[Attachment] | None = None,
+        language: str = "",
+        run: str = "person",
+    ) -> str:
         """One task: a user message (or a background prompt) worked to completion.
 
         ``purpose`` is what approval cards show as the reason for an action; it defaults
@@ -465,8 +538,9 @@ class MuseAgent:
                     # the language rule and the memory section follow the latest message
                     latest = self.messages[-1].content or ""
                     system_prompt = self.build_system_prompt(latest, await self.recall_for(latest))
-                context = [Message.system(system_prompt), *self.context_messages()]
-                response = await self.llm.ask(
+                context = self._request_context(system_prompt, tool_params)
+                response = await task_budget.ask(
+                    self.llm,
                     context,
                     tools=tool_params,
                     on_delta=self.ui.on_text_delta,
@@ -480,7 +554,8 @@ class MuseAgent:
                     # the model thought until the budget ran out (reasoning models do on a
                     # hard step): the same call once more, with room to think and answer
                     logger.info("reply cut off before it began; asking again with more room")
-                    response = await self.llm.ask(
+                    response = await task_budget.ask(
+                        self.llm,
                         context,
                         tools=tool_params,
                         on_delta=self.ui.on_text_delta,
@@ -527,6 +602,9 @@ class MuseAgent:
                 stop = False
                 pictures: list[str] = []
                 for call in response.tool_calls:
+                    budget = task_budget.current()
+                    if budget is not None:
+                        budget.check()
                     tool = self.tools.get(call.name)
                     if tool is None:
                         summary = f"{call.name}(?)"
@@ -574,8 +652,9 @@ class MuseAgent:
             else:
                 # Step budget exhausted: ask for a wrap-up without tools.
                 self.messages.append(Message.user(prompts.MAX_STEPS_PROMPT))
-                context = [Message.system(system_prompt), *self.context_messages()]
-                response = await self.llm.ask(
+                context = self._request_context(system_prompt, None)
+                response = await task_budget.ask(
+                    self.llm,
                     context,
                     tools=None,
                     on_delta=self.ui.on_text_delta,
@@ -640,7 +719,7 @@ class MuseAgent:
         self._repair_dangling_tool_calls()
         return len(self.messages)
 
-    def _repair_dangling_tool_calls(self) -> None:
+    def _repair_dangling_tool_calls(self, reason: str = "") -> None:
         """A restart in the middle of a tool call (say, while an approval was pending)
         leaves an assistant message whose tool calls have no results. Providers reject
         that history outright, so give every orphan a result that says what happened."""
@@ -661,11 +740,14 @@ class MuseAgent:
                 if call.id not in answered:
                     repaired.append(
                         Message.tool(
-                            "(no result: the app was restarted before this call finished)",
+                            reason
+                            or "(no result: the app was restarted before this call finished)",
                             call.id,
                             call.function.name,
                         )
                     )
+                    if reason:
+                        self.ui.on_tool_result(call, ToolResult.fail(reason))
         if len(repaired) != len(self.messages):
             logger.info("repaired {} unanswered tool call(s)", len(repaired) - len(self.messages))
             self.messages = repaired

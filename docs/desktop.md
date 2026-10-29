@@ -172,8 +172,12 @@ speaking as nanoMuse through the `nanomuse` preset, with:
 - **Each model call tells the account's record where it sat** (relay 0.31). The harness's
   model adapter sends a provider's headers the same on every request, and a call's
   provenance changes with each, so the `nanoMuse Cloud` provider row points at a loopback
-  door of the plugin's own (`http://127.0.0.1:<port>/v1`; the port is each start's, and the
-  row is pointed at it again at start). The door sends a request on only when it carries the
+  door of the plugin's own (`http://127.0.0.1:<port>/v1`). The door asks for the port it had
+  at the last start (kept in the plugin's state as `doorPort`), so the row is right as it is;
+  when that port is taken, or the row was written by 1.0.7 and names the relay itself, the row
+  is pointed at today's door once the Host is up — not while the plugins are still starting,
+  where waiting for the write held the Host before it announced its address (1.0.8, #701).
+  The door sends a request on only when it carries the
   account's own key (anything else is a 401 here, as it would be at the relay), with the
   device, the platform (`X-NanoMuse-Platform: desktop`) and what the `llm/stream` hook
   announced for that call: who started the turn (`X-NanoMuse-Run`: `person`, `schedule`,

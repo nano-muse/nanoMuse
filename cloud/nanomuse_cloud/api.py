@@ -561,6 +561,18 @@ def create_app(
                         log.info("analytics: %d kept calls assigned to their turns so far", analytics.keys_rows)
                     await asyncio.sleep(pause(t0, n))
                     continue
+                if not analytics.figures_done:
+                    # 0.31.1: the figures rows of the own turns kept before the relay wrote
+                    # them, a page at a time, paced like the other backfills
+                    t0 = time.monotonic()
+                    n = await asyncio.to_thread(analytics.own_figures_step, 200)
+                    if n and (analytics.figures_rows - n) // 20000 != analytics.figures_rows // 20000:
+                        log.info("analytics: figures of %d own turns written so far", analytics.figures_rows)
+                    if analytics.figures_done:
+                        log.info("analytics: the own turns' figures are complete (%d read this run)", analytics.figures_rows)
+                    # through (a file with no own turns is through at once): on to the hourly work
+                    await asyncio.sleep(0.5 if analytics.figures_done else pause(t0, n))
+                    continue
                 if optimized_at is None or time.monotonic() - optimized_at > 3600:
                     # the planner's statistics (Database.optimize): milliseconds, once an hour
                     optimized_at = time.monotonic()

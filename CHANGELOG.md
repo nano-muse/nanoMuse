@@ -6,13 +6,18 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- **The console's pages load again on a large relay.** The *Usage* page's table of the turns people ran on keys of their own read a week of them from the record itself, where a turn's provider and cached count sit behind its request and answer; on a relay holding tens of gigabytes one call took minutes and, holding the read connection's lock, left *Overview* and every other page at "loading". The relay now keeps those figures in one small row per own turn (`own_figures`), written with the turn and filled in for older turns by a paced backfill after the restart, and the table reads them in milliseconds. The console's usage answer carries `own_keys_pending` while the backfill is still running.
+
 ### Runtime
+
+- **A task can be given a budget: tokens, money, time, and the size of one request.** Off unless set. `[agent.budget]` in `config.toml` takes `max_total_tokens`, `max_cost_usd` (with your own `input_usd_per_million` and `output_usd_per_million` rates) and `max_seconds`; a task that reaches one stops with a sentence that says which, the unanswered tool calls get a result that says so, and the turn's usage is written to the audit log as a `task_budget` entry (only when a limit is set or reached). A phone or computer run inside the task shares the task's allowance; a standalone run reads `[gui.budget]`. `agent.max_context_tokens` caps the approximate size of one request: tool results are shortened to a labelled head and tail and old exchanges dropped as whole groups, the current task's requests and the tool-call arguments stay, and the saved conversation keeps the original text; each shortening is one INFO log line with the call id and the sizes, never the text. Text is counted at four UTF-8 bytes a token and a picture at 4,096, with the provider's own figures taking over after a call. The web app and the Python hands only; the Android agent and the desktop's own loop have their own engines. [Task budgets](docs/runtime-budgets.md); from [#697](https://github.com/nano-muse/nanoMuse/pull/697).
+- **A contact's card folds its long lines at 75 octets.** `render_vcard` wrote a long Chinese note as one oversized line, past what RFC 6350 allows a content line to be, so a strict importer could reject or truncate it; the card now folds with the same UTF-8-safe cut the calendar's lines already use, never splitting a character, and a folded card parses back without loss.
 
 ### Web
 
 ### Desktop
 
-- Fixed a startup deadlock when reopening a profile with saved nanoMuse Cloud models. Cloud requests waited for the local proxy address to update and stopped using configuration snapshots from the previous run; account data and other providers were preserved.
+- **The 1.0.8 desktop starts again when you are signed in.** The plugin pointed the `nanoMuse Cloud` provider row at the loopback door it opens for the relay and waited for that settings write while the plugins were still starting; the write waits for the plugins, so the Host never announced its address and the window sat on *Starting…* for good, with *nanoMuse is still starting* every ten minutes — on the first start after the 1.0.7 upgrade (the row named the relay itself) and on every start after a sign-in (the door's port was each start's own). Reported for the Mac in [#701](https://github.com/nano-muse/nanoMuse/issues/701); every platform had it. The door now asks for the port it had last, so the row is usually right as it is, and when it is not the row is rewritten once the Host is up, without being waited for. A fresh install was never affected, which is why the release check passed.
 
 ### Android
 

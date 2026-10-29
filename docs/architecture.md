@@ -33,7 +33,7 @@ sequenceDiagram
 | Area | Files | Notes |
 |---|---|---|
 | Composition root | `nanomuse/app.py` | `NanoMuseApp` wires settings → LLM, tools, vault, Sentinel, memory, goals, agent |
-| Agent loop | `nanomuse/agent/core.py` | prompt assembly, context trimming, stuck detection, session persistence, inbox |
+| Agent loop | `nanomuse/agent/core.py` | prompt assembly, context trimming, stuck detection, session persistence, inbox; optional shared [task budgets](runtime-budgets.md), with logged tool-result shortening |
 | Prompts | `nanomuse/prompts.py` | system prompt, language rule and script detection, goal-advance prompt |
 | Sentinel | `nanomuse/sentinel/gate.py`, `policy.py`, `audit.py` | guard, decision order, approvals, taint, vault resolution, redaction, JSONL audit |
 | Vault | `nanomuse/vault/vault.py` | Fernet store, `{{vault:NAME}}` placeholders |

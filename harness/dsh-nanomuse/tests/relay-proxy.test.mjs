@@ -181,3 +181,32 @@ test('a GET is sent on without a body; a relay that is away is a 502 with the of
   }
   assert.equal(proxy.openaiBase, '')
 })
+
+test('listen(preferred) opens on last start\'s port when it is free and gives way, with a note in the log, when it is not', async () => {
+  const u = await upstream()
+  const first = await door(u)
+  const port = first.proxy.port
+  await first.proxy.close()
+  const again = new RelayProxy({ origin: () => u.origin, token: async () => 'k', device: () => 'd', claim: () => undefined })
+  await again.listen(port)
+  try {
+    assert.equal(again.port, port)
+  } finally {
+    await again.close()
+  }
+  const squatter = createServer()
+  await new Promise((resolve) => squatter.listen(port, '127.0.0.1', resolve))
+  const logs = []
+  const other = new RelayProxy({ origin: () => u.origin, token: async () => 'k', device: () => 'd', claim: () => undefined, log: (level, text) => logs.push(`${level}: ${text}`) })
+  try {
+    await other.listen(port)
+    assert.ok(other.port > 0 && other.port !== port)
+    assert.ok(logs.some((l) => l.startsWith(`info: nanomuse relay door: port ${port} is taken`)))
+    const res = await fetch(`${other.openaiBase}/models`, { headers: { authorization: 'Bearer k' } })
+    assert.equal(res.status, 200, 'the door works on the other port')
+  } finally {
+    await other.close()
+    await new Promise((resolve) => squatter.close(resolve))
+    await u.close()
+  }
+})

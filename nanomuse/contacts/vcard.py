@@ -316,6 +316,25 @@ def _escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
+def _fold(line: str) -> str:
+    """Content lines are at most 75 octets; longer ones continue on the next line with a space.
+
+    Same algorithm as calendar.ics._fold: the cut steps back over UTF-8 continuation bytes so a
+    multi-octet character is never split (RFC 6350 section 3.2), and parse_vcards's unfold
+    (_FOLD) is the byte-exact inverse, so a folded card round-trips without loss.
+    """
+    out: list[str] = []
+    data = line.encode("utf-8")
+    while len(data) > 74:
+        cut = 74
+        while cut > 0 and (data[cut] & 0xC0) == 0x80:  # do not split a UTF-8 sequence
+            cut -= 1
+        out.append(data[:cut].decode("utf-8"))
+        data = b" " + data[cut:]
+    out.append(data.decode("utf-8"))
+    return "\r\n".join(out)
+
+
 def render_vcard(contact: Contact) -> str:
     """A 4.0 card for the agent's own book. Labels in parentheses become TYPE params."""
     lines = ["BEGIN:VCARD", "VERSION:4.0", f"UID:{contact.id}", f"FN:{_escape(contact.name)}"]
@@ -341,7 +360,7 @@ def render_vcard(contact: Contact) -> str:
     if contact.note:
         lines.append(f"NOTE:{_escape(contact.note)}")
     lines.append("END:VCARD")
-    return "\r\n".join(lines) + "\r\n"
+    return "\r\n".join(_fold(line) for line in lines) + "\r\n"
 
 
 __all__ = ["Contact", "parse_vcards", "render_vcard"]
