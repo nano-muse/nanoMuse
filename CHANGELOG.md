@@ -12,6 +12,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Fixed a startup deadlock when reopening a profile with saved nanoMuse Cloud models. Cloud requests waited for the local proxy address to update and stopped using configuration snapshots from the previous run; account data and other providers were preserved.
+
 ### Android
 
 ### iOS
