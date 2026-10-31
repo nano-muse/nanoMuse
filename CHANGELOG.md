@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- **A turn keeps its own time in the record, and a slower record cannot overtake a later turn.** Each turn row took the second its background write landed in, and the account's turn list orders by that timestamp with the write's rowid beside it: a turn whose picture was still decoding could land behind a plain turn that answered after it, and read above it, newest first upside down. The timestamp is now taken when the answer leaves and the writes are chained in that order, so the list says what happened in the order it happened.
+
 ### Runtime
 
 ### Web

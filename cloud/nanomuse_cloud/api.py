@@ -1287,22 +1287,33 @@ def create_app(
     # a test can wait for them: app.state.record_tasks)
     record_tasks: set[asyncio.Task] = set()
     app.state.record_tasks = record_tasks
+    # the turn list reads newest first by (ts, rowid). ts is taken below, as the answer
+    # leaves — a record written seconds later under load keeps the turn's own time — and
+    # the writes are chained in that order, so a slow record (a picture still decoding)
+    # cannot take a later rowid than a turn that answered after it and read as newer.
+    record_prev: asyncio.Task | None = None
 
     def record_later(*args: Any, **kwargs: Any) -> None:
         """The turn's record (service.record_turn) written off the loop after the answer
         has left — the pictures are decoded, hashed and written to disk there, and the
         row after them. A failure is logged; it is never the person's problem."""
+        nonlocal record_prev
         if not settings.record_turns:
             return
+        kwargs.setdefault("ts", int(time.time()))
+        prev = record_prev
 
         async def run() -> None:
             try:
+                if prev is not None:
+                    await prev  # its own run() swallows its failure; nothing propagates here
                 await asyncio.to_thread(cloud.record_turn, *args, **kwargs)
             except Exception:
                 log.exception("record turn")
 
         task = asyncio.create_task(run(), name="record-turn")
         record_tasks.add(task)
+        record_prev = task
         task.add_done_callback(record_tasks.discard)
 
     async def chat_post(url: str, headers: dict[str, str], payload: bytes, call: InFlightCall) -> tuple[httpx.Response, int]:
