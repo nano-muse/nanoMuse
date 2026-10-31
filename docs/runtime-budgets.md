@@ -24,7 +24,8 @@ output_usd_per_million = 0
 `max_context_tokens` caps an approximate token count of the main Agent's input request, including the
 system prompt, tool schemas, reasoning history and pictures. It is separate from the
 model's output limit, `llm.max_tokens`. Text uses one estimated token per four UTF-8
-bytes, rounded up, including JSON overhead; each image adds 4,096 estimated tokens.
+bytes, rounded up, including JSON overhead, and a CJK character counts for one and a half
+(three bytes, but one to two tokens from real tokenizers); each image adds 4,096 estimated tokens.
 The settings are in tokens, not bytes. This portable heuristic is not an exact
 tokenizer, can differ by model and language, and does not guarantee a vision model's
 context window. Provider-reported usage replaces the estimate after a completed call.

@@ -1,8 +1,9 @@
 """Task-scoped accounting for the Agent and its nested screen operators.
 
-Text is estimated at four UTF-8 bytes per token, including request overhead;
-pictures use a fixed estimate. Reported usage replaces an estimate when available. This bounds
-application requests, not a provider's invoice or retries hidden inside a client.
+Text is estimated at four UTF-8 bytes per token and a CJK character at one and a half
+tokens, including request overhead; pictures use a fixed estimate. Reported usage replaces an
+estimate when available. This bounds application requests, not a provider's invoice or retries
+hidden inside a client.
 """
 
 from __future__ import annotations
@@ -33,10 +34,19 @@ class BudgetExceeded(RuntimeError):
 
 
 def estimate_tokens(messages: list[Message], tools: list[dict[str, Any]] | None = None) -> int:
-    """A provider-independent approximation, not a count of raw bytes or exact tokens."""
+    """A provider-independent approximation, not a count of raw bytes or exact tokens.
+
+    A CJK character is three UTF-8 bytes but one to two tokens from real tokenizers, so
+    counting it at the byte rule's three quarters packs a window to twice what the model
+    takes. It counts for one and a half here — the estimate decides what fits and cannot
+    err low; the relay's own fallback count (cloud/nanomuse_cloud/service.py) gives it a
+    whole token for the same reason.
+    """
     wire = [m.to_openai(include_reasoning=True) for m in messages]
-    size = len(json.dumps([wire, tools or []], ensure_ascii=False).encode("utf-8"))
-    return (size + 3) // 4 + 4096 * sum(len(m.images or []) for m in messages)
+    text = json.dumps([wire, tools or []], ensure_ascii=False)
+    cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
+    size = len(text.encode("utf-8")) - 3 * cjk
+    return (size + 3) // 4 + (3 * cjk + 1) // 2 + 4096 * sum(len(m.images or []) for m in messages)
 
 
 @dataclass

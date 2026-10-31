@@ -295,6 +295,34 @@ def test_long_english_context_is_estimated_as_tokens_not_bytes():
     assert fit_context(messages, None, 50000, [request]) == messages
 
 
+def test_a_chinese_context_is_not_estimated_at_three_quarters_of_its_characters():
+    request = Message.user("读取报告并保留原始文件" * 1000)
+    messages = [Message.system("policy"), request]
+    raw_size = len(
+        json.dumps(
+            [[m.to_openai(include_reasoning=True) for m in messages], []], ensure_ascii=False
+        ).encode("utf-8")
+    )
+    estimate = budgets.estimate_tokens(messages)
+    assert raw_size > 30000
+    # a Chinese character is one to two tokens from real tokenizers; three quarters of
+    # one let a conversation pack a window to twice the model's own limit
+    assert 11000 <= estimate < 22000
+
+
+def test_a_chinese_tool_result_is_shortened_until_it_fits_the_honest_estimate():
+    request = Message.user("只读取这个文件，不要发送。")
+    call = ToolCall(function=Function(name="read", arguments=json.dumps({"path": "notes.txt"})))
+    result = Message.tool("头" + "中" * 30000 + "尾", call.id)
+    history = [Message.system("规定"), request, Message.assistant(tool_calls=[call]), result]
+    packed = fit_context(history, None, 5000, [request])
+    assert budgets.estimate_tokens(packed) <= 5000
+    # what is kept must also fit measured the honest way: a token and a half a character
+    assert len(packed[-1].content or "") * 3 // 2 <= 5000
+    assert "shortened" in (packed[-1].content or "")
+    assert packed[-1].tool_call_id == packed[-2].tool_calls[0].id
+
+
 def test_estimate_includes_tool_schemas_and_image_allowance():
     messages = [Message.user("look")]
     tools = [
