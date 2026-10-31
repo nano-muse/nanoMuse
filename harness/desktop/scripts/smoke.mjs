@@ -15,6 +15,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkSavedProfileStartup } from "./saved-profile-smoke.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(here, "..");
@@ -147,6 +148,7 @@ if (warnings > 0) {
   throw new Error("some entries did not activate");
 }
 console.log("ok: the harness boots with the nanoMuse bundle");
+await checkSavedProfileStartup(electron, dshDir);
 
 // 4. opt-in: the operator — the app as an app this time (not Node mode), with the check flag
 // src/main.ts answers: it starts the operator server alone, asks it for /info and a small
