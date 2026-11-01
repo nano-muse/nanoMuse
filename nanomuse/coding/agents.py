@@ -498,7 +498,7 @@ def _cursor_session(
 
 
 # -- Codex -------------------------------------------------------------------------------
-def _codex_files(limit: int) -> list[Path]:
+def _codex_files(limit: int, workspace: str | None = None) -> list[Path]:
     root = sessions_root("codex")
     if not root.is_dir():
         return []
@@ -509,7 +509,10 @@ def _codex_files(limit: int) -> list[Path]:
         except OSError:
             continue
     files.sort(key=lambda t: -t[0])
-    return [f for _, f in files[: max(limit * 3, 30)]]
+    # A filtered list may need to pass many newer transcripts from other workspaces.
+    # The session reader below uses the transcript's cwd before counting toward limit.
+    candidates = files if workspace else files[: max(limit * 3, 30)]
+    return [f for _, f in candidates]
 
 
 def _codex_session(f: Path, full: bool) -> Session | None:
@@ -590,7 +593,7 @@ def _codex_session(f: Path, full: bool) -> Session | None:
 
 def _codex_sessions(limit: int, workspace: str | None) -> list[Session]:
     out = []
-    for f in _codex_files(limit):
+    for f in _codex_files(limit, workspace):
         s = _codex_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)
@@ -618,7 +621,10 @@ def _claude_sessions(limit: int, workspace: str | None) -> list[Session]:
                 continue
     files.sort(key=lambda t: -t[0])
     out = []
-    for _, f in files[: max(limit * 2, 20)]:
+    # Directory slugs are lossy: repo-tools and repo/tools can share a slug. Only
+    # the transcript's cwd below can decide whether it belongs to this workspace.
+    candidates = files if workspace else files[: max(limit * 2, 20)]
+    for _, f in candidates:
         s = _claude_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)
@@ -863,7 +869,10 @@ def _dsh_sessions(limit: int, workspace: str | None) -> list[Session]:
                 continue
     files.sort(key=lambda t: -t[0])
     out = []
-    for _, f in files[: max(limit * 2, 20)]:
+    # Directory slugs are lossy: repo-tools and repo/tools can share a slug. Only
+    # the transcript's cwd below can decide whether it belongs to this workspace.
+    candidates = files if workspace else files[: max(limit * 2, 20)]
+    for _, f in candidates:
         s = _dsh_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)
