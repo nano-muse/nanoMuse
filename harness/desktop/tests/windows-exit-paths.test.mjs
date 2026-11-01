@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import vm from "node:vm";
 import ts from "typescript";
+import * as windowPermissions from "../out/window-permissions.js";
 
 // Execute the shipped shell callbacks, with only Electron's window/app side
 // effects replaced. AST extraction avoids booting a Host or personal profile.
@@ -24,7 +25,7 @@ function shell(phase = "ready") {
   const requests = [];
   const noop = () => undefined;
   class Window extends EventEmitter {
-    webContents = { send: noop, on: noop, setWindowOpenHandler: noop, session: { setPermissionRequestHandler: noop } };
+    webContents = { send: noop, on: noop, setWindowOpenHandler: noop, session: { setPermissionRequestHandler: noop, setPermissionCheckHandler: noop } };
     loadFile = noop;
   }
   const app = Object.assign(new EventEmitter(), { quit: () => requests.push("app quit") });
@@ -42,6 +43,7 @@ function shell(phase = "ready") {
   });
   context.electron_1 = { app, BrowserWindow: Window, nativeTheme: context.nativeTheme, nativeImage: context.nativeImage, globalShortcut: { unregisterAll: noop } };
   context.node_path_1 = { join: context.join };
+  context.window_permissions_1 = windowPermissions;
   vm.runInContext(functions, context);
   vm.runInContext(hooks.join(";\n"), context);
   return { context, requests };
