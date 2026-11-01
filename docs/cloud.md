@@ -595,6 +595,10 @@ so it can skip its own echo).
 
 ## Allowance
 
+The admin console's Usage dates, day picker and People sign-up chart follow the
+relay's `DAY_OFFSET_H` calendar. Viewing them from a different browser timezone
+does not shift a day's label or move its sign-ups into an adjacent day.
+
 nanoMuse is a community project and charges nothing. The public relay at
 `cloud.nanomuse.cn` is paid for by the developer, so each account has a pool
 to draw on, for its lifetime, not by the day (relay 0.5):
@@ -701,6 +705,10 @@ card changes; its title and buttons stay the app's. Apps built against relay
 0.22 and earlier ignore the two fields.
 
 ## Controls
+
+In the admin console, a People table or a Usage day's top accounts expanded with
+*More* keeps its visible rows when polling refreshes the data. If the list becomes
+shorter, the expansion shrinks with it.
 
 The operator can pause parts of the relay without a restart or a deploy
 (relay 0.22, *Controls* on the admin console; `nanomuse-cloud admin controls
