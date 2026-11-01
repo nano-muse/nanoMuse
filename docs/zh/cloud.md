@@ -153,6 +153,9 @@ nanoMuse 只求一样回报：在 [GitHub](https://github.com/nano-muse/nanoMuse
 
 ## 控制 {#controls}
 
+在管理控制台，用户表格或用量单日详情里的账号排行点过「更多」后，轮询刷新不会收起
+已经展开的行。列表变短时，展开范围会随之缩小。
+
 运营者可以不重启、不重新部署就暂停中继的某些部分（中继 0.22，管理控制台的「控制」；命令行是 `nanomuse-cloud admin controls …`；见 [`cloud/README.md`](../../cloud/README.md#controls-022)）。六个开关，默认都开，都存在数据库里所以重启后不变，每次切换都在审计日志里记一行：谁、什么时候、为什么。五个「暂停」开关里某一个关着时 App 看到的是：
 
 | 开关 | 关着时 App 得到什么 |
