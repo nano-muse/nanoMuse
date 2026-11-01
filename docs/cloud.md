@@ -594,6 +594,10 @@ so it can skip its own echo).
 
 ## Allowance
 
+The admin console's Usage dates, day picker and People sign-up chart follow the
+relay's `DAY_OFFSET_H` calendar. Viewing them from a different browser timezone
+does not shift a day's label or move its sign-ups into an adjacent day.
+
 nanoMuse is a community project and charges nothing. The public relay at
 `cloud.nanomuse.cn` is paid for by the developer, so each account has a pool
 to draw on, for its lifetime, not by the day (relay 0.5):
