@@ -82,10 +82,28 @@ _TOOL_LABELS = {
 }
 
 
-def thread_id_for(channel: str, chat_id: str) -> str:
+_USERID_FOLDED_CHANNELS = frozenset({"wecom"})
+"""Channels whose member user ids are case-insensitive by their own documentation, so one
+1:1 chat can arrive in more than one spelling: WeCom's admin-typed user ids: "userid ...
+不区分大小写" (https://developer.work.weixin.qq.com/document/path/96255). The promise
+covers the member user id only: a WeCom group is named by its chatid, a different id for
+which the message contract (https://developer.work.weixin.qq.com/document/path/100719)
+gives no such rule, and other channels' ids merely tend to be lower case. Only an id known
+to be a covered user id folds; everything else keeps the case it arrives in, because its
+case may be the only difference between two genuinely different chats."""
+
+
+def thread_id_for(channel: str, chat_id: str, *, fold_user_id: bool = False) -> str:
     """The conversation a chat maps to. Letters, digits, ``_ . -`` only: the id names a file
-    in the threads folder, and a colon in a file name breaks on Windows."""
+    in the threads folder, and a colon in a file name breaks on Windows. ``fold_user_id``
+    lowers the id for the one id kind its channel documents as case-insensitive: a 1:1
+    WeCom chat named by the member user id, where a user whose admin-typed id is
+    ``ZhangSan`` may arrive once as ``ZhangSan`` and once as ``zhangsan``. Anything else -
+    a WeCom group named by its chatid, every other channel's ids - keeps the case it
+    arrived in, because its case may be the only difference between two chats."""
     safe = _SAFE.sub("_", chat_id).strip("._") or "chat"
+    if fold_user_id:
+        safe = safe.lower()
     return f"{THREAD_PREFIX}{channel}-{safe[:80]}"
 
 
@@ -321,9 +339,16 @@ class ChannelManager(ChannelBus):
             await self._send(msg.channel, msg.chat_id, _short(exc))
 
     def _thread_for(self, msg: InboundMessage) -> str:
-        thread_id = thread_id_for(msg.channel, msg.chat_id)
+        # a 1:1 WeCom chat is named by the member user id, whose case WeCom documents as not
+        # distinguishing chats; a group chat is named by its chatid, whose case gets no such
+        # promise, so a group never folds and never adopts an earlier spelling's history
+        fold = msg.channel in _USERID_FOLDED_CHANNELS and not msg.is_group
+        thread_id = thread_id_for(msg.channel, msg.chat_id, fold_user_id=fold)
         self.routes[thread_id] = (msg.channel, msg.chat_id)
         if thread_id not in self.svc.threads:
+            if fold:
+                # this chat may have written history under an earlier spelling
+                self.svc.adopt_thread_id(thread_id)
             self.svc.timeline(thread_id)
             label = self.types[msg.channel].label
             who = msg.chat_name or (
@@ -659,7 +684,13 @@ class ChannelManager(ChannelBus):
                     "chat_id": entry.get("chat_id", sender_id),
                     "deliver": bool(entry.get("deliver")),
                     "approved_at": entry.get("approved_at"),
-                    "thread": thread_id_for(name, str(entry.get("chat_id") or sender_id)),
+                    "thread": thread_id_for(
+                        name,
+                        str(entry.get("chat_id") or sender_id),
+                        # a pairing names a sender's 1:1 chat, which a folded channel
+                        # names by the member user id
+                        fold_user_id=name in _USERID_FOLDED_CHANNELS,
+                    ),
                 }
                 for sender_id, entry in self.pairing.approved(name).items()
             ]

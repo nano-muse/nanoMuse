@@ -922,6 +922,22 @@ class MuseService:
             self._save_index()
         return thread.timeline
 
+    def adopt_thread_id(self, thread_id: str) -> None:
+        """A channel id whose case stopped mattering (a WeCom member user id's) keeps the
+        history an earlier spelling wrote: before the folded id is first used, the newest
+        thread whose id differs from it only by case moves onto it, file by file. Callers
+        gate this on the id being one the channel documents as case-insensitive — an id
+        whose case still distinguishes chats (a WeCom group's chatid, any other channel's
+        id) must never be merged this way."""
+        if thread_id in self.threads:
+            return
+        variants = [t for k, t in self.threads.items() if k.lower() == thread_id.lower()]
+        if not variants:
+            return
+        thread = max(variants, key=lambda t: t.updated_at)
+        self._move_thread(thread, thread_id)
+        self._save_index()
+
     def create_thread(self, title: str = "") -> Thread:
         tid = "t_" + uuid.uuid4().hex[:8]
         thread = self._make_thread(tid, title.strip() or "Side chat")
@@ -996,9 +1012,13 @@ class MuseService:
         thread.agent._save_session()
         self.app.holds.clear_thread(thread.id)
         self.app.sentinel.end_conversation(thread.id)
+        self._thread_file(new_id, ".json")  # the id is validated like any other use
+        # the destination keeps the new spelling un-resolved: resolve() would hand back
+        # the old on-disk spelling on a case-insensitive filesystem, and a move that only
+        # changes case would rename the file to itself
         pairs = (
-            (thread.timeline.path, self._thread_file(new_id, ".json")),
-            (thread.agent.session_file, self._thread_file(new_id, ".session.json")),
+            (thread.timeline.path, self.threads_dir / f"{new_id}.json"),
+            (thread.agent.session_file, self.threads_dir / f"{new_id}.session.json"),
         )
         # a write still on its way to disk lands under the new id, not the old one
         thread.timeline.path = pairs[0][1]
@@ -1007,6 +1027,11 @@ class MuseService:
                 continue
             src_path = Path(src)
             if dst.exists():
+                if src_path.exists() and src_path.samefile(dst):
+                    # one file under two spellings, on a case-insensitive filesystem:
+                    # unlinking dst would drop the history itself — a rename re-spells it
+                    src_path.replace(dst)
+                    continue
                 dst.unlink()
             if src_path.exists():
                 src_path.replace(dst)
