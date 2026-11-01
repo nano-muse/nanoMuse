@@ -238,7 +238,7 @@ class AgentSettings(BaseModel):
     # "auto" → answer in the user's language; or force e.g. "zh" / "en".
     language: str = "auto"
     max_context_messages: int = 80
-    # Approximate input tokens (4 UTF-8 bytes per text token), with tools and images. 0 = no cap.
+    # Approximate input tokens (4 UTF-8 bytes per text token, a CJK character at 1.5), with tools and images. 0 = no cap.
     max_context_tokens: int = Field(default=0, ge=0)
     budget: TaskBudgetSettings = Field(default_factory=TaskBudgetSettings)
     # How many of the newest image-bearing messages keep their pictures in a model request.
