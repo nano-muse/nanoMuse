@@ -32,6 +32,8 @@ describe("looksLikeForeignNumber", () => {
 
   it("leaves mainland numbers and e-mail addresses alone", () => {
     expect(looksLikeForeignNumber("+86 138 0000 0000")).toBe(false);
+    expect(looksLikeForeignNumber("+8613800138000")).toBe(false); // E.164, no spaces
+    expect(looksLikeForeignNumber("0086 138 0000 0000")).toBe(false);
     expect(looksLikeForeignNumber("138 0000 0000")).toBe(false);
     expect(looksLikeForeignNumber("you@example.com")).toBe(false);
   });

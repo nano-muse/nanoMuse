@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- **The Usage page names a day with the site's calendar date, not the operator's browser.** The relay's day stamp is the site-local day's start, but the matrix labels, the day rows and weekday, the drill-down title and the hour tooltips all rendered it in the browser's timezone, so any operator outside the site's offset read every bar as the day before — and the date picker parsed the picked date at browser-local noon, which lands on the next site-day for browsers west of about UTC−4. Labels, weekday and picker now work at the site's `day_offset_h`, through `siteDay`/`siteWeekday`/`siteDayStamp` in the console's format library.
+- **The People page's sign-ups-per-day chart counts site-local days.** The bars were bucketed at UTC midnight while their labels rendered the browser's calendar, so for the primary UTC+8 audience a sign-up made between midnight and eight in the morning landed on the previous day's bar, and for a browser west of UTC every bar wore the date before. The buckets now start at the site's day boundary (`siteDayStart`), the same day the Usage page and the relay itself count.
 - **The relay's checks ran on Windows as well as Linux.** Both platforms checked the cloud service and built and tested its admin console. Changes to the showcase mirror also ran these checks because the cloud tests load those scripts. The committed-build check remained on Linux. ([#670](https://github.com/nano-muse/nanoMuse/pull/670))
 - **The local self-hosting script printed a working command for sign-in codes.** Its hint now enters `cloud/` before reading the relay logs, so it can be copied from the repository root. ([#716](https://github.com/nano-muse/nanoMuse/pull/716))
 
@@ -13,6 +15,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
+- **A CJK character is estimated at one and a half tokens, not the byte rule's three quarters of one.** The context and budget estimates count text at four UTF-8 bytes a token, but a Chinese character is three bytes and one to two tokens from real tokenizers, so a Chinese conversation could pack `max_context_tokens` to twice what the model's window takes and be refused, shortened, and refused again on the same estimate. The estimate now gives a character in the CJK range one and a half tokens, in the direction of the relay's own fallback count, and the two budget guides say so. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
