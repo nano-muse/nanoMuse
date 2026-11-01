@@ -269,6 +269,9 @@ It is written after the answer has left, off the request's path, and is never
 the reason a chat fails. It does not depend on *Help improve* (that switch is
 about the training set) or on *Sync conversations* (that is the apps' own
 copy of a chat); `RECORD_TURNS=0` on a relay you run keeps none of it.
+The timestamp is captured when the reply finishes. Records from the same account
+are saved in that order, including replies with media, while other accounts can
+record independently. A failed write does not block that account's later turns.
 
 **Who reads it.** The account's devices: `GET /v1/turns` (newest first; paged
 with `before` and `before_id`; `conversation=` for one chat), `GET

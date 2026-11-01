@@ -1289,32 +1289,38 @@ def create_app(
     app.state.record_tasks = record_tasks
     # the turn list reads newest first by (ts, rowid). ts is taken below, as the answer
     # leaves — a record written seconds later under load keeps the turn's own time — and
-    # the writes are chained in that order, so a slow record (a picture still decoding)
-    # cannot take a later rowid than a turn that answered after it and read as newer.
-    record_prev: asyncio.Task | None = None
+    # writes for each account are chained in that order. A slow media write keeps its
+    # place within that account without holding up another account's history.
+    record_prev: dict[str, asyncio.Task] = {}
 
-    def record_later(*args: Any, **kwargs: Any) -> None:
+    def record_later(caller: Caller, *args: Any, **kwargs: Any) -> None:
         """The turn's record (service.record_turn) written off the loop after the answer
         has left — the pictures are decoded, hashed and written to disk there, and the
         row after them. A failure is logged; it is never the person's problem."""
-        nonlocal record_prev
         if not settings.record_turns:
             return
         kwargs.setdefault("ts", int(time.time()))
-        prev = record_prev
+        account_id = caller.account_id
+        prev = record_prev.get(account_id)
 
         async def run() -> None:
             try:
                 if prev is not None:
                     await prev  # its own run() swallows its failure; nothing propagates here
-                await asyncio.to_thread(cloud.record_turn, *args, **kwargs)
+                await asyncio.to_thread(cloud.record_turn, caller, *args, **kwargs)
             except Exception:
                 log.exception("record turn")
 
         task = asyncio.create_task(run(), name="record-turn")
         record_tasks.add(task)
-        record_prev = task
-        task.add_done_callback(record_tasks.discard)
+        record_prev[account_id] = task
+
+        def recorded(done: asyncio.Task) -> None:
+            record_tasks.discard(done)
+            if record_prev.get(account_id) is done:
+                record_prev.pop(account_id)
+
+        task.add_done_callback(recorded)
 
     async def chat_post(url: str, headers: dict[str, str], payload: bytes, call: InFlightCall) -> tuple[httpx.Response, int]:
         """One non-streaming turn, queued globally and retried before an answer exists;

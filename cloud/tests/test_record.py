@@ -7,6 +7,7 @@ import base64
 import hashlib
 import itertools
 import json
+import threading
 import time
 from dataclasses import replace
 
@@ -280,6 +281,78 @@ async def test_a_slower_record_cannot_list_an_older_turn_above_a_newer_one(tmp_p
     await settled(app)
     turns = (await client.get("/v1/turns", headers=headers)).json()["turns"]
     assert [t["conversation"] for t in turns] == ["conv-b", "conv-a"]  # newest first
+
+
+async def test_a_slow_accounts_record_does_not_delay_another_account(tmp_path, monkeypatch):
+    app, client, sender, up, cloud = relay(tmp_path)
+    data_a = await sign_up(client, sender, identifier="slow-record@example.com")
+    data_b = await sign_up(client, sender, identifier="other-record@example.com")
+    real_record = cloud.record_turn
+    entered = threading.Event()
+    release = threading.Event()
+    other_written = threading.Event()
+
+    def record(caller, *args, **kwargs):
+        if kwargs.get("conversation") == "slow":
+            entered.set()
+            assert release.wait(5), "test must release the slow record"
+        result = real_record(caller, *args, **kwargs)
+        if kwargs.get("conversation") == "other":
+            other_written.set()
+        return result
+
+    monkeypatch.setattr(cloud, "record_turn", record)
+    try:
+        for data, conversation in ((data_a, "slow"), (data_b, "other")):
+            response = await client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": f"Bearer {data['api_key']}", "X-NanoMuse-Conversation": conversation, **APP_UA},
+                json={"model": "qwen3.8-27b", "messages": [{"role": "user", "content": "hi"}]},
+            )
+            assert response.status_code == 200
+            if conversation == "slow":
+                assert await asyncio.to_thread(entered.wait, 2)
+        assert await asyncio.to_thread(other_written.wait, 2), "another account must not wait for the slow account"
+    finally:
+        release.set()
+        await settled(app)
+
+
+async def test_failed_record_does_not_block_the_accounts_next_turn(tmp_path, monkeypatch):
+    app, client, sender, up, cloud = relay(tmp_path)
+    data = await sign_up(client, sender, identifier="failed-record@example.com")
+    headers = {"Authorization": f"Bearer {data['api_key']}", **APP_UA}
+    real_record = cloud.record_turn
+    entered = threading.Event()
+    release = threading.Event()
+    next_entered = threading.Event()
+
+    def record(*args, **kwargs):
+        if kwargs.get("conversation") == "failed":
+            entered.set()
+            assert release.wait(5), "test must release the failing record"
+            raise OSError("simulated record write failure")
+        next_entered.set()
+        return real_record(*args, **kwargs)
+
+    monkeypatch.setattr(cloud, "record_turn", record)
+    try:
+        for conversation in ("failed", "next"):
+            response = await client.post(
+                "/v1/chat/completions",
+                headers={**headers, "X-NanoMuse-Conversation": conversation},
+                json={"model": "qwen3.8-27b", "messages": [{"role": "user", "content": "hi"}]},
+            )
+            assert response.status_code == 200
+            if conversation == "failed":
+                assert await asyncio.to_thread(entered.wait, 2)
+        assert not next_entered.is_set(), "the next turn of the same account still waits its turn"
+    finally:
+        release.set()
+        await settled(app)
+    assert next_entered.is_set()
+    turns = (await client.get("/v1/turns", headers=headers)).json()["turns"]
+    assert [t["conversation"] for t in turns] == ["next"]
 
 
 async def test_a_turn_on_an_own_key_is_put_up_with_its_files(tmp_path):
