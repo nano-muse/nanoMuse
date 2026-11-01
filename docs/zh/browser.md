@@ -61,6 +61,9 @@ Playwright 后端还会在浏览器请求继续前再检查一次，缩短 DNS �
 
 在手机沙箱里的脚本中，同一个工具叫 `nanomuse-browser <action> …`（[local-runtime.md](local-runtime.md#the-python-side-on-a-phone)）：`nanomuse-browser fetch https://example.com/api/orders` 就是从 shell 里走第二级，受同一个哨兵（Sentinel）管着。
 
+Python 运行时把显式请求的截图保存在 `<workspace>/screenshots/`，文件名带时间戳。
+同一秒内拍摄的截图会使用不同名称，例如 `20260101-120000-2.jpg`，之前的图片仍可读取。
+
 ## 登录 {#logging-in}
 
 要登录的页面是用户的事，不是模型的事。智能体在表单前停下来，把页面交出去（`browser` → `hand_over`，附上原因：*登录 12306*、*输入短信里的验证码*、*完成人机验证*、*确认付款*）；用户做完，按「完成」；智能体接着用页面当时的样子继续。这一切发生在聊天里的浏览器卡片上，用户先一步接管时出现的也是同一张卡片：
