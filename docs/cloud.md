@@ -269,6 +269,9 @@ It is written after the answer has left, off the request's path, and is never
 the reason a chat fails. It does not depend on *Help improve* (that switch is
 about the training set) or on *Sync conversations* (that is the apps' own
 copy of a chat); `RECORD_TURNS=0` on a relay you run keeps none of it.
+The timestamp is captured when the reply finishes. Records from the same account
+are saved in that order, including replies with media, while other accounts can
+record independently. A failed write does not block that account's later turns.
 
 **Who reads it.** The account's devices: `GET /v1/turns` (newest first; paged
 with `before` and `before_id`; `conversation=` for one chat), `GET
@@ -281,6 +284,10 @@ this is the account's data, not the training set, which stays
 `/v1/admin/samples/export` without them), one file at
 `/v1/admin/blobs/{sha256}`, and `GET /v1/admin/record` for the figures:
 turns and files in all and per day, the store against its cap.
+
+In the admin console, changing a filter on Turns or an account's ledger and events
+starts a new list. An older page still loading cannot add its rows to that list
+or replace its error and loading state.
 
 History and sample pages use the existing timestamp indexes to skip newer seconds before applying the insertion-order tie-break. Exports and the analytics backfill use the same paging boundary; no database migration is needed.
 
