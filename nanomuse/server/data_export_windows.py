@@ -75,7 +75,7 @@ def _open_relative(name: str, parent: int, *, directory: bool) -> int:
         # https://learn.microsoft.com/windows/win32/api/winternl/nf-winternl-ntcreatefile
         status = create(
             ctypes.byref(handle),
-            0x100081 if directory else 0x80000000,  # SYNCHRONIZE | LIST | ATTRS / GENERIC_READ
+            0x100081 if directory else 0x120089,  # SYNCHRONIZE | LIST | ATTRS / FILE_GENERIC_READ
             ctypes.byref(attributes),
             ctypes.byref(result),
             None,
