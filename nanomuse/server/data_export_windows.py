@@ -33,10 +33,12 @@ def open_no_follow(path: Path, *, directory: bool) -> int:
         close.restype = wintypes.BOOL
         # Directory handles allow reading but prevent deletion, renaming and in-place
         # reparse changes. Files allow current writers (e.g. SQLite), but not replacement.
+        # Attribute-only handles do not participate in Windows sharing checks, so a
+        # directory also needs FILE_LIST_DIRECTORY for its deny-write/delete flags.
         # https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-createfilew
         handle = create(
             str(path),
-            0x80 if directory else 0x80000000,  # FILE_READ_ATTRIBUTES / GENERIC_READ
+            0x81 if directory else 0x80000000,  # LIST_DIRECTORY | READ_ATTRIBUTES / GENERIC_READ
             1 if directory else 3,  # FILE_SHARE_READ / FILE_SHARE_READ | FILE_SHARE_WRITE
             None,
             3,  # OPEN_EXISTING

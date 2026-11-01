@@ -224,7 +224,10 @@ def test_windows_export_pins_ancestors_and_skips_junctions(tmp_path: Path) -> No
     with export._data_directory(data):
         with pytest.raises(PermissionError):
             data.rename(tmp_path / "moved")
+        with pytest.raises(PermissionError):
+            tmp_path.rename(tmp_path.with_name(f"{tmp_path.name}-moved"))
     assert entries(data) == {"profile.json": b"allowed"}
+    data.rename(tmp_path / "moved")  # ancestor handles were released
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows file handle lifetime")
