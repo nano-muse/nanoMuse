@@ -12,6 +12,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - **A hub directory listing that was cut at two thousand entries says so.** A folder with more (a `node_modules`, a maildir) came back as exactly two thousand names with no marker, and the phone read the cut list as the whole folder. The listing now carries `truncated: true` and the directory's real `total`, as the shell's own output cap has always said in text.
+- **A CJK character is estimated at one and a half tokens, not the byte rule's three quarters of one.** The context and budget estimates count text at four UTF-8 bytes a token, but a Chinese character is three bytes and one to two tokens from real tokenizers, so a Chinese conversation could pack `max_context_tokens` to twice what the model's window takes and be refused, shortened, and refused again on the same estimate. The estimate now gives a character in the CJK range one and a half tokens, in the direction of the relay's own fallback count, and the two budget guides say so. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
