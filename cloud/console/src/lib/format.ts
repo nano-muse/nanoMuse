@@ -87,6 +87,8 @@ export const weekday = (ts: number, zh: boolean): string => weekdayName(new Date
  *  is the calendar date at the site's day offset, not whatever the operator's browser
  *  happens to run in. */
 export const siteDay = (day: number, offsetH: number): string => dayUtc(day + offsetH * 3600);
+/** The start of the site-local day `t` falls in, as a UNIX time. */
+export const siteDayStart = (t: number, offsetH: number): number => t - ((t + offsetH * 3600) % 86400);
 export const siteWeekday = (day: number, offsetH: number, zh: boolean): string =>
   weekdayName(new Date((day + offsetH * 3600) * 1000).getUTCDay(), zh);
 /** The day stamp a picked calendar date names at the site's offset. */
