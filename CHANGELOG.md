@@ -11,6 +11,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **A hub directory listing that was cut at two thousand entries says so.** A folder with more (a `node_modules`, a maildir) came back as exactly two thousand names with no marker, and the phone read the cut list as the whole folder. The listing now carries `truncated: true` and the directory's real `total`, as the shell's own output cap has always said in text.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web

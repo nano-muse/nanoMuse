@@ -142,6 +142,9 @@ def _entry(p: Path, st: os.stat_result) -> dict[str, Any]:
     return {"name": p.name, "type": kind, "size": st.st_size, "mtime": int(st.st_mtime)}
 
 
+FILES_MAX = 2000
+
+
 def files(path: str | None = None) -> dict[str, Any]:
     p = expand(path)
     if not p.exists():
@@ -158,8 +161,10 @@ def files(path: str | None = None) -> dict[str, Any]:
             entries.append(_entry(child, child.lstat()))
         except OSError:
             continue
-        if len(entries) >= 2000:
-            break
+        if len(entries) >= FILES_MAX:
+            # a cut list reads as the whole folder, and the phone has no way to know
+            # there are more — the shell's own output cap says so in text
+            return {"path": str(p), "entries": entries, "truncated": True, "total": len(children)}
     return {"path": str(p), "entries": entries}
 
 
