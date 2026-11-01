@@ -17,6 +17,7 @@ from tests.goal_eval_tasks import (
     FIXTURES,
     World,
     archive_observation,
+    assess,
     make_report,
     meeting_observations,
     observations,
@@ -160,6 +161,34 @@ def test_expense_header_and_total(tmp_path: Path) -> None:
     )
     result = observations(world, before, "总额300元")
     assert result["EXP-C1"] and result["EXP-C2"]
+
+
+@pytest.mark.parametrize(
+    ("answer", "criterion"),
+    [
+        ("总额300.00元", "met"),
+        ("总额+300元", "met"),
+        ("总额300.99元", "not_met"),
+        ("总额-300元", "not_met"),
+        ("总额−300元", "not_met"),
+        ("总额300,000元", "not_met"),
+        ("总额300e2元", "not_met"),
+        ("总额300元，另一个总额300.99元", "unknown"),
+        ("总额300.00000000000000001元", "unknown"),
+        ("总额300,99元", "unknown"),
+    ],
+)
+def test_expense_answer_total_must_match_exactly(
+    tmp_path: Path, answer: str, criterion: str
+) -> None:
+    world = World("P1", tmp_path)
+    before = world.snapshot()
+    (world.workspace / "report.csv").write_text(
+        "category,amount\n交通,80\n办公,160\n餐饮,60\n总额,300\n", encoding="utf-8"
+    )
+    result = assess(DATA["cases"][0], observations(world, before, answer))
+    assert result["criteria"]["EXP-C4"] == criterion
+    assert (result["status"] == "verified") == (criterion == "met")
 
 
 def test_recording_resolves_symlink_paths(tmp_path: Path) -> None:

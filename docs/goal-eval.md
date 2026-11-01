@@ -34,5 +34,8 @@ The rules can miss paraphrases or misunderstand text, and these ten tasks do not
 performance on other tasks. The live test checks that the runner completes, not that the
 model succeeds.
 
+Expense totals keep their sign and fractional part. Conflicting totals or numbers that
+cannot be represented without losing precision remain unknown rather than passing.
+
 The expected outcomes in `tasks_v1.json` describe the currently committed responses. After
 refreshing them, review each changed outcome manually before updating the expectations.

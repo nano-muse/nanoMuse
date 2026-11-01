@@ -7,6 +7,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 import re
 import sqlite3
 from collections.abc import Callable
@@ -664,9 +665,23 @@ def observations(world: World, before: dict[str, Any], answer: str) -> dict[str,
                     }
             except (StopIteration, UnicodeError, ValueError, KeyError, TypeError, InvalidOperation):
                 pass
-        totals = re.findall(r"总额[^0-9\n]{0,6}(\d+)", answer)
-        if len(set(totals)) == 1:
-            out["EXP-C4"] = int(totals[0])
+        literals = re.findall(
+            r"总额[^0-9+\-−－.\n]{0,6}"
+            r"([+\-−－]?\s*\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+\-]?\d+)?)"
+            r"(?![\d.,eE])",
+            answer,
+        )
+        totals = {
+            Decimal(re.sub(r"[\s,]", "", item).replace("−", "-").replace("－", "-"))
+            for item in literals
+        }
+        if len(totals) == 1:
+            total = totals.pop()
+            numeric = float(total)
+            # Evidence accepts JSON numbers. Do not turn a fraction into its integer
+            # prefix, or let a lossy float conversion make an incorrect total match.
+            if math.isfinite(numeric) and Decimal(str(numeric)) == total:
+                out["EXP-C4"] = int(numeric) if numeric.is_integer() else numeric
     elif world.family == "ticket":
         out.update(ticket_observations(answer))
     elif world.family == "meeting":

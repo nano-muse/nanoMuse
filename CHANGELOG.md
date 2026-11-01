@@ -38,7 +38,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
-- **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. [Goal evaluation](docs/goal-eval.md).
+- **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. Expense checks kept signs and fractions instead of accepting an incorrect total's integer prefix. [Goal evaluation](docs/goal-eval.md).
 
 - **GUI regression gained 20 fixed simulated tasks and independent state checks.** Reference mode ran offline in CI, an opt-in runner used a configured model, and a standalone recorder reported model calls, latency and available token usage. The cases also corrected loop detection for identical click coordinates on different pages. [GUI regression](docs/gui-regression.md).
 
