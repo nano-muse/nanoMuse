@@ -91,7 +91,7 @@ def _open(path: Path, *, directory: bool = False, parent_fd: int | None = None) 
     if sys.platform == "win32":
         from nanomuse.server.data_export_windows import open_no_follow
 
-        return open_no_follow(path, directory=directory)
+        return open_no_follow(path, directory=directory, parent_fd=parent_fd)
     else:
         flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
         if directory:
@@ -187,7 +187,8 @@ def _add_tree(z: zipfile.ZipFile, root: Path, fd: int, under: str) -> None:
         path = root / name
         archive_name = f"{under}/{name}"
         # The directory open is no-follow too, so swapping a tree after enumeration
-        # cannot redirect the walk. On Windows every ancestor stays delete/write-locked.
+        # cannot redirect child opens. Windows may enumerate a changed pathname, but
+        # each returned name is opened relative to the original directory handle.
         try:
             with _directory(path, fd) as child_fd:
                 _add_tree(z, path, child_fd, archive_name)

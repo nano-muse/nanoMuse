@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import ctypes
 import io
 import os
 import stat
+import struct
 import subprocess
+import sys
 import time
 import zipfile
+from ctypes import wintypes
 from pathlib import Path
 
 import pytest
@@ -245,3 +249,82 @@ def test_windows_export_file_handle_denies_replacement(tmp_path: Path) -> None:
         finally:
             os.close(fd)
     replacement.replace(path)  # handles were released, including the pinned ancestors
+
+
+def _set_windows_junction(path: Path, target: Path) -> None:
+    """Change an empty directory using only attribute access, which bypasses share locks."""
+    if sys.platform != "win32":
+        raise OSError("Windows junction fixture")
+    else:
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        create = kernel.CreateFileW
+        create.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        create.restype = wintypes.HANDLE
+        control = kernel.DeviceIoControl
+        control.argtypes = [
+            wintypes.HANDLE,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.LPVOID,
+        ]
+        control.restype = wintypes.BOOL
+        close = kernel.CloseHandle
+        close.argtypes = [wintypes.HANDLE]
+        close.restype = wintypes.BOOL
+        handle = create(str(path), 0x100, 7, None, 3, 0x02200000, None)
+        if handle == wintypes.HANDLE(-1).value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            substitute = ("\\??\\" + str(target)).encode("utf-16-le")
+            printable = str(target).encode("utf-16-le")
+            data = struct.pack("<HHHH", 0, len(substitute), len(substitute) + 2, len(printable))
+            data += substitute + b"\0\0" + printable + b"\0\0"
+            buffer = ctypes.create_string_buffer(
+                struct.pack("<LHH", 0xA0000003, len(data), 0) + data
+            )
+            returned = wintypes.DWORD()
+            if not control(
+                handle, 0x900A4, buffer, len(buffer) - 1, None, 0, ctypes.byref(returned), None
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+        finally:
+            close(handle)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows in-place junction conversion")
+def test_windows_export_uses_parent_handle_after_reparse_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "threads"
+    folder.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "chat.json").write_bytes(EXCLUDED)
+    identity = folder.stat().st_ino
+    fstat = os.fstat
+    swapped = False
+
+    def swap(fd: int) -> os.stat_result:
+        nonlocal swapped
+        info = fstat(fd)
+        if not swapped and info.st_ino == identity and stat.S_ISDIR(info.st_mode):
+            _set_windows_junction(folder, outside)
+            swapped = True
+        return info
+
+    monkeypatch.setattr(export.os, "fstat", swap)
+    assert entries(tmp_path) == {}
+    assert swapped
+    folder.rmdir()  # remove the junction after all handles close
