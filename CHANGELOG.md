@@ -11,6 +11,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web

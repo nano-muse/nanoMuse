@@ -52,8 +52,10 @@ class WeComChannel(Channel):
         super().__init__(settings)
         self._client: Any = None
         self._seen: OrderedDict[str, None] = OrderedDict()
-        # the last inbound frame per chat; replies stream against it
-        self._frames: dict[str, Any] = {}
+        # the last inbound frame per chat; replies stream against it. Capped like _seen:
+        # a company-wide robot hears from thousands of chats over weeks of uptime, and
+        # only a chat's newest frame is ever asked for
+        self._frames: OrderedDict[str, Any] = OrderedDict()
         # stream id -> (frame, chat_id) while a reply is being typed out
         self._streams: dict[str, tuple[Any, str]] = {}
         self._connected = asyncio.Event()
@@ -139,6 +141,11 @@ class WeComChannel(Channel):
             self.bus.set_status(self.name, "error", self._error)
 
     # ------------------------------------------------------------------ inbound
+    def _remember_frame(self, chat_id: str, frame: Any) -> None:
+        self._frames[chat_id] = frame
+        while len(self._frames) > 1000:
+            self._frames.popitem(last=False)
+
     async def _on_enter_chat(self, frame: Any) -> None:
         """Someone opened the robot's chat for the first time: a hello, which also
         shows the pairing code when needed."""
@@ -149,7 +156,7 @@ class WeComChannel(Channel):
         chat_id = str(body.get("chatid") or sender)
         if not sender:
             return
-        self._frames[chat_id] = frame
+        self._remember_frame(chat_id, frame)
         self.bus.inbound(
             InboundMessage(
                 channel=self.name,
@@ -180,7 +187,7 @@ class WeComChannel(Channel):
         if not sender or not chat_id:
             return
         text, files = await self._content(body)
-        self._frames[chat_id] = frame
+        self._remember_frame(chat_id, frame)
         self.bus.inbound(
             InboundMessage(
                 channel=self.name,
