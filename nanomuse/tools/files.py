@@ -207,9 +207,10 @@ class Files(BaseTool):
     def _resolve(self, path: str | None, must_exist: bool = False) -> Path:
         raw = path or "."
         # Validate before strip() or resolve() can erase the spelling that was requested.
-        reason = refuses_windows_path(os.path.expanduser(raw))
-        if reason:
-            raise OSError(reason)
+        for spelling in (raw, raw.strip()):
+            reason = refuses_windows_path(os.path.expanduser(spelling))
+            if reason:
+                raise OSError(reason)
         raw = raw.strip()
         candidate = Path(os.path.expanduser(raw))
         if not candidate.is_absolute():

@@ -43,6 +43,7 @@ def test_a_windows_device_name_is_refused_before_anything_is_written(
     [
         "NUL.txt",
         "AUX.md",
+        " NUL.txt",
         "COM³.log",
         "report ",
         "folder./notes.txt",
