@@ -107,6 +107,10 @@ The socket host (`openws.work.weixin.qq.com`) is added to `NO_PROXY` for the run
 process; a corporate HTTPS proxy usually cannot carry it. Replies stream over the same
 socket; proactive messages (delivery) are markdown.
 
+The runtime keeps reply frames for at most 1,000 WeCom chats. If a chat's frame has
+been evicted, its next pending reply is sent as one complete message instead of a stream.
+A new incoming message supplies a fresh frame.
+
 ### Telegram
 
 1. In Telegram talk to **@BotFather**, send `/newbot`, copy the token into the app.
