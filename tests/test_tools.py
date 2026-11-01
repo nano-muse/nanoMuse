@@ -136,8 +136,12 @@ async def test_files_workspace_scoping(tmp_path: Path):
 async def test_a_windows_device_name_is_refused_before_the_write_reaches_the_device(
     tmp_path, monkeypatch
 ):
+    from nanomuse.tools import files as files_module
+
     files = Files(workspace=tmp_path)
-    monkeypatch.setattr(os, "name", "nt")
+    # the module's own switch, not os.name: patching os.name makes Path() build a
+    # WindowsPath on Python 3.11 and earlier, which is not what these tests are about
+    monkeypatch.setattr(files_module, "ON_WINDOWS", True, raising=False)
     r = await files.execute(action="write", path="NUL", content="gone")
     assert r.error and "device name" in r.error
     assert list(tmp_path.iterdir()) == []
@@ -146,8 +150,10 @@ async def test_a_windows_device_name_is_refused_before_the_write_reaches_the_dev
 async def test_a_name_windows_would_change_is_refused_with_the_name_it_would_land_as(
     tmp_path, monkeypatch
 ):
+    from nanomuse.tools import files as files_module
+
     files = Files(workspace=tmp_path)
-    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(files_module, "ON_WINDOWS", True, raising=False)
     r = await files.execute(action="write", path="report.", content="x")
     assert r.error and "'report'" in r.error
     assert list(tmp_path.iterdir()) == []

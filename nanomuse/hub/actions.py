@@ -30,7 +30,7 @@ from nanomuse import __version__
 from nanomuse.computer.screen import BlackScreen, take_screenshot
 from nanomuse.stdio import decode_output
 from nanomuse.tools.base import number_arg
-from nanomuse.tools.files import windows_rejects
+from nanomuse.tools.files import refuses_windows_name
 from nanomuse.tools.shell import kill_tree, scrubbed_env
 
 OUTPUT_LIMIT = 200_000
@@ -50,11 +50,11 @@ class ActionError(Exception):
 
 def expand(path: str | None) -> Path:
     expanded = os.path.expandvars(os.path.expanduser(path or "~"))
-    if path and os.name == "nt":
+    if path:
         # the asked-for name, before resolve() normalizes it away: a bare Windows device
         # name or a trailing dot names no file — the files tool refuses both for the
-        # same reason (nanomuse.tools.files.windows_rejects)
-        reason = windows_rejects(Path(expanded).name)
+        # same reason, on Windows only (nanomuse.tools.files.ON_WINDOWS)
+        reason = refuses_windows_name(Path(expanded).name)
         if reason:
             raise ActionError("bad_name", reason)
     return Path(expanded).resolve()

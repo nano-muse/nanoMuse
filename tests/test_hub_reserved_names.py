@@ -6,18 +6,19 @@ nothing, so it runs everywhere.)
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
 from nanomuse.hub import actions
+from nanomuse.tools import files as files_module
 
 
 def test_a_windows_device_name_is_refused_before_anything_is_written(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(os, "name", "nt")
+    # the files module's own switch, not os.name (see its docstring)
+    monkeypatch.setattr(files_module, "ON_WINDOWS", True, raising=False)
     with pytest.raises(actions.ActionError) as e:
         actions.file_put(str(tmp_path / "NUL"), "eA==")  # "a"
     assert "device name" in e.value.message

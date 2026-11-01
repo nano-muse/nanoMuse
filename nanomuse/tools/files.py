@@ -142,6 +142,19 @@ def windows_rejects(name: str) -> str | None:
     return None
 
 
+ON_WINDOWS = os.name == "nt"
+
+
+def refuses_windows_name(name: str) -> str | None:
+    """`windows_rejects`, but only where Windows' rules apply. The platform switch is this
+    module's ``ON_WINDOWS`` rather than ``os.name`` read at call time, so the tests of
+    every platform can flip it — patching ``os.name`` itself makes ``Path()`` instantiate
+    a ``WindowsPath`` on Python 3.11 and earlier, which is not a test anyone wants."""
+    if not ON_WINDOWS:
+        return None
+    return windows_rejects(name)
+
+
 def shown_path(path: Path, workspace: Path) -> str:
     """``path`` as the report names it: relative to the workspace when it is inside it, the
     absolute path otherwise. An extra root on another drive has no relative form on Windows
@@ -179,12 +192,11 @@ class Files(BaseTool):
     # ------------------------------------------------------------------ helpers
     def _resolve(self, path: str | None, must_exist: bool = False) -> Path:
         raw = (path or ".").strip()
-        if os.name == "nt":
-            # asked-for name, before resolve() strips the trailing dot itself: the reasons
-            # in windows_rejects() are only visible on the name as the model wrote it
-            reason = windows_rejects(Path(raw).name)
-            if reason:
-                raise OSError(reason)
+        # asked-for name, before resolve() strips the trailing dot itself: the reasons in
+        # windows_rejects() are only visible on the name as the model wrote it
+        reason = refuses_windows_name(Path(raw).name)
+        if reason:
+            raise OSError(reason)
         candidate = Path(os.path.expanduser(raw))
         if not candidate.is_absolute():
             candidate = self.workspace / candidate
