@@ -253,7 +253,7 @@ function DayPage({ day, onBack, onDay }: { day: number; onBack: () => void; onDa
               <Btn size="sm" onClick={() => onDay(d.day + 86400)} disabled={d.day + 86400 > today}>
                 {T.us.next} ›
               </Btn>
-              <input type="date" className="inp" value={siteDay(d.day, d.day_offset_h)} max={siteDay(Math.floor(Date.now() / 1000), d.day_offset_h)} onChange={(e) => e.target.value && onDay(siteDayStamp(e.target.value, d.day_offset_h))} title={T.us.pickDay} />
+              <input type="date" className="inp" value={siteDay(d.day, d.day_offset_h)} max={siteDay(today, d.day_offset_h)} onChange={(e) => e.target.value && onDay(siteDayStamp(e.target.value, d.day_offset_h))} title={T.us.pickDay} />
               <h2 className="m-0 text-[15px] font-semibold">
                 {T.us.dayTitle(siteDay(d.day, d.day_offset_h))} <span className="hint font-normal">{siteWeekday(d.day, d.day_offset_h, zh)}</span>
               </h2>
