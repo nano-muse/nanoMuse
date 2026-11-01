@@ -80,9 +80,21 @@ export const shortDay = (ts: number): string => {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 export const dayUtc = (ts: number): string => new Date(ts * 1000).toISOString().slice(0, 10);
-export const weekday = (ts: number, zh: boolean): string => {
-  const i = new Date(ts * 1000).getDay();
-  return zh ? ["日", "一", "二", "三", "四", "五", "六"][i] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i];
+const weekdayName = (i: number, zh: boolean): string =>
+  (zh ? ["日", "一", "二", "三", "四", "五", "六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])[i];
+export const weekday = (ts: number, zh: boolean): string => weekdayName(new Date(ts * 1000).getDay(), zh);
+/** The relay's day stamp is the site-local day's start as a UNIX time: the date it names
+ *  is the calendar date at the site's day offset, not whatever the operator's browser
+ *  happens to run in. */
+export const siteDay = (day: number, offsetH: number): string => dayUtc(day + offsetH * 3600);
+/** The start of the site-local day `t` falls in, as a UNIX time. */
+export const siteDayStart = (t: number, offsetH: number): number => t - ((t + offsetH * 3600) % 86400);
+export const siteWeekday = (day: number, offsetH: number, zh: boolean): string =>
+  weekdayName(new Date((day + offsetH * 3600) * 1000).getUTCDay(), zh);
+/** The day stamp a picked calendar date names at the site's offset. */
+export const siteDayStamp = (iso: string, offsetH: number): number => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return Math.floor(Date.UTC(y, m - 1, d) / 1000) - offsetH * 3600;
 };
 
 export const sum = <T,>(rows: T[], key: (r: T) => number): number => rows.reduce((a, r) => a + (Number(key(r)) || 0), 0);

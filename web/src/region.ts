@@ -21,7 +21,9 @@ export function isMainland(account?: Pick<CloudAccount, "channel" | "region" | "
 
 /** A number with a country code that is not mainland China's: no text message can reach it. */
 export function looksLikeForeignNumber(value: string): boolean {
-  return /^\s*(\+|00)(?!86\b)\d/.test(value);
+  // 86 is the only country code that starts with 86, spaced or not: "+8613800138000" is
+  // as mainland as "+86 138 0000 0000", which the word boundary alone never matched
+  return /^\s*(\+|00)(?!86)\d/.test(value);
 }
 
 export interface OwnKeyWay {

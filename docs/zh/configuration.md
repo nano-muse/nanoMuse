@@ -175,6 +175,10 @@ user_profile         = ""              # free text injected into the system prom
 instructions         = ""              # extra rules appended to the system prompt
 ```
 
+在 Windows 上，运行时的 `files` 工具和 hub 文件操作会拒绝保留设备名（包括 `NUL.txt`），
+也会拒绝以点或空格结尾的路径分量。请换一个名称，不要依赖 Windows 自动改名。其他平台
+仍使用各自的文件命名规则。
+
 `language = "auto"` 时，系统提示词会点明回复语言并告诉模型用它回答：客户端随消息送来了界面语言（网页控制台会送，即 `POST /api/threads/{id}/send` 的 `language`；hub 上的 `task` 也可以带）就用界面语言，否则按最近一条用户消息的文字书写系统判断。笼统的一句「用用户的语言回复」在某些模型上不可靠；点名就管用。固定的 `language` 优先于两者。
 
 `max_context_images` 是给手用的。在屏幕上跑一次任务，每一步都会追加一张截图，而整段对话每一步都要重新上传，所以十几张全尺寸图片曾经超过中继的请求体上限（413 `too_large`，0.1.37）。现在只带最新的四张，每张缩到最多两百万像素；更早的换成一行说明，模型仍然知道那里有过一张截图。桌面版的 harness 按字节而不是按张数算（它的适配器只认字节）：一次请求里图片的 base64 合计不超过 2 MiB，大约是最新的四到八张截图，更早的同样换成一行说明。
