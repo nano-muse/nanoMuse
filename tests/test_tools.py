@@ -133,7 +133,9 @@ async def test_files_workspace_scoping(tmp_path: Path):
     assert r.ok and r.output == str(tmp_path / "docs" / "x.md")
 
 
-async def test_a_windows_device_name_is_refused_before_the_write_reaches_the_device(tmp_path, monkeypatch):
+async def test_a_windows_device_name_is_refused_before_the_write_reaches_the_device(
+    tmp_path, monkeypatch
+):
     files = Files(workspace=tmp_path)
     monkeypatch.setattr(os, "name", "nt")
     r = await files.execute(action="write", path="NUL", content="gone")
@@ -141,7 +143,9 @@ async def test_a_windows_device_name_is_refused_before_the_write_reaches_the_dev
     assert list(tmp_path.iterdir()) == []
 
 
-async def test_a_name_windows_would_change_is_refused_with_the_name_it_would_land_as(tmp_path, monkeypatch):
+async def test_a_name_windows_would_change_is_refused_with_the_name_it_would_land_as(
+    tmp_path, monkeypatch
+):
     files = Files(workspace=tmp_path)
     monkeypatch.setattr(os, "name", "nt")
     r = await files.execute(action="write", path="report.", content="x")
