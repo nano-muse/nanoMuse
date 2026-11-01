@@ -11,7 +11,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
-- **A workspace's own coding sessions stay findable however many newer chats other repos hold.** The per-workspace list took the newest twenty to thirty transcripts of them all and only then kept the workspace's, so a day of work elsewhere made an older repo look like it had no history. The Claude Code and harness stores are now read per project directory (each named for its workspace), and a Codex rollout names its cwd on its first line — the filter is applied before the recency slice, not after.
+- **A workspace's own coding sessions stay findable however many newer chats other repos hold.** The per-workspace list took the newest twenty to thirty transcripts of them all and only then kept the workspace's, so a day of work elsewhere made an older repo look like it had no history. The Claude Code, Codex and harness readers now check each transcript's workspace before counting it toward the requested limit, so ambiguous directory names cannot hide a matching session.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web

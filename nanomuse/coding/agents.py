@@ -509,31 +509,10 @@ def _codex_files(limit: int, workspace: str | None = None) -> list[Path]:
         except OSError:
             continue
     files.sort(key=lambda t: -t[0])
-    if workspace:
-        want = os.path.realpath(workspace)
-        files = [(m, f) for m, f in files if os.path.realpath(_codex_first_cwd(f)) == want]
-    return [f for _, f in files[: max(limit * 3, 30)]]
-
-
-def _codex_first_cwd(f: Path) -> str:
-    """The rollout's ``session_meta`` names its cwd, and it is written first: a few lines
-    per file tell this workspace's sessions from the others' without reading any of the
-    transcripts whole."""
-    try:
-        with f.open("rb") as fh:
-            for n, raw in enumerate(fh):
-                if n >= 20:
-                    break
-                raw = raw.strip()
-                if not raw:
-                    continue
-                obj = json.loads(raw)
-                payload = obj.get("payload") or {}
-                if obj.get("type") == "session_meta" and isinstance(payload, dict):
-                    return str(payload.get("cwd") or "")
-    except (OSError, ValueError):
-        pass
-    return ""
+    # A filtered list may need to pass many newer transcripts from other workspaces.
+    # The session reader below uses the transcript's cwd before counting toward limit.
+    candidates = files if workspace else files[: max(limit * 3, 30)]
+    return [f for _, f in candidates]
 
 
 def _codex_session(f: Path, full: bool) -> Session | None:
@@ -626,16 +605,6 @@ def _codex_sessions(limit: int, workspace: str | None) -> list[Session]:
     return out
 
 
-def _slug_matches(project: Path, workspace: str | None) -> bool:
-    """Could this store directory hold sessions of ``workspace``? The directory name
-    answers without opening a transcript. Claude Code prefixes the slug Cursor and the
-    harness use with a dash."""
-    if workspace is None:
-        return True
-    name = project.name[1:] if project.name.startswith("-") else project.name
-    return os.path.realpath(_slug_to_path(name)) == os.path.realpath(workspace)
-
-
 # -- Claude Code ------------------------------------------------------------------------------
 def _claude_sessions(limit: int, workspace: str | None) -> list[Session]:
     root = sessions_root("claude")
@@ -643,10 +612,7 @@ def _claude_sessions(limit: int, workspace: str | None) -> list[Session]:
         return []
     files: list[tuple[float, Path]] = []
     for project in root.iterdir():
-        if not project.is_dir() or not _slug_matches(project, workspace):
-            # the workspace's projects are picked by name before the newest-sessions
-            # slice, or a busy machine's newer chats elsewhere push this workspace's
-            # own off the back of the list and it looks like it has no history
+        if not project.is_dir():
             continue
         for f in project.glob("*.jsonl"):
             try:
@@ -655,7 +621,10 @@ def _claude_sessions(limit: int, workspace: str | None) -> list[Session]:
                 continue
     files.sort(key=lambda t: -t[0])
     out = []
-    for _, f in files[: max(limit * 2, 20)]:
+    # Directory slugs are lossy: repo-tools and repo/tools can share a slug. Only
+    # the transcript's cwd below can decide whether it belongs to this workspace.
+    candidates = files if workspace else files[: max(limit * 2, 20)]
+    for _, f in candidates:
         s = _claude_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)
@@ -886,8 +855,8 @@ def _dsh_sessions(limit: int, workspace: str | None) -> list[Session]:
         return []
     files: list[tuple[float, Path]] = []
     for project in root.iterdir():
-        if not project.is_dir() or not _slug_matches(project, workspace):
-            continue  # named for the workspace before the newest-sessions slice, as above
+        if not project.is_dir():
+            continue
         for sdir in project.iterdir():
             if not sdir.is_dir():
                 continue
@@ -900,7 +869,10 @@ def _dsh_sessions(limit: int, workspace: str | None) -> list[Session]:
                 continue
     files.sort(key=lambda t: -t[0])
     out = []
-    for _, f in files[: max(limit * 2, 20)]:
+    # Directory slugs are lossy: repo-tools and repo/tools can share a slug. Only
+    # the transcript's cwd below can decide whether it belongs to this workspace.
+    candidates = files if workspace else files[: max(limit * 2, 20)]
+    for _, f in candidates:
         s = _dsh_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)

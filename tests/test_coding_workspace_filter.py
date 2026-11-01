@@ -163,3 +163,23 @@ def test_a_workspaces_own_sessions_are_not_pushed_off_by_newer_chats_elsewhere(
     # without a filter the newest chats still lead, as before
     top = agents.sessions("claude", limit=10)
     assert top and top[0].id.startswith("new-")
+
+
+@pytest.mark.parametrize("agent", ["claude", "dsh"])
+def test_workspace_metadata_wins_when_two_paths_share_a_directory_slug(
+    coding_home: Path, tmp_path: Path, agent: str
+) -> None:
+    workspace = tmp_path / "repo" / "tools"
+    other = tmp_path / "repo-tools"
+    workspace.mkdir(parents=True)
+    other.mkdir()
+    assert _dir_slug(workspace) == _dir_slug(other)
+    write = _claude_chat if agent == "claude" else _dsh_chat
+    write(coding_home, workspace, "wanted", "The older session", at=1_000_000)
+    write(coding_home, other, "different", "The newer session", at=2_000_000)
+
+    rows = agents.sessions(agent, limit=1, workspace=str(workspace))
+    assert [row.id for row in rows] == ["wanted"]
+    assert [row.id for row in agents.sessions(agent, limit=1, workspace=str(other))] == [
+        "different"
+    ]
