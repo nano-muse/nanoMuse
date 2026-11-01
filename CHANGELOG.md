@@ -6,6 +6,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- **An expanded "More (N)" table keeps its rows through a poll.** Every poll hands the admin tables a freshly parsed array, and the expansion was reset on the array's arrival: click "More" on People or a Usage day's top accounts, wait out the two-minute poll, and the list snapped back to its first hundred or twenty-five rows while you were reading it. The expansion is kept unless the list itself no longer reaches it (`keptShown`), so a refresh of the same rows leaves the person where they scrolled to.
 - **The relay's checks ran on Windows as well as Linux.** Both platforms checked the cloud service and built and tested its admin console. Changes to the showcase mirror also ran these checks because the cloud tests load those scripts. The committed-build check remained on Linux. ([#670](https://github.com/nano-muse/nanoMuse/pull/670))
 - **The local self-hosting script printed a working command for sign-in codes.** Its hint now enters `cloud/` before reading the relay logs, so it can be copied from the repository root. ([#716](https://github.com/nano-muse/nanoMuse/pull/716))
 
