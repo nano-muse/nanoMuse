@@ -16,6 +16,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
+
 - **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
 - **Two browser screenshots inside one second are two files.** Both took the name of the second they landed in, so the second screenshot overwrote the first while the model still held the first one's path — a click-then-look sequence in one second lost the "before" picture. The second shot now takes the next free name (`…-2.jpg`), decided after the bytes arrive so two in-flight shots cannot pick the same name either.
 - **A hub directory listing that was cut at two thousand entries says so.** A folder with more (a `node_modules`, a maildir) came back as exactly two thousand names with no marker, and the phone read the cut list as the whole folder. The listing now carries `truncated: true` and the directory's real `total`, as the shell's own output cap has always said in text.
