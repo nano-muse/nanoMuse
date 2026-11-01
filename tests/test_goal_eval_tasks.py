@@ -176,6 +176,8 @@ def test_expense_header_and_total(tmp_path: Path) -> None:
         ("总额300元，另一个总额300.99元", "unknown"),
         ("总额300.00000000000000001元", "unknown"),
         ("总额300,99元", "unknown"),
+        ("总额300e9999999999999999999999999元", "unknown"),
+        ("总额300元，另一个总额300e-9999999999999999999999999元", "unknown"),
     ],
 )
 def test_expense_answer_total_must_match_exactly(

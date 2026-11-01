@@ -671,17 +671,21 @@ def observations(world: World, before: dict[str, Any], answer: str) -> dict[str,
             r"(?![\d.,eE])",
             answer,
         )
-        totals = {
-            Decimal(re.sub(r"[\s,]", "", item).replace("−", "-").replace("－", "-"))
-            for item in literals
-        }
-        if len(totals) == 1:
-            total = totals.pop()
-            numeric = float(total)
-            # Evidence accepts JSON numbers. Do not turn a fraction into its integer
-            # prefix, or let a lossy float conversion make an incorrect total match.
-            if math.isfinite(numeric) and Decimal(str(numeric)) == total:
-                out["EXP-C4"] = int(numeric) if numeric.is_integer() else numeric
+        try:
+            totals = {
+                Decimal(re.sub(r"[\s,]", "", item).replace("−", "-").replace("－", "-"))
+                for item in literals
+            }
+            if len(totals) == 1:
+                total = totals.pop()
+                numeric = float(total)
+                # Evidence accepts JSON numbers. Do not turn a fraction into its integer
+                # prefix, or let a lossy float conversion make an incorrect total match.
+                if math.isfinite(numeric) and Decimal(str(numeric)) == total:
+                    out["EXP-C4"] = int(numeric) if numeric.is_integer() else numeric
+        except (InvalidOperation, OverflowError, ValueError):
+            # Out-of-range model output is missing evidence, even beside a valid total.
+            pass
     elif world.family == "ticket":
         out.update(ticket_observations(answer))
     elif world.family == "meeting":
