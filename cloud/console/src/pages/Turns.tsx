@@ -4,13 +4,14 @@
  *  person added), and the reply the person saw. Pictures and clips are shown where they
  *  were sent. The figures at the top count questions beside calls. */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PageProps } from "../App";
 import { get, qs } from "../lib/api";
 import { compact, dur, fmt, nowS, when } from "../lib/format";
 import { useData, useDebounced } from "../lib/hooks";
 import { nameOf, useT, useZh } from "../lib/i18n";
 import { useRoute } from "../lib/router";
+import { LatestRequest } from "../lib/latest-request";
 import type { RecordView, TurnFull, TurnGroup, TurnGroups, TurnMessage, TurnStep } from "../lib/types";
 import { Ranks, modelColor } from "../ui/charts";
 import { isBlobRef, partsOf, toolArgs } from "../lib/turns";
@@ -253,27 +254,33 @@ function useTurnPages(query: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // a page asked for under an older filter (a "More" still in flight when the filter
+  // changed) must not land under the new one, nor clear its loading flag
+  const requests = useRef(new LatestRequest());
   const load = useCallback(
-    async (after?: TurnGroup) => {
-      setLoading(true);
-      setError("");
-      try {
+    (after?: TurnGroup) => requests.current.run(
+      () => {
         const extra = after ? `&before=${after.ts1}&before_key=${encodeURIComponent(after.key)}` : "";
-        const page = await get<TurnGroups>(`/v1/admin/record/turns?${query}${extra}`);
-        setPages((p) => (after ? [...p, page] : [page]));
-        if (page.turns.length < PAGE) setDone(true);
-      } catch (e) {
-        setError(String((e as Error).message || e));
-      } finally {
-        setLoading(false);
-      }
-    },
+        return get<TurnGroups>(`/v1/admin/record/turns?${query}${extra}`);
+      },
+      {
+        start: () => { setLoading(true); setError(""); },
+        success: (page) => {
+          setPages((p) => (after ? [...p, page] : [page]));
+          if (page.turns.length < PAGE) setDone(true);
+        },
+        error: (e) => setError(e instanceof Error ? e.message : String(e)),
+        finish: () => setLoading(false),
+      },
+    ),
     [query],
   );
   useEffect(() => {
+    const pending = requests.current;
     setPages([]);
     setDone(false);
     void load();
+    return () => pending.invalidate();
   }, [load]);
   const turns = useMemo(() => pages.flatMap((p) => p.turns), [pages]);
   const last = turns[turns.length - 1];
