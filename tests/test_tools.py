@@ -157,9 +157,10 @@ async def test_a_name_windows_would_change_is_refused_with_the_name_it_would_lan
     r = await files.execute(action="write", path="report.", content="x")
     assert r.error and "'report'" in r.error
     assert list(tmp_path.iterdir()) == []
-    # an extension makes it an ordinary file: NUL.txt is kept everywhere
+    # Win32 reserves the device basename even when an extension follows it.
     r = await files.execute(action="write", path="NUL.txt", content="kept")
-    assert r.ok and (tmp_path / "NUL.txt").read_text() == "kept"
+    assert r.error and "device name" in r.error
+    assert list(tmp_path.iterdir()) == []
 
 
 async def test_files_says_when_a_listing_or_a_search_was_cut(tmp_path: Path):

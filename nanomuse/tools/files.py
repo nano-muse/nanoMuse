@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import fnmatch
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from nanomuse.schema import RiskLevel, ToolResult
@@ -119,25 +119,29 @@ _WIN_DEVICE_NAMES = frozenset(
         "PRN",
         "AUX",
         "NUL",
+        "CONIN$",
+        "CONOUT$",
         *(f"COM{i}" for i in range(1, 10)),
         *(f"LPT{i}" for i in range(1, 10)),
+        *(f"COM{i}" for i in "¹²³"),
+        *(f"LPT{i}" for i in "¹²³"),
     ]
 )
 
 
 def windows_rejects(name: str) -> str | None:
-    """Why Windows cannot keep a file under this final component, or ``None``.
+    """Why a path component is a device or would be normalized by Windows.
 
-    A bare device name (``NUL``, ``com7``) opens the device itself, so the write reports
-    success and no file appears. A trailing dot or space is dropped by the path layer, so
-    ``report.`` lands as ``report`` — a name nobody asked for, which then reads as missing
-    the moment the same workspace is opened somewhere the name is kept. A device name with
-    an extension (``NUL.txt``) is an ordinary file and stays allowed."""
-    upper = name.upper()
+    Win32 reserves device names with extensions too, such as ``NUL.txt``. Refuse them
+    consistently across supported Windows versions, along with trailing dots and spaces.
+    """
+    if name in (".", ".."):
+        return None
+    upper = name.split(".", 1)[0].rstrip(" ").upper()
     if upper in _WIN_DEVICE_NAMES:
         return f"'{name}' is a Windows device name: the write would reach the device, and no file would appear"
     stripped = name.rstrip(". ")
-    if stripped and stripped != name:
+    if stripped != name:
         return f"'{name}' ends in a dot or a space, which Windows drops: the file would land as '{stripped}'"
     return None
 
@@ -145,14 +149,24 @@ def windows_rejects(name: str) -> str | None:
 ON_WINDOWS = os.name == "nt"
 
 
-def refuses_windows_name(name: str) -> str | None:
-    """`windows_rejects`, but only where Windows' rules apply. The platform switch is this
-    module's ``ON_WINDOWS`` rather than ``os.name`` read at call time, so the tests of
-    every platform can flip it — patching ``os.name`` itself makes ``Path()`` instantiate
-    a ``WindowsPath`` on Python 3.11 and earlier, which is not a test anyone wants."""
+def refuses_windows_path(path: str) -> str | None:
+    """Check all components before normalization, only on Windows.
+
+    PureWindowsPath also lets the same validation tests run on other platforms without
+    changing os.name or constructing a filesystem-bound WindowsPath.
+    """
     if not ON_WINDOWS:
         return None
-    return windows_rejects(name)
+    if path.replace("/", "\\").startswith("\\\\.\\"):
+        return "Windows device paths are not workspace files"
+    parsed = PureWindowsPath(path)
+    for part in parsed.parts:
+        if part == parsed.anchor:
+            continue
+        reason = windows_rejects(part)
+        if reason:
+            return reason
+    return None
 
 
 def shown_path(path: Path, workspace: Path) -> str:
@@ -191,12 +205,12 @@ class Files(BaseTool):
 
     # ------------------------------------------------------------------ helpers
     def _resolve(self, path: str | None, must_exist: bool = False) -> Path:
-        raw = (path or ".").strip()
-        # asked-for name, before resolve() strips the trailing dot itself: the reasons in
-        # windows_rejects() are only visible on the name as the model wrote it
-        reason = refuses_windows_name(Path(raw).name)
+        raw = path or "."
+        # Validate before strip() or resolve() can erase the spelling that was requested.
+        reason = refuses_windows_path(os.path.expanduser(raw))
         if reason:
             raise OSError(reason)
+        raw = raw.strip()
         candidate = Path(os.path.expanduser(raw))
         if not candidate.is_absolute():
             candidate = self.workspace / candidate
