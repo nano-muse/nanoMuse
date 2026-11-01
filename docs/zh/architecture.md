@@ -86,3 +86,5 @@ cd web && npm run build             # type-checks and rebuilds the app
 
 [GUI 回归](gui-regression.md)介绍固定模拟场景、独立状态校验和离线及真实模型入口；
 其用量记录不依赖任务预算功能。
+
+[目标评测任务](goal-eval.md)介绍十条录制的任务轨迹及可选的真实模型运行。
