@@ -70,7 +70,15 @@ def _claude_chat(home: Path, ws: Path, sid: str, text: str, at: float) -> None:
 
 
 def _codex_chat(home: Path, ws: Path, sid: str, text: str, at: float) -> None:
-    f = home / ".codex" / "sessions" / "2026" / "09" / "23" / f"rollout-2026-09-23T10-00-00-{sid}.jsonl"
+    f = (
+        home
+        / ".codex"
+        / "sessions"
+        / "2026"
+        / "09"
+        / "23"
+        / f"rollout-2026-09-23T10-00-00-{sid}.jsonl"
+    )
     _jsonl(
         f,
         [
@@ -81,7 +89,11 @@ def _codex_chat(home: Path, ws: Path, sid: str, text: str, at: float) -> None:
             },
             {
                 "type": "response_item",
-                "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": text}]},
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": text}],
+                },
             },
         ],
     )
@@ -93,12 +105,24 @@ def _dsh_chat(home: Path, ws: Path, sid: str, text: str, at: float) -> None:
     _zstd_frames(
         f,
         [
-            [{"type": "session", "version": 4, "id": sid, "createdAt": int(at * 1000), "cwd": str(ws)}],
+            [
+                {
+                    "type": "session",
+                    "version": 4,
+                    "id": sid,
+                    "createdAt": int(at * 1000),
+                    "cwd": str(ws),
+                }
+            ],
             [
                 {
                     "type": "user/message",
                     "seq": 1,
-                    "data": {"content": [{"type": "text", "text": text}], "source": {"kind": "user"}, "role": "user"},
+                    "data": {
+                        "content": [{"type": "text", "text": text}],
+                        "source": {"kind": "user"},
+                        "role": "user",
+                    },
                 }
             ],
         ],
@@ -115,18 +139,24 @@ def test_a_workspaces_own_sessions_are_not_pushed_off_by_newer_chats_elsewhere(
     ws.mkdir(parents=True)
     other.mkdir(parents=True)
     _claude_chat(home, ws, "s-old", "Explain the build", at=1_000_000)
-    _codex_chat(home, ws, "01a0c858-5820-7853-ba4c-dee7f183169c", "Rename the CLI flag", at=1_000_000)
+    _codex_chat(
+        home, ws, "01a0c858-5820-7853-ba4c-dee7f183169c", "Rename the CLI flag", at=1_000_000
+    )
     _dsh_chat(home, ws, "session-old", "Refactor the loader", at=1_000_000)
     # more newer chats in another repo than any reader's recency slice
     for i in range(30):
         at = 2_000_000 + i
         _claude_chat(home, other, f"new-{i}", f"unrelated {i}", at=at)
-        _codex_chat(home, other, f"7777777{i:05d}-8888-4999-aaaa-bbbbbbbbbbbb", f"unrelated {i}", at=at)
+        _codex_chat(
+            home, other, f"7777777{i:05d}-8888-4999-aaaa-bbbbbbbbbbbb", f"unrelated {i}", at=at
+        )
         _dsh_chat(home, other, f"session-new-{i}", f"unrelated {i}", at=at)
     for agent in ("claude", "codex", "dsh"):
         rows = agents.sessions(agent, limit=10, workspace=str(ws))
         assert rows and {s.id for s in rows} == {
-            "s-old" if agent == "claude" else "01a0c858-5820-7853-ba4c-dee7f183169c"
+            "s-old"
+            if agent == "claude"
+            else "01a0c858-5820-7853-ba4c-dee7f183169c"
             if agent == "codex"
             else "session-old"
         }, agent
