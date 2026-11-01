@@ -15,6 +15,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **A mainland number written without spaces is no longer read as a foreign one.** `looksLikeForeignNumber` rejected the country code only when a word boundary followed it, which a spaced `+86 138…` has and the canonical `+8613800138000` does not — so the E.164 form was classified as unreachable by text message. 86 is the only country code that begins with 86, so the check is now simply what follows the `+`/`00`.
+
 ### Desktop
 
 - **Added an on-demand guide for the agent's own desktop capabilities.** The native skill catalog now includes workspace and second-brain folder guidance, Windows paths, settings, connectors, skills, memory, and rooms, without searching app source or private configuration. Existing approval rules still apply. For [#712](https://github.com/nano-muse/nanoMuse/issues/712).
