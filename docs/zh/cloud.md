@@ -131,6 +131,9 @@ DELETE /v1/sync/conversations/{cid}     → {cursor, deleted: true}      a tombs
 
 ## 额度 {#allowance}
 
+管理控制台的用量日期、日期选择器和用户注册图表，都按中继的 `DAY_OFFSET_H` 划分日期。
+浏览器处在不同时区时，也不会把日期标签或注册人数挪到相邻的一天。
+
 nanoMuse 是社区项目，不收费。`cloud.nanomuse.cn` 这个公共中继由开发者出钱，所以每个账号有一个可以取用的池子，按账号的整个生命周期算，不按天（中继 0.5）：
 
 | | `cloud.nanomuse.cn` |
