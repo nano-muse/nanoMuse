@@ -11,6 +11,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Two browser screenshots inside one second are two files.** Both took the name of the second they landed in, so the second screenshot overwrote the first while the model still held the first one's path — a click-then-look sequence in one second lost the "before" picture. The second shot now takes the next free name (`…-2.jpg`), decided after the bytes arrive so two in-flight shots cannot pick the same name either.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
