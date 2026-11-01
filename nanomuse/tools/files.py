@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import fnmatch
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from nanomuse.schema import RiskLevel, ToolResult
@@ -113,6 +113,62 @@ LIST_MAX = 500
 SEARCH_MAX_MATCHES = 200
 
 
+_WIN_DEVICE_NAMES = frozenset(
+    [
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "CONIN$",
+        "CONOUT$",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+        *(f"COM{i}" for i in "¹²³"),
+        *(f"LPT{i}" for i in "¹²³"),
+    ]
+)
+
+
+def windows_rejects(name: str) -> str | None:
+    """Why a path component is a device or would be normalized by Windows.
+
+    Win32 reserves device names with extensions too, such as ``NUL.txt``. Refuse them
+    consistently across supported Windows versions, along with trailing dots and spaces.
+    """
+    if name in (".", ".."):
+        return None
+    upper = name.split(".", 1)[0].rstrip(" ").upper()
+    if upper in _WIN_DEVICE_NAMES:
+        return f"'{name}' is a Windows device name: the write would reach the device, and no file would appear"
+    stripped = name.rstrip(". ")
+    if stripped != name:
+        return f"'{name}' ends in a dot or a space, which Windows drops: the file would land as '{stripped}'"
+    return None
+
+
+ON_WINDOWS = os.name == "nt"
+
+
+def refuses_windows_path(path: str) -> str | None:
+    """Check all components before normalization, only on Windows.
+
+    PureWindowsPath also lets the same validation tests run on other platforms without
+    changing os.name or constructing a filesystem-bound WindowsPath.
+    """
+    if not ON_WINDOWS:
+        return None
+    if path.replace("/", "\\").startswith("\\\\.\\"):
+        return "Windows device paths are not workspace files"
+    parsed = PureWindowsPath(path)
+    for part in parsed.parts:
+        if part == parsed.anchor:
+            continue
+        reason = windows_rejects(part)
+        if reason:
+            return reason
+    return None
+
+
 def shown_path(path: Path, workspace: Path) -> str:
     """``path`` as the report names it: relative to the workspace when it is inside it, the
     absolute path otherwise. An extra root on another drive has no relative form on Windows
@@ -149,7 +205,13 @@ class Files(BaseTool):
 
     # ------------------------------------------------------------------ helpers
     def _resolve(self, path: str | None, must_exist: bool = False) -> Path:
-        raw = (path or ".").strip()
+        raw = path or "."
+        # Validate before strip() or resolve() can erase the spelling that was requested.
+        for spelling in (raw, raw.strip()):
+            reason = refuses_windows_path(os.path.expanduser(spelling))
+            if reason:
+                raise OSError(reason)
+        raw = raw.strip()
         candidate = Path(os.path.expanduser(raw))
         if not candidate.is_absolute():
             candidate = self.workspace / candidate

@@ -70,6 +70,11 @@ mixed copies or stale installation registration need to be sorted out separately
 
 ## What it is
 
+Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
+right-click an editable field to cut, copy, paste or select all. The Edit menu and the
+usual keyboard shortcuts also work. Page scripts cannot read the clipboard; pasting
+through the native menu or a keyboard shortcut is your explicit editing action.
+
 A dsh Host started by the shell as a child process, showing the harness's web app in a
 window of ours: the rail (Chats, Search, Feed, Ideas, Goals, Library, Devices, the
 hamburger), the chats column with the main chat and the side chats, the face and name

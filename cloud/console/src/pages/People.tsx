@@ -4,12 +4,12 @@
 import { useMemo } from "react";
 import { post } from "../lib/api";
 import { clientLine } from "../lib/client";
-import { dateOf, fmt, iso, matches, money, moneyN, nowS, terms } from "../lib/format";
+import { dateOf, fmt, iso, matches, money, moneyN, nowS, siteDay, siteDayStart, terms } from "../lib/format";
 import { invalidate, useData, useDebounced } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
 import { placeOf, regionKey } from "../lib/places";
 import { useRoute } from "../lib/router";
-import type { Account, AccountsPage } from "../lib/types";
+import type { Account, AccountsPage, Overview } from "../lib/types";
 import { Bars, Ranks, platformColor } from "../ui/charts";
 import { Bar, Btn, CsvButton, DataTable, Kpi, Panel, Pill, Search, useDialog, useToast, type Col } from "../ui/primitives";
 import { Ago, PlatformPill, Who, usePlaces } from "../ui/who";
@@ -70,6 +70,7 @@ export function People() {
   const toast = useToast();
   usePlaces();
   const q = useData<AccountsPage>("/v1/admin/accounts", { poll: 120_000 });
+  const ov = useData<Overview>("/v1/admin/overview?days=7", { maxAge: 300_000 });
   const p = route.params;
   const f = {
     q: p.get("q") || "",
@@ -247,14 +248,16 @@ export function People() {
     </label>
   );
 
-  // sign-ups per day for the shown set, last 30 days
+  // sign-ups per day for the shown set, last 30 days — site-local days, so a bar is the
+  // day the site's calendar says, the same day the Usage page and the relay count
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
   const signups = useMemo(() => {
     const t = nowS();
-    const start = t - (t % 86400) - 29 * 86400;
+    const start = siteDayStart(t, offsetH) - 29 * 86400;
     const per = new Array(30).fill(0);
     for (const a of shown) if (a.created_at >= start) per[Math.min(29, Math.floor((a.created_at - start) / 86400))]++;
     return { per, start };
-  }, [shown]);
+  }, [shown, offsetH]);
 
   return (
     <Loaded q={q}>
@@ -295,7 +298,7 @@ export function People() {
           </Panel>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
             <Panel title={T.pe.chartCreated} sub={`30 ${T.top.days(30).replace(/^\d+\s?/, "")}`} className="lg:col-span-2">
-              <Bars series={[{ name: T.pe.created, values: signups.per, color: "var(--c1)" }]} labels={signups.per.map((_, i) => dateOf(signups.start + i * 86400).slice(5))} height={120} />
+              <Bars series={[{ name: T.pe.created, values: signups.per, color: "var(--c1)" }]} labels={signups.per.map((_, i) => siteDay(signups.start + i * 86400, offsetH).slice(5))} height={120} />
             </Panel>
             <Panel title={T.pe.chartActivity}>
               <Ranks rows={["today", "7d", "30d", "older", "never"].map((k, i) => ({ name: T.pe.activity[k], value: shown.filter((a) => activityOf(a) === k).length, color: ["var(--ok)", "var(--c1)", "var(--c5)", "var(--ink-3)", "var(--warn)"][i], onClick: () => toggle("activity", k) }))} showShare />

@@ -5,7 +5,7 @@
 
 import { useMemo } from "react";
 import type { PageProps } from "../App";
-import { compact, dateOf, fmt, money, moneyN, ms, pct, weekday } from "../lib/format";
+import { compact, fmt, money, moneyN, ms, pct, siteDay, siteDayStamp, siteWeekday } from "../lib/format";
 import { useData, useNow } from "../lib/hooks";
 import { nameOf, useT, useZh } from "../lib/i18n";
 import { useRoute } from "../lib/router";
@@ -52,7 +52,7 @@ export function Usage({ days }: PageProps) {
               <Kpi label={T.g.perDay} value={money(d.totals.cost_cny / Math.max(1, d.totals.active_days))} sub={`${fmt(d.totals.requests / Math.max(1, d.totals.active_days))} ${T.g.requests}`} />
             </Kpis>
             <Panel title={T.us.title(days)} sub={T.us.matrixHint}>
-              <Bars series={stacked} labels={d.rows.map((r) => dateOf(r.day).slice(5))} titles={d.rows.map((r) => dateOf(r.day))} format={f} height={170} onPick={(i) => route.set({ day: d.rows[i].day })} />
+              <Bars series={stacked} labels={d.rows.map((r) => siteDay(r.day, d.day_offset_h).slice(5))} titles={d.rows.map((r) => siteDay(r.day, d.day_offset_h))} format={f} height={170} onPick={(i) => route.set({ day: d.rows[i].day })} />
               <Legend className="mt-2" items={models.map((m) => ({ name: <code>{m.model}</code>, color: modelColor(m.model), value: f(Number(m[metric === "accounts" ? "requests" : metric])) }))} />
             </Panel>
             <Panel title={T.us.matrix} right={<Chips options={METRICS.map((m) => ({ id: m, label: T.us.metric[m] }))} value={metric} onChange={(m) => route.set({ m }, true)} />} pad={false}>
@@ -77,7 +77,7 @@ export function Usage({ days }: PageProps) {
                     {[...d.rows].reverse().map((r) => (
                       <tr key={r.day} className="tap" onClick={() => route.set({ day: r.day })}>
                         <td>
-                          {dateOf(r.day)} <span className="hint">{weekday(r.day, zh)}</span>
+                          {siteDay(r.day, d.day_offset_h)} <span className="hint">{siteWeekday(r.day, d.day_offset_h, zh)}</span>
                         </td>
                         <td className="num font-medium">{f(rowTotal(r))}</td>
                         {models.map((m) => {
@@ -253,9 +253,9 @@ function DayPage({ day, onBack, onDay }: { day: number; onBack: () => void; onDa
               <Btn size="sm" onClick={() => onDay(d.day + 86400)} disabled={d.day + 86400 > today}>
                 {T.us.next} ›
               </Btn>
-              <input type="date" className="inp" value={new Date((d.day + d.day_offset_h * 3600) * 1000).toISOString().slice(0, 10)} max={new Date().toISOString().slice(0, 10)} onChange={(e) => e.target.value && onDay(Math.floor(new Date(e.target.value + "T12:00:00").getTime() / 1000))} title={T.us.pickDay} />
+              <input type="date" className="inp" value={siteDay(d.day, d.day_offset_h)} max={siteDay(today, d.day_offset_h)} onChange={(e) => e.target.value && onDay(siteDayStamp(e.target.value, d.day_offset_h))} title={T.us.pickDay} />
               <h2 className="m-0 text-[15px] font-semibold">
-                {T.us.dayTitle(dateOf(d.day))} <span className="hint font-normal">{weekday(d.day, zh)}</span>
+                {T.us.dayTitle(siteDay(d.day, d.day_offset_h))} <span className="hint font-normal">{siteWeekday(d.day, d.day_offset_h, zh)}</span>
               </h2>
             </div>
             <Kpis>
@@ -267,7 +267,7 @@ function DayPage({ day, onBack, onDay }: { day: number; onBack: () => void; onDa
               <Kpi label={T.g.hands} value={fmt(c.hands)} sub={`${T.g.images} ${fmt(c.with_images)} · ${T.g.tools} ${fmt(c.with_tools)}`} />
             </Kpis>
             <Panel title={T.us.hours} sub={T.us.hoursHint} right={<Seg options={[{ id: "requests", label: T.g.requests }, { id: "cost", label: T.g.cost }]} value={hourMetric} onChange={(v) => route.set({ hm: v === "cost" ? "cost" : null }, true)} />}>
-              <Bars series={stacked} labels={labels} titles={d.hours.map((h) => `${dateOf(d.day)} ${labels[h.hour]}:00 · ${fmt(h.accounts)} ${T.g.accounts}`)} format={hourMetric === "cost" ? (v) => money(v) : fmt} height={170} lines={[
+              <Bars series={stacked} labels={labels} titles={d.hours.map((h) => `${siteDay(d.day, d.day_offset_h)} ${labels[h.hour]}:00 · ${fmt(h.accounts)} ${T.g.accounts}`)} format={hourMetric === "cost" ? (v) => money(v) : fmt} height={170} lines={[
                 { name: T.ov.upstreamErrors, values: d.hours.map((h) => h.upstream_errors), color: "var(--bad)" },
                 { name: T.ov.budgetRefusals, values: d.hours.map((h) => h.budget_refused), color: "var(--violet)" },
               ]} />
