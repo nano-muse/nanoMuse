@@ -113,6 +113,28 @@ LIST_MAX = 500
 SEARCH_MAX_MATCHES = 200
 
 
+_WIN_DEVICE_NAMES = frozenset(
+    ["CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))]
+)
+
+
+def windows_rejects(name: str) -> str | None:
+    """Why Windows cannot keep a file under this final component, or ``None``.
+
+    A bare device name (``NUL``, ``com7``) opens the device itself, so the write reports
+    success and no file appears. A trailing dot or space is dropped by the path layer, so
+    ``report.`` lands as ``report`` — a name nobody asked for, which then reads as missing
+    the moment the same workspace is opened somewhere the name is kept. A device name with
+    an extension (``NUL.txt``) is an ordinary file and stays allowed."""
+    upper = name.upper()
+    if upper in _WIN_DEVICE_NAMES:
+        return f"'{name}' is a Windows device name: the write would reach the device, and no file would appear"
+    stripped = name.rstrip(". ")
+    if stripped and stripped != name:
+        return f"'{name}' ends in a dot or a space, which Windows drops: the file would land as '{stripped}'"
+    return None
+
+
 def shown_path(path: Path, workspace: Path) -> str:
     """``path`` as the report names it: relative to the workspace when it is inside it, the
     absolute path otherwise. An extra root on another drive has no relative form on Windows
@@ -150,6 +172,12 @@ class Files(BaseTool):
     # ------------------------------------------------------------------ helpers
     def _resolve(self, path: str | None, must_exist: bool = False) -> Path:
         raw = (path or ".").strip()
+        if os.name == "nt":
+            # asked-for name, before resolve() strips the trailing dot itself: the reasons
+            # in windows_rejects() are only visible on the name as the model wrote it
+            reason = windows_rejects(Path(raw).name)
+            if reason:
+                raise OSError(reason)
         candidate = Path(os.path.expanduser(raw))
         if not candidate.is_absolute():
             candidate = self.workspace / candidate

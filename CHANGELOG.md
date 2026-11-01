@@ -11,6 +11,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **A Windows device name or a trailing dot in a file's name is refused, not silently mapped elsewhere.** Writing to `NUL` or `com7` opened the device itself — the tool reported success and no file appeared — and `report.` landed as `report`, a name nobody asked for, which then reads as missing on a platform that keeps the name. Both are now refused with a sentence naming where the file would have landed; a device name with an extension (`NUL.txt`) is an ordinary file and stays allowed.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
