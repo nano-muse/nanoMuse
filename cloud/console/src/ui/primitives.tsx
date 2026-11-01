@@ -216,6 +216,11 @@ export interface Col<T> {
   wrap?: boolean;
 }
 
+/** What "shown" becomes when a poll brings a fresh list: the person's "More" survives,
+ *  unless the list itself no longer reaches what they were shown. */
+export const keptShown = (shown: number, limit: number | undefined, rows: number): number =>
+  Math.min(shown, Math.max(limit || 0, rows));
+
 export function DataTable<T>({
   columns,
   rows,
@@ -246,7 +251,9 @@ export function DataTable<T>({
   const T = useT();
   const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(defaultSort ? { key: defaultSort, desc: defaultDesc } : null);
   const [shown, setShown] = useState(limit || 0);
-  useEffect(() => setShown(limit || 0), [limit, rows]);
+  // every poll re-creates the rows array: the person's "More" survives the refresh, and
+  // gives way only when the list itself no longer reaches what they were shown
+  useEffect(() => setShown((s) => keptShown(s, limit, rows.length)), [limit, rows]);
   const sorted = useMemo(() => {
     if (!sort) return rows;
     const col = columns.find((c) => c.key === sort.key);

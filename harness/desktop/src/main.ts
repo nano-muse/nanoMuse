@@ -11,7 +11,8 @@ import { defaultHelperPath, HELPER_NAME, MacHelper } from "./mac-helper";
 import * as macPermissions from "./mac-permissions";
 import { Operator, SCREEN_PERMISSION_TEXT, type Marker } from "./operator";
 import { startOperatorServer, type OperatorServer } from "./operator-server";
-import { EXTERNAL_URL, mediaPermissionAllowed, navigationVerdict, sameOrigin } from "./navigation";
+import { EXTERNAL_URL, navigationVerdict, sameOrigin } from "./navigation";
+import { editContextMenu, installWindowPermissions } from "./window-permissions";
 import { readPrivateJson, writePrivateJson } from "./private-json";
 import { relink } from "./profile-link";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
@@ -1841,10 +1842,10 @@ function createWindow(): BrowserWindow {
     e.preventDefault();
     if (verdict === "external") void shell.openExternal(url);
   });
-  win.webContents.session.setPermissionRequestHandler((_wc, permission, callback, details) => {
-    // Dictation receives audio only. Video, mixed capture and cross-origin frames are denied.
-    const media = details as Electron.MediaAccessPermissionRequest;
-    callback(mediaPermissionAllowed(permission, details.requestingUrl, media.securityOrigin, media.mediaTypes, hostUrl));
+  installWindowPermissions(win.webContents, () => hostUrl);
+  win.webContents.on("context-menu", (_event, params) => {
+    const items = editContextMenu(params);
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
   });
   win.on("closed", mainWindowClosed);
   // Windows logoff/shutdown may close the last window without before-quit.
