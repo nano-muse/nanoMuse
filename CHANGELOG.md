@@ -11,6 +11,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
+
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
