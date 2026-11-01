@@ -132,6 +132,45 @@ def test_thread_ids_are_file_safe():
     assert thread_id_for("wecom", "") == "channel-wecom-chat"
 
 
+def test_thread_ids_fold_case_only_where_ids_are_case_insensitive():
+    # Windows resolves two names that differ only by case to one file, and a WeCom user's
+    # id is documented case-insensitive, so one person arrives in two spellings: fold.
+    assert thread_id_for("wecom", "ZhangSan") == thread_id_for("wecom", "zhangsan")
+    assert thread_id_for("wecom", "ZhangSan") == "channel-wecom-zhangsan"
+    # ids whose case distinguishes chats keep the case they arrive in
+    assert thread_id_for("feishu", "Ou_CaseSensitive") == "channel-feishu-Ou_CaseSensitive"
+    assert thread_id_for("dingtalk", "AbC123") == "channel-dingtalk-AbC123"
+
+
+def test_a_folded_wecom_id_adopts_the_history_an_earlier_spelling_wrote(chan):
+    client, service, llm, manager, fake = chan
+    folded = thread_id_for("wecom", "zhangsan")
+    # the spelling the pre-fold runtime would have registered for the same chat
+    old = "channel-wecom-ZhangSan"
+    assert folded == "channel-wecom-zhangsan" != old
+    service.timeline(old).add({"kind": "user", "text": "earlier spelling"})
+    service.rename_thread(old, "WeCom · ZhangSan")
+
+    service.adopt_thread_id(folded)
+
+    assert folded in service.threads and old not in service.threads
+    moved = service.threads[folded]
+    assert moved.title == "WeCom · ZhangSan"
+    assert [e["text"] for e in moved.timeline.events] == ["earlier spelling"]
+    assert moved.timeline.path.name == folded + ".json"
+    assert moved.timeline.path.exists()
+    # the folder holds the folded spelling only (an exists() probe would say yes to
+    # both spellings on a case-insensitive filesystem)
+    names = [p.name for p in service.threads_dir.glob("channel-wecom-*")]
+    assert folded + ".json" in names
+    assert old + ".json" not in names
+    # nothing to adopt: an id already registered, or one with no earlier spelling
+    service.adopt_thread_id(folded)
+    service.adopt_thread_id("channel-wecom-nobody")
+    assert folded in service.threads
+    assert "channel-wecom-nobody" not in service.threads
+
+
 def test_first_message_gets_a_pairing_code_and_approval_pairs(chan):
     client, service, llm, manager, fake = chan
     view = client.get("/api/channels").json()

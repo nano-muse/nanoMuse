@@ -82,10 +82,23 @@ _TOOL_LABELS = {
 }
 
 
+_CASE_FOLDED_CHANNELS = frozenset({"wecom"})
+"""Channels whose chat ids are case-insensitive by their own documentation, so one chat
+can arrive in more than one spelling: WeCom's admin-typed user ids: "userid ... 不区分
+大小写" (https://developer.work.weixin.qq.com/document/path/96255). Ids that merely tend
+to be lower case (Telegram's numbers, Feishu's and DingTalk's ids) keep the case they
+arrive in: folding those could merge two chats that are genuinely different."""
+
+
 def thread_id_for(channel: str, chat_id: str) -> str:
-    """The conversation a chat maps to. Letters, digits, ``_ . -`` only: the id names a file
-    in the threads folder, and a colon in a file name breaks on Windows."""
+    """The conversation a chat maps to. Letters, digits, ``_ . -`` only, folded to lower
+    case where the channel's own ids are case-insensitive: the id names a file in the
+    threads folder, a colon in a file name breaks on Windows, and two spellings of one
+    WeCom id that differ by case are one file there — a user whose admin-typed id is
+    ``ZhangSan`` and arrives once as ``ZhangSan`` and once as ``zhangsan``."""
     safe = _SAFE.sub("_", chat_id).strip("._") or "chat"
+    if channel in _CASE_FOLDED_CHANNELS:
+        safe = safe.lower()
     return f"{THREAD_PREFIX}{channel}-{safe[:80]}"
 
 
@@ -324,6 +337,9 @@ class ChannelManager(ChannelBus):
         thread_id = thread_id_for(msg.channel, msg.chat_id)
         self.routes[thread_id] = (msg.channel, msg.chat_id)
         if thread_id not in self.svc.threads:
+            if msg.channel in _CASE_FOLDED_CHANNELS:
+                # this chat may have written history under an earlier spelling
+                self.svc.adopt_thread_id(thread_id)
             self.svc.timeline(thread_id)
             label = self.types[msg.channel].label
             who = msg.chat_name or (
