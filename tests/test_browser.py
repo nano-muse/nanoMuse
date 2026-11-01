@@ -266,6 +266,21 @@ def test_sentinel_view_of_actions(tmp_path: Path):
     )
 
 
+async def test_two_screenshots_in_the_same_second_are_two_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from nanomuse.tools import browser as browser_module
+
+    backend = FakeBackend()
+    tool, _frames = tool_with(backend, tmp_path)
+    monkeypatch.setattr(browser_module.time, "strftime", lambda fmt: "20260101-120000")
+    first = await tool.execute(action="screenshot")
+    second = await tool.execute(action="screenshot")
+    assert first.ok and second.ok
+    assert Path(first.system) != Path(second.system)  # the first picture survives the second
+    assert Path(first.system).read_bytes() == JPEG and Path(second.system).read_bytes() == JPEG
+
+
 async def test_user_actions_are_reported_to_the_model_once(tmp_path: Path):
     backend = FakeBackend()
     tool, frames = tool_with(backend, tmp_path)

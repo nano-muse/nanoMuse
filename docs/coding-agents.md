@@ -94,6 +94,11 @@ EOF: `cursor-agent` leaves a worker server running after it answers and would
 otherwise hold the run open forever. The process is then waited for and killed
 after a grace period.
 
+When the Python runtime lists sessions for a workspace, it checks each transcript's
+workspace before applying the result limit. Newer chats in other projects do not hide
+that workspace's history. The stored workspace takes priority over a directory name,
+since different paths can map to the same directory name in a coding agent's store.
+
 ## Where it runs
 
 Every agent runs with the permissions it has on that computer (Codex in

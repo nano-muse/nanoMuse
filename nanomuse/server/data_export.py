@@ -19,7 +19,13 @@ The README in the zip says all of this.
 from __future__ import annotations
 
 import io
+import os
+import stat
+import sys
+import time
 import zipfile
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -80,34 +86,134 @@ def filename() -> str:
     return f"nanomuse-data-{stamp()}.zip"
 
 
-def _regular_file(path: Path) -> bool:
-    """A real file inside the data tree, never a symlink to something excluded."""
+def _open(path: Path, *, directory: bool = False, parent_fd: int | None = None) -> int:
+    """Open one entry, never following it, relative to an already pinned parent."""
+    if sys.platform == "win32":
+        from nanomuse.server.data_export_windows import open_no_follow
+
+        return open_no_follow(path, directory=directory, parent_fd=parent_fd)
+    else:
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        if directory:
+            flags |= os.O_DIRECTORY
+        return os.open(path if parent_fd is None else path.name, flags, dir_fd=parent_fd)
+
+
+def _is_link(info: os.stat_result) -> bool:
+    # fstat on a Windows junction does not necessarily report S_IFLNK.
+    return stat.S_ISLNK(info.st_mode) or bool(
+        getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+    )
+
+
+@contextmanager
+def _directory(path: Path, parent_fd: int | None = None) -> Iterator[int]:
+    fd = _open(path, directory=True, parent_fd=parent_fd)
     try:
-        return not path.is_symlink() and path.is_file()
+        info = os.fstat(fd)
+        if _is_link(info) or not stat.S_ISDIR(info.st_mode):
+            raise OSError("export directory is not a regular directory")
+        yield fd
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _data_directory(path: Path) -> Iterator[tuple[Path, int]]:
+    # Resolve configured ancestors (e.g. macOS /var), then pin every component of that
+    # path. The data directory itself, and every exported descendant, must not be a link.
+    path = path.absolute()
+    path = path.parent.resolve(strict=True) / path.name
+    with ExitStack() as stack:
+        current = Path(path.anchor)
+        fd = stack.enter_context(_directory(current))
+        for part in path.parts[1:]:
+            current /= part
+            fd = stack.enter_context(_directory(current, fd))
+        yield path, fd
+
+
+def _read_file(path: Path, parent_fd: int) -> tuple[os.stat_result, bytes] | None:
+    """Validate and read the same object, with a bound even if it grows during the read."""
+    try:
+        fd = _open(path, parent_fd=parent_fd)
+        try:
+            before = os.fstat(fd)
+            if (
+                _is_link(before)
+                or not stat.S_ISREG(before.st_mode)
+                or before.st_nlink != 1
+                or before.st_size > MAX_FILE_BYTES
+            ):
+                return None
+            with os.fdopen(fd, "rb", closefd=False) as source:
+                content = source.read(MAX_FILE_BYTES + 1)
+            after = os.fstat(fd)
+            if (
+                len(content) > MAX_FILE_BYTES
+                or after.st_nlink != 1
+                or after.st_size != before.st_size
+                or after.st_mtime_ns != before.st_mtime_ns
+                or after.st_ctime_ns != before.st_ctime_ns
+            ):
+                return None
+            return before, content
+        finally:
+            os.close(fd)
     except OSError:
-        return False
+        # A missing, inaccessible or replaced entry does not prevent exporting the rest.
+        return None
 
 
-def _add_tree(z: zipfile.ZipFile, root: Path, under: str) -> None:
-    if root.is_symlink():
+def _add_file(z: zipfile.ZipFile, path: Path, fd: int, name: str) -> None:
+    checked = _read_file(path, fd)
+    if checked is None:
         return
-    for path in sorted(root.rglob("*")):
-        if _regular_file(path) and path.stat().st_size <= MAX_FILE_BYTES:
-            z.write(path, f"{under}/{path.relative_to(root).as_posix()}")
+    info, content = checked
+    # Preserve the original metadata without ZipInfo.from_file's second pathname lookup.
+    stamp = time.localtime(info.st_mtime)
+    entry = zipfile.ZipInfo(name, stamp[:6])
+    entry.external_attr = (info.st_mode & 0xFFFF) << 16
+    entry.compress_type = zipfile.ZIP_DEFLATED
+    z.writestr(entry, content)
+
+
+def _add_tree(z: zipfile.ZipFile, root: Path, fd: int, under: str) -> None:
+    try:
+        names = sorted(os.listdir(root if sys.platform == "win32" else fd))
+    except OSError:
+        return
+    for name in names:
+        path = root / name
+        archive_name = f"{under}/{name}"
+        # The directory open is no-follow too, so swapping a tree after enumeration
+        # cannot redirect child opens. Windows may enumerate a changed pathname, but
+        # each returned name is opened relative to the original directory handle.
+        try:
+            with _directory(path, fd) as child_fd:
+                _add_tree(z, path, child_fd, archive_name)
+            continue
+        except OSError:
+            pass
+        _add_file(z, path, fd, archive_name)
 
 
 def agent_data_zip(data_dir: Path) -> bytes:
     """The zip's bytes: every file of the agent's data that is there, and the README."""
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        for name in FILES:
-            path = data_dir / name
-            if _regular_file(path) and path.stat().st_size <= MAX_FILE_BYTES:
-                z.write(path, name)
-        for folder in DIRS:
-            root = data_dir / folder
-            if not root.is_symlink() and root.is_dir():
-                _add_tree(z, root, folder)
+        try:
+            with _data_directory(data_dir) as (root, fd):
+                for name in FILES:
+                    _add_file(z, root / name, fd, name)
+                for folder in DIRS:
+                    try:
+                        with _directory(root / folder, fd) as child_fd:
+                            _add_tree(z, root / folder, child_fd, folder)
+                    except OSError:
+                        continue
+        except OSError:
+            pass
         z.writestr(
             "README.txt", README.format(when=datetime.now(UTC).isoformat(timespec="seconds"))
         )

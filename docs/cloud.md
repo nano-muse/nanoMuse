@@ -269,6 +269,9 @@ It is written after the answer has left, off the request's path, and is never
 the reason a chat fails. It does not depend on *Help improve* (that switch is
 about the training set) or on *Sync conversations* (that is the apps' own
 copy of a chat); `RECORD_TURNS=0` on a relay you run keeps none of it.
+The timestamp is captured when the reply finishes. Records from the same account
+are saved in that order, including replies with media, while other accounts can
+record independently. A failed write does not block that account's later turns.
 
 **Who reads it.** The account's devices: `GET /v1/turns` (newest first; paged
 with `before` and `before_id`; `conversation=` for one chat), `GET
@@ -281,6 +284,10 @@ this is the account's data, not the training set, which stays
 `/v1/admin/samples/export` without them), one file at
 `/v1/admin/blobs/{sha256}`, and `GET /v1/admin/record` for the figures:
 turns and files in all and per day, the store against its cap.
+
+In the admin console, changing a filter on Turns or an account's ledger and events
+starts a new list. An older page still loading cannot add its rows to that list
+or replace its error and loading state.
 
 History and sample pages use the existing timestamp indexes to skip newer seconds before applying the insertion-order tie-break. Exports and the analytics backfill use the same paging boundary; no database migration is needed.
 
@@ -591,6 +598,10 @@ so it can skip its own echo).
 
 ## Allowance
 
+The admin console's Usage dates, day picker and People sign-up chart follow the
+relay's `DAY_OFFSET_H` calendar. Viewing them from a different browser timezone
+does not shift a day's label or move its sign-ups into an adjacent day.
+
 nanoMuse is a community project and charges nothing. The public relay at
 `cloud.nanomuse.cn` is paid for by the developer, so each account has a pool
 to draw on, for its lifetime, not by the day (relay 0.5):
@@ -697,6 +708,10 @@ card changes; its title and buttons stay the app's. Apps built against relay
 0.22 and earlier ignore the two fields.
 
 ## Controls
+
+In the admin console, a People table or a Usage day's top accounts expanded with
+*More* keeps its visible rows when polling refreshes the data. If the list becomes
+shorter, the expansion shrinks with it.
 
 The operator can pause parts of the relay without a restart or a deploy
 (relay 0.22, *Controls* on the admin console; `nanomuse-cloud admin controls

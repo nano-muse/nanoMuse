@@ -482,8 +482,16 @@ class Browser(BaseTool):
         if action == "screenshot":
             shots = self.workspace / "screenshots"
             shots.mkdir(parents=True, exist_ok=True)
-            path = shots / f"{time.strftime('%Y%m%d-%H%M%S')}.jpg"
-            path.write_bytes(await backend.screenshot(85))
+            data = await backend.screenshot(85)
+            # two screenshots inside one second (click, then look again) are two pictures:
+            # the second takes the next free name, not the first one's file
+            stem = time.strftime("%Y%m%d-%H%M%S")
+            path = shots / f"{stem}.jpg"
+            n = 2
+            while path.exists():
+                path = shots / f"{stem}-{n}.jpg"
+                n += 1
+            path.write_bytes(data)
             await self._frame(backend, "Took a screenshot")
             return ToolResult(output=f"Screenshot saved to {path}", system=str(path))
         return ToolResult.fail(f"unknown action '{action}'")
