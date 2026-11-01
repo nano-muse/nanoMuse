@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../App";
 import { ApiError, download, get, post, qs } from "../lib/api";
+import { LatestRequest } from "../lib/latest-request";
 import { clientLine } from "../lib/client";
 import { compact, dateOf, dur, fmt, money, ms, when } from "../lib/format";
 import { invalidate, useData, useNow } from "../lib/hooks";
@@ -352,29 +353,28 @@ function usePaged<R extends { id: number }>(path: string, kind: string, text: st
   const [done, setDone] = useState(false);
   // a page asked for under older filters (a "More" still in flight when they changed)
   // must not land under the new ones, nor clear their loading flag
-  const gen = useRef(0);
+  const requests = useRef(new LatestRequest());
   const load = useCallback(
-    async (before: number) => {
-      const mine = ++gen.current;
-      setLoading(true);
-      setError("");
-      try {
-        const r = await get<{ rows: R[]; total: number }>(`${path}${qs({ limit: 200, before, kind, q: text })}`);
-        if (mine !== gen.current) return;
-        setRows((xs) => (before ? [...xs, ...r.rows] : r.rows));
-        setTotal(r.total);
-        setDone(r.rows.length < 200);
-      } catch (e) {
-        if (mine === gen.current) setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (mine === gen.current) setLoading(false);
-      }
-    },
+    (before: number) => requests.current.run(
+      () => get<{ rows: R[]; total: number }>(`${path}${qs({ limit: 200, before, kind, q: text })}`),
+      {
+        start: () => { setLoading(true); setError(""); },
+        success: (r) => {
+          setRows((xs) => (before ? [...xs, ...r.rows] : r.rows));
+          setTotal(r.total);
+          setDone(r.rows.length < 200);
+        },
+        error: (e) => setError(e instanceof Error ? e.message : String(e)),
+        finish: () => setLoading(false),
+      },
+    ),
     [path, kind, text],
   );
   useEffect(() => {
+    const pending = requests.current;
     setRows([]);
     void load(0);
+    return () => pending.invalidate();
   }, [load]);
   const more = () => rows.length && void load(rows[rows.length - 1].id);
   return { rows, total, loading, error, done, more };

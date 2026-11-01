@@ -282,6 +282,10 @@ this is the account's data, not the training set, which stays
 `/v1/admin/blobs/{sha256}`, and `GET /v1/admin/record` for the figures:
 turns and files in all and per day, the store against its cap.
 
+In the admin console, changing a filter on Turns or an account's ledger and events
+starts a new list. An older page still loading cannot add its rows to that list
+or replace its error and loading state.
+
 History and sample pages use the existing timestamp indexes to skip newer seconds before applying the insertion-order tie-break. Exports and the analytics backfill use the same paging boundary; no database migration is needed.
 
 **Turns on your own key.** From 1.0.7 an app that ran a turn on a key of its

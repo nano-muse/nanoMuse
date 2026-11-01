@@ -11,6 +11,7 @@ import { compact, dur, fmt, nowS, when } from "../lib/format";
 import { useData, useDebounced } from "../lib/hooks";
 import { nameOf, useT, useZh } from "../lib/i18n";
 import { useRoute } from "../lib/router";
+import { LatestRequest } from "../lib/latest-request";
 import type { RecordView, TurnFull, TurnGroup, TurnGroups, TurnMessage, TurnStep } from "../lib/types";
 import { Ranks, modelColor } from "../ui/charts";
 import { isBlobRef, partsOf, toolArgs } from "../lib/turns";
@@ -255,30 +256,31 @@ function useTurnPages(query: string) {
   const [done, setDone] = useState(false);
   // a page asked for under an older filter (a "More" still in flight when the filter
   // changed) must not land under the new one, nor clear its loading flag
-  const gen = useRef(0);
+  const requests = useRef(new LatestRequest());
   const load = useCallback(
-    async (after?: TurnGroup) => {
-      const mine = ++gen.current;
-      setLoading(true);
-      setError("");
-      try {
+    (after?: TurnGroup) => requests.current.run(
+      () => {
         const extra = after ? `&before=${after.ts1}&before_key=${encodeURIComponent(after.key)}` : "";
-        const page = await get<TurnGroups>(`/v1/admin/record/turns?${query}${extra}`);
-        if (mine !== gen.current) return;
-        setPages((p) => (after ? [...p, page] : [page]));
-        if (page.turns.length < PAGE) setDone(true);
-      } catch (e) {
-        if (mine === gen.current) setError(String((e as Error).message || e));
-      } finally {
-        if (mine === gen.current) setLoading(false);
-      }
-    },
+        return get<TurnGroups>(`/v1/admin/record/turns?${query}${extra}`);
+      },
+      {
+        start: () => { setLoading(true); setError(""); },
+        success: (page) => {
+          setPages((p) => (after ? [...p, page] : [page]));
+          if (page.turns.length < PAGE) setDone(true);
+        },
+        error: (e) => setError(e instanceof Error ? e.message : String(e)),
+        finish: () => setLoading(false),
+      },
+    ),
     [query],
   );
   useEffect(() => {
+    const pending = requests.current;
     setPages([]);
     setDone(false);
     void load();
+    return () => pending.invalidate();
   }, [load]);
   const turns = useMemo(() => pages.flatMap((p) => p.turns), [pages]);
   const last = turns[turns.length - 1];
