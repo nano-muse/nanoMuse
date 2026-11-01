@@ -151,20 +151,20 @@ def files(path: str | None = None) -> dict[str, Any]:
         raise ActionError("not_found", f"{p} does not exist")
     if p.is_file():
         return {"path": str(p), "entries": [_entry(p, p.stat())]}
-    entries = []
+    entries: list[dict[str, Any]] = []
     try:
         children = sorted(p.iterdir(), key=lambda c: (not c.is_dir(), c.name.lower()))
     except PermissionError as exc:
         raise ActionError("forbidden", f"cannot read {p}") from exc
     for child in children:
         try:
-            entries.append(_entry(child, child.lstat()))
+            entry = _entry(child, child.lstat())
         except OSError:
             continue
         if len(entries) >= FILES_MAX:
-            # a cut list reads as the whole folder, and the phone has no way to know
-            # there are more — the shell's own output cap says so in text
+            # Only an additional readable entry proves that the listing was capped.
             return {"path": str(p), "entries": entries, "truncated": True, "total": len(children)}
+        entries.append(entry)
     return {"path": str(p), "entries": entries}
 
 

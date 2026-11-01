@@ -303,6 +303,12 @@ remembered. Bodies for `file.get`, `file.put` and `screen` carry the bytes in
 base64 (`data`) with `mime`; the desktop refuses files over 8 MB, the relay
 refuses frames over `HUB_FRAME_LIMIT`.
 
+The Python runtime's `files` action returns at most 2,000 directory entries. When more
+readable entries exist, the result also includes `truncated: true` and `total`, the number
+of names observed in the directory before per-entry reads. An entry that disappears or
+cannot be read may be omitted. An exactly full listing is not marked truncated. These
+fields are optional additions; clients must also accept responses without them.
+
 From relay 0.27, a credential owns one Hub identity: its `device.id` and
 `device.kind` are fixed when the credential is issued with `device_id` and
 `device_kind` (`POST /v1/auth/verify` and `/login`), or else at the first
