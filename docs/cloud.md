@@ -705,6 +705,10 @@ card changes; its title and buttons stay the app's. Apps built against relay
 
 ## Controls
 
+In the admin console, a People table or a Usage day's top accounts expanded with
+*More* keeps its visible rows when polling refreshes the data. If the list becomes
+shorter, the expansion shrinks with it.
+
 The operator can pause parts of the relay without a restart or a deploy
 (relay 0.22, *Controls* on the admin console; `nanomuse-cloud admin controls
 …` on the command line; see [`cloud/README.md`](../cloud/README.md#controls-022)).
