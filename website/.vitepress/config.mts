@@ -122,6 +122,7 @@ const understandIt: DefaultTheme.SidebarItem[] = [
 
 const contribute: DefaultTheme.SidebarItem[] = [
   { text: 'Contributing', link: `${REPO}/blob/main/CONTRIBUTING.md` },
+  { text: 'Goal evaluation tasks', link: '/goal-eval' },
   { text: 'AGENTS.md', link: `${REPO}/blob/main/AGENTS.md` },
   { text: 'README', link: `${REPO}/blob/main/README.md` },
   { text: 'Roadmap', link: '/roadmap' },
@@ -181,6 +182,7 @@ const zhUnderstandIt: DefaultTheme.SidebarItem[] = [
 
 const zhContribute: DefaultTheme.SidebarItem[] = [
   { text: '参与贡献（英文）', link: `${REPO}/blob/main/CONTRIBUTING.md` },
+  { text: '目标评测任务', link: '/zh/goal-eval' },
   { text: 'AGENTS.md（英文）', link: `${REPO}/blob/main/AGENTS.md` },
   { text: '中文 README', link: `${REPO}/blob/main/docs/readme/README_zh.md` },
   { text: '路线图', link: '/zh/roadmap' },

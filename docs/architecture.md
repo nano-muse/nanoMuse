@@ -90,3 +90,5 @@ cd web && npm run build             # type-checks and rebuilds the app
 
 [GUI regression](gui-regression.md) describes the fixed simulated tasks, independent
 state checks and reference/live runners; its usage recorder does not require task budgets.
+
+[Goal evaluation tasks](goal-eval.md) describes ten recorded task trajectories and the opt-in model run.
