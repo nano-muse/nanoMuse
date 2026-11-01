@@ -901,10 +901,18 @@ def test_the_status_watcher_heals_after_the_bus_drops_it(
     assert dropped is not None and service.bus.subscribed(dropped)
     # the bus drops the slow subscriber — exactly what publish does on a full queue
     client.portal.call(service.bus.unsubscribe, dropped)  # type: ignore[union-attr]
-    # a later step still reaches the relay: the watcher healed itself
+
+    # a later step still reaches the relay: the watcher healed itself. The presence
+    # task the first status scheduled refreshes itself off ui.status and can carry the
+    # new step before the watcher's poll swaps the dropped queue, so the delivery does
+    # not by itself prove the heal: the fresh queue is waited for, then the delivery.
+    def healed() -> bool:
+        fresh = service.sync._status_queue
+        return fresh is not None and fresh is not dropped and service.bus.subscribed(fresh)
+
     client.portal.call(lambda: service.ui.set_status("working", "after the drop", MAIN_THREAD))
+    wait_for(healed)
     wait_for(lambda: any(c.get("detail") == "after the drop" for c in relay.working_calls))
-    assert service.sync._status_queue is not dropped
     client.portal.call(gate.set)  # type: ignore[union-attr]
     wait_for(lambda: relay.working_calls[-1]["working"] is False)
 
