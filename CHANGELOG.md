@@ -21,6 +21,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
+
 - **Added an on-demand guide for the agent's own desktop capabilities.** The native skill catalog now includes workspace and second-brain folder guidance, Windows paths, settings, connectors, skills, memory, and rooms, without searching app source or private configuration. Existing approval rules still apply. For [#712](https://github.com/nano-muse/nanoMuse/issues/712).
 
 - **A task from the phone works again after its chat was archived.** nanoMuse Desktop keeps a task's conversation in one chat, *From <device>*, and reuses it for the next task from the same device. Once somebody archived that chat in the chats column, the harness's archived-session gate refused every later task before the model was asked: the turn ended `blocked`, the hub answered with no words, and the phone drew 「完成」 as if the work had been done. A task now brings its chat back, as opening the chat and typing in it does, and a task a chat still refuses to start fails with a sentence instead of an empty answer. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
