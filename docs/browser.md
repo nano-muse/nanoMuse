@@ -64,6 +64,10 @@ Every action that changes the page sends a frame to the chat: a JPEG of the page
 
 From a script inside the sandbox on the phone the same tool is `nanomuse-browser <action> …` ([local-runtime.md](local-runtime.md#the-python-side-on-a-phone)): `nanomuse-browser fetch https://example.com/api/orders` is rung two from the shell, under the same Sentinel.
 
+The Python runtime saves explicit screenshots under `<workspace>/screenshots/` with a
+timestamped filename. Shots taken within the same second get separate names such as
+`20260101-120000-2.jpg`, so the earlier picture remains available.
+
 ## Logging in
 
 A page that wants a login is the user's job, not the model's. The agent stops at the form and hands the page over (`browser` → `hand_over`, with the reason: *sign in to 12306*, *type the code from the SMS*, *solve the CAPTCHA*, *confirm the payment*); the user does it and presses **Done**; the agent continues with the page as it is. The browser card in the chat is where that happens, and the same card appears when the user takes over first:

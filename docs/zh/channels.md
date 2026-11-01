@@ -70,6 +70,9 @@ Docker 镜像带全了这些。没装 SDK 时，应用会显示要安装的那�
 
 socket 主机（`openws.work.weixin.qq.com`）已加进运行时进程的 `NO_PROXY`；公司的 HTTPS 代理通常带不动它。回复经同一个 socket 流式返回；主动消息（推送）是 markdown。
 
+运行时最多保留 1,000 个企业微信聊天的回复帧。如果某个聊天的帧已被移除，它接下来
+等待发送的回复会作为一条完整消息发出，不再流式更新。收到新消息后会保留新的回复帧。
+
 ### Telegram {#telegram}
 
 1. 在 Telegram 里找 **@BotFather**，发 `/newbot`，把 token 复制到应用里。

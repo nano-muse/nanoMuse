@@ -208,6 +208,38 @@ async def test_connect_messages_and_streamed_replies(sdk: types.ModuleType, tmp_
         await ch.send("ann", "x")
 
 
+async def test_the_last_frame_per_chat_is_capped(sdk: types.ModuleType):  # noqa: ANN001
+    bus = Bus()
+    ch = WeComChannel({"bot_id": "bot-1", "secret": "s3"})
+    await ch.start(bus)
+    client = FakeWSClient.instances[0]
+    for i in range(1002):
+        await client.handlers["message.text"](
+            frame(
+                {
+                    "msgid": f"m{i}",
+                    "from": {"userid": f"u{i}"},
+                    "chattype": "single",
+                    "text": {"content": "x"},
+                },
+                req_id=f"req-{i}",
+            )
+        )
+    # a company-wide robot hears from thousands of chats: only a chat's newest frame is
+    # ever asked for, and the map gives the oldest away
+    assert len(ch._frames) == 1000
+    # the oldest chat's frame fell off the cap, so its reply goes out plainly
+    await ch.stream("u0", "s-old", "late", done=True)
+    assert client.of("send_message")[-1] == (
+        "u0",
+        {"msgtype": "markdown", "markdown": {"content": "late"}},
+    )
+    # the newest chat's frame is still there to stream against
+    await ch.stream("u1001", "s-new", "now", done=True)
+    assert ("req-1001", "s-new", "now", True) in client.of("reply_stream")
+    await ch.stop()
+
+
 async def test_bad_secret_fails_to_start(sdk: types.ModuleType):
     ch = WeComChannel({"bot_id": "bot-1", "secret": "bad"})
     with pytest.raises(RuntimeError, match="invalid secret"):
