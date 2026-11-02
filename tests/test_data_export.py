@@ -359,7 +359,7 @@ def test_the_export_carries_the_data_the_runtime_actually_keeps(tmp_path: Path) 
     (tmp_path / "phone-traces" / "task-1.jsonl").write_bytes(b"{}")
     (tmp_path / "computer-traces").mkdir()
     (tmp_path / "computer-traces" / "task-2.jsonl").write_bytes(b"{}")
-    (tmp_path / "scheduled-deliveries.db").write_bytes(b"SQLite format 3")
+    _spilling_database(tmp_path / "scheduled-deliveries.db")
     (tmp_path / "nudges.json").write_bytes(b"[]")
     # deliberately this device's own concerns, named in the README's "not in this zip"
     (tmp_path / "sync.json").write_bytes(b"{}")
@@ -541,8 +541,9 @@ def test_database_snapshot_never_reopens_the_live_path(
         db.close()
 
 
-def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path) -> None:
-    db = sqlite3.connect(tmp_path / "memory.db")
+@pytest.mark.parametrize("name", export.DATABASES)
+def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path, name: str) -> None:
+    db = sqlite3.connect(tmp_path / name)
     try:
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("PRAGMA wal_autocheckpoint=0")
@@ -553,7 +554,7 @@ def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path) -> None:
         got = entries(tmp_path)
         check = sqlite3.connect(":memory:")
         try:
-            check.deserialize(got["memory.db"])
+            check.deserialize(got[name])
             assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
             assert check.execute("SELECT value FROM t").fetchall() == [("committed",)]
         finally:

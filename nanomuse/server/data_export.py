@@ -59,7 +59,7 @@ FILES = (
 
 # The SQLite databases among the files: shipped as a self-consistent snapshot, not as the
 # raw bytes of a file a writer may be mid-way through (the rollback journal never ships).
-DATABASES = ("memory.db", "goals.db", "reminders.db", "triggers.db")
+DATABASES = ("memory.db", "goals.db", "reminders.db", "triggers.db", "scheduled-deliveries.db")
 
 # How long to wait for a database's rollback journal to clear before shipping the file.
 DATABASE_WAIT_S = 5.0
@@ -83,7 +83,7 @@ contacts.vcf              the agent's address book
 contacts-cache.json       the contacts it looked up
 contacts/                 the address-book sources, as uploaded
 calendar-cache.json       the calendar as last read
-skills/                   the skills edited in the app, one folder each
+skills/                   skills stored in the data directory, one folder each
 phone-traces/             what ran on the phone, one file per task
 computer-traces/          what ran on the computer, one file per task
 firstrun.json             the first-conversation state
