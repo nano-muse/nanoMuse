@@ -228,6 +228,8 @@ harness 保留外部下载方式。不带软件内更新能力的版本，需先
 
 ## 配置和数据 {#config-and-data}
 
+一台设备完成一轮任务时，只会清除自己的工作状态。较早的停止通知不会清除同一设备后来发出的工作状态。
+
 `~/.nanomuse/desktop`（`NANOMUSE_DESKTOP_HOME` 可以把它挪到别处）是应用的 dsh 主目录：
 `profiles/nanomuse` 下的 profile（插件列表，以及本人的 `cordis.patch.yml`，设置页和登录流程把
 `nanoMuse Cloud` 服务商写在这里），存着账号 key 的 dsh 凭据存储，会话，记录外壳和 Host 两边

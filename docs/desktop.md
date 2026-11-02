@@ -304,6 +304,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
+
 `~/.nanomuse/desktop` (`NANOMUSE_DESKTOP_HOME` moves it) is the app's dsh home: the
 profile under `profiles/nanomuse` (the bundle list, the person's own `cordis.patch.yml`
 where Settings and the sign-in write the `nanoMuse Cloud` provider), dsh's credential

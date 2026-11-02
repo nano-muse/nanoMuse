@@ -30,7 +30,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
-- **One device finishing no longer takes away another device's working line.** The «is working» line under a conversation was dropped by any end that named it: another device's turn ending, or its reply arriving, deleted the line whoever's it was — a phone still mid-turn lost its line the moment a tablet finished its own, until the phone's next step brought it back. An end now takes away only the line the device that ended put up — a working frame by its own sender, or its own reply arriving — and a late end of an earlier turn no longer cuts a newer line either.
+- Kept another device's working indicator when a different device finished a turn.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
