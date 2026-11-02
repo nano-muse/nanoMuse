@@ -44,7 +44,7 @@
  *
  * Never a key in a log, never a file: attachments travel as names and sizes.
  */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -142,7 +142,19 @@ export interface PushResult {
   rejected: Array<{ cid?: string; mid?: string; reason: string; cid_main?: string }>
 }
 
-/** `/v1/sync/*` as the engine needs them; `fetchImpl` is swapped in tests. Every call has a deadline (relay.ts `withTimeout`), so a hung connection does not stall the sync for good. */
+/** A message id stable across retries: the relay keeps a known mid out of the tables, so a line
+ * whose answer was lost and is sent again must carry the mid it went up with, not a fresh one;
+ * otherwise the same words land twice and every other device reads them twice. */
+export function deriveMid(device: string, sessionId: string, lineId: string): string {
+  return createHash('sha256').update(JSON.stringify([device, sessionId, lineId])).digest('hex').slice(0, 32)
+}
+
+/** Local line IDs can be reused by different session logs. */
+export function lineKey(sessionId: string, lineId: string): string {
+  return `line:${JSON.stringify([sessionId, lineId])}`
+}
+
+/** Relay calls have deadlines; tests supply a local fetch implementation. */
 export class SyncRelay {
   readonly origin: string
   private readonly fetchImpl: TimedFetch
@@ -481,7 +493,7 @@ export interface SyncState {
   cids: Record<string, string>
   /** dsh session id → the account it was first pushed to or pulled from (C10); absent = never synced. */
   owners: Record<string, string>
-  /** dsh message id → the mid it was pushed as. */
+  /** Session-scoped local line key to uploaded mid; legacy bare message IDs remain readable. */
   mids: Record<string, string>
   /** session id → the title last pushed (or pulled: not pushed back). */
   titles: Record<string, string>
@@ -812,7 +824,10 @@ export class SyncEngine {
       // on again: this device's conversations go up in full — the signed-in account's and the
       // ownerless; another account's lines keep their ids (its relay store was not emptied, C10)
       const keep = new Set<string>()
-      for (const sid of this.foreign()) for (const line of await this.options.sessions.lines(sid).catch(() => [] as SessionLine[])) keep.add(line.id)
+      for (const sid of this.foreign()) for (const line of await this.options.sessions.lines(sid).catch(() => [] as SessionLine[])) {
+        keep.add(line.id) // Preserve mappings written by earlier versions.
+        keep.add(lineKey(sid, line.id))
+      }
       this.state.titles = Object.fromEntries(Object.entries(this.state.titles).filter(([sid]) => !this.owns(sid)))
       this.state.mids = Object.fromEntries(Object.entries(this.state.mids).filter(([id]) => keep.has(id)))
     }
@@ -1143,12 +1158,12 @@ export class SyncEngine {
         }
         const lines = await this.options.sessions.lines(sessionId)
         for (const line of lines) {
-          if (this.state.mids[line.id]) continue
+          if (this.state.mids[lineKey(sessionId, line.id)] || this.state.mids[line.id]) continue
           if (messages.length >= batch) {
             again.add(sessionId)
             break
           }
-          const mid = randomUUID()
+          const mid = deriveMid(device, sessionId, line.id)
           messages.push({ mid, cid, role: line.role, text: line.text, created_at: Math.floor(line.at / 1000) })
           pending.push({ sessionId, line, mid })
         }
@@ -1161,6 +1176,10 @@ export class SyncEngine {
         ids.splice(0, ids.length, ...ids.filter((sid) => again.has(sid)))
         break
       }
+      // The relay may accept this round even if its response is lost. Persist its
+      // conversation mapping and account ownership before sending, including retries.
+      for (const sid of touched) this.adopt(sid)
+      await this.options.save(this.state)
       let out: PushResult
       try {
         out = await this.options.relay.push(token, device, conversations, messages)
@@ -1170,13 +1189,11 @@ export class SyncEngine {
           batch = Math.max(1, Math.floor(messages.length / 2))
           continue
         }
-        for (const p of pending) this.state.mids[p.line.id] = `refused:${error.code || 'too_large'}`
+        for (const p of pending) this.state.mids[lineKey(p.sessionId, p.line.id)] = `refused:${error.code || 'too_large'}`
         await this.save()
         this.log('warn', `nanomuse sync: a message the relay refused as too large stays on this device (${error.code})`)
         continue
       }
-      // the relay took the round: an ownerless session is the signed-in account's from now on (C10)
-      for (const sid of touched) this.adopt(sid)
       const redirect = new Map<string, string>()
       for (const r of out.rejected) if (r.reason === 'main_exists' && r.cid && r.cid_main) redirect.set(r.cid, r.cid_main)
       if (redirect.size > 0) {
@@ -1196,7 +1213,7 @@ export class SyncEngine {
       for (const p of pending) {
         if (redirected.has(p.mid)) continue
         // a refused row stays refused: it is not sent again and again
-        this.state.mids[p.line.id] = refused.has(p.mid) ? `refused:${refused.get(p.mid)}` : p.mid
+        this.state.mids[lineKey(p.sessionId, p.line.id)] = refused.has(p.mid) ? `refused:${refused.get(p.mid)}` : p.mid
       }
       for (const c of conversations) {
         if (out.rejected.some((r) => r.cid === c.cid)) continue

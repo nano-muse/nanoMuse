@@ -309,6 +309,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+When a conversation upload reaches the relay but its response is lost, a retry keeps the same message IDs so other devices do not receive duplicate messages. The conversation mapping is saved before upload so this also works after a restart; if that local save fails, the upload waits for a later attempt.
+
 On Windows, stopping a coding run also asks the system to terminate its child processes, including detached helpers.
 
 A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.

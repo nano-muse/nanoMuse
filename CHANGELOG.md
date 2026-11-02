@@ -47,6 +47,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Kept stable message IDs when retrying conversation uploads after a lost relay response.
+
 - Stopped coding-run child processes on Windows along with their parent CLI.
 
 - Kept another device's working indicator when a different device finished a turn.
