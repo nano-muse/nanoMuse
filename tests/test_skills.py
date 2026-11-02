@@ -155,11 +155,22 @@ def test_files_skip_a_dot_segment_inside_the_folder(tmp_path: Path):
     assert s.files == [Path("scripts/sub/ok.py")]
 
 
+def test_shared_skill_creator_copies_are_current():
+    root = Path(__file__).resolve().parents[1]
+    source = (BUILTIN_DIR / "skill-creator" / "SKILL.md").read_text(encoding="utf-8")
+    for relative in (
+        "harness/dsh-nanomuse/assets/skill-creator.md",
+        "android/src/android/app/src/main/assets/nanomuse/skill-creator.md",
+    ):
+        assert (root / relative).read_text(encoding="utf-8") == source
+
+
 def test_builtin_skills_are_well_formed():
     lib = SkillLibrary(SkillsSettings(), own_dir=Path("/nonexistent/skills"))
     names = [s.name for s in lib.all()]
     assert names == sorted(names) and len(names) >= 5
     assert {
+        "skill-creator",
         "weekly-review",
         "trip-plan",
         "inbox-triage",

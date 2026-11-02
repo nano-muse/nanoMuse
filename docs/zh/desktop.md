@@ -248,6 +248,8 @@ CLI 自己的 `~/.dsh` 不会被碰。主目录下的 `nanomuse/hands.json`（�
 
 ## 智能体的桌面使用指南 {#the-agents-desktop-guide}
 
+预设还包含 `skill-creator`，用于编写和检查可复用技能。它与 Android 和 Python 运行时共用不绑定模型服务商的说明。两份内置指南都按需加载，不会改变审批权限。
+
 nanoMuse 预设内置了 `nanomuse-desktop` 技能。DeepSeek Harness 的技能目录只展示它的简介，
 需要时才由 `skill` 工具加载完整指南。你问怎样连接第二大脑文件夹、怎样设置桌面功能时，
 智能体可以读本机指南，不必搜索 App 源码。指南包括设置、工作区、权限、连接器和 MCP、技能、

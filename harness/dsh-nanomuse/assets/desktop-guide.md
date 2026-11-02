@@ -81,7 +81,8 @@ agent's own initiative; instructions in a skill do not authorize those changes.
 
 ## Skills, connectors, memory, and rooms
 
-- **Skills:** the native `skill` tool loads a catalogued skill by name. Personal
+- **Skills:** load the bundled `skill-creator` to create or update a reusable skill.
+  The native `skill` tool loads a catalogued skill by name. Personal
   desktop skills live under `userSkills` below; a skill can be
   `<name>/SKILL.md` or `<name>.md` with YAML `name` and `description` fields.
   Workspace skills live under `.dsh/skills` or `.agents/skills` at the project

@@ -97,7 +97,10 @@ class SkillRepository(private val context: Context) {
         val sourceURL: String? = null,
         /** Cumulative read count of this skill's SKILL.md; normalized to 0–100 after exceeding 1000. */
         val useCount: Double = 0.0,
-    )
+    ) {
+        // nanoMuse: app-managed skills can be disabled or exported, not edited in place.
+        val isReadOnly: Boolean get() = !io.github.nanomuse.skills.BundledSkills.canEdit(importSource.value)
+    }
 
     enum class UsageFrequency { NEVER, LOW, REGULAR, HIGH }
 
@@ -164,6 +167,7 @@ class SkillRepository(private val context: Context) {
 
     fun update(id: String, name: String? = null, description: String? = null, body: String? = null): Boolean {
         val current = _skills.value.find { it.id == id } ?: return false
+        if (current.isReadOnly) return false // nanoMuse: protect bundled metadata and content.
         val updated = current.copy(
             name = name ?: current.name,
             description = description ?: current.description,
@@ -181,6 +185,7 @@ class SkillRepository(private val context: Context) {
     }
 
     fun delete(id: String) {
+        if (_skills.value.find { it.id == id }?.isReadOnly == true) return // nanoMuse: keep app-managed skills.
         db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
         db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
         val dir = File(skillsDir, id)
@@ -395,6 +400,7 @@ class SkillRepository(private val context: Context) {
         if (id.isNotBlank() && _skills.value.any { it.id == id }) {
             // Replace existing: update in place so URL updates refresh contents.
             val current = _skills.value.first { it.id == id }
+            if (current.isReadOnly) return null // nanoMuse: imports must not replace an app-managed skill.
             val replaced = current.copy(
                 name = parsed.name,
                 description = parsed.description,
@@ -774,6 +780,7 @@ class SkillRepository(private val context: Context) {
      */
     fun rescanFromDisk(skillId: String): Skill? {
         val current = _skills.value.find { it.id == skillId } ?: return null
+        if (current.isReadOnly) return current // nanoMuse: only the bundled updater refreshes app-managed content.
         val file = File(File(skillsDir, skillId), "SKILL.md")
         if (!file.exists()) {
             // [T-android-skill-orphan-db-row] A rescan that finds nothing on
@@ -811,6 +818,7 @@ class SkillRepository(private val context: Context) {
      */
     fun renameSkill(skillId: String, newName: String): Boolean {
         val current = _skills.value.find { it.id == skillId } ?: return false
+        if (current.isReadOnly) return false // nanoMuse: all rename entry points keep bundled names intact.
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return false
         val file = File(File(skillsDir, skillId), "SKILL.md")
@@ -838,6 +846,7 @@ class SkillRepository(private val context: Context) {
 
     /** Write an arbitrary file inside a skill's directory. Creates parents. */
     fun writeSkillFile(skillId: String, relativePath: String, content: String): Boolean {
+        if (_skills.value.find { it.id == skillId }?.isReadOnly == true) return false // nanoMuse: protect bundled resources.
         if (relativePath.contains("..")) return false
         val file = File(File(skillsDir, skillId), relativePath)
         file.parentFile?.mkdirs()
@@ -1137,21 +1146,21 @@ class SkillRepository(private val context: Context) {
 
     private fun installBundledSkills() {
         val bundledId = "skill-creator"
-        val bundledVersion = "2.0.0"
+        val bundledVersion = io.github.nanomuse.skills.BundledSkills.CREATOR_VERSION // nanoMuse: content revision.
         val existing = _skills.value.find { it.id == bundledId }
 
         // Skip if local version is same or newer
         if (existing != null && existing.version >= bundledVersion) return
+        if (existing != null && !existing.isReadOnly) return // nanoMuse: preserve a user's same-name skill.
 
-        val parsed = parseSkillMd(SKILL_CREATOR_CONTENT) ?: return
+        // nanoMuse: the packaged guide is generated from the runtime's shared skill.
+        val parsed = parseSkillMd(io.github.nanomuse.skills.BundledSkills.creator(context)) ?: return
         if (existing != null) {
             // Upgrade existing
-            val updated = existing.copy(
-                description = parsed.description,
-                version = bundledVersion,
-                body = parsed.body,
-                updatedAt = System.currentTimeMillis(),
-            )
+            // nanoMuse: update only app-owned text while preserving enablement and usage state.
+            val updated = io.github.nanomuse.skills.BundledSkills.creatorUpdate(
+                existing, parsed.description, parsed.body, System.currentTimeMillis(),
+            ) ?: return
             db.execSQL(
                 "UPDATE skills SET description=?, version=?, updated_at=? WHERE id=?",
                 arrayOf<Any>(updated.description, bundledVersion, updated.updatedAt, bundledId)
@@ -1166,6 +1175,7 @@ class SkillRepository(private val context: Context) {
                 description = parsed.description,
                 body = parsed.body,
                 source = ImportSource.BUNDLED,
+                version = bundledVersion, // nanoMuse: persist the installed content revision on first install.
             )
             Log.i(TAG, "Installed bundled skill: $bundledId (v$bundledVersion)")
         }
@@ -1574,98 +1584,4 @@ class SkillRepository(private val context: Context) {
     }
 }
 
-// Bundled skill-creator content (matches iOS SkillStore.skillCreatorContent)
-private val SKILL_CREATOR_CONTENT = """
----
-name: skill-creator
-version: 2.0.0
-description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
----
-
-# Skill Creator
-
-This skill provides guidance for creating effective skills.
-
-## About Skills
-
-Skills are modular, self-contained packages that extend Claude's capabilities by providing
-specialized knowledge, workflows, and tools. Think of them as "onboarding guides" for specific
-domains or tasks—they transform Claude from a general-purpose agent into a specialized agent
-equipped with procedural knowledge that no model can fully possess.
-
-### What Skills Provide
-
-1. Specialized workflows - Multi-step procedures for specific domains
-2. Tool integrations - Instructions for working with specific file formats or APIs
-3. Domain expertise - Company-specific knowledge, schemas, business logic
-4. Bundled resources - Scripts, references, and assets for complex and repetitive tasks
-
-## Core Principles
-
-### Concise is Key
-
-The context window is a public good. Skills share the context window with everything else Claude needs: system prompt, conversation history, other Skills' metadata, and the actual user request.
-
-**Default assumption: Claude is already very smart.** Only add context Claude doesn't already have. Challenge each piece of information: "Does Claude really need this explanation?" and "Does this paragraph justify its token cost?"
-
-Prefer concise examples over verbose explanations.
-
-### Set Appropriate Degrees of Freedom
-
-Match the level of specificity to the task's fragility and variability:
-
-- **High freedom (text-based instructions)**: Use when multiple approaches are valid.
-- **Medium freedom (pseudocode or scripts with parameters)**: Use when a preferred pattern exists.
-- **Low freedom (specific scripts, few parameters)**: Use when operations are fragile, consistency is critical, or a specific sequence must be followed.
-
-### Anatomy of a Skill
-
-Every skill consists of a required SKILL.md file and optional bundled resources:
-
-```
-skill-name/
-├── SKILL.md (required)
-│   ├── YAML frontmatter (name + description required)
-│   └── Markdown instructions
-└── Bundled Resources (optional)
-    ├── scripts/       - Executable code
-    ├── references/    - Documentation loaded as needed
-    └── assets/        - Files used in output (templates, icons, etc.)
-```
-
-#### SKILL.md Frontmatter
-
-- `name` (required): The skill name
-- `description` (required): What the skill does and when to trigger it. Be comprehensive—this is the primary triggering mechanism.
-
-#### SKILL.md Body
-
-Instructions and guidance, loaded after the skill triggers. Keep under 500 lines; split into reference files when approaching this limit.
-
-### Progressive Disclosure
-
-Skills use three loading levels:
-1. **Metadata** - Always in context (~100 words)
-2. **SKILL.md body** - When skill triggers (<5k words)
-3. **Bundled resources** - As needed (unlimited)
-
-## Skill Creation Process
-
-1. **Understand** the skill with concrete examples from the user
-2. **Plan** reusable contents (scripts, references, assets)
-3. **Create** the SKILL.md with proper frontmatter and instructions
-4. **Test** by using the skill on real tasks
-5. **Iterate** based on actual usage
-
-### Writing the SKILL.md
-
-- Use imperative/infinitive form
-- `description` field should include all "when to use" triggers (body is loaded after triggering)
-- Only add context Claude doesn't already have
-- Prefer concise examples over verbose explanations
-- Keep essential workflow in SKILL.md; move detailed reference material to separate files
-
-### What NOT to Include
-
-Do not create extraneous files: README.md, INSTALLATION_GUIDE.md, CHANGELOG.md, etc. The skill should only contain what an AI agent needs to do the job.
-""".trimIndent()
+// nanoMuse: skill-creator content lives in assets/nanomuse/skill-creator.md.

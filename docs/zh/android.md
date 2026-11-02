@@ -1,5 +1,7 @@
 # Android App
 
+设置 → 技能中的内置技能可以查看、导出和停用。名称、内容和文件由 App 管理，因此不提供编辑、更新和删除。需要自定义时，可以导出后换一个名称再导入。内置 `skill-creator` 指南使用与模型服务商无关的说明。
+
 `android/` 是手机上的 nanoMuse：[OpenMinis](https://github.com/OpenMinis/OpenMinis)
 1.13（GPL-3.0）：一个原生 App，智能体**在手机上**运行，Linux shell、浏览器、MCP 服务器、
 技能和定时任务都装在 APK 里，再加上 nanoMuse 自己的身份、设计和功能。属于 nanoMuse 的一切

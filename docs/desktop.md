@@ -332,6 +332,8 @@ and removes a password from the proxy address in the `desktop.json` it packs.
 
 ## The agent's desktop guide
 
+The preset also includes `skill-creator`, a guide for writing and checking reusable skills. Its model-neutral instructions are shared with Android and the Python runtime. Both bundled guides load only when requested and do not change approval permissions.
+
 The nanoMuse preset includes a `nanomuse-desktop` skill. Its description appears in the
 native DeepSeek Harness skill catalog; the `skill` tool loads its full guide only when
 needed. Ask how to connect a second-brain folder or configure a desktop capability, and
