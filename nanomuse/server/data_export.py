@@ -2,7 +2,8 @@
 
 The desktop's rooms host has had *Download your agent data* since 0.1.30 (a zip written to
 Downloads); this is the same file for the web client, and for anyone whose runtime runs on
-another machine: the reply is the zip itself, so nothing is written to the runtime's disk.
+another machine: the reply is the zip itself. SQLite snapshots use private temporary
+files which are removed before the reply is returned.
 
 What goes in is what the runtime keeps about the person and its own work: the profile and
 the look, the rooms (feed, ideas, memory, goals, reminders, triggers), the address book,
@@ -20,14 +21,18 @@ from __future__ import annotations
 
 import io
 import os
+import sqlite3
 import stat
 import sys
 import time
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from nanomuse.logger import logger
 
 # As the desktop's export: one file this big is not worth shipping inside a zip.
 MAX_FILE_BYTES = 64 * 1024 * 1024
@@ -50,6 +55,13 @@ FILES = (
     "audit.jsonl",
 )
 
+# The SQLite databases among the files: shipped as a self-consistent snapshot, not as the
+# raw bytes of a file a writer may be mid-way through (the rollback journal never ships).
+DATABASES = ("memory.db", "goals.db", "reminders.db", "triggers.db")
+
+# Retry budget for SQLite's online backup of an already-open database.
+DATABASE_WAIT_S = 5.0
+
 # Folders of the chats, as the runtime keeps them.
 DIRS = ("threads", "sessions")
 
@@ -70,6 +82,9 @@ firstrun.json       the first-conversation state
 audit.jsonl         every tool call it made, in order
 threads/            the chats, one file each
 sessions/           the running state of a conversation
+
+Database entries are committed SQLite snapshots. Private temporary output files are
+removed before the export is returned. Any omitted databases are listed below.
 
 Not in this zip, on purpose: the secrets themselves (vault.enc, vault.key), the app's own
 password (server_token), the key that signs notifications (push-vapid.json), the settings
@@ -170,6 +185,10 @@ def _add_file(z: zipfile.ZipFile, path: Path, fd: int, name: str) -> None:
     if checked is None:
         return
     info, content = checked
+    _write_entry(z, name, info, content)
+
+
+def _write_entry(z: zipfile.ZipFile, name: str, info: os.stat_result, content: bytes) -> None:
     # Preserve the original metadata without ZipInfo.from_file's second pathname lookup.
     # The zip's own clock starts in 1980: an older file (a migrated photo, a 1970-epoch
     # stamp a sync tool kept) keeps its bytes and lands at the floor, not a failed export.
@@ -181,6 +200,93 @@ def _add_file(z: zipfile.ZipFile, path: Path, fd: int, name: str) -> None:
     entry.external_attr = (info.st_mode & 0xFFFF) << 16
     entry.compress_type = zipfile.ZIP_DEFLATED
     z.writestr(entry, content)
+
+
+def _database_info(path: Path, parent_fd: int) -> os.stat_result:
+    # Do not open and close a raw database descriptor: on POSIX closing any descriptor
+    # can release SQLite's process-wide locks. Snapshot reads use the runtime's existing
+    # connection; this stat only checks the archive entry and supplies its metadata.
+    info = (
+        path.lstat()
+        if sys.platform == "win32"
+        else os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+    )
+    if _is_link(info) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise OSError("database export entry is linked or is not a regular file")
+    return info
+
+
+def _database_snapshot(source: sqlite3.Connection) -> bytes | None:
+    """SQLite's online backup reads the already-owned connection, with bounded retries."""
+    if source.in_transaction:
+        return None
+    deadline = time.monotonic() + DATABASE_WAIT_S
+    page_size = source.execute("PRAGMA page_size").fetchone()[0]
+    page_count = source.execute("PRAGMA page_count").fetchone()[0]
+    if page_size * page_count > MAX_FILE_BYTES:
+        return None
+    with TemporaryDirectory(prefix="nanomuse-export-") as temporary:
+        snapshot_path = Path(temporary) / "snapshot.db"
+        snapshot = sqlite3.connect(snapshot_path)
+        try:
+            snapshot.execute(f"PRAGMA page_size={page_size}")
+            snapshot.execute(f"PRAGMA max_page_count={MAX_FILE_BYTES // page_size}")
+
+            def progress(status: int, remaining: int, total: int) -> None:
+                if total * page_size > MAX_FILE_BYTES:
+                    raise ValueError("database snapshot exceeds export size limit")
+                if source.in_transaction:
+                    raise ValueError("source connection has an uncommitted transaction")
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("database snapshot exceeded export deadline")
+
+            source.backup(snapshot, pages=64, progress=progress, sleep=0.05)
+            # WAL is incorporated by SQLite's snapshot, not copied as a sidecar. The
+            # standalone result must use rollback mode, including its file header.
+            snapshot.execute("PRAGMA journal_mode=DELETE")
+        finally:
+            snapshot.close()
+        with snapshot_path.open("rb") as result:
+            content = result.read(MAX_FILE_BYTES + 1)
+        return content if len(content) <= MAX_FILE_BYTES else None
+
+
+def _add_database(
+    z: zipfile.ZipFile,
+    path: Path,
+    fd: int,
+    name: str,
+    sources: Mapping[str, sqlite3.Connection],
+) -> bool:
+    """Return false when an existing database could not safely be included."""
+    try:
+        before = _database_info(path, fd)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    source = sources.get(name)
+    if source is None:
+        return False
+    try:
+        # Only the expected store's main database may fill this archive entry. Explicit
+        # sources from another data directory or in-memory connections are refused.
+        database_path = next(
+            (row[2] for row in source.execute("PRAGMA database_list") if row[1] == "main"), ""
+        )
+        if not database_path or Path(database_path).resolve(strict=True) != path:
+            return False
+        content = _database_snapshot(source)
+        if content is None:
+            return False
+        after = _database_info(path, fd)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            return False
+        _write_entry(z, name, before, content)
+        return True
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        logger.warning("{} could not be snapshotted; skipped from this export: {}", name, exc)
+        return False
 
 
 def _add_tree(z: zipfile.ZipFile, root: Path, fd: int, under: str) -> None:
@@ -203,14 +309,21 @@ def _add_tree(z: zipfile.ZipFile, root: Path, fd: int, under: str) -> None:
         _add_file(z, path, fd, archive_name)
 
 
-def agent_data_zip(data_dir: Path) -> bytes:
+def agent_data_zip(
+    data_dir: Path, *, databases: Mapping[str, sqlite3.Connection] | None = None
+) -> bytes:
     """The zip's bytes: every file of the agent's data that is there, and the README."""
+    omitted: list[str] = []
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         try:
             with _data_directory(data_dir) as (root, fd):
                 for name in FILES:
-                    _add_file(z, root / name, fd, name)
+                    if name in DATABASES:
+                        if not _add_database(z, root / name, fd, name, databases or {}):
+                            omitted.append(name)
+                    else:
+                        _add_file(z, root / name, fd, name)
                 for folder in DIRS:
                     try:
                         with _directory(root / folder, fd) as child_fd:
@@ -220,9 +333,25 @@ def agent_data_zip(data_dir: Path) -> bytes:
         except OSError:
             pass
         z.writestr(
-            "README.txt", README.format(when=datetime.now(UTC).isoformat(timespec="seconds"))
+            "README.txt",
+            README.format(when=datetime.now(UTC).isoformat(timespec="seconds"))
+            + (
+                "\nDatabases omitted because a safe snapshot was unavailable: "
+                + ", ".join(omitted)
+                + ". Retry from the running app with the relevant feature enabled, after writes finish.\n"
+                if omitted
+                else ""
+            ),
         )
     return out.getvalue()
 
 
-__all__ = ["DIRS", "FILES", "MAX_FILE_BYTES", "README", "agent_data_zip", "filename"]
+__all__ = [
+    "DATABASES",
+    "DIRS",
+    "FILES",
+    "MAX_FILE_BYTES",
+    "README",
+    "agent_data_zip",
+    "filename",
+]

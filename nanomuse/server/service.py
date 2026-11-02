@@ -14,6 +14,7 @@ import json
 import mimetypes
 import re
 import secrets
+import sqlite3
 import time
 import uuid
 from collections.abc import Coroutine
@@ -379,6 +380,18 @@ def _parse_when(value: str | None) -> datetime | None:
 
 
 class MuseService:
+    def data_export_sources(self) -> dict[str, sqlite3.Connection]:
+        """The active stores' main databases, never newly opened export paths."""
+        sources = {
+            "goals.db": self.app.goals._conn,
+            "reminders.db": self.app.reminders._conn,
+            "triggers.db": self.app.triggers._conn,
+            "scheduled-deliveries.db": self.deliveries._conn,
+        }
+        if self.app.memory is not None:
+            sources["memory.db"] = self.app.memory._conn
+        return sources
+
     def __init__(self, settings: Settings, llm: BaseLLM | None = None):
         self.settings = settings
         settings.ensure_dirs()

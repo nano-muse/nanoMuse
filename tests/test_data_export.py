@@ -5,10 +5,12 @@ from __future__ import annotations
 import ctypes
 import io
 import os
+import sqlite3
 import stat
 import struct
 import subprocess
 import sys
+import threading
 import time
 import zipfile
 from ctypes import wintypes
@@ -21,8 +23,8 @@ from nanomuse.server import data_export as export
 EXCLUDED = b"excluded fixture content"
 
 
-def entries(data: Path) -> dict[str, bytes]:
-    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(data))) as archive:
+def entries(data: Path, databases: dict[str, sqlite3.Connection] | None = None) -> dict[str, bytes]:
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(data, databases=databases))) as archive:
         return {name: archive.read(name) for name in archive.namelist() if name != "README.txt"}
 
 
@@ -343,6 +345,70 @@ def test_windows_export_uses_parent_handle_after_reparse_change(
     folder.rmdir()  # remove the junction after all handles close
 
 
+def _spilling_database(db: Path) -> None:
+    """A database whose next big uncommitted transaction spills into the main file."""
+    con = sqlite3.connect(db)
+    con.execute("PRAGMA page_size=512")
+    con.execute("PRAGMA journal_mode=DELETE")
+    con.execute("CREATE TABLE t(id INTEGER PRIMARY KEY, payload BLOB)")
+    con.executemany("INSERT INTO t(payload) VALUES (?)", [(b"x" * 400,) for _ in range(50)])
+    con.commit()
+    con.close()
+
+
+def _spill_and_hold(db: Path, spilled: threading.Event, hold: threading.Event) -> threading.Thread:
+    def writer() -> None:
+        wcon = sqlite3.connect(db, timeout=60)
+        wcon.execute("PRAGMA cache_size=2")  # a few inserts force the cache to spill
+        wcon.execute("BEGIN")
+        wcon.executemany(
+            "INSERT INTO t(payload) VALUES (?)", [(bytes([i % 256]) * 480,) for i in range(4000)]
+        )
+        spilled.set()
+        hold.wait(timeout=60)
+        wcon.rollback()
+        wcon.close()
+
+    thread = threading.Thread(target=writer, daemon=True)
+    thread.start()
+    return thread
+
+
+def test_a_database_stuck_mid_write_is_left_out_rather_than_shipped_corrupt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(export, "DATABASE_WAIT_S", 0.2)
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path, timeout=0)
+    spilled, hold = threading.Event(), threading.Event()
+    thread = _spill_and_hold(path, spilled, hold)
+    assert spilled.wait(30)
+    try:
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+    finally:
+        hold.set()
+        thread.join(timeout=30)
+        source.close()
+
+
+def test_a_database_exports_as_a_self_consistent_snapshot(tmp_path: Path) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path)
+    try:
+        got = entries(tmp_path, {"memory.db": source})
+    finally:
+        source.close()
+    check = sqlite3.connect(":memory:")
+    try:
+        check.deserialize(got["memory.db"])
+        assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert check.execute("SELECT count(*) FROM t").fetchone()[0] == 50
+    finally:
+        check.close()
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows junction at the configured data root")
 def test_windows_export_follows_a_junction_data_root(tmp_path: Path) -> None:
     real = tmp_path / "real"
@@ -388,6 +454,97 @@ def test_export_keeps_resolved_root_when_configured_link_changes(
     assert entries(root) == {"profile.json": b"profile"}
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ancestor replacement race")
+def test_database_snapshot_never_reopens_the_live_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data, outside = tmp_path / "data", tmp_path / "outside"
+    for folder, value in [(data, "allowed"), (outside, "excluded fixture")]:
+        folder.mkdir()
+        with sqlite3.connect(folder / "memory.db") as db:
+            db.execute("CREATE TABLE t(value TEXT)")
+            db.execute("INSERT INTO t VALUES (?)", (value,))
+    source = sqlite3.connect(data / "memory.db")
+    snapshot = export._database_snapshot
+    swapped = False
+
+    def swap(connection: sqlite3.Connection) -> bytes | None:
+        nonlocal swapped
+        data.rename(tmp_path / "original")
+        symlink(data, outside, directory=True)
+        swapped = True
+        return snapshot(connection)
+
+    monkeypatch.setattr(export, "_database_snapshot", swap)
+    try:
+        got = entries(data, {"memory.db": source})
+    finally:
+        source.close()
+    assert swapped
+    check = sqlite3.connect(":memory:")
+    try:
+        if "memory.db" in got:
+            check.deserialize(got["memory.db"])
+            assert check.execute("SELECT value FROM t").fetchall() == [("allowed",)]
+    finally:
+        check.close()
+
+
+@pytest.mark.parametrize("name", export.DATABASES)
+def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path, name: str) -> None:
+    writer = sqlite3.connect(tmp_path / name)
+    source = sqlite3.connect(tmp_path / name)
+    try:
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute("CREATE TABLE t(value TEXT)")
+        writer.execute("INSERT INTO t VALUES ('committed')")
+        writer.commit()
+        writer.execute("INSERT INTO t VALUES ('uncommitted')")
+        got = entries(tmp_path, {name: source})
+        check = sqlite3.connect(":memory:")
+        try:
+            check.deserialize(got[name])
+            assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert check.execute("SELECT value FROM t").fetchall() == [("committed",)]
+        finally:
+            check.close()
+    finally:
+        source.close()
+        writer.close()
+
+
+def test_corrupt_database_does_not_fall_back_to_raw_bytes(tmp_path: Path) -> None:
+    (tmp_path / "memory.db").write_bytes(b"SQLite format 3\0" + b"bad" * 100)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_database_snapshot_bounds_the_result_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    monkeypatch.setattr(export, "MAX_FILE_BYTES", 1_024)
+    source = sqlite3.connect(path)
+    try:
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+    finally:
+        source.close()
+
+
+def test_database_snapshot_stops_at_its_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    monkeypatch.setattr(export, "DATABASE_WAIT_S", 0)
+    source = sqlite3.connect(path)
+    try:
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+    finally:
+        source.close()
+
+
 def test_export_keeps_a_file_newer_than_the_zip_clock(tmp_path: Path) -> None:
     path = tmp_path / "profile.json"
     path.write_bytes(b"profile")
@@ -399,3 +556,123 @@ def test_export_keeps_a_file_newer_than_the_zip_clock(tmp_path: Path) -> None:
         assert archive.read("profile.json") == b"profile"
         assert archive.getinfo("profile.json").date_time == (2107, 12, 31, 23, 59, 58)
         assert archive.testzip() is None
+
+
+def test_database_from_another_data_directory_is_not_exported(tmp_path: Path) -> None:
+    data, outside = tmp_path / "data", tmp_path / "outside"
+    data.mkdir()
+    outside.mkdir()
+    _spilling_database(data / "memory.db")
+    _spilling_database(outside / "memory.db")
+    source = sqlite3.connect(outside / "memory.db")
+    try:
+        assert "memory.db" not in entries(data, {"memory.db": source})
+    finally:
+        source.close()
+
+
+def test_database_without_an_active_store_is_named_in_readme(tmp_path: Path) -> None:
+    _spilling_database(tmp_path / "memory.db")
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(tmp_path))) as archive:
+        assert "memory.db" not in archive.namelist()
+        assert b"Databases omitted" in archive.read("README.txt")
+
+
+def test_database_export_does_not_commit_the_runtime_transaction(tmp_path: Path) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path)
+    try:
+        source.execute("DELETE FROM t")
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+        assert source.in_transaction
+        source.rollback()
+        assert source.execute("SELECT count(*) FROM t").fetchone()[0] == 50
+    finally:
+        source.close()
+
+
+def test_owned_connection_snapshot_stays_consistent_when_file_times_are_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from collections.abc import Callable
+
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    writer = sqlite3.connect(path)
+    writer.executemany("INSERT INTO t(payload) VALUES (?)", [(b"x" * 400,) for _ in range(400)])
+    writer.commit()
+    changed = False
+
+    class Source(sqlite3.Connection):
+        def backup(
+            self,
+            target: sqlite3.Connection,
+            *,
+            pages: int,
+            progress: Callable[[int, int, int], None],
+            sleep: float,
+        ) -> None:
+            def update(status: int, remaining: int, total: int) -> None:
+                nonlocal changed
+                if remaining and not changed:
+                    writer.execute("UPDATE t SET payload = ?", (b"new" * 150,))
+                    writer.commit()
+                    changed = True
+                progress(status, remaining, total)
+
+            super().backup(target, pages=pages, progress=update, sleep=sleep)
+
+    source = sqlite3.connect(path, factory=Source)
+    info = path.stat()
+    monkeypatch.setattr(export, "_database_info", lambda path, fd: info)
+    try:
+        got = entries(tmp_path, {"memory.db": source})
+        assert changed
+        check = sqlite3.connect(":memory:")
+        try:
+            check.deserialize(got["memory.db"])
+            assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert check.execute("SELECT count(DISTINCT payload) FROM t").fetchone()[0] == 1
+            assert check.execute("SELECT count(*) FROM t").fetchone()[0] == 450
+        finally:
+            check.close()
+    finally:
+        source.close()
+        writer.close()
+
+
+def test_database_export_preserves_the_runtime_connection_lock(tmp_path: Path) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path)
+    try:
+        source.execute("BEGIN")
+        source.execute("SELECT count(*) FROM t").fetchone()
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+        # Closing an unrelated raw descriptor releases process-wide SQLite locks on
+        # POSIX. Another process must still be unable to commit over this read lock.
+        attempt = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import sqlite3,sys\n"
+                "db=sqlite3.connect(sys.argv[1],timeout=0)\n"
+                "try:\n"
+                " db.execute('DELETE FROM t'); db.commit(); print('written')\n"
+                "except sqlite3.OperationalError:\n"
+                " print('locked')\n"
+                "finally:\n"
+                " db.close()\n",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert attempt.stdout.strip() == "locked"
+        source.rollback()
+        assert source.execute("SELECT count(*) FROM t").fetchone()[0] == 50
+    finally:
+        source.close()

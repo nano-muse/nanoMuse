@@ -23,6 +23,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Exported committed SQLite snapshots from the runtime's already-open stores, including WAL transactions, without reopening database paths or releasing their locks. Unavailable, busy or oversized databases were skipped and named in the archive README.
+
 - Kept Windows coding-agent discovery working when process names or command lines used the console code page.
 
 - Kept calendar drafts with the same date and title in separate files instead of overwriting the earlier draft.
