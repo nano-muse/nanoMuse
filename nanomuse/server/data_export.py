@@ -42,6 +42,8 @@ FILES = (
     "goals.db",
     "reminders.db",
     "triggers.db",
+    "scheduled-deliveries.db",
+    "nudges.json",
     "approvals.json",
     "contacts.vcf",
     "contacts-cache.json",
@@ -51,29 +53,37 @@ FILES = (
 )
 
 # Folders of the chats, as the runtime keeps them.
-DIRS = ("threads", "sessions")
+DIRS = ("threads", "sessions", "skills", "contacts", "phone-traces", "computer-traces")
 
 README = """Your nanoMuse data, exported {when}
 
-profile.json        the agent's name and look
-feed_posts.json     the Feed as it was written
-ideas.json          the ideas kept for a new chat
-memory.db           what the agent remembers
-goals.db            goals and their steps
-reminders.db        reminders and routines
-triggers.db         standing instructions that fire on something happening
-approvals.json      the approvals it was given
-contacts.vcf        the agent's address book
-contacts-cache.json the contacts it looked up
-calendar-cache.json the calendar as last read
-firstrun.json       the first-conversation state
-audit.jsonl         every tool call it made, in order
-threads/            the chats, one file each
-sessions/           the running state of a conversation
+profile.json              the agent's name and look
+feed_posts.json           the Feed as it was written
+ideas.json                the ideas kept for a new chat
+memory.db                 what the agent remembers
+goals.db                  goals and their steps
+reminders.db              reminders and routines
+triggers.db               standing instructions that fire on something happening
+scheduled-deliveries.db   what a reminder or routine still owes a chat, mid-delivery
+nudges.json               the relay's nudges as last fetched
+approvals.json            the approvals it was given
+contacts.vcf              the agent's address book
+contacts-cache.json       the contacts it looked up
+contacts/                 the address-book sources, as uploaded
+calendar-cache.json       the calendar as last read
+skills/                   the skills edited in the app, one folder each
+phone-traces/             what ran on the phone, one file per task
+computer-traces/          what ran on the computer, one file per task
+firstrun.json             the first-conversation state
+audit.jsonl               every tool call it made, in order
+threads/                  the chats, one file each
+sessions/                 the running state of a conversation
 
 Not in this zip, on purpose: the secrets themselves (vault.enc, vault.key), the app's own
 password (server_token), the key that signs notifications (push-vapid.json), the settings
-file (it can hold an API key in the clear), the logs, and workspace/ (your own files).
+file (it can hold an API key in the clear), the pairing credentials (channels/), this
+device's own sync cursor (sync.json — another device's copy would fight it), the push
+subscription endpoints (push-subscriptions.json), the logs, and workspace/ (your own files).
 """
 
 

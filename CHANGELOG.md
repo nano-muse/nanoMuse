@@ -16,6 +16,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **The export carries the data the runtime actually keeps.** The manifest is a whitelist, and the runtime grew folders the list never learned: skills edited in the app, the contacts sources uploaded in Connections, the per-task phone and computer traces, the delivery outbox whose pending rows a restore must still owe (a claimed reminder that lost its row is gone for good — the source's fired counter has moved on), and the relay's nudges cache. A populated data directory exported as a zip containing a README and little else, while the desktop's own export walks the whole tree. All of it is in the zip now, and the README's "not in this zip" names the deliberately-left-out files with their reasons: the pairing credentials, this device's own sync cursor, and the push subscription endpoints.
+
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
 - **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
