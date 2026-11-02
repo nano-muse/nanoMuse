@@ -16,7 +16,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
-- **Two looks at a device's screen inside one second are two pictures.** `device_screen` named both after the second they landed in, so a look-act-look check in one second overwrote the "before" picture while the model still held its path — the verification read the wrong screen. The second picture now takes the next free name (`…-2.jpg`), decided after the bytes arrive, as the browser's own screenshots have done since they learned this.
+- Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
