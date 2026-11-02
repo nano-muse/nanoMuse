@@ -130,10 +130,10 @@ def _directory(path: Path, parent_fd: int | None = None) -> Iterator[int]:
 
 @contextmanager
 def _data_directory(path: Path) -> Iterator[tuple[Path, int]]:
-    # Resolve configured ancestors (e.g. macOS /var), then pin every component of that
-    # path. The data directory itself, and every exported descendant, must not be a link.
-    path = path.absolute()
-    path = path.parent.resolve(strict=True) / path.name
+    # Resolve the whole configured path (e.g. macOS /var, or a data root the user moved to
+    # a bigger disk as a junction): the root is the one link the user set up themselves.
+    # Every exported descendant below it is pinned without following, and must not be a link.
+    path = path.resolve(strict=True)
     with ExitStack() as stack:
         current = Path(path.anchor)
         fd = stack.enter_context(_directory(current))
@@ -185,8 +185,10 @@ def _add_file(z: zipfile.ZipFile, path: Path, fd: int, name: str) -> None:
 
 def _write_entry(z: zipfile.ZipFile, name: str, info: os.stat_result, content: bytes) -> None:
     # Preserve the original metadata without ZipInfo.from_file's second pathname lookup.
-    stamp = time.localtime(info.st_mtime)
-    entry = zipfile.ZipInfo(name, stamp[:6])
+    # The zip's own clock starts in 1980: an older file (a migrated photo, a 1970-epoch
+    # stamp a sync tool kept) keeps its bytes and lands at the floor, not a failed export.
+    stamp = max(time.localtime(info.st_mtime)[:6], (1980, 1, 1, 0, 0, 0))
+    entry = zipfile.ZipInfo(name, stamp)
     entry.external_attr = (info.st_mode & 0xFFFF) << 16
     entry.compress_type = zipfile.ZIP_DEFLATED
     z.writestr(entry, content)
