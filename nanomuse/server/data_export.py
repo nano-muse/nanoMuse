@@ -59,7 +59,7 @@ FILES = (
 # raw bytes of a file a writer may be mid-way through (the rollback journal never ships).
 DATABASES = ("memory.db", "goals.db", "reminders.db", "triggers.db")
 
-# How long to wait for a database's rollback journal to clear before shipping the file.
+# Retry budget for SQLite's online backup of an already-open database.
 DATABASE_WAIT_S = 5.0
 
 # Folders of the chats, as the runtime keeps them.
@@ -82,6 +82,9 @@ firstrun.json       the first-conversation state
 audit.jsonl         every tool call it made, in order
 threads/            the chats, one file each
 sessions/           the running state of a conversation
+
+Database entries are committed SQLite snapshots. Private temporary output files are
+removed before the export is returned. Any omitted databases are listed below.
 
 Not in this zip, on purpose: the secrets themselves (vault.enc, vault.key), the app's own
 password (server_token), the key that signs notifications (push-vapid.json), the settings
