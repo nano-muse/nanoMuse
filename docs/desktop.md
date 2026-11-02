@@ -309,6 +309,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
+
 Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
 
 The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
