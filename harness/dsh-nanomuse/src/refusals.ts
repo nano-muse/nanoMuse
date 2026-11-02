@@ -256,6 +256,12 @@ export function cloudOffFailure(): FailureLike {
   return { message: refusalSentence(refusal), code: refusalCode('cloud_off') }
 }
 
+export const CLOUD_STARTUP_FAILURE_CODE = 'NANOMUSE_CLOUD_STARTUP_FAILED'
+
+export function cloudStartupFailure(): FailureLike {
+  return { code: CLOUD_STARTUP_FAILURE_CODE, message: 'nanoMuse Cloud could not update its local connection. Restart the app and try again.' }
+}
+
 /** The shape of a finish chunk's failure, as far as this module reads and writes it. */
 export interface FailureLike {
   readonly message: string

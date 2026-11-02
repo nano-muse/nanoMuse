@@ -36,7 +36,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { ToolDispatchExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
-import { createUserMessage, type ContentBlock, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, isAgentLoopRequest, markAgentLoopRequest, type ContentBlock, type GenerateOptions, type LlmRuntime, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId, AgentCancelCause } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-user-approval'
@@ -47,7 +47,7 @@ import { brief, REMOTE_ACTIONS, run as runAction, type RemoteAction } from './ac
 import { CODING_ACTIONS, CodingService, codingBrief, GATED_CODING_ACTIONS } from './coding.ts'
 import { helloLlm, HubClient, HubError, type Caller, type HubDevice, type IncomingCall } from './hub.ts'
 import { ProfileStore, type Profile } from './profile.ts'
-import { cloudOffFailure, relayFailure, transportFailure, type RelayRefusal } from './refusals.ts'
+import { cloudOffFailure, cloudStartupFailure, relayFailure, transportFailure, type RelayRefusal } from './refusals.ts'
 import { Relay, RelayError, type Account, type Estimate, type Invite, type ProfileWrite, type RelayModel, type SignIn } from './relay.ts'
 import { homeWorkspace } from './home.ts'
 import { TaskRunner, textOf } from './task.ts'
@@ -625,6 +625,10 @@ export default class NanomuseCloud extends Service {
   readonly hub: HubClient
   private state: State = {}
   private busy: Promise<unknown> = Promise.resolve()
+  private providerReady: Promise<void> = Promise.resolve()
+  private readonly providerStop = new AbortController()
+  private readonly providerDispatches = new WeakSet<GenerateOptions>()
+  private providerRebind = false
   private readonly streams = new Set<ServerResponse>()
   private readonly changeListeners = new Set<() => void>()
   private readonly calls = new Map<string, HandsCall>()
@@ -835,6 +839,22 @@ export default class NanomuseCloud extends Service {
       this.ctx.logger.warn('nanomuse cloud: no loopback door to the relay (%s); calls go direct, without their provenance', message(error))
     }
     this.ctx.effect(() => () => void this.relayDoor.close(), 'nanomuse cloud: relay door')
+    this.ctx.effect(() => () => this.providerStop.abort(), 'nanomuse cloud: provider startup')
+    const loader = this.ctx.get('loader')
+    const reportProviderError = (error: unknown) => {
+      if (!this.providerStop.signal.aborted) this.ctx.logger.warn('nanomuse cloud: could not point the provider row at the relay door: %s', message(error))
+    }
+    if (loader) {
+      this.providerRebind = true
+      this.providerReady = this.serialize(async () => {
+        await loader.await()
+        this.providerStop.signal.throwIfAborted()
+        await this.repointProvider()
+      })
+      void this.providerReady.catch(reportProviderError)
+    } else {
+      await this.repointProvider().catch(reportProviderError)
+    }
     // A row that points elsewhere (the door got another port, or 1.0.7 wrote it with the relay's
     // address) is rewritten — but not waited for: a settings write goes through the loader, which
     // is still bringing the plugins up while this runs, so waiting here held the host before it
@@ -1168,6 +1188,7 @@ export default class NanomuseCloud extends Service {
           cloud.ctx.logger.info('nanomuse cloud: a call to %s refused, Cloud models are off%s', options.model, options.purpose ? ` (${options.purpose})` : '')
           return cloud.refuseCloudOff()
         }
+        if (cloud.providerRebind && !cloud.providerDispatches.delete(options)) return cloud.streamAfterProviderReady(this, options)
         // the call's provenance, for the door to put on the request the adapter is about to send
         const release = cloud.provenance.expect(options, cloud.state.deviceId ?? '')
         return cloud.watchRelayStream(next(), options.sessionId === undefined ? '' : String(options.sessionId), release)
@@ -3355,6 +3376,42 @@ export default class NanomuseCloud extends Service {
     if (!ours || typeof ours !== 'object') return
     if ((ours as { baseURL?: unknown }).baseURL === base) return
     await this.ctx.settings.update(LLM_ROW, { providers: { [PROVIDER_ID]: { ...(ours as Record<string, unknown>), baseURL: base } } })
+  }
+
+  private async *streamAfterProviderReady(runtime: LlmRuntime, options: GenerateOptions): AsyncIterable<StreamChunk> {
+    const signal = options.signal ? AbortSignal.any([options.signal, this.providerStop.signal]) : this.providerStop.signal
+    try {
+      signal.throwIfAborted()
+      await new Promise<void>((resolve, reject) => {
+        const abort = () => {
+          signal.removeEventListener('abort', abort)
+          reject(signal.reason)
+        }
+        signal.addEventListener('abort', abort, { once: true })
+        void this.providerReady.then(() => {
+          signal.removeEventListener('abort', abort)
+          resolve()
+        }, (error: unknown) => {
+          signal.removeEventListener('abort', abort)
+          reject(error)
+        })
+      })
+      signal.throwIfAborted()
+    } catch (error: unknown) {
+      yield { type: 'finish', reason: signal.aborted
+        ? { kind: 'aborted', failure: { code: 'ABORTED', message: message(error) } }
+        : { kind: 'error', failure: cloudStartupFailure() } }
+      return
+    }
+    const rebound = isAgentLoopRequest(options)
+      ? markAgentLoopRequest(Object.freeze({ ...options, signal }))
+      : { ...options, signal }
+    this.providerDispatches.add(rebound)
+    try {
+      yield* runtime.stream(rebound)
+    } finally {
+      this.providerDispatches.delete(rebound)
+    }
   }
 
   /** Whether the row written earlier reaches the relay through today's door (or, without one, directly). */

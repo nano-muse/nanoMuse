@@ -17,7 +17,7 @@
  * chat slot untouched (`POST /retry-cloud`, then the same resend). Nothing falls back by itself.
  */
 import { createElement as h, Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
-import { providerFailureKind, refusalCard, refusalKindOf, type RefusalKind } from '../refusals.ts'
+import { CLOUD_STARTUP_FAILURE_CODE, providerFailureKind, refusalCard, refusalKindOf, type RefusalKind } from '../refusals.ts'
 import { type AccountSheet } from './AccountPage.tsx'
 import { allowanceInfo, AllowanceWays } from './AllowanceWays.tsx'
 import { call, muted, row, type Translate, failureText } from './api.ts'
@@ -82,6 +82,7 @@ export function refusalText(t: Translate, kind: RefusalKind, message: string, re
 
 /** The sentence for any other provider's failure, by the harness's routing code. */
 export function providerFailureText(t: Translate, code: string | undefined, message: string): string {
+  if (code === CLOUD_STARTUP_FAILURE_CODE) return t('rfCloudStartup')
   switch (providerFailureKind(code, message)) {
     case 'auth':
       return t('rfGenAuth')

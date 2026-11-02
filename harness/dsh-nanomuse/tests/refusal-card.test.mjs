@@ -84,6 +84,12 @@ function nodeFor(status, inner, dshCode) {
 
 const deps = { retry: async () => undefined, newChat: () => undefined }
 
+test('a local Cloud startup failure explains how to recover in both languages', () => {
+  const node = { kind: 'turn-error', key: 'turn-error:1', seq: 1, data: { message: '', code: 'NANOMUSE_CLOUD_STARTUP_FAILED', turn: 1 } }
+  assert.match(render('en', node), /Restart the app and try again/)
+  assert.match(render('zh', node), /本地连接配置未能更新，请重启应用后再试/)
+})
+
 function render(lang, node) {
   return bundle.renderCard(translator(lang), deps, node)
 }
