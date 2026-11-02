@@ -3079,3 +3079,33 @@ def test_the_hub_devices_frame_fires_them(server):
     client.portal.call(lambda: service.hub._on_devices([me, phone]))
     wait_idle(service, "main")
     assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
+
+
+def test_data_export_keeps_pending_scheduled_delivery_rows(server):
+    import io
+    import sqlite3
+    import zipfile
+
+    client, service, _ = server
+    delivery = service.deliveries.claim(
+        "export-fixture",
+        kind="reminder",
+        source_id="fixture-reminder",
+        occurrence="2026-01-01T12:00:00+00:00",
+        thread="main",
+        text="delivery fixture",
+        label="fixture",
+    )
+    assert delivery is not None
+    response = client.get("/api/data/export")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        check = sqlite3.connect(":memory:")
+        try:
+            check.deserialize(archive.read("scheduled-deliveries.db"))
+            assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert check.execute(
+                "SELECT status, text FROM scheduled_deliveries WHERE id = ?", (delivery.id,)
+            ).fetchone() == ("pending", "delivery fixture")
+        finally:
+            check.close()
