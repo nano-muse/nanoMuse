@@ -8,6 +8,10 @@ data class EmojiLook(val emoji: String, val color: String) {
         const val DEFAULT_EMOJI = "✨"
         const val DEFAULT_COLOR = "#0064d4"
 
+        /** A missing drawn payload must not be recorded as uploaded; unchanged emoji stays shared. */
+        fun sharedStamp(body: JSONObject, emoji: EmojiLook?, stamp: String): String =
+            if (body.optString("avatar") == "face" || emoji != null) stamp else ""
+
         fun fromProfile(profile: JSONObject): EmojiLook? {
             if (profile.optString("avatar") != "emoji") return null
             val digits = profile.optString("color").trim().removePrefix("#")

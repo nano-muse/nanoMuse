@@ -307,7 +307,7 @@ object ProfileSync {
         SharedConnectors.absorb(context, out)
         val editor = p.edit()
             .putInt(KEY_REV, out.optInt("rev", p.getInt(KEY_REV, 0)))
-            .putString(KEY_PUSHED_FACE, stamp)
+            .putString(KEY_PUSHED_FACE, io.github.nanomuse.avatar.EmojiLook.sharedStamp(body, AvatarStore.emoji.value.takeIf { cur == null }, stamp))
             .putString(KEY_PUSHED_NAME, name)
             .putString(KEY_PUSHED_CONNECTORS, connectors.toString())
         if (body.has("avatar") && body.optString("avatar") != "face") editor.putString(KEY_FACE_HASH, "")

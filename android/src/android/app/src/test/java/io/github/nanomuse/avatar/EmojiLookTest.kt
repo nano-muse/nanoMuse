@@ -53,4 +53,13 @@ class EmojiLookTest {
         val file = tmp.newFile("emoji.json").apply { writeText("not json") }
         assertNull(EmojiLook.load(file))
     }
+
+    @Test fun `a drawn face whose missing picture was not uploaded stays eligible for retry`() {
+        assertEquals("", EmojiLook.sharedStamp(JSONObject(), null, "new-drawn-face"))
+        assertEquals("drawn", EmojiLook.sharedStamp(JSONObject().put("avatar", "face"), null, "drawn"))
+    }
+
+    @Test fun `an unchanged emoji keeps its shared stamp when a rename omits the avatar field`() {
+        assertEquals("emoji-stamp", EmojiLook.sharedStamp(JSONObject(), EmojiLook("🦊", "#112233"), "emoji-stamp"))
+    }
 }
