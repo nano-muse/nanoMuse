@@ -212,6 +212,19 @@ def test_export_keeps_metadata_from_the_validated_file(tmp_path: Path) -> None:
         assert info.external_attr >> 16 == path.stat().st_mode & 0xFFFF
 
 
+def test_export_keeps_a_file_older_than_the_zip_clock(tmp_path: Path) -> None:
+    path = tmp_path / "profile.json"
+    path.write_bytes(b"profile")
+    other = tmp_path / "feed_posts.json"
+    other.write_bytes(b"feed")
+    os.utime(path, (170000000.0, 170000000.0))  # 1975-06-01, before the zip clock's 1980
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(tmp_path))) as archive:
+        assert archive.read("profile.json") == b"profile"
+        assert archive.read("feed_posts.json") == b"feed"
+        assert archive.getinfo("profile.json").date_time == (1980, 1, 1, 0, 0, 0)
+        assert archive.testzip() is None
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows handle sharing and junctions")
 def test_windows_export_pins_ancestors_and_skips_junctions(tmp_path: Path) -> None:
     data = tmp_path / "data"
@@ -328,3 +341,61 @@ def test_windows_export_uses_parent_handle_after_reparse_change(
     assert entries(tmp_path) == {}
     assert swapped
     folder.rmdir()  # remove the junction after all handles close
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows junction at the configured data root")
+def test_windows_export_follows_a_junction_data_root(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    (real / "threads").mkdir(parents=True)
+    (real / "profile.json").write_bytes(b"profile")
+    (real / "threads" / "chat.json").write_bytes(b"chat")
+    root = tmp_path / "linked-root"
+    root.mkdir()
+    _set_windows_junction(root, real)
+    assert entries(root) == {"profile.json": b"profile", "threads/chat.json": b"chat"}
+
+
+def test_export_follows_a_configured_symlink_root(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "profile.json").write_bytes(b"profile")
+    root = tmp_path / "linked-root"
+    symlink(root, real, directory=True)
+    assert entries(root) == {"profile.json": b"profile"}
+
+
+def test_export_keeps_resolved_root_when_configured_link_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "profile.json").write_bytes(b"profile")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "profile.json").write_bytes(EXCLUDED)
+    root = tmp_path / "linked-root"
+    symlink(root, real, directory=True)
+    resolve = Path.resolve
+
+    def retarget(path: Path, strict: bool = False) -> Path:
+        resolved = resolve(path, strict=strict)
+        if path == root:
+            root.unlink()
+            symlink(root, outside, directory=True)
+        return resolved
+
+    monkeypatch.setattr(Path, "resolve", retarget)
+    assert entries(root) == {"profile.json": b"profile"}
+
+
+def test_export_keeps_a_file_newer_than_the_zip_clock(tmp_path: Path) -> None:
+    path = tmp_path / "profile.json"
+    path.write_bytes(b"profile")
+    timestamp = 7_258_118_400  # 2200-01-01, after the zip clock's 2107 ceiling
+    os.utime(path, (timestamp, timestamp))
+    if time.localtime(path.stat().st_mtime).tm_year <= 2107:
+        pytest.skip("filesystem clamps future timestamps before the ZIP ceiling")
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(tmp_path))) as archive:
+        assert archive.read("profile.json") == b"profile"
+        assert archive.getinfo("profile.json").date_time == (2107, 12, 31, 23, 59, 58)
+        assert archive.testzip() is None

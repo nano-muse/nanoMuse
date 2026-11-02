@@ -314,6 +314,79 @@ keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
 
 仅用于聊天测试的模拟器构建（`-Pnm.abi=x86_64`）会排除缓存中的 arm64 proot 和 Alpine 根文件系统资源。切回默认的 arm64 构建后会重新包含这些资源，无需删除缓存。
 
+### 在 Windows 上使用 WSL {#windows-wsl}
+
+在 x64 Windows 上，使用 WSL 2 中的 x86_64 Ubuntu 完成整个构建。原生构建脚本支持
+Linux 和 macOS 主机，不支持 Windows shell。尚未安装时，先按
+[WSL 安装说明](https://learn.microsoft.com/zh-cn/windows/wsl/install)操作，再打开 Ubuntu。
+只有下面第一条命令在管理员 PowerShell 中运行：
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+后续命令都在 Ubuntu 中运行。把代码、SDK 和缓存放在 Linux 文件系统中，而不是
+`/mnt/c` 下；shell 脚本保持 LF 换行：
+
+```bash
+sudo apt update
+sudo apt install -y git curl unzip zip build-essential pkg-config openjdk-21-jdk-headless
+mkdir -p ~/src
+git clone --config core.autocrlf=false https://github.com/nano-muse/nanoMuse.git ~/src/nanoMuse
+cd ~/src/nanoMuse
+git submodule update --init android/deps/proot
+```
+
+安装 [Linux 版 Go](https://go.dev/doc/install)，把它的 `go` 命令加入 Ubuntu 的 `PATH`；
+[Android 工作流](https://github.com/nano-muse/nanoMuse/blob/main/.github/workflows/android.yml)
+使用 Go 1.26。下载 **Linux 版** Android SDK Command-Line Tools，按
+[sdkmanager 安装说明](https://developer.android.com/tools/sdkmanager)设置，以
+`$HOME/Android/Sdk` 为 SDK 目录。可执行文件应位于
+`$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager`。Windows 版 Android Studio
+安装的 SDK 不包含这次构建所需的 Linux NDK 可执行文件。
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+export GOROOT="$(go env GOROOT)"
+export GOPATH="$(go env GOPATH)"
+export PATH="$GOPATH/bin:$PATH"
+export GOTOOLCHAIN=auto
+
+java -version
+go version                         # 应显示 linux/amd64
+sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-36" \
+  "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.2.12479018"
+
+bash scripts/android/build-natives.sh
+cd android/src/android
+./gradlew :app:assembleDebug --console=plain --no-daemon
+```
+
+APK 位于 Gradle 工程目录下的 `app/build/outputs/apk/debug/app-debug.apk`。
+需要时把生成的 APK 复制到 Windows，构建目录仍保留在 Linux 中。
+
+Gradle 在 Ubuntu 内的 `$HOME/.android/debug.keystore` 创建 debug 签名密钥。
+如果后续 debug 构建需要覆盖安装这个 APK，保留这把位于代码目录之外的密钥。
+它可能与 Windows 用户目录里的密钥不同。debug APK 不能覆盖另一把密钥签名的官方 APK；
+使用自己的 release 密钥时，按上面的 release 签名说明操作。
+
+如果 Kotlin 报 Java 堆内存不足，先用 `free -h` 查看 WSL 可用内存。
+机器能同时满足 Windows 和 WSL 的内存需求时，可以只为这次构建提高 Gradle 与 Kotlin
+daemon 的上限，不修改仓库配置。例如在同一 Gradle 工程目录中运行：
+
+```bash
+./gradlew :app:assembleDebug --console=plain --no-daemon \
+  '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' \
+  '-Pkotlin.daemon.jvmargs=-Xmx6g'
+```
+
+这些是可选的堆内存上限，不是最低要求。按 WSL 实际可用内存选择，并为其他进程留出空间。
+
+
 ## 发布 {#releases}
 
 `.github/workflows/android.yml` 在 `android/` 下每有改动就构建 debug APK（「debug APK · arm64-v8a」

@@ -470,6 +470,82 @@ and put its four values in `android/keystore.properties` (git-ignored: `storeFil
 
 The chat-only emulator build (`-Pnm.abi=x86_64`) excludes cached arm64 proot and Alpine root filesystem assets. Switching back to the default arm64 build includes those assets again; no cache deletion is needed.
 
+### Windows with WSL {#windows-wsl}
+
+On x64 Windows, use an x86_64 Ubuntu environment in WSL 2 for the complete build.
+The native build scripts support Linux and macOS hosts, not Windows shells.
+[Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install) first if needed,
+then open Ubuntu. Only this first command runs in an administrator PowerShell:
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+Run the remaining commands in Ubuntu. Keep the checkout, SDK and caches in its Linux
+filesystem, rather than under `/mnt/c`, and keep shell scripts as LF text:
+
+```bash
+sudo apt update
+sudo apt install -y git curl unzip zip build-essential pkg-config openjdk-21-jdk-headless
+mkdir -p ~/src
+git clone --config core.autocrlf=false https://github.com/nano-muse/nanoMuse.git ~/src/nanoMuse
+cd ~/src/nanoMuse
+git submodule update --init android/deps/proot
+```
+
+Install [Go for Linux](https://go.dev/doc/install) and put its `go` command on
+Ubuntu's `PATH`; the [Android workflow](https://github.com/nano-muse/nanoMuse/blob/main/.github/workflows/android.yml)
+uses Go 1.26. Download the **Linux** Android SDK Command-Line Tools and follow the
+[sdkmanager setup](https://developer.android.com/tools/sdkmanager), using
+`$HOME/Android/Sdk` as the SDK directory. The executable must end up at
+`$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager`. The SDK installed by
+Windows Android Studio does not contain the Linux NDK executables this build needs.
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+export GOROOT="$(go env GOROOT)"
+export GOPATH="$(go env GOPATH)"
+export PATH="$GOPATH/bin:$PATH"
+export GOTOOLCHAIN=auto
+
+java -version
+go version                         # must report linux/amd64
+sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-36" \
+  "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.2.12479018"
+
+bash scripts/android/build-natives.sh
+cd android/src/android
+./gradlew :app:assembleDebug --console=plain --no-daemon
+```
+
+The APK is `app/build/outputs/apk/debug/app-debug.apk` relative to the Gradle
+directory. Copy the completed APK to Windows if needed; keep the build tree in Linux.
+
+Gradle creates the debug signing key at `$HOME/.android/debug.keystore` inside
+Ubuntu. Preserve that key outside the checkout if later debug builds need to update
+this APK. It may differ from the key in your Windows home. A debug APK cannot update
+an official APK signed with another key; use the release-signing instructions above
+for your own release key.
+
+If Kotlin runs out of Java heap, check the memory available to WSL with `free -h`.
+On a machine with enough memory for both Windows and WSL, a build can raise the Gradle
+and Kotlin daemon limits without editing the repository. For example, from the same
+Gradle directory:
+
+```bash
+./gradlew :app:assembleDebug --console=plain --no-daemon \
+  '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' \
+  '-Pkotlin.daemon.jvmargs=-Xmx6g'
+```
+
+These are optional heap ceilings, not minimum requirements. Choose limits that fit
+the memory available to WSL and leave room for the other processes.
+
+
 ## Releases
 
 `.github/workflows/android.yml` builds the debug APK on every change under `android/`
