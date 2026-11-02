@@ -1,11 +1,8 @@
-// The account snapshot file (`cloud.json`) is written whole beside itself and renamed
-// over — a crash or power cut mid-write leaves the previous sign-in in place instead of
-// a half file nothing can read (which the next start reads as "no account", silently
-// signing the desktop out while the relay still knows its device). The temp file never
-// outlives the write, and a state that cannot be serialized leaves the file untouched.
+// Account snapshots are replaced only after the complete temporary file is written.
+// Concurrent saves preserve invocation order; failures preserve the previous file.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
@@ -84,4 +81,33 @@ test('a state that cannot be serialized leaves the signed-in file as it was', as
     svc.state.deviceName = 'first'
     await done()
   }
+})
+
+test('concurrent snapshot requests finish in order without sharing a temporary file', async () => {
+  const { svc, statePath, home, done } = await make({ deviceName: 'first' })
+  try {
+    const writes = []
+    for (let i = 0; i < 24; i++) {
+      svc.state.deviceName = `snapshot-${i}`
+      writes.push(svc.writeState())
+    }
+    await Promise.all(writes)
+    assert.equal(JSON.parse(await readFile(statePath, 'utf8')).deviceName, 'snapshot-23')
+    assert.deepEqual(await readdir(home), ['cloud.json'])
+    if (process.platform !== 'win32') assert.equal((await stat(statePath)).mode & 0o777, 0o600)
+  } finally { await done() }
+})
+
+test('a failed replacement cleans its temporary file and does not block a later save', async () => {
+  const { svc, statePath, home, done } = await make({ deviceName: 'first' })
+  try {
+    await rm(statePath)
+    await mkdir(statePath)
+    await assert.rejects(svc.writeState())
+    assert.deepEqual(await readdir(home), ['cloud.json'])
+    await rm(statePath, { recursive: true })
+    svc.state.deviceName = 'recovered'
+    await svc.writeState()
+    assert.equal(JSON.parse(await readFile(statePath, 'utf8')).deviceName, 'recovered')
+  } finally { await done() }
 })

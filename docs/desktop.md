@@ -304,6 +304,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
+
 `~/.nanomuse/desktop` (`NANOMUSE_DESKTOP_HOME` moves it) is the app's dsh home: the
 profile under `profiles/nanomuse` (the bundle list, the person's own `cordis.patch.yml`
 where Settings and the sign-in write the `nanoMuse Cloud` provider), dsh's credential

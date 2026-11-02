@@ -30,7 +30,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
-- **A crash mid-write no longer signs the desktop out.** The account snapshot (`cloud.json`) was written straight over: the file is truncated before the new bytes land, so a crash or a power cut in that window left half a file nothing could read — the next start found no account and no device id, silently signed out while the relay still knew the device. The snapshot is now written whole beside itself and renamed over, as the sync's kept-turns store has always been, and the temp file never outlives the write.
+- Saved desktop account state through ordered atomic replacements so interrupted writes preserved the previous snapshot.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 

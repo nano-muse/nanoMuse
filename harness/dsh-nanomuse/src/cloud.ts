@@ -625,6 +625,7 @@ export default class NanomuseCloud extends Service {
   readonly hub: HubClient
   private state: State = {}
   private busy: Promise<unknown> = Promise.resolve()
+  private stateWrites: Promise<void> = Promise.resolve()
   private readonly streams = new Set<ServerResponse>()
   private readonly changeListeners = new Set<() => void>()
   private readonly calls = new Map<string, HandsCall>()
@@ -3829,13 +3830,22 @@ export default class NanomuseCloud extends Service {
 
   private async writeState(): Promise<void> {
     const path = this.statePath()
-    await mkdir(dirname(path), { recursive: true })
-    // a crash mid-write must not take the signed-in account with it: the whole file is
-    // written beside it and renamed over, as the sync's kept-turns store has always done
-    const tmp = `${path}.${process.pid}.tmp`
-    await writeFile(tmp, JSON.stringify(this.state, null, 2) + '\n', { mode: 0o600 })
-    await rename(tmp, path)
-    await chmod(path, 0o600).catch(() => undefined)
+    // Capture each requested snapshot before yielding, and commit writes in that order.
+    const contents = JSON.stringify(this.state, null, 2) + '\n'
+    const write = async (): Promise<void> => {
+      await mkdir(dirname(path), { recursive: true })
+      const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+      try {
+        await writeFile(tmp, contents, { mode: 0o600, flag: 'wx' })
+        await rename(tmp, path)
+        await chmod(path, 0o600).catch(() => undefined)
+      } finally {
+        await rm(tmp, { force: true }).catch(() => undefined)
+      }
+    }
+    const next = this.stateWrites.then(write, write)
+    this.stateWrites = next.catch(() => undefined)
+    await next
   }
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {
