@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from nanomuse import stdio
 from nanomuse.coding import agents
 
 # cp437, the OEM code page of an English Windows console: 'ü' is b'\x81'. cp1252, the ANSI
@@ -38,16 +39,17 @@ def test_the_windows_process_table_survives_an_accented_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(stdio, "console_encoding", lambda: "cp437")
     monkeypatch.setattr(agents.subprocess, "run", _english_windows_run)
     rows = agents._processes()
-    assert [name for name, _ in rows] == ["node.exe", "\ufffdnicorn.exe"] or len(rows) == 2
+    assert [name for name, _ in rows] == ["node.exe", "ünicorn.exe"]
 
 
 def test_the_node_command_lines_survive_an_accented_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(stdio, "console_encoding", lambda: "cp437")
     monkeypatch.setattr(agents.subprocess, "run", _english_windows_run)
     lines = agents._windows_node_command_lines()
-    assert len(lines) == 1
-    assert lines[0].endswith("server.js")
+    assert lines == [r"c:\tools\ütool\server.js"]

@@ -16,7 +16,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
-- **An accented process name no longer breaks the coding agent list.** The Windows side of the process table read `tasklist` and PowerShell with `text=True`, which decodes in the ANSI code page — but a console's own tools write in the OEM one, and the two disagree exactly on the bytes of an accented name: on an English Windows, a process called `ünicorn` raised a `UnicodeDecodeError` the reader was never written to catch, and the whole coding session list died on it. Both outputs are now read through the shell's own decoder, as every other child's output already is.
+- Kept Windows coding-agent discovery working when process names or command lines used the console code page.
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
