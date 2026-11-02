@@ -230,6 +230,12 @@ harness 保留外部下载方式。不带软件内更新能力的版本，需先
 
 账号状态按顺序保存，先写入私有临时文件，再替换 `cloud.json`。替换前写入如果中断，原来的完整状态仍然保留。
 
+桌面端的同步缓存最多保留最近使用的 64 个对话日志。需要更早的日志时会重新从磁盘读取，保存的对话仍可正常使用。
+
+`MEMORY.md` 中每条记忆旁的日期使用这台电脑的本地日期。
+
+桌面开发环境的冒烟测试在 Windows 等平台通过文件 URL 导入 Electron，仓库路径可以包含空格、Unicode 字符、`#` 或 `%`。
+
 `~/.nanomuse/desktop`（`NANOMUSE_DESKTOP_HOME` 可以把它挪到别处）是应用的 dsh 主目录：
 `profiles/nanomuse` 下的 profile（插件列表，以及本人的 `cordis.patch.yml`，设置页和登录流程把
 `nanoMuse Cloud` 服务商写在这里），存着账号 key 的 dsh 凭据存储，会话，记录外壳和 Host 两边
