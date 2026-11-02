@@ -346,11 +346,19 @@ class FeishuChannel(Channel):
             return
         # the socket reads on; when the handed-over handling fails, the exception must
         # not sit in a future nobody reads
-        done = asyncio.run_coroutine_threadsafe(self._handle_message(data), loop)
+        coro = self._handle_message(data)
+        try:
+            done = asyncio.run_coroutine_threadsafe(coro, loop)
+        except RuntimeError:
+            coro.close()
+            logger.warning("feishu: the runtime loop stopped before message handover")
+            return
         done.add_done_callback(self._log_failed_handover)
 
     @staticmethod
     def _log_failed_handover(future: Future[Any]) -> None:
+        if future.cancelled():
+            return
         exc = future.exception()
         if exc is not None:
             logger.warning("feishu: a handed-over message failed: {}", exc)

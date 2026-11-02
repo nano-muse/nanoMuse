@@ -16,7 +16,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
-- **A chat message that crossed threads and failed now leaves a line in the log.** The DingTalk stream and the Feishu socket hand each inbound message to the runtime's loop with `run_coroutine_threadsafe` and read on — the ack had already gone out, so when the handed-over handling failed, the exception sat in a future nobody read: the message was gone, with nothing in the log to say it had ever arrived or why it died. The failure is now logged with the channel's name, as every other failure in the channel is.
+- Recorded Feishu and DingTalk message-processing failures after thread handover instead of silently dropping their errors.
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
