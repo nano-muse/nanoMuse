@@ -472,3 +472,116 @@ def test_export_keeps_resolved_root_when_configured_link_changes(
 
     monkeypatch.setattr(Path, "resolve", retarget)
     assert entries(root) == {"profile.json": b"profile"}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ancestor replacement race")
+def test_database_snapshot_never_reopens_the_live_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = tmp_path / "data"
+    outside = tmp_path / "outside"
+    for folder, value in [(data, "allowed"), (outside, "excluded fixture")]:
+        folder.mkdir()
+        with sqlite3.connect(folder / "memory.db") as db:
+            db.execute("CREATE TABLE t(value TEXT)")
+            db.execute("INSERT INTO t VALUES (?)", (value,))
+    identity = (data / "memory.db").stat().st_ino
+    fstat = os.fstat
+    swapped = False
+
+    def swap(fd: int) -> os.stat_result:
+        nonlocal swapped
+        info = fstat(fd)
+        if not swapped and stat.S_ISREG(info.st_mode) and info.st_ino == identity:
+            swapped = True
+            data.rename(tmp_path / "original")
+            symlink(data, outside, directory=True)
+        return info
+
+    monkeypatch.setattr(export.os, "fstat", swap)
+    got = entries(data)
+    assert swapped
+    db = sqlite3.connect(":memory:")
+    try:
+        db.deserialize(got["memory.db"])
+        assert db.execute("SELECT value FROM t").fetchall() == [("allowed",)]
+    finally:
+        db.close()
+
+
+def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path) -> None:
+    db = sqlite3.connect(tmp_path / "memory.db")
+    try:
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA wal_autocheckpoint=0")
+        db.execute("CREATE TABLE t(value TEXT)")
+        db.execute("INSERT INTO t VALUES ('committed')")
+        db.commit()
+        db.execute("INSERT INTO t VALUES ('uncommitted')")
+        got = entries(tmp_path)
+        check = sqlite3.connect(":memory:")
+        try:
+            check.deserialize(got["memory.db"])
+            assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert check.execute("SELECT value FROM t").fetchall() == [("committed",)]
+        finally:
+            check.close()
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "hardlink"])
+def test_database_snapshot_rejects_linked_wal(tmp_path: Path, kind: str) -> None:
+    _spilling_database(tmp_path / "memory.db")
+    excluded = tmp_path / "vault.key"
+    excluded.write_bytes(EXCLUDED)
+    wal = tmp_path / "memory.db-wal"
+    if kind == "symlink":
+        symlink(wal, excluded)
+    else:
+        wal.hardlink_to(excluded)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_database_snapshot_rejects_a_wal_that_appeared_during_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    opened = export._open
+    calls = 0
+
+    def create_wal(path: Path, *, directory: bool = False, parent_fd: int | None = None) -> int:
+        nonlocal calls
+        if path.name == "memory.db-wal":
+            calls += 1
+            if calls == 2:
+                path.write_bytes(b"new WAL")
+        return opened(path, directory=directory, parent_fd=parent_fd)
+
+    monkeypatch.setattr(export, "_open", create_wal)
+    assert "memory.db" not in entries(tmp_path)
+    assert calls == 2
+
+
+def test_corrupt_database_does_not_fall_back_to_raw_bytes(tmp_path: Path) -> None:
+    (tmp_path / "memory.db").write_bytes(b"SQLite format 3\0" + b"bad" * 100)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_database_snapshot_bounds_the_result_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    monkeypatch.setattr(export, "MAX_FILE_BYTES", 1_024)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_database_snapshot_stops_at_its_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    monkeypatch.setattr(export, "DATABASE_WAIT_S", 0)
+    assert "memory.db" not in entries(tmp_path)
