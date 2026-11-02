@@ -46,7 +46,6 @@ const WEB_APP_ONLY = [
   '_timeStart',
   '_toBottom',
   '_toBottomSlot',
-  '_userRow',
 ]
 
 test('every hook styles.ts leans on is in the installed dsh packages, set by the bundle itself, or a known web-app hook', { skip: !existsSync(scoped) && 'no @deepseek-ai packages installed' }, () => {
