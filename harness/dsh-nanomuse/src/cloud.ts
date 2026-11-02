@@ -25,7 +25,7 @@
  * (`/events`) carrying the live state — registered when the web server is
  * present; the headless and SDK profiles get the service without routes.
  */
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ApprovalDesk, appLabel, appOf, type ApprovalScope, isOwnApp, checkForUpdate, compareVersions, DEVICE_GRANT_PREFIX, grantCovers, HoldDesk, modelFor, pickChatModel, pickHandsModel, REMOTE_CONTROL_GRANT_ID, scheduleRunIds, sharedConnectors, standingGrants, takesImages, UPDATE_RETRY_MS, updateCacheFresh, withGrant, type Grant, type Hold, type HoldTool, type PendingApproval, type StandingGrant, type UpdateInfo } from './desk.ts'
 import { arch, homedir, hostname, release, type, userInfo } from 'node:os'
@@ -3830,7 +3830,12 @@ export default class NanomuseCloud extends Service {
   private async writeState(): Promise<void> {
     const path = this.statePath()
     await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, JSON.stringify(this.state, null, 2) + '\n', { mode: 0o600 })
+    // a crash mid-write must not take the signed-in account with it: the whole file is
+    // written beside it and renamed over, as the sync's kept-turns store has always done
+    const tmp = `${path}.${process.pid}.tmp`
+    await writeFile(tmp, JSON.stringify(this.state, null, 2) + '\n', { mode: 0o600 })
+    await rename(tmp, path)
+    await chmod(path, 0o600).catch(() => undefined)
   }
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {

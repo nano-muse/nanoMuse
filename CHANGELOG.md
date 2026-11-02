@@ -30,6 +30,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **A crash mid-write no longer signs the desktop out.** The account snapshot (`cloud.json`) was written straight over: the file is truncated before the new bytes land, so a crash or a power cut in that window left half a file nothing could read — the next start found no account and no device id, silently signed out while the relay still knew the device. The snapshot is now written whole beside itself and renamed over, as the sync's kept-turns store has always been, and the temp file never outlives the write.
+
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
 - **Added an on-demand guide for the agent's own desktop capabilities.** The native skill catalog now includes workspace and second-brain folder guidance, Windows paths, settings, connectors, skills, memory, and rooms, without searching app source or private configuration. Existing approval rules still apply. For [#712](https://github.com/nano-muse/nanoMuse/issues/712).
