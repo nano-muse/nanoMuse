@@ -7,6 +7,8 @@ can do on its own and for the others, how a task travels, and which existing
 pieces each part is built from. The protocol itself is in [hub.md](hub.md);
 this page is about the product shape and the code around it.
 
+The Python runtime keeps each `device_screen` screenshot in a separate file, including repeated captures within the same second.
+
 ## One Muse per device, one shape
 
 Every device runs its own Muse (the phone its OpenMinis-based agent, the

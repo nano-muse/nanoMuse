@@ -6,6 +6,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Restored the default for invalid numeric preferences saved by the admin console, including blank values.
+
+- Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
 
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
@@ -23,6 +26,14 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **The export carries the data the runtime actually keeps.** The manifest is a whitelist, and the runtime grew folders the list never learned: skills edited in the app, the contacts sources uploaded in Connections, the per-task phone and computer traces, the delivery outbox whose pending rows a restore must still owe (a claimed reminder that lost its row is gone for good — the source's fired counter has moved on), and the relay's nudges cache. A populated data directory exported as a zip containing a README and little else, while the desktop's own export walks the whole tree. All of it is in the zip now, and the README's "not in this zip" names the deliberately-left-out files with their reasons: the pairing credentials, this device's own sync cursor, and the push subscription endpoints.
 
 - Exported committed SQLite snapshots from the runtime's already-open stores, including WAL transactions, without reopening database paths or releasing their locks. Unavailable, busy or oversized databases were skipped and named in the archive README.
+
+- Kept Windows coding-agent discovery working when process names or command lines used the console code page.
+
+- Kept calendar drafts with the same date and title in separate files instead of overwriting the earlier draft.
+
+- Recorded Feishu and DingTalk message-processing failures after thread handover instead of silently dropping their errors.
+
+- Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
 - Kept files dated after 2107 in data exports by clamping their archive timestamps to ZIP's supported upper limit.
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
@@ -41,6 +52,22 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Web
 
 ### Desktop
+
+- Kept separate screenshots when reporting more than one problem within the same second.
+
+- Kept stable message IDs when retrying conversation uploads after a lost relay response.
+
+- Stopped coding-run child processes on Windows along with their parent CLI.
+
+- Kept another device's working indicator when a different device finished a turn.
+
+- Saved desktop account state through ordered atomic replacements so interrupted writes preserved the previous snapshot.
+
+- Bounded the desktop conversation-log cache to 64 recently used sessions.
+
+- Dated desktop memory entries using the computer's local calendar day.
+
+- **Fixed dark device authorization cards and chat action placement.** Authorization cards used the selected theme background, and user-message timestamps and Copy buttons stayed below the message without overlapping text or attachments. For [#774](https://github.com/nano-muse/nanoMuse/issues/774) and [#781](https://github.com/nano-muse/nanoMuse/issues/781).
 
 - Fixed the development desktop smoke test on Windows by importing Electron through a file URL, including paths with spaces and URL-significant characters.
 
