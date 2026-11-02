@@ -155,7 +155,7 @@ def test_files_skip_a_dot_segment_inside_the_folder(tmp_path: Path):
     assert s.files == [Path("scripts/sub/ok.py")]
 
 
-def test_shared_skill_creator_copies_are_current():
+def test_shared_skill_creator_copies_are_current() -> None:
     root = Path(__file__).resolve().parents[1]
     source = (BUILTIN_DIR / "skill-creator" / "SKILL.md").read_text(encoding="utf-8")
     for relative in (
