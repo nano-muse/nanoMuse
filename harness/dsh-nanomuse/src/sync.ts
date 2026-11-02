@@ -1038,12 +1038,13 @@ export class SyncEngine {
 
   private drainFramePull(): void {
     if (this.pulling) {
+      // finally creates a separate promise that inherits the pull's already-recorded failure.
       void this.pulling.finally(() => {
         if (this.frameNeedsPull || this.frameCursor > this.state.cursor) {
           this.frameNeedsPull = false
           void this.pull().catch(() => 0)
         }
-      })
+      }).catch(() => 0)
       return
     }
     this.frameNeedsPull = false

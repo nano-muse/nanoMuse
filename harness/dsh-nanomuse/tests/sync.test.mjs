@@ -966,6 +966,52 @@ test('C10: the same account again changes nothing; a 0.1.38 state gives its mapp
   e.stop()
 })
 
+for (const kind of ['request timeout', 'connection timeout']) {
+  for (const notification of ['sync frame', 'hub reconnect']) {
+    test(`an in-flight pull's ${kind} stays handled after a ${notification}, and sync recovers`, async (t) => {
+      const error = kind === 'request timeout'
+        ? new DOMException('The operation was aborted due to timeout', 'TimeoutError')
+        : new TypeError('fetch failed', { cause: Object.assign(new Error('Connect Timeout Error'), { code: 'UND_ERR_CONNECT_TIMEOUT' }) })
+      const relay = fakeRelay()
+      relay.add('c-main', 'main', 'Main chat')
+      relay.say('c-main', 'assistant', 'reply kept while offline')
+      const fetch = relay.fetch
+      let rejectPull
+      const pending = new Promise((_resolve, reject) => { rejectPull = reject })
+      let attempts = 0
+      relay.fetch = async (url, init) => {
+        attempts += 1
+        if (attempts === 1) return pending
+        if (attempts === 2) throw error
+        return fetch(url, init)
+      }
+      const sessions = fakeSessions()
+      const logs = []
+      const { engine: e } = engine(relay, sessions, { options: { log: (level, text) => logs.push({ level, text }) } })
+      t.after(() => e.stop())
+      const firstPull = e.pull()
+      const refused = assert.rejects(firstPull, (reason) => reason === error)
+      await until(() => attempts === 1)
+      e.onFrame(notification === 'sync frame' ? { cursor: relay.seq, from: 'phone-1' } : {})
+      await until(() => e.frameTimer === undefined)
+      rejectPull(error)
+      await refused
+      await until(() => attempts === 2 && e.pulling === undefined)
+      // Allow Node to report any rejection leaked by the frame's detached finally branch.
+      await tick(10)
+      assert.equal(e.error, error.message)
+      assert.equal(e.state.cursor, 0)
+      assert.equal(sessions.created, 0)
+      assert.equal(logs.filter((entry) => entry.level === 'debug').length, 2)
+
+      await e.pull()
+      assert.equal(attempts, 3)
+      assert.equal(e.state.cursor, relay.seq)
+      assert.deepEqual(sessions.remote(e.state.mainSession).map((line) => line.text), ['reply kept while offline'])
+    })
+  }
+}
+
 test('a sync frame arriving while a pull is in flight triggers a follow-up pull, and RemoteStore records keptAt for clock-skewed anchors', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'nm-remote-skew-'))
   try {
