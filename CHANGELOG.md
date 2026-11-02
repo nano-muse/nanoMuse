@@ -47,6 +47,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Saved desktop account state through ordered atomic replacements so interrupted writes preserved the previous snapshot.
+
 - Bounded the desktop conversation-log cache to 64 recently used sessions.
 
 - Dated desktop memory entries using the computer's local calendar day.

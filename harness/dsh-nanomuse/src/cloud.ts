@@ -25,7 +25,7 @@
  * (`/events`) carrying the live state — registered when the web server is
  * present; the headless and SDK profiles get the service without routes.
  */
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ApprovalDesk, appLabel, appOf, type ApprovalScope, isOwnApp, checkForUpdate, compareVersions, DEVICE_GRANT_PREFIX, grantCovers, HoldDesk, modelFor, pickChatModel, pickHandsModel, REMOTE_CONTROL_GRANT_ID, scheduleRunIds, sharedConnectors, standingGrants, takesImages, UPDATE_RETRY_MS, updateCacheFresh, withGrant, type Grant, type Hold, type HoldTool, type PendingApproval, type StandingGrant, type UpdateInfo } from './desk.ts'
 import { arch, homedir, hostname, release, type, userInfo } from 'node:os'
@@ -627,6 +627,7 @@ export default class NanomuseCloud extends Service {
   readonly hub: HubClient
   private state: State = {}
   private busy: Promise<unknown> = Promise.resolve()
+  private stateWrites: Promise<void> = Promise.resolve()
   private readonly streams = new Set<ServerResponse>()
   private readonly changeListeners = new Set<() => void>()
   private readonly calls = new Map<string, HandsCall>()
@@ -3843,8 +3844,22 @@ export default class NanomuseCloud extends Service {
 
   private async writeState(): Promise<void> {
     const path = this.statePath()
-    await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, JSON.stringify(this.state, null, 2) + '\n', { mode: 0o600 })
+    // Capture each requested snapshot before yielding, and commit writes in that order.
+    const contents = JSON.stringify(this.state, null, 2) + '\n'
+    const write = async (): Promise<void> => {
+      await mkdir(dirname(path), { recursive: true })
+      const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+      try {
+        await writeFile(tmp, contents, { mode: 0o600, flag: 'wx' })
+        await rename(tmp, path)
+        await chmod(path, 0o600).catch(() => undefined)
+      } finally {
+        await rm(tmp, { force: true }).catch(() => undefined)
+      }
+    }
+    const next = this.stateWrites.then(write, write)
+    this.stateWrites = next.catch(() => undefined)
+    await next
   }
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {
