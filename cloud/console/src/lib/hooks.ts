@@ -15,6 +15,8 @@ interface Entry {
 }
 
 const CACHE = new Map<string, Entry>();
+// Do not reuse a generation after signing out clears the cache.
+let generation = 0;
 const listeners = new Map<string, Set<() => void>>();
 
 const notify = (url: string) => {
@@ -24,11 +26,11 @@ const notify = (url: string) => {
 export function fetchInto(url: string, force = false): Promise<unknown> {
   const e = CACHE.get(url) || { data: undefined, at: 0, error: null, promise: null, gen: 0 };
   if (e.promise && !force) return e.promise;
-  const mine = e.gen + 1;
+  const mine = ++generation;
   const p = get(url)
     .then((d) => {
       const cur = CACHE.get(url);
-      if (!cur || cur.gen === mine) {
+      if (cur?.gen === mine) {
         CACHE.set(url, { data: d, at: Date.now(), error: null, promise: null, gen: mine });
         notify(url);
       }
@@ -36,8 +38,8 @@ export function fetchInto(url: string, force = false): Promise<unknown> {
     })
     .catch((err: ApiError) => {
       const cur = CACHE.get(url);
-      if (!cur || cur.gen === mine) {
-        CACHE.set(url, { data: cur?.data, at: cur?.at ?? 0, error: err, promise: null, gen: mine });
+      if (cur?.gen === mine) {
+        CACHE.set(url, { data: cur.data, at: cur.at, error: err, promise: null, gen: mine });
         notify(url);
       }
       throw err;
