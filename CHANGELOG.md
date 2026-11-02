@@ -23,6 +23,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
 - Kept files dated after 2107 in data exports by clamping their archive timestamps to ZIP's supported upper limit.
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
