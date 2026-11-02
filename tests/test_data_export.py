@@ -642,6 +642,42 @@ def test_owned_connection_snapshot_stays_consistent_when_file_times_are_stale(
         writer.close()
 
 
+def test_the_export_carries_the_data_the_runtime_actually_keeps(tmp_path: Path) -> None:
+    """The manifest is a whitelist, and the runtime grew folders the list never learned:
+    skills edited in the app, the contacts sources, the per-task traces, and the delivery
+    outbox whose pending rows a restore must still owe — losing them silently is losing
+    the user's data while the zip says "your nanoMuse data, exported"."""
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "skills" / "morning-brief").mkdir()
+    (tmp_path / "skills" / "morning-brief" / "SKILL.md").write_bytes(b"# brief")
+    (tmp_path / "contacts").mkdir()
+    (tmp_path / "contacts" / "work.vcf").write_bytes(b"BEGIN:VCARD")
+    (tmp_path / "phone-traces").mkdir()
+    (tmp_path / "phone-traces" / "task-1.jsonl").write_bytes(b"{}")
+    (tmp_path / "computer-traces").mkdir()
+    (tmp_path / "computer-traces" / "task-2.jsonl").write_bytes(b"{}")
+    _spilling_database(tmp_path / "scheduled-deliveries.db")
+    (tmp_path / "nudges.json").write_bytes(b"[]")
+    # deliberately this device's own concerns, named in the README's "not in this zip"
+    (tmp_path / "sync.json").write_bytes(b"{}")
+    (tmp_path / "channels").mkdir()
+    (tmp_path / "channels" / "pairing.json").write_bytes(b"{}")
+
+    source = sqlite3.connect(tmp_path / "scheduled-deliveries.db")
+    try:
+        got = entries(tmp_path, {"scheduled-deliveries.db": source})
+    finally:
+        source.close()
+    assert "skills/morning-brief/SKILL.md" in got
+    assert "contacts/work.vcf" in got
+    assert "phone-traces/task-1.jsonl" in got
+    assert "computer-traces/task-2.jsonl" in got
+    assert "scheduled-deliveries.db" in got
+    assert "nudges.json" in got
+    assert not any(name.startswith("channels/") for name in got)
+    assert "sync.json" not in got
+
+
 def test_database_export_preserves_the_runtime_connection_lock(tmp_path: Path) -> None:
     path = tmp_path / "memory.db"
     _spilling_database(path)
