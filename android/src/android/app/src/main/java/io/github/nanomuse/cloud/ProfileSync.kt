@@ -37,7 +37,7 @@ import org.json.JSONObject
  * older relays are checked against the downloaded still. So a rename on the desktop changes
  * the name here and nothing else.
  *
- * An emoji look chosen on the web has no picture here, so the phone wears the dragon for it.
+ * An emoji look chosen on another device is kept beside the drawn face and worn here too.
  *
  * The same profile carries which device connected which service (`connectors`, contract C3,
  * [SharedConnectors]): this phone's entries ride along with every push — names, addresses,
@@ -145,7 +145,7 @@ object ProfileSync {
             // it is the plain default (nothing worth telling the other devices) — and so do
             // its connections, if it has any
             val name = SoulStore.load(context)?.metadata?.name.orEmpty()
-            if (AvatarStore.current.value != null || (name.isNotBlank() && name != "nanoMuse") || SharedConnectors.mine(context).length() > 0) push(context)
+            if (AvatarStore.current.value != null || AvatarStore.emoji.value != null || (name.isNotBlank() && name != "nanoMuse") || SharedConnectors.mine(context).length() > 0) push(context)
             return
         }
         if (rev <= known) {
@@ -165,6 +165,10 @@ object ProfileSync {
             }
             val knownHash = prefs(context).getString(KEY_FACE_HASH, "").orEmpty()
             when {
+                avatar == "emoji" -> {
+                    io.github.nanomuse.avatar.EmojiLook.fromProfile(light)?.let(AvatarStore::adoptEmoji)
+                    rememberClips(context, null)
+                }
                 avatar == "face" && light.optBoolean("has_face") -> {
                     val remote = light.optString("face_id")
                     if (AvatarStore.current.value == null || remote.isEmpty() || remote != knownHash) {
@@ -177,8 +181,8 @@ object ProfileSync {
                     rememberClips(context, light.optJSONObject("clips"))
                     adoptClips(context, account)
                 }
-                // the dragon, or an emoji the phone cannot draw: the built-in face
-                AvatarStore.current.value != null -> { AvatarStore.reset(); rememberClips(context, null) }
+                // A reset from another device removes either kind of custom still.
+                AvatarStore.current.value != null || AvatarStore.emoji.value != null -> { AvatarStore.reset(); rememberClips(context, null) }
                 else -> rememberClips(context, null)
             }
         } finally {
@@ -238,7 +242,7 @@ object ProfileSync {
 
     /** What identifies the face worn here, so a rename does not resend the pictures. */
     private fun faceStamp(): String {
-        val cur = AvatarStore.current.value ?: return ""
+        val cur = AvatarStore.current.value ?: return AvatarStore.emoji.value?.let { "emoji:${it.emoji}:${it.color}" }.orEmpty()
         return "${cur.createdAt}:${cur.moods.keys.sortedBy { it.ordinal }.joinToString(",") { it.name }}"
     }
 
@@ -269,7 +273,7 @@ object ProfileSync {
             // connector change on a phone without a face leaves the look as the relay has it
             // (relay 0.25 keeps a field that is absent). Before, every such write carried the
             // dragon and the account's face vanished from the other devices.
-            if (!sameFace) body.put("avatar", DRAGON)
+            io.github.nanomuse.avatar.EmojiLook.writeProfile(body, AvatarStore.emoji.value, changed = !sameFace)
         } else {
             body.put("avatar", "face")
                 .put("style", cur.style.take(20))
@@ -303,13 +307,13 @@ object ProfileSync {
         SharedConnectors.absorb(context, out)
         val editor = p.edit()
             .putInt(KEY_REV, out.optInt("rev", p.getInt(KEY_REV, 0)))
-            .putString(KEY_PUSHED_FACE, if (body.optString("avatar") == "face") stamp else "")
+            .putString(KEY_PUSHED_FACE, stamp)
             .putString(KEY_PUSHED_NAME, name)
             .putString(KEY_PUSHED_CONNECTORS, connectors.toString())
-        if (body.optString("avatar") != "face") editor.putString(KEY_FACE_HASH, "")
+        if (body.has("avatar") && body.optString("avatar") != "face") editor.putString(KEY_FACE_HASH, "")
         else if (sentHash != null) editor.putString(KEY_FACE_HASH, sentHash)
         // new pictures, or no face: the relay drops the clips of the old face with them
-        if (body.has("face") || body.optString("avatar") != "face") editor.putString(KEY_CLIPS, "")
+        if (body.has("face") || (body.has("avatar") && body.optString("avatar") != "face")) editor.putString(KEY_CLIPS, "")
         editor.apply()
         AppLogger.info(TAG, "shared with the account as rev ${out.optInt("rev")}")
         // clips this phone drew of the face before the account knew the face: up they go now
