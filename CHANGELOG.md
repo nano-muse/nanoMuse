@@ -30,6 +30,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **A memory line is stamped with the day the person reads, not the UTC one.** The agent's documents dated each remembered line by the UTC calendar day of its timestamp, so anyone ahead of UTC — eight hours of China every night — saw things the agent remembered after midnight filed under yesterday in `MEMORY.md`, a document kept for the person to read and edit. The stamp now uses the machine's own calendar day, as the document's reader lives in that time zone. ([#713](https://github.com/nano-muse/nanoMuse/pull/713) neighborhood)
+
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
 - **Added an on-demand guide for the agent's own desktop capabilities.** The native skill catalog now includes workspace and second-brain folder guidance, Windows paths, settings, connectors, skills, memory, and rooms, without searching app source or private configuration. Existing approval rules still apply. For [#712](https://github.com/nano-muse/nanoMuse/issues/712).
