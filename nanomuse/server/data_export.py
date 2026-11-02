@@ -120,10 +120,10 @@ def _directory(path: Path, parent_fd: int | None = None) -> Iterator[int]:
 
 @contextmanager
 def _data_directory(path: Path) -> Iterator[tuple[Path, int]]:
-    # Resolve configured ancestors (e.g. macOS /var), then pin every component of that
-    # path. The data directory itself, and every exported descendant, must not be a link.
-    path = path.absolute()
-    path = path.parent.resolve(strict=True) / path.name
+    # Resolve the whole configured path (e.g. macOS /var, or a data root the user moved to
+    # a bigger disk as a junction): the root is the one link the user set up themselves.
+    # Every exported descendant below it is pinned without following, and must not be a link.
+    path = path.resolve(strict=True)
     with ExitStack() as stack:
         current = Path(path.anchor)
         fd = stack.enter_context(_directory(current))
