@@ -23,6 +23,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Fixed the ChatGPT proxy failing to start after sign-in, which kept the desktop from adding its models.
+
 - Included data-directory skills, uploaded contact sources, phone and computer traces, pending scheduled deliveries and cached nudges in runtime data exports. The archive README named the deliberately excluded device credentials and sync state.
 
 - Exported committed SQLite snapshots from the runtime's already-open stores, including WAL transactions, without reopening database paths or releasing their locks. Unavailable, busy or oversized databases were skipped and named in the archive README.
