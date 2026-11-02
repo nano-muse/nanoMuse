@@ -9,6 +9,7 @@
 //   node scripts/smoke.mjs --operator      # also: the app's own hands (src/operator.ts) load and answer
 //                                          # /info and /screenshot — needs a display (DISPLAY on Linux)
 
+import { electronPath } from "./electron-path.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -39,8 +40,7 @@ if (args.includes("--app") && appArg) {
   }
 } else {
   const electronPkg = join(appDir, "node_modules", "electron");
-  const { default: path } = await import(join(electronPkg, "index.js")).catch(() => ({ default: undefined }));
-  electron = path;
+  electron = await electronPath(electronPkg).catch(() => undefined);
   dshDir = join(appDir, "dsh");
 }
 if (!electron || !existsSync(electron)) throw new Error(`no Electron binary at ${electron}`);
