@@ -83,6 +83,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Android listed online task-capable devices above files in the leading @ menu, showed device identity, and qualified duplicate names with their stable IDs.
+
 - **Kept built-in skills managed by the app.** Their contents remained readable and exportable, with enable switches available, while editing, importing over them and deleting them were blocked. For [#756](https://github.com/nano-muse/nanoMuse/issues/756).
 
 - **A `nanomuse-pc task` that does not run says so, instead of an empty answer.** The phone took the computer's wordless answer as success and told the model to pass it on, which read as *Done*; a task that did not run now comes back as a failure with the computer's own sentence, and a refusal names what happened instead of a status code. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
