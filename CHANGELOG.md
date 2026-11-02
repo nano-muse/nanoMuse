@@ -23,7 +23,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
-- **The export carries the data the runtime actually keeps.** The manifest is a whitelist, and the runtime grew folders the list never learned: skills edited in the app, the contacts sources uploaded in Connections, the per-task phone and computer traces, the delivery outbox whose pending rows a restore must still owe (a claimed reminder that lost its row is gone for good — the source's fired counter has moved on), and the relay's nudges cache. A populated data directory exported as a zip containing a README and little else, while the desktop's own export walks the whole tree. All of it is in the zip now, and the README's "not in this zip" names the deliberately-left-out files with their reasons: the pairing credentials, this device's own sync cursor, and the push subscription endpoints.
+- Included data-directory skills, uploaded contact sources, phone and computer traces, pending scheduled deliveries and cached nudges in runtime data exports. The archive README named the deliberately excluded device credentials and sync state.
 
 - Exported committed SQLite snapshots from the runtime's already-open stores, including WAL transactions, without reopening database paths or releasing their locks. Unavailable, busy or oversized databases were skipped and named in the archive README.
 
