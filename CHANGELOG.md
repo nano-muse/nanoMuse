@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
+
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
 - **A turn keeps its own time in the record, and a slower record cannot overtake a later turn.** Each turn row took the second its background write landed in, and the account's turn list orders by that timestamp with the write's rowid beside it: a turn whose picture was still decoding could land behind a plain turn that answered after it, and read above it, newest first upside down. The timestamp is now taken when the answer leaves and each account's writes are chained in that order, so the list says what happened in the order it happened without making other accounts wait for its media.
 - **An expanded "More (N)" table keeps its rows through a poll.** Every poll hands the admin tables a freshly parsed array, and the expansion was reset on the array's arrival: click "More" on People or a Usage day's top accounts, wait out the two-minute poll, and the list snapped back to its first hundred or twenty-five rows while you were reading it. The expansion is kept unless the list itself no longer reaches it (`keptShown`), so a refresh of the same rows leaves the person where they scrolled to.
@@ -13,12 +15,18 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **The People page's sign-ups-per-day chart counts site-local days.** The bars were bucketed at UTC midnight while their labels rendered the browser's calendar, so for the primary UTC+8 audience a sign-up made between midnight and eight in the morning landed on the previous day's bar, and for a browser west of UTC every bar wore the date before. The buckets now start at the site's day boundary (`siteDayStart`), the same day the Usage page and the relay itself count.
 - **The relay's checks ran on Windows as well as Linux.** Both platforms checked the cloud service and built and tested its admin console. Changes to the showcase mirror also ran these checks because the cloud tests load those scripts. The committed-build check remained on Linux. ([#670](https://github.com/nano-muse/nanoMuse/pull/670))
 - **The local self-hosting script printed a working command for sign-in codes.** Its hint now enters `cloud/` before reading the relay logs, so it can be copied from the repository root. ([#716](https://github.com/nano-muse/nanoMuse/pull/716))
+- Added `--with-runtime` to self-hosting setup to start the web runtime beside the relay, retain its token and connect both containers on the relay network. The runtime stayed on loopback unless LAN access was explicitly selected.
+- Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
 
 - Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
+- Kept files dated after 2107 in data exports by clamping their archive timestamps to ZIP's supported upper limit.
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
+- **A file older than the zip's own clock no longer fails the whole export.** The zip format's timestamps begin in 1980, and one file stamped before that — an old photo carried through migrations, a 1970-epoch stamp a sync tool preserved — raised a `ValueError` no catch in the exporter was written for, so `/api/data/export` answered 500 and the person got nothing at all. The file now keeps its bytes and lands at the floor date, as every archiver writes it, and the rest of the zip is untouched.
+
+- **A data root the user moved to another disk as a junction exports everything, not a README.** The exporter pinned the configured path without resolving its last component — the defense that keeps a planted link inside the tree out of the zip — but a Windows user who moved the whole data directory to a bigger disk with a junction has that link as the root itself: the no-follow open hit the reparse point, the error was skipped like any unreadable directory, and the export came back containing nothing but the README, with a success status. The root is the one link the user configured, so it is now resolved before pinning; every directory below it is still pinned without following, where a planted link is refused as before.
 
 - **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
 - **Two browser screenshots inside one second are two files.** Both took the name of the second they landed in, so the second screenshot overwrote the first while the model still held the first one's path — a click-then-look sequence in one second lost the "before" picture. The second shot now takes the next free name (`…-2.jpg`), decided after the bytes arrive so two in-flight shots cannot pick the same name either.
@@ -31,6 +39,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Web
 
 ### Desktop
+
+- Fixed the development desktop smoke test on Windows by importing Electron through a file URL, including paths with spaces and URL-significant characters.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
@@ -54,6 +64,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Kept System Auto reply speech on the chosen language-specific voice.** An inactive concrete voice later in the Voice Output group no longer overrides Auto. A concrete System voice explicitly selected for Voice Output still takes priority. For [#722](https://github.com/nano-muse/nanoMuse/issues/722).
 
 ### Project
+
+- Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
 
 - **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. Expense checks kept signs and fractions instead of accepting an incorrect total's integer prefix. [Goal evaluation](docs/goal-eval.md).
 
