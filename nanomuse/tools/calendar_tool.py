@@ -188,8 +188,19 @@ class Calendar(BaseTool):
         )
         folder = self.workspace / "calendar"
         folder.mkdir(parents=True, exist_ok=True)
-        path = folder / f"{start:%Y-%m-%d}-{_slug(title)}.ics"
-        path.write_text(ics, encoding="utf-8")
+        # the name is the day and the title's slug: two proposals that share both must not
+        # land on one path, so the file is created exclusively and the next free name is taken
+        stem = f"{start:%Y-%m-%d}-{_slug(title)}"
+        path = folder / f"{stem}.ics"
+        n = 2
+        while True:
+            try:
+                with path.open("x", encoding="utf-8") as fh:
+                    fh.write(ics)
+                break
+            except FileExistsError:
+                path = folder / f"{stem}-{n}.ics"
+                n += 1
         rel = path.relative_to(self.workspace).as_posix()
         when = f"{start:%a %Y-%m-%d}" if all_day else f"{start:%a %Y-%m-%d %H:%M}–{end:%H:%M}"
         return ToolResult(
