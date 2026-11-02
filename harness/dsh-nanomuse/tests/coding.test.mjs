@@ -477,7 +477,7 @@ setTimeout(() => process.exit(${fail ? 1 : 0}), ${linger})
   return cli
 }
 
-test('runner: stopping a run ends the whole tree on Windows', { skip: posix }, async () => {
+test('runner: stopping a run ends the whole tree on Windows', { skip: posix, timeout: 30_000 }, async (t) => {
   await scratch(async (dir) => {
     const marker = join(dir, 'helper.pid')
     // a fake CLI shaped like the real ones: it starts a helper (the header's `cursor-agent`
@@ -493,12 +493,17 @@ test('runner: stopping a run ends the whole tree on Windows', { skip: posix }, a
     const run = new Run('run_tree', 'claude', '', '', 'hi')
     run.process = cli
     let helper = 0
+    t.after(() => {
+      try { cli.kill() } catch {}
+      if (helper) { try { process.kill(helper) } catch {} }
+    })
+    const exited = new Promise((resolve) => cli.once('exit', resolve))
     for (let i = 0; i < 100 && !helper; i++) {
       try { helper = Number(await readFile(marker, 'utf8')) } catch { await new Promise((r) => setTimeout(r, 50)) }
     }
     assert.ok(helper, 'the CLI started its helper')
     assert.equal(run.stop(), true)
-    await new Promise((r) => cli.once('exit', r))
+    await exited
     let gone = false
     for (let i = 0; i < 100 && !gone; i++) {
       try { process.kill(helper, 0) } catch { gone = true }

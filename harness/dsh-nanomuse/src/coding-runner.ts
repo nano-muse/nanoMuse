@@ -114,8 +114,10 @@ export class Run {
         // taskkill /T walks the tree by parentage, as the runtime's own kill_tree does: a
         // plain kill() ends the CLI alone, and the helpers it detached from its job (the
         // header's `cursor-agent` worker server) keep running with their parent gone
-        const killed = spawnSync('taskkill', ['/PID', String(p.pid), '/T', '/F'])
-        if (killed.error) p.kill()
+        const killed = spawnSync('taskkill', ['/PID', String(p.pid), '/T', '/F'], { windowsHide: true, timeout: 10_000 })
+        if (killed.error || killed.status !== 0) {
+          if (!p.kill()) return false
+        }
       }
     } catch {
       return false

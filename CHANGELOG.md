@@ -30,7 +30,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
-- **Stopping a coding run ends the whole tree on Windows, not the CLI alone.** The runner's `stop()` documented itself as ending the process group, and off Windows it does — but on Windows it killed only the CLI process. The helpers a CLI detaches from its job (the `cursor-agent` worker server this file's own header warns about) survived a stop from the phone, a timeout, or the app closing, and kept running with their parent gone. The stop now walks the tree by parentage with `taskkill /T`, as the runtime's own `kill_tree` always has.
+- Stopped coding-run child processes on Windows along with their parent CLI.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
