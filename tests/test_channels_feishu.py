@@ -17,6 +17,7 @@ import pytest
 from nanomuse.channels import feishu
 from nanomuse.channels.base import InboundMessage
 from nanomuse.channels.feishu import FeishuChannel, _post_text, _strip_mentions
+from nanomuse.logger import logger
 
 
 class Bus:
@@ -473,3 +474,27 @@ def test_qr_login_flow(monkeypatch: pytest.MonkeyPatch):
     }
     assert posted[-1][0] == "lark" and posted[-1][1]["tp"] == "ob_app"
     assert feishu.login_poll("dev-1")["status"] == "failed"
+
+
+async def test_a_failed_handover_is_logged_not_swallowed(lark: SimpleNamespace):
+    """The socket thread hands an event to the loop with ``run_coroutine_threadsafe`` and
+    reads on; when the handed-over handling then fails, the exception sat in a future
+    nobody read — the event was gone with no line in the log."""
+    bus = Bus()
+    ch = FeishuChannel({"app_id": "cli_x", "app_secret": "s3", "domain": "feishu"})
+    await ch.start(bus)
+    try:
+
+        async def boom(data: Any) -> None:
+            raise RuntimeError("hand-over exploded")
+
+        ch._handle_message = boom  # type: ignore[method-assign]
+        warnings: list[str] = []
+        sink = logger.add(lambda m: warnings.append(m.record["message"]), level="WARNING")
+        try:
+            lark.handler.message_cb(message_event("boom"))
+            await until(lambda: any("hand-over exploded" in w for w in warnings))
+        finally:
+            logger.remove(sink)
+    finally:
+        await ch.stop()

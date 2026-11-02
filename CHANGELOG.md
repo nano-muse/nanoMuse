@@ -23,6 +23,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Recorded Feishu and DingTalk message-processing failures after thread handover instead of silently dropping their errors.
+
 - Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
 - Kept files dated after 2107 in data exports by clamping their archive timestamps to ZIP's supported upper limit.
 
