@@ -30,6 +30,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **The sync's session-log cache keeps the newest chats, not every chat.** Each cached entry holds a session's whole decompressed transcript — read in full by `inspect`, kept until the session's next event — and an entry whose session went quiet never left: weeks of uptime held every chat the process had ever heard of, for the few dozen the chats column and the sync actually touch. The cache now keeps sixty-four sessions and gives the longest-untouched away, to be read again if ever asked for, as the robot's per-chat frame map already does.
+
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
 - **Added an on-demand guide for the agent's own desktop capabilities.** The native skill catalog now includes workspace and second-brain folder guidance, Windows paths, settings, connectors, skills, memory, and rooms, without searching app source or private configuration. Existing approval rules still apply. For [#712](https://github.com/nano-muse/nanoMuse/issues/712).
