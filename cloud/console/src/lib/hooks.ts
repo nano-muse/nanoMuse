@@ -118,7 +118,7 @@ export function storedValue<T extends string | number | boolean>(raw: string | n
   if (raw === null) return initial;
   if (typeof initial === "number") {
     const n = Number(raw);
-    return (raw !== "" && Number.isFinite(n) ? n : initial) as T;
+    return (raw.trim() !== "" && Number.isFinite(n) ? n : initial) as T;
   }
   if (typeof initial === "boolean") return (raw === "1") as T;
   return raw as T;

@@ -13,6 +13,10 @@ describe("storedValue", () => {
 
   it("falls back to the initial value on an empty string, not 0", () => {
     expect(storedValue("", 30)).toBe(30);
+    expect(storedValue(" \t\n", 30)).toBe(30);
+    expect(storedValue("Infinity", 30)).toBe(30);
+    expect(storedValue("NaN", 30)).toBe(30);
+    expect(storedValue("0", 30)).toBe(0);
   });
 
   it("keeps booleans and strings as they were stored", () => {

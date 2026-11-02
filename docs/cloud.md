@@ -5,6 +5,8 @@ or an e-mail address, get a free allowance, and use nanoMuse without an API key 
 Bringing your own key still works exactly as before: this is one more
 provider, not a replacement.
 
+If a saved numeric admin-console preference is blank or is not a finite number, the console uses that setting’s default value.
+
 ## In the app
 
 Since 0.1.20 the account is where every app starts: the first screen asks for a
