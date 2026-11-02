@@ -27,6 +27,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = ROOT / "scripts" / "desktop-app" / "nanomuse_runtime.spec"
+
+
+def _clear_dir(path: Path) -> None:
+    # A process the check just terminated can keep its working directory pinned a beat
+    # after wait() returns; retry briefly rather than leave the probe's directories behind.
+    for _ in range(20):
+        shutil.rmtree(path, ignore_errors=True)
+        if not path.exists():
+            return
+        time.sleep(0.05)
+
+
 WORK = ROOT / "build" / "runtime-pyi"
 DIST = ROOT / "build" / "runtime-dist"
 TARGET = ROOT / "harness" / "desktop" / "runtime"
@@ -78,7 +90,7 @@ def check(exe: Path) -> None:
     home = ROOT / "build" / "runtime-check-home"
     cwd = ROOT / "build" / "runtime-check-cwd"
     for d in (home, cwd):
-        shutil.rmtree(d, ignore_errors=True)
+        _clear_dir(d)
     cwd.mkdir(parents=True)
     env = dict(os.environ, NANOMUSE_DATA_DIR=str(home), PYTHONUTF8="1")
     for key in (
@@ -138,7 +150,7 @@ def check(exe: Path) -> None:
                 proc.kill()
                 proc.wait(10)
             for d in (home, cwd):
-                shutil.rmtree(d, ignore_errors=True)
+                _clear_dir(d)
 
 
 def main() -> None:
