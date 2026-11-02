@@ -1,5 +1,8 @@
 # nanoMuse 桌面版
 
+设备授权卡片会跟随浅色或深色外观。聊天中，每条用户消息的时间和复制按钮
+都在文字及附件下方靠右排列。将鼠标移到消息上，或用键盘选中按钮，即可显示复制操作。
+
 电脑上的 Muse，装在一个窗口里：nanoMuse 建在
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）之上，窗口的
 布局一屏一屏见 [desktop-muse.md](desktop-muse.md)，账号、形象、在这台电脑屏幕上动手的
