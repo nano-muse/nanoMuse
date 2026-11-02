@@ -6,6 +6,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { nextScreenshotPath } from "./screenshot-path.js";
 import { GLOW_HIDE_MS, GLOW_SETTLE_MS, type Leak, LeakLog, leakIsEvidence, leakIsReal, pointerAction, REARM_DELAYS_MS, staleInstance } from "./glow";
 import { defaultHelperPath, HELPER_NAME, MacHelper } from "./mac-helper";
 import * as macPermissions from "./mac-permissions";
@@ -942,7 +943,7 @@ async function reportBug(): Promise<{ screenshot: string; url: string }> {
     try {
       const image = await mainWindow.webContents.capturePage();
       const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      screenshot = join(app.getPath("downloads"), `nanoMuse-${stamp}.png`);
+      screenshot = nextScreenshotPath(app.getPath("downloads"), stamp);
       writeFileSync(screenshot, image.toPNG());
     } catch (exc) {
       log(`report: no screenshot: ${String(exc)}`);

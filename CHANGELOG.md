@@ -30,6 +30,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **Two bug reports inside one second carry two screenshots.** *Report a problem* named its screenshot by the second it landed in and wrote straight over whatever already wore the name: reporting twice in a hurry — or reporting again after a look at the first shot — replaced the first screenshot while its issue tab was still open on it. The second report now takes the next free name (`…-2.png`), as the browser's and the device screen's pictures already do.
+
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
 - **Added an on-demand guide for the agent's own desktop capabilities.** The native skill catalog now includes workspace and second-brain folder guidance, Windows paths, settings, connectors, skills, memory, and rooms, without searching app source or private configuration. Existing approval rules still apply. For [#712](https://github.com/nano-muse/nanoMuse/issues/712).
