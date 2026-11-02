@@ -676,3 +676,39 @@ def test_the_export_carries_the_data_the_runtime_actually_keeps(tmp_path: Path) 
     assert "nudges.json" in got
     assert not any(name.startswith("channels/") for name in got)
     assert "sync.json" not in got
+
+
+def test_database_export_preserves_the_runtime_connection_lock(tmp_path: Path) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path)
+    try:
+        source.execute("BEGIN")
+        source.execute("SELECT count(*) FROM t").fetchone()
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+        # Closing an unrelated raw descriptor releases process-wide SQLite locks on
+        # POSIX. Another process must still be unable to commit over this read lock.
+        attempt = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import sqlite3,sys\n"
+                "db=sqlite3.connect(sys.argv[1],timeout=0)\n"
+                "try:\n"
+                " db.execute('DELETE FROM t'); db.commit(); print('written')\n"
+                "except sqlite3.OperationalError:\n"
+                " print('locked')\n"
+                "finally:\n"
+                " db.close()\n",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert attempt.stdout.strip() == "locked"
+        source.rollback()
+        assert source.execute("SELECT count(*) FROM t").fetchone()[0] == 50
+    finally:
+        source.close()
