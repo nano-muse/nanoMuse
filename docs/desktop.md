@@ -8,6 +8,11 @@ plugins ([harness.md](harness.md)). Windows 10+, macOS 12+ and Linux x64; one
 installer each, nothing to install first: the harness, the nanoMuse bundle and the
 runtime for the hands are inside.
 
+Device authorization cards follow the selected light or dark appearance. In the
+chat, each user message keeps its timestamp and Copy button below its text and
+attachments, aligned to the right. Hover over the message or focus its controls
+with the keyboard to reveal Copy.
+
 | | |
 | --- | --- |
 | Windows | `nanoMuse-Desktop-<version>-win-x64.exe` (NSIS; no certificate, so SmartScreen asks for *Run anyway*) |
