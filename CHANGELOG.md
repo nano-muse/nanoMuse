@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Restored the default for invalid numeric preferences saved by the admin console, including blank values.
+
 - Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
 

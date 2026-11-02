@@ -125,15 +125,22 @@ export function useData<T>(url: string | null, opts: { poll?: number; maxAge?: n
   };
 }
 
+/** What a stored raw string reads back as: a value another page (or another era of this
+ * one) wrote. A number that no longer parses — "abc", an empty string — falls back to
+ * the initial value instead of arriving as NaN or 0. */
+export function storedValue<T extends string | number | boolean>(raw: string | null, initial: T): T {
+  if (raw === null) return initial;
+  if (typeof initial === "number") {
+    const n = Number(raw);
+    return (raw.trim() !== "" && Number.isFinite(n) ? n : initial) as T;
+  }
+  if (typeof initial === "boolean") return (raw === "1") as T;
+  return raw as T;
+}
+
 /** A value kept in localStorage. */
 export function useStored<T extends string | number | boolean>(key: string, initial: T): [T, (v: T) => void] {
-  const [v, setV] = useState<T>(() => {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return initial;
-    if (typeof initial === "number") return Number(raw) as T;
-    if (typeof initial === "boolean") return (raw === "1") as T;
-    return raw as T;
-  });
+  const [v, setV] = useState<T>(() => storedValue(localStorage.getItem(key), initial));
   const set = useCallback(
     (x: T) => {
       setV(x);

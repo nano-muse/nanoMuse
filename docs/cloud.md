@@ -5,6 +5,8 @@ or an e-mail address, get a free allowance, and use nanoMuse without an API key 
 Bringing your own key still works exactly as before: this is one more
 provider, not a replacement.
 
+If a saved numeric admin-console preference is blank or is not a finite number, the console uses that setting’s default value.
+
 Admin-console refreshes keep the newest response for each URL. Responses from before sign-out cannot repopulate the cleared cache or replace a later account’s data.
 
 ## In the app
