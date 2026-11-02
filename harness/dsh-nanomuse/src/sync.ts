@@ -44,7 +44,7 @@
  *
  * Never a key in a log, never a file: attachments travel as names and sizes.
  */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -143,6 +143,13 @@ export interface PushResult {
 }
 
 /** `/v1/sync/*` as the engine needs them; `fetchImpl` is swapped in tests. Every call has a deadline (relay.ts `withTimeout`), so a hung connection does not stall the sync for good. */
+/** A message id stable across retries: the relay keeps a known mid out of the tables, so a line
+ * whose answer was lost and is sent again must carry the mid it went up with, not a fresh one —
+ * otherwise the same words land twice and every other device reads them twice. */
+export function deriveMid(device: string, lineId: string): string {
+  return createHash('sha256').update(`${device}:${lineId}`).digest('hex').slice(0, 32)
+}
+
 export class SyncRelay {
   readonly origin: string
   private readonly fetchImpl: TimedFetch
@@ -1142,7 +1149,7 @@ export class SyncEngine {
             again.add(sessionId)
             break
           }
-          const mid = randomUUID()
+          const mid = deriveMid(device, line.id)
           messages.push({ mid, cid, role: line.role, text: line.text, created_at: Math.floor(line.at / 1000) })
           pending.push({ sessionId, line, mid })
         }

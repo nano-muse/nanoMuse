@@ -1032,3 +1032,46 @@ test('a sync frame arriving while a pull is in flight triggers a follow-up pull,
   e.stop()
 })
 
+
+test('a line the relay took but answered nothing about is sent again as itself, not as a twin', async () => {
+  const relay = fakeRelay()
+  const sessions = fakeSessions()
+  sessions.add('s-main', 'Hello there', [{ id: 'u1', role: 'user', text: 'hi there', at: 1738000000000 }])
+  // the relay's answer dies on the way back: the POST reached it (the message is in), the client sees an error
+  const realFetch = relay.fetch
+  let dropFirst = true
+  relay.fetch = async (url, init) => {
+    const r = await realFetch(url, init)
+    if (dropFirst && String(url).endsWith('/v1/sync/changes') && r.ok) {
+      dropFirst = false
+      throw new Error('the network died after the relay took the round')
+    }
+    return r
+  }
+  const { engine: e } = engine(relay, sessions)
+  await e.setMain('s-main')
+  e.messageSent('s-main')
+  await until(() => relay.pushes.length >= 1 && (relay.pushes[0].messages ?? []).length > 0)
+  await tick(20)
+  // the failed round left the session dirty; the next event in it sends it again
+  e.messageSent('s-main')
+  await until(() => relay.pushes.length >= 2 && relay.pushes.every((p) => (p.messages ?? []).length > 0))
+  const midsFor = (p) => (p.messages ?? []).filter((m) => m.text === 'hi there').map((m) => m.mid)
+  const first = midsFor(relay.pushes[0])
+  const second = midsFor(relay.pushes[1])
+  assert.equal(first.length, 1)
+  assert.equal(second.length, 1)
+  // the retry carries the same mid, so the relay's per-mid idempotence turns it away
+  assert.equal(second[0], first[0])
+  assert.equal([...relay.msgs.values()].filter((m) => m.text === 'hi there').length, 1)
+})
+
+test('a message id is derived, not minted: same device and line, same id; anything else differs', async () => {
+  const { deriveMid } = await import('../lib/sync.js')
+  const id = /^[a-z0-9][a-z0-9._:-]{3,63}$/
+  const a = deriveMid('pc-1', 'u1')
+  assert.ok(id.test(a))
+  assert.equal(deriveMid('pc-1', 'u1'), a)
+  assert.notEqual(deriveMid('pc-1', 'u2'), a)
+  assert.notEqual(deriveMid('pc-2', 'u1'), a)
+})
