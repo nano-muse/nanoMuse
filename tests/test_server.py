@@ -2905,10 +2905,11 @@ def test_data_export_is_the_agent_data_as_a_zip(server):
     """*Download your agent data* for the web (parity note 37): the runtime answers the
     token with the zip itself, and a credential is never inside it."""
     import io
+    import sqlite3
     import zipfile
 
     client, service, _ = server
-    service.app.triggers.create("mail", "summarise it", match="landlord")
+    trigger = service.app.triggers.create("mail", "summarise it", match="landlord")
 
     r = client.get("/api/data/export")
     assert r.status_code == 200, r.text
@@ -2919,6 +2920,18 @@ def test_data_export_is_the_agent_data_as_a_zip(server):
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         names = z.namelist()
         readme = z.read("README.txt").decode()
+        exported = sqlite3.connect(":memory:")
+        try:
+            exported.deserialize(z.read("triggers.db"))
+            assert exported.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert (
+                exported.execute(
+                    "SELECT text FROM triggers WHERE id = ?", (trigger.id,)
+                ).fetchone()[0]
+                == "summarise it"
+            )
+        finally:
+            exported.close()
     assert "README.txt" in names and "triggers.db" in names
     # the chats go in as the runtime keeps them, index first (written at startup)
     assert "threads/index.json" in names
