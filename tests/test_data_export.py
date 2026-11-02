@@ -585,3 +585,16 @@ def test_database_snapshot_stops_at_its_deadline(
     _spilling_database(path)
     monkeypatch.setattr(export, "DATABASE_WAIT_S", 0)
     assert "memory.db" not in entries(tmp_path)
+
+
+def test_export_keeps_a_file_newer_than_the_zip_clock(tmp_path: Path) -> None:
+    path = tmp_path / "profile.json"
+    path.write_bytes(b"profile")
+    timestamp = 7_258_118_400  # 2200-01-01, after the zip clock's 2107 ceiling
+    os.utime(path, (timestamp, timestamp))
+    if time.localtime(path.stat().st_mtime).tm_year <= 2107:
+        pytest.skip("filesystem clamps future timestamps before the ZIP ceiling")
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(tmp_path))) as archive:
+        assert archive.read("profile.json") == b"profile"
+        assert archive.getinfo("profile.json").date_time == (2107, 12, 31, 23, 59, 58)
+        assert archive.testzip() is None

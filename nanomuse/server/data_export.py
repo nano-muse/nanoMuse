@@ -189,7 +189,10 @@ def _write_entry(z: zipfile.ZipFile, name: str, info: os.stat_result, content: b
     # Preserve the original metadata without ZipInfo.from_file's second pathname lookup.
     # The zip's own clock starts in 1980: an older file (a migrated photo, a 1970-epoch
     # stamp a sync tool kept) keeps its bytes and lands at the floor, not a failed export.
-    stamp = max(time.localtime(info.st_mtime)[:6], (1980, 1, 1, 0, 0, 0))
+    stamp = min(
+        max(time.localtime(info.st_mtime)[:6], (1980, 1, 1, 0, 0, 0)),
+        (2107, 12, 31, 23, 59, 58),
+    )
     entry = zipfile.ZipInfo(name, stamp)
     entry.external_attr = (info.st_mode & 0xFFFF) << 16
     entry.compress_type = zipfile.ZIP_DEFLATED
