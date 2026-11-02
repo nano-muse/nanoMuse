@@ -21,6 +21,8 @@ pip install 'nanomuse[channels]'    # all three; Telegram needs nothing extra
 The Docker image carries all of them. Without an SDK the app shows the line to install
 and leaves the switch alone.
 
+If a Feishu or DingTalk message fails after reaching the runtime, the runtime log records the channel and the error. Check that log when a connected bot receives a message but does not answer.
+
 ## Where to find it
 
 * **App**: Settings → *Chat apps* (「聊天入口」). One card per app: the switch, the

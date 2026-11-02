@@ -30,6 +30,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
+from concurrent.futures import Future
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -343,7 +344,24 @@ class FeishuChannel(Channel):
         loop = self._loop
         if loop is None or loop.is_closed():
             return
-        asyncio.run_coroutine_threadsafe(self._handle_message(data), loop)
+        # the socket reads on; when the handed-over handling fails, the exception must
+        # not sit in a future nobody reads
+        coro = self._handle_message(data)
+        try:
+            done = asyncio.run_coroutine_threadsafe(coro, loop)
+        except RuntimeError:
+            coro.close()
+            logger.warning("feishu: the runtime loop stopped before message handover")
+            return
+        done.add_done_callback(self._log_failed_handover)
+
+    @staticmethod
+    def _log_failed_handover(future: Future[Any]) -> None:
+        if future.cancelled():
+            return
+        exc = future.exception()
+        if exc is not None:
+            logger.warning("feishu: a handed-over message failed: {}", exc)
 
     def _on_card_action(self, data: Any) -> Any:
         event = getattr(data, "event", None)
