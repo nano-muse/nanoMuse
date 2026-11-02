@@ -5,10 +5,12 @@ from __future__ import annotations
 import ctypes
 import io
 import os
+import sqlite3
 import stat
 import struct
 import subprocess
 import sys
+import threading
 import time
 import zipfile
 from ctypes import wintypes
@@ -212,6 +214,19 @@ def test_export_keeps_metadata_from_the_validated_file(tmp_path: Path) -> None:
         assert info.external_attr >> 16 == path.stat().st_mode & 0xFFFF
 
 
+def test_export_keeps_a_file_older_than_the_zip_clock(tmp_path: Path) -> None:
+    path = tmp_path / "profile.json"
+    path.write_bytes(b"profile")
+    other = tmp_path / "feed_posts.json"
+    other.write_bytes(b"feed")
+    os.utime(path, (170000000.0, 170000000.0))  # 1975-06-01, before the zip clock's 1980
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(tmp_path))) as archive:
+        assert archive.read("profile.json") == b"profile"
+        assert archive.read("feed_posts.json") == b"feed"
+        assert archive.getinfo("profile.json").date_time == (1980, 1, 1, 0, 0, 0)
+        assert archive.testzip() is None
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows handle sharing and junctions")
 def test_windows_export_pins_ancestors_and_skips_junctions(tmp_path: Path) -> None:
     data = tmp_path / "data"
@@ -360,3 +375,258 @@ def test_the_export_carries_the_data_the_runtime_actually_keeps(tmp_path: Path) 
     assert "nudges.json" in got
     assert not any(name.startswith("channels/") for name in got)
     assert "sync.json" not in got
+
+
+def _spilling_database(db: Path) -> None:
+    """A database whose next big uncommitted transaction spills into the main file."""
+    con = sqlite3.connect(db)
+    con.execute("PRAGMA page_size=512")
+    con.execute("PRAGMA journal_mode=DELETE")
+    con.execute("CREATE TABLE t(id INTEGER PRIMARY KEY, payload BLOB)")
+    con.executemany("INSERT INTO t(payload) VALUES (?)", [(b"x" * 400,) for _ in range(50)])
+    con.commit()
+    con.close()
+
+
+def _spill_and_hold(db: Path, spilled: threading.Event, hold: threading.Event) -> threading.Thread:
+    def writer() -> None:
+        wcon = sqlite3.connect(db, timeout=60)
+        wcon.execute("PRAGMA cache_size=2")  # a few inserts force the cache to spill
+        wcon.execute("BEGIN")
+        wcon.executemany(
+            "INSERT INTO t(payload) VALUES (?)", [(bytes([i % 256]) * 480,) for i in range(4000)]
+        )
+        spilled.set()
+        hold.wait(timeout=60)
+        wcon.rollback()
+        wcon.close()
+
+    thread = threading.Thread(target=writer, daemon=True)
+    thread.start()
+    return thread
+
+
+def test_a_database_stuck_mid_write_is_left_out_rather_than_shipped_corrupt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # With the rollback journal pending, the main file's bytes are not a database SQLite
+    # can open, and a backup read would roll the writer's transaction back out from under
+    # it. The export waits out the journal, and a writer that outlives the wait costs the
+    # file this export instead of shipping corrupt bytes.
+    monkeypatch.setattr(export, "DATABASE_WAIT_S", 0.2)
+    db = tmp_path / "memory.db"
+    _spilling_database(db)
+
+    spilled = threading.Event()
+    hold = threading.Event()
+    thread = _spill_and_hold(db, spilled, hold)
+    assert spilled.wait(30), "writer never reached the spill point"
+    time.sleep(0.3)  # let the spilled pages land
+
+    try:
+        got = entries(tmp_path)
+    finally:
+        hold.set()
+        thread.join(timeout=30)
+    assert "memory.db" not in got
+
+
+def test_a_database_exports_as_a_self_consistent_snapshot(tmp_path: Path) -> None:
+    # Once the journal has cleared, the file may still differ from what a plain byte copy
+    # would have caught mid-write; the shipped snapshot opens and holds the committed rows.
+    db = tmp_path / "memory.db"
+    _spilling_database(db)
+
+    spilled = threading.Event()
+    hold = threading.Event()
+    thread = _spill_and_hold(db, spilled, hold)
+    assert spilled.wait(30), "writer never reached the spill point"
+    hold.set()  # let the writer roll back and clear the journal
+    thread.join(timeout=30)
+    for _ in range(50):
+        if not db.with_name("memory.db-journal").exists():
+            break
+        time.sleep(0.1)
+
+    got = entries(tmp_path)
+    assert "memory.db" in got
+    copy = tmp_path / "memory-from-zip.db"
+    copy.write_bytes(got["memory.db"])
+    check = sqlite3.connect(copy)
+    try:
+        assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert check.execute("SELECT count(*) FROM t").fetchone()[0] == 50
+    finally:
+        check.close()
+        copy.unlink()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows junction at the configured data root")
+def test_windows_export_follows_a_junction_data_root(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    (real / "threads").mkdir(parents=True)
+    (real / "profile.json").write_bytes(b"profile")
+    (real / "threads" / "chat.json").write_bytes(b"chat")
+    root = tmp_path / "linked-root"
+    root.mkdir()
+    _set_windows_junction(root, real)
+    assert entries(root) == {"profile.json": b"profile", "threads/chat.json": b"chat"}
+
+
+def test_export_follows_a_configured_symlink_root(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "profile.json").write_bytes(b"profile")
+    root = tmp_path / "linked-root"
+    symlink(root, real, directory=True)
+    assert entries(root) == {"profile.json": b"profile"}
+
+
+def test_export_keeps_resolved_root_when_configured_link_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "profile.json").write_bytes(b"profile")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "profile.json").write_bytes(EXCLUDED)
+    root = tmp_path / "linked-root"
+    symlink(root, real, directory=True)
+    resolve = Path.resolve
+
+    def retarget(path: Path, strict: bool = False) -> Path:
+        resolved = resolve(path, strict=strict)
+        if path == root:
+            root.unlink()
+            symlink(root, outside, directory=True)
+        return resolved
+
+    monkeypatch.setattr(Path, "resolve", retarget)
+    assert entries(root) == {"profile.json": b"profile"}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ancestor replacement race")
+def test_database_snapshot_never_reopens_the_live_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = tmp_path / "data"
+    outside = tmp_path / "outside"
+    for folder, value in [(data, "allowed"), (outside, "excluded fixture")]:
+        folder.mkdir()
+        with sqlite3.connect(folder / "memory.db") as db:
+            db.execute("CREATE TABLE t(value TEXT)")
+            db.execute("INSERT INTO t VALUES (?)", (value,))
+    identity = (data / "memory.db").stat().st_ino
+    fstat = os.fstat
+    swapped = False
+
+    def swap(fd: int) -> os.stat_result:
+        nonlocal swapped
+        info = fstat(fd)
+        if not swapped and stat.S_ISREG(info.st_mode) and info.st_ino == identity:
+            swapped = True
+            data.rename(tmp_path / "original")
+            symlink(data, outside, directory=True)
+        return info
+
+    monkeypatch.setattr(export.os, "fstat", swap)
+    got = entries(data)
+    assert swapped
+    db = sqlite3.connect(":memory:")
+    try:
+        db.deserialize(got["memory.db"])
+        assert db.execute("SELECT value FROM t").fetchall() == [("allowed",)]
+    finally:
+        db.close()
+
+
+def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path) -> None:
+    db = sqlite3.connect(tmp_path / "memory.db")
+    try:
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA wal_autocheckpoint=0")
+        db.execute("CREATE TABLE t(value TEXT)")
+        db.execute("INSERT INTO t VALUES ('committed')")
+        db.commit()
+        db.execute("INSERT INTO t VALUES ('uncommitted')")
+        got = entries(tmp_path)
+        check = sqlite3.connect(":memory:")
+        try:
+            check.deserialize(got["memory.db"])
+            assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert check.execute("SELECT value FROM t").fetchall() == [("committed",)]
+        finally:
+            check.close()
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "hardlink"])
+def test_database_snapshot_rejects_linked_wal(tmp_path: Path, kind: str) -> None:
+    _spilling_database(tmp_path / "memory.db")
+    excluded = tmp_path / "vault.key"
+    excluded.write_bytes(EXCLUDED)
+    wal = tmp_path / "memory.db-wal"
+    if kind == "symlink":
+        symlink(wal, excluded)
+    else:
+        wal.hardlink_to(excluded)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_database_snapshot_rejects_a_wal_that_appeared_during_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    opened = export._open
+    calls = 0
+
+    def create_wal(path: Path, *, directory: bool = False, parent_fd: int | None = None) -> int:
+        nonlocal calls
+        if path.name == "memory.db-wal":
+            calls += 1
+            if calls == 2:
+                path.write_bytes(b"new WAL")
+        return opened(path, directory=directory, parent_fd=parent_fd)
+
+    monkeypatch.setattr(export, "_open", create_wal)
+    assert "memory.db" not in entries(tmp_path)
+    assert calls == 2
+
+
+def test_corrupt_database_does_not_fall_back_to_raw_bytes(tmp_path: Path) -> None:
+    (tmp_path / "memory.db").write_bytes(b"SQLite format 3\0" + b"bad" * 100)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_database_snapshot_bounds_the_result_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    monkeypatch.setattr(export, "MAX_FILE_BYTES", 1_024)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_database_snapshot_stops_at_its_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    monkeypatch.setattr(export, "DATABASE_WAIT_S", 0)
+    assert "memory.db" not in entries(tmp_path)
+
+
+def test_export_keeps_a_file_newer_than_the_zip_clock(tmp_path: Path) -> None:
+    path = tmp_path / "profile.json"
+    path.write_bytes(b"profile")
+    timestamp = 7_258_118_400  # 2200-01-01, after the zip clock's 2107 ceiling
+    os.utime(path, (timestamp, timestamp))
+    if time.localtime(path.stat().st_mtime).tm_year <= 2107:
+        pytest.skip("filesystem clamps future timestamps before the ZIP ceiling")
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(tmp_path))) as archive:
+        assert archive.read("profile.json") == b"profile"
+        assert archive.getinfo("profile.json").date_time == (2107, 12, 31, 23, 59, 58)
+        assert archive.testzip() is None
