@@ -126,3 +126,20 @@ docker compose up -d app                  # the web app on http://<host>:8787, t
 如果本地中继已经占用 8787 端口，启动网页版前在仓库根目录的 `.env` 中加入 `NANOMUSE_RUNTIME_PORT=8788`，然后用 8788 端口访问。它只改变网页版在宿主机上的端口，容器内仍监听 8787。详见[部署](deployment.md#docker)。
 
 容器只看得到它的数据卷和 `./workspace`；capability 都已丢弃。让它一直跑着、arm64 的发布镜像、从你的网络外面访问它，都在[部署](deployment.md)。这个运行时像其他任何设备一样登录到一个中继（设了 `NANOMUSE_CLOUD_BASE_URL` 的话，就是第 2 节里你自己的那个），之后手机就可以通过 hub 把任务交给它，像交给一台常开的电脑（[every-device.md](every-device.md)）。
+
+### 中继和运行时，一条命令起两个 {#the-relay-and-the-runtime-in-one-command}
+
+中继和运行时在同一台机器上时，脚本会启动两者并显示各自的地址：
+
+```bash
+bash scripts/self-host.sh --local --with-runtime                # 中继在 8787，网页版在 8788
+bash scripts/self-host.sh --local --with-runtime --runtime-port 9000   # 网页版换个端口
+```
+
+`config/config.toml` 不存在时，脚本从示例复制一份出来，因为容器没有它起不来：宿主机上缺这个文件，docker 会建一个同名目录挂上去，容器直接以 *not a directory* 失败。已经踩过这一步的话，先检查这个目录，确认为空后执行 `sudo rmdir -- config/config.toml`，再运行脚本。仓库根目录的 `.env` 里还会补两行，已经有了就不动：`NANOMUSE_SERVER_TOKEN`，让网页版的链接跨重启不变；`NANOMUSE_CLOUD_BASE_URL=http://relay:8787`。中继自己的设置在 `cloud/.env` 里，两个文件一起备份。
+
+`http://relay:8787` 里的 `relay` 是中继在两个容器共享的 docker 网络上的名字。所以 `--local` 下（中继只发布在回环地址上）运行时也连得到它，有域名的服务器上也是（走公网域名要路由器支持 hairpin NAT，这样就不必）。在运行时的页面上登录，等于把模型 key 交给了它：中继对它来说就是一个 OpenAI 兼容的服务商，用账号的额度，运行时的 `.env` 里不用自己再填 key。
+
+更新是 `git pull` 之后跑同一条命令：两个镜像都重建，各自的数据会保留：中继的 `cloud/data`，运行时的 `nanomuse-data` 卷。脚本不会删这两个；在仓库根目录手打 `docker compose down -v` 仍然会删掉运行时的卷。
+
+运行时默认只监听回环地址，即使中继配置了域名也是如此。它的 HTTP 端口不受中继 Caddy 的 TLS 配置保护。远程访问可使用 SSH 隧道或 TLS 反向代理；`--local --bind 0.0.0.0` 会明确将两个端口发布到局域网。运行时创建、加入中继网络或启动失败时，脚本会报错，中继继续运行。

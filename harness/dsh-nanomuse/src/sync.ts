@@ -884,7 +884,13 @@ export class SyncEngine {
   private noteWorking(w: WireWorking, tell: boolean): boolean {
     if (!w.cid || w.from === this.options.deviceId()) return false
     const at = w.at * 1000
-    if (!w.working || Date.now() - at >= WORKING_TTL_MS) return this.working.delete(w.cid)
+    if (!w.working || Date.now() - at >= WORKING_TTL_MS) {
+      // an end frame takes away only the line its own device put up, and only when it is
+      // not older than the line: a late end of an earlier turn must not cut a newer one
+      const known = this.working.get(w.cid)
+      if (!known || known.from !== w.from || known.at > at) return false
+      return this.working.delete(w.cid)
+    }
     const state: WorkingState = w.state ?? 'working'
     const detail = w.detail ?? ''
     const known = this.working.get(w.cid)
@@ -1383,8 +1389,12 @@ export class SyncEngine {
     // main conversation; do not advance the cursor past its final reply.
     const kind = this.state.conversations[m.cid]?.kind
     if (!this.state.sideChats && (kind === 'side' || (kind !== 'main' && sessionId !== this.state.mainSession))) return
-    // the reply arrived: the other device is not working on it any more
-    if (m.role === 'assistant') this.working.delete(m.cid)
+    // the reply arrived: its device is not working on it any more — another device's reply
+    // must not take away a line that is still someone else's
+    if (m.role === 'assistant') {
+      const known = this.working.get(m.cid)
+      if (known?.from === m.device) this.working.delete(m.cid)
+    }
     if (!sessionId) return
     const line: RemoteLine = { mid: m.mid, role: m.role, text: m.text, at: m.created_at * 1000, device: m.device, deviceName: m.device_name }
     try {

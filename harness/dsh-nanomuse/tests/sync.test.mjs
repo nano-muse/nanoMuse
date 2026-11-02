@@ -732,6 +732,35 @@ test('C9: presence — the turn’s start and end are told after the push, once,
   e.stop()
 })
 
+test('C9: an end takes away only the line its own device put up', async () => {
+  const relay = fakeRelay()
+  relay.add('their-main', 'main', 'Main chat')
+  const sessions = fakeSessions()
+  sessions.add('s-main', 'Main here', [{ id: 'u1', role: 'user', text: 'desk question', at: 1738000000000 }])
+  const { engine: e } = engine(relay, sessions)
+  await e.setMain('s-main')
+  await e.accountChanged('acct-1')
+  await until(() => e.state.cids['s-main'] === 'their-main')
+  const now = Math.floor(Date.now() / 1000)
+  // the phone is working on the conversation
+  e.onWorking({ cid: 'their-main', from: 'phone-1', device_name: 'Pixel 8', working: true, at: now })
+  assert.equal(e.workingOf('s-main')?.from, 'phone-1')
+  // the tablet finishes its own turn: its end frame leaves the phone's line alone
+  e.onWorking({ cid: 'their-main', from: 'tablet-9', device_name: 'iPad', working: false, at: now + 1 })
+  assert.equal(e.workingOf('s-main')?.from, 'phone-1')
+  // the tablet's reply arriving leaves it alone too
+  relay.say('their-main', 'assistant', 'the tablet’s answer', 'tablet-9', 'iPad', now + 1)
+  await e.pull()
+  assert.equal(e.workingOf('s-main')?.from, 'phone-1')
+  // an end older than the line it names does not take it away either
+  e.onWorking({ cid: 'their-main', from: 'phone-1', device_name: 'Pixel 8', working: false, at: now - 1 })
+  assert.equal(e.workingOf('s-main')?.from, 'phone-1')
+  // the phone's own end, at or after its line, does
+  e.onWorking({ cid: 'their-main', from: 'phone-1', device_name: 'Pixel 8', working: false, at: now + 2 })
+  assert.equal(e.workingOf('s-main'), null)
+  e.stop()
+})
+
 test('the host is quiet while nothing changes: no listing or reading of sessions after the push, one read per session per push, frames coalesced', async () => {
   const relay = fakeRelay()
   const sessions = fakeSessions()

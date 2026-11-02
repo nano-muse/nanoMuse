@@ -367,9 +367,8 @@ html[data-nm-muse] [data-chat-flow-kind="turn-tail"] [class*="_endInfo"] > :not(
 html[data-nm-muse] [data-chat-flow-kind="turn-tail"] [data-clock="end"] > button[class*="_action"]:nth-of-type(2) { display: none !important; }
 .nm-quote-act { width: 24px; height: 24px; border: 0; padding: 0; border-radius: 6px; background: transparent; color: var(--dsw-alias-label-tertiary); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .nm-quote-act:hover { background: var(--nm-hover); color: var(--dsw-alias-label-primary); }
-/* the time of a message sits centred over it, small and grey, as Muse's do */
-html[data-nm-muse] [data-chat-flow-kind="user"] [class*="_userRow"] { position: relative; margin-top: 18px; }
-html[data-nm-muse] [data-chat-flow-kind="user"] [data-clock="start"] { position: absolute; left: 0; right: 0; top: -18px; justify-content: center; opacity: 1 !important; }
+/* Keep the clock and actions in the message's layout, below its text and attachments. */
+html[data-nm-muse] [data-chat-flow-kind="user"] [data-clock="start"] { position: static; align-self: flex-end; justify-content: flex-end; flex-wrap: wrap; height: auto; min-height: 28px; max-width: 100%; opacity: 1 !important; }
 html[data-nm-muse] [data-chat-flow-kind="user"] [data-clock="start"] [class*="_timeStart"] { font-size: 11px; color: var(--dsw-alias-label-dimmed); }
 html[data-nm-muse] [data-chat-flow-kind="user"] [data-clock="start"] button { opacity: 0; transition: opacity 160ms; }
 html[data-nm-muse] [data-chat-flow-kind="user"]:hover [data-clock="start"] button, html[data-nm-muse] [data-chat-flow-kind="user"] [data-clock="start"] button:focus-visible { opacity: 1; }
@@ -1198,7 +1197,7 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-lib-col-top { heig
 .nm-menu-item-label { flex: 1; min-width: 0; }
 .nm-menu-sep { height: 1px; margin: 4px 6px; background: var(--nm-divider); }
 .nm-menu-hint { font-size: 11px; color: var(--dsw-alias-label-tertiary); }
-.nm-ask { width: min(420px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 14px; background: var(--dsw-alias-bg-primary, #fff); color: var(--dsw-alias-label-primary, inherit); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); border: 1px solid var(--nm-divider); display: flex; flex-direction: column; gap: 8px; }
+.nm-ask { box-sizing: border-box; width: min(420px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 14px; background: var(--nm-card); color: var(--dsw-alias-label-primary); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); border: 1px solid var(--nm-divider); display: flex; flex-direction: column; gap: 8px; }
 .nm-ask-title { font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary); }
 .nm-ask-text { font-size: 14px; line-height: 1.4; word-break: break-word; }
 .nm-ask-actions { display: flex; flex-wrap: wrap; gap: 8px; }
