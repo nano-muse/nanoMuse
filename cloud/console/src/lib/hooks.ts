@@ -10,6 +10,8 @@ interface Entry {
   at: number;
   error: ApiError | null;
   promise: Promise<unknown> | null;
+  /** Which fetch this entry belongs to; only the newest fetch's answer is written. */
+  gen: number;
 }
 
 const CACHE = new Map<string, Entry>();
@@ -20,23 +22,27 @@ const notify = (url: string) => {
 };
 
 export function fetchInto(url: string, force = false): Promise<unknown> {
-  const e = CACHE.get(url) || { data: undefined, at: 0, error: null, promise: null };
+  const e = CACHE.get(url) || { data: undefined, at: 0, error: null, promise: null, gen: 0 };
   if (e.promise && !force) return e.promise;
+  const mine = e.gen + 1;
   const p = get(url)
     .then((d) => {
-      const cur = CACHE.get(url) || e;
-      CACHE.set(url, { data: d, at: Date.now(), error: null, promise: null });
-      void cur;
-      notify(url);
+      const cur = CACHE.get(url);
+      if (!cur || cur.gen === mine) {
+        CACHE.set(url, { data: d, at: Date.now(), error: null, promise: null, gen: mine });
+        notify(url);
+      }
       return d;
     })
     .catch((err: ApiError) => {
-      const cur = CACHE.get(url) || e;
-      CACHE.set(url, { data: cur.data, at: cur.at, error: err, promise: null });
-      notify(url);
+      const cur = CACHE.get(url);
+      if (!cur || cur.gen === mine) {
+        CACHE.set(url, { data: cur?.data, at: cur?.at ?? 0, error: err, promise: null, gen: mine });
+        notify(url);
+      }
       throw err;
     });
-  CACHE.set(url, { ...e, promise: p });
+  CACHE.set(url, { ...e, promise: p, gen: mine });
   notify(url);
   return p;
 }
@@ -54,6 +60,12 @@ export function invalidate(...prefixes: string[]): void {
 
 export function clearCache(): void {
   CACHE.clear();
+}
+
+/** The cache's current answer for a URL — the tests' window into the session cache. */
+export function cachedAnswer(url: string): { data: unknown; at: number; error: ApiError | null } | undefined {
+  const e = CACHE.get(url);
+  return e ? { data: e.data, at: e.at, error: e.error } : undefined;
 }
 
 export interface Query<T> {
