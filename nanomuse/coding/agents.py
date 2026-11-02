@@ -39,6 +39,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from nanomuse.stdio import decode_output
+
 # The agents nanoMuse knows how to read and drive; `bins` are tried in order.
 AGENTS: dict[str, dict[str, Any]] = {
     "cursor": {
@@ -213,14 +215,12 @@ def _processes() -> list[tuple[str, str]]:
         return rows
     if plat == "win32":
         try:
-            tl = subprocess.run(
-                ["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True, timeout=8
-            )
+            tl = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, timeout=8)
         except (OSError, subprocess.TimeoutExpired):
             return []
         rows = []
         node_lines: list[str] | None = None
-        for line in tl.stdout.splitlines():
+        for line in decode_output(tl.stdout).splitlines():
             name = line.split('","', 1)[0].strip('" ')
             if not name:
                 continue
@@ -245,12 +245,11 @@ def _windows_node_command_lines() -> list[str]:
                 "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | ForEach-Object { $_.CommandLine }",
             ],
             capture_output=True,
-            text=True,
             timeout=15,
         )
     except (OSError, subprocess.TimeoutExpired):
         return []
-    return [line.strip() for line in ps.stdout.splitlines() if line.strip()]
+    return [line.strip() for line in decode_output(ps.stdout).splitlines() if line.strip()]
 
 
 def sessions_root(agent: str) -> Path:

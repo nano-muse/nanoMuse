@@ -14,6 +14,8 @@ Three layers, later ones win: the file, then environment overrides, then whateve
 
 A key the runtime has no setting for (a misspelt `modle`, a key from another version) is ignored and the default applies; the loader says so in the log with the key's path (`llm.modle`), and `nanomuse doctor` lists such keys as a problem. Free-form tables (`[llm.extra_headers]`, an MCP server's `env`) and the `[channels.<name>]` tables of [channels.md](channels.md) take any key.
 
+Calendar drafts with the same day and title receive numbered filenames such as `calendar/<date>-<title>-2.ics`; earlier drafts stay intact.
+
 ## Environment overrides
 
 These win over the file. They cover the settings people change most often and what Docker needs.

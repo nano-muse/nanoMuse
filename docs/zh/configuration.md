@@ -14,6 +14,8 @@ nanoMuse 只读一个 TOML 文件。`nanomuse config init` 把带注释的 [`con
 
 运行时没有对应设置的键（拼错的 `modle`、来自另一个版本的键）会被忽略，取默认值；加载时会在日志里带着键的路径（`llm.modle`）说明，`nanomuse doctor` 把这类键列为问题。自由格式的表（`[llm.extra_headers]`、MCP 服务器的 `env`）和 [channels.md](channels.md) 里的 `[channels.<name>]` 表接受任何键。
 
+日期和标题相同的日历草稿会使用带序号的文件名，如 `calendar/<date>-<title>-2.ics`，已有草稿会保留。
+
 ## 环境变量覆盖 {#environment-overrides}
 
 这些优先于文件。它们覆盖了人们最常改的设置，以及 Docker 需要的东西。

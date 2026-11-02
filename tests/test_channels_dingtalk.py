@@ -16,6 +16,7 @@ import pytest
 
 from nanomuse.channels.base import InboundMessage
 from nanomuse.channels.dingtalk import DingTalkChannel
+from nanomuse.logger import logger
 
 
 class Bus:
@@ -252,5 +253,42 @@ async def test_a_stream_that_gives_up_is_reported_not_left_hanging(
         assert thread is not None
         await asyncio.to_thread(thread.join, 3)
         assert not thread.is_alive()  # the loop stopped with the stream
+    finally:
+        await ch.stop()
+
+
+async def test_a_failed_handover_is_logged_not_swallowed(sdk: types.ModuleType, tmp_path):  # noqa: ANN001
+    """The stream thread hands a message to the loop with ``run_coroutine_threadsafe`` and
+    acks right away; when the handed-over handling then fails, the exception sat in a future
+    nobody read — the message was gone with no line in the log."""
+    api = FakeRobotApi()
+    bus = Bus()
+    ch = channel(api)
+    await ch.start(bus)
+    try:
+        await until(lambda: ch._client is not None)
+        handler = FakeStreamClient.instances[0].handlers["/v1.0/im/bot/messages/get"]
+
+        async def boom(data: dict[str, Any]) -> None:
+            raise RuntimeError("hand-over exploded")
+
+        ch._handle = boom  # type: ignore[method-assign]
+        warnings: list[str] = []
+        sink = logger.add(lambda m: warnings.append(m.record["message"]), level="WARNING")
+        try:
+            ack = await handler.process(
+                SimpleNamespace(
+                    data={
+                        "msgId": "m9",
+                        "msgtype": "text",
+                        "text": {"content": " hi "},
+                        "senderStaffId": "staff1",
+                    }
+                )
+            )
+            assert ack == (sdk.AckMessage.STATUS_OK, "OK")
+            await until(lambda: any("hand-over exploded" in w for w in warnings))
+        finally:
+            logger.remove(sink)
     finally:
         await ch.stop()
