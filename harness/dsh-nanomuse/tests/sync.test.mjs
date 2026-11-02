@@ -7,7 +7,7 @@
 // the working presence both ways, and the host doing no work while nothing changes.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { SyncEngine, SyncRelay, MAX_POST_MESSAGES, TAIL, emptyState, migrate, RemoteStore, meanwhileNote, toWorking } from '../lib/sync.js'
+import { SyncEngine, SyncRelay, MAX_POST_MESSAGES, TAIL, emptyState, migrate, RemoteStore, meanwhileNote, toWorking, lineKey } from '../lib/sync.js'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -465,7 +465,7 @@ test('a push the relay or the network refused keeps its lines for the next push;
   sessions.lines.get('s-main').push({ id: 'huge', role: 'user', text: 'x'.repeat(10), at: 1738000010000 })
   relay.refuseAll413 = 1
   e.turnEnded('s-main')
-  await until(() => saved().mids.huge === 'refused:too_large')
+  await until(() => saved().mids[lineKey('s-main', 'huge')] === 'refused:too_large')
   assert.equal(relay.msgs.size, 6)
   const pushes = relay.pushes.length
   e.turnEnded('s-main')
@@ -1033,7 +1033,7 @@ test('a sync frame arriving while a pull is in flight triggers a follow-up pull,
 })
 
 
-test('a line the relay took but answered nothing about is sent again as itself, not as a twin', async () => {
+test('a line the relay took but answered nothing about is sent again as itself, not as a twin', async (t) => {
   const relay = fakeRelay()
   const sessions = fakeSessions()
   sessions.add('s-main', 'Hello there', [{ id: 'u1', role: 'user', text: 'hi there', at: 1738000000000 }])
@@ -1049,6 +1049,7 @@ test('a line the relay took but answered nothing about is sent again as itself, 
     return r
   }
   const { engine: e } = engine(relay, sessions)
+  t.after(() => e.stop())
   await e.setMain('s-main')
   e.messageSent('s-main')
   await until(() => relay.pushes.length >= 1 && (relay.pushes[0].messages ?? []).length > 0)
@@ -1069,9 +1070,92 @@ test('a line the relay took but answered nothing about is sent again as itself, 
 test('a message id is derived, not minted: same device and line, same id; anything else differs', async () => {
   const { deriveMid } = await import('../lib/sync.js')
   const id = /^[a-z0-9][a-z0-9._:-]{3,63}$/
-  const a = deriveMid('pc-1', 'u1')
+  const a = deriveMid('pc-1', 's-main', 'u1')
   assert.ok(id.test(a))
-  assert.equal(deriveMid('pc-1', 'u1'), a)
-  assert.notEqual(deriveMid('pc-1', 'u2'), a)
-  assert.notEqual(deriveMid('pc-2', 'u1'), a)
+  assert.equal(deriveMid('pc-1', 's-main', 'u1'), a)
+  assert.notEqual(deriveMid('pc-1', 's-side', 'u1'), a)
+  assert.notEqual(deriveMid('a:b', 'c', 'd'), deriveMid('a', 'b:c', 'd'))
+  assert.notEqual(deriveMid('pc-1', 's-main', 'u2'), a)
+  assert.notEqual(deriveMid('pc-2', 's-main', 'u1'), a)
+})
+
+test('separate sessions with the same local line ID both upload, including later rounds', async (t) => {
+  const relay = fakeRelay()
+  const sessions = fakeSessions()
+  sessions.add('s-main', 'Main', [{ id: 'u1', role: 'user', text: 'first session', at: 1738000000000 }])
+  sessions.add('s-side', 'Side', [{ id: 'u1', role: 'user', text: 'second session', at: 1738000000001 }])
+  const { engine: e } = engine(relay, sessions)
+  t.after(() => e.stop())
+  e.state.sideChats = true
+  await e.setMain('s-main')
+  e.dirty.add('s-main')
+  await e.push()
+  e.dirty.add('s-side')
+  await e.push()
+  const rows = [...relay.msgs.values()]
+  assert.deepEqual(rows.map((m) => m.text), ['first session', 'second session'])
+  assert.equal(new Set(rows.map((m) => m.mid)).size, 2)
+  assert.equal(Object.keys(e.state.mids).length, 2)
+})
+
+test('saved random message IDs from an earlier desktop remain recognized', async (t) => {
+  const relay = fakeRelay()
+  const sessions = fakeSessions()
+  sessions.add('s-main', 'Main', [{ id: 'old-line', role: 'user', text: 'already uploaded', at: 1738000000000 }])
+  const { engine: e } = engine(relay, sessions)
+  t.after(() => e.stop())
+  e.state.mids['old-line'] = 'legacy-random-id'
+  await e.setMain('s-main')
+  await e.push()
+  assert.equal([...relay.msgs.values()].length, 0)
+  assert.equal(e.state.mids['old-line'], 'legacy-random-id')
+})
+
+test('a lost upload response followed by restart keeps both the conversation and message IDs', async (t) => {
+  const relay = fakeRelay()
+  const sessions = fakeSessions()
+  sessions.add('s-side', 'Side', [{ id: 'u1', role: 'user', text: 'survives restart', at: 1738000000000 }])
+  const fetch = relay.fetch
+  let loseResponse = true
+  relay.fetch = async (url, init) => {
+    const result = await fetch(url, init)
+    if (loseResponse && init?.method === 'POST' && String(url).endsWith('/v1/sync/changes')) {
+      loseResponse = false
+      throw new Error('lost upload response')
+    }
+    return result
+  }
+  const first = engine(relay, sessions, { state: { ...emptyState(), accountId: 'account-a', sideChats: true } })
+  t.after(() => first.engine.stop())
+  first.engine.dirty.add('s-side')
+  await assert.rejects(first.engine.push(), /lost upload response/)
+  first.engine.stop()
+  const saved = first.saved()
+  assert.ok(saved?.cids['s-side'], 'the conversation mapping was saved before uploading')
+  assert.equal(saved.owners['s-side'], 'account-a', 'a lost response does not leave the uploaded chat ownerless')
+  const next = engine(relay, sessions, { state: saved })
+  t.after(() => next.engine.stop())
+  next.engine.dirty.add('s-side')
+  await next.engine.push()
+  assert.equal(relay.convs.size, 1)
+  assert.equal(relay.msgs.size, 1)
+  assert.equal(relay.pushes[0].messages[0].mid, relay.pushes[1].messages[0].mid)
+  assert.equal(relay.pushes[0].messages[0].cid, relay.pushes[1].messages[0].cid)
+})
+
+test('a failed local mapping save prevents upload and the next attempt can recover', async (t) => {
+  const relay = fakeRelay()
+  const sessions = fakeSessions()
+  sessions.add('s-side', 'Side', [{ id: 'u1', role: 'user', text: 'save before upload', at: 1738000000000 }])
+  let failSave = true
+  const { engine: e } = engine(relay, sessions, { options: {
+    save: async () => { if (failSave) throw new Error('local save failed') },
+  } })
+  t.after(() => e.stop())
+  e.dirty.add('s-side')
+  await assert.rejects(e.push(), /local save failed/)
+  assert.equal(relay.pushes.length, 0)
+  failSave = false
+  await e.push()
+  assert.equal(relay.msgs.size, 1)
 })

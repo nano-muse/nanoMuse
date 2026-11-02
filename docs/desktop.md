@@ -304,6 +304,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+When a conversation upload reaches the relay but its response is lost, a retry keeps the same message IDs so other devices do not receive duplicate messages. The conversation mapping is saved before upload so this also works after a restart; if that local save fails, the upload waits for a later attempt.
+
 `~/.nanomuse/desktop` (`NANOMUSE_DESKTOP_HOME` moves it) is the app's dsh home: the
 profile under `profiles/nanomuse` (the bundle list, the person's own `cordis.patch.yml`
 where Settings and the sign-in write the `nanoMuse Cloud` provider), dsh's credential

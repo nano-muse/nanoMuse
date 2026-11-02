@@ -30,7 +30,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
-- **A message the relay took but never answered for is sent again as itself, not as a twin.** The relay keeps a known message id out of its tables, and the desktop minted a fresh random id for every attempt: when a push reached the relay but its answer died on the network, the retry carried a new id the relay had never seen, went in a second time, and every other device read the same words twice. A message id is now derived from the device and the line it carries, so however many times the network makes the engine send it, it arrives under the one id the relay already knows.
+- Kept stable message IDs when retrying conversation uploads after a lost relay response.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
