@@ -157,20 +157,18 @@ test('a new file takes the next free number instead of overwriting (#689)', asyn
   }
 })
 
-test('a memory line is stamped with the local day, not the UTC one', async () => {
-  const { memoryDoc } = await import('../lib/rooms.js')
-  const localDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  // Find a moment today whose local day differs from its UTC day, if this time zone has one.
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  let at = null
-  for (let h = 0; h < 24 && at === null; h++) {
-    const t = new Date(start.getFullYear(), start.getMonth(), start.getDate(), h, 30)
-    if (localDay(t) !== t.toISOString().slice(0, 10)) at = t.getTime()
+test('memory dates follow fixed local calendar boundaries east and west of UTC', async () => {
+  const { execFileSync } = await import('node:child_process')
+  for (const [zone, at, expected] of [
+    ['Asia/Shanghai', '2026-01-01T16:30:00Z', '2026-01-02'],
+    ['America/Los_Angeles', '2026-01-01T00:30:00Z', '2025-12-31'],
+    ['UTC', '2026-01-01T00:30:00Z', '2026-01-01'],
+  ]) {
+    const script = `import { memoryDoc } from ${JSON.stringify(new URL('../lib/rooms.js', import.meta.url).href)};
+      console.log(memoryDoc([{ source: 'agent', at: Date.parse(${JSON.stringify(at)}), text: 'boundary memory' }], false));`
+    const doc = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...process.env, TZ: zone }, encoding: 'utf8',
+    })
+    assert.ok(doc.includes(`(${expected})`), `${zone}: ${doc}`)
   }
-  const memory = [{ source: 'agent', at: at ?? Date.now(), text: 'likes early walks' }]
-  const line = memoryDoc(memory, false).split('\n').find((l) => l.includes('likes early walks'))
-  const stamped = line.match(/\((\d{4}-\d{2}-\d{2})\)/)[1]
-  assert.equal(stamped, localDay(new Date(memory[0].at)))
-  if (at !== null) assert.notEqual(stamped, new Date(memory[0].at).toISOString().slice(0, 10))
 })
