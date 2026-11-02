@@ -5,10 +5,12 @@ from __future__ import annotations
 import ctypes
 import io
 import os
+import sqlite3
 import stat
 import struct
 import subprocess
 import sys
+import threading
 import time
 import zipfile
 from ctypes import wintypes
@@ -328,3 +330,87 @@ def test_windows_export_uses_parent_handle_after_reparse_change(
     assert entries(tmp_path) == {}
     assert swapped
     folder.rmdir()  # remove the junction after all handles close
+
+
+def _spilling_database(db: Path) -> None:
+    """A database whose next big uncommitted transaction spills into the main file."""
+    con = sqlite3.connect(db)
+    con.execute("PRAGMA page_size=512")
+    con.execute("PRAGMA journal_mode=DELETE")
+    con.execute("CREATE TABLE t(id INTEGER PRIMARY KEY, payload BLOB)")
+    con.executemany("INSERT INTO t(payload) VALUES (?)", [(b"x" * 400,) for _ in range(50)])
+    con.commit()
+    con.close()
+
+
+def _spill_and_hold(db: Path, spilled: threading.Event, hold: threading.Event) -> threading.Thread:
+    def writer() -> None:
+        wcon = sqlite3.connect(db, timeout=60)
+        wcon.execute("PRAGMA cache_size=2")  # a few inserts force the cache to spill
+        wcon.execute("BEGIN")
+        wcon.executemany(
+            "INSERT INTO t(payload) VALUES (?)", [(bytes([i % 256]) * 480,) for i in range(4000)]
+        )
+        spilled.set()
+        hold.wait(timeout=60)
+        wcon.rollback()
+        wcon.close()
+
+    thread = threading.Thread(target=writer, daemon=True)
+    thread.start()
+    return thread
+
+
+def test_a_database_stuck_mid_write_is_left_out_rather_than_shipped_corrupt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # With the rollback journal pending, the main file's bytes are not a database SQLite
+    # can open, and a backup read would roll the writer's transaction back out from under
+    # it. The export waits out the journal, and a writer that outlives the wait costs the
+    # file this export instead of shipping corrupt bytes.
+    monkeypatch.setattr(export, "DATABASE_WAIT_S", 0.2)
+    db = tmp_path / "memory.db"
+    _spilling_database(db)
+
+    spilled = threading.Event()
+    hold = threading.Event()
+    thread = _spill_and_hold(db, spilled, hold)
+    assert spilled.wait(30), "writer never reached the spill point"
+    time.sleep(0.3)  # let the spilled pages land
+
+    try:
+        got = entries(tmp_path)
+    finally:
+        hold.set()
+        thread.join(timeout=30)
+    assert "memory.db" not in got
+
+
+def test_a_database_exports_as_a_self_consistent_snapshot(tmp_path: Path) -> None:
+    # Once the journal has cleared, the file may still differ from what a plain byte copy
+    # would have caught mid-write; the shipped snapshot opens and holds the committed rows.
+    db = tmp_path / "memory.db"
+    _spilling_database(db)
+
+    spilled = threading.Event()
+    hold = threading.Event()
+    thread = _spill_and_hold(db, spilled, hold)
+    assert spilled.wait(30), "writer never reached the spill point"
+    hold.set()  # let the writer roll back and clear the journal
+    thread.join(timeout=30)
+    for _ in range(50):
+        if not db.with_name("memory.db-journal").exists():
+            break
+        time.sleep(0.1)
+
+    got = entries(tmp_path)
+    assert "memory.db" in got
+    copy = tmp_path / "memory-from-zip.db"
+    copy.write_bytes(got["memory.db"])
+    check = sqlite3.connect(copy)
+    try:
+        assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert check.execute("SELECT count(*) FROM t").fetchone()[0] == 50
+    finally:
+        check.close()
+        copy.unlink()

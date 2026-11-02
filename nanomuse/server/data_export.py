@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import io
 import os
+import sqlite3
 import stat
 import sys
 import time
@@ -28,6 +29,8 @@ from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+
+from nanomuse.logger import logger
 
 # As the desktop's export: one file this big is not worth shipping inside a zip.
 MAX_FILE_BYTES = 64 * 1024 * 1024
@@ -49,6 +52,13 @@ FILES = (
     "firstrun.json",
     "audit.jsonl",
 )
+
+# The SQLite databases among the files: shipped as a self-consistent snapshot, not as the
+# raw bytes of a file a writer may be mid-way through (the rollback journal never ships).
+DATABASES = ("memory.db", "goals.db", "reminders.db", "triggers.db")
+
+# How long to wait for a database's rollback journal to clear before shipping the file.
+DATABASE_WAIT_S = 5.0
 
 # Folders of the chats, as the runtime keeps them.
 DIRS = ("threads", "sessions")
@@ -170,12 +180,87 @@ def _add_file(z: zipfile.ZipFile, path: Path, fd: int, name: str) -> None:
     if checked is None:
         return
     info, content = checked
+    _write_entry(z, name, info, content)
+
+
+def _write_entry(z: zipfile.ZipFile, name: str, info: os.stat_result, content: bytes) -> None:
     # Preserve the original metadata without ZipInfo.from_file's second pathname lookup.
     stamp = time.localtime(info.st_mtime)
     entry = zipfile.ZipInfo(name, stamp[:6])
     entry.external_attr = (info.st_mode & 0xFFFF) << 16
     entry.compress_type = zipfile.ZIP_DEFLATED
     z.writestr(entry, content)
+
+
+def _read_database(path: Path, parent_fd: int) -> tuple[os.stat_result, bytes] | None:
+    """A committed, self-consistent snapshot of one of the agent's databases.
+
+    The plain byte copy a regular read would give can catch the file mid-write: with a
+    rollback journal pending, the main file's bytes alone are not a database SQLite can
+    open — and reading through the backup API *while* the journal is pending would roll
+    the writer's transaction back out from under it. So a pending journal is waited out
+    first; a writer that outlives the wait costs the file this export, not its bytes.
+    """
+    try:
+        fd = _open(path, parent_fd=parent_fd)
+    except OSError:
+        return None
+    try:
+        before = os.fstat(fd)
+        if (
+            _is_link(before)
+            or not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_size > MAX_FILE_BYTES
+        ):
+            return None
+        journal = path.with_name(path.name + "-journal")
+        deadline = time.monotonic() + DATABASE_WAIT_S
+        while journal.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        if journal.exists():
+            logger.warning(
+                "{} stayed mid-transaction for {}s; skipped from this export",
+                path.name,
+                DATABASE_WAIT_S,
+            )
+            return None
+        try:
+            source = sqlite3.connect(f"{path.absolute().as_uri()}?mode=ro", uri=True)
+            try:
+                snapshot = sqlite3.connect(":memory:")
+                try:
+                    source.backup(snapshot)
+                    content = bytes(snapshot.serialize())
+                finally:
+                    snapshot.close()
+            finally:
+                source.close()
+        except sqlite3.Error as exc:
+            # Not a database at all (an empty placeholder, a damaged file): the bytes are
+            # what the person has on disk, and what a plain export has always shipped.
+            logger.warning("snapshot of {} fell back to its bytes: {}", path.name, exc)
+            return _read_file(path, parent_fd)
+        after = os.fstat(fd)
+        if (
+            len(content) > MAX_FILE_BYTES
+            or after.st_nlink != 1
+            or after.st_size != before.st_size
+            or after.st_mtime_ns != before.st_mtime_ns
+            or after.st_ctime_ns != before.st_ctime_ns
+        ):
+            return None
+        return before, content
+    finally:
+        os.close(fd)
+
+
+def _add_database(z: zipfile.ZipFile, path: Path, fd: int, name: str) -> None:
+    checked = _read_database(path, fd)
+    if checked is None:
+        return
+    info, content = checked
+    _write_entry(z, name, info, content)
 
 
 def _add_tree(z: zipfile.ZipFile, root: Path, fd: int, under: str) -> None:
@@ -205,7 +290,10 @@ def agent_data_zip(data_dir: Path) -> bytes:
         try:
             with _data_directory(data_dir) as (root, fd):
                 for name in FILES:
-                    _add_file(z, root / name, fd, name)
+                    if name in DATABASES:
+                        _add_database(z, root / name, fd, name)
+                    else:
+                        _add_file(z, root / name, fd, name)
                 for folder in DIRS:
                     try:
                         with _directory(root / folder, fd) as child_fd:
@@ -220,4 +308,12 @@ def agent_data_zip(data_dir: Path) -> bytes:
     return out.getvalue()
 
 
-__all__ = ["DIRS", "FILES", "MAX_FILE_BYTES", "README", "agent_data_zip", "filename"]
+__all__ = [
+    "DATABASES",
+    "DIRS",
+    "FILES",
+    "MAX_FILE_BYTES",
+    "README",
+    "agent_data_zip",
+    "filename",
+]

@@ -16,6 +16,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **The databases in a data export are consistent snapshots, not bytes caught mid-write.** The exporter copied the four SQLite files as bytes, but a database caught while a write transaction was spilling into the main file — its rollback journal never ships — is not a database SQLite can open: the copy failed `integrity_check` and held rows nobody committed. Reading through SQLite's backup API while the journal is pending would instead roll the writer's transaction back out from under it, so the journal is waited out first; a writer that outlives the wait costs the file that export, and a database at rest ships as the committed snapshot. For [#732](https://github.com/nano-muse/nanoMuse/issues/732) neighborhood.
+
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
 - **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
