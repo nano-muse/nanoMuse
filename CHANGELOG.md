@@ -23,6 +23,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Kept Windows coding-agent discovery working when process names or command lines used the console code page.
+
 - Kept calendar drafts with the same date and title in separate files instead of overwriting the earlier draft.
 
 - Recorded Feishu and DingTalk message-processing failures after thread handover instead of silently dropping their errors.
