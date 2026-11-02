@@ -16,6 +16,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **A chat message that crossed threads and failed now leaves a line in the log.** The DingTalk stream and the Feishu socket hand each inbound message to the runtime's loop with `run_coroutine_threadsafe` and read on — the ack had already gone out, so when the handed-over handling failed, the exception sat in a future nobody read: the message was gone, with nothing in the log to say it had ever arrived or why it died. The failure is now logged with the channel's name, as every other failure in the channel is.
+
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
 - **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
