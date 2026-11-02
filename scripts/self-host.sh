@@ -52,6 +52,15 @@ done
 say() { printf '%s\n' "$*"; }
 die() { printf 'self-host: %s\n' "$*" >&2; exit 1; }
 
+if [ "$RUNTIME" = 1 ]; then
+  [[ "$PORT" =~ ^[0-9]{1,5}$ ]] || die "--port must be between 1 and 65535"
+  PORT=$((10#$PORT))
+  [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "--port must be between 1 and 65535"
+  [[ "$RUNTIME_PORT" =~ ^[0-9]{1,5}$ ]] || die "--runtime-port must be between 1 and 65535"
+  RUNTIME_PORT=$((10#$RUNTIME_PORT))
+  [ "$RUNTIME_PORT" -ge 1 ] && [ "$RUNTIME_PORT" -le 65535 ] || die "--runtime-port must be between 1 and 65535"
+fi
+
 # --- tools --------------------------------------------------------------------------------
 if docker compose version >/dev/null 2>&1; then COMPOSE=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then COMPOSE=(docker-compose)
@@ -242,7 +251,7 @@ ensure_runtime_config() {
   # behind belongs to root. Writing the file before the first `up` is what prevents that.
   local cfg="$ROOT/config/config.toml"
   if [ -d "$cfg" ]; then
-    die "$cfg is a directory: docker made one when the file was missing, and nothing can be mounted over it. Remove it with: sudo rm -rf '$cfg'"
+    die "$cfg is a directory. Check its contents; if it is empty, remove it with: sudo rmdir -- '$cfg'"
   fi
   if [ -f "$cfg" ]; then return 0; fi
   cp "$ROOT/config/config.example.toml" "$cfg"
@@ -280,31 +289,37 @@ relay_network() { # the docker network the relay was started on; empty when it c
 }
 
 up_runtime() {
-  local net id ok=0 tries
+  local net id ok=0 tries probe_host
   # read before the working directory changes: the relay's compose files are relative to cloud/
   net="$(relay_network)"
+  if [ -z "$net" ]; then
+    say "Could not read the relay's Docker network. The relay is up; the runtime was not started."
+    return 1
+  fi
   say
   say "Starting the runtime on port $RUNTIME_PORT (the first build takes a few minutes)…"
-  cd "$ROOT"
+  cd "$ROOT" || return 1
   # Created first, started afterwards, so it joins the relay's network before its first
   # request; on a second run it is already joined and the connect is a no-op.
   NANOMUSE_RUNTIME_BIND="$RUNTIME_BIND" NANOMUSE_RUNTIME_PORT="$RUNTIME_PORT" \
-    "${COMPOSE[@]}" -f docker-compose.yml up -d --build --no-start app
-  id="$("${COMPOSE[@]}" -f docker-compose.yml ps -q app 2>/dev/null | awk 'NR==1' || true)"
+    "${COMPOSE[@]}" -f docker-compose.yml up -d --build --no-start app || return 1
+  id="$("${COMPOSE[@]}" -f docker-compose.yml ps -a -q app 2>/dev/null | awk 'NR==1' || true)"
   RUNTIME_JOINED=0
   if [ -n "$net" ] && [ -n "$id" ]; then
     if docker network connect "$net" "$id" 2>/dev/null; then
       RUNTIME_JOINED=1
-    elif docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$id" 2>/dev/null | grep -q "$net"; then
+    elif docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' "$id" 2>/dev/null | grep -Fxq -- "$net"; then
       RUNTIME_JOINED=1 # already joined by an earlier run
     fi
   fi
   if [ "$RUNTIME_JOINED" = 0 ]; then
-    say "Could not read the relay's docker network, so the runtime starts without it and cannot"
-    say "sign in to the relay until the two are joined by hand: docker network connect <network> <container>"
+    say "Could not join the relay's Docker network. The relay is up; the runtime was not started."
+    return 1
   fi
-  "${COMPOSE[@]}" -f docker-compose.yml start app
-  health="http://127.0.0.1:$RUNTIME_PORT/api/health"
+  "${COMPOSE[@]}" -f docker-compose.yml start app || return 1
+  probe_host="$RUNTIME_BIND"
+  [ "$probe_host" != 0.0.0.0 ] || probe_host=127.0.0.1
+  health="http://$probe_host:$RUNTIME_PORT/api/health"
   printf 'Waiting for %s ' "$health"
   tries=0
   while [ "$tries" -lt 90 ]; do
@@ -328,10 +343,14 @@ if [ "$RUNTIME" = 1 ]; then
   if [ "$LOCAL" = 1 ] && [ "$RUNTIME_PORT" = "$PORT" ]; then
     die "the runtime would take the relay's port $PORT; pick another with --runtime-port N"
   fi
+  if [ "$LOCAL" = 0 ] && { [ "$RUNTIME_PORT" = 80 ] || [ "$RUNTIME_PORT" = 443 ]; }; then
+    die "the runtime would take Caddy's port $RUNTIME_PORT; pick another with --runtime-port N"
+  fi
   ensure_runtime_config
   write_runtime_env
-  # Same address as the relay: this machine only under --local, every interface on a server.
-  if [ "$LOCAL" = 1 ]; then RUNTIME_BIND="$BIND"; else RUNTIME_BIND=0.0.0.0; fi
+  # A domain secures the relay through Caddy, not the runtime's HTTP port.
+  # Keep that port local unless --local --bind explicitly selected another address.
+  if [ "$LOCAL" = 1 ]; then RUNTIME_BIND="$BIND"; else RUNTIME_BIND=127.0.0.1; fi
   RUNTIME_SHOWN="$RUNTIME_BIND"
   if [ "$RUNTIME_SHOWN" = 0.0.0.0 ]; then
     RUNTIME_SHOWN="$(lan_address)"
@@ -403,10 +422,13 @@ say
 say "Point each app at $BASE: on Android and iPhone, tap \"Use a different server\" on the"
 say "sign-in screen; on the desktop, set the plugin's baseURL in cordis.patch.yml; for the"
 say "terminal runtime, export NANOMUSE_CLOUD_BASE_URL=$BASE. The exact steps: docs/self-hosting.md."
-if [ "$RUNTIME" = 1 ] && [ "$RUNTIME_JOINED" = 1 ]; then
+if [ "$RUNTIME" = 1 ] && [ "$(get NANOMUSE_CLOUD_BASE_URL "$RUNTIME_ENV")" = http://relay:8787 ]; then
   say "The runtime started here already points at this relay (http://relay:8787, the relay's name"
   say "on the network the two containers share): sign in on its page and chat goes through the"
   say "relay's provider, within the account's allowance."
+fi
+if [ "$RUNTIME" = 1 ] && [ "$LOCAL" = 0 ]; then
+  say "The runtime's HTTP port is local to this server. Use an SSH tunnel or a TLS reverse proxy to reach it remotely."
 fi
 if [ "$LOCAL" = 1 ] && [ "$BIND" = 127.0.0.1 ]; then
   say "Only this machine can reach the relay. For the phones on the same network, run it again with --bind 0.0.0.0: the URLs then carry this machine's LAN address."
