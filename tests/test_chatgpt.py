@@ -192,7 +192,13 @@ async def test_the_loop_keeps_turning_while_another_process_holds_the_lock(tmp_p
         beat = asyncio.create_task(ticker())
         refresh = asyncio.create_task(auth.token())
         await asyncio.sleep(0.3)
-        assert not refresh.done() and ticks >= 10, "the wait for the lock blocked the loop"
+        # the ticker beats every 10 ms; a loaded runner stretches a beat far past that,
+        # so the count itself is not the point — only that beats keep coming at all
+        # while the refresh waits for the lock. A blocked loop delivers none.
+        assert not refresh.done(), "the refresh finished without the lock"
+        before = ticks
+        await asyncio.sleep(0.3)
+        assert not refresh.done() and ticks > before, "the wait for the lock blocked the loop"
         release.set()
         fresh = await asyncio.wait_for(refresh, 5)
         beat.cancel()
