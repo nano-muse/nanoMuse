@@ -665,7 +665,7 @@ export default class NanomuseCloud extends Service {
    * in full (and decompressed) by `inspect`, so the title, the lines and the prompts'
    * positions are kept here until the session's next event (`session/event`) drops them.
    * Capped: an entry holds a session's whole decompressed transcript, and the chats the
-   * sync and the column actually touch are a few dozen of the account's newest — the
+   * sync and the column actually touch are a few dozen of the account's newest; the
    * oldest untouched entries go, to be re-read if ever asked for again.
    */
   private readonly logCache = new Map<string, { title?: { at: number; title: string }; lines?: SessionLine[]; prompts?: Array<{ key: string; time: number }> }>()
@@ -3734,14 +3734,16 @@ export default class NanomuseCloud extends Service {
     if (!entry) {
       entry = {}
       this.logCache.set(sessionId, entry)
-      // insertion order is the last-touched order (an event drops the entry, the next
-      // read re-adds it at the end), so the head is the longest untouched
+      // Entries are refreshed on reads below; the head is the least recently used.
       while (this.logCache.size > LOG_CACHE_SESSIONS) {
         const oldest = this.logCache.keys().next().value
         if (oldest === undefined) break
         this.logCache.delete(oldest)
       }
     }
+    // Reading an existing entry refreshes its place in the eviction order too.
+    this.logCache.delete(sessionId)
+    this.logCache.set(sessionId, entry)
     return entry
   }
 

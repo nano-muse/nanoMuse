@@ -228,6 +228,8 @@ harness 保留外部下载方式。不带软件内更新能力的版本，需先
 
 ## 配置和数据 {#config-and-data}
 
+桌面端的同步缓存最多保留最近使用的 64 个对话日志。需要更早的日志时会重新从磁盘读取，保存的对话仍可正常使用。
+
 `~/.nanomuse/desktop`（`NANOMUSE_DESKTOP_HOME` 可以把它挪到别处）是应用的 dsh 主目录：
 `profiles/nanomuse` 下的 profile（插件列表，以及本人的 `cordis.patch.yml`，设置页和登录流程把
 `nanoMuse Cloud` 服务商写在这里），存着账号 key 的 dsh 凭据存储，会话，记录外壳和 Host 两边

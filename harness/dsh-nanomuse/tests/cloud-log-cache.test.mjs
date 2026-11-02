@@ -73,12 +73,11 @@ test('the log cache keeps the newest chats and gives the oldest away', async () 
   }
 })
 
-test('a session that just produced an event moves to the back of the line', async () => {
+test('reading a cached session refreshes its eviction order', async () => {
   const { svc, done } = await make()
   try {
     for (let i = 0; i < 64; i++) svc.cached(`s-${i}`)
-    // an active session's event drops its entry, and the next read re-adds it at the end
-    svc.logChanged('s-0')
+    // Reading a quiet session refreshes it without requiring a new event.
     svc.cached('s-0')
     svc.cached('s-64')
     assert.ok(svc.logCache.has('s-0'), 'the session that just changed must not be the one given away')
