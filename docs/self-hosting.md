@@ -133,3 +133,20 @@ docker compose up -d app                  # the web app on http://<host>:8787, t
 If your local relay already uses port 8787, put `NANOMUSE_RUNTIME_PORT=8788` in the root `.env` before starting the app, then open it on port 8788. This changes the app's host port only; the container still listens on 8787. See [deployment.md](deployment.md#docker).
 
 The container sees only its data volume and `./workspace`; capabilities are dropped. Keeping it running, a published image for arm64, and reaching it from outside your network are in [deployment.md](deployment.md). The runtime signs in to a relay like any other device (yours, from section 2, if you set `NANOMUSE_CLOUD_BASE_URL`), and then the phone can hand it tasks over the hub like a computer that is always on ([every-device.md](every-device.md)).
+
+### The relay and the runtime in one command
+
+When both live on the same machine, the script starts both and prints their addresses:
+
+```bash
+bash scripts/self-host.sh --local --with-runtime                # relay on 8787, web app on 8788
+bash scripts/self-host.sh --local --with-runtime --runtime-port 9000   # another port for the web app
+```
+
+It writes `config/config.toml` from the example when that file is missing, because the container cannot start without it: a missing host file is mounted as a directory and the start fails with *not a directory*. If that has already happened, check that directory first, then use `sudo rmdir -- config/config.toml` if it is empty and run the script again. It also puts two lines in the root `.env` when they are not there yet: `NANOMUSE_SERVER_TOKEN`, so the web app's link stays the same across restarts, and `NANOMUSE_CLOUD_BASE_URL=http://relay:8787`. It never overwrites a value you set yourself. The relay's own settings stay in `cloud/.env`; back the two files up together.
+
+`http://relay:8787` is the relay's name on the docker network the two containers share. That is why the runtime reaches the relay even under `--local` (where the relay publishes nothing but loopback) and on a server with a domain (where a round trip through the public name would need hairpin NAT on the router). Signing in on the runtime's page is also what gives it a model key: the relay is one more OpenAI-compatible provider to it, within the account's allowance, so the runtime's `.env` needs no key of its own.
+
+To update, `git pull` and run the same command: both images are rebuilt and everything they keep stays put: `cloud/data` for the relay, the `nanomuse-data` volume for the runtime. The script never removes either; a `docker compose down -v` typed by hand at the repository root still deletes the runtime's volume.
+
+The runtime listens on loopback by default, including when the relay has a domain. Its HTTP port is not covered by the relay’s Caddy TLS setup. Use an SSH tunnel or a TLS reverse proxy for remote access; `--local --bind 0.0.0.0` explicitly publishes both ports on the LAN. If the runtime cannot be created, joined to the relay network or started, the script fails and leaves the relay running.

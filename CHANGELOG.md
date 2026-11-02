@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
+
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
 - **A turn keeps its own time in the record, and a slower record cannot overtake a later turn.** Each turn row took the second its background write landed in, and the account's turn list orders by that timestamp with the write's rowid beside it: a turn whose picture was still decoding could land behind a plain turn that answered after it, and read above it, newest first upside down. The timestamp is now taken when the answer leaves and each account's writes are chained in that order, so the list says what happened in the order it happened without making other accounts wait for its media.
 - **An expanded "More (N)" table keeps its rows through a poll.** Every poll hands the admin tables a freshly parsed array, and the expansion was reset on the array's arrival: click "More" on People or a Usage day's top accounts, wait out the two-minute poll, and the list snapped back to its first hundred or twenty-five rows while you were reading it. The expansion is kept unless the list itself no longer reaches it (`keptShown`), so a refresh of the same rows leaves the person where they scrolled to.
@@ -13,6 +15,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **The People page's sign-ups-per-day chart counts site-local days.** The bars were bucketed at UTC midnight while their labels rendered the browser's calendar, so for the primary UTC+8 audience a sign-up made between midnight and eight in the morning landed on the previous day's bar, and for a browser west of UTC every bar wore the date before. The buckets now start at the site's day boundary (`siteDayStart`), the same day the Usage page and the relay itself count.
 - **The relay's checks ran on Windows as well as Linux.** Both platforms checked the cloud service and built and tested its admin console. Changes to the showcase mirror also ran these checks because the cloud tests load those scripts. The committed-build check remained on Linux. ([#670](https://github.com/nano-muse/nanoMuse/pull/670))
 - **The local self-hosting script printed a working command for sign-in codes.** Its hint now enters `cloud/` before reading the relay logs, so it can be copied from the repository root. ([#716](https://github.com/nano-muse/nanoMuse/pull/716))
+- Added `--with-runtime` to self-hosting setup to start the web runtime beside the relay, retain its token and connect both containers on the relay network. The runtime stayed on loopback unless LAN access was explicitly selected.
+- Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
 
@@ -35,6 +39,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Web
 
 ### Desktop
+
+- Fixed the development desktop smoke test on Windows by importing Electron through a file URL, including paths with spaces and URL-significant characters.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
 
@@ -59,11 +65,15 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
+- Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
+
 - **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. Expense checks kept signs and fractions instead of accepting an incorrect total's integer prefix. [Goal evaluation](docs/goal-eval.md).
 
 - **GUI regression gained 20 fixed simulated tasks and independent state checks.** Reference mode ran offline in CI, an opt-in runner used a configured model, and a standalone recorder reported model calls, latency and available token usage. The cases also corrected loop detection for identical click coordinates on different pages. [GUI regression](docs/gui-regression.md).
 
 - **The docs say which approval cards reach the phone:** only those of a scheduled task running on nanoMuse Desktop. A card of a chat somebody is typing in, on the desktop or in the web console, stays where it was asked, and the Python runtime does not push yet; the hub page, the troubleshooting page and the desktop page say so. ([#704](https://github.com/nano-muse/nanoMuse/issues/704))
+
+- **The runtime build's check cleans up the directories a killed probe kept pinned.** The check removes the probe's home and working directories right after terminating it, but on Windows a process that was just terminated can keep its working directory pinned a beat after the wait returns: the removal failed silently and the directories stayed, and the check's own tests failed about a quarter of the time under load. The removal now retries for up to a second, so the probe starts from clean directories again.
 
 ## [1.0.9] - 2026-10-29 · Tiller
 
