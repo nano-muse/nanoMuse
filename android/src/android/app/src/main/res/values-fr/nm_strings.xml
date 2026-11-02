@@ -1226,4 +1226,10 @@
     <string name="nm_context_compact_idle_timeout">La compression s’est arrêtée après %1$d secondes sans réponse (%2$d appels au modèle).</string>
     <string name="nm_context_compact_no_gain">Le résumé n’a pas réduit le contexte. Le contenu original a été conservé.</string>
     <string name="nm_context_compact_incomplete">Le modèle n’a pas renvoyé de résumé complet. Le contexte original a été conservé.</string>
+    <string name="nm_remote_ambiguous">Plusieurs appareils correspondent. Choisissez dans Compte → Appareils.</string>
+    <string name="nm_remote_attachments">Les mentions d’appareils envoient uniquement du texte. Retirez les pièces jointes avant l’envoi.</string>
+    <string name="nm_remote_no_answer">%1$s a terminé sans réponse.</string>
+    <string name="nm_remote_failed">%1$s n’a pas répondu : %2$s</string>
+    <string name="nm_remote_offline">%1$s est hors ligne.</string>
+    <string name="nm_remote_chat_busy">Attendez la fin de cette conversation avant d’envoyer une tâche à un appareil.</string>
 </resources>

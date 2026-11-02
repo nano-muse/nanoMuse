@@ -1225,4 +1225,10 @@
     <string name="nm_context_compact_idle_timeout">Huminto ang pagpapaikli ng konteksto matapos ang %1$d segundo na walang tugon (%2$d tawag sa modelo).</string>
     <string name="nm_context_compact_no_gain">Hindi napaikli ng buod ang konteksto. Pinanatili ang orihinal na nilalaman.</string>
     <string name="nm_context_compact_incomplete">Hindi nagbalik ang modelo ng kumpletong buod. Pinanatili ang orihinal na konteksto.</string>
+    <string name="nm_remote_ambiguous">Higit sa isang device ang tumutugma. Pumili sa Account → Mga device.</string>
+    <string name="nm_remote_attachments">Text lang ang ipinapadala ng pagbanggit sa device. Alisin muna ang mga attachment.</string>
+    <string name="nm_remote_no_answer">Natapos ang %1$s nang walang sagot.</string>
+    <string name="nm_remote_failed">Hindi sumagot ang %1$s: %2$s</string>
+    <string name="nm_remote_offline">Offline ang %1$s.</string>
+    <string name="nm_remote_chat_busy">Hintaying matapos ang usapang ito bago magpadala ng gawain sa device.</string>
 </resources>

@@ -1205,4 +1205,10 @@
     <string name="nm_context_compact_idle_timeout">Compaction stopped after %1$d seconds without a response (%2$d model calls).</string>
     <string name="nm_context_compact_no_gain">The summary did not shorten the context. The original content was kept.</string>
     <string name="nm_context_compact_incomplete">The model did not return a complete summary. The original context was kept.</string>
+    <string name="nm_remote_ambiguous">More than one device matches. Choose a device in Account → Devices.</string>
+    <string name="nm_remote_attachments">Device mentions send text only. Remove the attachments before sending.</string>
+    <string name="nm_remote_no_answer">%1$s finished without an answer.</string>
+    <string name="nm_remote_failed">%1$s did not answer: %2$s</string>
+    <string name="nm_remote_offline">%1$s is offline.</string>
+    <string name="nm_remote_chat_busy">Wait for this conversation to finish before sending a device task.</string>
 </resources>

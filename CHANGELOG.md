@@ -83,6 +83,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Android sent explicit device mentions directly through the Hub, displayed remote steps and streamed text, reused scoped approval cards, and stopped the exact remote call without starting a local model turn.
+
 - **Kept built-in skills managed by the app.** Their contents remained readable and exportable, with enable switches available, while editing, importing over them and deleting them were blocked. For [#756](https://github.com/nano-muse/nanoMuse/issues/756).
 
 - **A `nanomuse-pc task` that does not run says so, instead of an empty answer.** The phone took the computer's wordless answer as success and told the model to pass it on, which read as *Done*; a task that did not run now comes back as a failure with the computer's own sentence, and a refusal names what happened instead of a status code. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))

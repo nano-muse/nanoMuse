@@ -1226,4 +1226,10 @@
     <string name="nm_context_compact_idle_timeout">A compactação parou após %1$d segundos sem resposta (%2$d chamadas ao modelo).</string>
     <string name="nm_context_compact_no_gain">O resumo não reduziu o contexto. O conteúdo original foi mantido.</string>
     <string name="nm_context_compact_incomplete">O modelo não retornou um resumo completo. O contexto original foi mantido.</string>
+    <string name="nm_remote_ambiguous">Mais de um equipamento corresponde. Escolha em Conta → Dispositivos.</string>
+    <string name="nm_remote_attachments">Menções a equipamentos enviam apenas texto. Remova os anexos antes de enviar.</string>
+    <string name="nm_remote_no_answer">%1$s terminou sem responder.</string>
+    <string name="nm_remote_failed">%1$s não respondeu: %2$s</string>
+    <string name="nm_remote_offline">%1$s está offline.</string>
+    <string name="nm_remote_chat_busy">Espere esta conversa terminar antes de enviar uma tarefa a outro equipamento.</string>
 </resources>

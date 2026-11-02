@@ -29,15 +29,23 @@ object DeviceMention {
         val t = text.trimStart()
         if (!t.startsWith("@") || targets.isEmpty()) return null
         val body = t.substring(1)
+        // A duplicate display name is qualified by the stable hub id in the picker.
+        for (d in targets) {
+            val qualified = "${d.name} [${d.id}]"
+            if (body.startsWith(qualified, ignoreCase = true) && boundary(body, qualified.length)) {
+                return Match(d, rest(body, qualified.length))
+            }
+        }
         for (d in targets.sortedByDescending { it.name.length }) {
             if (d.name.isBlank()) continue
             if (body.startsWith(d.name, ignoreCase = true) && boundary(body, d.name.length)) {
+                if (targets.count { it.name.equals(d.name, ignoreCase = true) } > 1) return null
                 return Match(d, rest(body, d.name.length))
             }
         }
         val word = body.takeWhile { !it.isWhitespace() && it !in separators }
         if (word.isEmpty()) return null
-        val d = targets.firstOrNull { it.name.startsWith(word, ignoreCase = true) } ?: return null
+        val d = targets.filter { it.name.startsWith(word, ignoreCase = true) }.singleOrNull() ?: return null
         return Match(d, rest(body, word.length))
     }
 

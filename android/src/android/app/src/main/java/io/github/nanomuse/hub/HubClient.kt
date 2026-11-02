@@ -319,8 +319,11 @@ class HubClient(
     }
 
     /** Ask device [to] to carry out [action]; blocks up to [timeoutMs]. Returns the result body or throws [HubException]. */
-    fun call(to: String, action: String, args: JSONObject, timeoutMs: Long, onEvent: ((JSONObject) -> Unit)? = null): JSONObject {
-        val id = UUID.randomUUID().toString().replace("-", "").take(16)
+    fun call(to: String, action: String, args: JSONObject, timeoutMs: Long, onEvent: ((JSONObject) -> Unit)? = null): JSONObject =
+        callWithId(UUID.randomUUID().toString().replace("-", "").take(16), to, action, args, timeoutMs, onEvent)
+
+    /** A caller-owned id lets Stop name this exact task without affecting another chat. */
+    fun callWithId(id: String, to: String, action: String, args: JSONObject, timeoutMs: Long, onEvent: ((JSONObject) -> Unit)? = null): JSONObject {
         val p = Pending(onEvent)
         pending[id] = p
         var pump: Thread? = null

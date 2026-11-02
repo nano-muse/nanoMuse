@@ -582,3 +582,11 @@ like the Python package's version does.
 | `connectors/`, `ui/connectors/` | The connectors catalogue (`ConnectorsCatalogue` reads the asset), MCP authorization discovery + registration (`McpAuthDiscovery`), connecting and token refresh (`Connectors`), what this phone connected as published to the profile and what the other devices did (`SharedConnectors`), the Settings → Connectors page |
 | `ui/cloud/` | Sign-in, the Account screen, the Devices section |
 | `res/values*/nm_strings.xml` | Every nanoMuse string in the seventeen languages the app has (English, 简体中文, 繁體中文, German, Spanish, Filipino, French, Indonesian, Japanese, Korean, Malay, Polish, Brazilian Portuguese, Romanian, Russian, Thai, Turkish); every file carries the same keys, apart from the two the English file marks `translatable="false"` (the relay address example and the product name `nanoMuse Cloud`), and a missing one falls back to English |
+
+## Direct tasks to another device
+
+Start a message with `@Device name` to send its text directly to that device over the Hub. The local model does not spend a turn deciding how to delegate. The remote device uses its own model, tools and configuration. This is one task, not a persistent execution destination for subsequent messages.
+
+The chat shows the device name, tool steps and response text while they arrive. Partial text replaces the current segment instead of adding duplicate messages. Destinations that do not stream still return their final answer. Approvals use the same local cards and scoped grants as model-delegated tasks; Stop cancels this call on the destination and withdraws its pending cards.
+
+An offline or ambiguous destination keeps the message in the composer. Device tasks accept text only: remove attachments and pasted-file content before sending. Wait for an active turn to finish before sending another device task; ordinary local messages retain the existing queue. A failed call can have completed earlier steps, so a failure or missing answer is shown explicitly. The final text and device attribution are saved once; live remote tool capsules are not reconstructed after reopening the chat.

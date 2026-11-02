@@ -1,0 +1,104 @@
+package io.github.nanomuse.hub
+
+import io.github.nanomuse.sync.RemoteDeviceTask
+import io.github.nanomuse.sync.RemoteTaskReply
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withContext
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.json.JSONObject
+import org.junit.Assert.*
+import org.junit.Test
+
+/** Real local WebSocket frames, without a provider, account credentials or a remote machine. */
+class RemoteTaskSocketTest {
+    private val device = Device("desk", "Desk", "computer", "Linux", "", true, listOf("task"), 0)
+
+    private fun connected(server: MockWebServer): HubClient {
+        val ready = CountDownLatch(1)
+        val client = HubClient(server.url("/v1/hub").toString().replaceFirst("http", "ws"), "test-key",
+            hello = { JSONObject().put("type", "hello") }, onCall = {}, onDevices = {},
+            onState = { connected, _ -> if (connected) ready.countDown() })
+        client.start()
+        assertTrue("local socket did not connect", ready.await(5, TimeUnit.SECONDS))
+        return client
+    }
+
+    @Test fun `streamed frames reach the reply in order before its one final answer`() = runBlocking {
+        val server = MockWebServer()
+        val calls = CopyOnWriteArrayList<JSONObject>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onClosing(socket: WebSocket, code: Int, reason: String) { socket.close(1000, null) }
+            override fun onMessage(socket: WebSocket, text: String) {
+                val frame = JSONObject(text)
+                if (frame.optString("type") == "hello") { socket.send("""{"type":"welcome","devices":[]}"""); return }
+                if (frame.optString("action") != "task") return
+                calls += frame
+                val id = frame.getString("id")
+                for (value in listOf("O", "Olá")) socket.send(JSONObject().put("type", "event").put("id", id)
+                    .put("body", JSONObject().put("stage", "text").put("text", value).put("partial", true)).toString())
+                socket.send(JSONObject().put("type", "result").put("id", id).put("ok", true)
+                    .put("body", JSONObject().put("text", "Olá")).toString())
+            }
+        }))
+        server.start()
+        val client = connected(server)
+        try {
+            val reply = RemoteTaskReply(device.id)
+            val result = RemoteDeviceTask(device, "hello", "pt-BR", "specific-call").run(
+                call = { id, to, action, args, event -> runInterruptible(Dispatchers.IO) { client.callWithId(id, to, action, args, 5_000, event) } },
+                onEvent = { reply.event(it) }, stop = {},
+            )
+            assertEquals("specific-call", calls.single().getString("id"))
+            assertEquals("desk", calls.single().getString("to"))
+            assertTrue(calls.single().getJSONObject("args").getBoolean("stream"))
+            reply.finish(RemoteTaskReply.answer(result)!!)
+            assertEquals(listOf("Olá"), reply.blocks.map { it.content })
+        } finally { client.stop(); server.close() }
+    }
+
+    @Test fun `cancellation sends stop naming the original call`() = runBlocking {
+        val server = MockWebServer()
+        val started = CountDownLatch(1)
+        val stoppedCall = AtomicReference("")
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onClosing(socket: WebSocket, code: Int, reason: String) { socket.close(1000, null) }
+            override fun onMessage(socket: WebSocket, text: String) {
+                val frame = JSONObject(text)
+                if (frame.optString("type") == "hello") { socket.send("""{"type":"welcome","devices":[]}"""); return }
+                when (frame.optString("action")) {
+                    "task" -> started.countDown()
+                    "stop" -> {
+                        stoppedCall.set(frame.getJSONObject("args").getString("call"))
+                        socket.send(JSONObject().put("type", "result").put("id", frame.getString("id")).put("ok", true)
+                            .put("body", JSONObject().put("stopped", true)).toString())
+                    }
+                }
+            }
+        }))
+        server.start()
+        val client = connected(server)
+        try {
+            val job = launch {
+                RemoteDeviceTask(device, "hello", "en", "own-call").run(
+                    call = { id, to, action, args, event -> runInterruptible(Dispatchers.IO) { client.callWithId(id, to, action, args, 5_000, event) } },
+                    onEvent = {},
+                    stop = { id -> runInterruptible(Dispatchers.IO) { client.call(device.id, "stop", JSONObject().put("call", id), 5_000) }; Unit },
+                )
+            }
+            assertTrue(withContext(Dispatchers.IO) { started.await(5, TimeUnit.SECONDS) })
+            job.cancelAndJoin()
+            assertEquals("own-call", stoppedCall.get())
+        } finally { client.stop(); server.close() }
+    }
+}

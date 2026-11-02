@@ -1225,4 +1225,10 @@
     <string name="nm_context_compact_idle_timeout">Die Komprimierung wurde nach %1$d Sekunden ohne Antwort gestoppt (%2$d Modellaufrufe).</string>
     <string name="nm_context_compact_no_gain">Die Zusammenfassung hat den Kontext nicht verkürzt. Der ursprüngliche Inhalt wurde beibehalten.</string>
     <string name="nm_context_compact_incomplete">Das Modell hat keine vollständige Zusammenfassung zurückgegeben. Der ursprüngliche Kontext wurde beibehalten.</string>
+    <string name="nm_remote_ambiguous">Mehrere Geräte passen. Wähle ein Gerät unter Konto → Geräte.</string>
+    <string name="nm_remote_attachments">Geräteerwähnungen senden nur Text. Entferne vor dem Senden die Anhänge.</string>
+    <string name="nm_remote_no_answer">%1$s wurde ohne Antwort beendet.</string>
+    <string name="nm_remote_failed">%1$s hat nicht geantwortet: %2$s</string>
+    <string name="nm_remote_offline">%1$s ist offline.</string>
+    <string name="nm_remote_chat_busy">Warte, bis diese Unterhaltung fertig ist, bevor du eine Geräteaufgabe sendest.</string>
 </resources>

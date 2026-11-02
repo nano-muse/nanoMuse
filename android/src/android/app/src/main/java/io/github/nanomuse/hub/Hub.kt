@@ -172,6 +172,11 @@ object Hub {
         return c.call(to, action, args, timeoutMs, onEvent)
     }
 
+    fun callWithId(id: String, to: String, action: String, args: JSONObject, timeoutMs: Long, onEvent: ((JSONObject) -> Unit)? = null): JSONObject {
+        val c = client ?: throw HubException("disconnected", "the hub is not connected")
+        return c.callWithId(id, to, action, args, timeoutMs, onEvent)
+    }
+
     fun forget(deviceId: String) = client?.forget(deviceId)
 
     /** The other devices of the account — never this phone, never a browser tab. */
