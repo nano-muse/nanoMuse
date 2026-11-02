@@ -306,6 +306,14 @@ process before removing the check's data directories.
 
 A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
 
+Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
+
+The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
+
+Dates beside entries in `MEMORY.md` use the computer's local calendar day.
+
+The development desktop smoke test imports Electron through a file URL on Windows and other platforms. Checkout paths may contain spaces, Unicode, `#` or `%`.
+
 `~/.nanomuse/desktop` (`NANOMUSE_DESKTOP_HOME` moves it) is the app's dsh home: the
 profile under `profiles/nanomuse` (the bundle list, the person's own `cordis.patch.yml`
 where Settings and the sign-in write the `nanoMuse Cloud` provider), dsh's credential

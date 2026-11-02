@@ -25,7 +25,7 @@
  * (`/events`) carrying the live state — registered when the web server is
  * present; the headless and SDK profiles get the service without routes.
  */
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ApprovalDesk, appLabel, appOf, type ApprovalScope, isOwnApp, checkForUpdate, compareVersions, DEVICE_GRANT_PREFIX, grantCovers, HoldDesk, modelFor, pickChatModel, pickHandsModel, REMOTE_CONTROL_GRANT_ID, scheduleRunIds, sharedConnectors, standingGrants, takesImages, UPDATE_RETRY_MS, updateCacheFresh, withGrant, type Grant, type Hold, type HoldTool, type PendingApproval, type StandingGrant, type UpdateInfo } from './desk.ts'
 import { arch, homedir, hostname, release, type, userInfo } from 'node:os'
@@ -466,6 +466,8 @@ export interface MediaState {
 export const VIDEO_OFF = 'off'
 /** How long a video-model check against a provider is trusted. */
 const VIDEO_CHECK_TTL_MS = 24 * 60 * 60_000
+/** Sessions whose log facts stay cached for the sync; the newest chats the column shows are a few dozen. */
+const LOG_CACHE_SESSIONS = 64
 
 /** What Settings → Media shows. */
 export interface MediaView {
@@ -625,6 +627,7 @@ export default class NanomuseCloud extends Service {
   readonly hub: HubClient
   private state: State = {}
   private busy: Promise<unknown> = Promise.resolve()
+  private stateWrites: Promise<void> = Promise.resolve()
   private readonly streams = new Set<ServerResponse>()
   private readonly changeListeners = new Set<() => void>()
   private readonly calls = new Map<string, HandsCall>()
@@ -662,6 +665,9 @@ export default class NanomuseCloud extends Service {
    * What the sync needs of a session's log, read once per change: a session's log is read
    * in full (and decompressed) by `inspect`, so the title, the lines and the prompts'
    * positions are kept here until the session's next event (`session/event`) drops them.
+   * Capped: an entry holds a session's whole decompressed transcript, and the chats the
+   * sync and the column actually touch are a few dozen of the account's newest; the
+   * oldest untouched entries go, to be re-read if ever asked for again.
    */
   private readonly logCache = new Map<string, { title?: { at: number; title: string }; lines?: SessionLine[]; prompts?: Array<{ key: string; time: number }> }>()
   /** Approvals the stage may answer (C2) and holds of the hands (C1). */
@@ -3729,7 +3735,16 @@ export default class NanomuseCloud extends Service {
     if (!entry) {
       entry = {}
       this.logCache.set(sessionId, entry)
+      // Entries are refreshed on reads below; the head is the least recently used.
+      while (this.logCache.size > LOG_CACHE_SESSIONS) {
+        const oldest = this.logCache.keys().next().value
+        if (oldest === undefined) break
+        this.logCache.delete(oldest)
+      }
     }
+    // Reading an existing entry refreshes its place in the eviction order too.
+    this.logCache.delete(sessionId)
+    this.logCache.set(sessionId, entry)
     return entry
   }
 
@@ -3829,8 +3844,22 @@ export default class NanomuseCloud extends Service {
 
   private async writeState(): Promise<void> {
     const path = this.statePath()
-    await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, JSON.stringify(this.state, null, 2) + '\n', { mode: 0o600 })
+    // Capture each requested snapshot before yielding, and commit writes in that order.
+    const contents = JSON.stringify(this.state, null, 2) + '\n'
+    const write = async (): Promise<void> => {
+      await mkdir(dirname(path), { recursive: true })
+      const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+      try {
+        await writeFile(tmp, contents, { mode: 0o600, flag: 'wx' })
+        await rename(tmp, path)
+        await chmod(path, 0o600).catch(() => undefined)
+      } finally {
+        await rm(tmp, { force: true }).catch(() => undefined)
+      }
+    }
+    const next = this.stateWrites.then(write, write)
+    this.stateWrites = next.catch(() => undefined)
+    await next
   }
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {
