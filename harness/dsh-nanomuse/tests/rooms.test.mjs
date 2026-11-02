@@ -156,3 +156,19 @@ test('a new file takes the next free number instead of overwriting (#689)', asyn
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('memory dates follow fixed local calendar boundaries east and west of UTC', async () => {
+  const { execFileSync } = await import('node:child_process')
+  for (const [zone, at, expected] of [
+    ['Asia/Shanghai', '2026-01-01T16:30:00Z', '2026-01-02'],
+    ['America/Los_Angeles', '2026-01-01T00:30:00Z', '2025-12-31'],
+    ['UTC', '2026-01-01T00:30:00Z', '2026-01-01'],
+  ]) {
+    const script = `import { memoryDoc } from ${JSON.stringify(new URL('../lib/rooms.js', import.meta.url).href)};
+      console.log(memoryDoc([{ source: 'agent', at: Date.parse(${JSON.stringify(at)}), text: 'boundary memory' }], false));`
+    const doc = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...process.env, TZ: zone }, encoding: 'utf8',
+    })
+    assert.ok(doc.includes(`(${expected})`), `${zone}: ${doc}`)
+  }
+})
