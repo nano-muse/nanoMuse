@@ -683,7 +683,7 @@ def test_the_profile_is_shared_and_announced(client):
     )
 
 
-def test_a_flooding_socket_is_slowed_then_closed(client):
+def test_a_flooding_socket_is_slowed_then_closed(client, monkeypatch):
     """One socket may send so many frames and bytes a second (hub.FRAMES_PER_S, BYTES_PER_S,
     twice that in a burst); over it frames are dropped with one error a second, and a socket
     that keeps flooding is closed. The bucket itself, with a clock of our own."""
@@ -698,14 +698,22 @@ def test_a_flooding_socket_is_slowed_then_closed(client):
     clock[0] = 100
     assert sum(1 for _ in range(50) if bucket.take()) == 20  # never more than the burst
 
+    # Only the connection buckets share this fixed instant. TestClient can take long
+    # enough to send a burst that a wall-clock bucket would refill while it is queued.
+    # The explicit-clock assertions above still cover refill and the burst ceiling.
+    def frozen_bucket(rate, burst):
+        return Bucket(rate, burst, clock=lambda: clock[0])
+
+    monkeypatch.setattr(hub_module, "Bucket", frozen_bucket)
+
     a = sign_up(client, "13800138000")
     with connect(client, a) as pa:
         pa.send_json(hello("phone", "phone-1", "A's"))
         pa.receive_json()
         pa.receive_json()
-        # a flood: twice the burst of pings in no time — the burst answered (a few more, for
-        # the tokens that trickle in meanwhile), then one rate_limited error, not one per
-        # dropped frame — and the hub counts the drops
+        # A flood: twice the burst of pings with no bucket time passing. The burst is
+        # answered, then one rate_limited error, not one per dropped frame, and the
+        # hub counts the drops.
         burst = int(2 * hub_module.FRAMES_PER_S)
         for _ in range(burst + 50):
             pa.send_json({"type": "ping"})
@@ -716,7 +724,7 @@ def test_a_flooding_socket_is_slowed_then_closed(client):
             if r["type"] == "error":
                 break
         pongs = sum(1 for r in got if r["type"] == "pong")
-        assert burst <= pongs <= burst + 10 and got[-1]["code"] == "rate_limited"
+        assert pongs == burst and got[-1]["code"] == "rate_limited"
         hub = client.app.state.hub
         assert hub.dropped_total >= 1 and hub.stats()["dropped_frames"] == hub.dropped_total
         # kept up, the socket goes
