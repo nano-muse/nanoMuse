@@ -15,6 +15,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **The People page's sign-ups-per-day chart counts site-local days.** The bars were bucketed at UTC midnight while their labels rendered the browser's calendar, so for the primary UTC+8 audience a sign-up made between midnight and eight in the morning landed on the previous day's bar, and for a browser west of UTC every bar wore the date before. The buckets now start at the site's day boundary (`siteDayStart`), the same day the Usage page and the relay itself count.
 - **The relay's checks ran on Windows as well as Linux.** Both platforms checked the cloud service and built and tested its admin console. Changes to the showcase mirror also ran these checks because the cloud tests load those scripts. The committed-build check remained on Linux. ([#670](https://github.com/nano-muse/nanoMuse/pull/670))
 - **The local self-hosting script printed a working command for sign-in codes.** Its hint now enters `cloud/` before reading the relay logs, so it can be copied from the repository root. ([#716](https://github.com/nano-muse/nanoMuse/pull/716))
+- Added `--with-runtime` to self-hosting setup to start the web runtime beside the relay, retain its token and connect both containers on the relay network. The runtime stayed on loopback unless LAN access was explicitly selected.
+- Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
 
