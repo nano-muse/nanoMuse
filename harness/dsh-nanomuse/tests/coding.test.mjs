@@ -4,6 +4,7 @@
 // against a fake CLI, and the hub action shapes — the runtime's `to_dict()`s, so the
 // phones and the web cannot tell the desktop from the Python runtime.
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -475,6 +476,42 @@ setTimeout(() => process.exit(${fail ? 1 : 0}), ${linger})
   await chmod(cli, 0o755)
   return cli
 }
+
+test('runner: stopping a run ends the whole tree on Windows', { skip: posix, timeout: 30_000 }, async (t) => {
+  await scratch(async (dir) => {
+    const marker = join(dir, 'helper.pid')
+    // a fake CLI shaped like the real ones: it starts a helper (the header's `cursor-agent`
+    // leaves a worker server behind) and then keeps running until somebody stops it
+    const cli = spawn(process.execPath, ['-e', [
+      `const { spawn } = require('node:child_process')`,
+      `const { writeFileSync } = require('node:fs')`,
+      `const helper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true })`,
+      `helper.unref()`,
+      `writeFileSync(${JSON.stringify(marker)}, String(helper.pid))`,
+      `setInterval(() => {}, 1000)`,
+    ].join('\n')], { stdio: 'ignore' })
+    const run = new Run('run_tree', 'claude', '', '', 'hi')
+    run.process = cli
+    let helper = 0
+    t.after(() => {
+      try { cli.kill() } catch {}
+      if (helper) { try { process.kill(helper) } catch {} }
+    })
+    const exited = new Promise((resolve) => cli.once('exit', resolve))
+    for (let i = 0; i < 100 && !helper; i++) {
+      try { helper = Number(await readFile(marker, 'utf8')) } catch { await new Promise((r) => setTimeout(r, 50)) }
+    }
+    assert.ok(helper, 'the CLI started its helper')
+    assert.equal(run.stop(), true)
+    await exited
+    let gone = false
+    for (let i = 0; i < 100 && !gone; i++) {
+      try { process.kill(helper, 0) } catch { gone = true }
+      if (!gone) await new Promise((r) => setTimeout(r, 50))
+    }
+    assert.ok(gone, 'the helper the CLI left behind is stopped with it')
+  })
+})
 
 test('runner: a run against a fake CLI streams events and ends at the terminal event', { skip: !posix }, async () => {
   await scratch(async (dir) => {

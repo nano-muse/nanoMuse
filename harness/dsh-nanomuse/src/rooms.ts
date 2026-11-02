@@ -2332,8 +2332,10 @@ function titleKey(title: string): string {
 
 // ---- the agent's documents -------------------------------------------------------------------
 
+/** The day a memory line is stamped with is the day the person reads, at their wall clock. */
 function isoDay(at = Date.now()): string {
-  return new Date(at).toISOString().slice(0, 10)
+  const d = new Date(at)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 /** IDENTITY.md as it reads before the person touches it: the name, the look, the voice. */

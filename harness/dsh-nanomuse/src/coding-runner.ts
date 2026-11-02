@@ -15,7 +15,7 @@
  * then waits for the process and kills it after a grace period. `Run.stop()` ends the
  * process group.
  */
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AGENTS, cliFor, home, readSession, type AgentId, type CodingSession } from './coding-readers.ts'
@@ -110,7 +110,15 @@ export class Run {
     if (!p || p.exitCode !== null || p.signalCode !== null || !p.pid) return false
     try {
       if (process.platform !== 'win32') process.kill(-p.pid, 'SIGTERM')
-      else p.kill()
+      else {
+        // taskkill /T walks the tree by parentage, as the runtime's own kill_tree does: a
+        // plain kill() ends the CLI alone, and the helpers it detached from its job (the
+        // header's `cursor-agent` worker server) keep running with their parent gone
+        const killed = spawnSync('taskkill', ['/PID', String(p.pid), '/T', '/F'], { windowsHide: true, timeout: 10_000 })
+        if (killed.error || killed.status !== 0) {
+          if (!p.kill()) return false
+        }
+      }
     } catch {
       return false
     }

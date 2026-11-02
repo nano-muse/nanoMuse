@@ -43,7 +43,22 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Desktop
 
 - **Added the model-neutral `skill-creator` guide to the desktop and Python runtime.** Android loaded the same packaged instructions, including on existing installs. For [#757](https://github.com/nano-muse/nanoMuse/issues/757) and [#758](https://github.com/nano-muse/nanoMuse/issues/758).
+- Kept separate screenshots when reporting more than one problem within the same second.
+
+- Kept stable message IDs when retrying conversation uploads after a lost relay response.
+
+- Stopped coding-run child processes on Windows along with their parent CLI.
+
+- Kept another device's working indicator when a different device finished a turn.
+
+- Saved desktop account state through ordered atomic replacements so interrupted writes preserved the previous snapshot.
+
+- Bounded the desktop conversation-log cache to 64 recently used sessions.
+
+- Dated desktop memory entries using the computer's local calendar day.
+
 - **Fixed dark device authorization cards and chat action placement.** Authorization cards used the selected theme background, and user-message timestamps and Copy buttons stayed below the message without overlapping text or attachments. For [#774](https://github.com/nano-muse/nanoMuse/issues/774) and [#781](https://github.com/nano-muse/nanoMuse/issues/781).
+
 - Fixed the development desktop smoke test on Windows by importing Electron through a file URL, including paths with spaces and URL-significant characters.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).
