@@ -3,6 +3,7 @@ name: skill-creator
 description: Use when creating or updating a reusable skill with task-specific instructions, supporting files and checks.
 metadata:
   version: "2.1.0"
+  channel: cli
 ---
 
 # Skill Creator
