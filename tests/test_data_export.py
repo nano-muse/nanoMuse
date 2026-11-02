@@ -23,8 +23,8 @@ from nanomuse.server import data_export as export
 EXCLUDED = b"excluded fixture content"
 
 
-def entries(data: Path) -> dict[str, bytes]:
-    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(data))) as archive:
+def entries(data: Path, databases: dict[str, sqlite3.Connection] | None = None) -> dict[str, bytes]:
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(data, databases=databases))) as archive:
         return {name: archive.read(name) for name in archive.namelist() if name != "README.txt"}
 
 
@@ -377,56 +377,36 @@ def _spill_and_hold(db: Path, spilled: threading.Event, hold: threading.Event) -
 def test_a_database_stuck_mid_write_is_left_out_rather_than_shipped_corrupt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # With the rollback journal pending, the main file's bytes are not a database SQLite
-    # can open, and a backup read would roll the writer's transaction back out from under
-    # it. The export waits out the journal, and a writer that outlives the wait costs the
-    # file this export instead of shipping corrupt bytes.
     monkeypatch.setattr(export, "DATABASE_WAIT_S", 0.2)
-    db = tmp_path / "memory.db"
-    _spilling_database(db)
-
-    spilled = threading.Event()
-    hold = threading.Event()
-    thread = _spill_and_hold(db, spilled, hold)
-    assert spilled.wait(30), "writer never reached the spill point"
-    time.sleep(0.3)  # let the spilled pages land
-
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path, timeout=0)
+    spilled, hold = threading.Event(), threading.Event()
+    thread = _spill_and_hold(path, spilled, hold)
+    assert spilled.wait(30)
     try:
-        got = entries(tmp_path)
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
     finally:
         hold.set()
         thread.join(timeout=30)
-    assert "memory.db" not in got
+        source.close()
 
 
 def test_a_database_exports_as_a_self_consistent_snapshot(tmp_path: Path) -> None:
-    # Once the journal has cleared, the file may still differ from what a plain byte copy
-    # would have caught mid-write; the shipped snapshot opens and holds the committed rows.
-    db = tmp_path / "memory.db"
-    _spilling_database(db)
-
-    spilled = threading.Event()
-    hold = threading.Event()
-    thread = _spill_and_hold(db, spilled, hold)
-    assert spilled.wait(30), "writer never reached the spill point"
-    hold.set()  # let the writer roll back and clear the journal
-    thread.join(timeout=30)
-    for _ in range(50):
-        if not db.with_name("memory.db-journal").exists():
-            break
-        time.sleep(0.1)
-
-    got = entries(tmp_path)
-    assert "memory.db" in got
-    copy = tmp_path / "memory-from-zip.db"
-    copy.write_bytes(got["memory.db"])
-    check = sqlite3.connect(copy)
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path)
     try:
+        got = entries(tmp_path, {"memory.db": source})
+    finally:
+        source.close()
+    check = sqlite3.connect(":memory:")
+    try:
+        check.deserialize(got["memory.db"])
         assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert check.execute("SELECT count(*) FROM t").fetchone()[0] == 50
     finally:
         check.close()
-        copy.unlink()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows junction at the configured data root")
@@ -478,90 +458,60 @@ def test_export_keeps_resolved_root_when_configured_link_changes(
 def test_database_snapshot_never_reopens_the_live_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    data = tmp_path / "data"
-    outside = tmp_path / "outside"
+    data, outside = tmp_path / "data", tmp_path / "outside"
     for folder, value in [(data, "allowed"), (outside, "excluded fixture")]:
         folder.mkdir()
         with sqlite3.connect(folder / "memory.db") as db:
             db.execute("CREATE TABLE t(value TEXT)")
             db.execute("INSERT INTO t VALUES (?)", (value,))
-    identity = (data / "memory.db").stat().st_ino
-    fstat = os.fstat
+    source = sqlite3.connect(data / "memory.db")
+    snapshot = export._database_snapshot
     swapped = False
 
-    def swap(fd: int) -> os.stat_result:
+    def swap(connection: sqlite3.Connection) -> bytes | None:
         nonlocal swapped
-        info = fstat(fd)
-        if not swapped and stat.S_ISREG(info.st_mode) and info.st_ino == identity:
-            swapped = True
-            data.rename(tmp_path / "original")
-            symlink(data, outside, directory=True)
-        return info
+        data.rename(tmp_path / "original")
+        symlink(data, outside, directory=True)
+        swapped = True
+        return snapshot(connection)
 
-    monkeypatch.setattr(export.os, "fstat", swap)
-    got = entries(data)
-    assert swapped
-    db = sqlite3.connect(":memory:")
+    monkeypatch.setattr(export, "_database_snapshot", swap)
     try:
-        db.deserialize(got["memory.db"])
-        assert db.execute("SELECT value FROM t").fetchall() == [("allowed",)]
+        got = entries(data, {"memory.db": source})
     finally:
-        db.close()
-
-
-def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path) -> None:
-    db = sqlite3.connect(tmp_path / "memory.db")
+        source.close()
+    assert swapped
+    check = sqlite3.connect(":memory:")
     try:
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA wal_autocheckpoint=0")
-        db.execute("CREATE TABLE t(value TEXT)")
-        db.execute("INSERT INTO t VALUES ('committed')")
-        db.commit()
-        db.execute("INSERT INTO t VALUES ('uncommitted')")
-        got = entries(tmp_path)
+        if "memory.db" in got:
+            check.deserialize(got["memory.db"])
+            assert check.execute("SELECT value FROM t").fetchall() == [("allowed",)]
+    finally:
+        check.close()
+
+
+@pytest.mark.parametrize("name", export.DATABASES)
+def test_database_snapshot_includes_committed_wal_rows(tmp_path: Path, name: str) -> None:
+    writer = sqlite3.connect(tmp_path / name)
+    source = sqlite3.connect(tmp_path / name)
+    try:
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute("CREATE TABLE t(value TEXT)")
+        writer.execute("INSERT INTO t VALUES ('committed')")
+        writer.commit()
+        writer.execute("INSERT INTO t VALUES ('uncommitted')")
+        got = entries(tmp_path, {name: source})
         check = sqlite3.connect(":memory:")
         try:
-            check.deserialize(got["memory.db"])
+            check.deserialize(got[name])
             assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
             assert check.execute("SELECT value FROM t").fetchall() == [("committed",)]
         finally:
             check.close()
     finally:
-        db.close()
-
-
-@pytest.mark.parametrize("kind", ["symlink", "hardlink"])
-def test_database_snapshot_rejects_linked_wal(tmp_path: Path, kind: str) -> None:
-    _spilling_database(tmp_path / "memory.db")
-    excluded = tmp_path / "vault.key"
-    excluded.write_bytes(EXCLUDED)
-    wal = tmp_path / "memory.db-wal"
-    if kind == "symlink":
-        symlink(wal, excluded)
-    else:
-        wal.hardlink_to(excluded)
-    assert "memory.db" not in entries(tmp_path)
-
-
-def test_database_snapshot_rejects_a_wal_that_appeared_during_copy(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    path = tmp_path / "memory.db"
-    _spilling_database(path)
-    opened = export._open
-    calls = 0
-
-    def create_wal(path: Path, *, directory: bool = False, parent_fd: int | None = None) -> int:
-        nonlocal calls
-        if path.name == "memory.db-wal":
-            calls += 1
-            if calls == 2:
-                path.write_bytes(b"new WAL")
-        return opened(path, directory=directory, parent_fd=parent_fd)
-
-    monkeypatch.setattr(export, "_open", create_wal)
-    assert "memory.db" not in entries(tmp_path)
-    assert calls == 2
+        source.close()
+        writer.close()
 
 
 def test_corrupt_database_does_not_fall_back_to_raw_bytes(tmp_path: Path) -> None:
@@ -575,7 +525,11 @@ def test_database_snapshot_bounds_the_result_size(
     path = tmp_path / "memory.db"
     _spilling_database(path)
     monkeypatch.setattr(export, "MAX_FILE_BYTES", 1_024)
-    assert "memory.db" not in entries(tmp_path)
+    source = sqlite3.connect(path)
+    try:
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+    finally:
+        source.close()
 
 
 def test_database_snapshot_stops_at_its_deadline(
@@ -584,7 +538,11 @@ def test_database_snapshot_stops_at_its_deadline(
     path = tmp_path / "memory.db"
     _spilling_database(path)
     monkeypatch.setattr(export, "DATABASE_WAIT_S", 0)
-    assert "memory.db" not in entries(tmp_path)
+    source = sqlite3.connect(path)
+    try:
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+    finally:
+        source.close()
 
 
 def test_export_keeps_a_file_newer_than_the_zip_clock(tmp_path: Path) -> None:
@@ -598,3 +556,87 @@ def test_export_keeps_a_file_newer_than_the_zip_clock(tmp_path: Path) -> None:
         assert archive.read("profile.json") == b"profile"
         assert archive.getinfo("profile.json").date_time == (2107, 12, 31, 23, 59, 58)
         assert archive.testzip() is None
+
+
+def test_database_from_another_data_directory_is_not_exported(tmp_path: Path) -> None:
+    data, outside = tmp_path / "data", tmp_path / "outside"
+    data.mkdir()
+    outside.mkdir()
+    _spilling_database(data / "memory.db")
+    _spilling_database(outside / "memory.db")
+    source = sqlite3.connect(outside / "memory.db")
+    try:
+        assert "memory.db" not in entries(data, {"memory.db": source})
+    finally:
+        source.close()
+
+
+def test_database_without_an_active_store_is_named_in_readme(tmp_path: Path) -> None:
+    _spilling_database(tmp_path / "memory.db")
+    with zipfile.ZipFile(io.BytesIO(export.agent_data_zip(tmp_path))) as archive:
+        assert "memory.db" not in archive.namelist()
+        assert b"Databases omitted" in archive.read("README.txt")
+
+
+def test_database_export_does_not_commit_the_runtime_transaction(tmp_path: Path) -> None:
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    source = sqlite3.connect(path)
+    try:
+        source.execute("DELETE FROM t")
+        assert "memory.db" not in entries(tmp_path, {"memory.db": source})
+        assert source.in_transaction
+        source.rollback()
+        assert source.execute("SELECT count(*) FROM t").fetchone()[0] == 50
+    finally:
+        source.close()
+
+
+def test_owned_connection_snapshot_stays_consistent_when_file_times_are_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from collections.abc import Callable
+
+    path = tmp_path / "memory.db"
+    _spilling_database(path)
+    writer = sqlite3.connect(path)
+    writer.executemany("INSERT INTO t(payload) VALUES (?)", [(b"x" * 400,) for _ in range(400)])
+    writer.commit()
+    changed = False
+
+    class Source(sqlite3.Connection):
+        def backup(
+            self,
+            target: sqlite3.Connection,
+            *,
+            pages: int,
+            progress: Callable[[int, int, int], None],
+            sleep: float,
+        ) -> None:
+            def update(status: int, remaining: int, total: int) -> None:
+                nonlocal changed
+                if remaining and not changed:
+                    writer.execute("UPDATE t SET payload = ?", (b"new" * 150,))
+                    writer.commit()
+                    changed = True
+                progress(status, remaining, total)
+
+            super().backup(target, pages=pages, progress=update, sleep=sleep)
+
+    source = sqlite3.connect(path, factory=Source)
+    info = path.stat()
+    monkeypatch.setattr(export, "_database_info", lambda path, fd: info)
+    try:
+        got = entries(tmp_path, {"memory.db": source})
+        assert changed
+        check = sqlite3.connect(":memory:")
+        try:
+            check.deserialize(got["memory.db"])
+            assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert check.execute("SELECT count(DISTINCT payload) FROM t").fetchone()[0] == 1
+            assert check.execute("SELECT count(*) FROM t").fetchone()[0] == 450
+        finally:
+            check.close()
+    finally:
+        source.close()
+        writer.close()

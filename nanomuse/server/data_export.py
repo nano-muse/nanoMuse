@@ -26,7 +26,7 @@ import stat
 import sys
 import time
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -199,153 +199,91 @@ def _write_entry(z: zipfile.ZipFile, name: str, info: os.stat_result, content: b
     z.writestr(entry, content)
 
 
-def _present(path: Path, parent_fd: int) -> bool:
-    """Check a sidecar relative to the pinned parent, refusing links and access errors."""
-    try:
-        fd = _open(path, parent_fd=parent_fd)
-    except FileNotFoundError:
-        return False
-    os.close(fd)
-    return True
-
-
-def _file_state(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
-    return (
-        info.st_dev,
-        info.st_ino,
-        info.st_nlink,
-        info.st_size,
-        info.st_mtime_ns,
-        info.st_ctime_ns,
+def _database_info(path: Path, parent_fd: int) -> os.stat_result:
+    # Do not open and close a raw database descriptor: on POSIX closing any descriptor
+    # can release SQLite's process-wide locks. Snapshot reads use the runtime's existing
+    # connection; this stat only checks the archive entry and supplies its metadata.
+    info = (
+        path.lstat()
+        if sys.platform == "win32"
+        else os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
     )
+    if _is_link(info) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise OSError("database export entry is linked or is not a regular file")
+    return info
 
 
-def _database_copy(path: Path, parent_fd: int) -> tuple[os.stat_result, dict[str, bytes]] | None:
-    """Copy a stable database and WAL using only handles beneath the pinned directory."""
-    journal = path.with_name(path.name + "-journal")
-    deadline = time.monotonic() + DATABASE_WAIT_S
-    while _present(journal, parent_fd):
-        if time.monotonic() >= deadline:
-            return None
-        time.sleep(0.05)
-    paths = {"database.db": path, "database.db-wal": path.with_name(path.name + "-wal")}
-    with ExitStack() as stack:
-        opened: dict[str, int] = {}
-        before: dict[str, os.stat_result] = {}
-        for name, candidate in paths.items():
-            try:
-                fd = _open(candidate, parent_fd=parent_fd)
-            except FileNotFoundError:
-                if name == "database.db":
-                    return None
-                continue
-            stack.callback(os.close, fd)
-            info = os.fstat(fd)
-            if (
-                _is_link(info)
-                or not stat.S_ISREG(info.st_mode)
-                or info.st_nlink != 1
-                or info.st_size > MAX_FILE_BYTES
-            ):
-                return None
-            opened[name], before[name] = fd, info
-        if _present(journal, parent_fd):
-            return None
-        content: dict[str, bytes] = {}
-        for name, fd in opened.items():
-            with os.fdopen(fd, "rb", closefd=False) as source:
-                content[name] = source.read(MAX_FILE_BYTES + 1)
-            if len(content[name]) > MAX_FILE_BYTES:
-                return None
-        # Check the complete set after copying, including a WAL which appeared, was
-        # replaced or disappeared between the two reads. A live rollback is never copied.
-        for name, candidate in paths.items():
-            try:
-                current = _open(candidate, parent_fd=parent_fd)
-            except FileNotFoundError:
-                if name in opened:
-                    return None
-                continue
-            try:
-                if (
-                    name not in opened
-                    or _file_state(os.fstat(current)) != _file_state(before[name])
-                    or _file_state(os.fstat(opened[name])) != _file_state(before[name])
-                ):
-                    return None
-            finally:
-                os.close(current)
-        if _present(journal, parent_fd):
-            return None
-        return before["database.db"], content
-
-
-def _database_snapshot(files: dict[str, bytes]) -> bytes | None:
-    """SQLite only opens our private copies, never a pathname in the live data tree."""
-    deadline = time.monotonic() + DATABASE_WAIT_S
-    with TemporaryDirectory(prefix="nanomuse-export-") as temporary:
-        root = Path(temporary)
-        for name, content in files.items():
-            (root / name).write_bytes(content)
-        source = sqlite3.connect(f"{(root / 'database.db').as_uri()}?mode=ro", uri=True)
-        try:
-            page_size = source.execute("PRAGMA page_size").fetchone()[0]
-            page_count = source.execute("PRAGMA page_count").fetchone()[0]
-            if page_size * page_count > MAX_FILE_BYTES:
-                return None
-            snapshot_path = root / "snapshot.db"
-            snapshot = sqlite3.connect(snapshot_path)
-            try:
-                snapshot.execute(f"PRAGMA page_size={page_size}")
-                snapshot.execute(f"PRAGMA max_page_count={MAX_FILE_BYTES // page_size}")
-
-                def progress(status: int, remaining: int, total: int) -> None:
-                    if total * page_size > MAX_FILE_BYTES:
-                        raise ValueError("database snapshot exceeds export size limit")
-                    if time.monotonic() >= deadline:
-                        raise TimeoutError("database snapshot exceeded export deadline")
-
-                source.backup(snapshot, pages=64, progress=progress, sleep=0.05)
-                # A standalone export has no WAL sidecar. Normalize the private result
-                # to rollback mode, including its header, before shipping its bytes.
-                snapshot.execute("PRAGMA journal_mode=DELETE")
-            finally:
-                snapshot.close()
-            with snapshot_path.open("rb") as result:
-                content = result.read(MAX_FILE_BYTES + 1)
-            return content if len(content) <= MAX_FILE_BYTES else None
-        finally:
-            source.close()
-
-
-def _read_database(path: Path, parent_fd: int) -> tuple[os.stat_result, bytes] | None:
-    """Export a stable, committed snapshot without asking SQLite to open live paths."""
-    try:
-        if not _present(path, parent_fd):
-            return None
-        copied = _database_copy(path, parent_fd)
-        if copied is None:
-            logger.warning("{} was busy or changed; skipped from this export", path.name)
-            return None
-        info, files = copied
-        content = files["database.db"]
-        # Preserve non-database placeholders through the same validated-handle copy.
-        # A recognizable but corrupt database must never fall back to uncommitted bytes.
-        if not content.startswith(b"SQLite format 3\0"):
-            return (info, content) if "database.db-wal" not in files else None
-        snapshot = _database_snapshot(files)
-        return (info, snapshot) if snapshot is not None else None
-    except (OSError, sqlite3.Error, ValueError) as exc:
-        logger.warning("{} could not be snapshotted; skipped from this export: {}", path.name, exc)
+def _database_snapshot(source: sqlite3.Connection) -> bytes | None:
+    """SQLite's online backup reads the already-owned connection, with bounded retries."""
+    if source.in_transaction:
         return None
+    deadline = time.monotonic() + DATABASE_WAIT_S
+    page_size = source.execute("PRAGMA page_size").fetchone()[0]
+    page_count = source.execute("PRAGMA page_count").fetchone()[0]
+    if page_size * page_count > MAX_FILE_BYTES:
+        return None
+    with TemporaryDirectory(prefix="nanomuse-export-") as temporary:
+        snapshot_path = Path(temporary) / "snapshot.db"
+        snapshot = sqlite3.connect(snapshot_path)
+        try:
+            snapshot.execute(f"PRAGMA page_size={page_size}")
+            snapshot.execute(f"PRAGMA max_page_count={MAX_FILE_BYTES // page_size}")
+
+            def progress(status: int, remaining: int, total: int) -> None:
+                if total * page_size > MAX_FILE_BYTES:
+                    raise ValueError("database snapshot exceeds export size limit")
+                if source.in_transaction:
+                    raise ValueError("source connection has an uncommitted transaction")
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("database snapshot exceeded export deadline")
+
+            source.backup(snapshot, pages=64, progress=progress, sleep=0.05)
+            # WAL is incorporated by SQLite's snapshot, not copied as a sidecar. The
+            # standalone result must use rollback mode, including its file header.
+            snapshot.execute("PRAGMA journal_mode=DELETE")
+        finally:
+            snapshot.close()
+        with snapshot_path.open("rb") as result:
+            content = result.read(MAX_FILE_BYTES + 1)
+        return content if len(content) <= MAX_FILE_BYTES else None
 
 
-def _add_database(z: zipfile.ZipFile, path: Path, fd: int, name: str) -> None:
-    checked = _read_database(path, fd)
-    if checked is None:
-        return
-    info, content = checked
-    _write_entry(z, name, info, content)
+def _add_database(
+    z: zipfile.ZipFile,
+    path: Path,
+    fd: int,
+    name: str,
+    sources: Mapping[str, sqlite3.Connection],
+) -> bool:
+    """Return false when an existing database could not safely be included."""
+    try:
+        before = _database_info(path, fd)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    source = sources.get(name)
+    if source is None:
+        return False
+    try:
+        # Only the expected store's main database may fill this archive entry. Explicit
+        # sources from another data directory or in-memory connections are refused.
+        database_path = next(
+            (row[2] for row in source.execute("PRAGMA database_list") if row[1] == "main"), ""
+        )
+        if not database_path or Path(database_path).resolve(strict=True) != path:
+            return False
+        content = _database_snapshot(source)
+        if content is None:
+            return False
+        after = _database_info(path, fd)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            return False
+        _write_entry(z, name, before, content)
+        return True
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        logger.warning("{} could not be snapshotted; skipped from this export: {}", name, exc)
+        return False
 
 
 def _add_tree(z: zipfile.ZipFile, root: Path, fd: int, under: str) -> None:
@@ -368,15 +306,19 @@ def _add_tree(z: zipfile.ZipFile, root: Path, fd: int, under: str) -> None:
         _add_file(z, path, fd, archive_name)
 
 
-def agent_data_zip(data_dir: Path) -> bytes:
+def agent_data_zip(
+    data_dir: Path, *, databases: Mapping[str, sqlite3.Connection] | None = None
+) -> bytes:
     """The zip's bytes: every file of the agent's data that is there, and the README."""
+    omitted: list[str] = []
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         try:
             with _data_directory(data_dir) as (root, fd):
                 for name in FILES:
                     if name in DATABASES:
-                        _add_database(z, root / name, fd, name)
+                        if not _add_database(z, root / name, fd, name, databases or {}):
+                            omitted.append(name)
                     else:
                         _add_file(z, root / name, fd, name)
                 for folder in DIRS:
@@ -388,7 +330,15 @@ def agent_data_zip(data_dir: Path) -> bytes:
         except OSError:
             pass
         z.writestr(
-            "README.txt", README.format(when=datetime.now(UTC).isoformat(timespec="seconds"))
+            "README.txt",
+            README.format(when=datetime.now(UTC).isoformat(timespec="seconds"))
+            + (
+                "\nDatabases omitted because a safe snapshot was unavailable: "
+                + ", ".join(omitted)
+                + ". Retry from the running app with the relevant feature enabled, after writes finish.\n"
+                if omitted
+                else ""
+            ),
         )
     return out.getvalue()
 

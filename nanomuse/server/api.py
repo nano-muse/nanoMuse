@@ -1971,8 +1971,12 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     async def export_data() -> Response:
         """The agent's data as one zip (parity note 37): what the runtime keeps about the
         person and about its own work, and never a credential. The reply is the file itself,
-        so a browser on another machine gets it and nothing is written to this disk."""
-        data = await asyncio.to_thread(data_export.agent_data_zip, svc.settings.data_dir)
+        so a browser on another machine gets it. Private snapshot files are removed first."""
+        data = await asyncio.to_thread(
+            data_export.agent_data_zip,
+            svc.settings.data_dir,
+            databases=svc.data_export_sources(),
+        )
         return Response(
             data,
             media_type="application/zip",
