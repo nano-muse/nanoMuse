@@ -42,7 +42,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Dated desktop memory entries using the computer's local calendar day.
+
 - **Fixed dark device authorization cards and chat action placement.** Authorization cards used the selected theme background, and user-message timestamps and Copy buttons stayed below the message without overlapping text or attachments. For [#774](https://github.com/nano-muse/nanoMuse/issues/774) and [#781](https://github.com/nano-muse/nanoMuse/issues/781).
+
 - Fixed the development desktop smoke test on Windows by importing Electron through a file URL, including paths with spaces and URL-significant characters.
 
 - **Restored the app's copy buttons and added right-click text editing.** The app's main page could write to the clipboard, while embedded pages and script clipboard reads stayed blocked. Editable fields offered Cut, Copy, Paste and Select All using the system's editing permissions. For [#735](https://github.com/nano-muse/nanoMuse/issues/735).

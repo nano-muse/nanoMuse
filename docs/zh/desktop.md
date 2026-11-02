@@ -231,6 +231,8 @@ harness 保留外部下载方式。不带软件内更新能力的版本，需先
 
 ## 配置和数据 {#config-and-data}
 
+`MEMORY.md` 中每条记忆旁的日期使用这台电脑的本地日期。
+
 桌面开发环境的冒烟测试在 Windows 等平台通过文件 URL 导入 Electron，仓库路径可以包含空格、Unicode 字符、`#` 或 `%`。
 
 `~/.nanomuse/desktop`（`NANOMUSE_DESKTOP_HOME` 可以把它挪到别处）是应用的 dsh 主目录：
