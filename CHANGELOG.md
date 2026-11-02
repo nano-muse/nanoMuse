@@ -18,6 +18,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Kept calendar drafts with the same date and title in separate files instead of overwriting the earlier draft.
 
+- Recorded Feishu and DingTalk message-processing failures after thread handover instead of silently dropping their errors.
+
+- Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
+
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
 - **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
