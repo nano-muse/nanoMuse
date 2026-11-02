@@ -82,7 +82,7 @@ sessions/                 the running state of a conversation
 Not in this zip, on purpose: the secrets themselves (vault.enc, vault.key), the app's own
 password (server_token), the key that signs notifications (push-vapid.json), the settings
 file (it can hold an API key in the clear), the pairing credentials (channels/), this
-device's own sync cursor (sync.json — another device's copy would fight it), the push
+device's own sync cursor (sync.json; another device's copy would fight it), the push
 subscription endpoints (push-subscriptions.json), the logs, and workspace/ (your own files).
 """
 
