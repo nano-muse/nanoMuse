@@ -5,6 +5,8 @@ or an e-mail address, get a free allowance, and use nanoMuse without an API key 
 Bringing your own key still works exactly as before: this is one more
 provider, not a replacement.
 
+Admin-console refreshes keep the newest response for each URL. Responses from before sign-out cannot repopulate the cleared cache or replace a later account’s data.
+
 ## In the app
 
 Since 0.1.20 the account is where every app starts: the first screen asks for a
@@ -571,10 +573,17 @@ see the run move between its start and its end. Request bodies over
 `MAX_REQUEST_BYTES` (16 MiB by default since 0.20) are 413 `too_large` with
 *Request body is N MB; this relay accepts up to M MB*.
 
+A retry keeps the original `mid`, including when the relay accepted the message but
+its response was lost. The desktop derives new message IDs from the device, local
+session and local line ID; existing persisted message IDs remain recognized. The
+accepted ID format and other clients' UUIDs are unchanged. The desktop saves its
+conversation mapping before upload, so a lost response followed by a restart also
+keeps the same conversation ID.
+
 A conversation is `{cid, kind: main | side, title, device, device_name,
 created_at, updated_at, deleted, seq}` and a message `{mid, cid, seq, device,
 device_name, role: user | assistant, text, truncated, attachments[{name, mime,
-size}], created_at, deleted}`; `cid` and `mid` are UUIDs the device makes (4–64
+size}], created_at, deleted}`; `cid` and `mid` are opaque IDs the device makes (4–64
 characters of `a-z 0-9 . _ : -`, folded to lower case), times are Unix seconds.
 Every accepted change takes the account's next `seq`; a device keeps the
 highest `cursor` it has pulled and asks for `since=` that. A push is idempotent

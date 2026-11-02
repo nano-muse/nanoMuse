@@ -2,6 +2,8 @@
 
 「现在就开始」这条路：用手机号（中国大陆；验证码走短信）或邮箱注册，拿一份免费额度，不用自己的 API key 就能用 nanoMuse。用自己的 key 的方式和以前完全一样：这只是多了一个服务商，不是替代。
 
+管理控制台刷新时，每个 URL 只保留最新请求的结果。退出登录前尚未返回的请求不会重新填充已清空的缓存，也不会覆盖之后登录账号的数据。
+
 ## 在应用里 {#in-the-app}
 
 0.1.20 起，账号是每个 App 的起点：第一屏要你填手机号或邮箱，发一个六位验证码（或者，设过密码的话，直接输密码），然后问由哪个模型来回答：账号自带的（Cloud），还是你自己的 key。短信验证码只发中国大陆号码（号码认证服务不往别处发）；香港、台湾或海外号码会立刻被告知（`phone_region`），改用邮箱登录。退出登录会回到那一屏（自己部署的：在运行时上设 `[cloud] required = false` 或 `NANOMUSE_CLOUD_REQUIRED=0`）。那一屏是门，不是墙：点「改用自己的 API key」就能越过它进入设置里的自备 key 路径；有了自己的 key，App 不登录也能用（聊天、动手、图片、短片），登录入口留在「连接」里（手机上是「设置 → nanoMuse Cloud」），用于 Cloud 模型、同步和你的设备。输完验证码后，App 有了：
@@ -129,7 +131,9 @@ DELETE /v1/sync/conversations/{cid}     → {cursor, deleted: true}      a tombs
 
 `scope`（中继 0.20）不写就是 `all`；`main` 只返回主要聊天及其消息，还没有主要聊天的账号得到一个空页，其 `cursor` 是账号的计数器。`tail=K`（K ≤ 500，只在 `since=0` 时生效）按 `seq` 顺序返回最新的 K 条消息、它们所属的对话、位于账号计数器的 `cursor`、`more: false`，以及 `skipped`（略过了多少条更早的消息）。从中继 0.25 起，只要账号有主要聊天，tail 页就一定带上它的那一行，哪怕最新的 K 条里没有它自己的消息，这样新设备第一次拉取就认领 `cid_main`，而不是先造第二个 main、再从 `main_exists` 的拒绝里学到那个 id（1.0.3 的客户端把多出的这一行当作普通对话行处理，行为不变）。其他任何 `scope` 都是 400 `bad_scope`。`POST /v1/sync/working` 表示 `device`（或 `X-Nanomuse-Device`）里指名的设备正在 `cid` 里回答（`working: true`）或已经结束（`false`）；中继把活跃的那些在内存里保留十分钟（从不进数据库，所以重启就忘），在状态的 `working` 下列出（`[{cid, from, device_name, working, at}]`），并向账号的其他套接字发一个 `working` 帧（[hub.md](hub.md#frames)）。请求正文超过 `MAX_REQUEST_BYTES`（0.20 起默认 16 MiB）是 413 `too_large`，附一句「请求正文 N MB；这个中继最多接受 M MB」。
 
-一个对话是 `{cid, kind: main | side, title, device, device_name, created_at, updated_at, deleted, seq}`，一条消息是 `{mid, cid, seq, device, device_name, role: user | assistant, text, truncated, attachments[{name, mime, size}], created_at, deleted}`；`cid` 和 `mid` 是设备生成的 UUID（4–64 个字符，取自 `a-z 0-9 . _ : -`，折叠为小写），时间是 Unix 秒。每个被接受的变更拿到账号的下一个 `seq`；设备记住自己拉到过的最高 `cursor`，下次用 `since=` 它来请求。推送是幂等的（已知的 `mid` 原样不动，除非新行是墓碑记录；已知的 `cid` 取较新的标题；比中继时钟晚一周以上、或早于对话开始的时间，按对话的 `created_at` 读，中继 0.25。更早的中继从 `created_at` 起算这一周，所以超过一周的聊天每一次改名都被丢掉），而且一次最多 200 条消息或对话（413 `too_many_messages`）。一页按 `seq` 顺序列出它的对话和消息，中继还会把页里每条消息所属的对话一并加上，即使那个对话自己的 `seq` 在更后面（重命名会把它挪后），所以客户端先应用页里的对话、再应用消息，永远不会拿到一个没有归属的孤儿。拒绝会指名那一行：第二个 `main` 被推上来时是 `main_exists` 加 `cid_main`（设备随后改用 `cid_main` 重发），还有 `conversation_limit`（中继 0.23，账号的旁聊已到上限）、`unknown_cid`、`conversation_deleted`、`bad_cid`、`bad_mid`、`bad_kind`、`bad_role`。墓碑记录保留 30 天，然后清扫掉。推送被接受或删除之后，hub 用一个 `sync` 帧通知账号的其他设备（控制台发出的 `DELETE` 在 `X-Nanomuse-Device` 里带着执行删除的设备，好让它跳过自己的回声）。
+重试时沿用原来的 `mid`，包括中继已经接收消息但响应丢失的情况。桌面端根据设备、本地会话和本地消息行 ID 生成新消息的 ID，并继续识别已经保存的消息 ID。允许的 ID 格式和其他客户端使用的 UUID 保持不变。桌面端在上传前保存会话映射，因此响应丢失并重启后，会话 ID 也保持不变。
+
+一个对话是 `{cid, kind: main | side, title, device, device_name, created_at, updated_at, deleted, seq}`，一条消息是 `{mid, cid, seq, device, device_name, role: user | assistant, text, truncated, attachments[{name, mime, size}], created_at, deleted}`；`cid` 和 `mid` 是设备生成的不透明 ID（4–64 个字符，取自 `a-z 0-9 . _ : -`，折叠为小写），时间是 Unix 秒。每个被接受的变更拿到账号的下一个 `seq`；设备记住自己拉到过的最高 `cursor`，下次用 `since=` 它来请求。推送是幂等的（已知的 `mid` 原样不动，除非新行是墓碑记录；已知的 `cid` 取较新的标题；比中继时钟晚一周以上、或早于对话开始的时间，按对话的 `created_at` 读，中继 0.25。更早的中继从 `created_at` 起算这一周，所以超过一周的聊天每一次改名都被丢掉），而且一次最多 200 条消息或对话（413 `too_many_messages`）。一页按 `seq` 顺序列出它的对话和消息，中继还会把页里每条消息所属的对话一并加上，即使那个对话自己的 `seq` 在更后面（重命名会把它挪后），所以客户端先应用页里的对话、再应用消息，永远不会拿到一个没有归属的孤儿。拒绝会指名那一行：第二个 `main` 被推上来时是 `main_exists` 加 `cid_main`（设备随后改用 `cid_main` 重发），还有 `conversation_limit`（中继 0.23，账号的旁聊已到上限）、`unknown_cid`、`conversation_deleted`、`bad_cid`、`bad_mid`、`bad_kind`、`bad_role`。墓碑记录保留 30 天，然后清扫掉。推送被接受或删除之后，hub 用一个 `sync` 帧通知账号的其他设备（控制台发出的 `DELETE` 在 `X-Nanomuse-Device` 里带着执行删除的设备，好让它跳过自己的回声）。
 
 ## 额度 {#allowance}
 
