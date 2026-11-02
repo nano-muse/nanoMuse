@@ -19,6 +19,9 @@ harness/**/*.ico binary
 # them with its own byte for byte (tests/fences.test.mjs), so they keep LF the same way.
 android/src/android/app/src/main/assets/nanomuse/*.json text eol=lf
 android/src/ios/NanoMuse/Resources/*.json text eol=lf
+# The shared authoring guide is also checked byte for byte against the desktop copy.
+nanomuse/skills/builtin/skill-creator/SKILL.md text eol=lf
+android/src/android/app/src/main/assets/nanomuse/skill-creator.md text eol=lf
 
 # The web app is built on Windows too (`cd web && npm run build` writes the console into
 # nanomuse/server/static), and Vite carries the source's line endings into what it writes: with
