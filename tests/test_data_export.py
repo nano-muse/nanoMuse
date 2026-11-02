@@ -328,3 +328,15 @@ def test_windows_export_uses_parent_handle_after_reparse_change(
     assert entries(tmp_path) == {}
     assert swapped
     folder.rmdir()  # remove the junction after all handles close
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows junction at the configured data root")
+def test_windows_export_follows_a_junction_data_root(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    (real / "threads").mkdir(parents=True)
+    (real / "profile.json").write_bytes(b"profile")
+    (real / "threads" / "chat.json").write_bytes(b"chat")
+    root = tmp_path / "linked-root"
+    root.mkdir()
+    _set_windows_junction(root, real)
+    assert entries(root) == {"profile.json": b"profile", "threads/chat.json": b"chat"}
