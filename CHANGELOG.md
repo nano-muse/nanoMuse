@@ -18,7 +18,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Kept files dated after 2107 in data exports by clamping their archive timestamps to ZIP's supported upper limit.
+
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
+- **A file older than the zip's own clock no longer fails the whole export.** The zip format's timestamps begin in 1980, and one file stamped before that — an old photo carried through migrations, a 1970-epoch stamp a sync tool preserved — raised a `ValueError` no catch in the exporter was written for, so `/api/data/export` answered 500 and the person got nothing at all. The file now keeps its bytes and lands at the floor date, as every archiver writes it, and the rest of the zip is untouched.
 
 - **A data root the user moved to another disk as a junction exports everything, not a README.** The exporter pinned the configured path without resolving its last component — the defense that keeps a planted link inside the tree out of the zip — but a Windows user who moved the whole data directory to a bigger disk with a junction has that link as the root itself: the no-follow open hit the reparse point, the error was skipped like any unreadable directory, and the export came back containing nothing but the README, with a success status. The root is the one link the user configured, so it is now resolved before pinning; every directory below it is still pinned without following, where a planted link is refused as before.
 
