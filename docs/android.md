@@ -1,5 +1,7 @@
 # The Android app
 
+Bundled skills in Settings → Skills can be read, exported and switched off. Their name, content and files are managed by the app, so Edit, Update and Delete are unavailable. To customize one, export it and import a copy with a different name. The bundled `skill-creator` guide uses provider-neutral instructions.
+
 `android/` is nanoMuse for the phone: [OpenMinis](https://github.com/OpenMinis/OpenMinis)
 1.13 (GPL-3.0): a native app whose agent runs **on the phone**, with a Linux shell, a
 browser, MCP servers, skills and scheduled tasks inside the APK, with nanoMuse's own

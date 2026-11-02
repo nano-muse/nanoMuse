@@ -136,7 +136,7 @@ The app speaks English and 简体中文. *Settings → App language* is a device
 
 ### Skills
 
-A skill is a recipe: a folder with a `SKILL.md` (a name and a one-line description up top, then the steps in Markdown) in the [Agent Skills](https://agentskills.io) format, so a skill written for another agent works here and yours work there. Eleven ship with the app (`weekly-review`, `trip-plan`, `inbox-triage`, `compare-options`, `meeting-prep`, `phone-messages`, and the service skills `feishu`, `tencent-meeting`, `amap`, `kuaidi100`, `train-tickets`); yours live in `<data_dir>/skills/<name>/`, and one with the same name as a built-in replaces it.
+A skill is a recipe: a folder with a `SKILL.md` (a name and a one-line description up top, then the steps in Markdown) in the [Agent Skills](https://agentskills.io) format, so a skill written for another agent works here and yours work there. Twelve ship with the app (`skill-creator`, `weekly-review`, `trip-plan`, `inbox-triage`, `compare-options`, `meeting-prep`, `phone-messages`, and the service skills `feishu`, `tencent-meeting`, `amap`, `kuaidi100`, `train-tickets`); yours live in `<data_dir>/skills/<name>/`, and one with the same name as a built-in replaces it.
 
 The model sees the index (every enabled skill's name and description) in its system prompt and picks one when a request fits ("plan me a week in Kyoto" reaches for `trip-plan`), reading the full steps with the `skills` tool before it starts. You can also name one yourself: type `/` in the composer and the enabled skills come up (`Tab` completes the first match); `/trip-plan Kyoto, 5 days in November` sends the skill's instructions with your text as the task.
 

@@ -49,6 +49,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **Added the model-neutral `skill-creator` guide to the desktop and Python runtime.** Android loaded the same packaged instructions, including on existing installs. For [#757](https://github.com/nano-muse/nanoMuse/issues/757) and [#758](https://github.com/nano-muse/nanoMuse/issues/758).
 - Kept separate screenshots when reporting more than one problem within the same second.
 
 - Kept stable message IDs when retrying conversation uploads after a lost relay response.
@@ -77,6 +78,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A chat another device sends a task to, and every chat the rooms open, start in the `~/nanoMuse` workspace** instead of the bare home folder. On Windows a workspace that is the whole profile folder could not run a single `workspace-write` command: the sandbox's temp root lies inside it, and a session begun from the web console or the phone failed at the first step. ([#705](https://github.com/nano-muse/nanoMuse/issues/705))
 
 ### Android
+
+- **Kept built-in skills managed by the app.** Their contents remained readable and exportable, with enable switches available, while editing, importing over them and deleting them were blocked. For [#756](https://github.com/nano-muse/nanoMuse/issues/756).
 
 - **A `nanomuse-pc task` that does not run says so, instead of an empty answer.** The phone took the computer's wordless answer as success and told the model to pass it on, which read as *Done*; a task that did not run now comes back as a failure with the computer's own sentence, and a refusal names what happened instead of a status code. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
 - **Replaced Android's universal 32k compaction target with model-specific request budgets.** The phone now accounts for the active model or group window, output space, system instructions and tool definitions. Provider input usage gradually calibrates estimates in both directions, with separate saved records for each provider configuration and model. A failed early summary continues below the capacity reserve, with at most three automatic attempts per run and one provider request when only calibration reports overflow. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).

@@ -2,10 +2,11 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as capabilitySkill from '../lib/capability-skill.js'
-import { desktopSkillProvider, SKILL_NAME } from '../lib/capability-skill.js'
+import { creatorSkillProvider, desktopSkillProvider, CREATOR_SKILL_NAME, SKILL_NAME } from '../lib/capability-skill.js'
 
 test('the native registry advertises the manual without loading its body, then loads on demand', async () => {
   const ctx = new Context()
@@ -47,8 +48,39 @@ test('the preset plugin serves the packaged manual and unregisters on disposal',
     assert.ok(skill)
     assert.match(skill.content, /^# nanoMuse Desktop capability and configuration guide/)
     assert.match(skill.content, /Host paths for this request/)
+    const creator = await ctx.skills.get(CREATOR_SKILL_NAME)
+    assert.match(creator.content, /^\s*# Skill Creator/)
+    assert.equal(creator.source, 'bundled')
     await plugin.dispose()
     assert.equal(await ctx.skills.get(SKILL_NAME), undefined)
+    assert.equal(await ctx.skills.get(CREATOR_SKILL_NAME), undefined)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('authoring guidance loads on demand, respects cancellation and keeps client copies current', async () => {
+  const ctx = new Context()
+  await ctx.plugin(SkillRegistry)
+  let loads = 0
+  ctx.skills.registerProvider(() => creatorSkillProvider(async () => {
+    loads += 1
+    return '---\nname: skill-creator\n---\n# Guide'
+  }))
+  try {
+    const catalog = await ctx.skills.list()
+    assert.equal(catalog[0].name, CREATOR_SKILL_NAME)
+    assert.equal(catalog[0].invocation.modelInvocable, true)
+    assert.equal(catalog[0].invocation.userInvocable, true)
+    assert.equal(loads, 0)
+    await assert.rejects(ctx.skills.get(CREATOR_SKILL_NAME, { signal: AbortSignal.abort() }))
+    assert.equal(loads, 0)
+    assert.equal((await ctx.skills.get(CREATOR_SKILL_NAME)).content, '# Guide')
+    assert.equal(loads, 1)
+    const source = readFileSync(new URL('../../../nanomuse/skills/builtin/skill-creator/SKILL.md', import.meta.url), 'utf8')
+    for (const path of ['../assets/skill-creator.md', '../../../android/src/android/app/src/main/assets/nanomuse/skill-creator.md']) {
+      assert.equal(readFileSync(new URL(path, import.meta.url), 'utf8'), source)
+    }
   } finally {
     await ctx.fiber.dispose()
   }
