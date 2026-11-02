@@ -47,6 +47,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Bounded the desktop conversation-log cache to 64 recently used sessions.
+
 - Dated desktop memory entries using the computer's local calendar day.
 
 - **Fixed dark device authorization cards and chat action placement.** Authorization cards used the selected theme background, and user-message timestamps and Copy buttons stayed below the message without overlapping text or attachments. For [#774](https://github.com/nano-muse/nanoMuse/issues/774) and [#781](https://github.com/nano-muse/nanoMuse/issues/781).

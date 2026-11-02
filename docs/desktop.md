@@ -309,6 +309,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
+
 Dates beside entries in `MEMORY.md` use the computer's local calendar day.
 
 The development desktop smoke test imports Electron through a file URL on Windows and other platforms. Checkout paths may contain spaces, Unicode, `#` or `%`.
