@@ -16,6 +16,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Two looks at a device's screen inside one second are two pictures.** `device_screen` named both after the second they landed in, so a look-act-look check in one second overwrote the "before" picture while the model still held its path — the verification read the wrong screen. The second picture now takes the next free name (`…-2.jpg`), decided after the bytes arrive, as the browser's own screenshots have done since they learned this.
+
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
 
 - **The WeCom robot's last-frame-per-chat map is capped.** Every chat that ever wrote in kept its last inbound frame in a plain dict for the life of the process — a company-wide robot hears from thousands of chats over weeks of uptime, and only a chat's newest frame is ever asked for. The map now holds a thousand chats and gives the oldest away, exactly as the seen-message ids beside it always have; a chat whose frame fell off simply gets its reply sent plainly.
