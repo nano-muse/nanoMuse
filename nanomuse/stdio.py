@@ -71,7 +71,7 @@ _BOMS = (
 )
 
 
-def decode_output(data: bytes) -> str:
+def decode_output(data: bytes | str) -> str:
     """A program's output as text: UTF-8 if it is UTF-8, else the console's code page.
 
     UTF-8 first and strictly, so a modern tool that names its encoding stays readable on a
@@ -80,7 +80,11 @@ def decode_output(data: bytes) -> str:
     ``wsl.exe`` answers its own ``-l -q`` in UTF-16, and a file written by Notepad or by
     ``reg export`` starts with one of the other two. Bytes that fit neither are replaced
     rather than raised, because a command's output is a report and never worth a traceback.
+    Text that arrives as text is passed through as it is: a caller that decoded it its own
+    way (a test's stand-in for a command, a library that already read the pipe) has spoken.
     """
+    if isinstance(data, str):
+        return data
     for bom, encoding in _BOMS:
         if data.startswith(bom):
             return data[len(bom) :].decode(encoding, errors="replace")

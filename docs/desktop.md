@@ -8,6 +8,11 @@ plugins ([harness.md](harness.md)). Windows 10+, macOS 12+ and Linux x64; one
 installer each, nothing to install first: the harness, the nanoMuse bundle and the
 runtime for the hands are inside.
 
+Device authorization cards follow the selected light or dark appearance. In the
+chat, each user message keeps its timestamp and Copy button below its text and
+attachments, aligned to the right. Hover over the message or focus its controls
+with the keyboard to reveal Copy.
+
 | | |
 | --- | --- |
 | Windows | `nanoMuse-Desktop-<version>-win-x64.exe` (NSIS; no certificate, so SmartScreen asks for *Run anyway*) |
@@ -303,6 +308,20 @@ runtime is still not ready after 60 seconds, it reports the end of the log and s
 process before removing the check's data directories.
 
 ## Config and data
+
+If two problem reports produce screenshots within the same second, the later screenshot receives a numbered filename instead of replacing the earlier one.
+
+When a conversation upload reaches the relay but its response is lost, a retry keeps the same message IDs so other devices do not receive duplicate messages. The conversation mapping is saved before upload so this also works after a restart; if that local save fails, the upload waits for a later attempt.
+
+On Windows, stopping a coding run also asks the system to terminate its child processes, including detached helpers.
+
+A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
+
+Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
+
+The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
+
+Dates beside entries in `MEMORY.md` use the computer's local calendar day.
 
 The development desktop smoke test imports Electron through a file URL on Windows and other platforms. Checkout paths may contain spaces, Unicode, `#` or `%`.
 

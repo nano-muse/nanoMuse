@@ -10,6 +10,8 @@ leave on disk, starts their own command-line interface for a new message, and
 streams what comes back. Another device asks over the hub; the hub only carries
 the frames.
 
+On Windows, process discovery decodes command output using the console encoding when it is not UTF-8. Accented process names no longer interrupt the coding agent list.
+
 ## In the apps
 
 - **Phone**: the drawer's *Coding* row (or *Settings → Coding agents*, or the

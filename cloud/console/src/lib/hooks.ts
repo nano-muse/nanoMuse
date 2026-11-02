@@ -10,9 +10,13 @@ interface Entry {
   at: number;
   error: ApiError | null;
   promise: Promise<unknown> | null;
+  /** Which fetch this entry belongs to; only the newest fetch's answer is written. */
+  gen: number;
 }
 
 const CACHE = new Map<string, Entry>();
+// Do not reuse a generation after signing out clears the cache.
+let generation = 0;
 const listeners = new Map<string, Set<() => void>>();
 
 const notify = (url: string) => {
@@ -20,23 +24,27 @@ const notify = (url: string) => {
 };
 
 export function fetchInto(url: string, force = false): Promise<unknown> {
-  const e = CACHE.get(url) || { data: undefined, at: 0, error: null, promise: null };
+  const e = CACHE.get(url) || { data: undefined, at: 0, error: null, promise: null, gen: 0 };
   if (e.promise && !force) return e.promise;
+  const mine = ++generation;
   const p = get(url)
     .then((d) => {
-      const cur = CACHE.get(url) || e;
-      CACHE.set(url, { data: d, at: Date.now(), error: null, promise: null });
-      void cur;
-      notify(url);
+      const cur = CACHE.get(url);
+      if (cur?.gen === mine) {
+        CACHE.set(url, { data: d, at: Date.now(), error: null, promise: null, gen: mine });
+        notify(url);
+      }
       return d;
     })
     .catch((err: ApiError) => {
-      const cur = CACHE.get(url) || e;
-      CACHE.set(url, { data: cur.data, at: cur.at, error: err, promise: null });
-      notify(url);
+      const cur = CACHE.get(url);
+      if (cur?.gen === mine) {
+        CACHE.set(url, { data: cur.data, at: cur.at, error: err, promise: null, gen: mine });
+        notify(url);
+      }
       throw err;
     });
-  CACHE.set(url, { ...e, promise: p });
+  CACHE.set(url, { ...e, promise: p, gen: mine });
   notify(url);
   return p;
 }
@@ -54,6 +62,12 @@ export function invalidate(...prefixes: string[]): void {
 
 export function clearCache(): void {
   CACHE.clear();
+}
+
+/** The cache's current answer for a URL — the tests' window into the session cache. */
+export function cachedAnswer(url: string): { data: unknown; at: number; error: ApiError | null } | undefined {
+  const e = CACHE.get(url);
+  return e ? { data: e.data, at: e.at, error: e.error } : undefined;
 }
 
 export interface Query<T> {
@@ -111,15 +125,22 @@ export function useData<T>(url: string | null, opts: { poll?: number; maxAge?: n
   };
 }
 
+/** What a stored raw string reads back as: a value another page (or another era of this
+ * one) wrote. A number that no longer parses — "abc", an empty string — falls back to
+ * the initial value instead of arriving as NaN or 0. */
+export function storedValue<T extends string | number | boolean>(raw: string | null, initial: T): T {
+  if (raw === null) return initial;
+  if (typeof initial === "number") {
+    const n = Number(raw);
+    return (raw.trim() !== "" && Number.isFinite(n) ? n : initial) as T;
+  }
+  if (typeof initial === "boolean") return (raw === "1") as T;
+  return raw as T;
+}
+
 /** A value kept in localStorage. */
 export function useStored<T extends string | number | boolean>(key: string, initial: T): [T, (v: T) => void] {
-  const [v, setV] = useState<T>(() => {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return initial;
-    if (typeof initial === "number") return Number(raw) as T;
-    if (typeof initial === "boolean") return (raw === "1") as T;
-    return raw as T;
-  });
+  const [v, setV] = useState<T>(() => storedValue(localStorage.getItem(key), initial));
   const set = useCallback(
     (x: T) => {
       setV(x);
