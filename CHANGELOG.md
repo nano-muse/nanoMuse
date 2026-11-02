@@ -23,6 +23,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Kept calendar drafts with the same date and title in separate files instead of overwriting the earlier draft.
+
 - Recorded Feishu and DingTalk message-processing failures after thread handover instead of silently dropping their errors.
 
 - Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
