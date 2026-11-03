@@ -1,10 +1,11 @@
 /** What the operator can change while the relay runs (allowance, invite bonus, sign-ups),
  *  the broad pool actions, the nudges policy, and the environment read-only. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { post, put } from "../lib/api";
 import { fmt, money, usd, when } from "../lib/format";
 import { invalidate, useData } from "../lib/hooks";
+import { sameDraft } from "../lib/drafts";
 import { nameOf, useT } from "../lib/i18n";
 import type { Nudges, NudgesPolicy, Overview, RuntimeSettings, Settings } from "../lib/types";
 import { Btn, Field, Grid, KV, Note, Panel, Pill, Toggle, useDialog, useToast } from "../ui/primitives";
@@ -30,9 +31,15 @@ function Runtime({ r, reload }: { r: RuntimeSettings; reload: () => void }) {
   const [allowance, setAllowance] = useState(String(r.values.allowance_cny));
   const [bonus, setBonus] = useState(String(r.values.invite_bonus_cny));
   const [busy, setBusy] = useState("");
+  // a poll that changed nothing (a fresh object, same numbers) must not reseed
+  // what the operator is typing; a value that moved on the server still does
+  const seeded = useRef([String(r.values.allowance_cny), String(r.values.invite_bonus_cny)]);
   useEffect(() => {
-    setAllowance(String(r.values.allowance_cny));
-    setBonus(String(r.values.invite_bonus_cny));
+    const incoming = [String(r.values.allowance_cny), String(r.values.invite_bonus_cny)];
+    if (sameDraft(seeded.current, incoming)) return;
+    seeded.current = incoming;
+    setAllowance(incoming[0]);
+    setBonus(incoming[1]);
   }, [r]);
   const act = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key);
@@ -148,7 +155,10 @@ function NudgesEditor({ n, reload }: { n: Nudges; reload: () => void }) {
   const [tasks, setTasks] = useState(n.nudges.star.moments.tasks.join(", "));
   const [daysUsed, setDaysUsed] = useState(n.nudges.star.moments.days_used.join(", "));
   const [busy, setBusy] = useState(false);
+  const seeded = useRef(n.nudges);
   useEffect(() => {
+    if (sameDraft(seeded.current, n.nudges)) return;  // the 5-minute poll, unchanged
+    seeded.current = n.nudges;
     setP(n.nudges);
     setTasks(n.nudges.star.moments.tasks.join(", "));
     setDaysUsed(n.nudges.star.moments.days_used.join(", "));
