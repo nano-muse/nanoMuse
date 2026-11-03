@@ -27,6 +27,8 @@ from nanomuse.logger import logger
 
 PING_EVERY_S = 25.0
 MAX_FRAME = 16 * 1024 * 1024
+TASK_CALL_TIMEOUT_S = 15 * 60
+TASK_STOP_TIMEOUT_S = 15.0
 #: a provider or model id as `hello` may carry it: no URL, no key, no space
 _ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.:/_-]{0,79}")
 
@@ -436,30 +438,40 @@ class HubClient:
         p = _Pending(done=loop.create_future(), on_event=on_event)
         self._pending[call_id] = p
         try:
-            await self._send(
-                {"type": "call", "id": call_id, "to": to, "action": action, "args": args or {}}
-            )
             try:
-                frame = await asyncio.wait_for(p.done, timeout)
-            except TimeoutError:
-                raise HubError(
-                    "timeout", f"no answer from the device within {int(timeout)} s"
-                ) from None
-        finally:
-            self._pending.pop(call_id, None)
-            for t in list(p.tasks):
-                if not t.done():
-                    t.cancel()
-        if frame.get("type") == "error":
-            raise HubError(
-                str(frame.get("code") or "error"),
-                str(frame.get("message") or "the hub refused the call"),
-            )
-        if not frame.get("ok"):
-            raise HubError(
-                str(frame.get("error") or "failed"),
-                str(frame.get("message") or "the device could not do it"),
-            )
+                await self._send(
+                    {"type": "call", "id": call_id, "to": to, "action": action, "args": args or {}}
+                )
+                try:
+                    frame = await asyncio.wait_for(p.done, timeout)
+                except TimeoutError:
+                    raise HubError(
+                        "timeout", f"no answer from the device within {int(timeout)} s"
+                    ) from None
+                if frame.get("type") == "error":
+                    raise HubError(
+                        str(frame.get("code") or "error"),
+                        str(frame.get("message") or "the hub refused the call"),
+                    )
+                if not frame.get("ok"):
+                    raise HubError(
+                        str(frame.get("error") or "failed"),
+                        str(frame.get("message") or "the device could not do it"),
+                    )
+            finally:
+                self._pending.pop(call_id, None)
+                for t in list(p.tasks):
+                    if not t.done():
+                        t.cancel()
+        except (HubError, asyncio.CancelledError) as exc:
+            if action == "task" and (
+                isinstance(exc, asyncio.CancelledError) or exc.code == "timeout"
+            ):
+                # Both the local deadline and the relay's timeout abandon the same run.
+                # An exact call id prevents a delayed stop from ending its successor.
+                with contextlib.suppress(HubError):
+                    await self.call(to, "stop", {"call": call_id}, timeout=TASK_STOP_TIMEOUT_S)
+            raise
         body = frame.get("body")
         return body if isinstance(body, dict) else {}
 

@@ -47,11 +47,12 @@ enum NanoMuseHubTasks {
         return named.isEmpty ? "from-\(senderId.isEmpty ? "unknown" : senderId)" : named
     }
 
-    /// The run a `stop` from `senderId` would end: the one opened by `callId`, else the sender's
+    /// The run a `stop` from `senderId` would end: the one opened by `callId`, or the sender's
     /// run in `conversation` (its own per-device conversation when none is named). Only the device
     /// that asked for a task may stop it; nil when there is nothing of theirs to stop.
     static func find(senderId: String, callId: String?, conversation: String?) -> String? {
-        if let callId, !callId.isEmpty, let run = running[callId] {
+        if let callId, !callId.isEmpty {
+            guard let run = running[callId] else { return nil }
             return run.senderId == senderId ? callId : nil
         }
         let wanted = conversationKey(senderId: senderId, conversation: conversation)

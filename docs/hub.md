@@ -78,6 +78,15 @@ Two kinds of request travel over the hub:
   caller that does not ask gets each message once (Android's `nanomuse-pc task` lists every
   `text` as a step); the runtime ignores `stream` for now.
 
+  The runtime and iPhone callers wait up to 15 minutes, matching the desktop and
+  runtime task budget. A local deadline or a `timeout` from the relay makes the caller
+  send `stop {call}` for the original task, with a separate 15-second cleanup limit.
+  Runtime cancellation uses the same exact call id. Cleanup is best effort: a disconnected
+  target may not receive it, so the caller keeps the original failure and does not claim
+  the remote work stopped. The target's own deadline still applies. An explicit call id
+  that is no longer running returns `{stopped: false}`; it must not select a later task
+  in that conversation. The frame format is unchanged and older clients still work.
+
   While a task runs the target sends `event` frames whose `body.stage` tells
   the caller what to draw, so the run reads the same in the caller's chat as in
   the target's own: `tool {id, name, summary}` when a tool starts and

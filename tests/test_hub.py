@@ -437,6 +437,73 @@ def test_client_connects_calls_and_answers(relay: FakeRelay) -> None:
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize("failure", ["local", "relay", "target", "cancel"])
+@pytest.mark.parametrize("stop_answers", [True, False])
+def test_abandoned_task_stops_its_exact_call(
+    relay: FakeRelay, monkeypatch: pytest.MonkeyPatch, failure: str, stop_answers: bool
+) -> None:
+    monkeypatch.setattr("nanomuse.hub.client.TASK_STOP_TIMEOUT_S", 0.05)
+
+    def phone(frame: dict[str, Any]) -> list[dict[str, Any]]:
+        if frame["action"] == "stop":
+            return _phone_default(frame) if stop_answers else []
+        if failure == "relay":
+            return [{"type": "error", "id": frame["id"], "code": "timeout", "message": "expired"}]
+        if failure == "target":
+            return [{"type": "result", "id": frame["id"], "ok": False, "error": "timeout"}]
+        return []
+
+    relay.phone_handler = phone
+
+    async def scenario() -> None:
+        client = HubClient(hub_url(relay.base_url), "test-key", "pc-1", "Desk", actions=["info"])
+        client.start()
+        try:
+            await asyncio.wait_for(client.connected.wait(), 5)
+            task = asyncio.create_task(
+                client.call(
+                    "phone-1", "task", {"text": "work"}, timeout=0.05 if failure == "local" else 5
+                )
+            )
+            original = await asyncio.to_thread(relay.next_frame, "call")
+            if failure == "cancel":
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await asyncio.wait_for(task, 2)
+            else:
+                with pytest.raises(HubError) as exc:
+                    await asyncio.wait_for(task, 2)
+                assert exc.value.code == "timeout"
+            stop = await asyncio.to_thread(relay.next_frame, "call")
+            assert stop["to"] == original["to"]
+            assert stop["action"] == "stop" and stop["args"] == {"call": original["id"]}
+            assert stop["id"] != original["id"]
+            assert not client._pending
+            assert not relay.drain("call")
+        finally:
+            await client.stop()
+
+    asyncio.run(scenario())
+
+
+def test_non_task_timeout_does_not_stop_a_task(relay: FakeRelay) -> None:
+    relay.phone_handler = lambda _: []
+
+    async def scenario() -> None:
+        client = HubClient(hub_url(relay.base_url), "test-key", "pc-1", "Desk", actions=["info"])
+        client.start()
+        try:
+            await asyncio.wait_for(client.connected.wait(), 5)
+            with pytest.raises(HubError) as exc:
+                await client.call("phone-1", "info", timeout=0.05)
+            assert exc.value.code == "timeout"
+            assert [frame["action"] for frame in relay.drain("call")] == ["info"]
+        finally:
+            await client.stop()
+
+    asyncio.run(scenario())
+
+
 def test_client_refuses_to_hammer_on_bad_key(relay: FakeRelay) -> None:
     async def scenario() -> None:
         client = HubClient(hub_url(relay.base_url), "wrong", "pc-1", "Desk", actions=["info"])
@@ -822,6 +889,10 @@ def test_a_stopped_task_fails_with_cancelled_and_only_for_its_asker(hub_server) 
     )
     assert relay.next_frame("result")["body"] == {"stopped": False}
     assert client.get("/api/state").json()["status"]["state"] != "idle"
+    # A late stop for an old call must not fall back to a newer run in that chat.
+    relay.call_runtime("stop", {"call": "t1", "conversation": "conv-s"}, "late-stop")
+    assert relay.next_frame("result")["body"] == {"stopped": False}
+    assert client.get("/api/state").json()["status"]["state"] != "idle"
     # the asker can
     relay.call_runtime("stop", {"call": "t2"}, "s1")
     results = {f["id"]: f for f in (relay.next_frame("result"), relay.next_frame("result"))}
@@ -942,6 +1013,36 @@ def test_ask_a_device_runs_the_text_there_and_shows_its_steps(hub_server) -> Non
     again = client.post("/api/hub/ask", json={"device": "phone-1"}).json()
     assert again["thread"]["id"] == thread["id"]
     assert client.post("/api/hub/ask", json={"device": "toaster"}).status_code == 404
+
+
+@pytest.mark.parametrize("finish", ["timeout", "cancel"])
+def test_device_chat_abandonment_stops_target_and_clears_working_state(
+    hub_server, monkeypatch: pytest.MonkeyPatch, finish: str
+) -> None:
+    client, service, _llm, relay = hub_server
+    if finish == "timeout":
+        monkeypatch.setattr("nanomuse.hub.service.REMOTE_TASK_TIMEOUT_S", 0.05)
+
+    def phone(frame: dict[str, Any]) -> list[dict[str, Any]]:
+        if frame["action"] == "task":
+            return _phone_default(frame)[:1]  # An unfinished tool, no final answer.
+        return _phone_default(frame)
+
+    relay.phone_handler = phone
+    sign_in(client)
+    wait_for(lambda: client.get("/api/hub").json()["state"] == "connected")
+    response = client.post("/api/hub/ask", json={"device": "Pixel", "text": "take a while"})
+    tid = response.json()["thread"]["id"]
+    original = relay.next_frame("call")
+    if finish == "cancel":
+        assert client.post(f"/api/threads/{tid}/stop").json() == {"ok": True}
+    stop = relay.next_frame("call")
+    assert stop["action"] == "stop" and stop["args"] == {"call": original["id"]}
+    wait_for(lambda: not service.threads[tid].busy)
+    events = client.get(f"/api/threads/{tid}/events").json()["events"]
+    assert not any(event["type"] == "assistant" for event in events)
+    assert all(event["status"] == "error" for event in events if event["type"] == "tool")
+    assert not relay.drain("call")
 
 
 def test_device_chat_relays_its_approval_card_back(hub_server) -> None:

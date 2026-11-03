@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Any
 
 from nanomuse.cloud import CLOUD_KEY, CloudClient, CloudError, model_url
 from nanomuse.hub import actions
-from nanomuse.hub.client import HubClient, HubError, IncomingCall
+from nanomuse.hub.client import TASK_CALL_TIMEOUT_S, HubClient, HubError, IncomingCall
 from nanomuse.hub.profile import ProfileSync
 from nanomuse.llm import session as llm_session
 from nanomuse.logger import logger
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 TASK_TIMEOUT_S = 15 * 60
 APPROVAL_TIMEOUT_S = 180
-REMOTE_TASK_TIMEOUT_S = 10 * 60
+REMOTE_TASK_TIMEOUT_S = TASK_CALL_TIMEOUT_S
 _RISK_WORDS = {"safe": "safe", "low": "low", "moderate": "moderate", "sensitive": "sensitive"}
 # Raw actions another device may ask of this computer that the person here agrees to first
 # (once, or always for that device): what runs, reads or writes. ``info``, ``notify`` and the
@@ -752,8 +752,12 @@ class HubService:
         if call.action == "stop":
             # only the device that asked may stop its task (docs/hub.md): a `call` id must be
             # one of the sender's own, a `conversation` one the sender's tasks run in
-            tid = self._incoming.get(str(call.args.get("call") or ""))
-            if tid is None or not self._asked_by(tid, call.sender_id):
+            call_id = str(call.args.get("call") or "")
+            tid = self._incoming.get(call_id)
+            if call_id:
+                if tid is not None and not self._asked_by(tid, call.sender_id):
+                    tid = None
+            else:
                 tid = self._thread_for(call.sender_id, str(call.args.get("conversation") or ""))
             stopped = bool(tid) and self.svc.stop_thread(tid or "")
             await call.result({"stopped": stopped})
@@ -1227,8 +1231,7 @@ class HubService:
             )
         except asyncio.CancelledError:
             ui.emit({"type": "notice", "level": "info", "text": "Stopped.", "thread": tid})
-            with contextlib.suppress(HubError):
-                await self.call(device_id, "stop", {"conversation": tid}, timeout=15)
+            # HubClient stops the exact task call on cancellation and timeout.
             raise
         finally:
             for eid in tool_events.values():
