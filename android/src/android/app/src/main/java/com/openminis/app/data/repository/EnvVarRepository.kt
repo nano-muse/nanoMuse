@@ -154,7 +154,10 @@ class EnvVarRepository(private val context: Context) {
     }
 
     // nanoMuse: refresh observers after category recovery.
-    fun reloadAfterRestoreRecovery() = loadMetadata()
+    fun reloadAfterRestoreRecovery() {
+        // A rollback can restore the original absence of the metadata file.
+        if (!metadataFile.exists()) _entries.value = emptyList() else loadMetadata()
+    }
 
     private fun loadMetadata() {
         try {

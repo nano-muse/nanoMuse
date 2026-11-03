@@ -586,3 +586,5 @@ like the Python package's version does.
 ## Interrupted restore recovery {#restore-recovery}
 
 Android keeps a recovery snapshot before changing shared files, skills, memory, MCP configuration, providers or environment variables during a restore. A failed category is rolled back, and an interrupted category is reconciled before repositories open at the next launch. Recovery failures retain the snapshot and block normal startup for another attempt. Chats keep their existing merge behavior; this is not a full rollback of chat history. Recovery metadata stays outside exported data.
+
+Recovered environment-variable metadata also refreshes the running app when the original metadata file was absent.

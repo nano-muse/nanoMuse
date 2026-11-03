@@ -66,4 +66,20 @@ class RestoreRecoveryIntegrationTest {
             assertFalse(File(memory, "new").exists())
         } finally { root.deleteRecursively() }
     }
+
+    @Test fun rollbackToAbsentEnvironmentMetadataClearsAlreadyLoadedEntries() {
+        val root = Files.createTempDirectory("environment recovery").toFile()
+        try {
+            val context = context(root)
+            val repository = com.openminis.app.data.repository.EnvVarRepository(context)
+            assertTrue(AndroidRestoreRecovery.begin(context, "environment_variables"))
+            File(root, "env-vars.json").writeText("""[{"id":"partial","key":"PARTIAL","createdAt":1}]""")
+            repository.reloadAfterRestoreRecovery()
+            assertEquals(listOf("PARTIAL"), repository.entries.value.map { it.key })
+            AndroidRestoreRecovery.recover(context)
+            repository.reloadAfterRestoreRecovery()
+            assertFalse(File(root, "env-vars.json").exists())
+            assertTrue(repository.entries.value.isEmpty())
+        } finally { root.deleteRecursively() }
+    }
 }
