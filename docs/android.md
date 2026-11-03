@@ -586,3 +586,5 @@ like the Python package's version does.
 ## Unread replies {#unread-replies}
 
 A successful reply completed while its chat is not visible is marked unread in the Muse drawer and classic session list. Collapsed classic groups retain the unread signal. Opening the conversation clears it. Failed, cancelled and duplicate completions do not create unread indicators. This state is local, kept only for the current process, and independent of running and paused badges. This covers unread replies from issue #531, not its entire working-state and approval proposal.
+
+Visibility follows the resumed chat in both layouts, including a draft after its first message. Switching to another tab, covering the chat with another page, or putting the app in the background makes subsequent replies unread.

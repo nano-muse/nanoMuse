@@ -3418,8 +3418,14 @@ class ChatViewModel(
         sessionId.substringAfter("__fld__", "").substringBefore("__grp__")
             .takeIf { it.isNotEmpty() }
 
-    /** The real session ID (same as sessionId for existing sessions, generated on first message for drafts). */
+    // nanoMuse: observe draft promotion so presence follows the ID used by completion events.
+    private val nmDisplayedSessionId = MutableStateFlow(sessionId)
+    val displayedSessionId: StateFlow<String> = nmDisplayedSessionId.asStateFlow()
     internal var realSessionId: String = if (isDraft) "" else sessionId
+        set(value) {
+            field = value
+            nmDisplayedSessionId.value = value.ifEmpty { sessionId }
+        }
 
     // nanoMuse: the first conversation — scripted opening, "what should I call
     // you?", then the name chooser. Logic lives in io.github.nanomuse.onboarding;
