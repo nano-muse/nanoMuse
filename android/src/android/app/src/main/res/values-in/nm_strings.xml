@@ -1221,5 +1221,12 @@
     <string name="nm_context_compact_idle_timeout">Pemadatan berhenti setelah %1$d detik tanpa respons (%2$d panggilan model).</string>
     <string name="nm_context_compact_no_gain">Ringkasan tidak memperpendek konteks. Konten asli tetap disimpan.</string>
     <string name="nm_context_compact_incomplete">Model tidak mengembalikan ringkasan lengkap. Konteks asli tetap disimpan.</string>
+    <string name="nm_remote_ambiguous">Lebih dari satu perangkat cocok. Pilih di Akun → Perangkat.</string>
+    <string name="nm_remote_attachments">Sebutan perangkat hanya mengirim teks. Hapus lampiran sebelum mengirim.</string>
+    <string name="nm_remote_no_answer">%1$s selesai tanpa jawaban.</string>
+    <string name="nm_remote_failed">%1$s tidak menjawab: %2$s</string>
+    <string name="nm_remote_offline">%1$s sedang offline.</string>
+    <string name="nm_remote_chat_busy">Tunggu percakapan ini selesai sebelum mengirim tugas ke perangkat.</string>
+
     <string name="nm_reply_unread">Balasan belum dibaca</string>
 </resources>

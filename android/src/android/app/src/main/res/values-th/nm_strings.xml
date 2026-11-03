@@ -1221,5 +1221,12 @@
     <string name="nm_context_compact_idle_timeout">หยุดย่อบริบทหลังจากไม่มีการตอบกลับเป็นเวลา %1$d วินาที (เรียกโมเดล %2$d ครั้ง)</string>
     <string name="nm_context_compact_no_gain">สรุปไม่ได้ทำให้บริบทสั้นลง จึงเก็บเนื้อหาเดิมไว้</string>
     <string name="nm_context_compact_incomplete">โมเดลไม่ได้ส่งคืนสรุปที่สมบูรณ์ จึงเก็บบริบทเดิมไว้</string>
+    <string name="nm_remote_ambiguous">พบอุปกรณ์ที่ตรงกันมากกว่าหนึ่งเครื่อง เลือกในบัญชี → อุปกรณ์</string>
+    <string name="nm_remote_attachments">การกล่าวถึงอุปกรณ์ส่งได้เฉพาะข้อความ โปรดนำไฟล์แนบออกก่อนส่ง</string>
+    <string name="nm_remote_no_answer">%1$s ทำงานเสร็จโดยไม่มีคำตอบ</string>
+    <string name="nm_remote_failed">%1$s ไม่ตอบกลับ: %2$s</string>
+    <string name="nm_remote_offline">%1$s ออฟไลน์อยู่</string>
+    <string name="nm_remote_chat_busy">รอให้การสนทนานี้ทำงานเสร็จก่อนส่งงานไปยังอุปกรณ์</string>
+
     <string name="nm_reply_unread">คำตอบที่ยังไม่ได้อ่าน</string>
 </resources>

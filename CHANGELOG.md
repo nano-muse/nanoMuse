@@ -101,6 +101,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Android sent explicit device mentions directly through the Hub, displayed remote steps and streamed text, reused scoped approval cards, and stopped the exact remote call without starting a local model turn.
+
 - Marked successful background replies unread in both Android layouts and collapsed classic groups, cleared them when the visible conversation opened, and followed tab visibility and draft promotion.
 
 - Android listed online task-capable devices above files in the leading @ menu, showed device identity, and qualified duplicate names with their stable IDs.
