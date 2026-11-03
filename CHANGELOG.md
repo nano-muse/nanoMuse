@@ -70,6 +70,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
+
 - Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
 
 - **Added the model-neutral `skill-creator` guide to the desktop and Python runtime.** Android loaded the same packaged instructions, including on existing installs. For [#757](https://github.com/nano-muse/nanoMuse/issues/757) and [#758](https://github.com/nano-muse/nanoMuse/issues/758).

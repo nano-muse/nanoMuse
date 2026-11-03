@@ -351,6 +351,14 @@ are readable by the owner alone, as the proxy address may carry a password. *Dow
 agent data* writes its zip one file at a time, leaves out links and anything over 64 MB,
 and removes a password from the proxy address in the `desktop.json` it packs.
 
+Settings → Plugins saves the selected bundles in `profiles/nanomuse/package.json`.
+Startup preserves that list and its order, including plugins you enabled and those you
+turned off. Defaults are written only when no bundle selection has been saved: Schedule
+starts enabled, while agent teams and automatic authorization review remain optional.
+If an earlier version already reset your choices, enable the plugins you want again;
+the lost selection cannot be recovered automatically. Your existing `cordis.yml` and
+`cordis.patch.yml` are kept.
+
 ## The agent's desktop guide
 
 The preset also includes `skill-creator`, a guide for writing and checking reusable skills. Its model-neutral instructions are shared with Android and the Python runtime. Both bundled guides load only when requested and do not change approval permissions.
