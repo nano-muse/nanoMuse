@@ -158,6 +158,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // nanoMuse: startup reconciled an interrupted restore before opening the repositories.
+        io.github.nanomuse.backup.AndroidRestoreRecovery.showNotice(this)
 
         // Register the crash-share "Save to..." launcher BEFORE the
         // safe-mode early-return below — ActivityResultLauncher must be

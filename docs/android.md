@@ -583,6 +583,12 @@ like the Python package's version does.
 | `ui/cloud/` | Sign-in, the Account screen, the Devices section |
 | `res/values*/nm_strings.xml` | Every nanoMuse string in the seventeen languages the app has (English, 简体中文, 繁體中文, German, Spanish, Filipino, French, Indonesian, Japanese, Korean, Malay, Polish, Brazilian Portuguese, Romanian, Russian, Thai, Turkish); every file carries the same keys, apart from the two the English file marks `translatable="false"` (the relay address example and the product name `nanoMuse Cloud`), and a missing one falls back to English |
 
+## Interrupted restore recovery {#restore-recovery}
+
+Android keeps a recovery snapshot before changing shared files, skills, memory, MCP configuration, providers or environment variables during a restore. A failed category is rolled back, and an interrupted category is reconciled before repositories open at the next launch. Recovery failures retain the snapshot and block normal startup for another attempt. Chats keep their existing merge behavior; this is not a full rollback of chat history. Recovery metadata stays outside exported data.
+
+Recovered environment-variable metadata also refreshes the running app when the original metadata file was absent.
+
 ## Direct tasks to another device
 
 Start a message with `@Device name` to send its text directly to that device over the Hub. The local model does not spend a turn deciding how to delegate. The remote device uses its own model, tools and configuration. This is one task, not a persistent execution destination for subsequent messages.

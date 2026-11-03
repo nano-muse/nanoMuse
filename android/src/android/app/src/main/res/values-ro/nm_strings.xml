@@ -1229,6 +1229,8 @@
     <string name="nm_context_compact_idle_timeout">Comprimarea s-a oprit după %1$d secunde fără răspuns (%2$d apeluri către model).</string>
     <string name="nm_context_compact_no_gain">Rezumatul nu a redus contextul. Conținutul original a fost păstrat.</string>
     <string name="nm_context_compact_incomplete">Modelul nu a returnat un rezumat complet. Contextul original a fost păstrat.</string>
+    <string name="nm_restore_recovered">Restaurarea întreruptă a fost recuperată. Dacă recuperarea eșuează, datele se păstrează pentru o nouă încercare.</string>
+    <string name="nm_restore_recovery_failed">Recuperarea a eșuat. Datele de recuperare au fost păstrate. Repornește aplicația pentru a reîncerca.</string>
     <string name="nm_remote_ambiguous">Se potrivesc mai multe dispozitive. Alege din Cont → Dispozitive.</string>
     <string name="nm_remote_attachments">Mențiunile dispozitivelor trimit doar text. Elimină atașamentele înainte de trimitere.</string>
     <string name="nm_remote_no_answer">%1$s a terminat fără răspuns.</string>
