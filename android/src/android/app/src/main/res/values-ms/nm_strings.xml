@@ -1221,4 +1221,7 @@
     <string name="nm_context_compact_idle_timeout">Pemadatan dihentikan selepas %1$d saat tanpa respons (%2$d panggilan model).</string>
     <string name="nm_context_compact_no_gain">Ringkasan tidak memendekkan konteks. Kandungan asal dikekalkan.</string>
     <string name="nm_context_compact_incomplete">Model tidak mengembalikan ringkasan lengkap. Konteks asal dikekalkan.</string>
+    <string name="nm_backup_resume">Sambung sandaran</string>
+    <string name="nm_backup_discard">Buang sandaran terganggu</string>
+    <string name="nm_backup_resume_hint">Sandaran terganggu sedang menunggu. Sambung dengan pilihan asal dan masukkan semula kata laluan jika perlu, atau buang untuk bermula semula.</string>
 </resources>

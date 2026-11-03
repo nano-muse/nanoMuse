@@ -1191,4 +1191,7 @@
     <string name="nm_context_compact_idle_timeout">模型連續 %1$d 秒未傳回資料，已停止整理上下文（呼叫模型 %2$d 次）。</string>
     <string name="nm_context_compact_no_gain">摘要未縮短上下文，已保留原有內容。</string>
     <string name="nm_context_compact_incomplete">模型未傳回完整摘要，已保留原有上下文。</string>
+    <string name="nm_backup_resume">繼續備份</string>
+    <string name="nm_backup_discard">捨棄中斷的備份</string>
+    <string name="nm_backup_resume_hint">有一份備份尚未完成。請使用原來的選項繼續，必要時重新輸入加密密碼；也可捨棄後重新開始。</string>
 </resources>

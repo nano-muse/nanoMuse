@@ -1205,4 +1205,7 @@
     <string name="nm_context_compact_idle_timeout">Compaction stopped after %1$d seconds without a response (%2$d model calls).</string>
     <string name="nm_context_compact_no_gain">The summary did not shorten the context. The original content was kept.</string>
     <string name="nm_context_compact_incomplete">The model did not return a complete summary. The original context was kept.</string>
+    <string name="nm_backup_resume">Resume backup</string>
+    <string name="nm_backup_discard">Discard interrupted backup</string>
+    <string name="nm_backup_resume_hint">An interrupted backup is waiting. Resume with the original options and enter the encryption password again if needed, or discard it to start over.</string>
 </resources>

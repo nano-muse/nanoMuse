@@ -1226,4 +1226,7 @@
     <string name="nm_context_compact_idle_timeout">A compactação parou após %1$d segundos sem resposta (%2$d chamadas ao modelo).</string>
     <string name="nm_context_compact_no_gain">O resumo não reduziu o contexto. O conteúdo original foi mantido.</string>
     <string name="nm_context_compact_incomplete">O modelo não retornou um resumo completo. O contexto original foi mantido.</string>
+    <string name="nm_backup_resume">Retomar backup</string>
+    <string name="nm_backup_discard">Descartar backup interrompido</string>
+    <string name="nm_backup_resume_hint">Há um backup interrompido. Retome com as opções originais e digite novamente a senha se necessário, ou descarte para começar de novo.</string>
 </resources>
