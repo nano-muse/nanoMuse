@@ -1232,4 +1232,6 @@
     <string name="nm_remote_failed">%1$s não respondeu: %2$s</string>
     <string name="nm_remote_offline">%1$s está offline.</string>
     <string name="nm_remote_chat_busy">Espere esta conversa terminar antes de enviar uma tarefa a outro equipamento.</string>
+
+    <string name="nm_reply_unread">Resposta não lida</string>
 </resources>

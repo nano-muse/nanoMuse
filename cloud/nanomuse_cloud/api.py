@@ -116,6 +116,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import dataclasses
 import hashlib
 import json
 import logging
@@ -1190,7 +1191,11 @@ def create_app(
             spec = settings.unlisted_model(e.id, e.kind)
             if spec is None:
                 continue
-            pub = spec.to_public()
+            pub = dataclasses.replace(
+                spec,
+                context_length=e.context_length,
+                max_output_tokens=e.max_output_tokens,
+            ).to_public()
             pub["nanomuse"]["catalog"] = True
             pub["nanomuse"]["vision"] = e.vision
             pub["nanomuse"]["verified"] = e.verified  # the probe's word, not the name's
@@ -1214,6 +1219,11 @@ def create_app(
         if m is None:
             more = " on the menu; add ?kind=chat|image|video to ask for one beyond it" if cloud.any_model(caller) else ""
             raise CloudError(404, "model_not_offered", f"nanoMuse Cloud does not offer {model_id!r}{more}")
+        if not m.listed and settings.catalog_enabled:
+            entries = await catalog.get(app.state.http, settings.upstream_base, settings.upstream_key)
+            found = next((entry for entry in entries if entry.id == m.id), None)
+            if found is not None:
+                m = dataclasses.replace(m, context_length=found.context_length, max_output_tokens=found.max_output_tokens)
         return m.to_public()
 
     # -- chat -----------------------------------------------------------------------------

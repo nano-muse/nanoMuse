@@ -199,14 +199,14 @@ object OpenAIModelsApi {
                     idLower.contains("codex")
 
                 parsed.add(
-                    LLMModel(
+                    io.github.nanomuse.cloud.ModelCapacity.apply(LLMModel(
                         id = id,
                         displayName = displayName,
                         provider = if (isCustomBase) "Custom" else "OpenAI",
                         inputModalities = inputModalities,
                         outputModalities = outputModalities,
                         supportsReasoning = if (knownReasoning) true else null,
-                    )
+                    ), obj) // nanoMuse: retain capacities disclosed by the serving endpoint.
                 )
             }
             if (parsed.isEmpty()) return@withContext fallback

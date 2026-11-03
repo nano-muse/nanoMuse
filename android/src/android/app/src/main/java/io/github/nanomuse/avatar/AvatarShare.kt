@@ -132,8 +132,7 @@ object AvatarShare {
     }
 
     private fun faceBitmap(context: Context, mood: AgentMood): Bitmap? {
-        val f = if (mood == AgentMood.IDLE) AvatarStore.baseFile() else AvatarStore.moodFile(mood)
-        val custom = AvatarStore.decodeBitmap(if (f.exists()) f else AvatarStore.baseFile())
+        val custom = AvatarStore.bitmap(mood)
         if (custom != null) return custom
         // No custom face: the built-in character at this mood.
         return runCatching {

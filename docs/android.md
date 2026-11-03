@@ -592,3 +592,15 @@ The chat shows the device name, tool steps and response text while they arrive. 
 An offline or ambiguous destination keeps the message in the composer. Device tasks accept text only: remove attachments and pasted-file content before sending. Wait for an active turn to finish before sending another device task; ordinary local messages retain the existing queue. A failed call can have completed earlier steps, so a failure or missing answer is shown explicitly. The final text and device attribution are saved once; live remote tool capsules are not reconstructed after reopening the chat.
 
 Android device tasks wait up to fifteen minutes, matching the relay task deadline. A caller timeout or cancellation sends a best-effort stop for that exact call, with at most fifteen seconds for cleanup. An expired call identifier cannot stop a later task in the same conversation.
+
+## Unread replies {#unread-replies}
+
+A successful reply completed while its chat is not visible is marked unread in the Muse drawer and classic session list. Collapsed classic groups retain the unread signal. Opening the conversation clears it. Failed, cancelled and duplicate completions do not create unread indicators. This state is local, kept only for the current process, and independent of running and paused badges. This covers unread replies from issue #531, not its entire working-state and approval proposal.
+
+Visibility follows the resumed chat in both layouts, including a draft after its first message. Switching to another tab, covering the chat with another page, or putting the app in the background makes subsequent replies unread.
+
+## Emoji avatars from another device
+
+An emoji avatar chosen on desktop or web also appears on Android, with its background colour. The phone keeps the emoji beside the drawn avatar, so it survives a restart and follows the existing account isolation. An empty emoji uses ✨ and an invalid colour uses blue (`#0064d4`).
+
+Drawn faces and personal clips retain their existing priority. Renaming the agent or changing connectors leaves an unchanged remote appearance alone. Resetting the avatar explicitly returns to the dragon. Choosing an emoji on Android is not part of this change.

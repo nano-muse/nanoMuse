@@ -1231,4 +1231,6 @@
     <string name="nm_remote_failed">%1$s hat nicht geantwortet: %2$s</string>
     <string name="nm_remote_offline">%1$s ist offline.</string>
     <string name="nm_remote_chat_busy">Warte, bis diese Unterhaltung fertig ist, bevor du eine Geräteaufgabe sendest.</string>
+
+    <string name="nm_reply_unread">Ungelesene Antwort</string>
 </resources>

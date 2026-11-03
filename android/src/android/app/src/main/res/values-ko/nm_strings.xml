@@ -1227,4 +1227,6 @@
     <string name="nm_remote_failed">%1$s에서 응답하지 않았습니다: %2$s</string>
     <string name="nm_remote_offline">%1$s 기기가 오프라인입니다.</string>
     <string name="nm_remote_chat_busy">이 대화의 처리가 끝난 후 기기에 작업을 보내세요.</string>
+
+    <string name="nm_reply_unread">읽지 않은 답변</string>
 </resources>

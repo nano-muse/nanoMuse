@@ -1231,4 +1231,6 @@
     <string name="nm_remote_failed">%1$s yanıt vermedi: %2$s</string>
     <string name="nm_remote_offline">%1$s çevrimdışı.</string>
     <string name="nm_remote_chat_busy">Bir cihaza görev göndermeden önce bu konuşmanın bitmesini bekleyin.</string>
+
+    <string name="nm_reply_unread">Okunmamış yanıt</string>
 </resources>

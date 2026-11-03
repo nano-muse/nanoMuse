@@ -1231,4 +1231,6 @@
     <string name="nm_remote_failed">Hindi sumagot ang %1$s: %2$s</string>
     <string name="nm_remote_offline">Offline ang %1$s.</string>
     <string name="nm_remote_chat_busy">Hintaying matapos ang usapang ito bago magpadala ng gawain sa device.</string>
+
+    <string name="nm_reply_unread">Hindi pa nababasang sagot</string>
 </resources>

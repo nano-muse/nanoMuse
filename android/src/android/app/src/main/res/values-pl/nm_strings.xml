@@ -1239,4 +1239,6 @@
     <string name="nm_remote_failed">%1$s nie odpowiedziało: %2$s</string>
     <string name="nm_remote_offline">%1$s jest offline.</string>
     <string name="nm_remote_chat_busy">Poczekaj na zakończenie tej rozmowy przed wysłaniem zadania do urządzenia.</string>
+
+    <string name="nm_reply_unread">Nieprzeczytana odpowiedź</string>
 </resources>

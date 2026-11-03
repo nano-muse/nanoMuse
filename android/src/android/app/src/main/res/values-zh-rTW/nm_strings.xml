@@ -1197,4 +1197,6 @@
     <string name="nm_remote_failed">%1$s 未回覆：%2$s</string>
     <string name="nm_remote_offline">%1$s 目前離線。</string>
     <string name="nm_remote_chat_busy">請等本次對話執行完畢後再傳送裝置任務。</string>
+
+    <string name="nm_reply_unread">未讀回覆</string>
 </resources>

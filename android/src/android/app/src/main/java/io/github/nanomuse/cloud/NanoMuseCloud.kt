@@ -991,6 +991,19 @@ object NanoMuseCloud {
     private suspend fun syncModels(context: Context, apiKey: String) {
         val reply = call(context, "GET", "/v1/models", null, token = apiKey)
         rememberModels(context, reply.optJSONArray("data"), stamp = true)
+        val models = reply.optJSONArray("data") ?: return
+        val inst = instance(context) ?: return
+        val repository = repo(context) ?: return
+        val previous = repository.config.value.modelEntries.filter { it.providerInstanceId == inst.id }
+            .associate { it.baseModel.id to it.baseModel }
+        val parsed = (0 until models.length()).mapNotNull { index ->
+            val fresh = models.optJSONObject(index)?.let(::modelFromRelay) ?: return@mapNotNull null
+            // Refresh these limits without discarding metadata learned by normal discovery.
+            previous[fresh.id]?.copy(contextWindow = fresh.contextWindow,
+                maxOutputTokens = fresh.maxOutputTokens) ?: fresh
+        }
+        if (parsed.isNotEmpty()) repository.replaceEntries(inst.id,
+            com.openminis.app.provider.ModelsDevApi.enrichModels(parsed))
     }
 
     private fun rememberModels(context: Context, models: JSONArray?, stamp: Boolean) {
@@ -1078,13 +1091,13 @@ object NanoMuseCloud {
             val arr = arch?.optJSONArray(key) ?: return null
             return (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }.takeIf { it.isNotEmpty() }
         }
-        return LLMModel(
+        return ModelCapacity.apply(LLMModel(
             id = id,
             displayName = item.optString("name").ifBlank { id },
             provider = LABEL,
             inputModalities = mods("input_modalities"),
             outputModalities = mods("output_modalities"),
-        )
+        ), item)
     }
 
     private fun saveAccount(context: Context, reply: JSONObject) {

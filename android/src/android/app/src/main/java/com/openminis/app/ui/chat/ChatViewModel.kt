@@ -1700,8 +1700,9 @@ class ChatViewModel(
         return if (groupLimit != null) minOf(window, groupLimit) else window
     }
 
+    // nanoMuse: the usage sheet follows refreshed endpoint metadata and live overrides.
     val currentModelMaxOutputTokens: Int?
-        get() = currentModel?.maxOutputTokens
+        get() = (currentProvider?.let(::nmResolvedModel) ?: currentModel)?.maxOutputTokens
 
     // ── Session token usage (iOS parity: TokenUsageSheet data) ─────────────
 
@@ -3418,8 +3419,14 @@ class ChatViewModel(
         sessionId.substringAfter("__fld__", "").substringBefore("__grp__")
             .takeIf { it.isNotEmpty() }
 
-    /** The real session ID (same as sessionId for existing sessions, generated on first message for drafts). */
+    // nanoMuse: observe draft promotion so presence follows the ID used by completion events.
+    private val nmDisplayedSessionId = MutableStateFlow(sessionId)
+    val displayedSessionId: StateFlow<String> = nmDisplayedSessionId.asStateFlow()
     internal var realSessionId: String = if (isDraft) "" else sessionId
+        set(value) {
+            field = value
+            nmDisplayedSessionId.value = value.ifEmpty { sessionId }
+        }
 
     // nanoMuse: the first conversation — scripted opening, "what should I call
     // you?", then the name chooser. Logic lives in io.github.nanomuse.onboarding;
@@ -5664,8 +5671,8 @@ class ChatViewModel(
                     // non-null excerpt. Reading _messages here is safe:
                     // we're in the finally block of the agent loop and
                     // the stream has already flushed its last delta.
-                    publishOverlayReplyExcerpt(activeSessionId)
-                    SessionActivityTracker.setInactive(activeSessionId)
+
+                    finishTrackedReply(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
                     AppLogger.info(TAG_STREAM, "$label streamJob FINALLY exit")
                 }
@@ -7049,8 +7056,8 @@ class ChatViewModel(
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "send streamJob FINALLY exit")
                     }
@@ -7407,8 +7414,8 @@ class ChatViewModel(
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "retryLast streamJob FINALLY exit")
                     }
@@ -11650,6 +11657,15 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }?.content
         SessionActivityTracker.publishLastReply(sessionId, text)
     }
+    // nanoMuse: every stream path shares completion classification before publishing its badge.
+    private suspend fun finishTrackedReply(id: String) {
+        if (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isCancelled == true) {
+            SessionActivityTracker.markReplyIncomplete(id)
+        }
+        publishOverlayReplyExcerpt(id)
+        SessionActivityTracker.setInactive(id)
+    }
+
 
     fun cancelStream() {
         // nanoMuse: Stop belongs to the remote call; no local shell was started.
@@ -11673,10 +11689,13 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // surface any reply we already streamed + tag outcome as
         // Cancelled so the overlay's glyph reflects the actual end
         // state (⊘) instead of carrying over the prior tool's outcome.
+        // nanoMuse: cancellation must be recorded before the immediate tracker teardown.
+        SessionActivityTracker.markReplyIncomplete(activeSessionId)
         publishOverlayReplyExcerpt(activeSessionId)
         SessionActivityTracker.clearToolRunning(com.openminis.app.service.ToolOutcome.Cancelled)
         SessionActivityTracker.setInactive(activeSessionId)
         if (isDraft && realSessionId.isNotEmpty() && activeSessionId != sessionId) {
+            SessionActivityTracker.markReplyIncomplete(sessionId)
             SessionActivityTracker.setInactive(sessionId)
         }
         // Stop whichever shell the agent loop is actually dispatching against.
@@ -11805,6 +11824,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         AppLogger.error(TAG_STREAM, "resumeQueueAfterCancel drain EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "Queued drain error (resumeQueueAfterCancel)", e)
                         setInlineError(e.message ?: "Unknown error")
+                        // nanoMuse: a failed resumed run is not a new unread answer.
+                        SessionActivityTracker.markReplyIncomplete(activeSessionId)
                     } finally {
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY enter")
                         // [T-android-overlay-reply-status-34599] Surface
@@ -11814,8 +11835,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY exit")
                     }
@@ -12092,6 +12112,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         AppLogger.error(TAG_STREAM, "resume runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "Agent loop error (resume)", e)
                         setInlineError(e.message ?: "Unknown error")
+                        // nanoMuse: a failed resumed run is not a new unread answer.
+                        SessionActivityTracker.markReplyIncomplete(activeSessionId)
                     } finally {
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY enter")
                         // [T-android-overlay-reply-status-34599] Surface
@@ -12101,8 +12123,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY exit")
                     }

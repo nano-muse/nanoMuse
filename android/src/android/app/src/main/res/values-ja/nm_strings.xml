@@ -1227,4 +1227,6 @@
     <string name="nm_remote_failed">%1$s から応答がありません：%2$s</string>
     <string name="nm_remote_offline">%1$s はオフラインです。</string>
     <string name="nm_remote_chat_busy">この会話の処理が終わってからデバイスにタスクを送信してください。</string>
+
+    <string name="nm_reply_unread">未読の返信</string>
 </resources>

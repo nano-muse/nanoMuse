@@ -1227,4 +1227,6 @@
     <string name="nm_remote_failed">%1$s tidak menjawab: %2$s</string>
     <string name="nm_remote_offline">%1$s sedang offline.</string>
     <string name="nm_remote_chat_busy">Tunggu percakapan ini selesai sebelum mengirim tugas ke perangkat.</string>
+
+    <string name="nm_reply_unread">Balasan belum dibaca</string>
 </resources>

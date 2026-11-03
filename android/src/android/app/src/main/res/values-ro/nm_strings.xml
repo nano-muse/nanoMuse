@@ -1235,4 +1235,6 @@
     <string name="nm_remote_failed">%1$s nu a răspuns: %2$s</string>
     <string name="nm_remote_offline">%1$s este offline.</string>
     <string name="nm_remote_chat_busy">Așteaptă încheierea acestei conversații înainte să trimiți o sarcină unui dispozitiv.</string>
+
+    <string name="nm_reply_unread">Răspuns necitit</string>
 </resources>

@@ -1239,4 +1239,6 @@
     <string name="nm_remote_failed">%1$s не ответило: %2$s</string>
     <string name="nm_remote_offline">%1$s не в сети.</string>
     <string name="nm_remote_chat_busy">Дождитесь завершения этой беседы перед отправкой задачи устройству.</string>
+
+    <string name="nm_reply_unread">Непрочитанный ответ</string>
 </resources>
