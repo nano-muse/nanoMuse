@@ -22,6 +22,7 @@ class RemoteChatBridge(
         val text: String
         val blocks: List<AssistantBlock>
         val failed: Boolean
+        val stopped: Boolean get() = false
         suspend fun run(sessionId: String, update: () -> Unit)
         fun stop()
     }
@@ -33,6 +34,8 @@ class RemoteChatBridge(
         fun restoreDraft(text: String)
         suspend fun session(): String
         suspend fun user(sessionId: String, text: String)
+        fun started(sessionId: String) {}
+        fun ended(sessionId: String, completed: Boolean) {}
         fun show(id: String, task: Task)
         suspend fun finish(sessionId: String, id: String, task: Task)
         fun afterTurn()
@@ -64,12 +67,15 @@ class RemoteChatBridge(
         run.job = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             var sessionId: String? = null
             var userShown = false
+            var taskReturned = false
             try {
                 sessionId = host.session()
                 host.user(sessionId, text)
                 userShown = true
+                host.started(sessionId)
                 host.show(id, run.task)
                 run.task.run(sessionId) { if (active === run) host.show(id, run.task) }
+                taskReturned = true
             } catch (e: CancellationException) {
                 run.task.stop()
                 throw e
@@ -77,12 +83,19 @@ class RemoteChatBridge(
                 host.error(Issue.FAILED, route.device.name)
             } finally {
                 withContext(NonCancellable) {
+                    var saved = false
                     try {
-                        if (userShown && sessionId != null) host.finish(sessionId, id, run.task)
+                        if (userShown && sessionId != null) {
+                            host.finish(sessionId, id, run.task)
+                            saved = true
+                        }
                         else host.restoreDraft(text)
                     } catch (_: Exception) {
                         host.error(Issue.FAILED, route.device.name)
                     } finally {
+                        if (userShown && sessionId != null) {
+                            host.ended(sessionId, saved && taskReturned && !run.task.failed && !run.task.stopped)
+                        }
                         if (active === run) {
                             active = null
                             host.setBusy(false)

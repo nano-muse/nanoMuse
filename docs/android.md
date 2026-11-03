@@ -604,3 +604,5 @@ Visibility follows the resumed chat in both layouts, including a draft after its
 An emoji avatar chosen on desktop or web also appears on Android, with its background colour. The phone keeps the emoji beside the drawn avatar, so it survives a restart and follows the existing account isolation. An empty emoji uses ✨ and an invalid colour uses blue (`#0064d4`).
 
 Drawn faces and personal clips retain their existing priority. Renaming the agent or changing connectors leaves an unchanged remote appearance alone. Resetting the avatar explicitly returns to the dragon. Choosing an emoji on Android is not part of this change.
+
+Remote tasks use the same foreground-service tracking as local replies. A successful reply completed away from its conversation is marked unread; cancellation, failures and unsaved replies are not.

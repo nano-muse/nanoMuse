@@ -6311,6 +6311,14 @@ class ChatViewModel(
             override fun restoreDraft(text: String) { if (_inputText.value.isEmpty()) _inputText.value = text }
             override suspend fun session(): String = ensureSession()
             override suspend fun user(sessionId: String, text: String) = nmAppendUserLine(sessionId, text)
+            override fun started(sessionId: String) {
+                SessionActivityTracker.setActive(sessionId) { nmRemoteBridge.cancel() }
+            }
+            override fun ended(sessionId: String, completed: Boolean) {
+                if (!completed) SessionActivityTracker.markReplyIncomplete(sessionId)
+                publishOverlayReplyExcerpt(sessionId)
+                SessionActivityTracker.setInactive(sessionId)
+            }
             override fun show(id: String, task: io.github.nanomuse.sync.RemoteChatBridge.Task) {
                 val message = ChatMessage(id = "nm_remote_$id", role = "assistant", content = task.text,
                     toolBlocks = task.blocks, isStreaming = true, isAwaitingModelResponse = task.blocks.size <= 1)

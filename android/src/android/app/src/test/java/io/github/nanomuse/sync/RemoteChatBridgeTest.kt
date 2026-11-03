@@ -17,8 +17,11 @@ class RemoteChatBridgeTest {
         var draft = "@Desk hello"
         var userCount = 0
         var saved = 0
+        var failSave = false
         var updates = 0
         var ended = 0
+        var tracked = 0
+        val completions = mutableListOf<Boolean>()
         val errors = mutableListOf<RemoteChatBridge.Issue>()
         override fun setBusy(value: Boolean) { running = value }
         override fun error(issue: RemoteChatBridge.Issue, device: String) { errors += issue }
@@ -26,14 +29,20 @@ class RemoteChatBridgeTest {
         override fun restoreDraft(text: String) { draft = text }
         override suspend fun session() = "session"
         override suspend fun user(sessionId: String, text: String) { userCount++ }
+        override fun started(sessionId: String) { tracked++ }
+        override fun ended(sessionId: String, completed: Boolean) { tracked--; completions += completed }
         override fun show(id: String, task: RemoteChatBridge.Task) { updates++ }
-        override suspend fun finish(sessionId: String, id: String, task: RemoteChatBridge.Task) { saved++ }
+        override suspend fun finish(sessionId: String, id: String, task: RemoteChatBridge.Task) {
+            check(!failSave) { "storage unavailable" }
+            saved++
+        }
         override fun afterTurn() { ended++ }
     }
     private class Task(private val wait: Boolean = false) : RemoteChatBridge.Task {
         override val text = "remote answer"
         override val blocks = emptyList<AssistantBlock>()
         override val failed = false
+        override var stopped = false
         var stops = 0
         var lateUpdate: (() -> Unit)? = null
         override suspend fun run(sessionId: String, update: () -> Unit) {
@@ -41,7 +50,7 @@ class RemoteChatBridgeTest {
             update()
             if (wait) awaitCancellation()
         }
-        override fun stop() { stops++ }
+        override fun stop() { stops++; stopped = true }
     }
 
     @Test fun `direct routing records one user and one answer and never creates a local task`() = runTest {
@@ -59,6 +68,8 @@ class RemoteChatBridgeTest {
         assertEquals(1, host.userCount)
         assertEquals(1, host.saved)
         assertEquals(1, host.ended)
+        assertEquals(listOf(true), host.completions)
+        assertEquals(0, host.tracked)
         assertFalse(host.busy)
         val updates = host.updates
         task.lateUpdate!!()
@@ -82,10 +93,24 @@ class RemoteChatBridgeTest {
         val task = Task(wait = true)
         val bridge = RemoteChatBridge(this, host) { _, _, _ -> task }
         bridge.send("@Desk hello", listOf(device), false, false)
+        assertEquals(1, host.tracked)
         assertTrue(bridge.cancel())
         runCurrent()
         assertEquals(1, host.saved)
+        assertEquals(listOf(false), host.completions)
+        assertEquals(0, host.tracked)
         assertFalse(host.busy)
         assertFalse(bridge.cancel())
+    }
+
+    @Test fun `failed persistence releases tracking without marking an answer unread`() = runTest {
+        val host = Host().apply { failSave = true }
+        val bridge = RemoteChatBridge(this, host) { _, _, _ -> Task() }
+        bridge.send("@Desk hello", listOf(device), false, false)
+        runCurrent()
+        assertEquals(0, host.saved)
+        assertEquals(listOf(false), host.completions)
+        assertEquals(0, host.tracked)
+        assertFalse(host.busy)
     }
 }

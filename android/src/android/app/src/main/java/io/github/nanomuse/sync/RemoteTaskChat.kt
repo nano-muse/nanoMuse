@@ -20,6 +20,8 @@ class RemoteTaskChat(private val context: Context, private val device: Device, t
     private var ended = false
     override var failed = false
         private set
+    override var stopped = false
+        private set
 
     override val text: String get() = context.getString(R.string.nm_sync_from, device.name) + "\n\n" + reply.text
     override val blocks: List<AssistantBlock> get() = listOf(AssistantBlock(
@@ -27,6 +29,7 @@ class RemoteTaskChat(private val context: Context, private val device: Device, t
     )) + reply.blocks
 
     override fun stop() {
+        stopped = true
         reply.finish(context.getString(R.string.nm_coding_stopped), stopped = true)
         ended = true
     }
