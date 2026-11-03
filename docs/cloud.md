@@ -1,5 +1,7 @@
 # nanoMuse Cloud
 
+Changing an Activity filter discards pending responses from the previous filter. Automatic refresh pauses while older event pages are being read, so it cannot discard a pending or already loaded More page.
+
 The "start now" path: sign up with a phone number (mainland China; the code comes by SMS)
 or an e-mail address, get a free allowance, and use nanoMuse without an API key of your own.
 Bringing your own key still works exactly as before: this is one more

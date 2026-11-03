@@ -36,28 +36,33 @@ export function Activity({ days }: PageProps) {
   // a page asked for under an older filter (or the poll racing a "More") must not
   // land under the newer list, nor clear its loading flag
   const requests = useRef(new LatestRequest());
+  const readingHistory = useRef(false);
   const load = useCallback(
-    (before: number) => requests.current.run(
-      () => get<{ events: EventRow[] }>(`/v1/admin/events${qs({ limit: 200, kind, before })}`),
-      {
-        start: () => { setLoading(true); setError(""); },
-        success: (r) => {
-          setEvents((xs) => (before ? [...xs, ...r.events] : r.events));
-          setDone(r.events.length < 200);
+    (before: number) => {
+      if (before) readingHistory.current = true;
+      return requests.current.run(
+        () => get<{ events: EventRow[] }>(`/v1/admin/events${qs({ limit: 200, kind, before })}`),
+        {
+          start: () => { setLoading(true); setError(""); },
+          success: (r) => {
+            setEvents((xs) => (before ? [...xs, ...r.events] : r.events));
+            setDone(r.events.length < 200);
+          },
+          error: (e) => setError(e instanceof Error ? e.message : String(e)),
+          finish: () => setLoading(false),
         },
-        error: (e) => setError(e instanceof Error ? e.message : String(e)),
-        finish: () => setLoading(false),
-      },
-    ),
+      );
+    },
     [kind],
   );
   useEffect(() => {
     const pending = requests.current;
     setEvents([]);
     setDone(false);
+    readingHistory.current = false;
     void load(0);
     const id = setInterval(() => {
-      if (document.visibilityState === "visible") void load(0);
+      if (document.visibilityState === "visible" && !readingHistory.current) void load(0);
     }, 30_000);
     return () => {
       clearInterval(id);
