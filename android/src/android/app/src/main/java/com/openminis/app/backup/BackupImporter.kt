@@ -132,6 +132,11 @@ class BackupImporter(
         onProgress: ((String) -> Unit)?,
         onCount: ((Progress) -> Unit)?,
     ): Report {
+        // nanoMuse: recover before touching another category.
+        val recovered = io.github.nanomuse.backup.AndroidRestoreRecovery.recover(context)
+        app?.providerRepositoryOrNull?.awaitConfigLoaded()
+        if ("providers" in recovered) app?.providerRepositoryOrNull?.reloadAfterRestoreRecovery()
+        if ("environment_variables" in recovered) app?.envVarRepository?.reloadAfterRestoreRecovery()
         val started = System.currentTimeMillis()
         // iOS zips through NSFileCoordinator, which wraps the tree in an outer
         // folder, so the real root may be one level down.
@@ -203,6 +208,8 @@ class BackupImporter(
                 val report0: (Int) -> Unit = { done ->
                     onCount?.invoke(Progress(category.key, done, total))
                 }
+                // nanoMuse: snapshot before the category writes.
+                val protected = io.github.nanomuse.backup.AndroidRestoreRecovery.begin(context, category.key)
                 val categoryReport = try {
                     when (category) {
                         BackupCategory.CHATS -> importChats(work, fileIndex, report0)
@@ -217,6 +224,14 @@ class BackupImporter(
                 } catch (e: Exception) {
                     AppLogger.error(TAG, "[Restore] category ${category.key} failed: ${e.message}")
                     CategoryReport(category.key, failed = e.message ?: e.toString())
+                }
+                // nanoMuse: preserve successful categories, recover a failed category.
+                if (protected) {
+                    if (categoryReport?.failed != null) {
+                        io.github.nanomuse.backup.AndroidRestoreRecovery.recover(context)
+                        if (category == BackupCategory.PROVIDERS) app?.providerRepositoryOrNull?.reloadAfterRestoreRecovery()
+                        if (category == BackupCategory.ENVIRONMENT_VARIABLES) app?.envVarRepository?.reloadAfterRestoreRecovery()
+                    } else io.github.nanomuse.backup.AndroidRestoreRecovery.complete(context, category.key)
                 }
                 categoryReport?.let {
                     report.categories.add(it)

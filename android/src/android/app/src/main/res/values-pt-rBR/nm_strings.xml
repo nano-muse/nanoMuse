@@ -1226,6 +1226,16 @@
     <string name="nm_context_compact_idle_timeout">A compactação parou após %1$d segundos sem resposta (%2$d chamadas ao modelo).</string>
     <string name="nm_context_compact_no_gain">O resumo não reduziu o contexto. O conteúdo original foi mantido.</string>
     <string name="nm_context_compact_incomplete">O modelo não retornou um resumo completo. O contexto original foi mantido.</string>
+    <string name="nm_remote_ambiguous">Mais de um equipamento corresponde. Escolha em Conta → Dispositivos.</string>
+    <string name="nm_remote_attachments">Menções a equipamentos enviam apenas texto. Remova os anexos antes de enviar.</string>
+    <string name="nm_remote_no_answer">%1$s terminou sem responder.</string>
+    <string name="nm_remote_failed">%1$s não respondeu: %2$s</string>
+    <string name="nm_remote_offline">%1$s está offline.</string>
+    <string name="nm_remote_chat_busy">Espere esta conversa terminar antes de enviar uma tarefa a outro equipamento.</string>
+
+    <string name="nm_reply_unread">Resposta não lida</string>
+    <string name="nm_restore_recovered">A restauração interrompida foi recuperada. Se a recuperação falhar, os dados de recuperação serão mantidos para outra tentativa.</string>
+    <string name="nm_restore_recovery_failed">A recuperação falhou. Os dados de recuperação foram mantidos. Reinicie o aplicativo para tentar novamente.</string>
     <string name="nm_backup_resume">Retomar backup</string>
     <string name="nm_backup_discard">Descartar backup interrompido</string>
     <string name="nm_backup_resume_hint">Há um backup interrompido. Retome com as opções originais e digite novamente a senha se necessário, ou descarte para começar de novo.</string>

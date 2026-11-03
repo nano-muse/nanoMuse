@@ -1233,6 +1233,16 @@
     <string name="nm_context_compact_idle_timeout">Kompresja została zatrzymana po %1$d sekundach bez odpowiedzi (%2$d wywołań modelu).</string>
     <string name="nm_context_compact_no_gain">Podsumowanie nie skróciło kontekstu. Zachowano oryginalną treść.</string>
     <string name="nm_context_compact_incomplete">Model nie zwrócił pełnego podsumowania. Zachowano oryginalny kontekst.</string>
+    <string name="nm_remote_ambiguous">Pasuje więcej niż jedno urządzenie. Wybierz w Konto → Urządzenia.</string>
+    <string name="nm_remote_attachments">Wzmianki o urządzeniach wysyłają tylko tekst. Usuń załączniki przed wysłaniem.</string>
+    <string name="nm_remote_no_answer">%1$s zakończyło pracę bez odpowiedzi.</string>
+    <string name="nm_remote_failed">%1$s nie odpowiedziało: %2$s</string>
+    <string name="nm_remote_offline">%1$s jest offline.</string>
+    <string name="nm_remote_chat_busy">Poczekaj na zakończenie tej rozmowy przed wysłaniem zadania do urządzenia.</string>
+
+    <string name="nm_reply_unread">Nieprzeczytana odpowiedź</string>
+    <string name="nm_restore_recovered">Odzyskano stan po przerwanym przywracaniu. W razie błędu dane odzyskiwania pozostają do kolejnej próby.</string>
+    <string name="nm_restore_recovery_failed">Odzyskiwanie nie powiodło się. Dane odzyskiwania zachowano. Uruchom aplikację ponownie, aby spróbować jeszcze raz.</string>
     <string name="nm_backup_resume">Wznów kopię</string>
     <string name="nm_backup_discard">Odrzuć przerwaną kopię</string>
     <string name="nm_backup_resume_hint">Przerwana kopia czeka. Wznów z pierwotnymi opcjami i ponownie podaj hasło, jeśli jest potrzebne, albo odrzuć i zacznij od nowa.</string>
