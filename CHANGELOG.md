@@ -57,6 +57,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **A provider answer that started before a sign-out no longer repopulates the cache after it.** Signing out invalidates the loaded provider view, but an `/api/providers` request already in flight kept its `then` attached, and when it landed it wrote the signed-out view back into the cache for every later reader until a forced reload. Each load now carries the generation it started under, and an answer whose generation was invalidated lands for its caller without repopulating the cache.
+
 ### Desktop
 
 - Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
