@@ -23,6 +23,8 @@ import com.openminis.app.R
 import io.github.nanomuse.guard.AppAccess
 import io.github.nanomuse.guard.AccessAuthentication
 import io.github.nanomuse.guard.DeviceCredential
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.launch
 
 fun Context.accessActivity(): Activity? = when (this) {
     is Activity -> this
@@ -34,14 +36,23 @@ fun Context.accessActivity(): Activity? = when (this) {
 fun rememberAccessAuthenticator(): (String, (Boolean) -> Unit) -> Unit {
     val context = LocalContext.current
     val activity = context.accessActivity()
+    val owner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    fun deliver(success: Boolean, callback: (Boolean) -> Unit) {
+        scope.launch {
+            io.github.nanomuse.guard.awaitNativeResume(owner.lifecycle.currentStateFlow)
+            callback(success)
+        }
+    }
     var pending by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        pending?.invoke(result.resultCode == Activity.RESULT_OK)
+        val callback = pending
         pending = null
+        if (callback != null) deliver(result.resultCode == Activity.RESULT_OK, callback)
     }
     return { title, callback ->
         if (activity == null || !AccessAuthentication.available(context) || pending != null) callback(false)
-        else if (DeviceCredential.promptsItself()) AccessAuthentication.confirm(activity, title, callback)
+        else if (DeviceCredential.promptsItself()) AccessAuthentication.confirm(activity, title) { success -> deliver(success, callback) }
         else {
             val intent = DeviceCredential.keyguardIntent(context, title, title)
             if (intent == null) callback(false)

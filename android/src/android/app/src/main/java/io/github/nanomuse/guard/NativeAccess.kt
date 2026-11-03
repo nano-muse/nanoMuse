@@ -15,8 +15,12 @@ import kotlinx.coroutines.launch
 internal fun watchNativeAccess(locked: StateFlow<Boolean>, scope: CoroutineScope, close: () -> Unit) =
     scope.launch(start = CoroutineStart.UNDISPATCHED) { locked.first { it }; close() }
 
-internal suspend fun awaitNativeAccess(resumed: StateFlow<Lifecycle.State>, locked: StateFlow<Boolean>) {
+internal suspend fun awaitNativeResume(resumed: StateFlow<Lifecycle.State>) {
     resumed.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+}
+
+internal suspend fun awaitNativeAccess(resumed: StateFlow<Lifecycle.State>, locked: StateFlow<Boolean>) {
+    awaitNativeResume(resumed)
     locked.first { !it }
 }
 
