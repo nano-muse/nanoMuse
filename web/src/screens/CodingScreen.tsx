@@ -460,10 +460,20 @@ function NewChatSheet({ agent: initial, agents, device, onClose, onStarted }: { 
   const [busy, setBusy] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => {
+    // the agent picker re-runs this; a slower answer for the earlier agent
+    // must not land its workspaces under the newly picked one
+    let latest = true;
     api
       .codingSessions({ agent, device, limit: 30 })
-      .then((r) => setRecent(Array.from(new Set(r.sessions.map((s) => s.workspace).filter(Boolean))).slice(0, 6)))
-      .catch(() => setRecent([]));
+      .then((r) => {
+        if (latest) setRecent(Array.from(new Set(r.sessions.map((s) => s.workspace).filter(Boolean))).slice(0, 6));
+      })
+      .catch(() => {
+        if (latest) setRecent([]);
+      });
+    return () => {
+      latest = false;
+    };
   }, [agent, device]);
 
   const start = async () => {
