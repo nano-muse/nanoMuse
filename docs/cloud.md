@@ -1,5 +1,7 @@
 # nanoMuse Cloud
 
+Switching accounts in the admin drawer clears the samples list and ignores pending sample responses and errors from the previous account.
+
 The "start now" path: sign up with a phone number (mainland China; the code comes by SMS)
 or an e-mail address, get a free allowance, and use nanoMuse without an API key of your own.
 Bringing your own key still works exactly as before: this is one more
