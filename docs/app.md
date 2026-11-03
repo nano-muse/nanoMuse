@@ -1,5 +1,7 @@
 # The app
 
+Contact searches and recent coding workspaces discard responses from previous queries, agents or devices. Previous results clear when the selection changes.
+
 > **Design record of the Python line** (`nanomuse/` + `web/`, tag `pre-openminis`): this is
 > the web app `nanomuse serve` serves, today the front door of the desktop app, and of
 > a runtime opened in a browser tab (nanomuse.cn/web itself is the demo on a simulated phone). The phone app in `android/` is OpenMinis-based and described in

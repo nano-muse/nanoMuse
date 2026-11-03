@@ -2740,6 +2740,7 @@ export function ContactsCard({
     }
     // a slower answer from an earlier query must not land under the newer one
     let latest = true;
+    setHits(null);
     const handle = setTimeout(() => {
       api
         .contacts(query.trim(), 5)
