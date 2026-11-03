@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { PageProps } from "../App";
 import { browserOf, clientLine, platformOf } from "../lib/client";
+import { perDayVisits } from "../lib/demo";
 import { dateOf, dur, fmt, matches, nowS, terms, when } from "../lib/format";
 import { useData, useNow } from "../lib/hooks";
 import { nameOf, useT, useZh } from "../lib/i18n";
@@ -22,17 +23,8 @@ export function Demo({ days }: PageProps) {
   const ov = useData<Overview>(`/v1/admin/overview?days=7`, { maxAge: 300_000 });
   const pick = route.params.get("s") || "";
   const [text, setText] = useState("");
-  const offset = Number(ov.data?.settings.day_offset_h || 0) * 3600;
-  const perDay = useMemo(() => {
-    const t = nowS();
-    const dayStart = t - ((t + offset) % 86400);
-    const n = Math.min(days, 90);
-    const start = dayStart - (n - 1) * 86400;
-    const per = new Array(n).fill(0);
-    const all = [...(q.data?.active || []), ...(q.data?.visits || [])];
-    for (const v of all) if (v.started >= start) per[Math.min(n - 1, Math.floor((v.started - start) / 86400))]++;
-    return { per, start };
-  }, [q.data, days, offset]);
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
+  const perDay = useMemo(() => perDayVisits(q.data?.active, q.data?.visits, days, offsetH, nowS()), [q.data, days, offsetH]);
   return (
     <Loaded q={q}>
       {(d) => {
