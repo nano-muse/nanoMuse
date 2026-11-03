@@ -59,6 +59,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept stable message IDs when retrying conversation uploads after a lost relay response.
 
 - Stopped coding-run child processes on Windows along with their parent CLI.
+- **A coding run's Chinese output arrives whole even when a pipe splits a character.** The run's line reader decoded each pipe read on its own, and a multi-byte character straddling two reads became replacement characters in the run's output and view, which for stream-JSON output is intermittent mojibake in the person's own text. Whole lines are now cut out of the accumulated bytes and decoded once complete.
 
 - Kept another device's working indicator when a different device finished a turn.
 
