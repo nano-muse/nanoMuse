@@ -192,6 +192,7 @@ export async function loadProviders(force = false): Promise<ProvidersInfo> {
 /** Forget what was loaded (after the model was changed or a sign-in finished). */
 export function invalidateProviders(): void {
   cached = null;
+  inflight = null;
   generation += 1;
 }
 
