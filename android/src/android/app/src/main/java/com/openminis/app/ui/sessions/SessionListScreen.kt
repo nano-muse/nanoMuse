@@ -2383,6 +2383,8 @@ private fun FolderCard(
                 // paused badge below and for the same reason: an expanded
                 // group's members carry their own rings, so a header copy
                 // would leave the user guessing which row it refers to.
+                // nanoMuse: a collapsed folder retains its members' unread signal.
+                if (block.isCollapsed) io.github.nanomuse.ui.chat.UnreadReplyGroupDot(block.ids, Modifier.align(Alignment.TopEnd))
                 if (block.isCollapsed && block.anyActive) {
                     SpinningRing(
                         color = categoryStyle(block.firstCategory).color,
@@ -2818,6 +2820,8 @@ private fun SessionRow(
                     )
                 }
             }
+            // nanoMuse: unread uses the other corner without changing the row height.
+            io.github.nanomuse.ui.chat.UnreadReplyDot(session.id, Modifier.align(Alignment.TopEnd))
             if (badgeHead != null) {
                 SessionBadgeOverlay(
                     state = badgeHead,
@@ -2831,6 +2835,8 @@ private fun SessionRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
+
+
             val titleText = session.title ?: "New Chat"
             if (searchQuery.isNotBlank()) {
                 Text(

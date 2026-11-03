@@ -161,3 +161,7 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 - 版本检查在每个客户端上按同样的顺序读同样的两个来源：`https://nanomuse.cn/dl/index.json`，然后 GitHub 的 `releases/latest`；缓存一天；那一行永远也显示已安装的版本。
 - 对话同步从四个客户端和一个中继说同一种线路格式（`docs/cloud.md` 里的约定 C7）：`cloud/nanomuse_cloud/sync.py`、`nanomuse/sync/`（运行时和网页）、`harness/dsh-nanomuse/src/sync.ts`（桌面）、`io.github.nanomuse.sync`（Android）、`NanoMuse/NanoMuseSync.swift`（iOS）。每个客户端都先应用一页的对话再应用它的消息，只在拉取时移动游标；每个客户端只推送这个人的话和最终答复（绝不推送工具步骤、工具结果或系统提示），例程、目标、动态和替另一台设备干的活都留在家里。
 - `ideas.en.json` / `ideas.zh.json` 是同一个文件存四份（Android 资源、iOS Resources、`harness/dsh-nanomuse/assets`、`web/src/ideas`）；某一份漂移时 harness 和网页的测试会失败。
+
+| 功能 | Android | iOS |
+|---|---|---|
+| 未读回复 | ✓ 未发布，见 [Android](android.md#unread-replies) | ✓ |

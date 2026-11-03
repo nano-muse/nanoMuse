@@ -1221,4 +1221,5 @@
     <string name="nm_context_compact_idle_timeout">%1$d 秒間応答がなかったため、コンテキストの圧縮を停止しました（モデル呼び出し %2$d 回）。</string>
     <string name="nm_context_compact_no_gain">要約でコンテキストが短くならなかったため、元の内容を保持しました。</string>
     <string name="nm_context_compact_incomplete">モデルから完全な要約が返されなかったため、元のコンテキストを保持しました。</string>
+    <string name="nm_reply_unread">未読の返信</string>
 </resources>

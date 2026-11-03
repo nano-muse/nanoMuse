@@ -1225,4 +1225,5 @@
     <string name="nm_context_compact_idle_timeout">Huminto ang pagpapaikli ng konteksto matapos ang %1$d segundo na walang tugon (%2$d tawag sa modelo).</string>
     <string name="nm_context_compact_no_gain">Hindi napaikli ng buod ang konteksto. Pinanatili ang orihinal na nilalaman.</string>
     <string name="nm_context_compact_incomplete">Hindi nagbalik ang modelo ng kumpletong buod. Pinanatili ang orihinal na konteksto.</string>
+    <string name="nm_reply_unread">Hindi pa nababasang sagot</string>
 </resources>
