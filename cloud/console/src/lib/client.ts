@@ -6,6 +6,9 @@ const APP_TOKENS: [string, string][] = [
   ["nanoMuse-iOS", "ios"],
   ["nanoMuse-Desktop", "desktop"],
   ["deepseek-harness", "desktop"],
+  // the Python runtime of 1.0.6 and earlier signed its model calls with the OpenAI SDK's
+  // own string; the relay's client.py reads it, and so does this mirror of it
+  ["AsyncOpenAI/Python", "runtime"],
   ["Minis/", "minis"],
 ];
 const SYSTEMS: [string, string][] = [

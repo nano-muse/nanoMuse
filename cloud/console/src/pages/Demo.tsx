@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { PageProps } from "../App";
 import { browserOf, clientLine, platformOf } from "../lib/client";
+import { perDayVisits } from "../lib/demo";
 import { dur, fmt, matches, nowS, siteDay, terms, when } from "../lib/format";
 import { useData, useNow } from "../lib/hooks";
 import { nameOf, useT, useZh } from "../lib/i18n";
@@ -22,17 +23,8 @@ export function Demo({ days }: PageProps) {
   const ov = useData<Overview>(`/v1/admin/overview?days=7`, { maxAge: 300_000 });
   const pick = route.params.get("s") || "";
   const [text, setText] = useState("");
-  const offset = Number(ov.data?.settings.day_offset_h || 0) * 3600;
-  const perDay = useMemo(() => {
-    const t = nowS();
-    const dayStart = t - ((t + offset) % 86400);
-    const n = Math.min(days, 90);
-    const start = dayStart - (n - 1) * 86400;
-    const per = new Array(n).fill(0);
-    const all = [...(q.data?.active || []), ...(q.data?.visits || [])];
-    for (const v of all) if (v.started >= start) per[Math.min(n - 1, Math.floor((v.started - start) / 86400))]++;
-    return { per, start };
-  }, [q.data, days, offset]);
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
+  const perDay = useMemo(() => perDayVisits(q.data?.active, q.data?.visits, days, offsetH, nowS()), [q.data, days, offsetH]);
   return (
     <Loaded q={q}>
       {(d) => {
@@ -55,7 +47,7 @@ export function Demo({ days }: PageProps) {
             </Kpis>
             <Grid cols={3}>
               <Panel title={T.de.perDay} sub={fmt(perDay.per.reduce((a, b) => a + b, 0))}>
-                <Bars series={[{ name: T.de.visits, values: perDay.per, color: "var(--c5)" }]} labels={perDay.per.map((_, i) => siteDay(perDay.start + i * 86400, offset / 3600).slice(5))} height={130} />
+                <Bars series={[{ name: T.de.visits, values: perDay.per, color: "var(--c5)" }]} labels={perDay.per.map((_, i) => siteDay(perDay.start + i * 86400, offsetH).slice(5))} height={130} />
               </Panel>
               <Panel title={T.de.reasons}>
                 <Ranks rows={reasons.map(([name, value]) => ({ name, value, color: "var(--c4)" }))} showShare />
