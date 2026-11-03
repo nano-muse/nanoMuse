@@ -1,5 +1,7 @@
 # 应用
 
+联系人搜索和最近编程工作区会忽略旧查询、旧编程助手或旧设备的响应；切换条件时，旧结果会清空。
+
 > **Python 线的设计记录**（`nanomuse/` + `web/`，标签 `pre-openminis`）：这里讲的是
 > `nanomuse serve` 提供的网页版，今天它是桌面版的门面，也是在浏览器标签页里打开的
 > 运行时的门面（nanomuse.cn/web 本身是跑在一台模拟手机上的演示）。`android/` 里的手机 App 基于 OpenMinis，

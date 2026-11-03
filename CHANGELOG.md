@@ -63,6 +63,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Web
 
 - **A provider answer that started before a sign-out no longer repopulates the cache after it.** Signing out invalidates the loaded provider view, but an `/api/providers` request already in flight kept its `then` attached, and when it landed it wrote the signed-out view back into the cache for every later reader until a forced reload. Each load now carries the generation it started under, and an answer whose generation was invalidated lands for its caller without repopulating the cache.
+- **A slower search answer no longer lands under a newer query.** The contacts search and the coding screen's recent-workspaces list both fired a request per query (or per picked agent) and took whatever answer arrived last: type past a slow request, or switch agents while one was still loading, and the earlier answer's results replaced the newer one's on screen. Both effects now drop answers that were superseded before they landed.
 
 ### Desktop
 
