@@ -9,6 +9,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
 
 - Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
+- **One account's samples stay out of another account's drawer.** The account drawer re-targets in place when another account's link is clicked, and its samples tab ran its loads without a generation: an answer that started under the first account could land its rows under the second account's title. The tab now runs through the same `LatestRequest` guard the drawer's paged readers use.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
 
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
