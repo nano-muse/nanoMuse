@@ -1,5 +1,6 @@
 # nanoMuse Cloud
 
+The admin console counts each demo visit once in its daily chart, including visits present in both the active and recent lists. Days follow the site's configured timezone offset.
 The admin console classifies legacy Python runtime sessions with an `AsyncOpenAI/Python` user agent as runtime sessions, matching the relay.
 
 The "start now" path: sign up with a phone number (mainland China; the code comes by SMS)
