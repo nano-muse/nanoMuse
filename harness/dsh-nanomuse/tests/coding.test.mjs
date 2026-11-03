@@ -677,17 +677,15 @@ test('service: another computer’s agents through the hub, and a remote send fo
 })
 
 test('remote: a tool call counts once whatever phases the CLI emits, and notes never', async () => {
-  await scratch(async (home) => {
-    const svc = new CodingService({ hub: fakeHub(), env: { ...process.env, NANOMUSE_CODING_HOME: home }, storePath: join(home, 'state', 'runs.json') })
-    svc.remote = async (_device, _action, _args, onEvent) => {
-      onEvent({ kind: 'tool', text: 'started a call', phase: 'started' })
-      onEvent({ kind: 'tool', text: 'the call finished', phase: 'completed' })
-      onEvent({ kind: 'tool', text: 'an IDE-only note', phase: 'note' })
-      onEvent({ kind: 'text', text: 'done text' })
-      return { id: 'run_x', agent: 'codex', session_id: 's1', asked_session_id: 's1', workspace: '', text: 'do it',
-        started_at: 1, ended_at: 2, status: 'done', output: 'done text', resumed: false, error: '', tools: 1 }
-    }
-    const view = await svc.remoteSend('other-pc', { agent: 'codex', text: 'do it' })
-    assert.equal(view.tools, 1, 'one tool call is one step, on whatever computer it ran')
-  })
+  const svc = new CodingService({ hub: fakeHub(), env: { ...process.env, NANOMUSE_CODING_HOME: '/nonexistent/nanomuse-test' } })
+  svc.remote = async (_device, _action, _args, onEvent) => {
+    onEvent({ kind: 'tool', text: 'started a call', phase: 'started' })
+    onEvent({ kind: 'tool', text: 'the call finished', phase: 'completed' })
+    onEvent({ kind: 'tool', text: 'an IDE-only note', phase: 'note' })
+    onEvent({ kind: 'text', text: 'done text' })
+    return { id: 'run_x', agent: 'codex', session_id: 's1', asked_session_id: 's1', workspace: '', text: 'do it',
+      started_at: 1, ended_at: 2, status: 'done', output: 'done text', resumed: false, error: '', tools: 1 }
+  }
+  const view = await svc.remoteSend('other-pc', { agent: 'codex', text: 'do it' })
+  assert.equal(view.tools, 1, 'one tool call is one step, on whatever computer it ran')
 })
