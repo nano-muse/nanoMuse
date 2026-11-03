@@ -17,7 +17,7 @@ class BackupResumeIntegrationTest {
     @Test fun resumedExporterProducesAVerifiablePackageWithOriginalMemorySnapshot() = runBlocking {
         val root = Files.createTempDirectory("resume integration 空").toFile()
         try {
-            val context = mock(Context::class.java)
+            val context = mock(Context::class.java, RETURNS_DEEP_STUBS)
             `when`(context.filesDir).thenReturn(root)
             `when`(context.applicationContext).thenReturn(context)
             `when`(context.cacheDir).thenReturn(File(root, "cache"))
@@ -53,7 +53,7 @@ class BackupResumeIntegrationTest {
     @Test fun interruptedEncryptionResumesAsAnEncryptedVerifiableBackup() = runBlocking {
         val root = Files.createTempDirectory("encrypted resume").toFile()
         try {
-            val context = mock(Context::class.java)
+            val context = mock(Context::class.java, RETURNS_DEEP_STUBS)
             `when`(context.filesDir).thenReturn(root)
             `when`(context.cacheDir).thenReturn(File(root, "cache"))
             `when`(context.applicationContext).thenReturn(context)
@@ -96,7 +96,7 @@ class BackupResumeIntegrationTest {
     @Test fun cancellationKeepsCheckpointsAndDoesNotProduceAFinishedPackage() = runBlocking {
         val root = Files.createTempDirectory("cancel export").toFile()
         try {
-            val context = mock(Context::class.java)
+            val context = mock(Context::class.java, RETURNS_DEEP_STUBS)
             `when`(context.filesDir).thenReturn(root)
             `when`(context.applicationContext).thenReturn(context)
             val db = mock(AppDatabase::class.java)
