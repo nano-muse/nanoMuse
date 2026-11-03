@@ -901,6 +901,63 @@ def test_task_from_a_device_runs_in_a_visible_side_chat(hub_server) -> None:
     }
 
 
+@pytest.mark.parametrize("finish", ["stop", "timeout"])
+def test_old_task_forwarding_cannot_stop_a_successor(
+    hub_server, monkeypatch: pytest.MonkeyPatch, finish: str
+) -> None:
+    from nanomuse.hub.client import IncomingCall
+    from nanomuse.hub.service import HubService
+
+    client, service, llm, relay = hub_server
+    sign_in(client)
+    wait_for(lambda: client.get("/api/hub").json()["state"] == "connected")
+    service.settings.sentinel.mode = "auto"
+    blocked = threading.Event()
+    release = threading.Event()
+    forward = HubService._forward_event
+
+    async def delayed(
+        self: HubService, call: IncomingCall, ev: dict[str, Any], *, fresh: bool = True
+    ) -> None:
+        if call.id == "old" and not blocked.is_set():
+            blocked.set()
+            await asyncio.to_thread(release.wait)
+            if finish == "timeout":
+                # Expire the held forwarding path only after the successor has started.
+                raise TimeoutError
+        await forward(self, call, ev, fresh=fresh)
+
+    monkeypatch.setattr(HubService, "_forward_event", delayed)
+    llm.script.append(LLMResponse(content="Earlier answer"))
+    relay.call_runtime("task", {"text": "first", "conversation": "same"}, "old")
+    tid = ""
+    try:
+        assert blocked.wait(3)
+        tid = next(t.id for t in service.threads.values() if t.remote_from)
+        old_worker = service.threads[tid].worker
+        wait_for(lambda: old_worker is not None and old_worker.done())
+        llm.script.append(LLMResponse(tool_calls=[tc("shell", command="sleep 20")]))
+        relay.call_runtime("task", {"text": "second", "conversation": "same"}, "new")
+        event = relay.next_frame("event")
+        assert event["id"] == "new" and event["body"]["stage"] == "tool"
+        assert "old" in service.hub._incoming and "new" in service.hub._incoming
+        assert service.threads[tid].worker is not old_worker
+        if finish == "stop":
+            relay.call_runtime("stop", {"call": "old"}, "late-stop")
+            result = relay.next_frame("result")
+            assert result["id"] == "late-stop" and result["body"] == {"stopped": False}
+        else:
+            release.set()
+            result = relay.next_frame("result")
+            assert result["id"] == "old" and result["error"] == "timeout"
+        assert service.threads[tid].busy
+        assert service.threads[tid].worker.cancelling() == 0
+    finally:
+        release.set()
+        if tid:
+            client.post(f"/api/threads/{tid}/stop")
+
+
 def test_a_stopped_task_fails_with_cancelled_and_only_for_its_asker(hub_server) -> None:
     """docs/hub.md: the asking device ends its task with `stop {call}` or
     `stop {conversation}`; the target answers `{stopped: true}` and the `task` call fails
