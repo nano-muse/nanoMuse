@@ -33,6 +33,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
 
+- Stopped timed-out remote tasks by their original call id, allowed the full 15-minute task budget from the runtime and iPhone, and kept late stop requests from cancelling a newer task. For #805.
+
 - Fixed the ChatGPT proxy failing to start after sign-in, which kept the desktop from adding its models.
 
 - Included data-directory skills, uploaded contact sources, phone and computer traces, pending scheduled deliveries and cached nudges in runtime data exports. The archive README named the deliberately excluded device credentials and sync state.
