@@ -23,8 +23,8 @@ export function Demo({ days }: PageProps) {
   const ov = useData<Overview>(`/v1/admin/overview?days=7`, { maxAge: 300_000 });
   const pick = route.params.get("s") || "";
   const [text, setText] = useState("");
-  const offset = Number(ov.data?.settings.day_offset_h || 0) * 3600;
-  const perDay = useMemo(() => perDayVisits(q.data?.active, q.data?.visits, days, offset, nowS()), [q.data, days, offset]);
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
+  const perDay = useMemo(() => perDayVisits(q.data?.active, q.data?.visits, days, offsetH, nowS()), [q.data, days, offsetH]);
   return (
     <Loaded q={q}>
       {(d) => {

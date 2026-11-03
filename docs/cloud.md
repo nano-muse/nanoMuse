@@ -1,5 +1,7 @@
 # nanoMuse Cloud
 
+The admin console counts each demo visit once in its daily chart, including visits present in both the active and recent lists. Days follow the site's configured timezone offset.
+
 The "start now" path: sign up with a phone number (mainland China; the code comes by SMS)
 or an e-mail address, get a free allowance, and use nanoMuse without an API key of your own.
 Bringing your own key still works exactly as before: this is one more
