@@ -105,7 +105,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
-- Added device authentication and configurable re-locking before Android app content is shown.
+- Added device authentication and configurable re-locking before Android app content or safe-mode diagnostics are shown, including diagnostic export after an external file picker.
 
 - Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
 

@@ -627,4 +627,4 @@ Drawn faces and personal clips retain their existing priority. Renaming the agen
 
 ## App lock
 
-Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts and incoming shares use the same gate. This protects access in the app, not encryption of stored data. Background tasks continue. Hardware validation remains pending.
+Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts, incoming shares and safe-mode diagnostics use the same gate. Native diagnostic windows close if the app re-locks, and returning from the export file picker requires access again before any diagnostic data is written. This protects access in the app, not encryption of stored data. Background tasks continue.

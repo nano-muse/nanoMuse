@@ -179,29 +179,32 @@ class MainActivity : ComponentActivity() {
                 pendingCrashSaveOnClosed = null
                 return@registerForActivityResult
             }
-            try {
-                contentResolver.openOutputStream(targetUri)?.use { out ->
-                    java.io.FileInputStream(zip).use { input -> input.copyTo(out) }
-                } ?: throw java.io.IOException("openOutputStream returned null")
-                // Auto-open the saved file so the user sees where it
-                // landed. ACTION_VIEW with the SAF URI hands control to
-                // whatever app the system associates with .zip /
-                // application/zip (file managers, archive viewers).
+            // nanoMuse: an external file picker may outlive the unlock lease.
+            io.github.nanomuse.guard.NativeAccess.afterUnlock(this) {
                 try {
-                    val view = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(targetUri, "application/zip")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    contentResolver.openOutputStream(targetUri)?.use { out ->
+                        java.io.FileInputStream(zip).use { input -> input.copyTo(out) }
+                    } ?: throw java.io.IOException("openOutputStream returned null")
+                    // Auto-open the saved file so the user sees where it
+                    // landed. ACTION_VIEW with the SAF URI hands control to
+                    // whatever app the system associates with .zip /
+                    // application/zip (file managers, archive viewers).
+                    try {
+                        val view = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(targetUri, "application/zip")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(view)
+                    } catch (t: Throwable) {
+                        android.util.Log.w("MainActivity", "ACTION_VIEW after save failed: ${t.message}")
                     }
-                    startActivity(view)
                 } catch (t: Throwable) {
-                    android.util.Log.w("MainActivity", "ACTION_VIEW after save failed: ${t.message}")
+                    android.util.Log.w("MainActivity", "crash zip save failed: ${t.message}")
+                } finally {
+                    pendingCrashSaveOnClosed?.invoke()
+                    pendingCrashSaveOnClosed = null
                 }
-            } catch (t: Throwable) {
-                android.util.Log.w("MainActivity", "crash zip save failed: ${t.message}")
-            } finally {
-                pendingCrashSaveOnClosed?.invoke()
-                pendingCrashSaveOnClosed = null
             }
         }
 
@@ -259,36 +262,41 @@ class MainActivity : ComponentActivity() {
                     "${com.openminis.app.crash.CrashFrequencyDetector.isSafeMode()}) — " +
                     "showing crash share dialog and finishing",
             )
-            com.openminis.app.crash.CrashFrequencyDetector.maybeShowOnActivity(
-                activity = this,
-                // T-android-safemode-lateinit-crash: plain finish() here is a
-                // dead end on the second launch. maybeShowOnActivity invokes
-                // onClosed immediately when pendingShareFiles is null, which
-                // is exactly the state after the user dismissed the dialog on
-                // the previous launch — the app would close the instant it was
-                // tapped, reading as "nanoMuse won't open at all". The process
-                // still holds a permanently uninitialized Application, so the
-                // only real recovery is a fresh process: tell the user, then
-                // exit hard so the next tap gets a clean init.
-                onClosed = { finishAndRestartProcess() },
-                saveLauncher = { zip, onSaveDone ->
-                    pendingCrashZip = zip
-                    pendingCrashSaveOnClosed = onSaveDone
-                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "application/zip"
-                        putExtra(Intent.EXTRA_TITLE, zip.name)
-                    }
-                    try {
-                        crashSaveLauncher.launch(intent)
-                    } catch (t: Throwable) {
-                        android.util.Log.w("MainActivity", "CREATE_DOCUMENT launch failed: ${t.message}")
-                        pendingCrashZip = null
-                        pendingCrashSaveOnClosed = null
-                        onSaveDone()
-                    }
-                },
-            )
+            // nanoMuse: safe-mode diagnostics must authenticate without touching uninitialized repositories.
+            setContent {
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    com.openminis.app.crash.CrashFrequencyDetector.maybeShowOnActivity(
+                        activity = this@MainActivity,
+                        // T-android-safemode-lateinit-crash: plain finish() here is a
+                        // dead end on the second launch. maybeShowOnActivity invokes
+                        // onClosed immediately when pendingShareFiles is null, which
+                        // is exactly the state after the user dismissed the dialog on
+                        // the previous launch — the app would close the instant it was
+                        // tapped, reading as "nanoMuse won't open at all". The process
+                        // still holds a permanently uninitialized Application, so the
+                        // only real recovery is a fresh process: tell the user, then
+                        // exit hard so the next tap gets a clean init.
+                        onClosed = { finishAndRestartProcess() },
+                        saveLauncher = { zip, onSaveDone ->
+                            pendingCrashZip = zip
+                            pendingCrashSaveOnClosed = onSaveDone
+                            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "application/zip"
+                                putExtra(Intent.EXTRA_TITLE, zip.name)
+                            }
+                            try {
+                                crashSaveLauncher.launch(intent)
+                            } catch (t: Throwable) {
+                                android.util.Log.w("MainActivity", "CREATE_DOCUMENT launch failed: ${t.message}")
+                                pendingCrashZip = null
+                                pendingCrashSaveOnClosed = null
+                                onSaveDone()
+                            }
+                        },
+                    )
+                }
+            }
             return
         }
 
