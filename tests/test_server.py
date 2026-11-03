@@ -2437,7 +2437,9 @@ def _chromium_available() -> bool:
 
 
 @pytest.mark.skipif(not _chromium_available(), reason="playwright + chromium not installed")
-async def test_browser_tool_reports_frames_and_user_takeover(tmp_path):
+async def test_browser_tool_reports_frames_and_user_takeover(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import http.server
     import threading
 
@@ -2464,6 +2466,13 @@ async def test_browser_tool_reports_frames_and_user_takeover(tmp_path):
 
     frames: list[BrowserFrame] = []
     tool = Browser(workspace=tmp_path, on_frame=frames.append)
+    url_allowed = tool._url_allowed
+
+    async def allow_fixture(url: str) -> bool:
+        # This test serves its page on loopback; keep the guard for every other URL.
+        return url == page or await url_allowed(url)
+
+    monkeypatch.setattr(tool, "_url_allowed", allow_fixture)
     try:
         result = await tool.execute(action="navigate", url=page)
         assert not result.error and "Sign in" in result.output and "[0]" in result.output
