@@ -6291,7 +6291,7 @@ class ChatViewModel(
     }
 
     // nanoMuse: only the adapter touches upstream state; the lifecycle lives in RemoteChatBridge.
-    private val nmRemoteBridge by lazy {
+    private val nmRemoteBridge: io.github.nanomuse.sync.RemoteChatBridge by lazy {
         val host = object : io.github.nanomuse.sync.RemoteChatBridge.Host {
             override val busy: Boolean get() = _isStreaming.value
             override fun setBusy(value: Boolean) { _isStreaming.value = value }
