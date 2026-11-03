@@ -309,6 +309,8 @@ data class FolderGroupBlock(
      * that ends on its own, so it can never go stale.
      */
     val anyActive: Boolean = false,
+    // nanoMuse: badge membership survives folding; ids controls only the visible rows.
+    val memberIds: List<String> = ids,
 )
 
 /**
@@ -386,9 +388,12 @@ internal fun partitionByFolder(
         // Pinned members first, stable partition — the pin is a display
         // affordance inside the group, not a reason to leave it.
         val displayOrdered = m.filter { it.pinnedAt != null } + m.filter { it.pinnedAt == null }
+        // nanoMuse: compute membership once for both row rendering and unread aggregation.
+        val memberIds = displayOrdered.map { it.id }
         FolderGroupBlock(
             folder = folder,
-            ids = if (collapsed) emptyList() else displayOrdered.map { it.id },
+            ids = if (collapsed) emptyList() else memberIds,
+            memberIds = memberIds,
             totalCount = m.size,
             isCollapsed = collapsed,
             // Recency order (not display order) — this means "newest activity".
@@ -2384,7 +2389,7 @@ private fun FolderCard(
                 // group's members carry their own rings, so a header copy
                 // would leave the user guessing which row it refers to.
                 // nanoMuse: a collapsed folder retains its members' unread signal.
-                if (block.isCollapsed) io.github.nanomuse.ui.chat.UnreadReplyGroupDot(block.ids, Modifier.align(Alignment.TopEnd))
+                if (block.isCollapsed) io.github.nanomuse.ui.chat.UnreadReplyGroupDot(block.memberIds, Modifier.align(Alignment.TopEnd))
                 if (block.isCollapsed && block.anyActive) {
                     SpinningRing(
                         color = categoryStyle(block.firstCategory).color,
