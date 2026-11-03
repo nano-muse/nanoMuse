@@ -10,6 +10,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
+- **A legacy runtime's user agent is read the way the relay reads it.** The console's own classifier missed the `AsyncOpenAI/Python` token the Python runtime of 1.0.6 and earlier signed its model calls with, so those sessions and demo visitors showed as "other" wherever the console classifies client-side; the relay's `client.py` has carried the token since it first appeared, and the console's mirror of that list now does too.
 
 - Android and desktop inherited the relay's disclosed context and output limits when model fields were blank, refreshed those defaults without another sign-in, and preserved manual overrides. Discovered model capacities survived vision probes and individual lookups.
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
