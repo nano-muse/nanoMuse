@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { siteDay, siteDayStamp, siteDayStart, siteWeekday } from "./format";
+import { dayLabels, dayTitles, siteDay, siteDayStamp, siteDayStart, siteWeekday } from "./format";
 
 // the relay's grid: a day stamp is the site-local day's start as a UNIX time, so
 // 2026-10-31T16:00Z is the start of Nov 1 at the default offset of +8h
@@ -33,5 +33,22 @@ describe("siteDayStart", () => {
     const threePastMidnightSite = Date.UTC(2026, 9, 31, 19) / 1000; // 03:00 on Nov 1 at +8
     expect(siteDayStart(threePastMidnightSite, 8)).toBe(NOV_1_AT_8);
     expect(siteDay(siteDayStart(threePastMidnightSite, 8), 8)).toBe("2026-11-01");
+  });
+});
+
+
+describe("analytics day labels", () => {
+  it("uses UTC for offset zero instead of the browser timezone", () => {
+    const day = Date.UTC(2026, 10, 1) / 1000;
+    expect(dayLabels([day], 0)).toEqual(["11-01"]);
+    expect(dayTitles([day], 0)).toEqual(["2026-11-01"]);
+  });
+
+  it("keeps labels and tooltips on the same day at positive and negative offsets", () => {
+    expect(dayLabels([NOV_1_AT_8], 8)).toEqual(["11-01"]);
+    expect(dayTitles([NOV_1_AT_8], 8)).toEqual(["2026-11-01"]);
+    const midnightWest = Date.UTC(2026, 10, 1, 7) / 1000;
+    expect(dayLabels([midnightWest], -7)).toEqual(["11-01"]);
+    expect(dayTitles([midnightWest], -7)).toEqual(["2026-11-01"]);
   });
 });

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { PageProps } from "../App";
 import { browserOf, clientLine, platformOf } from "../lib/client";
-import { dateOf, dur, fmt, matches, nowS, terms, when } from "../lib/format";
+import { dur, fmt, matches, nowS, siteDay, terms, when } from "../lib/format";
 import { useData, useNow } from "../lib/hooks";
 import { nameOf, useT, useZh } from "../lib/i18n";
 import { useRoute } from "../lib/router";
@@ -55,7 +55,7 @@ export function Demo({ days }: PageProps) {
             </Kpis>
             <Grid cols={3}>
               <Panel title={T.de.perDay} sub={fmt(perDay.per.reduce((a, b) => a + b, 0))}>
-                <Bars series={[{ name: T.de.visits, values: perDay.per, color: "var(--c5)" }]} labels={perDay.per.map((_, i) => dateOf(perDay.start + i * 86400).slice(5))} height={130} />
+                <Bars series={[{ name: T.de.visits, values: perDay.per, color: "var(--c5)" }]} labels={perDay.per.map((_, i) => siteDay(perDay.start + i * 86400, offset / 3600).slice(5))} height={130} />
               </Panel>
               <Panel title={T.de.reasons}>
                 <Ranks rows={reasons.map(([name, value]) => ({ name, value, color: "var(--c4)" }))} showShare />

@@ -72,7 +72,7 @@ export function Overview({ days }: PageProps) {
                         { name: T.ov.trendNew, values: se.data.days.map((x) => x.new_accounts), color: "var(--c4)" },
                       ]}
                       labels={dayLabels(se.data.days.map((x) => x.day), Number(d.settings.day_offset_h || 0))}
-                      titles={dayTitles(se.data.days.map((x) => x.day))}
+                      titles={dayTitles(se.data.days.map((x) => x.day), Number(d.settings.day_offset_h || 0))}
                       format={compact}
                       height={150}
                     />
@@ -87,7 +87,7 @@ export function Overview({ days }: PageProps) {
                         { name: T.ov.trendRefusals, values: se.data.days.map((x) => x.budget_refusals), color: "var(--violet)" },
                       ]}
                       labels={dayLabels(se.data.days.map((x) => x.day), Number(d.settings.day_offset_h || 0))}
-                      titles={dayTitles(se.data.days.map((x) => x.day))}
+                      titles={dayTitles(se.data.days.map((x) => x.day), Number(d.settings.day_offset_h || 0))}
                       format={compact}
                       height={110}
                       fill={false}
