@@ -165,3 +165,7 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 | 功能 | Android | iOS |
 |---|---|---|
 | 应用锁 | ✓ 未发布，见 [Android](android.md#app-lock) | ✓ |
+
+| 功能 | Android | iOS |
+|---|---|---|
+| 受保护的对话 | ✓ 未发布，见 [Android](android.md#session-lock) | ✓ |

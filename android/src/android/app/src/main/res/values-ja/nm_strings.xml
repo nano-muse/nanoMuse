@@ -1229,4 +1229,8 @@
     <string name="nm_access_never">自動ロックしない</string>
     <string name="nm_access_seconds">%1$d 秒</string>
     <string name="nm_access_unavailable">先にこの端末の画面ロックを設定してください。</string>
+    <string name="nm_session_protected">保護された会話</string>
+    <string name="nm_session_protect">会話を保護</string>
+    <string name="nm_session_unprotect">会話の保護を解除</string>
+    <string name="nm_session_settings">会話のロック時間</string>
 </resources>

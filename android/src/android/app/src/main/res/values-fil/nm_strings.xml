@@ -1233,4 +1233,8 @@
     <string name="nm_access_never">Huwag awtomatikong i-lock</string>
     <string name="nm_access_seconds">%1$d segundo</string>
     <string name="nm_access_unavailable">Magtakda muna ng screen lock sa device na ito.</string>
+    <string name="nm_session_protected">Protektadong pag-uusap</string>
+    <string name="nm_session_protect">Protektahan ang pag-uusap</string>
+    <string name="nm_session_unprotect">Alisin ang proteksyon ng pag-uusap</string>
+    <string name="nm_session_settings">Oras ng pag-lock ng pag-uusap</string>
 </resources>

@@ -2854,7 +2854,11 @@ private fun SessionRow(
             // During an active search, prefer the matched message snippet
             // (content hit) over the generic lastMessage preview. Falls back
             // to lastMessage when match was title-only (snippet is null).
-            if (searchQuery.isNotBlank() && searchSnippet != null) {
+            // nanoMuse: protected conversation previews never reveal message snippets.
+            val protectedIds by io.github.nanomuse.guard.SessionAccess.protected.collectAsState()
+            if (session.id in protectedIds) {
+                Text(stringResource(R.string.nm_session_protected), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (searchQuery.isNotBlank() && searchSnippet != null) {
                 Text(
                     text = highlightedAnnotatedString(searchSnippet, searchQuery),
                     fontSize = 14.sp,

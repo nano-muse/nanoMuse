@@ -404,3 +404,7 @@ notes above; a settled item keeps its number and says how it went.
 | Feature | Android | iOS |
 |---|---|---|
 | App lock | ✓ Unreleased, see [Android](android.md#app-lock) | ✓ |
+
+| Feature | Android | iOS |
+|---|---|---|
+| Protected conversations | ✓ Unreleased, see [Android](android.md#session-lock) | ✓ |

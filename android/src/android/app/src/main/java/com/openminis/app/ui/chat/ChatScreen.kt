@@ -538,6 +538,8 @@ fun ChatScreen(
     // composer sits above it; the message list slides behind it for the blur.
     nmBottomOverlay: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
+    // nanoMuse: every entry route authenticates before reading conversation content.
+    if (!io.github.nanomuse.ui.guard.SessionAccessGate(sessionId)) return
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -3073,6 +3075,8 @@ fun ChatScreen(
                             expanded = showChatMenu,
                             onDismissRequest = { showChatMenu = false },
                         ) {
+                            // nanoMuse: both layouts use this menu and the same local protection policy.
+                            io.github.nanomuse.ui.guard.SessionAccessMenuItem(sessionId) { showChatMenu = false }
                             // [T-android-memory-enabled-minisconfig] Gate the
                             // "Memories in Session" item below on the session's
                             // live memoryEnabled — when memory is off the entry

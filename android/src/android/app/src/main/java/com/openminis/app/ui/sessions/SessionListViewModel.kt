@@ -158,9 +158,11 @@ class SessionListViewModel(
 
     // The list to actually show: search results when searching, otherwise all sessions
     val displayedSessions: StateFlow<List<ChatSessionEntity>> = combine(
-        _allSessions, searchResults, searchQuery, isSearchActive
-    ) { all, results, q, active ->
-        if (active && q.isNotBlank()) results else all
+        _allSessions, searchResults, searchQuery, isSearchActive,
+        io.github.nanomuse.guard.SessionAccess.protected,
+    ) { all, results, q, active, protected ->
+        // nanoMuse: protected message bodies do not participate in visible search results.
+        if (active && q.isNotBlank()) results.filter { it.id !in protected || it.title.orEmpty().contains(q, true) } else all
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ─── Session groups ("folders") ────────────────────────────────────────

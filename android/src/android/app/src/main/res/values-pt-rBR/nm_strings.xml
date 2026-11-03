@@ -1234,4 +1234,8 @@
     <string name="nm_access_never">Nunca bloquear automaticamente</string>
     <string name="nm_access_seconds">%1$d segundos</string>
     <string name="nm_access_unavailable">Configure primeiro um bloqueio de tela neste aparelho.</string>
+    <string name="nm_session_protected">Conversa protegida</string>
+    <string name="nm_session_protect">Proteger conversa</string>
+    <string name="nm_session_unprotect">Remover proteção da conversa</string>
+    <string name="nm_session_settings">Tempo de bloqueio das conversas</string>
 </resources>

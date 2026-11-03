@@ -1229,4 +1229,8 @@
     <string name="nm_access_never">자동으로 잠그지 않음</string>
     <string name="nm_access_seconds">%1$d초</string>
     <string name="nm_access_unavailable">먼저 이 기기의 화면 잠금을 설정하세요.</string>
+    <string name="nm_session_protected">보호된 대화</string>
+    <string name="nm_session_protect">대화 보호</string>
+    <string name="nm_session_unprotect">대화 보호 해제</string>
+    <string name="nm_session_settings">대화 잠금 시간</string>
 </resources>

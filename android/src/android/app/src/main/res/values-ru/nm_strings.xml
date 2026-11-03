@@ -1241,4 +1241,8 @@
     <string name="nm_access_never">Не блокировать автоматически</string>
     <string name="nm_access_seconds">%1$d секунд</string>
     <string name="nm_access_unavailable">Сначала настройте блокировку экрана этого устройства.</string>
+    <string name="nm_session_protected">Защищённый разговор</string>
+    <string name="nm_session_protect">Защитить разговор</string>
+    <string name="nm_session_unprotect">Снять защиту разговора</string>
+    <string name="nm_session_settings">Время блокировки разговоров</string>
 </resources>

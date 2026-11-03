@@ -1,0 +1,88 @@
+package io.github.nanomuse.ui.guard
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.openminis.app.R
+import io.github.nanomuse.guard.AppAccess
+import io.github.nanomuse.guard.SessionAccess
+import kotlinx.coroutines.delay
+
+/** Runs before the screen obtains its ViewModel, including deep-link and notification entry. */
+@Composable
+fun SessionAccessGate(sessionId: String): Boolean {
+    SessionAccess.initialize(LocalContext.current)
+    val revision by SessionAccess.revision.collectAsState()
+    var tick by remember(sessionId) { mutableIntStateOf(0) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(sessionId, lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) SessionAccess.leave(sessionId)
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); SessionAccess.leave(sessionId) }
+    }
+    LaunchedEffect(sessionId) { while (true) { delay(1000); tick++ } }
+    val locked = remember(sessionId, revision, tick) { SessionAccess.isLocked(sessionId) }
+    if (locked) {
+        val authenticate = rememberAccessAuthenticator()
+        val title = stringResource(R.string.nm_session_protected)
+        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+            Text(title, style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.nm_access_hint))
+            Button(onClick = { authenticate(title) { SessionAccess.authenticate(sessionId, it) } }) {
+                Text(stringResource(R.string.nm_access_unlock))
+            }
+        }
+    }
+    return !locked
+}
+
+@Composable
+fun SessionAccessMenuItem(sessionId: String, dismiss: () -> Unit) {
+    val protected by SessionAccess.protected.collectAsState()
+    val authenticate = rememberAccessAuthenticator()
+    val title = stringResource(if (sessionId in protected) R.string.nm_session_unprotect else R.string.nm_session_protect)
+    DropdownMenuItem(text = { Text(title) }, onClick = {
+        dismiss()
+        authenticate(title) { success ->
+            if (sessionId in protected) SessionAccess.unprotect(sessionId, success)
+            else SessionAccess.protect(sessionId, success)
+        }
+    })
+}
+
+@Composable
+fun SessionAccessSettings() {
+    var show by remember { mutableStateOf(false) }
+    var seconds by remember { mutableIntStateOf(SessionAccess.timeout) }
+    val authenticate = rememberAccessAuthenticator()
+    val title = stringResource(R.string.nm_session_settings)
+    TextButton(onClick = { show = true }) { Text(title) }
+    if (show) AlertDialog(onDismissRequest = { show = false }, title = { Text(title) }, text = {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            for (value in AppAccess.TIMEOUTS) Row {
+                RadioButton(selected = seconds == value, onClick = { seconds = value })
+                Text(when (value) {
+                    -1 -> stringResource(R.string.nm_access_on_exit)
+                    0 -> stringResource(R.string.nm_access_never)
+                    else -> stringResource(R.string.nm_access_seconds, value)
+                })
+            }
+        }
+    }, confirmButton = {
+        TextButton(onClick = { authenticate(title) { success ->
+            SessionAccess.configureTimeout(seconds, success)
+            if (success) show = false
+        } }) { Text(stringResource(android.R.string.ok)) }
+    }, dismissButton = { TextButton(onClick = { show = false }) { Text(stringResource(android.R.string.cancel)) } })
+}

@@ -586,3 +586,7 @@ like the Python package's version does.
 ## App lock
 
 Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts and incoming shares use the same gate. This protects access in the app, not encryption of stored data. Background tasks continue. Hardware validation remains pending.
+
+## Protected conversations {#session-lock}
+
+The conversation menu can protect an individual chat with the device screen lock. Authentication is required to protect it or remove protection. Settings controls its re-lock interval; leaving a chat can lock it immediately. Protection applies to both layouts and to notification and deep-link entry. Protected message previews and body-search matches are hidden. Local protection metadata survives restarts, but unlocks do not, and neither is shared through conversation sync or backup. Background work continues. This does not encrypt chat storage.
