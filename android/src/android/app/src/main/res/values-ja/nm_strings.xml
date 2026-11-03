@@ -1221,4 +1221,6 @@
     <string name="nm_context_compact_idle_timeout">%1$d 秒間応答がなかったため、コンテキストの圧縮を停止しました（モデル呼び出し %2$d 回）。</string>
     <string name="nm_context_compact_no_gain">要約でコンテキストが短くならなかったため、元の内容を保持しました。</string>
     <string name="nm_context_compact_incomplete">モデルから完全な要約が返されなかったため、元のコンテキストを保持しました。</string>
+    <string name="nm_restore_recovered">中断した復元を回復しました。回復に失敗した場合、再試行用のデータは保持されます。</string>
+    <string name="nm_restore_recovery_failed">復元の回復に失敗しました。回復用データは保持されています。アプリを再起動して再試行してください。</string>
 </resources>

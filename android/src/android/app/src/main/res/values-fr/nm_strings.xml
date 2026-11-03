@@ -1226,4 +1226,6 @@
     <string name="nm_context_compact_idle_timeout">La compression s’est arrêtée après %1$d secondes sans réponse (%2$d appels au modèle).</string>
     <string name="nm_context_compact_no_gain">Le résumé n’a pas réduit le contexte. Le contenu original a été conservé.</string>
     <string name="nm_context_compact_incomplete">Le modèle n’a pas renvoyé de résumé complet. Le contexte original a été conservé.</string>
+    <string name="nm_restore_recovered">La restauration interrompue a été récupérée. En cas d’échec, les données de récupération sont conservées pour un nouvel essai.</string>
+    <string name="nm_restore_recovery_failed">La récupération a échoué. Les données de récupération sont conservées. Redémarrez l’application pour réessayer.</string>
 </resources>

@@ -1233,4 +1233,6 @@
     <string name="nm_context_compact_idle_timeout">Сжатие остановлено после %1$d секунд без ответа (вызовов модели: %2$d).</string>
     <string name="nm_context_compact_no_gain">Сводка не сократила контекст. Исходное содержимое сохранено.</string>
     <string name="nm_context_compact_incomplete">Модель не вернула полную сводку. Исходный контекст сохранён.</string>
+    <string name="nm_restore_recovered">Прерванное восстановление восстановлено. При ошибке данные для восстановления сохраняются для повторной попытки.</string>
+    <string name="nm_restore_recovery_failed">Восстановление не удалось. Данные для восстановления сохранены. Перезапустите приложение для повторной попытки.</string>
 </resources>

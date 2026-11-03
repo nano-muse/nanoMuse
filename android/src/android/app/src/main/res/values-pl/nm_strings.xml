@@ -1233,4 +1233,6 @@
     <string name="nm_context_compact_idle_timeout">Kompresja została zatrzymana po %1$d sekundach bez odpowiedzi (%2$d wywołań modelu).</string>
     <string name="nm_context_compact_no_gain">Podsumowanie nie skróciło kontekstu. Zachowano oryginalną treść.</string>
     <string name="nm_context_compact_incomplete">Model nie zwrócił pełnego podsumowania. Zachowano oryginalny kontekst.</string>
+    <string name="nm_restore_recovered">Odzyskano stan po przerwanym przywracaniu. W razie błędu dane odzyskiwania pozostają do kolejnej próby.</string>
+    <string name="nm_restore_recovery_failed">Odzyskiwanie nie powiodło się. Dane odzyskiwania zachowano. Uruchom aplikację ponownie, aby spróbować jeszcze raz.</string>
 </resources>

@@ -1226,4 +1226,6 @@
     <string name="nm_context_compact_idle_timeout">A compactação parou após %1$d segundos sem resposta (%2$d chamadas ao modelo).</string>
     <string name="nm_context_compact_no_gain">O resumo não reduziu o contexto. O conteúdo original foi mantido.</string>
     <string name="nm_context_compact_incomplete">O modelo não retornou um resumo completo. O contexto original foi mantido.</string>
+    <string name="nm_restore_recovered">A restauração interrompida foi recuperada. Se a recuperação falhar, os dados de recuperação serão mantidos para outra tentativa.</string>
+    <string name="nm_restore_recovery_failed">A recuperação falhou. Os dados de recuperação foram mantidos. Reinicie o aplicativo para tentar novamente.</string>
 </resources>

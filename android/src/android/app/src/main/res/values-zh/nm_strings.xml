@@ -1198,4 +1198,6 @@
     <string name="nm_context_compact_idle_timeout">模型连续 %1$d 秒未返回数据，已停止整理上下文（调用模型 %2$d 次）。</string>
     <string name="nm_context_compact_no_gain">摘要未缩短上下文，已保留原有内容。</string>
     <string name="nm_context_compact_incomplete">模型未返回完整摘要，已保留原有上下文。</string>
+    <string name="nm_restore_recovered">已恢复中断的还原操作。若恢复失败，恢复数据会保留供重试。</string>
+    <string name="nm_restore_recovery_failed">还原恢复失败。恢复数据已保留，请重启应用重试。</string>
 </resources>

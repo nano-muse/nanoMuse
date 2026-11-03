@@ -400,3 +400,7 @@ notes above; a settled item keeps its number and says how it went.
   system prompt) and leaves routines, goals, the feed and work for another device at home.
 - `ideas.en.json` / `ideas.zh.json` are one file four times (Android assets, iOS Resources,
   `harness/dsh-nanomuse/assets`, `web/src/ideas`); the harness and web tests fail when a copy drifts.
+
+| Feature | Android | iOS |
+|---|---|---|
+| Interrupted restore recovery | ✓ Unreleased, see [Android](android.md#restore-recovery) | ✓ |

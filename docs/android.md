@@ -582,3 +582,7 @@ like the Python package's version does.
 | `connectors/`, `ui/connectors/` | The connectors catalogue (`ConnectorsCatalogue` reads the asset), MCP authorization discovery + registration (`McpAuthDiscovery`), connecting and token refresh (`Connectors`), what this phone connected as published to the profile and what the other devices did (`SharedConnectors`), the Settings → Connectors page |
 | `ui/cloud/` | Sign-in, the Account screen, the Devices section |
 | `res/values*/nm_strings.xml` | Every nanoMuse string in the seventeen languages the app has (English, 简体中文, 繁體中文, German, Spanish, Filipino, French, Indonesian, Japanese, Korean, Malay, Polish, Brazilian Portuguese, Romanian, Russian, Thai, Turkish); every file carries the same keys, apart from the two the English file marks `translatable="false"` (the relay address example and the product name `nanoMuse Cloud`), and a missing one falls back to English |
+
+## Interrupted restore recovery {#restore-recovery}
+
+Android keeps a recovery snapshot before changing shared files, skills, memory, MCP configuration, providers or environment variables during a restore. A failed category is rolled back, and an interrupted category is reconciled before repositories open at the next launch. Recovery failures retain the snapshot and block normal startup for another attempt. Chats keep their existing merge behavior; this is not a full rollback of chat history. Recovery metadata stays outside exported data.

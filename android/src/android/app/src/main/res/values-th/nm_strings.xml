@@ -1221,4 +1221,6 @@
     <string name="nm_context_compact_idle_timeout">หยุดย่อบริบทหลังจากไม่มีการตอบกลับเป็นเวลา %1$d วินาที (เรียกโมเดล %2$d ครั้ง)</string>
     <string name="nm_context_compact_no_gain">สรุปไม่ได้ทำให้บริบทสั้นลง จึงเก็บเนื้อหาเดิมไว้</string>
     <string name="nm_context_compact_incomplete">โมเดลไม่ได้ส่งคืนสรุปที่สมบูรณ์ จึงเก็บบริบทเดิมไว้</string>
+    <string name="nm_restore_recovered">กู้คืนการคืนค่าที่ขัดจังหวะแล้ว หากกู้คืนไม่สำเร็จ จะเก็บข้อมูลการกู้คืนไว้เพื่อลองอีกครั้ง</string>
+    <string name="nm_restore_recovery_failed">กู้คืนไม่สำเร็จ เก็บข้อมูลการกู้คืนไว้แล้ว เริ่มแอปใหม่เพื่อลองอีกครั้ง</string>
 </resources>

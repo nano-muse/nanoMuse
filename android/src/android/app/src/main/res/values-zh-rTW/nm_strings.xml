@@ -1191,4 +1191,6 @@
     <string name="nm_context_compact_idle_timeout">模型連續 %1$d 秒未傳回資料，已停止整理上下文（呼叫模型 %2$d 次）。</string>
     <string name="nm_context_compact_no_gain">摘要未縮短上下文，已保留原有內容。</string>
     <string name="nm_context_compact_incomplete">模型未傳回完整摘要，已保留原有上下文。</string>
+    <string name="nm_restore_recovered">已復原中斷的還原作業。若復原失敗，復原資料會保留供重試。</string>
+    <string name="nm_restore_recovery_failed">還原復原失敗。復原資料已保留，請重新啟動應用程式重試。</string>
 </resources>

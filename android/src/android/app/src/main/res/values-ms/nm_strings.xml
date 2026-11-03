@@ -1221,4 +1221,6 @@
     <string name="nm_context_compact_idle_timeout">Pemadatan dihentikan selepas %1$d saat tanpa respons (%2$d panggilan model).</string>
     <string name="nm_context_compact_no_gain">Ringkasan tidak memendekkan konteks. Kandungan asal dikekalkan.</string>
     <string name="nm_context_compact_incomplete">Model tidak mengembalikan ringkasan lengkap. Konteks asal dikekalkan.</string>
+    <string name="nm_restore_recovered">Pemulihan terganggu telah dipulihkan. Jika gagal, data pemulihan disimpan untuk cubaan seterusnya.</string>
+    <string name="nm_restore_recovery_failed">Pemulihan gagal. Data pemulihan disimpan. Mulakan semula aplikasi untuk mencuba lagi.</string>
 </resources>

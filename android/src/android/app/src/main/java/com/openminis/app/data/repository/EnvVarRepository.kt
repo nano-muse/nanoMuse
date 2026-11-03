@@ -153,6 +153,9 @@ class EnvVarRepository(private val context: Context) {
         }
     }
 
+    // nanoMuse: refresh observers after category recovery.
+    fun reloadAfterRestoreRecovery() = loadMetadata()
+
     private fun loadMetadata() {
         try {
             if (!metadataFile.exists()) return

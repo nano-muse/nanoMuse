@@ -421,3 +421,7 @@ daemon 的上限，不修改仓库配置。例如在同一 Gradle 工程目录�
 | `connectors/`、`ui/connectors/` | 连接器目录（`ConnectorsCatalogue` 读取资源文件）、MCP 授权发现与注册（`McpAuthDiscovery`）、连接和令牌刷新（`Connectors`）、这台手机连接了什么并发布到 profile、其他设备连接了什么（`SharedConnectors`）、「设置 → 连接器」页面 |
 | `ui/cloud/` | 登录、账号屏、设备部分 |
 | `res/values*/nm_strings.xml` | nanoMuse 的全部字符串，App 支持的十七种语言各一份（英语、简体中文、繁體中文、德语、西班牙语、菲律宾语、法语、印尼语、日语、韩语、马来语、波兰语、巴西葡萄牙语、罗马尼亚语、俄语、泰语、土耳其语）；每个文件的键相同，只有英语文件里标了 `translatable="false"` 的两条（中继地址示例和产品名 `nanoMuse Cloud`）例外，缺的回落到英语 |
+
+## 中断还原的恢复 {#restore-recovery}
+
+Android 在还原共享文件、技能、记忆、MCP 配置、服务商或环境变量前保存恢复快照。类别还原失败时会回滚；若进程中断，下次启动会在打开数据仓库前恢复该类别。恢复失败会保留快照并阻止正常启动，以便重试。对话仍按原有规则合并，此功能不提供完整的对话历史回滚。恢复元数据不包含在导出内容中。

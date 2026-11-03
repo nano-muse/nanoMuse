@@ -1225,4 +1225,6 @@
     <string name="nm_context_compact_idle_timeout">Die Komprimierung wurde nach %1$d Sekunden ohne Antwort gestoppt (%2$d Modellaufrufe).</string>
     <string name="nm_context_compact_no_gain">Die Zusammenfassung hat den Kontext nicht verkürzt. Der ursprüngliche Inhalt wurde beibehalten.</string>
     <string name="nm_context_compact_incomplete">Das Modell hat keine vollständige Zusammenfassung zurückgegeben. Der ursprüngliche Kontext wurde beibehalten.</string>
+    <string name="nm_restore_recovered">Die unterbrochene Wiederherstellung wurde zurückgesetzt. Bei einem Fehler bleiben die Wiederherstellungsdaten für einen weiteren Versuch erhalten.</string>
+    <string name="nm_restore_recovery_failed">Die Wiederherstellung ist fehlgeschlagen. Die Wiederherstellungsdaten bleiben erhalten. App zum erneuten Versuch neu starten.</string>
 </resources>
