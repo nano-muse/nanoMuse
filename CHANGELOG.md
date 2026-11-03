@@ -94,6 +94,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Android listed online task-capable devices above files in the leading @ menu, showed device identity, and qualified duplicate names with their stable IDs.
+
 - Android displayed emoji avatars and their background colours from the account profile, kept them across restarts and account changes, and preserved them when renaming the agent or updating connectors.
 
 - **Kept built-in skills managed by the app.** Their contents remained readable and exportable, with enable switches available, while editing, importing over them and deleting them were blocked. For [#756](https://github.com/nano-muse/nanoMuse/issues/756).

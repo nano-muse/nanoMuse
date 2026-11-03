@@ -583,6 +583,12 @@ like the Python package's version does.
 | `ui/cloud/` | Sign-in, the Account screen, the Devices section |
 | `res/values*/nm_strings.xml` | Every nanoMuse string in the seventeen languages the app has (English, 简体中文, 繁體中文, German, Spanish, Filipino, French, Indonesian, Japanese, Korean, Malay, Polish, Brazilian Portuguese, Romanian, Russian, Thai, Turkish); every file carries the same keys, apart from the two the English file marks `translatable="false"` (the relay address example and the product name `nanoMuse Cloud`), and a missing one falls back to English |
 
+## Picking a device with @
+
+At the beginning of a message, type `@` to see online devices that accept tasks above the usual file matches. Filter by name, then tap a row or use the existing arrow keys and Return. Each device row shows its name, phone or computer icon, operating system, online state and device ID.
+
+Selection inserts the full name. Devices with identical names use `@Name [device-id]` to identify the selected device; an ambiguous unqualified name or prefix is not resolved to the first match. The delegation instruction uses the stable ID. Mentions later in a message continue to offer files only.
+
 ## Emoji avatars from another device
 
 An emoji avatar chosen on desktop or web also appears on Android, with its background colour. The phone keeps the emoji beside the drawn avatar, so it survives a restart and follows the existing account isolation. An empty emoji uses ✨ and an invalid colour uses blue (`#0064d4`).
