@@ -24,12 +24,13 @@ import re
 import socket
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from nanomuse.cloud import CLOUD_KEY, CloudClient, CloudError, model_url
 from nanomuse.hub import actions
-from nanomuse.hub.client import HubClient, HubError, IncomingCall
+from nanomuse.hub.client import TASK_CALL_TIMEOUT_S, HubClient, HubError, IncomingCall
 from nanomuse.hub.profile import ProfileSync
 from nanomuse.llm import session as llm_session
 from nanomuse.logger import logger
@@ -46,7 +47,7 @@ if TYPE_CHECKING:
 
 TASK_TIMEOUT_S = 15 * 60
 APPROVAL_TIMEOUT_S = 180
-REMOTE_TASK_TIMEOUT_S = 10 * 60
+REMOTE_TASK_TIMEOUT_S = TASK_CALL_TIMEOUT_S
 _RISK_WORDS = {"safe": "safe", "low": "low", "moderate": "moderate", "sensitive": "sensitive"}
 # Raw actions another device may ask of this computer that the person here agrees to first
 # (once, or always for that device): what runs, reads or writes. ``info``, ``notify`` and the
@@ -60,6 +61,12 @@ REMOTE_CONTROL_TOOL = "remote_control"
 
 class _RunStopped(Exception):
     """The run a `task` call was following was stopped before it answered."""
+
+
+@dataclass(frozen=True)
+class _IncomingTask:
+    thread_id: str
+    worker: asyncio.Task[None] | None
 
 
 class HubService:
@@ -78,8 +85,8 @@ class HubService:
         self.models: list[dict[str, Any]] = []
         # approval cards raised by *other* devices' runs, shown here: card id → (device id, approval id)
         self.remote_approvals: dict[str, tuple[str, str]] = {}
-        # runs other devices asked for, by call id → the thread they run in
-        self._incoming: dict[str, str] = {}
+        # Bind each call to its worker, since a thread can start again before forwarding ends.
+        self._incoming: dict[str, _IncomingTask] = {}
         # approval cards of those runs sent to the device that asked (approval id → device
         # id): the only cards a device may answer with ``approve``
         self._relayed_approvals: dict[str, str] = {}
@@ -752,8 +759,12 @@ class HubService:
         if call.action == "stop":
             # only the device that asked may stop its task (docs/hub.md): a `call` id must be
             # one of the sender's own, a `conversation` one the sender's tasks run in
-            tid = self._incoming.get(str(call.args.get("call") or ""))
-            if tid is None or not self._asked_by(tid, call.sender_id):
+            call_id = str(call.args.get("call") or "")
+            tid = self._active_task_thread(call_id)
+            if call_id:
+                if tid is not None and not self._asked_by(tid, call.sender_id):
+                    tid = None
+            else:
                 tid = self._thread_for(call.sender_id, str(call.args.get("conversation") or ""))
             stopped = bool(tid) and self.svc.stop_thread(tid or "")
             await call.result({"stopped": stopped})
@@ -900,6 +911,13 @@ class HubService:
         thread = self.svc.threads.get(thread_id)
         return bool(thread and thread.remote_from and thread.remote_from.get("device") == sender_id)
 
+    def _active_task_thread(self, call_id: str) -> str | None:
+        run = self._incoming.get(call_id)
+        if run is None or run.worker is None or run.worker.done():
+            return None
+        thread = self.svc.threads.get(run.thread_id)
+        return run.thread_id if thread is not None and thread.worker is run.worker else None
+
     async def _task(self, call: IncomingCall) -> None:
         text = str(call.args.get("text") or "").strip()
         if not text:
@@ -910,7 +928,6 @@ class HubService:
         if thread.busy or thread.device:
             await call.fail("busy", "this conversation is already busy")
             return
-        self._incoming[call.id] = thread.id
         queue = self.svc.bus.subscribe()
         try:
             # `language`: the asking device's UI language (optional, docs/hub.md); the
@@ -922,11 +939,14 @@ class HubService:
                 label=call.sender_name,
                 language=str(call.args.get("language") or "")[:20],
             )
+            self._incoming[call.id] = _IncomingTask(thread.id, thread.worker)
             final = await asyncio.wait_for(
                 self._relay_run(thread, call, queue), timeout=TASK_TIMEOUT_S
             )
         except TimeoutError:
-            self.svc.stop_thread(thread.id)
+            active = self._active_task_thread(call.id)
+            if active is not None:
+                self.svc.stop_thread(active)
             await call.fail("timeout", "the task took longer than the hub allows")
             return
         except _RunStopped:
@@ -1227,8 +1247,7 @@ class HubService:
             )
         except asyncio.CancelledError:
             ui.emit({"type": "notice", "level": "info", "text": "Stopped.", "thread": tid})
-            with contextlib.suppress(HubError):
-                await self.call(device_id, "stop", {"conversation": tid}, timeout=15)
+            # HubClient stops the exact task call on cancellation and timeout.
             raise
         finally:
             for eid in tool_events.values():

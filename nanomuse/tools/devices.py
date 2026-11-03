@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ConfigDict
 
 from nanomuse.hub import actions
-from nanomuse.hub.client import HubError
+from nanomuse.hub.client import TASK_CALL_TIMEOUT_S, HubError
 from nanomuse.schema import RiskLevel, ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment, int_arg
 from nanomuse.tools.shell import _DANGEROUS, programs_of
@@ -518,7 +518,7 @@ class Delegate(_DeviceTool):
                 str(d["id"]),
                 "task",
                 {"text": task, "from": hub.device_name},
-                timeout=600,
+                timeout=TASK_CALL_TIMEOUT_S,
                 on_event=on_event,
             )
         finally:

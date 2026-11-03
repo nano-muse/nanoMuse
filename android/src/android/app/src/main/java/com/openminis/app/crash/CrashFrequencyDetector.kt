@@ -308,6 +308,8 @@ object CrashFrequencyDetector {
         onClosed: (() -> Unit)? = null,
         saveLauncher: ((zip: File, onSaveDone: () -> Unit) -> Unit)? = null,
     ) {
+        // nanoMuse: never consume or expose diagnostics before the app access gate unlocks.
+        if (io.github.nanomuse.guard.AppAccess.locked.value) return
         val triggerFiles = pendingShareFiles ?: run {
             // No pending burst — still invoke onClosed so safe-mode
             // callers that pass `finish()` aren't stranded. With no
@@ -487,6 +489,8 @@ object CrashFrequencyDetector {
             .create()
         applyRoundedBackground(activity, dialog)
         dialog.show()
+        // nanoMuse: a native window must close when the app re-locks after background expiry.
+        io.github.nanomuse.guard.NativeAccess.protect(activity, dialog)
     }
 
     /**
@@ -586,6 +590,8 @@ object CrashFrequencyDetector {
         applyRoundedBackground(activity, dlg)
         dialogRef[0] = dlg
         dlg.show()
+        // nanoMuse: protect the export-method window as well as the file picker.
+        io.github.nanomuse.guard.NativeAccess.protect(activity, dlg)
     }
 
     /**

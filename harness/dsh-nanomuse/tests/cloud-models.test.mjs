@@ -101,6 +101,37 @@ async function cloud({ signedIn = false, defaultModel, baseURL = 'https://relay.
 
 const BAILIAN_MODELS = ['deepseek-v4.1-flash', 'qwen3.8-27b', 'qwen3-vl-plus', 'qwen-image-3.0', 'wan2.2-i2v-flash']
 
+test('Cloud refresh persists capacity-only changes and preserves editable model limits', async () => {
+  const out = await cloud({ signedIn: true })
+  try {
+    out.svc.state.models = out.svc.state.models.map((m) => ({ ...m, inputModalities: ['text'] }))
+    let models = ACCOUNT_MODELS.filter((m) => m.kind === 'chat').map((m) => ({
+      ...m, inputModalities: ['text'], contextWindow: 98304, maxTokens: 4096,
+    }))
+    out.svc.relay.me = async () => (await out.state()).account
+    out.svc.relay.models = async () => models
+    out.svc.profile.pull = async () => undefined
+    out.settings[LLM_ROW].providers[PROVIDER_ID] = {
+      models: [{ id: models[0].id, contextWindow: 32000, maxTokens: 1024 }],
+    }
+    await NanomuseCloud.prototype.refresh.call(out.svc)
+    assert.equal(out.svc.capacityModels()[0].contextWindow, 98304)
+    assert.equal(out.settings[LLM_ROW].providers[PROVIDER_ID].models[0].contextWindow, 32000)
+    assert.equal(out.settings[LLM_ROW].providers[PROVIDER_ID].models[0].maxTokens, 1024)
+    assert.equal((await out.state()).models[0].contextWindow, 98304)
+    const raw = { nanomuse: { models: [{ id: models[0].id }] } }
+    const first = out.svc.providerDefaults(raw)
+    assert.equal(first.nanomuse.models[0].contextWindow, 98304)
+    assert.equal(out.svc.providerDefaults(raw), first)
+    models = models.map((m, i) => i === 0 ? { ...m, contextWindow: 65536 } : m)
+    await NanomuseCloud.prototype.refresh.call(out.svc)
+    assert.equal((await out.state()).models[0].contextWindow, 65536)
+    assert.equal(out.svc.providerDefaults(raw).nanomuse.models[0].contextWindow, 65536)
+    assert.notEqual(out.svc.providerDefaults(raw), first)
+    assert.equal(out.settings[LLM_ROW].providers[PROVIDER_ID].models[0].contextWindow, 32000)
+  } finally { await out.done() }
+})
+
 test('the public Cloud ignores retired media models left in an older local snapshot', async () => {
   assert.equal(relayMediaEnabled('https://cloud.nanomuse.cn/'), false)
   assert.equal(relayMediaEnabled('https://relay.example/v1'), true)

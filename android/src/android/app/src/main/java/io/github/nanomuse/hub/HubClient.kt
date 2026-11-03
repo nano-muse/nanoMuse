@@ -321,6 +321,25 @@ class HubClient(
     /** Ask device [to] to carry out [action]; blocks up to [timeoutMs]. Returns the result body or throws [HubException]. */
     fun call(to: String, action: String, args: JSONObject, timeoutMs: Long, onEvent: ((JSONObject) -> Unit)? = null): JSONObject {
         val id = UUID.randomUUID().toString().replace("-", "").take(16)
+        try {
+            return callWithId(id, to, action, args, timeoutMs, onEvent)
+        } catch (error: Exception) {
+            if (action == "task" && (error is InterruptedException ||
+                    error is HubException && error.code == "timeout")) {
+                // The caller owns this id. A late cleanup must never stop a different task.
+                val interrupted = Thread.interrupted() || error is InterruptedException
+                try {
+                    runCatching { call(to, "stop", JSONObject().put("call", id), TASK_STOP_TIMEOUT_MS) }
+                } finally {
+                    if (interrupted) Thread.currentThread().interrupt()
+                }
+            }
+            throw error
+        }
+    }
+
+    /** A caller-owned id lets Stop name this exact task without affecting another chat. */
+    fun callWithId(id: String, to: String, action: String, args: JSONObject, timeoutMs: Long, onEvent: ((JSONObject) -> Unit)? = null): JSONObject {
         val p = Pending(onEvent)
         pending[id] = p
         var pump: Thread? = null
@@ -364,6 +383,9 @@ class HubClient(
 
     companion object {
         private const val TAG = "HubClient"
+        /** Match the relay and desktop/runtime task deadline. */
+        const val TASK_TIMEOUT_MS = 15 * 60_000L
+        const val TASK_STOP_TIMEOUT_MS = 15_000L
         /** After 4003 without a reason (replaced by a newer connection): what the desktop waits too. */
         private const val REPLACED_RETRY_MS = 30_000L
         /** After 4003 `hub_paused` (the operator paused the hub): what the desktop and the iPhone wait too. */

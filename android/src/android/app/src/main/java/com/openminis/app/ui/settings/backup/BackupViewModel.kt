@@ -237,7 +237,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
      * encrypted" means. Matches iOS 08904c7b1; the two sides must agree or
      * packages stop being interchangeable.
      */
-    fun startExport(passphrase: String?) {
+    fun startExport(passphrase: String?, resumeInterrupted: Boolean = false) {
         if (_isRunning.value) return
         val cats = _selected.value
         if (cats.isEmpty()) { _errorText.value = "Choose at least one thing to include."; return }
@@ -282,6 +282,8 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                 val summary = withContext(Dispatchers.IO) {
                     BackupExporter(getApplication(), db).export(
                         BackupExporter.Options(
+                            // nanoMuse: an interrupted run resumes only after an explicit request.
+                            resumeInterrupted = resumeInterrupted,
                             categories = cats,
                             maxFileBytes = maxFileBytesOption(),
                             chatFiles = _chatFiles.value, // nanoMuse: messages only when off (#561)
@@ -405,7 +407,10 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 AppLogger.error(TAG, "[Backup] export failed: ${e.message}")
-                _errorText.value = e.message ?: "Backup failed."
+                // nanoMuse: an interrupted run requires a deliberate, localized recovery choice.
+                _errorText.value = if (runCatching { BackupExporter.interrupted(getApplication()) }.getOrNull() != null)
+                    getApplication<Application>().getString(com.openminis.app.R.string.nm_backup_resume_hint)
+                else e.message ?: "Backup failed."
                 note(e.message ?: "Backup failed.", problem = true)
                 record = record.copy(
                     finishedAt = System.currentTimeMillis(),

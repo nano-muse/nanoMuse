@@ -2,10 +2,10 @@
  *  and the worst, the prompts repeated most. Shapes only, never a text. */
 
 import type { PageProps } from "../App";
-import { bytes, compact, dateOf, fmt, pct } from "../lib/format";
+import { bytes, compact, fmt, pct, siteDay } from "../lib/format";
 import { useData } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
-import type { Quality as QualityT, QualityAccount } from "../lib/types";
+import type { Overview, Quality as QualityT, QualityAccount } from "../lib/types";
 import { Bars, Donut, Legend, Ranks, platformColor } from "../ui/charts";
 import { Bar, DataTable, Grid, Kpi, Kpis, Note, Panel, Pill, type Col } from "../ui/primitives";
 import { Ago, PlatformPill, TierPill, Who } from "../ui/who";
@@ -14,6 +14,8 @@ import { Loaded, dayLabels } from "./common";
 export function Quality({ days }: PageProps) {
   const T = useT();
   const q = useData<QualityT>(`/v1/admin/analytics/quality?days=${days}`, { poll: 300_000 });
+  const ov = useData<Overview>("/v1/admin/overview?days=7", { maxAge: 300_000 });
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
   const accountCols: Col<QualityAccount>[] = [
     { key: "who", label: T.g.account, sortable: false, render: (a) => <Who id={a.account_id} hint={a.hint} identifier={a.identifier} disabled={a.disabled} tags={!a.contribute ? <Pill tone="warn">{T.qu.contributeOff}</Pill> : null} /> },
     { key: "score", label: T.qu.score, num: true, render: (a) => <span className="inline-flex items-center gap-2"><Bar value={a.score} max={100} tone={a.tier === "high" ? "ok" : a.tier === "low" ? "bad" : "warn"} className="w-14" />{a.score}</span> },
@@ -56,8 +58,8 @@ export function Quality({ days }: PageProps) {
                   { name: T.qu.legendTurns, values: d.series.map((r) => Math.max(0, r.turns - r.trivial)), color: "var(--c1)" },
                 ]}
                 lines={[{ name: T.qu.accounts, values: d.series.map((r) => r.accounts), color: "var(--ink-3)" }]}
-                labels={dayLabels(d.series.map((r) => r.day))}
-                titles={d.series.map((r) => `${dateOf(r.day)} · ${fmt(r.turns)} ${T.g.turns} · ${compact(r.bytes)}B`)}
+                labels={dayLabels(d.series.map((r) => r.day), offsetH)}
+                titles={d.series.map((r) => `${siteDay(r.day, offsetH)} · ${fmt(r.turns)} ${T.g.turns} · ${compact(r.bytes)}B`)}
                 format={fmt}
                 height={150}
               />

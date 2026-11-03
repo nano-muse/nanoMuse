@@ -8,7 +8,6 @@ import com.openminis.app.sandbox.NativeOffloadResult
 import com.openminis.app.sandbox.PRootKernel
 import io.github.nanomuse.sandbox.SandboxPaths
 import io.github.nanomuse.guard.GateOutcome
-import io.github.nanomuse.guard.GuardKind
 import io.github.nanomuse.guard.RiskAssessment
 import io.github.nanomuse.guard.RiskClass
 import io.github.nanomuse.guard.RiskGate
@@ -109,7 +108,7 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
                 "approval" -> {
                     val id = ev.optString("approval_id")
                     val preview = ev.optString("preview").ifBlank { ev.optString("summary") }
-                    val assessment = RiskAssessment(riskClass(ev.optString("risk")), ev.optString("reason").ifBlank { "asked by ${c.name}" }, RemoteApprovalKey.target(ev))
+                    val assessment = RemoteApprovalGate.assessment(ev, c.name)
                     val gate = approve(sessionId, c, assessment, "${c.name}: $preview")
                     Computers.approve(c, id, allow = gate.denied == null)
                     steps.put(JSONObject().put("approval", preview).put("allowed", gate.denied == null).apply { gate.notice?.let { put("notice", it) } })
@@ -137,14 +136,6 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
                 .put("steps", steps).put("conversation", r.optString("conversation"))
                 .put("tell_user", "Relay ${c.name}'s answer to the user in their language, as coming from ${c.name}."),
         )
-    }
-
-    private fun riskClass(risk: String): RiskClass = when (risk.lowercase()) {
-        "destructive", "delete" -> RiskClass.DESTRUCTIVE
-        "outbound", "send", "network" -> RiskClass.OUTBOUND
-        "money", "payment" -> RiskClass.MONEY
-        "install" -> RiskClass.INSTALL
-        else -> RiskClass.DESTRUCTIVE // "system" and anything unnamed: ask, with the reason on the card
     }
 
     private fun run(args: MediaOffloadHandler.Args, c: Computers.Computer, sessionId: String?): NativeOffloadResult {
@@ -222,8 +213,7 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     /** The card for an action on the computer. Grants are kept apart from the phone's. */
     private fun approve(sessionId: String?, c: Computers.Computer, assessment: RiskAssessment, preview: String): Gate {
-        val scoped = assessment.copy(target = assessment.target?.let { "pc:$it" })
-        val outcome = runBlocking { RiskGate.check(sessionId ?: "pc", GuardKind.COMPUTER, scoped, preview, pageUrl = c.name) }
+        val outcome = runBlocking { RemoteApprovalGate.check(sessionId, c.name, assessment, preview) }
         return when (outcome) {
             is GateOutcome.Allowed -> Gate(notice = outcome.notice)
             is GateOutcome.Denied -> Gate(denied = outcome.message)

@@ -66,6 +66,9 @@ import { PHONE_CARD_SECONDS, PhoneApprovals, type CardStatus } from './phone-app
 import { editImage as ownEditImage, generateImage as ownGenerateImage, imageShapeOf, type ImageEndpoint } from './images.ts'
 import { checkMove, checkScreenshot, displayInfo, isBlack, runtimeInfo, screenHead, type MoveCheck, type RuntimeInfo, type ScreenshotCheck } from './hands-check.ts'
 import { apiOf, baseUrlFor, CAPABILITIES, capabilitiesForAuth, capabilitiesOf, CHATGPT_KEY_REF, CHATGPT_PROVIDER, ChatGptDesk, hasUserinfo, keyRefFor, kindOf, listModelRows, listModels, loadCatalogue, modelsOf, ownProviderRow, parseModelReasoning, regionOf, sighted, typedModelIds, USERINFO_TEXT, type Capability, type ChatGptState, type LoginView, type OwnModel, type OwnProvider, type ProviderEntry, type Region } from './providers.ts'
+import { inheritCloudCapacity, type CapacityProviders } from './cloud-llm.ts'
+
+const EMPTY_RELAY_MODELS: readonly RelayModel[] = []
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -626,6 +629,7 @@ export default class NanomuseCloud extends Service {
   readonly profile: ProfileStore
   readonly hub: HubClient
   private state: State = {}
+  private capacityCache: { providers: CapacityProviders; models: readonly RelayModel[]; result: CapacityProviders } | undefined
   private busy: Promise<unknown> = Promise.resolve()
   private stateWrites: Promise<void> = Promise.resolve()
   private readonly streams = new Set<ServerResponse>()
@@ -3332,6 +3336,19 @@ export default class NanomuseCloud extends Service {
     return this.ctx.credentials.resolve(credentialRef(TOKEN_REF)).then((r) => r?.value)
   }
 
+  /** The persisted relay catalogue, reused by the adapter's default-capacity layer. */
+  capacityModels(): readonly RelayModel[] { return this.state.models ?? EMPTY_RELAY_MODELS }
+
+  /** Runtime defaults only: the editable settings remain the person's original values. */
+  providerDefaults<T extends CapacityProviders>(providers: T): T {
+    const models = this.capacityModels()
+    const cached = this.capacityCache
+    if (cached?.providers === providers && cached.models === models) return cached.result as T
+    const result = inheritCloudCapacity(providers, models)
+    this.capacityCache = { providers, models, result }
+    return result
+  }
+
   // -- the provider row -----------------------------------------------------------
 
   /**
@@ -3342,7 +3359,14 @@ export default class NanomuseCloud extends Service {
    * budget) and each is scaled to the pixel budget before it is encoded.
    */
   providerRow(models: RelayModel[]): Record<string, unknown> {
-    return providerRowFor(this.relayDoor.openaiBase || this.relay.openaiBase, models, this.state.deviceId ?? '')
+    const section = this.ctx.settings.describe().find((row) => row.ns === LLM_ROW)
+    const providers = (section?.value as { providers?: Record<string, Record<string, unknown>> } | undefined)?.providers
+    const previous = providers?.[PROVIDER_ID] ?? {}
+    const base = providerRowFor(this.relayDoor.openaiBase || this.relay.openaiBase, models, this.state.deviceId ?? '')
+    const oldModels = Array.isArray(previous.models) ? previous.models as Record<string, unknown>[] : []
+    return { ...previous, ...base, models: (base.models as Record<string, unknown>[]).map((model) => ({
+      ...oldModels.find((old) => old.id === model.id), ...model,
+    })) }
   }
 
   /**
@@ -4513,7 +4537,7 @@ function sameModels(a: RelayModel[], b: RelayModel[]): boolean {
   const key = (models: RelayModel[]) =>
     models
       .filter((m) => m.kind === 'chat')
-      .map((m) => `${m.id}:${m.name}:${m.inputModalities.join(',')}`)
+      .map((m) => `${m.id}:${m.name}:${m.inputModalities.join(',')}:${m.contextWindow ?? ''}:${m.maxTokens ?? ''}`)
       .sort()
       .join('|')
   return key(a) === key(b)
