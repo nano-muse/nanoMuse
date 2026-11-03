@@ -1,12 +1,13 @@
 /** What happens day by day, and the feed of everyone's events, filtered by kind and paged. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageProps } from "../App";
 import { get, qs } from "../lib/api";
 import { compact, dateOf, fmt, when } from "../lib/format";
 import { useData } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
 import { useRoute } from "../lib/router";
+import { LatestRequest } from "../lib/latest-request";
 import type { EventRow, Series } from "../lib/types";
 import { Legend, Lines } from "../ui/charts";
 import { Btn, Chips, Grid, Note, Panel, Pill } from "../ui/primitives";
@@ -32,29 +33,36 @@ export function Activity({ days }: PageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // a page asked for under an older filter (or the poll racing a "More") must not
+  // land under the newer list, nor clear its loading flag
+  const requests = useRef(new LatestRequest());
   const load = useCallback(
-    async (before: number) => {
-      setLoading(true);
-      setError("");
-      try {
-        const r = await get<{ events: EventRow[] }>(`/v1/admin/events${qs({ limit: 200, kind, before })}`);
-        setEvents((xs) => (before ? [...xs, ...r.events] : r.events));
-        setDone(r.events.length < 200);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    },
+    (before: number) => requests.current.run(
+      () => get<{ events: EventRow[] }>(`/v1/admin/events${qs({ limit: 200, kind, before })}`),
+      {
+        start: () => { setLoading(true); setError(""); },
+        success: (r) => {
+          setEvents((xs) => (before ? [...xs, ...r.events] : r.events));
+          setDone(r.events.length < 200);
+        },
+        error: (e) => setError(e instanceof Error ? e.message : String(e)),
+        finish: () => setLoading(false),
+      },
+    ),
     [kind],
   );
   useEffect(() => {
+    const pending = requests.current;
     setEvents([]);
+    setDone(false);
     void load(0);
     const id = setInterval(() => {
       if (document.visibilityState === "visible") void load(0);
     }, 30_000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      pending.invalidate();
+    };
   }, [load]);
   return (
     <>
