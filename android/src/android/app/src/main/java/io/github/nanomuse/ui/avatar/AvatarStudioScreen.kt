@@ -117,6 +117,7 @@ private val avatarPresets = listOf(
 fun AvatarStudioScreen(onBack: () -> Unit, onOpenSoul: () -> Unit, onOpenMediaModels: () -> Unit = {}) {
     val context = LocalContext.current
     val current by AvatarStore.current.collectAsState()
+    val emoji by AvatarStore.emoji.collectAsState()
     val slots by AvatarStudio.slots.collectAsState()
     val selected by AvatarStudio.selected.collectAsState()
     val progress by AvatarStudio.moodProgress.collectAsState()
@@ -209,6 +210,8 @@ fun AvatarStudioScreen(onBack: () -> Unit, onOpenSoul: () -> Unit, onOpenMediaMo
                                 text = { Text(stringResource(R.string.nm_avatar_menu_regenerate_moods)) },
                                 onClick = { menu = false; priced(io.github.nanomuse.cloud.FaceCost.poses()) { AvatarStudio.generateMoods(context, force = true) } },
                             )
+                        }
+                        if (current != null || emoji != null) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.nm_avatar_menu_reset), color = MaterialTheme.colorScheme.error) },
                                 onClick = { menu = false; AvatarStudio.reset(context) },

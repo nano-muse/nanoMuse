@@ -1700,8 +1700,9 @@ class ChatViewModel(
         return if (groupLimit != null) minOf(window, groupLimit) else window
     }
 
+    // nanoMuse: the usage sheet follows refreshed endpoint metadata and live overrides.
     val currentModelMaxOutputTokens: Int?
-        get() = currentModel?.maxOutputTokens
+        get() = (currentProvider?.let(::nmResolvedModel) ?: currentModel)?.maxOutputTokens
 
     // ── Session token usage (iOS parity: TokenUsageSheet data) ─────────────
 
