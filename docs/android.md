@@ -582,3 +582,9 @@ like the Python package's version does.
 | `connectors/`, `ui/connectors/` | The connectors catalogue (`ConnectorsCatalogue` reads the asset), MCP authorization discovery + registration (`McpAuthDiscovery`), connecting and token refresh (`Connectors`), what this phone connected as published to the profile and what the other devices did (`SharedConnectors`), the Settings → Connectors page |
 | `ui/cloud/` | Sign-in, the Account screen, the Devices section |
 | `res/values*/nm_strings.xml` | Every nanoMuse string in the seventeen languages the app has (English, 简体中文, 繁體中文, German, Spanish, Filipino, French, Indonesian, Japanese, Korean, Malay, Polish, Brazilian Portuguese, Romanian, Russian, Thai, Turkish); every file carries the same keys, apart from the two the English file marks `translatable="false"` (the relay address example and the product name `nanoMuse Cloud`), and a missing one falls back to English |
+
+## Emoji avatars from another device
+
+An emoji avatar chosen on desktop or web also appears on Android, with its background colour. The phone keeps the emoji beside the drawn avatar, so it survives a restart and follows the existing account isolation. An empty emoji uses ✨ and an invalid colour uses blue (`#0064d4`).
+
+Drawn faces and personal clips retain their existing priority. Renaming the agent or changing connectors leaves an unchanged remote appearance alone. Resetting the avatar explicitly returns to the dragon. Choosing an emoji on Android is not part of this change.
