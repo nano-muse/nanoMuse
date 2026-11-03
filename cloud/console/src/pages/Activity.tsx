@@ -8,7 +8,7 @@ import { useData } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
 import { useRoute } from "../lib/router";
 import { LatestRequest } from "../lib/latest-request";
-import type { EventRow, Series } from "../lib/types";
+import type { EventRow, Overview, Series } from "../lib/types";
 import { Legend, Lines } from "../ui/charts";
 import { Btn, Chips, Grid, Note, Panel, Pill } from "../ui/primitives";
 import { IpChip, PlatformPill, Who } from "../ui/who";
@@ -29,6 +29,8 @@ export function Activity({ days }: PageProps) {
   const route = useRoute();
   const kind = route.params.get("k") || "";
   const se = useData<Series>(`/v1/admin/series?days=${days}`, { poll: 120_000 });
+  const ov = useData<Overview>("/v1/admin/overview?days=7", { maxAge: 300_000 });
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -73,8 +75,8 @@ export function Activity({ days }: PageProps) {
     <>
       <Loaded q={se}>
         {(d) => {
-          const labels = dayLabels(d.days.map((x) => x.day));
-          const titles = dayTitles(d.days.map((x) => x.day));
+          const labels = dayLabels(d.days.map((x) => x.day), offsetH);
+          const titles = dayTitles(d.days.map((x) => x.day), offsetH);
           const L = (k: keyof typeof T.at.series, key: keyof Series["days"][number], color: string) => ({ name: T.at.series[k], values: d.days.map((x) => Number(x[key] || 0)), color });
           const blocks: { series: ReturnType<typeof L>[]; title: string }[] = [
             { title: T.at.series.calls, series: [L("calls", "calls", "var(--c1)")] },

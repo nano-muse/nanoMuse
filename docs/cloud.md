@@ -1,5 +1,6 @@
 # nanoMuse Cloud
 
+Daily analytics labels and tooltips use the site's configured timezone offset, including UTC, regardless of the operator's browser timezone.
 Unchanged settings polls preserve unsaved allowance, invite bonus and nudge-policy edits. A changed server value still refreshes the corresponding editor.
 Switching accounts in the admin drawer clears the samples list and ignores pending sample responses and errors from the previous account.
 Changing an Activity filter discards pending responses from the previous filter. Automatic refresh pauses while older event pages are being read, so it cannot discard a pending or already loaded More page.

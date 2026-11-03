@@ -71,12 +71,21 @@ describe("Activity request ownership", () => {
     expect(text()).toContain("event-400");
   });
 
-  it("resumes first-page polling after the filter changes", async () => {
-    vi.mocked(get).mockResolvedValue({ events: [event(1)] });
+  it("resumes polling after leaving a paged filter and drops its pending More answer", async () => {
+    const more = deferred();
+    vi.mocked(get)
+      .mockResolvedValueOnce({ events: Array.from({ length: 200 }, (_, i) => event(400 - i)) })
+      .mockReturnValueOnce(more.promise)
+      .mockResolvedValue({ events: [event(1, "current-filter")] });
     await act(async () => { screen = create(page()); });
+    const button = screen!.root.findAllByType("button").find((node) => node.props.children === "Load 200 more");
+    act(() => { void button!.props.onClick(); });
     route.params = new URLSearchParams({ k: "upstream.error" });
     await act(async () => { screen!.update(page()); });
+    await act(async () => { more.resolve({ events: [event(199, "previous-filter-history")] }); });
+    expect(text()).toContain("current-filter");
+    expect(text()).not.toContain("previous-filter-history");
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
-    expect(get).toHaveBeenCalledTimes(3);
+    expect(get).toHaveBeenCalledTimes(4);
   });
 });

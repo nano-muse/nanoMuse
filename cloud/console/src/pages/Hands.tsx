@@ -2,10 +2,10 @@
  *  tool; the accounts that used it; the devices that can be operated. */
 
 import type { PageProps } from "../App";
-import { dateOf, fmt, pct } from "../lib/format";
+import { fmt, pct, siteDay } from "../lib/format";
 import { useData } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
-import type { Hands as HandsT } from "../lib/types";
+import type { Hands as HandsT, Overview } from "../lib/types";
 import { Bars, Legend, Ranks, platformColor } from "../ui/charts";
 import { DataTable, Grid, Kpi, Kpis, Note, Panel, Pill } from "../ui/primitives";
 import { Ago, PlatformPill, Who } from "../ui/who";
@@ -14,6 +14,8 @@ import { Loaded, dayLabels } from "./common";
 export function Hands({ days }: PageProps) {
   const T = useT();
   const q = useData<HandsT>(`/v1/admin/analytics/hands?days=${days}`, { poll: 300_000 });
+  const ov = useData<Overview>("/v1/admin/overview?days=7", { maxAge: 300_000 });
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
   return (
     <Loaded q={q}>
       {(d) => {
@@ -34,8 +36,8 @@ export function Hands({ days }: PageProps) {
               <Bars
                 series={platforms.map((p) => ({ name: nameOf(T.platforms, p), values: d.days_series.map((r) => r.platforms[p] || 0), color: platformColor(p) }))}
                 lines={[{ name: T.ha.accounts, values: d.days_series.map((r) => r.hands_accounts), color: "var(--ink-3)" }]}
-                labels={dayLabels(d.days_series.map((r) => r.day))}
-                titles={d.days_series.map((r) => `${dateOf(r.day)} · ${fmt(r.hands)} / ${fmt(r.calls)}`)}
+                labels={dayLabels(d.days_series.map((r) => r.day), offsetH)}
+                titles={d.days_series.map((r) => `${siteDay(r.day, offsetH)} · ${fmt(r.hands)} / ${fmt(r.calls)}`)}
                 height={160}
               />
               <Legend className="mt-2" items={[...platforms.map((p) => ({ name: nameOf(T.platforms, p), color: platformColor(p) })), { name: T.ha.accounts, color: "var(--ink-3)" }]} />
