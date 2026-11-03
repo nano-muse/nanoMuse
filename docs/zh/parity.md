@@ -162,4 +162,6 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 - 对话同步从四个客户端和一个中继说同一种线路格式（`docs/cloud.md` 里的约定 C7）：`cloud/nanomuse_cloud/sync.py`、`nanomuse/sync/`（运行时和网页）、`harness/dsh-nanomuse/src/sync.ts`（桌面）、`io.github.nanomuse.sync`（Android）、`NanoMuse/NanoMuseSync.swift`（iOS）。每个客户端都先应用一页的对话再应用它的消息，只在拉取时移动游标；每个客户端只推送这个人的话和最终答复（绝不推送工具步骤、工具结果或系统提示），例程、目标、动态和替另一台设备干的活都留在家里。
 - `ideas.en.json` / `ideas.zh.json` 是同一个文件存四份（Android 资源、iOS Resources、`harness/dsh-nanomuse/assets`、`web/src/ideas`）；某一份漂移时 harness 和网页的测试会失败。
 
-Android：Android 可在显示应用内容前要求使用本机锁屏方式验证。在设置中启用应用锁并选择重新锁定的时间，保存更改需要验证。解锁状态仅在当前进程内有效。两种布局和传入分享使用同一入口保护。这是应用内访问保护，不是存储加密。后台任务继续运行。尚未完成真机验证。
+| 功能 | Android | iOS |
+|---|---|---|
+| 应用锁 | ✓ 未发布，见 [Android](android.md#app-lock) | ✓ |

@@ -401,4 +401,6 @@ notes above; a settled item keeps its number and says how it went.
 - `ideas.en.json` / `ideas.zh.json` are one file four times (Android assets, iOS Resources,
   `harness/dsh-nanomuse/assets`, `web/src/ideas`); the harness and web tests fail when a copy drifts.
 
-Android: Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts and incoming shares use the same gate. This protects access in the app, not encryption of stored data. Background tasks continue. Hardware validation remains pending.
+| Feature | Android | iOS |
+|---|---|---|
+| App lock | ✓ Unreleased, see [Android](android.md#app-lock) | ✓ |
