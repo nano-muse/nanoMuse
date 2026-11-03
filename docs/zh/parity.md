@@ -166,5 +166,6 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 
 | 功能 | Android | iOS |
 |---|---|---|
+| 继续中断的备份 | ✓ 未发布，见 [Android](android.md#export-resume) | ✓ |
 | 中断还原的恢复 | ✓ 未发布，见 [Android](android.md#restore-recovery) | ✓ |
 | 未读回复 | ✓ 未发布，见 [Android](android.md#unread-replies) | ✓ |

@@ -1225,8 +1225,6 @@
     <string name="nm_context_compact_idle_timeout">La compactación se detuvo tras %1$d segundos sin respuesta (%2$d llamadas al modelo).</string>
     <string name="nm_context_compact_no_gain">El resumen no redujo el contexto. Se conservó el contenido original.</string>
     <string name="nm_context_compact_incomplete">El modelo no devolvió un resumen completo. Se conservó el contexto original.</string>
-    <string name="nm_restore_recovered">Se recuperó la restauración interrumpida. Si falla la recuperación, sus datos se conservan para otro intento.</string>
-    <string name="nm_restore_recovery_failed">Falló la recuperación. Sus datos se conservaron. Reinicia la aplicación para reintentar.</string>
     <string name="nm_remote_ambiguous">Coincide más de un dispositivo. Elige uno en Cuenta → Dispositivos.</string>
     <string name="nm_remote_attachments">Las menciones a dispositivos solo envían texto. Quita los adjuntos antes de enviar.</string>
     <string name="nm_remote_no_answer">%1$s terminó sin responder.</string>
@@ -1235,4 +1233,9 @@
     <string name="nm_remote_chat_busy">Espera a que termine esta conversación antes de enviar una tarea a un dispositivo.</string>
 
     <string name="nm_reply_unread">Respuesta sin leer</string>
+    <string name="nm_restore_recovered">Se recuperó la restauración interrumpida. Si falla la recuperación, sus datos se conservan para otro intento.</string>
+    <string name="nm_restore_recovery_failed">Falló la recuperación. Sus datos se conservaron. Reinicia la aplicación para reintentar.</string>
+    <string name="nm_backup_resume">Reanudar copia</string>
+    <string name="nm_backup_discard">Descartar copia interrumpida</string>
+    <string name="nm_backup_resume_hint">Hay una copia interrumpida. Reanúdala con las opciones originales y vuelve a introducir la contraseña si hace falta, o descártala para empezar de nuevo.</string>
 </resources>

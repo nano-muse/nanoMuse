@@ -404,5 +404,6 @@ notes above; a settled item keeps its number and says how it went.
 
 | Feature | Android | iOS |
 |---|---|---|
+| Resume interrupted backups | ✓ Unreleased, see [Android](android.md#export-resume) | ✓ |
 | Interrupted restore recovery | ✓ Unreleased, see [Android](android.md#restore-recovery) | ✓ |
 | Unread replies | ✓ Unreleased, see [Android](android.md#unread-replies) | ✓ |

@@ -101,6 +101,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
+
 - Recovered interrupted Android restore categories before opening their repositories, retaining snapshots when recovery failed.
 
 - Android sent explicit device mentions directly through the Hub, displayed remote steps and streamed text, reused scoped approval cards, and stopped the exact remote call without starting a local model turn.

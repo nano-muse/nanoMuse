@@ -1221,8 +1221,6 @@
     <string name="nm_context_compact_idle_timeout">หยุดย่อบริบทหลังจากไม่มีการตอบกลับเป็นเวลา %1$d วินาที (เรียกโมเดล %2$d ครั้ง)</string>
     <string name="nm_context_compact_no_gain">สรุปไม่ได้ทำให้บริบทสั้นลง จึงเก็บเนื้อหาเดิมไว้</string>
     <string name="nm_context_compact_incomplete">โมเดลไม่ได้ส่งคืนสรุปที่สมบูรณ์ จึงเก็บบริบทเดิมไว้</string>
-    <string name="nm_restore_recovered">กู้คืนการคืนค่าที่ขัดจังหวะแล้ว หากกู้คืนไม่สำเร็จ จะเก็บข้อมูลการกู้คืนไว้เพื่อลองอีกครั้ง</string>
-    <string name="nm_restore_recovery_failed">กู้คืนไม่สำเร็จ เก็บข้อมูลการกู้คืนไว้แล้ว เริ่มแอปใหม่เพื่อลองอีกครั้ง</string>
     <string name="nm_remote_ambiguous">พบอุปกรณ์ที่ตรงกันมากกว่าหนึ่งเครื่อง เลือกในบัญชี → อุปกรณ์</string>
     <string name="nm_remote_attachments">การกล่าวถึงอุปกรณ์ส่งได้เฉพาะข้อความ โปรดนำไฟล์แนบออกก่อนส่ง</string>
     <string name="nm_remote_no_answer">%1$s ทำงานเสร็จโดยไม่มีคำตอบ</string>
@@ -1231,4 +1229,9 @@
     <string name="nm_remote_chat_busy">รอให้การสนทนานี้ทำงานเสร็จก่อนส่งงานไปยังอุปกรณ์</string>
 
     <string name="nm_reply_unread">คำตอบที่ยังไม่ได้อ่าน</string>
+    <string name="nm_restore_recovered">กู้คืนการคืนค่าที่ขัดจังหวะแล้ว หากกู้คืนไม่สำเร็จ จะเก็บข้อมูลการกู้คืนไว้เพื่อลองอีกครั้ง</string>
+    <string name="nm_restore_recovery_failed">กู้คืนไม่สำเร็จ เก็บข้อมูลการกู้คืนไว้แล้ว เริ่มแอปใหม่เพื่อลองอีกครั้ง</string>
+    <string name="nm_backup_resume">สำรองข้อมูลต่อ</string>
+    <string name="nm_backup_discard">ทิ้งการสำรองข้อมูลที่ขัดจังหวะ</string>
+    <string name="nm_backup_resume_hint">มีการสำรองข้อมูลที่ขัดจังหวะอยู่ ดำเนินการต่อด้วยตัวเลือกเดิมและป้อนรหัสผ่านอีกครั้งหากจำเป็น หรือทิ้งเพื่อเริ่มใหม่</string>
 </resources>

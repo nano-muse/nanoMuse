@@ -583,6 +583,12 @@ like the Python package's version does.
 | `ui/cloud/` | Sign-in, the Account screen, the Devices section |
 | `res/values*/nm_strings.xml` | Every nanoMuse string in the seventeen languages the app has (English, 简体中文, 繁體中文, German, Spanish, Filipino, French, Indonesian, Japanese, Korean, Malay, Polish, Brazilian Portuguese, Romanian, Russian, Thai, Turkish); every file carries the same keys, apart from the two the English file marks `translatable="false"` (the relay address example and the product name `nanoMuse Cloud`), and a missing one falls back to English |
 
+## Resume interrupted backups {#export-resume}
+
+Backup and restore offers Resume and Discard for an interrupted export. Resume requires the original category, file-limit, chat-file and credential options, preserves its identifier and cut-off, and reuses verified completed categories. An encrypted run requires the password again and cannot resume as plaintext. The password is never written to the journal. Encryption and packaging use a disposable copy, so allow temporary disk space for that copy. Failed runs retain private staging until resumed or discarded. Scheduled runs report the pending recovery choice instead of replacing it. Finished packages keep the existing interoperable .minisbak format.
+
+Resuming verifies the committed file index as well as staged data and blobs, so changed destination paths or metadata are refused even when the index length is unchanged.
+
 ## Interrupted restore recovery {#restore-recovery}
 
 Android keeps a recovery snapshot before changing shared files, skills, memory, MCP configuration, providers or environment variables during a restore. A failed category is rolled back, and an interrupted category is reconciled before repositories open at the next launch. Recovery failures retain the snapshot and block normal startup for another attempt. Chats keep their existing merge behavior; this is not a full rollback of chat history. Recovery metadata stays outside exported data.
