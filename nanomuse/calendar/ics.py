@@ -3,8 +3,9 @@
 Every calendar people use can hand out a private ``.ics`` link — Google, Outlook, iCloud,
 Fastmail, Nextcloud — and reading one needs no OAuth dance, which is why this is the
 connector. What is read: VEVENT summary, times (with TZID, UTC and all-day forms),
-location, description, RRULE with EXDATE and RECURRENCE-ID overrides, CANCELLED status.
-What is not: VTODO, VJOURNAL, alarms, attendees.
+location, description, RRULE with EXDATE, RDATE and RECURRENCE-ID overrides, CANCELLED
+status. What is not: RDATE's PERIOD form (an occurrence that carries its own end), VTODO,
+VJOURNAL, alarms, attendees.
 """
 
 from __future__ import annotations
@@ -54,6 +55,7 @@ class Event:
     description: str = ""
     rrule: str = ""
     exdates: list[datetime] = field(default_factory=list)
+    rdates: list[datetime] = field(default_factory=list)
     recurrence_id: datetime | None = None  # this VEVENT replaces one occurrence of ``uid``
     calendar: str = ""
     cancelled: bool = False
@@ -206,11 +208,19 @@ def parse_ics(text: str, default_tz: tzinfo, calendar: str = "") -> list[Event]:
 def _event(props: list[tuple[str, dict[str, str], str]], tz: tzinfo, calendar: str) -> Event | None:
     fields: dict[str, tuple[dict[str, str], str]] = {}
     exdates: list[datetime] = []
+    rdates: list[datetime] = []
     for name, params, value in props:
-        if name == "EXDATE":
+        if name in ("EXDATE", "RDATE"):
+            # RDATE is dated on its own line, so it carries its own TZID and may sit in
+            # another zone than DTSTART. A PERIOD value ("19970101T180000Z/PT5H30M") gives
+            # that one occurrence its own length, which this reader does not keep: it is
+            # skipped rather than added with the event's duration, which would be wrong.
+            into = exdates if name == "EXDATE" else rdates
+            if params.get("VALUE", "").upper() == "PERIOD":
+                continue
             for part in value.split(","):
                 try:
-                    exdates.append(parse_dt(part, params, tz)[0])
+                    into.append(parse_dt(part, params, tz)[0])
                 except ValueError:
                     continue
         else:
@@ -243,6 +253,7 @@ def _event(props: list[tuple[str, dict[str, str], str]], tz: tzinfo, calendar: s
         description=text("DESCRIPTION"),
         rrule=fields["RRULE"][1].strip() if "RRULE" in fields else "",
         exdates=exdates,
+        rdates=rdates,
         recurrence_id=rec_id,
         calendar=calendar,
         cancelled=text("STATUS").upper() == "CANCELLED",
@@ -300,22 +311,32 @@ def _occurrence(ev: Event, start: datetime, end: datetime) -> Occurrence:
 
 
 def _starts(ev: Event, start: datetime, end: datetime) -> list[datetime]:
-    if not ev.rrule:
+    if not ev.rrule and not ev.rdates:
         return [ev.start]
     # Occurrences that begin before the window but run into it still count.
     lookback = max(ev.duration, timedelta(0))
-    try:
-        rule = rrulestr(_rrule_for(ev), dtstart=ev.start)
-    except (ValueError, TypeError):
-        return [ev.start]
     rules = rruleset()
-    rules.rrule(rule)  # type: ignore[arg-type]
+    if ev.rrule:
+        try:
+            rule = rrulestr(_rrule_for(ev), dtstart=ev.start)
+        except (ValueError, TypeError):
+            # A rule we cannot read still leaves the event itself on the calendar.
+            rules.rdate(ev.start)
+        else:
+            rules.rrule(rule)  # type: ignore[arg-type]
+    else:
+        # No rule: DTSTART is the one occurrence, and RDATE adds the others.
+        rules.rdate(ev.start)
+    for rd in ev.rdates:
+        rules.rdate(rd if not ev.all_day else rd.replace(tzinfo=ev.start.tzinfo))
     for ex in ev.exdates:
         rules.exdate(ex if not ev.all_day else ex.replace(tzinfo=ev.start.tzinfo))
     try:
-        return list(rules.between(start - lookback, end, inc=True))
+        starts = rules.between(start - lookback, end, inc=True)
     except (ValueError, TypeError):
-        return [ev.start]
+        return sorted({ev.start, *ev.rdates})
+    # An RDATE may land on an occurrence the rule already made: once, not twice.
+    return sorted(set(starts))
 
 
 def _rrule_for(ev: Event) -> str:

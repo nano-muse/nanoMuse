@@ -319,3 +319,82 @@ async def test_calendar_tool(tmp_path: Path):
 
     off = Calendar(feeds=CalendarFeeds(settings_for(enabled=False), tz=TZ), workspace=ws)
     assert "no calendar is connected" in (await off.execute(action="agenda")).error
+
+
+def test_rdate_adds_the_dates_a_rule_does_not_make():
+    """RFC 5545 §3.8.5.2: RDATE names further occurrences of an event. A feed that dates a
+    series this way (Outlook and iCloud do, for one-off additions) used to lose all of
+    them: the reader kept DTSTART, unrolled RRULE and dropped EXDATE dates, and had no
+    place for a date on its own line."""
+    ics = (
+        "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:physio\n"
+        "DTSTART;TZID=Asia/Shanghai:20261105T090000\n"
+        "DTEND;TZID=Asia/Shanghai:20261105T093000\n"
+        "RDATE;TZID=Asia/Shanghai:20261112T090000,20261119T090000\n"
+        "SUMMARY:Physio\nEND:VEVENT\nEND:VCALENDAR\n"
+    )
+    events = parse_ics(ics, TZ)
+    assert [rd.date() for rd in events[0].rdates] == [date(2026, 11, 12), date(2026, 11, 19)]
+    month = expand(events, datetime(2026, 11, 1, tzinfo=TZ), datetime(2026, 12, 1, tzinfo=TZ))
+    assert [o.start.date() for o in month] == [
+        date(2026, 11, 5),
+        date(2026, 11, 12),
+        date(2026, 11, 19),
+    ]
+    assert {o.end - o.start for o in month} == {timedelta(minutes=30)}
+
+
+def test_rdate_beside_a_rule_doubles_nothing_and_keeps_all_day_dates():
+    """An RDATE that lands on a date the rule already makes is one occurrence; an all-day
+    one is a whole day; a PERIOD one is skipped rather than added with the wrong length."""
+    ics = (
+        "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:standup\n"
+        "DTSTART;TZID=Asia/Shanghai:20261102T093000\n"
+        "DTEND;TZID=Asia/Shanghai:20261102T100000\n"
+        "RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20261201T000000Z\n"
+        "RDATE;TZID=Asia/Shanghai:20261107T140000,20261109T093000\n"
+        "SUMMARY:Standup\nEND:VEVENT\n"
+        "BEGIN:VEVENT\nUID:rent\nDTSTART;VALUE=DATE:20261101\n"
+        "RDATE;VALUE=DATE:20261115\n"
+        "RDATE;VALUE=PERIOD:20261120T000000/PT3H\n"
+        "SUMMARY:Rent\nEND:VEVENT\nEND:VCALENDAR\n"
+    )
+    events = parse_ics(ics, TZ)
+    month = expand(events, datetime(2026, 11, 1, tzinfo=TZ), datetime(2026, 12, 1, tzinfo=TZ))
+    standup = [
+        o.start.astimezone(TZ).strftime("%m-%d %H:%M") for o in month if o.summary == "Standup"
+    ]
+    assert standup == [
+        "11-02 09:30",
+        "11-07 14:00",
+        "11-09 09:30",
+        "11-16 09:30",
+        "11-23 09:30",
+        "11-30 09:30",
+    ]
+    rent = [o for o in month if o.summary == "Rent"]
+    assert [o.start.date() for o in rent] == [date(2026, 11, 1), date(2026, 11, 15)]
+    assert all(
+        o.all_day and o.end - o.start == timedelta(days=1) for o in rent
+    ), "PERIOD is skipped"
+    assert any(o.rdates for o in events)
+
+
+def test_exdate_still_removes_an_rdate():
+    """An EXDATE on a date that RDATE added cancels it, as it cancels a rule's occurrence."""
+    head = (
+        "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:standup\n"
+        "DTSTART;TZID=Asia/Shanghai:20261102T093000\n"
+        "RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20261117T000000Z\n"
+        "RDATE;TZID=Asia/Shanghai:20261107T140000\n"
+    )
+    tail = "SUMMARY:Standup\nEND:VEVENT\nEND:VCALENDAR\n"
+    window = (datetime(2026, 11, 1, tzinfo=TZ), datetime(2026, 12, 1, tzinfo=TZ))
+
+    def days(text: str) -> list[str]:
+        found = expand(parse_ics(text, TZ), *window)
+        return [o.start.astimezone(TZ).strftime("%m-%d") for o in found]
+
+    assert days(head + tail) == ["11-02", "11-07", "11-09", "11-16"]
+    cancelled = head + "EXDATE;TZID=Asia/Shanghai:20261107T140000\n" + tail
+    assert days(cancelled) == ["11-02", "11-09", "11-16"]
