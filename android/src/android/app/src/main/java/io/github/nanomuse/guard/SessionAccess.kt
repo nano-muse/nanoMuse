@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /** Local-only metadata, deliberately separate from ChatSessionEntity and export/sync. */
 object SessionAccess {
@@ -37,5 +38,5 @@ object SessionAccess {
         check(prefs.edit().putInt("timeout", seconds).commit())
         changed()
     }
-    private fun changed() { _revision.value++ }
+    private fun changed() { _revision.update { it + 1 } }
 }
