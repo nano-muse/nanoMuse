@@ -34,7 +34,6 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Recorded Feishu and DingTalk message-processing failures after thread handover instead of silently dropping their errors.
 
 - Kept repeated device screenshots in separate files so a later capture no longer overwrote an earlier picture.
-- **A run on another computer counts its tool calls the way a local run does.** The remote mirror counted every tool event it was forwarded, and the CLIs emit two phases per call (plus uncounted notes), so a codex or dsh run followed from another machine reported about twice the steps the same run showed locally; the mirror now counts a call when it starts and takes the run's own figure when it lands.
 - Kept files dated after 2107 in data exports by clamping their archive timestamps to ZIP's supported upper limit.
 
 - **Kept replaced or linked files out of data exports.** The exporter read each file through the handle it validated, pinned the containing directories, and skipped symbolic links, hardlinks, reparse points and files that changed or exceeded 64 MB while being read. For [#732](https://github.com/nano-muse/nanoMuse/issues/732).
@@ -53,6 +52,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Web
 
 ### Desktop
+
+- Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
 
 - **Added the model-neutral `skill-creator` guide to the desktop and Python runtime.** Android loaded the same packaged instructions, including on existing installs. For [#757](https://github.com/nano-muse/nanoMuse/issues/757) and [#758](https://github.com/nano-muse/nanoMuse/issues/758).
 - Kept separate screenshots when reporting more than one problem within the same second.

@@ -394,7 +394,7 @@ export class CodingService {
               shadow.current = String(body.text ?? '')
               shadow.commit()
             }
-          } else if (kind === 'tool' && String(body.phase ?? 'started') === 'started') shadow.tools += 1
+          } else if (kind === 'tool' && String(body.phase ?? 'started') === (agent === 'codex' ? 'completed' : 'started')) shadow.tools += 1
           else if (kind === 'started' && body.session_id) shadow.result_session_id = String(body.session_id)
           publish(body)
         })
@@ -402,7 +402,7 @@ export class CodingService {
         shadow.status = status === 'failed' || status === 'stopped' ? status : 'done'
         shadow.output = String(result.output ?? shadow.output)
         shadow.result_session_id = String(result.session_id ?? shadow.result_session_id)
-        shadow.tools = Number(result.tools ?? shadow.tools)
+        if (typeof result.tools === 'number' && Number.isSafeInteger(result.tools) && result.tools >= 0) shadow.tools = result.tools
         shadow.error = String(result.error ?? '')
         shadow.resumed = Boolean(result.resumed)
       } catch (error: unknown) {
