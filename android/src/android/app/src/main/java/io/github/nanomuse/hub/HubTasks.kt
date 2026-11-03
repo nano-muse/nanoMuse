@@ -26,13 +26,16 @@ internal class HubTasks {
     fun finished(callId: String): Boolean = runs.remove(callId)?.stopped == true
 
     /**
-     * The session a `stop` from [senderId] would end: the run opened for [callId], else the
-     * sender's run in [conversation] (its own per-device conversation when none is named). Only
+     * The session a `stop` from [senderId] would end: an explicit [callId] selects only that run.
+     * With no call id, select [conversation] or the sender's per-device conversation. Only
      * the device that asked for a task may stop it; null when there is nothing of theirs to stop.
      */
     fun find(senderId: String, callId: String?, conversation: String?): String? {
-        val run = callId?.takeIf { it.isNotBlank() }?.let { runs[it] }
-            ?: runs.values.firstOrNull { it.conversation == conversationKey(senderId, conversation) }
+        val explicitCall = callId?.takeIf { it.isNotBlank() }
+        val run = if (explicitCall != null) runs[explicitCall]
+            else runs.values.firstOrNull {
+                it.senderId == senderId && it.conversation == conversationKey(senderId, conversation)
+            }
         return run?.takeIf { it.senderId == senderId }?.sessionId
     }
 

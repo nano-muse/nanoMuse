@@ -1227,4 +1227,12 @@
     <string name="nm_context_compact_incomplete">Model eksiksiz bir özet döndürmedi. Orijinal bağlam korundu.</string>
     <string name="nm_restore_recovered">Kesilen geri yükleme kurtarıldı. Kurtarma başarısız olursa veriler yeniden denemek için saklanır.</string>
     <string name="nm_restore_recovery_failed">Kurtarma başarısız oldu. Kurtarma verileri saklandı. Yeniden denemek için uygulamayı yeniden başlatın.</string>
+    <string name="nm_remote_ambiguous">Birden fazla cihaz eşleşiyor. Hesap → Cihazlar bölümünden seçin.</string>
+    <string name="nm_remote_attachments">Cihaz bahsetmeleri yalnızca metin gönderir. Göndermeden önce ekleri kaldırın.</string>
+    <string name="nm_remote_no_answer">%1$s yanıt vermeden tamamlandı.</string>
+    <string name="nm_remote_failed">%1$s yanıt vermedi: %2$s</string>
+    <string name="nm_remote_offline">%1$s çevrimdışı.</string>
+    <string name="nm_remote_chat_busy">Bir cihaza görev göndermeden önce bu konuşmanın bitmesini bekleyin.</string>
+
+    <string name="nm_reply_unread">Okunmamış yanıt</string>
 </resources>

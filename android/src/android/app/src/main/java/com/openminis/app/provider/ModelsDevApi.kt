@@ -141,8 +141,9 @@ object ModelsDevApi {
 
     private fun applyDevData(model: LLMModel, devModel: ModelDevEntry): LLMModel {
         return model.copy(
-            contextWindow = devModel.contextWindow ?: model.contextWindow,
-            maxOutputTokens = devModel.maxOutputTokens ?: model.maxOutputTokens,
+            // nanoMuse: the serving endpoint's capacities precede the public catalog.
+            contextWindow = model.contextWindow ?: devModel.contextWindow,
+            maxOutputTokens = model.maxOutputTokens ?: devModel.maxOutputTokens,
             supportsReasoning = devModel.reasoning ?: model.supportsReasoning,
             interleavedReasoningField = devModel.interleavedField ?: model.interleavedReasoningField,
             // nanoMuse: the provider that serves the model knows what it takes

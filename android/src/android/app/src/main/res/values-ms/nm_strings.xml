@@ -1223,4 +1223,12 @@
     <string name="nm_context_compact_incomplete">Model tidak mengembalikan ringkasan lengkap. Konteks asal dikekalkan.</string>
     <string name="nm_restore_recovered">Pemulihan terganggu telah dipulihkan. Jika gagal, data pemulihan disimpan untuk cubaan seterusnya.</string>
     <string name="nm_restore_recovery_failed">Pemulihan gagal. Data pemulihan disimpan. Mulakan semula aplikasi untuk mencuba lagi.</string>
+    <string name="nm_remote_ambiguous">Lebih daripada satu peranti sepadan. Pilih dalam Akaun → Peranti.</string>
+    <string name="nm_remote_attachments">Sebutan peranti hanya menghantar teks. Alih keluar lampiran sebelum menghantar.</string>
+    <string name="nm_remote_no_answer">%1$s selesai tanpa jawapan.</string>
+    <string name="nm_remote_failed">%1$s tidak menjawab: %2$s</string>
+    <string name="nm_remote_offline">%1$s di luar talian.</string>
+    <string name="nm_remote_chat_busy">Tunggu perbualan ini selesai sebelum menghantar tugas kepada peranti.</string>
+
+    <string name="nm_reply_unread">Balasan belum dibaca</string>
 </resources>

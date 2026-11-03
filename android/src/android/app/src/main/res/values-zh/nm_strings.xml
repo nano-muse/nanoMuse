@@ -1200,4 +1200,12 @@
     <string name="nm_context_compact_incomplete">模型未返回完整摘要，已保留原有上下文。</string>
     <string name="nm_restore_recovered">已恢复中断的还原操作。若恢复失败，恢复数据会保留供重试。</string>
     <string name="nm_restore_recovery_failed">还原恢复失败。恢复数据已保留，请重启应用重试。</string>
+    <string name="nm_remote_ambiguous">有多台设备匹配。请在账号 → 设备中选择。</string>
+    <string name="nm_remote_attachments">设备提及只发送文字。请先移除附件。</string>
+    <string name="nm_remote_no_answer">%1$s 已结束，但没有回复。</string>
+    <string name="nm_remote_failed">%1$s 未回复：%2$s</string>
+    <string name="nm_remote_offline">%1$s 当前离线。</string>
+    <string name="nm_remote_chat_busy">请等本次对话执行完毕后再发送设备任务。</string>
+
+    <string name="nm_reply_unread">未读回复</string>
 </resources>

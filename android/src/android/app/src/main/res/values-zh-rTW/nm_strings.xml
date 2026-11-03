@@ -1193,4 +1193,12 @@
     <string name="nm_context_compact_incomplete">模型未傳回完整摘要，已保留原有上下文。</string>
     <string name="nm_restore_recovered">已復原中斷的還原作業。若復原失敗，復原資料會保留供重試。</string>
     <string name="nm_restore_recovery_failed">還原復原失敗。復原資料已保留，請重新啟動應用程式重試。</string>
+    <string name="nm_remote_ambiguous">有多台裝置符合。請在帳號 → 裝置中選擇。</string>
+    <string name="nm_remote_attachments">裝置提及只傳送文字。請先移除附件。</string>
+    <string name="nm_remote_no_answer">%1$s 已結束，但沒有回覆。</string>
+    <string name="nm_remote_failed">%1$s 未回覆：%2$s</string>
+    <string name="nm_remote_offline">%1$s 目前離線。</string>
+    <string name="nm_remote_chat_busy">請等本次對話執行完畢後再傳送裝置任務。</string>
+
+    <string name="nm_reply_unread">未讀回覆</string>
 </resources>

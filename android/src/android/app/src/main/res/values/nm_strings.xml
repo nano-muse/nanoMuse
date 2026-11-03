@@ -1207,4 +1207,12 @@
     <string name="nm_context_compact_incomplete">The model did not return a complete summary. The original context was kept.</string>
     <string name="nm_restore_recovered">Recovered the interrupted restore. If recovery fails, the saved recovery data is kept for another attempt.</string>
     <string name="nm_restore_recovery_failed">Restore recovery failed. Recovery data was kept. Restart the app to retry.</string>
+    <string name="nm_remote_ambiguous">More than one device matches. Choose a device in Account → Devices.</string>
+    <string name="nm_remote_attachments">Device mentions send text only. Remove the attachments before sending.</string>
+    <string name="nm_remote_no_answer">%1$s finished without an answer.</string>
+    <string name="nm_remote_failed">%1$s did not answer: %2$s</string>
+    <string name="nm_remote_offline">%1$s is offline.</string>
+    <string name="nm_remote_chat_busy">Wait for this conversation to finish before sending a device task.</string>
+
+    <string name="nm_reply_unread">Unread reply</string>
 </resources>
