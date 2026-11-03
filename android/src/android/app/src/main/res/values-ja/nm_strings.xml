@@ -1221,4 +1221,17 @@
     <string name="nm_context_compact_idle_timeout">%1$d 秒間応答がなかったため、コンテキストの圧縮を停止しました（モデル呼び出し %2$d 回）。</string>
     <string name="nm_context_compact_no_gain">要約でコンテキストが短くならなかったため、元の内容を保持しました。</string>
     <string name="nm_context_compact_incomplete">モデルから完全な要約が返されなかったため、元のコンテキストを保持しました。</string>
+    <string name="nm_remote_ambiguous">複数のデバイスが一致します。アカウント → デバイスで選択してください。</string>
+    <string name="nm_remote_attachments">デバイスへのメンションではテキストのみ送信します。添付ファイルを削除してください。</string>
+    <string name="nm_remote_no_answer">%1$s は応答なしで終了しました。</string>
+    <string name="nm_remote_failed">%1$s から応答がありません：%2$s</string>
+    <string name="nm_remote_offline">%1$s はオフラインです。</string>
+    <string name="nm_remote_chat_busy">この会話の処理が終わってからデバイスにタスクを送信してください。</string>
+
+    <string name="nm_reply_unread">未読の返信</string>
+    <string name="nm_restore_recovered">中断した復元を回復しました。回復に失敗した場合、再試行用のデータは保持されます。</string>
+    <string name="nm_restore_recovery_failed">復元の回復に失敗しました。回復用データは保持されています。アプリを再起動して再試行してください。</string>
+    <string name="nm_backup_resume">バックアップを再開</string>
+    <string name="nm_backup_discard">中断したバックアップを破棄</string>
+    <string name="nm_backup_resume_hint">中断したバックアップがあります。元の設定で再開し、必要なら暗号化パスワードを再入力するか、破棄して最初から開始してください。</string>
 </resources>

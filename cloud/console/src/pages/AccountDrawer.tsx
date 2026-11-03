@@ -526,23 +526,31 @@ function SamplesTab({ id, total }: { id: string; total: number }) {
   const [rows, setRows] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  // a slow answer belongs to the account it was asked for: the drawer re-targets
+  // in place when another account's link is clicked, and the old account's
+  // samples must not land under the new one's title
+  const requests = useRef(new LatestRequest());
   const load = useCallback(
-    async (before?: Sample) => {
-      setLoading(true);
-      try {
-        const r = await get<{ samples: Sample[]; total: number }>(`/v1/admin/samples${qs({ account_id: id, limit: 30, before: before?.ts, before_id: before?.id })}`);
-        setRows((xs) => (before ? [...xs, ...r.samples] : r.samples));
-        setDone(r.samples.length < 30);
-      } catch (e) {
-        toast(e instanceof Error ? e.message : String(e), "bad");
-      } finally {
-        setLoading(false);
-      }
-    },
+    (before?: Sample) => requests.current.run(
+      () => get<{ samples: Sample[]; total: number }>(`/v1/admin/samples${qs({ account_id: id, limit: 30, before: before?.ts, before_id: before?.id })}`),
+      {
+        start: () => setLoading(true),
+        success: (r) => {
+          setRows((xs) => (before ? [...xs, ...r.samples] : r.samples));
+          setDone(r.samples.length < 30);
+        },
+        error: (e) => toast(e instanceof Error ? e.message : String(e), "bad"),
+        finish: () => setLoading(false),
+      },
+    ),
     [id, toast],
   );
   useEffect(() => {
+    const pending = requests.current;
+    setRows([]);
+    setDone(false);
     void load();
+    return () => pending.invalidate();
   }, [load]);
   const exportAll = () => download(`/v1/admin/samples/export?account_id=${encodeURIComponent(id)}`, `nanomuse-samples-${id.slice(0, 8)}.jsonl`).catch((e) => toast(String(e.message || e), "bad"));
   return (

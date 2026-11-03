@@ -77,6 +77,8 @@ Legend: **✓** done · **◐** partial (what is missing is in the note) · **�
 | Coding agents (Cursor, Codex, Claude Code on the computers; DeepSeek Harness too, read by the desktop app since 1.0.4 and by the runtime since 1.0.5) | ✓ | ✓ 0.1.34 over the hub *(9)* | ✓ *Settings → Coding agents*, this computer first; announces and serves `coding.*` *(8)* | ✓ |
 | Devices of the account, remote control, rename, forget | ✓ | ◐ list, Reach sheet 0.1.33 | ✓ | ✓ |
 | Hub, outbound: the model reaches the account's other devices (`devices`, `device_*`, `delegate`, `@<device>`) | ✓ *Computers*, the reach offload | ◐ the Reach sheet by hand and `@device` to the hub; since round 9 also a tap on an online device in the account's Devices list, as on Android; no tool in the model's hands *(29)* | ✓ `reach.ts` | ✓ the runtime's `tools/devices.py` |
+| Explicit @ task goes directly to the device, with live text, steps and Stop | ✓ no local model delegation turn; text only | ✓ #513 | Target streams through #515; caller UI not audited here | Caller UI not audited here |
+| Online devices in the leading @ picker, above files | ✓ names, icons and qualified IDs for duplicates | ✓ #506 | Not audited here | Not audited here |
 | Hub, inbound: the device answers the others (shell · files · open · screen · notify · task) | ✓ `HubActions` | ◐ info · open · notify · task; shell, files and screen answer *not supported* *(10)* | ✓ `actions.ts` | ✓ the runtime; a browser tab is not a device |
 | Hands: the device's own screen as a hand | ✓ | n/a *(10)* | ✓ Linux X11 (Wayland *(21)*); macOS one window while the person keeps the mouse, per-app grants, glow and capsule out of the shots *(19)*; Windows to be tried *(31)* | n/a |
 | Report a problem: one tap opens a GitHub issue | ✓ Settings → Account | ✓ About → *Report an issue* | ✓ the corner menu; under the shell a screenshot goes to Downloads and the issue opens filled in | ✓ Settings → Feedback |
@@ -399,3 +401,9 @@ notes above; a settled item keeps its number and says how it went.
   system prompt) and leaves routines, goals, the feed and work for another device at home.
 - `ideas.en.json` / `ideas.zh.json` are one file four times (Android assets, iOS Resources,
   `harness/dsh-nanomuse/assets`, `web/src/ideas`); the harness and web tests fail when a copy drifts.
+
+| Feature | Android | iOS |
+|---|---|---|
+| Resume interrupted backups | ✓ Unreleased, see [Android](android.md#export-resume) | ✓ |
+| Interrupted restore recovery | ✓ Unreleased, see [Android](android.md#restore-recovery) | ✓ |
+| Unread replies | ✓ Unreleased, see [Android](android.md#unread-replies) | ✓ |

@@ -75,6 +75,8 @@ class FileMentionIndex(
         val mountName: String?,
         val modifiedAt: Long,
         val isDirectory: Boolean,
+        // nanoMuse: device rows reuse the picker's selection and keyboard path.
+        val nmDevice: io.github.nanomuse.hub.Device? = null,
     ) {
         val basename: String get() = linuxPath.substringAfterLast('/').ifEmpty { linuxPath }
         val displayPath: String get() = linuxPath.removePrefix("/var/minis/")

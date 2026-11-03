@@ -4,12 +4,14 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+
 ### Cloud
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
 - **A visit that is both running and recent counts once in the demo per-day bars.** The bars concatenated the active and recent lists without the dedup the page's own table applies, so a running visit sat in both lists and its day counted it twice, and the bar total disagreed with the visits number printed beside it.
 
 - Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
+- **One account's samples stay out of another account's drawer.** The account drawer re-targets in place when another account's link is clicked, and its samples tab ran its loads without a generation: an answer that started under the first account could land its rows under the second account's title. The tab now runs through the same `LatestRequest` guard the drawer's paged readers use.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
 - **A legacy runtime's user agent is read the way the relay reads it.** The console's own classifier missed the `AsyncOpenAI/Python` token the Python runtime of 1.0.6 and earlier signed its model calls with, so those sessions and demo visitors showed as "other" wherever the console classifies client-side; the relay's `client.py` has carried the token since it first appeared, and the console's mirror of that list now does too.
 
@@ -18,14 +20,18 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **The activity feed keeps its filter's events under a slow answer.** The feed's own loader carried no generation: switch a kind chip while its first page was still in flight and the old kind's rows (or its error) landed under the new chip, and the 30-second visibility poll could replace a half-read "More" history mid-scroll. The feed now runs through the same `LatestRequest` guard the paged readers use, dropped on arrival when its filter moved.
 - **A turn keeps its own time in the record, and a slower record cannot overtake a later turn.** Each turn row took the second its background write landed in, and the account's turn list orders by that timestamp with the write's rowid beside it: a turn whose picture was still decoding could land behind a plain turn that answered after it, and read above it, newest first upside down. The timestamp is now taken when the answer leaves and each account's writes are chained in that order, so the list says what happened in the order it happened without making other accounts wait for its media.
 - **An expanded "More (N)" table keeps its rows through a poll.** Every poll hands the admin tables a freshly parsed array, and the expansion was reset on the array's arrival: click "More" on People or a Usage day's top accounts, wait out the two-minute poll, and the list snapped back to its first hundred or twenty-five rows while you were reading it. The expansion is kept unless the list itself no longer reaches it (`keptShown`), so a refresh of the same rows leaves the person where they scrolled to.
+- **A settings poll no longer replaces what the operator is typing.** The allowance and bonus fields and the whole nudges form reseeded their drafts on every poll answer, and every answer is a fresh object even when its values are unchanged: an operator two minutes into an edit silently had the fields snapped back to the server's values, and a Save after that wrote them. The drafts now reseed only when the server's values actually moved.
 - **The Usage page names a day with the site's calendar date, not the operator's browser.** The relay's day stamp is the site-local day's start, but the matrix labels, the day rows and weekday, the drill-down title and the hour tooltips all rendered it in the browser's timezone, so any operator outside the site's offset read every bar as the day before — and the date picker parsed the picked date at browser-local noon, which lands on the next site-day for browsers west of about UTC−4. Labels, weekday and picker now work at the site's `day_offset_h`, through `siteDay`/`siteWeekday`/`siteDayStamp` in the console's format library.
 - **The People page's sign-ups-per-day chart counts site-local days.** The bars were bucketed at UTC midnight while their labels rendered the browser's calendar, so for the primary UTC+8 audience a sign-up made between midnight and eight in the morning landed on the previous day's bar, and for a browser west of UTC every bar wore the date before. The buckets now start at the site's day boundary (`siteDayStart`), the same day the Usage page and the relay itself count.
+- **Every analytics chart names a day at the site's calendar, not the operator's browser.** The Usage and People pages learned to read day stamps at the site's `day_offset_h`; the shared `dayLabels` the other five pages use still rendered them browser-local, so an operator outside the site's offset read the Overview trend, the Activity feed, Data, Hands and Quality bars as the day before, and the same stamp wore different dates on different pages. The shared labels now take the offset (the overview answer carries it), and the inline day titles on Hands and Quality use it too.
 - **The relay's checks ran on Windows as well as Linux.** Both platforms checked the cloud service and built and tested its admin console. Changes to the showcase mirror also ran these checks because the cloud tests load those scripts. The committed-build check remained on Linux. ([#670](https://github.com/nano-muse/nanoMuse/pull/670))
 - **The local self-hosting script printed a working command for sign-in codes.** Its hint now enters `cloud/` before reading the relay logs, so it can be copied from the repository root. ([#716](https://github.com/nano-muse/nanoMuse/pull/716))
 - Added `--with-runtime` to self-hosting setup to start the web runtime beside the relay, retain its token and connect both containers on the relay network. The runtime stayed on loopback unless LAN access was explicitly selected.
 - Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
+
+- **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
 
 - Stopped timed-out remote tasks by their original call id, allowed the full 15-minute task budget from the runtime and iPhone, and kept late stop requests from cancelling a newer task. For #805.
 
@@ -60,6 +66,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Web
 
 - **A provider answer that started before a sign-out no longer repopulates the cache after it.** Signing out invalidates the loaded provider view, but an `/api/providers` request already in flight kept its `then` attached, and when it landed it wrote the signed-out view back into the cache for every later reader until a forced reload. Each load now carries the generation it started under, and an answer whose generation was invalidated lands for its caller without repopulating the cache.
+- **A slower search answer no longer lands under a newer query.** The contacts search and the coding screen's recent-workspaces list both fired a request per query (or per picked agent) and took whatever answer arrived last: type past a slow request, or switch agents while one was still loading, and the earlier answer's results replaced the newer one's on screen. Both effects now drop answers that were superseded before they landed.
 
 ### Desktop
 
@@ -95,6 +102,16 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A chat another device sends a task to, and every chat the rooms open, start in the `~/nanoMuse` workspace** instead of the bare home folder. On Windows a workspace that is the whole profile folder could not run a single `workspace-write` command: the sandbox's temp root lies inside it, and a session begun from the web console or the phone failed at the first step. ([#705](https://github.com/nano-muse/nanoMuse/issues/705))
 
 ### Android
+
+- Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
+
+- Recovered interrupted Android restore categories before opening their repositories, retaining snapshots when recovery failed.
+
+- Android sent explicit device mentions directly through the Hub, displayed remote steps and streamed text, reused scoped approval cards, and stopped the exact remote call without starting a local model turn.
+
+- Marked successful background replies unread in both Android layouts and collapsed classic groups, cleared them when the visible conversation opened, and followed tab visibility and draft promotion.
+
+- Android listed online task-capable devices above files in the leading @ menu, showed device identity, and qualified duplicate names with their stable IDs.
 
 - Android displayed emoji avatars and their background colours from the account profile, kept them across restarts and account changes, and preserved them when renaming the agent or updating connectors.
 

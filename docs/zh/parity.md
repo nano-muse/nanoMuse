@@ -71,6 +71,8 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 | 编程助手（电脑上的 Cursor、Codex、Claude Code；还有 DeepSeek Harness，桌面版 1.0.4 起读取、运行时 1.0.5 起读取） | ✓ | ✓ 0.1.34 经 hub *(9)* | ✓ 「设置 → 编程助手」，先这台电脑；自己声明并应答 `coding.*` *(8)* | ✓ |
 | 账号的设备：远程控制、改名、忘记 | ✓ | ◐ 列表，Reach 面板 0.1.33 | ✓ | ✓ |
 | hub，出站：模型够得到账号的其他设备（`devices`、`device_*`、`delegate`、`@<device>`） | ✓ 「电脑」，Reach 的转派 | ◐ 手动的 Reach 面板，`@device` 发到 hub；第 9 轮起，在账号的设备列表里点一台在线设备也行，和 Android 一样；模型手里没有工具 *(29)* | ✓ `reach.ts` | ✓ 运行时的 `tools/devices.py` |
+| 明确的 @ 任务直达设备，显示文字、步骤并可停止 | ✓ 不经过本机模型委派，只发送文字 | ✓ #513 | #515 已支持作为目标流式回复；本次未核查发起端界面 | 本次未核查发起端界面 |
+| 消息开头的 @ 菜单中，在线设备列在文件之前 | ✓ 名称、图标，同名时用 ID 区分 | ✓ #506 | 本次未核查 | 本次未核查 |
 | hub，入站：这台设备回应别的设备（shell · 文件 · 打开 · 屏幕 · 通知 · 任务） | ✓ `HubActions` | ◐ 信息 · 打开 · 通知 · 任务；shell、文件和屏幕回答*不支持* *(10)* | ✓ `actions.ts` | ✓ 运行时；浏览器标签页不算一台设备 |
 | 手：这台设备自己的屏幕当手 | ✓ | n/a *(10)* | ✓ Linux X11（Wayland *(21)*）；macOS 上一次一个窗口、鼠标仍归人、按 App 授权、光晕和胶囊不进截图 *(19)*；Windows 待试 *(31)* | n/a |
 | 反馈问题：点一下打开一个 GitHub issue | ✓ 设置 → 账号 | ✓ 关于 → 「报告问题」 | ✓ 角落菜单；在外壳里截图存到「下载」，issue 带着内容打开 | ✓ 设置 → 反馈 |
@@ -161,3 +163,9 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 - 版本检查在每个客户端上按同样的顺序读同样的两个来源：`https://nanomuse.cn/dl/index.json`，然后 GitHub 的 `releases/latest`；缓存一天；那一行永远也显示已安装的版本。
 - 对话同步从四个客户端和一个中继说同一种线路格式（`docs/cloud.md` 里的约定 C7）：`cloud/nanomuse_cloud/sync.py`、`nanomuse/sync/`（运行时和网页）、`harness/dsh-nanomuse/src/sync.ts`（桌面）、`io.github.nanomuse.sync`（Android）、`NanoMuse/NanoMuseSync.swift`（iOS）。每个客户端都先应用一页的对话再应用它的消息，只在拉取时移动游标；每个客户端只推送这个人的话和最终答复（绝不推送工具步骤、工具结果或系统提示），例程、目标、动态和替另一台设备干的活都留在家里。
 - `ideas.en.json` / `ideas.zh.json` 是同一个文件存四份（Android 资源、iOS Resources、`harness/dsh-nanomuse/assets`、`web/src/ideas`）；某一份漂移时 harness 和网页的测试会失败。
+
+| 功能 | Android | iOS |
+|---|---|---|
+| 继续中断的备份 | ✓ 未发布，见 [Android](android.md#export-resume) | ✓ |
+| 中断还原的恢复 | ✓ 未发布，见 [Android](android.md#restore-recovery) | ✓ |
+| 未读回复 | ✓ 未发布，见 [Android](android.md#unread-replies) | ✓ |

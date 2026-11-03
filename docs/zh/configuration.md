@@ -298,6 +298,8 @@ scrub_secrets = true   # remove one-time codes and reset links before the model 
 
 任何提供私密 iCalendar 链接的日历都行（Google（「设置 → 整合日历 → iCal 格式的私密地址」）、Outlook（「共享日历 → 发布」）、iCloud（「共享日历 → 公共日历」）、Fastmail、Nextcloud），或者磁盘上的一个 `.ics` 文件。`webcal://` 链接通过 HTTPS 抓取。订阅源的文本缓存在 `<data_dir>/calendar-cache.json`（权限 0600），这样启动时和两次刷新之间都有日程可看。
 
+日程会显示通过 `RDATE` 为重复事件补充的日期，包括全天事件。重复日期只显示一次，`EXDATE` 仍可取消其中某次日程。暂不支持带独立时长的 `RDATE` 条目（`VALUE=PERIOD`），这类条目会被跳过。
+
 ```toml
 [connectors.calendar]
 enabled         = true

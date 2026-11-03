@@ -298,6 +298,8 @@ Store the values with `nanomuse vault set EMAIL_ADDRESS` and `nanomuse vault set
 
 Any calendar that offers a private iCalendar link (Google (*Settings → Integrate calendar → Secret address in iCal format*), Outlook (*Shared calendars → Publish*), iCloud (*Share Calendar → Public Calendar*), Fastmail, Nextcloud) or an `.ics` file on disk. `webcal://` links are fetched over HTTPS. The feed text is cached in `<data_dir>/calendar-cache.json` (mode 0600) so the agenda is there at startup and between refreshes.
 
+The agenda includes dates added to a recurring event with `RDATE`, including all-day dates. Duplicate dates appear once, and `EXDATE` still removes an occurrence. `RDATE` entries with their own duration (`VALUE=PERIOD`) are not supported and are skipped.
+
 ```toml
 [connectors.calendar]
 enabled         = true

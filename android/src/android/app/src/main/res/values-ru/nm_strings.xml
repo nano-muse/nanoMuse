@@ -1233,4 +1233,17 @@
     <string name="nm_context_compact_idle_timeout">Сжатие остановлено после %1$d секунд без ответа (вызовов модели: %2$d).</string>
     <string name="nm_context_compact_no_gain">Сводка не сократила контекст. Исходное содержимое сохранено.</string>
     <string name="nm_context_compact_incomplete">Модель не вернула полную сводку. Исходный контекст сохранён.</string>
+    <string name="nm_remote_ambiguous">Подходит несколько устройств. Выберите в разделе Аккаунт → Устройства.</string>
+    <string name="nm_remote_attachments">Упоминание устройства отправляет только текст. Сначала удалите вложения.</string>
+    <string name="nm_remote_no_answer">%1$s завершило работу без ответа.</string>
+    <string name="nm_remote_failed">%1$s не ответило: %2$s</string>
+    <string name="nm_remote_offline">%1$s не в сети.</string>
+    <string name="nm_remote_chat_busy">Дождитесь завершения этой беседы перед отправкой задачи устройству.</string>
+
+    <string name="nm_reply_unread">Непрочитанный ответ</string>
+    <string name="nm_restore_recovered">Прерванное восстановление восстановлено. При ошибке данные для восстановления сохраняются для повторной попытки.</string>
+    <string name="nm_restore_recovery_failed">Восстановление не удалось. Данные для восстановления сохранены. Перезапустите приложение для повторной попытки.</string>
+    <string name="nm_backup_resume">Продолжить копирование</string>
+    <string name="nm_backup_discard">Удалить прерванную копию</string>
+    <string name="nm_backup_resume_hint">Есть прерванная копия. Продолжите с исходными параметрами и при необходимости снова введите пароль, либо удалите её и начните заново.</string>
 </resources>

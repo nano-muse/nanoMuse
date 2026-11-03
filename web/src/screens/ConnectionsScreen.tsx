@@ -2738,13 +2738,23 @@ export function ContactsCard({
       setHits(null);
       return;
     }
+    // a slower answer from an earlier query must not land under the newer one
+    let latest = true;
+    setHits(null);
     const handle = setTimeout(() => {
       api
         .contacts(query.trim(), 5)
-        .then((r) => setHits(r.people))
-        .catch(() => setHits([]));
+        .then((r) => {
+          if (latest) setHits(r.people);
+        })
+        .catch(() => {
+          if (latest) setHits([]);
+        });
     }, 250);
-    return () => clearTimeout(handle);
+    return () => {
+      latest = false;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   const broken = c.sources.filter((f) => f.error).length;

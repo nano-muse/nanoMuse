@@ -420,6 +420,8 @@ class MinisApp : Application(), ImageLoaderFactory {
                     "The database file is left completely untouched — upgrading restores everything."
             )
         }
+        // nanoMuse: recover before repositories expose partially restored data.
+        io.github.nanomuse.backup.AndroidRestoreRecovery.recover(this)
         database = AppDatabase.getInstance(this)
         chatRepository = ChatRepository(database.chatDao())
         providerRepository = ProviderRepository(this)

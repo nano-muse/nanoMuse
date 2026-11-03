@@ -8,6 +8,8 @@ import com.openminis.app.data.db.FolderEntity
 import com.openminis.app.data.db.MessageEntity
 import com.openminis.app.logging.AppLogger
 import kotlinx.coroutines.sync.Mutex
+// nanoMuse: stop requests must preserve an interrupted run rather than finish packaging.
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -66,10 +68,13 @@ class BackupExporter(
          * state as of this instant; rows updated after it, and files modified
          * after it, are excluded. Without a cut-off the export is not a
          * snapshot — a session written between the index pass and the blob copy
+
          * lands in files.index while its content never gets stored, producing a
          * package that references content it does not contain.
          */
         val snapshotAtMillis: Long = System.currentTimeMillis(),
+        // nanoMuse: scheduled runs cannot overwrite an interrupted export.
+        val resumeInterrupted: Boolean = false,
     )
 
     data class Summary(
@@ -95,8 +100,20 @@ class BackupExporter(
         options: Options = Options(),
         onProgress: ((String) -> Unit)? = null,
     ): Summary = activityLock.withLock { exportBody(options, onProgress) }
+    private suspend fun exportBody(requested: Options, progress: ((String) -> Unit)?): Summary {
+        val execution = kotlin.coroutines.coroutineContext
+        val onProgress: (String) -> Unit = { line ->
+            execution.ensureActive()
+            progress?.invoke(line)
+            execution.ensureActive()
+        }
+        // nanoMuse: the journal is outside the package, and never contains a passphrase.
+        val journal = io.github.nanomuse.backup.ExportResume(File(context.filesDir, "backup-resume"), clock = { requested.snapshotAtMillis })
+        val signature = listOf(requested.categories.map { it.key }.sorted().joinToString(","), requested.maxFileBytes,
+            requested.chatFiles, requested.includeCredentials).joinToString("|")
+        val run = journal.open(signature, !requested.passphrase.isNullOrEmpty(), requested.resumeInterrupted)
+        val options = requested.copy(snapshotAtMillis = run.snapshotAt)
 
-    private suspend fun exportBody(options: Options, onProgress: ((String) -> Unit)?): Summary {
         // [T-backup-credentials-without-encryption] There is deliberately NO
         // "refuse to export credentials without a passphrase" guard here.
         //
@@ -116,53 +133,42 @@ class BackupExporter(
         // Matches iOS BackupExporter.swift, same tag — the two must agree or
         // packages stop being interchangeable, which is the thing this whole
         // format exists for.
+        val backupId = run.id // nanoMuse: stable across interrupted attempts
         val started = System.currentTimeMillis()
-        val backupId = UUID.randomUUID().toString()
 
         // Staging lives in filesDir, not cacheDir: the system may evict the
         // cache mid-export, and a multi-GB staging tree disappearing underneath
         // the writer is a failure mode worth designing out.
-        val staging = File(context.filesDir, "backup-staging/$backupId")
+        val staging = run.staging // nanoMuse: persistent plaintext checkpoints, never archived directly
         staging.mkdirs()
         try {
             val dataDir = File(staging, "data").apply { mkdirs() }
             val blobStore = BackupBlobStore(staging, options.maxFileBytes)
-            val stats = mutableMapOf<String, BackupManifest.CategoryStat>()
+            // nanoMuse: completed categories reuse their statistics and validated payload.
+            val stats = run.completed.mapValues { (_, json) ->
+                BackupFormat.json.decodeFromString(BackupManifest.CategoryStat.serializer(), json)
+            }.toMutableMap()
+            val indexFile = File(staging, "files.index.jsonl")
+            blobStore.rehydrateFromFileIndex(indexFile, strict = true)
 
-            BackupFileIndexWriter(File(staging, "files.index.jsonl")).use { fileIndex ->
+            BackupFileIndexWriter(indexFile, append = true).use { fileIndex ->
                 val trees = BackupFileTreeExporter(blobStore, fileIndex, options.snapshotAtMillis)
-
-                if (BackupCategory.CHATS in options.categories) {
-                    onProgress?.invoke("Exporting chats…")
-                    stats[BackupCategory.CHATS.key] =
-                        exportChats(dataDir, trees, options.snapshotAtMillis, options.chatFiles) // nanoMuse
-                }
-                if (BackupCategory.SHARED_FILES in options.categories) {
-                    onProgress?.invoke("Exporting shared files…")
-                    stats[BackupCategory.SHARED_FILES.key] = exportSharedFiles(trees)
-                }
-                if (BackupCategory.SKILLS in options.categories) {
-                    onProgress?.invoke("Exporting skills…")
-                    stats[BackupCategory.SKILLS.key] = exportSkills(trees)
-                }
-                if (BackupCategory.MEMORY in options.categories) {
-                    onProgress?.invoke("Exporting memory…")
-                    stats[BackupCategory.MEMORY.key] = exportMemory(dataDir)
-                }
-                if (BackupCategory.MCP_SERVERS in options.categories) {
-                    onProgress?.invoke("Exporting MCP servers…")
-                    exportMcpServers(dataDir)?.let { stats[BackupCategory.MCP_SERVERS.key] = it }
-                }
-                if (BackupCategory.PROVIDERS in options.categories) {
-                    onProgress?.invoke("Exporting providers…")
-                    stats[BackupCategory.PROVIDERS.key] =
-                        exportProviders(dataDir, options.includeCredentials)
-                }
-                if (BackupCategory.ENVIRONMENT_VARIABLES in options.categories) {
-                    onProgress?.invoke("Exporting environment variables…")
-                    exportEnvironmentVariables(dataDir)?.let {
-                        stats[BackupCategory.ENVIRONMENT_VARIABLES.key] = it
-                    }
+                // nanoMuse: one category runner owns checkpointing for every export entry point.
+                for (category in options.categories.sortedBy { it.ordinal }) {
+                    if (category.key in stats) continue
+                    onProgress.invoke(context.getString(io.github.nanomuse.backup.BackupLabels.categoryNameRes(category)) + "…")
+                    val stat = when (category) {
+                        BackupCategory.CHATS -> exportChats(dataDir, trees, options.snapshotAtMillis, options.chatFiles)
+                        BackupCategory.SHARED_FILES -> exportSharedFiles(trees)
+                        BackupCategory.SKILLS -> exportSkills(trees)
+                        BackupCategory.MEMORY -> exportMemory(dataDir)
+                        BackupCategory.MCP_SERVERS -> exportMcpServers(dataDir)
+                        BackupCategory.PROVIDERS -> exportProviders(dataDir, options.includeCredentials)
+                        BackupCategory.ENVIRONMENT_VARIABLES -> exportEnvironmentVariables(dataDir)
+                        else -> null
+                    } ?: BackupManifest.CategoryStat(0, 0, encrypted = false)
+                    stats[category.key] = stat
+                    journal.completed(run, category.key, BackupFormat.json.encodeToString(BackupManifest.CategoryStat.serializer(), stat))
                 }
             }
 
@@ -174,7 +180,7 @@ class BackupExporter(
             // once, AFTER the category exports, because it spans two
             // categories. Mirrors iOS exportProviders/BackupSecretsCollector.
             if (options.includeCredentials) {
-                onProgress?.invoke("Collecting credentials…")
+                onProgress.invoke("Collecting credentials…")
                 exportSecrets(staging, options.categories)
             }
 
@@ -182,17 +188,22 @@ class BackupExporter(
             // offered its files.
             writeBlobIndex(blobStore.blobIndex, staging)
 
+            // nanoMuse: encryption and packaging operate on a disposable copy. A killed encryption
+            // cannot damage the plaintext category checkpoints or force a silent downgrade.
+            val packaging = File(run.staging.parentFile, "packaging")
+            if (packaging.exists()) check(packaging.deleteRecursively())
+            check(staging.copyRecursively(packaging, overwrite = true))
             // Encryption happens BEFORE the manifest is built, because §5.3
             // says `integrity` records the CIPHERTEXT hash — that is what lets
             // a reader verify completeness without holding the passphrase.
             var encryption: BackupManifest.Encryption? = null
             var keys: BackupCrypto.Keys? = null
             if (!options.passphrase.isNullOrEmpty()) {
-                onProgress?.invoke("Encrypting…")
+                onProgress.invoke("Encrypting…")
                 val salt = BackupCrypto.makeSalt()
                 val kdf = BackupCrypto.currentKDF(salt)
                 val derived = BackupCrypto.deriveKeys(options.passphrase, kdf)
-                encryptStagedMembers(staging, derived)
+                encryptStagedMembers(packaging, derived)
                 encryption = BackupManifest.Encryption(BackupCrypto.SCHEME, kdf, derived.verifier)
                 keys = derived
                 // Every category's bytes are now ciphertext, so the per-category
@@ -200,9 +211,9 @@ class BackupExporter(
                 stats.replaceAll { _, v -> v.copy(encrypted = true) }
             }
 
-            onProgress?.invoke("Writing manifest…")
-            val manifest = buildManifest(backupId, stats, blobStore, staging, encryption, options)
-            val manifestFile = File(staging, "manifest.json")
+            onProgress.invoke("Writing manifest…")
+            val manifest = buildManifest(backupId, stats, blobStore, packaging, encryption, options)
+            val manifestFile = File(packaging, "manifest.json")
             manifestFile.writeText(
                 BackupFormat.json.encodeToString(BackupManifest.serializer(), manifest)
             )
@@ -213,20 +224,22 @@ class BackupExporter(
                 // reproduced byte-exactly here, and a MAC that only one
                 // platform can compute is worse than none. Both importers
                 // prefer this sidecar.
-                File(staging, "manifest.mac")
+                File(packaging, "manifest.mac")
                     .writeText(BackupCrypto.manifestMac(manifestFile.readBytes(), keys.macKey))
                 keys.destroy()
             }
 
-            onProgress?.invoke("Packaging…")
-            val packageFile = archive(staging, backupId)
+            onProgress.invoke("Packaging…")
+            val packageFile = archive(packaging, backupId)
             val duration = System.currentTimeMillis() - started
             AppLogger.info(
                 TAG,
                 "[Backup] done id=$backupId bytes=${packageFile.length()} " +
                     "skipped=${blobStore.skippedFiles} in ${duration}ms"
+
             )
 
+            journal.finish(run) // nanoMuse: commit only after the archive exists.
             return Summary(
                 packageFile = packageFile,
                 backupId = backupId,
@@ -238,12 +251,8 @@ class BackupExporter(
                 durationMillis = duration,
             )
         } finally {
-            // The archive is the deliverable; the staging tree is scratch and
-            // can be several GB. Always clear it, including on failure.
-            staging.deleteRecursively()
-            File(context.filesDir, "backup-staging").takeIf {
-                it.listFiles()?.isEmpty() == true
-            }?.delete()
+            // nanoMuse: failures retain checkpoints for explicit resume or discard.
+            File(run.staging.parentFile, "packaging").deleteRecursively()
         }
     }
 
@@ -780,11 +789,18 @@ class BackupExporter(
     companion object {
         private const val TAG = "Backup"
 
-        /**
-         * Process-wide export/restore lock. Both read the same stores, and a
-         * restore mutates them, so they must never overlap (iOS review I3).
-         */
+        /** Process-wide export/restore lock, including resume and discard. */
         private val activityLock = Mutex()
+
+        // nanoMuse: public inspection and guarded discard for the existing backup page.
+        fun interrupted(context: Context): io.github.nanomuse.backup.ExportResume.Run? =
+            io.github.nanomuse.backup.ExportResume(File(context.filesDir, "backup-resume")).pending()
+
+        suspend fun discardInterrupted(context: Context, expectedId: String) = activityLock.withLock {
+            val journal = io.github.nanomuse.backup.ExportResume(File(context.filesDir, "backup-resume"))
+            check(journal.pending()?.id == expectedId) { "Interrupted backup changed" }
+            journal.discard()
+        }
 
         /**
          * Where finished packages live. A sibling of the agent-visible
