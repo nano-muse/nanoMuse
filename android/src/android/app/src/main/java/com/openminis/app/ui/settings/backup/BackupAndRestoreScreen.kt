@@ -220,6 +220,8 @@ private fun BackupTab(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val selected by vm.selected.collectAsState()
+    // nanoMuse: interactive exports include protected chat content; scheduled backups remain unchanged.
+    val protectedBackupAction = io.github.nanomuse.ui.guard.rememberProtectedBackupAction()
     val encrypt by vm.encrypt.collectAsState()
     val maxFileSizeMB by vm.maxFileSizeMB.collectAsState()
     val running by vm.isRunning.collectAsState()
@@ -394,7 +396,9 @@ private fun BackupTab(
     Column(Modifier.padding(16.dp)) {
         // nanoMuse: starting a fresh backup never silently replaces an interrupted one.
         io.github.nanomuse.ui.guard.BackupResumeActions(running) {
-            vm.startExport(passphrase.takeIf { encrypt }, resumeInterrupted = true)
+            protectedBackupAction(BackupCategory.CHATS in selected) {
+                vm.startExport(passphrase.takeIf { encrypt }, resumeInterrupted = true)
+            }
         }
         // [T-android-backup-stop] ONE button that toggles. While a backup runs
         // it says "Stop Backup" and stops it — nothing else about the row
@@ -410,7 +414,7 @@ private fun BackupTab(
         MinisButton(
             onClick = {
                 if (running) vm.stopExport()
-                else vm.startExport(passphrase.takeIf { encrypt })
+                else protectedBackupAction(BackupCategory.CHATS in selected) { vm.startExport(passphrase.takeIf { encrypt }) }
             },
             // The start-time requirements gate STARTING only. Applying them
             // while running would disable the button mid-run and leave no way

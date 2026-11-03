@@ -501,6 +501,8 @@ fun SessionListScreen(
     draftPlaceholderId: String? = null,
 ) {
     val context = LocalContext.current
+    // nanoMuse: one authenticator serves every content-revealing context-menu action.
+    val protectedSessionAction = io.github.nanomuse.ui.guard.rememberProtectedSessionAction()
     // T46: hoist VM ownership to the NavBackStackEntry's ViewModelStore so
     // [searchQuery] / [isSearchActive] survive navigation. The previous
     // `remember {}` scoping tied the VM to the composable's lifetime — pushing
@@ -1044,10 +1046,10 @@ fun SessionListScreen(
                                     onPinToggle = { viewModel.togglePin(it) },
                                     onEditRequest = { editSession = it },
                                     onExportRequest = { s, fmt ->
-                                        exportSession(context, s, chatRepository, scope, fmt)
+                                        protectedSessionAction(s.id) { exportSession(context, s, chatRepository, scope, fmt) }
                                     },
-                                    onRegenerateTitle = { viewModel.regenerateTitle(it) },
-                                    onDuplicate = { viewModel.duplicateSession(it) },
+                                    onRegenerateTitle = { id -> protectedSessionAction(id) { viewModel.regenerateTitle(id) } },
+                                    onDuplicate = { id -> protectedSessionAction(id) { viewModel.duplicateSession(id) } },
                                     onDeleteRequest = { id ->
                                         deleteTargetId = id
                                         showDeleteDialog = true
@@ -3378,6 +3380,9 @@ private fun exportSession(
                 repository = chatRepository,
                 format = format,
             )
+            // nanoMuse: an export may finish after the access lease expires; never grant its URI while locked.
+            if (io.github.nanomuse.guard.AppAccess.locked.value) throw SecurityException("App access expired")
+            io.github.nanomuse.guard.SessionAccess.requireUnlocked(session.id)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/zip"
                 putExtra(Intent.EXTRA_SUBJECT, session.title ?: "Conversation")

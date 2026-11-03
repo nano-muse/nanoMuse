@@ -27,6 +27,34 @@ object SessionAccess {
     }
     fun isProtected(id: String) = id in _protected.value
     fun isLocked(id: String) = ::state.isInitialized && state.isLocked(id, timeout)
+    fun requireUnlocked(id: String) {
+        if (isLocked(id)) throw SecurityException("Device authentication required for protected conversation")
+    }
+    fun inheritProtection(sourceId: String, copyId: String) {
+        if (isProtected(sourceId)) protect(copyId, true)
+    }
+    suspend fun protectPersisted(authenticated: Boolean, persist: suspend () -> String): String? {
+        if (!authenticated || AppAccess.locked.value) return null
+        return persist().also { protect(it, true) }
+    }
+    fun authorizeAction(id: String, authenticate: ((Boolean) -> Unit) -> Unit, action: () -> Unit) {
+        val required = isLocked(id)
+        authorize(required, authenticate) {
+            if (required) this.authenticate(id, true)
+            if (!isLocked(id)) action()
+        }
+    }
+    /** Interactive backups ask once for the export, without unlocking every protected chat. */
+    fun authorizeExport(includesChats: Boolean, authenticate: ((Boolean) -> Unit) -> Unit, action: () -> Unit) {
+        authorize(includesChats && protected.value.any { isLocked(it) }, authenticate, action)
+    }
+    private fun authorize(required: Boolean, authenticate: ((Boolean) -> Unit) -> Unit, action: () -> Unit) {
+        if (AppAccess.locked.value) return
+        if (!required) { action(); return }
+        authenticate { success ->
+            if (success && !AppAccess.locked.value) action()
+        }
+    }
     fun protect(id: String, authenticated: Boolean) { state.protect(id, authenticated); changed() }
     fun unprotect(id: String, authenticated: Boolean) { state.unprotect(id, authenticated); changed() }
     fun authenticate(id: String, success: Boolean) { state.authenticate(id, success); changed() }

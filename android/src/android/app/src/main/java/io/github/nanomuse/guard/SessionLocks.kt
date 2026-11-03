@@ -6,7 +6,10 @@ class SessionLocks(initial: Set<String>, private val save: (Set<String>) -> Unit
     private val leases = mutableMapOf<String, AccessLease>()
     @Synchronized fun isLocked(id: String, seconds: Int): Boolean = id in ids && leases[id]?.isUnlocked(seconds) != true
     @Synchronized fun protect(id: String, authenticated: Boolean) {
-        if (authenticated) { leases.remove(id); ids = ids + id; save(ids) }
+        if (authenticated) {
+            require(id.isNotBlank() && !id.startsWith("__new__")) { "Protect the persisted conversation ID" }
+            leases.remove(id); ids = ids + id; save(ids)
+        }
     }
     @Synchronized fun authenticate(id: String, success: Boolean) { leases.getOrPut(id) { AccessLease(clock) }.authenticate(success) }
     @Synchronized fun unprotect(id: String, authenticated: Boolean) { if (authenticated) deleted(id) }

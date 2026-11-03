@@ -16,6 +16,7 @@ import com.openminis.app.R
 import io.github.nanomuse.guard.AppAccess
 import io.github.nanomuse.guard.SessionAccess
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Runs before the screen obtains its ViewModel, including deep-link and notification entry. */
 @Composable
@@ -48,17 +49,38 @@ fun SessionAccessGate(sessionId: String): Boolean {
 }
 
 @Composable
-fun SessionAccessMenuItem(sessionId: String, dismiss: () -> Unit) {
+fun SessionAccessMenuItem(sessionId: String, persistSessionId: suspend () -> String = { sessionId }, dismiss: () -> Unit) {
     val protected by SessionAccess.protected.collectAsState()
     val authenticate = rememberAccessAuthenticator()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
     val title = stringResource(if (sessionId in protected) R.string.nm_session_unprotect else R.string.nm_session_protect)
-    DropdownMenuItem(text = { Text(title) }, onClick = {
-        dismiss()
+    DropdownMenuItem(enabled = !busy, text = { Text(title) }, onClick = {
+        busy = true
         authenticate(title) { success ->
-            if (sessionId in protected) SessionAccess.unprotect(sessionId, success)
-            else SessionAccess.protect(sessionId, success)
+            scope.launch {
+                try {
+                    if (sessionId in protected) SessionAccess.unprotect(sessionId, success)
+                    else SessionAccess.protectPersisted(success, persistSessionId)
+                } finally { busy = false; dismiss() }
+            }
         }
     })
+}
+
+/** One native-authentication callback for context-menu export, duplication and title generation. */
+@Composable
+fun rememberProtectedSessionAction(): (String, () -> Unit) -> Unit {
+    val authenticate = rememberAccessAuthenticator()
+    val title = stringResource(R.string.nm_session_protected)
+    return { id, action -> SessionAccess.authorizeAction(id, { result -> authenticate(title, result) }, action) }
+}
+
+@Composable
+fun rememberProtectedBackupAction(): (Boolean, () -> Unit) -> Unit {
+    val authenticate = rememberAccessAuthenticator()
+    val title = stringResource(R.string.backup_title)
+    return { includesChats, action -> SessionAccess.authorizeExport(includesChats, { result -> authenticate(title, result) }, action) }
 }
 
 @Composable
