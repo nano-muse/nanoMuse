@@ -70,6 +70,49 @@ class RemoteTaskSocketTest {
         }
     }
 
+    @Test fun `interrupted task callers stop the original call and retain interruption`() {
+        val server = MockWebServer()
+        val started = CountDownLatch(1)
+        val calls = CopyOnWriteArrayList<JSONObject>()
+        val failure = AtomicReference<Throwable?>()
+        val interrupted = AtomicReference(false)
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onClosing(socket: WebSocket, code: Int, reason: String) { socket.close(1000, null) }
+            override fun onMessage(socket: WebSocket, text: String) {
+                val frame = JSONObject(text)
+                if (frame.optString("type") == "hello") { socket.send("""{"type":"welcome","devices":[]}"""); return }
+                calls += frame
+                when (frame.optString("action")) {
+                    "task" -> started.countDown()
+                    "stop" -> socket.send(JSONObject().put("type", "result").put("id", frame.getString("id"))
+                        .put("ok", true).put("body", JSONObject().put("stopped", true)).toString())
+                }
+            }
+        }))
+        server.start()
+        val client = connected(server)
+        val caller = Thread {
+            try { client.call(device.id, "task", JSONObject(), 30_000) }
+            catch (error: Throwable) { failure.set(error); interrupted.set(Thread.currentThread().isInterrupted) }
+        }
+        try {
+            caller.start()
+            assertTrue(started.await(5, TimeUnit.SECONDS))
+            caller.interrupt()
+            caller.join(5_000)
+            assertFalse("cleanup should finish after the stop response", caller.isAlive)
+            assertTrue(failure.get() is InterruptedException)
+            assertTrue("the caller's interruption must survive cleanup", interrupted.get())
+            assertEquals(listOf("task", "stop"), calls.map { it.getString("action") })
+            assertEquals(calls[0].getString("id"), calls[1].getJSONObject("args").getString("call"))
+        } finally {
+            client.stop()
+            caller.interrupt()
+            caller.join(5_000)
+            server.close()
+        }
+    }
+
     @Test fun `non-task timeouts never send a task stop`() {
         val server = MockWebServer()
         val calls = CopyOnWriteArrayList<JSONObject>()
