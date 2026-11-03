@@ -39,6 +39,11 @@ def _lanes(value: object, what: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+def positive_capacity(value: object) -> int | None:
+    """A wire capacity fits each client within a signed 32-bit token count."""
+    return value if type(value) is int and 0 < value <= 2**31 - 1 else None
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     """One model the relay offers. `id` is what the app sees and asks for;
@@ -50,6 +55,8 @@ class ModelSpec:
     kind: str = "chat"  # chat | image | video
     input_modalities: tuple[str, ...] = ("text",)
     output_modalities: tuple[str, ...] = ("text",)
+    context_length: int | None = None
+    max_output_tokens: int | None = None
     # The lanes a chat model serves, serialised as `for`: ("chat",), ("gui",) or both;
     # empty means "chat" for a chat model and nothing for a picture or a clip model
     # (their `kind` says what they do). `recommended_for` names the lane(s) a model
@@ -105,6 +112,10 @@ class ModelSpec:
     priced_as: str = ""
 
     def __post_init__(self) -> None:
+        for capacity_key in ("context_length", "max_output_tokens"):
+            value = getattr(self, capacity_key)
+            if value is not None and positive_capacity(value) is None:
+                raise ValueError(f"{self.id}: {capacity_key} must be a positive 32-bit integer")
         # a lane list from CLOUD_MODELS may arrive as a list; keep tuples, and only known lanes
         object.__setattr__(self, "for_", _lanes(self.for_, f"{self.id}: for"))
         object.__setattr__(self, "recommended_for", _lanes(self.recommended_for, f"{self.id}: recommended_for"))
@@ -147,6 +158,7 @@ class ModelSpec:
             "object": "model",
             "name": self.name,
             "owned_by": "nanomuse-cloud",
+            **{key: getattr(self, key) for key in ("context_length", "max_output_tokens") if getattr(self, key) is not None},
             "architecture": {
                 "input_modalities": list(self.input_modalities),
                 "output_modalities": list(self.output_modalities),

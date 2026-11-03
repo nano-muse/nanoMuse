@@ -238,6 +238,10 @@ DELETE /v1/devices/{id}     Bearer                            → 204; 409 devic
 
 `/v1/config` 里的 `code_ttl_s` 和 `password_min_len` 就是中继的 `CODE_TTL_S` 和 `PASSWORD_MIN_LEN`；网页控制台的登录表单和密码表单打印这两个数，所以设了别的数值的中继也能被说对，没有这两个字段的旧中继按十分钟和 8 位读。
 
+**模型容量。** 模型可以提供 `context_length`（输入与输出合计的上下文容量）和 `max_output_tokens`，单位都是 token，值为不超过 2147483647 的正整数。自托管时可在 `CLOUD_MODELS` 的对应模型条目中配置。未知的容量不输出，也不会根据模型名推测或沿用计价参考模型的容量。登录回复、`/v1/me`、模型列表和单模型查询共用配置菜单的同一种表示。有权限使用额外模型的成员，也能收到上游模型目录明确提供的这两个字段。
+
+Android 和桌面应用安装包中的容量字段留空时，采用中继提供的值；手动填写的值优先，模型组的上下文限制仍然生效。刷新会更新继承的容量，保留手动设置，不需要重新登录。旧中继没有这些字段时，客户端继续使用原有的回退值。容量与累计用量不同，缓存命中的输入仍然占用上下文。如果上游流没有 `usage`，中继会为账本估算用量，但不会把估算值作为实测数据写进流，所以会话统计可能与账号账本不同。
+
 其余都是 OpenAI API：`GET /v1/models`（带 `architecture` 模态，好认出图像模型，每个模型还有一个 `nanomuse` 块，含它的 `kind`、价格、`for`（聊天模型适用的通道：`chat` 和 / 或 `gui`）以及 `recommended_for`）、`GET /v1/models/{id}?kind=chat`（成员检查一个手动输入的 id：`listed`、`priced_as`）、流式的 `POST /v1/chat/completions`、`POST /v1/images/generations` 和 `/v1/images/edits`，以及走服务商自己路径的短视频（`POST /api/v1/services/aigc/video-generation/video-synthesis`、只能查自己任务的 `GET /api/v1/tasks/{id}`、`GET /api/v1/uploads`）。项目托管服务对图片/视频请求、上传、手动媒体模型查询、媒体估算和视频任务轮询，在调用上游之前统一返回 `410 hosted_media_retired`，并带 `action: configure_own_provider`。错误是 `{"error": {"message", "type": "nanomuse_cloud", "code"}}`，`code` 稳定不变，App 把它变成一句话。中继 0.22 加了运营者[开关](#controls)的码：`403 signup_closed`、`503 service_paused`、`503 sync_paused`、`503 hub_paused`（以及 hub 的关闭码 `4003 hub_paused`），还有免费额度是被暂停而不是花完时带 `paused: true` 的 `allowance_exhausted`；`/healthz`、`/v1/config` 和 `/v1/me` 在 `paused` 下列出关着的开关。
 
 **模型开口之前（中继 0.31）。** 一次流式对话可能先收到几段没有 `choices` 的 chunk：`{"object": "chat.completion.chunk", "model", "created", "choices": [], "nanomuse": {"phase", "waited_ms", "ahead"?}}`。请求在中继的模型名额（`CHAT_CONCURRENCY`）前排队时，每 5 秒来一段 `phase: "queued"`，`ahead` 是排在它前面的请求数；轮到它时来一段 `phase: "working"`；没排过队的请求一段也不会收到。模型迟迟不吐出第一个字节的时候，每 10 秒发一行注释（`: keepalive`）。SSE 解析器按定义会跳过注释行，而没有 choices 的 chunk 正是每个客户端早已处理的只带 usage 的那种形状，所以不认识这些的客户端看到的回复和从前一样；手机和桌面读这个字段，告诉你前面还有几个、这一轮等了多久。非流式对话里没有这些；这些也不计费、不入账。
