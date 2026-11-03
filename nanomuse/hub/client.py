@@ -469,8 +469,11 @@ class HubClient:
             ):
                 # Both the local deadline and the relay's timeout abandon the same run.
                 # An exact call id prevents a delayed stop from ending its successor.
-                with contextlib.suppress(HubError):
-                    await self.call(to, "stop", {"call": call_id}, timeout=TASK_STOP_TIMEOUT_S)
+                with contextlib.suppress(HubError, TimeoutError):
+                    await asyncio.wait_for(
+                        self.call(to, "stop", {"call": call_id}, timeout=TASK_STOP_TIMEOUT_S),
+                        timeout=TASK_STOP_TIMEOUT_S,
+                    )
             raise
         body = frame.get("body")
         return body if isinstance(body, dict) else {}

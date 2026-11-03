@@ -504,6 +504,52 @@ def test_non_task_timeout_does_not_stop_a_task(relay: FakeRelay) -> None:
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize("cancel", [False, True])
+def test_abandoned_task_bounds_the_stop_send(monkeypatch: pytest.MonkeyPatch, cancel: bool) -> None:
+    monkeypatch.setattr("nanomuse.hub.client.TASK_STOP_TIMEOUT_S", 0.02)
+
+    async def scenario() -> None:
+        client = HubClient("ws://relay.invalid", "test-key", "pc-1", "Desk", actions=[])
+        frames: list[dict[str, Any]] = []
+        started = asyncio.Event()
+        stopped = asyncio.Event()
+
+        async def blocked_send(frame: dict[str, Any]) -> None:
+            frames.append(frame)
+            if frame["action"] == "stop":
+                try:
+                    await asyncio.Future()
+                finally:
+                    stopped.set()
+            else:
+                started.set()
+
+        monkeypatch.setattr(client, "_send", blocked_send)
+        task = asyncio.create_task(client.call("phone-1", "task", timeout=0.02))
+        await started.wait()
+        if cancel:
+            task.cancel()
+        done, _ = await asyncio.wait({task}, timeout=1)
+        if not done:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            pytest.fail("the stop send exceeded its cleanup deadline")
+        if cancel:
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            with pytest.raises(HubError) as exc:
+                await task
+            assert exc.value.code == "timeout"
+            assert "no answer from the device" in exc.value.message
+        assert stopped.is_set()
+        assert len(frames) == 2
+        assert frames[1]["args"] == {"call": frames[0]["id"]}
+        assert not client._pending
+
+    asyncio.run(scenario())
+
+
 def test_client_refuses_to_hammer_on_bad_key(relay: FakeRelay) -> None:
     async def scenario() -> None:
         client = HubClient(hub_url(relay.base_url), "wrong", "pc-1", "Desk", actions=["info"])
