@@ -64,4 +64,15 @@ class ExportResumeTest {
         assertNull(journal.pending())
         assertEquals("keep", File(root, "unrelated").readText())
     }
+
+    @Test fun sameLengthCorruptionOfCommittedIndexMetadataIsRefused() = fixture { _, journal ->
+        val run = journal.open("options", false, false)
+        val index = File(run.staging, "files.index.jsonl")
+        index.writeText("""{"path":"shared/one","size":3}""" + "\n")
+        journal.completed(run, "shared_files", "statistics")
+        index.writeText(index.readText().replace("shared/one", "shared/two"))
+        try { journal.open("options", false, true); fail("must verify committed index metadata") }
+        catch (_: IllegalStateException) { }
+        assertNotNull(journal.pending())
+    }
 }

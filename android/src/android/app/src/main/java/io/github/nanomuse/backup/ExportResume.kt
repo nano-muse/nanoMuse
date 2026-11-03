@@ -57,6 +57,7 @@ class ExportResume(private val root: File, private val id: () -> String = { UUID
         }
         File(run.staging, "files.index.jsonl").takeIf { it.exists() }?.let { index ->
             FileOutputStream(index, true).use { it.fd.sync() }
+            checkpoint.setProperty("indexSha256", digest(index))
         }
         write(file, checkpoint)
     }
@@ -80,6 +81,9 @@ class ExportResume(private val root: File, private val id: () -> String = { UUID
         val index = File(run.staging, "files.index.jsonl")
         check(index.length() >= length) { "Staged backup index is incomplete; discard this interrupted run." }
         if (index.exists()) java.io.RandomAccessFile(index, "rw").use { it.setLength(length); it.fd.sync() }
+        check(length == 0L || digest(index) == p.getProperty("indexSha256")) {
+            "Staged backup index changed; discard this interrupted run."
+        }
     }
     fun discard() {
         val run = pending() ?: return
