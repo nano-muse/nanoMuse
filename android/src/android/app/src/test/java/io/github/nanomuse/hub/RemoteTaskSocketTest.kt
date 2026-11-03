@@ -34,6 +34,62 @@ class RemoteTaskSocketTest {
         return client
     }
 
+    @Test fun `local and relay task timeouts stop only the original call`() {
+        for (relayTimeout in listOf(false, true)) {
+            val server = MockWebServer()
+            val calls = CopyOnWriteArrayList<JSONObject>()
+            server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onClosing(socket: WebSocket, code: Int, reason: String) { socket.close(1000, null) }
+                override fun onMessage(socket: WebSocket, text: String) {
+                    val frame = JSONObject(text)
+                    if (frame.optString("type") == "hello") { socket.send("""{"type":"welcome","devices":[]}"""); return }
+                    calls += frame
+                    val id = frame.getString("id")
+                    if (frame.optString("action") == "task" && relayTimeout) {
+                        socket.send(JSONObject().put("type", "error").put("id", id)
+                            .put("code", "timeout").put("message", "task deadline reached").toString())
+                    }
+                    if (frame.optString("action") == "stop") {
+                        socket.send(JSONObject().put("type", "result").put("id", id).put("ok", true)
+                            .put("body", JSONObject().put("stopped", true)).toString())
+                    }
+                }
+            }))
+            server.start()
+            val client = connected(server)
+            try {
+                try {
+                    client.call(device.id, "task", JSONObject().put("text", "long task"), if (relayTimeout) 5_000 else 100)
+                    fail("task timeout must reach its caller")
+                } catch (error: HubException) { assertEquals("timeout", error.code) }
+                assertEquals(listOf("task", "stop"), calls.map { it.getString("action") })
+                assertEquals(calls[0].getString("id"), calls[1].getJSONObject("args").getString("call"))
+                assertEquals(device.id, calls[1].getString("to"))
+                assertFalse(calls[1].getJSONObject("args").has("conversation"))
+            } finally { client.stop(); server.close() }
+        }
+    }
+
+    @Test fun `non-task timeouts never send a task stop`() {
+        val server = MockWebServer()
+        val calls = CopyOnWriteArrayList<JSONObject>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onClosing(socket: WebSocket, code: Int, reason: String) { socket.close(1000, null) }
+            override fun onMessage(socket: WebSocket, text: String) {
+                val frame = JSONObject(text)
+                if (frame.optString("type") == "hello") socket.send("""{"type":"welcome","devices":[]}""")
+                else calls += frame
+            }
+        }))
+        server.start()
+        val client = connected(server)
+        try {
+            try { client.call(device.id, "info", JSONObject(), 100); fail("expected timeout") }
+            catch (error: HubException) { assertEquals("timeout", error.code) }
+            assertEquals(listOf("info"), calls.map { it.getString("action") })
+        } finally { client.stop(); server.close() }
+    }
+
     @Test fun `streamed frames reach the reply in order before its one final answer`() = runBlocking {
         val server = MockWebServer()
         val calls = CopyOnWriteArrayList<JSONObject>()

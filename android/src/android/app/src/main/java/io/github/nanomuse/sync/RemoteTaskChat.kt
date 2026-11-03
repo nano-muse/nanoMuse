@@ -57,10 +57,14 @@ class RemoteTaskChat(private val context: Context, private val device: Device, t
             val result = task.run(
                 call = { id, to, action, args, event ->
                     args.put("from", Hub.name(context))
-                    runInterruptible(Dispatchers.IO) { Hub.callWithId(id, to, action, args, 600_000, event) }
+                    runInterruptible(Dispatchers.IO) {
+                        Hub.callWithId(id, to, action, args, io.github.nanomuse.hub.HubClient.TASK_TIMEOUT_MS, event)
+                    }
                 },
                 onEvent = { body -> approvals.event(body); reply.event(body); update() },
-                stop = { id -> runInterruptible(Dispatchers.IO) { Hub.call(device.id, "stop", JSONObject().put("call", id), 5_000) }; Unit },
+                stop = { id -> runInterruptible(Dispatchers.IO) {
+                    Hub.call(device.id, "stop", JSONObject().put("call", id), io.github.nanomuse.hub.HubClient.TASK_STOP_TIMEOUT_MS)
+                }; Unit },
             )
             val answer = RemoteTaskReply.answer(result)
             failed = answer == null

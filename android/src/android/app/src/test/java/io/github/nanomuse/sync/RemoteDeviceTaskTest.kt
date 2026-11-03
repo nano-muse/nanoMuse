@@ -82,4 +82,20 @@ class RemoteDeviceTaskTest {
         } catch (_: IllegalStateException) { }
         assertEquals(listOf("own-call"), stops)
     }
+
+    @Test fun `a direct task timeout stops once and keeps the original error if cleanup fails`() = runTest {
+        val stops = mutableListOf<String>()
+        try {
+            RemoteDeviceTask(device, "long task", "en", "timed-out-call").run(
+                call = { _, _, _, _, _ -> throw io.github.nanomuse.hub.HubException("timeout", "original timeout") },
+                onEvent = {},
+                stop = { stops += it; throw io.github.nanomuse.hub.HubException("disconnected", "cleanup failed") },
+            )
+            fail("timeout must be reported")
+        } catch (error: io.github.nanomuse.hub.HubException) {
+            assertEquals("timeout", error.code)
+            assertEquals("original timeout", error.message)
+        }
+        assertEquals(listOf("timed-out-call"), stops)
+    }
 }
