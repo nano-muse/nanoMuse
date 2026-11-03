@@ -1,5 +1,9 @@
 # nanoMuse Cloud
 
+Changing an Activity filter discards pending responses from the previous filter. Automatic refresh pauses while older event pages are being read, so it cannot discard a pending or already loaded More page.
+The admin console counts each demo visit once in its daily chart, including visits present in both the active and recent lists. Days follow the site's configured timezone offset.
+The admin console classifies legacy Python runtime sessions with an `AsyncOpenAI/Python` user agent as runtime sessions, matching the relay.
+
 The "start now" path: sign up with a phone number (mainland China; the code comes by SMS)
 or an e-mail address, get a free allowance, and use nanoMuse without an API key of your own.
 Bringing your own key still works exactly as before: this is one more
@@ -849,6 +853,22 @@ DELETE /v1/devices/{id}     Bearer                            → 204; 409 devic
 and `PASSWORD_MIN_LEN`; the web console prints them in its sign-in and password
 forms, so a relay that sets other figures is described rightly, and an older
 relay without the two fields is read as ten minutes and eight characters.
+
+**Model capacities.** Each model may disclose `context_length` (combined input and output)
+and `max_output_tokens`, both positive integer token counts up to 2147483647. Operators
+can set these fields on each entry in `CLOUD_MODELS`. Unknown capacities are omitted,
+not guessed from a model's name or copied from its billing reference. The configured
+menu uses the same representation in sign-in replies, `/v1/me`, the model list and
+individual model lookups. Additional models discovered for eligible members retain
+these fields when the upstream provider supplies them.
+
+Android and the packaged desktop app use these values when a model's capacity field is blank. A manual
+model override wins; group context limits still apply. Refresh updates inherited values
+without another sign-in and preserves manual overrides. An older relay without these
+fields retains the client's existing fallback. Context capacity is not accumulated
+usage: cached input still occupies context. If an upstream stream omits `usage`, the
+relay estimates consumption for its ledger but does not label that estimate as measured
+usage in the stream, so conversation statistics may differ from the account ledger.
 
 Everything else is the OpenAI API: `GET /v1/models` (with `architecture`
 modalities so the picture model is recognisable, and a `nanomuse` block per

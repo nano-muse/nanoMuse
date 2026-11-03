@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import com.openminis.app.logging.AppLogger
 import io.github.nanomuse.ui.avatar.AgentMood
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +18,7 @@ import java.io.FileOutputStream
  * The user's own face for the agent: one chosen picture plus, when the image model could make
  * them, one picture per mood. Everything lives under `minis-global/nanomuse/avatar/` as PNGs so
  * it survives updates and can be backed up like the rest of the app's files. Null means the
- * built-in dragon.
+ * no drawn face; a profile emoji is worn before the built-in dragon.
  */
 data class AvatarSet(
     val base: ImageBitmap,
@@ -38,6 +39,8 @@ object AvatarStore {
     private lateinit var dir: File
     private val _current = MutableStateFlow<AvatarSet?>(null)
     val current: StateFlow<AvatarSet?> = _current
+    private val _emoji = MutableStateFlow<EmojiLook?>(null)
+    val emoji: StateFlow<EmojiLook?> = _emoji
 
     fun init(context: Context) {
         dir = File(context.filesDir, "minis-global/nanomuse/avatar").apply { mkdirs() }
@@ -56,8 +59,20 @@ object AvatarStore {
     fun baseFile(): File = File(dir, "base.png")
     fun moodFile(mood: AgentMood): File = File(dir, mood.name.lowercase() + ".png")
     private fun metaFile(): File = File(dir, "avatar.json")
+    private fun emojiFile(): File = File(dir, "emoji.json")
+
+    fun bitmap(mood: AgentMood): Bitmap? = current.value?.forMood(mood)?.asAndroidBitmap()
+        ?: emoji.value?.let { EmojiPortrait.bitmap(it) }
+
+    /** A pulled emoji replaces the old drawn face; account moves reuse reload(). */
+    fun adoptEmoji(look: EmojiLook) {
+        reset()
+        EmojiLook.save(emojiFile(), look)
+        reload()
+    }
 
     fun reload() {
+        _emoji.value = EmojiLook.load(emojiFile())
         val base = decode(baseFile()) ?: run { _current.value = null; return }
         val moods = AgentMood.entries.mapNotNull { m -> decode(moodFile(m))?.let { m to it } }.toMap()
         val meta = runCatching { JSONObject(metaFile().readText()) }.getOrNull()
@@ -73,6 +88,7 @@ object AvatarStore {
 
     /** Makes [bitmap] the face. Old mood pictures are dropped — they belonged to the old face. */
     fun adopt(bitmap: Bitmap, prompt: String, style: String, model: String) {
+        EmojiLook.save(emojiFile(), null)
         AgentMood.entries.forEach { moodFile(it).delete() }
         AvatarMotion.clear()
         write(baseFile(), bitmap)
@@ -93,6 +109,7 @@ object AvatarStore {
 
     /** Back to the built-in dragon. Candidates are kept so the user can pick again without paying. */
     fun reset() {
+        EmojiLook.save(emojiFile(), null)
         AvatarMotion.clear()
         baseFile().delete()
         AgentMood.entries.forEach { moodFile(it).delete() }
