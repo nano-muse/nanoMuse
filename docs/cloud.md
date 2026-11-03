@@ -1,5 +1,6 @@
 # nanoMuse Cloud
 
+Switching accounts in the admin drawer clears the samples list and ignores pending sample responses and errors from the previous account.
 Changing an Activity filter discards pending responses from the previous filter. Automatic refresh pauses while older event pages are being read, so it cannot discard a pending or already loaded More page.
 The admin console counts each demo visit once in its daily chart, including visits present in both the active and recent lists. Days follow the site's configured timezone offset.
 The admin console classifies legacy Python runtime sessions with an `AsyncOpenAI/Python` user agent as runtime sessions, matching the relay.
