@@ -1225,4 +1225,12 @@
     <string name="nm_context_compact_idle_timeout">La compactación se detuvo tras %1$d segundos sin respuesta (%2$d llamadas al modelo).</string>
     <string name="nm_context_compact_no_gain">El resumen no redujo el contexto. Se conservó el contenido original.</string>
     <string name="nm_context_compact_incomplete">El modelo no devolvió un resumen completo. Se conservó el contexto original.</string>
+    <string name="nm_access_locked">nanoMuse está bloqueado</string>
+    <string name="nm_access_hint">Confirma con el bloqueo de pantalla de este dispositivo.</string>
+    <string name="nm_access_unlock">Desbloquear</string>
+    <string name="nm_access_settings">Bloqueo de la aplicación</string>
+    <string name="nm_access_on_exit">Bloquear al salir</string>
+    <string name="nm_access_never">No bloquear automáticamente</string>
+    <string name="nm_access_seconds">%1$d segundos</string>
+    <string name="nm_access_unavailable">Primero configura un bloqueo de pantalla en este dispositivo.</string>
 </resources>

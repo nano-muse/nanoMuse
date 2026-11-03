@@ -238,6 +238,8 @@ class MinisApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // nanoMuse: initialize access policy before the first Activity or incoming share.
+        io.github.nanomuse.guard.AppAccess.initialize(this)
 
         // T287-followup: ACRA spawns a separate reporter process named
         // "<package>:acra" (declared by the library's manifest) to send

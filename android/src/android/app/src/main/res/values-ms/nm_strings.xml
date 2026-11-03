@@ -1221,4 +1221,12 @@
     <string name="nm_context_compact_idle_timeout">Pemadatan dihentikan selepas %1$d saat tanpa respons (%2$d panggilan model).</string>
     <string name="nm_context_compact_no_gain">Ringkasan tidak memendekkan konteks. Kandungan asal dikekalkan.</string>
     <string name="nm_context_compact_incomplete">Model tidak mengembalikan ringkasan lengkap. Konteks asal dikekalkan.</string>
+    <string name="nm_access_locked">nanoMuse dikunci</string>
+    <string name="nm_access_hint">Sahkan dengan kunci skrin peranti ini.</string>
+    <string name="nm_access_unlock">Buka kunci</string>
+    <string name="nm_access_settings">Kunci aplikasi</string>
+    <string name="nm_access_on_exit">Kunci apabila keluar</string>
+    <string name="nm_access_never">Jangan kunci secara automatik</string>
+    <string name="nm_access_seconds">%1$d saat</string>
+    <string name="nm_access_unavailable">Tetapkan kunci skrin pada peranti ini dahulu.</string>
 </resources>

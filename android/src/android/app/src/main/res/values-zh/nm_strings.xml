@@ -1198,4 +1198,12 @@
     <string name="nm_context_compact_idle_timeout">模型连续 %1$d 秒未返回数据，已停止整理上下文（调用模型 %2$d 次）。</string>
     <string name="nm_context_compact_no_gain">摘要未缩短上下文，已保留原有内容。</string>
     <string name="nm_context_compact_incomplete">模型未返回完整摘要，已保留原有上下文。</string>
+    <string name="nm_access_locked">nanoMuse 已锁定</string>
+    <string name="nm_access_hint">请使用本设备的锁屏方式验证。</string>
+    <string name="nm_access_unlock">解锁</string>
+    <string name="nm_access_settings">应用锁</string>
+    <string name="nm_access_on_exit">退出时锁定</string>
+    <string name="nm_access_never">不自动锁定</string>
+    <string name="nm_access_seconds">%1$d 秒</string>
+    <string name="nm_access_unavailable">请先为本设备设置锁屏密码。</string>
 </resources>

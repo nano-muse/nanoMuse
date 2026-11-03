@@ -1225,4 +1225,12 @@
     <string name="nm_context_compact_idle_timeout">Die Komprimierung wurde nach %1$d Sekunden ohne Antwort gestoppt (%2$d Modellaufrufe).</string>
     <string name="nm_context_compact_no_gain">Die Zusammenfassung hat den Kontext nicht verkürzt. Der ursprüngliche Inhalt wurde beibehalten.</string>
     <string name="nm_context_compact_incomplete">Das Modell hat keine vollständige Zusammenfassung zurückgegeben. Der ursprüngliche Kontext wurde beibehalten.</string>
+    <string name="nm_access_locked">nanoMuse ist gesperrt</string>
+    <string name="nm_access_hint">Mit der Bildschirmsperre dieses Geräts bestätigen.</string>
+    <string name="nm_access_unlock">Entsperren</string>
+    <string name="nm_access_settings">App-Sperre</string>
+    <string name="nm_access_on_exit">Beim Verlassen sperren</string>
+    <string name="nm_access_never">Nie automatisch sperren</string>
+    <string name="nm_access_seconds">%1$d Sekunden</string>
+    <string name="nm_access_unavailable">Zuerst eine Bildschirmsperre auf diesem Gerät einrichten.</string>
 </resources>

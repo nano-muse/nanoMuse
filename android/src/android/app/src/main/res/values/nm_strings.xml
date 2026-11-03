@@ -1205,4 +1205,12 @@
     <string name="nm_context_compact_idle_timeout">Compaction stopped after %1$d seconds without a response (%2$d model calls).</string>
     <string name="nm_context_compact_no_gain">The summary did not shorten the context. The original content was kept.</string>
     <string name="nm_context_compact_incomplete">The model did not return a complete summary. The original context was kept.</string>
+    <string name="nm_access_locked">nanoMuse is locked</string>
+    <string name="nm_access_hint">Confirm with the screen lock of this device.</string>
+    <string name="nm_access_unlock">Unlock</string>
+    <string name="nm_access_settings">App lock</string>
+    <string name="nm_access_on_exit">Lock on exit</string>
+    <string name="nm_access_never">Never auto-lock</string>
+    <string name="nm_access_seconds">%1$d seconds</string>
+    <string name="nm_access_unavailable">Set a screen lock on this device first.</string>
 </resources>

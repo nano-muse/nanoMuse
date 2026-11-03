@@ -1229,4 +1229,12 @@
     <string name="nm_context_compact_idle_timeout">Comprimarea s-a oprit după %1$d secunde fără răspuns (%2$d apeluri către model).</string>
     <string name="nm_context_compact_no_gain">Rezumatul nu a redus contextul. Conținutul original a fost păstrat.</string>
     <string name="nm_context_compact_incomplete">Modelul nu a returnat un rezumat complet. Contextul original a fost păstrat.</string>
+    <string name="nm_access_locked">nanoMuse este blocat</string>
+    <string name="nm_access_hint">Confirmă cu blocarea ecranului acestui dispozitiv.</string>
+    <string name="nm_access_unlock">Deblochează</string>
+    <string name="nm_access_settings">Blocarea aplicației</string>
+    <string name="nm_access_on_exit">Blochează la ieșire</string>
+    <string name="nm_access_never">Nu bloca automat</string>
+    <string name="nm_access_seconds">%1$d secunde</string>
+    <string name="nm_access_unavailable">Configurează mai întâi blocarea ecranului acestui dispozitiv.</string>
 </resources>

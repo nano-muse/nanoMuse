@@ -421,3 +421,7 @@ daemon 的上限，不修改仓库配置。例如在同一 Gradle 工程目录�
 | `connectors/`、`ui/connectors/` | 连接器目录（`ConnectorsCatalogue` 读取资源文件）、MCP 授权发现与注册（`McpAuthDiscovery`）、连接和令牌刷新（`Connectors`）、这台手机连接了什么并发布到 profile、其他设备连接了什么（`SharedConnectors`）、「设置 → 连接器」页面 |
 | `ui/cloud/` | 登录、账号屏、设备部分 |
 | `res/values*/nm_strings.xml` | nanoMuse 的全部字符串，App 支持的十七种语言各一份（英语、简体中文、繁體中文、德语、西班牙语、菲律宾语、法语、印尼语、日语、韩语、马来语、波兰语、巴西葡萄牙语、罗马尼亚语、俄语、泰语、土耳其语）；每个文件的键相同，只有英语文件里标了 `translatable="false"` 的两条（中继地址示例和产品名 `nanoMuse Cloud`）例外，缺的回落到英语 |
+
+## 应用锁 {#app-lock}
+
+Android 可在显示应用内容前要求使用本机锁屏方式验证。在设置中启用应用锁并选择重新锁定的时间，保存更改需要验证。解锁状态仅在当前进程内有效。两种布局和传入分享使用同一入口保护。这是应用内访问保护，不是存储加密。后台任务继续运行。尚未完成真机验证。

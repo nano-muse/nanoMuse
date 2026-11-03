@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added device authentication and configurable re-locking before Android app content is shown.
+
 ### Cloud
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.

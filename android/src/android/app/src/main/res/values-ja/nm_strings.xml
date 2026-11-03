@@ -1221,4 +1221,12 @@
     <string name="nm_context_compact_idle_timeout">%1$d 秒間応答がなかったため、コンテキストの圧縮を停止しました（モデル呼び出し %2$d 回）。</string>
     <string name="nm_context_compact_no_gain">要約でコンテキストが短くならなかったため、元の内容を保持しました。</string>
     <string name="nm_context_compact_incomplete">モデルから完全な要約が返されなかったため、元のコンテキストを保持しました。</string>
+    <string name="nm_access_locked">nanoMuse はロックされています</string>
+    <string name="nm_access_hint">この端末の画面ロックで認証してください。</string>
+    <string name="nm_access_unlock">ロック解除</string>
+    <string name="nm_access_settings">アプリのロック</string>
+    <string name="nm_access_on_exit">終了時にロック</string>
+    <string name="nm_access_never">自動ロックしない</string>
+    <string name="nm_access_seconds">%1$d 秒</string>
+    <string name="nm_access_unavailable">先にこの端末の画面ロックを設定してください。</string>
 </resources>

@@ -1225,4 +1225,12 @@
     <string name="nm_context_compact_idle_timeout">Sıkıştırma, %1$d saniye yanıt alınamadığı için durduruldu (%2$d model çağrısı).</string>
     <string name="nm_context_compact_no_gain">Özet bağlamı kısaltmadı. Orijinal içerik korundu.</string>
     <string name="nm_context_compact_incomplete">Model eksiksiz bir özet döndürmedi. Orijinal bağlam korundu.</string>
+    <string name="nm_access_locked">nanoMuse kilitli</string>
+    <string name="nm_access_hint">Bu cihazın ekran kilidiyle doğrulayın.</string>
+    <string name="nm_access_unlock">Kilidi aç</string>
+    <string name="nm_access_settings">Uygulama kilidi</string>
+    <string name="nm_access_on_exit">Çıkışta kilitle</string>
+    <string name="nm_access_never">Asla otomatik kilitleme</string>
+    <string name="nm_access_seconds">%1$d saniye</string>
+    <string name="nm_access_unavailable">Önce bu cihazda bir ekran kilidi ayarlayın.</string>
 </resources>

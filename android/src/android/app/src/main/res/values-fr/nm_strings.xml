@@ -1226,4 +1226,12 @@
     <string name="nm_context_compact_idle_timeout">La compression s’est arrêtée après %1$d secondes sans réponse (%2$d appels au modèle).</string>
     <string name="nm_context_compact_no_gain">Le résumé n’a pas réduit le contexte. Le contenu original a été conservé.</string>
     <string name="nm_context_compact_incomplete">Le modèle n’a pas renvoyé de résumé complet. Le contexte original a été conservé.</string>
+    <string name="nm_access_locked">nanoMuse est verrouillé</string>
+    <string name="nm_access_hint">Confirmez avec le verrouillage de cet appareil.</string>
+    <string name="nm_access_unlock">Déverrouiller</string>
+    <string name="nm_access_settings">Verrouillage de l’application</string>
+    <string name="nm_access_on_exit">Verrouiller en quittant</string>
+    <string name="nm_access_never">Ne jamais verrouiller automatiquement</string>
+    <string name="nm_access_seconds">%1$d secondes</string>
+    <string name="nm_access_unavailable">Configurez d’abord un verrouillage sur cet appareil.</string>
 </resources>

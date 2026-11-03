@@ -1,5 +1,8 @@
 package com.openminis.app.share
 
+// nanoMuse: shares use the same access gate as the main Activity.
+import io.github.nanomuse.ui.guard.secureSetContent
+import androidx.compose.runtime.LaunchedEffect
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -44,6 +47,11 @@ class ShareReceiverActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // nanoMuse: provider import prompts and shared content wait for authentication.
+        secureSetContent { LaunchedEffect(Unit) { receiveUnlocked() } }
+    }
+
+    private fun receiveUnlocked() {
         val items = mutableListOf<PendingShare.Item>()
         try {
             when (intent?.action) {

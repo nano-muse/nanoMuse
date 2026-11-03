@@ -12,7 +12,8 @@ import com.openminis.app.accessibility.AccessibilityRecoveryManager
 import android.graphics.Color
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
-import androidx.activity.compose.setContent
+// nanoMuse: protect both layouts before composing account or chat content.
+import io.github.nanomuse.ui.guard.secureSetContent as setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -326,6 +327,8 @@ class MainActivity : ComponentActivity() {
             OffloadPermissionManager.pendingAndroidPermission
                 .filterNotNull()
                 .collect { req ->
+                    // nanoMuse: native permission dialogs also wait behind the access gate.
+                    io.github.nanomuse.guard.AppAccess.awaitUnlocked()
                     val permanentlyDenied = req.permissions.any { permission ->
                         ContextCompat.checkSelfPermission(this@MainActivity, permission) !=
                             android.content.pm.PackageManager.PERMISSION_GRANTED &&
@@ -354,6 +357,8 @@ class MainActivity : ComponentActivity() {
             OffloadPermissionManager.pendingSettingsGate
                 .filterNotNull()
                 .collect { gate ->
+                    // nanoMuse: do not expose pending permissions over the lock screen.
+                    io.github.nanomuse.guard.AppAccess.awaitUnlocked()
                     AlertDialog.Builder(this@MainActivity)
                         .setTitle(gate.title)
                         .setMessage(gate.message)
@@ -401,6 +406,8 @@ class MainActivity : ComponentActivity() {
             AccessibilityRecoveryManager.pendingPrompt
                 .filterNotNull()
                 .collect { prompt ->
+                    // nanoMuse: repair prompts wait until the person unlocks the app.
+                    io.github.nanomuse.guard.AppAccess.awaitUnlocked()
                     val b = AlertDialog.Builder(this@MainActivity)
                         .setTitle(getString(R.string.a11y_repair_dialog_title))
                         .setCancelable(true)
