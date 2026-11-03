@@ -1,5 +1,7 @@
 # The web console: your model, your key, your plan
 
+After signing in, signing out or changing a model, the provider catalogue is fetched again. An earlier request cannot repopulate the cache or be reused by a new reader after invalidation.
+
 > The web console is the app `nanomuse serve` serves at `/`: the front door of
 > the desktop app and of a self-hosted runtime ([app.md](app.md)). This page is
 > about one part of it: how it picks the model that answers, and what it offers

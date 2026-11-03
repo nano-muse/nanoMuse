@@ -37,6 +37,8 @@ Only computers that announce the `coding.*` actions on the hub appear: one
 running the runtime, or one with the desktop app, which announces them too; a
 phone never does.
 
+When the desktop follows a coding run on another computer, its tool count uses the same phase as the originating runner: completion for Codex, start for the other agents. Notes do not count as tools. The final result supplies the originating computer's count if any events were missed.
+
 ## What is read
 
 | Agent | Sessions on disk | Started with |
