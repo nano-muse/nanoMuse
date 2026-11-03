@@ -9,6 +9,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -58,7 +60,11 @@ fun ComponentActivity.secureSetContent(content: @Composable () -> Unit) {
 fun AppAccessGate(content: @Composable () -> Unit) {
     val locked by AppAccess.locked.collectAsState()
     val holder = rememberSaveableStateHolder()
-    if (!locked) holder.SaveableStateProvider("unlocked") { content() }
+    if (!locked) holder.SaveableStateProvider("unlocked") {
+        val context = LocalContext.current
+        LaunchedEffect(Unit) { AppAccess.takePendingActivity()?.let { context.startActivity(it) } }
+        content()
+    }
     else {
         val context = LocalContext.current
         val authenticate = rememberAccessAuthenticator()
@@ -70,6 +76,7 @@ fun AppAccessGate(content: @Composable () -> Unit) {
             Text(title, style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
             Text(stringResource(R.string.nm_access_hint))
+            if (!AccessAuthentication.available(context)) Text(stringResource(R.string.nm_access_unavailable))
             Button(enabled = !busy, onClick = {
                 busy = true
                 authenticate(title) { success -> AppAccess.authenticated(success); busy = false }
@@ -88,7 +95,7 @@ fun AppAccessSettings() {
     val title = stringResource(R.string.nm_access_settings)
     TextButton(onClick = { show = true }) { Text(title) }
     if (show) AlertDialog(onDismissRequest = { show = false }, title = { Text(title) }, text = {
-        Column {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
             Text(stringResource(R.string.nm_access_hint))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = enabled, onCheckedChange = { enabled = it })

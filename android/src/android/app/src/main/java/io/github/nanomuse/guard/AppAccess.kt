@@ -29,6 +29,7 @@ object AppAccess {
     val enabled get() = prefs.getBoolean("app_enabled", false)
     val timeout get() = prefs.getInt("app_timeout", -1)
     private var started = 0
+    private var pendingActivity: android.content.Intent? = null
 
     @Synchronized fun initialize(context: Context) {
         if (::application.isInitialized) return
@@ -37,6 +38,7 @@ object AppAccess {
         application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) {
                 if (started++ == 0) { lease.foreground(timeout); publish() }
+                if (activity is com.openminis.app.webapp.WebAppActivity) deferIfLocked(activity)
             }
             override fun onActivityStopped(activity: Activity) {
                 started = (started - 1).coerceAtLeast(0)
@@ -60,6 +62,20 @@ object AppAccess {
         return true
     }
     suspend fun awaitUnlocked() { locked.first { !it } }
+    /** Standalone web apps are a second UI entry point; never execute their content while locked. */
+    fun deferIfLocked(activity: com.openminis.app.webapp.WebAppActivity): Boolean {
+        initialize(activity)
+        if (!_locked.value) return false
+        activity.window.decorView.visibility = android.view.View.INVISIBLE
+        pendingActivity = android.content.Intent(activity.intent).setClass(application, activity.javaClass)
+        activity.startActivity(android.content.Intent(activity, com.openminis.app.MainActivity::class.java))
+        activity.finish()
+        return true
+    }
+    fun takePendingActivity(): android.content.Intent? {
+        if (_locked.value) return null
+        return pendingActivity.also { pendingActivity = null }
+    }
     private fun publish() { _locked.value = enabled && !lease.isUnlocked(0) }
     val TIMEOUTS = listOf(-1, 30, 60, 300, 600, 900, 3600, 0)
 }
