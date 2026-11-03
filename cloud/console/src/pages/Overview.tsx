@@ -51,8 +51,8 @@ export function Overview({ days }: PageProps) {
                     {us.data ? (
                       <Bars
                         series={us.data.models.map((m) => ({ name: m.model, values: us.data!.rows.map((r) => Number(r.models[m.model]?.requests || 0)), color: modelColor(m.model) }))}
-                        labels={dayLabels(us.data.rows.map((r) => r.day))}
-                        titles={dayTitles(us.data.rows.map((r) => r.day))}
+                        labels={dayLabels(us.data.rows.map((r) => r.day), Number(d.settings.day_offset_h || 0))}
+                        titles={dayTitles(us.data.rows.map((r) => r.day), Number(d.settings.day_offset_h || 0))}
                         format={compact}
                         height={150}
                         onPick={(i) => route.go("usage", { day: us.data!.rows[i].day })}
@@ -71,7 +71,7 @@ export function Overview({ days }: PageProps) {
                         { name: T.ov.trendActive, values: se.data.days.map((x) => x.active_accounts), color: "var(--c2)" },
                         { name: T.ov.trendNew, values: se.data.days.map((x) => x.new_accounts), color: "var(--c4)" },
                       ]}
-                      labels={dayLabels(se.data.days.map((x) => x.day))}
+                      labels={dayLabels(se.data.days.map((x) => x.day), Number(d.settings.day_offset_h || 0))}
                       titles={dayTitles(se.data.days.map((x) => x.day))}
                       format={compact}
                       height={150}
@@ -86,7 +86,7 @@ export function Overview({ days }: PageProps) {
                         { name: T.ov.trendErrors, values: se.data.days.map((x) => x.upstream_errors), color: "var(--bad)" },
                         { name: T.ov.trendRefusals, values: se.data.days.map((x) => x.budget_refusals), color: "var(--violet)" },
                       ]}
-                      labels={dayLabels(se.data.days.map((x) => x.day))}
+                      labels={dayLabels(se.data.days.map((x) => x.day), Number(d.settings.day_offset_h || 0))}
                       titles={dayTitles(se.data.days.map((x) => x.day))}
                       format={compact}
                       height={110}

@@ -8,6 +8,9 @@ const NOV_1_AT_8 = Date.UTC(2026, 9, 31, 16) / 1000;
 describe("siteDay", () => {
   it("labels a day stamp with the site's calendar date, not the browser's", () => {
     expect(siteDay(NOV_1_AT_8, 8)).toBe("2026-11-01");
+    // the shared day labels cut the "MM-DD" tail out of this string; a format
+    // change here would silently re-label every chart that uses it
+    expect(siteDay(NOV_1_AT_8, 8).slice(5)).toBe("11-01");
     expect(siteDay(NOV_1_AT_8, 0)).toBe("2026-10-31");
   });
 
