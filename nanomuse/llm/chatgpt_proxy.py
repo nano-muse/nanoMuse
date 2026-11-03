@@ -339,6 +339,7 @@ def make_app(
         openapi_url=None,
         lifespan=_lifespan,
     )
+    app.state.chatgpt_models = models
     app.include_router(build_router(auth, client, models, bearer_check(token), usage))
 
     @app.exception_handler(HTTPException)

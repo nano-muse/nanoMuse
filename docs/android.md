@@ -601,6 +601,12 @@ A successful reply completed while its chat is not visible is marked unread in t
 
 Visibility follows the resumed chat in both layouts, including a draft after its first message. Switching to another tab, covering the chat with another page, or putting the app in the background makes subsequent replies unread.
 
+## Picking a device with @
+
+At the beginning of a message, type `@` to see online devices that accept tasks above the usual file matches. Filter by name, then tap a row or use the existing arrow keys and Return. Each device row shows its name, phone or computer icon, operating system, online state and device ID.
+
+Selection inserts the full name. Devices with identical names use `@Name [device-id]` to identify the selected device; an ambiguous unqualified name or prefix is not resolved to the first match. The delegation instruction uses the stable ID. Mentions later in a message continue to offer files only.
+
 ## Emoji avatars from another device
 
 An emoji avatar chosen on desktop or web also appears on Android, with its background colour. The phone keeps the emoji beside the drawn avatar, so it survives a restart and follows the existing account isolation. An empty emoji uses ✨ and an invalid colour uses blue (`#0064d4`).

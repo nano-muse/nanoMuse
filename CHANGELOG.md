@@ -8,13 +8,16 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Cloud
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
+- **A visit that is both running and recent counts once in the demo per-day bars.** The bars concatenated the active and recent lists without the dedup the page's own table applies, so a running visit sat in both lists and its day counted it twice, and the bar total disagreed with the visits number printed beside it.
 
 - Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
+- **One account's samples stay out of another account's drawer.** The account drawer re-targets in place when another account's link is clicked, and its samples tab ran its loads without a generation: an answer that started under the first account could land its rows under the second account's title. The tab now runs through the same `LatestRequest` guard the drawer's paged readers use.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
 - **A legacy runtime's user agent is read the way the relay reads it.** The console's own classifier missed the `AsyncOpenAI/Python` token the Python runtime of 1.0.6 and earlier signed its model calls with, so those sessions and demo visitors showed as "other" wherever the console classifies client-side; the relay's `client.py` has carried the token since it first appeared, and the console's mirror of that list now does too.
 
 - Android and desktop inherited the relay's disclosed context and output limits when model fields were blank, refreshed those defaults without another sign-in, and preserved manual overrides. Discovered model capacities survived vision probes and individual lookups.
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
+- **The activity feed keeps its filter's events under a slow answer.** The feed's own loader carried no generation: switch a kind chip while its first page was still in flight and the old kind's rows (or its error) landed under the new chip, and the 30-second visibility poll could replace a half-read "More" history mid-scroll. The feed now runs through the same `LatestRequest` guard the paged readers use, dropped on arrival when its filter moved.
 - **A turn keeps its own time in the record, and a slower record cannot overtake a later turn.** Each turn row took the second its background write landed in, and the account's turn list orders by that timestamp with the write's rowid beside it: a turn whose picture was still decoding could land behind a plain turn that answered after it, and read above it, newest first upside down. The timestamp is now taken when the answer leaves and each account's writes are chained in that order, so the list says what happened in the order it happened without making other accounts wait for its media.
 - **An expanded "More (N)" table keeps its rows through a poll.** Every poll hands the admin tables a freshly parsed array, and the expansion was reset on the array's arrival: click "More" on People or a Usage day's top accounts, wait out the two-minute poll, and the list snapped back to its first hundred or twenty-five rows while you were reading it. The expansion is kept unless the list itself no longer reaches it (`keptShown`), so a refresh of the same rows leaves the person where they scrolled to.
 - **The Usage page names a day with the site's calendar date, not the operator's browser.** The relay's day stamp is the site-local day's start, but the matrix labels, the day rows and weekday, the drill-down title and the hour tooltips all rendered it in the browser's timezone, so any operator outside the site's offset read every bar as the day before — and the date picker parsed the picked date at browser-local noon, which lands on the next site-day for browsers west of about UTC−4. Labels, weekday and picker now work at the site's `day_offset_h`, through `siteDay`/`siteWeekday`/`siteDayStamp` in the console's format library.
@@ -25,6 +28,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
+
+- Fixed the ChatGPT proxy failing to start after sign-in, which kept the desktop from adding its models.
 
 - Included data-directory skills, uploaded contact sources, phone and computer traces, pending scheduled deliveries and cached nudges in runtime data exports. The archive README named the deliberately excluded device credentials and sync state.
 
@@ -54,7 +59,11 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **A provider answer that started before a sign-out no longer repopulates the cache after it.** Signing out invalidates the loaded provider view, but an `/api/providers` request already in flight kept its `then` attached, and when it landed it wrote the signed-out view back into the cache for every later reader until a forced reload. Each load now carries the generation it started under, and an answer whose generation was invalidated lands for its caller without repopulating the cache.
+
 ### Desktop
+
+- Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
 
 - **Added the model-neutral `skill-creator` guide to the desktop and Python runtime.** Android loaded the same packaged instructions, including on existing installs. For [#757](https://github.com/nano-muse/nanoMuse/issues/757) and [#758](https://github.com/nano-muse/nanoMuse/issues/758).
 - Kept separate screenshots when reporting more than one problem within the same second.
@@ -91,7 +100,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Marked successful background replies unread in both Android layouts and collapsed classic groups, cleared them when the visible conversation opened, and followed tab visibility and draft promotion.
 
+- Android listed online task-capable devices above files in the leading @ menu, showed device identity, and qualified duplicate names with their stable IDs.
+
 - Android displayed emoji avatars and their background colours from the account profile, kept them across restarts and account changes, and preserved them when renaming the agent or updating connectors.
+
 - **Kept built-in skills managed by the app.** Their contents remained readable and exportable, with enable switches available, while editing, importing over them and deleting them were blocked. For [#756](https://github.com/nano-muse/nanoMuse/issues/756).
 
 - **A `nanomuse-pc task` that does not run says so, instead of an empty answer.** The phone took the computer's wordless answer as success and told the model to pass it on, which read as *Done*; a task that did not run now comes back as a failure with the computer's own sentence, and a refusal names what happened instead of a status code. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
