@@ -183,8 +183,9 @@ class BackupFileTreeExporter(
  * The cost is one small write per file rather than per 8KB; next to hashing and
  * copying the file's contents, that is noise.
  */
-class BackupFileIndexWriter(file: File) : AutoCloseable {
-    private val stream = file.also { it.parentFile?.mkdirs() }.outputStream()
+// nanoMuse: append only after the resume journal has truncated the incomplete category.
+class BackupFileIndexWriter(file: File, append: Boolean = false) : AutoCloseable {
+    private val stream = java.io.FileOutputStream(file.also { it.parentFile?.mkdirs() }, append)
 
     var written = 0
         private set

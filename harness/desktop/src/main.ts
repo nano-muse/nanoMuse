@@ -15,7 +15,7 @@ import { startOperatorServer, type OperatorServer } from "./operator-server";
 import { EXTERNAL_URL, navigationVerdict, sameOrigin } from "./navigation";
 import { editContextMenu, installWindowPermissions } from "./window-permissions";
 import { readPrivateJson, writePrivateJson } from "./private-json";
-import { relink } from "./profile-link";
+import { BUNDLE, ensureProfile, PROFILE } from "./profile";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
 import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
 import { HostWork } from "./host-work";
@@ -42,11 +42,6 @@ import { windowsNetworkCost } from "./windows-network-cost";
  * (docs/desktop.md, docs/harness.md).
  */
 
-const PROFILE = "nanomuse";
-// The composition: the harness's base and Web app, its Schedule (the goals' automations and
-// the agent's reminders — an optional bundle of the harness, on by default here), then ours.
-const BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@deepseek-ai/dsh-experimental-schedule-bundle", "dsh-nanomuse"];
-const BUNDLE = "dsh-nanomuse";
 const RELEASES_PAGE = "https://github.com/nano-muse/nanoMuse/releases/latest";
 const ISSUES_PAGE = "https://github.com/nano-muse/nanoMuse/issues";
 const DOCS_PAGE = "https://nanomuse.cn/docs/desktop";
@@ -189,57 +184,6 @@ function bundledRuntime(): string | undefined {
   return existsSync(exe) ? exe : undefined;
 }
 
-/**
- * The profile the Host boots: `~/.nanomuse/desktop/profiles/nanomuse`. Three small files the
- * harness reads (the manifest with the bundle list, the empty root, the person's own patch
- * layer, which dsh writes settings into) and one link: `node_modules/dsh-nanomuse` → the copy
- * under resources, which is how the Loader finds a bundle that is not among the harness's own
- * packages. The link is refreshed every start, so moving the app or updating it is enough.
- */
-function ensureProfile(dshDir: string): string {
-  const dir = join(harnessHome(), "profiles", PROFILE);
-  mkdirSync(join(dir, "node_modules"), { recursive: true });
-  const manifestPath = join(dir, "package.json");
-  let manifest: Record<string, unknown> = {};
-  if (existsSync(manifestPath)) {
-    try {
-      manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
-    } catch (exc) {
-      log(`profile manifest unreadable, rewriting: ${String(exc)}`);
-    }
-  }
-  const deps = (manifest.dependencies as Record<string, string> | undefined) ?? {};
-  const dsh = (manifest.dsh as { profile?: { bundles?: string[] } } | undefined) ?? {};
-  const bundles = dsh.profile?.bundles ?? [];
-  const same = bundles.length === BUNDLES.length && bundles.every((b, i) => b === BUNDLES[i]);
-  if (!same || deps[BUNDLE] !== "*" || manifest.name !== `dsh-profile-${PROFILE}`) {
-    const next = {
-      ...manifest,
-      name: `dsh-profile-${PROFILE}`,
-      private: true,
-      dependencies: { ...deps, [BUNDLE]: "*" },
-      dsh: { ...dsh, profile: { ...dsh.profile, bundles: [...BUNDLES] } },
-    };
-    writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}\n`);
-  }
-  if (!existsSync(join(dir, "cordis.yml"))) {
-    writeFileSync(
-      join(dir, "cordis.yml"),
-      "# dsh profile root — an empty entry list. The tree is composed as patches:\n# each bundle in package.json's dsh.profile.bundles, then cordis.patch.yml.\n# Edit cordis.patch.yml, not this file.\n[]\n",
-    );
-  }
-  if (!existsSync(join(dir, "cordis.patch.yml"))) {
-    writeFileSync(
-      join(dir, "cordis.patch.yml"),
-      "# Your patch layer for this dsh profile, applied after every bundle layer:\n# a top-level YAML array of loader patch entries. nanoMuse Desktop and dsh\n# write settings here; you may edit it too.\n[]\n",
-    );
-  }
-  const link = join(dir, "node_modules", BUNDLE);
-  const target = join(dshDir, "node_modules", BUNDLE);
-  if (relink(link, target)) log(`profile: ${BUNDLE} → ${target}`);
-  return dir;
-}
-
 /** Try to bind one loopback port (0 = any); the port bound, or 0 when it is taken. */
 function tryPort(port: number): Promise<number> {
   return new Promise((resolve) => {
@@ -319,7 +263,7 @@ function startHost(): Promise<string> {
   }
   const home = harnessHome();
   mkdirSync(home, { recursive: true });
-  ensureProfile(dshDir);
+  ensureProfile(home, dshDir, log);
   return new Promise<string>((resolve, reject) => {
     Promise.all([hostPort(home), ensureOperator()])
       .then(([port, operatorServer]) => {

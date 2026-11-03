@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -134,6 +135,7 @@ fun AgentAvatar(
     onClick: (() -> Unit)? = null,
 ) {
     val custom by AvatarStore.current.collectAsState()
+    val emoji by AvatarStore.emoji.collectAsState()
     val clips by io.github.nanomuse.avatar.AvatarMotion.clips.collectAsState()
     val ownClip by io.github.nanomuse.avatar.OwnClip.current.collectAsState()
     val ownPoster by io.github.nanomuse.avatar.OwnClip.poster.collectAsState()
@@ -235,6 +237,13 @@ fun AgentAvatar(
                 // No studio face: the clip's first frame is the still, for every mood.
                 Image(
                     bitmap = poster,
+                    contentDescription = contentDescription,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(size),
+                )
+            } else if (emoji != null) {
+                Image(
+                    bitmap = remember(emoji) { io.github.nanomuse.avatar.EmojiPortrait.bitmap(emoji!!).asImageBitmap() },
                     contentDescription = contentDescription,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(size),

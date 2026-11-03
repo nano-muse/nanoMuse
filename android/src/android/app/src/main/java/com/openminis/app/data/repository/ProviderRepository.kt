@@ -634,6 +634,12 @@ class ProviderRepository(private val context: Context) {
         )
     }
 
+    // nanoMuse: publish the recovered DB and preference snapshot to existing observers.
+    fun reloadAfterRestoreRecovery() = synchronized(configLock) {
+        _config.value = loadConfig()
+        loadAllThinkingRulesIntoCache()
+    }
+
     fun addInstance(instance: ProviderInstance): Unit = synchronized(configLock) {
         ensureConfigLoaded()
         val config = workingCopy()

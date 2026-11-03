@@ -38,12 +38,12 @@ import logging
 import re
 import time
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 import httpx
 
-from .config import MODEL_ID_RE
+from .config import MODEL_ID_RE, positive_capacity
 
 log = logging.getLogger("nanomuse_cloud.catalog")
 
@@ -99,6 +99,8 @@ class Entry:
     kind: str
     vision: bool = False
     verified: bool = False  # the vision flag comes from the probe, not the name
+    context_length: int | None = None
+    max_output_tokens: int | None = None
 
 
 @dataclass
@@ -211,12 +213,25 @@ class Catalog:
             log.info("catalog: the provider's /models did not answer (%s); %d models kept", self.error, len(self.entries))
             return
         rows = data.get("data") if isinstance(data, dict) else data
-        ids = sorted({str(m.get("id") or "") for m in rows if isinstance(m, dict)} if isinstance(rows, list) else set())
+        by_id = {str(m.get("id") or ""): m for m in rows if isinstance(m, dict)} if isinstance(rows, list) else {}
+        ids = sorted(by_id)
         out: list[Entry] = []
         for mid in ids:
             kind, vision = classify(mid)
             if kind != "other":
-                out.append(Entry(id=mid, kind=kind, vision=vision))
+                row = by_id[mid]
+                top = row.get("top_provider")
+                top = top if isinstance(top, dict) else {}
+                out.append(
+                    Entry(
+                        id=mid,
+                        kind=kind,
+                        vision=vision,
+                        context_length=positive_capacity(row.get("context_length")),
+                        max_output_tokens=positive_capacity(row.get("max_output_tokens"))
+                        or positive_capacity(top.get("max_completion_tokens")),
+                    )
+                )
         self._raw = out
         self._apply()
         self.error = ""
@@ -231,9 +246,9 @@ class Catalog:
         for e in self._raw:
             p = self._probes.get(e.id) if e.kind == "chat" else None
             if p is None:
-                out.append(Entry(id=e.id, kind=e.kind, vision=e.vision))
+                out.append(replace(e))
             elif p.works:
-                out.append(Entry(id=e.id, kind=e.kind, vision=p.vision, verified=True))
+                out.append(replace(e, vision=p.vision, verified=True))
         self.entries = out
 
     def _stale(self, entries: Iterable[Entry]) -> list[Entry]:

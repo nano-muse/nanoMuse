@@ -70,11 +70,12 @@ fun AvatarShareSheet(onDismiss: () -> Unit) {
     val soul by SoulStore.cachedMetadata.collectAsState()
     val name = soul.name.trim().ifEmpty { stringResource(R.string.app_name) }
     val current by AvatarStore.current.collectAsState()
+    val emoji by AvatarStore.emoji.collectAsState()
     var selected by remember { mutableIntStateOf(0) }
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Small previews of the five cards; re-rendered when the face or the name changes.
-    val previews by produceState<List<Bitmap>?>(initialValue = null, current, name) {
+    val previews by produceState<List<Bitmap>?>(initialValue = null, current, emoji, name) {
         value = withContext(Dispatchers.Default) {
             AvatarShare.palettes.map { AvatarShare.render(context, it, name, scale = 0.3f) }
         }

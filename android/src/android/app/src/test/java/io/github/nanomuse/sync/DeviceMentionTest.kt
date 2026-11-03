@@ -49,7 +49,7 @@ class DeviceMentionTest {
         val note = DeviceMention.note("MacBook Pro", "desk-1")
         assertTrue(note.startsWith("The person addressed MacBook Pro (id desk-1)"))
         assertTrue(note.contains("nanomuse-pc task"))
-        assertTrue(note.contains("--on \"MacBook Pro\""))
+        assertTrue(note.contains("--on \"desk-1\""))
         assertTrue(note.contains("report what it did"))
     }
 }

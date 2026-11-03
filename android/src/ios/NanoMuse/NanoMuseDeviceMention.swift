@@ -15,6 +15,9 @@
 import Foundation
 
 enum NanoMuseDeviceMention {
+    /// Allow the desktop/runtime target's full task budget before abandoning the call.
+    private static let taskTimeout: TimeInterval = 15 * 60
+
     struct Hit {
         let device: HubDevice
         /// The message without the mention; empty when the mention was all there was.
@@ -101,7 +104,7 @@ enum NanoMuseDeviceMention {
                     // `stream`: the reply draws a `text` in place (NanoMuseDeviceReply), so the
                     // computer may send a message's text while its model writes it; others ignore it.
                     args: ["text": task, "from": NanoMuseHub.shared.name, "language": NanoMuseLocale.tag, "stream": true],
-                    timeout: 600,
+                    timeout: taskTimeout,
                     id: live.callId
                 ) { body in
                     guard let stage = body["stage"] as? String else { return }
@@ -146,6 +149,11 @@ enum NanoMuseDeviceMention {
                 }
                 await live.finish(header: String(format: AppLocalized("%@ answered:"), device.name), answer: answer, replacing: true, completion: .answered)
             } catch {
+                if let failure = error as? HubError, failure.code == "timeout" {
+                    // A caller deadline or relay timeout does not stop the target by itself.
+                    // Keep the original error if the bounded stop cannot reach that device.
+                    _ = try? await NanoMuseHub.shared.call(to: device.id, action: "stop", args: ["call": live.callId], timeout: 15)
+                }
                 if live.stopped {
                     await live.finish(header: nil, answer: AppLocalized("Stopped."), replacing: false, completion: .stopped)
                 } else {

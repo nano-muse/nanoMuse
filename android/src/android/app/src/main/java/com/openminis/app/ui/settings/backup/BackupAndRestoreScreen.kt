@@ -392,6 +392,10 @@ private fun BackupTab(
 
     // -- Action --
     Column(Modifier.padding(16.dp)) {
+        // nanoMuse: starting a fresh backup never silently replaces an interrupted one.
+        io.github.nanomuse.ui.guard.BackupResumeActions(running) {
+            vm.startExport(passphrase.takeIf { encrypt }, resumeInterrupted = true)
+        }
         // [T-android-backup-stop] ONE button that toggles. While a backup runs
         // it says "Stop Backup" and stops it — nothing else about the row
         // changes.
@@ -1524,16 +1528,8 @@ internal fun categoryLabel(key: String): String =
     BackupCategory.fromKey(key)?.let { stringResource(categoryNameRes(it)) } ?: key
 
 /** Localized display name per category. */
-internal fun categoryNameRes(cat: BackupCategory): Int = when (cat) {
-    BackupCategory.CHATS -> R.string.backup_category_chats
-    BackupCategory.SHARED_FILES -> R.string.backup_category_shared_files
-    BackupCategory.SKILLS -> R.string.backup_category_skills
-    BackupCategory.MEMORY -> R.string.backup_category_memory
-    BackupCategory.PROVIDERS -> R.string.backup_category_providers
-    BackupCategory.MCP_SERVERS -> R.string.backup_category_mcp
-    BackupCategory.ENVIRONMENT_VARIABLES -> R.string.backup_category_env_vars
-    BackupCategory.VOICE_CORRECTIONS -> R.string.backup_category_voice
-}
+// nanoMuse: the exporter and page share the same category vocabulary.
+internal fun categoryNameRes(cat: BackupCategory): Int = io.github.nanomuse.backup.BackupLabels.categoryNameRes(cat)
 
 /**
  * Circular colored category icon — the Android counterpart of iOS

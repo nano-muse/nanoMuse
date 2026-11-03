@@ -159,6 +159,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // nanoMuse: startup reconciled an interrupted restore before opening the repositories.
+        io.github.nanomuse.backup.AndroidRestoreRecovery.showNotice(this)
 
         // Register the crash-share "Save to..." launcher BEFORE the
         // safe-mode early-return below — ActivityResultLauncher must be
@@ -564,29 +566,15 @@ class MainActivity : ComponentActivity() {
             MinisTheme(darkTheme = darkTheme, fontScale = fontScale) {
                 val navController = rememberNavController().also { this.navController = it }
 
-                // T166: drive `SessionActivityTracker.setPresent` /
-                // `setAbsent` from the nav back-stack so the foreground
-                // service runs the entire time the user is inside a
-                // chat, not only while a stream is in flight. Without
-                // this hook the process drops from adj=200 to adj=700
-                // the moment Home is pressed and a Pixel 4a will
-                // reclaim within a couple of minutes (see
-                // docs/parity/android-keep-alive-audit.md).
+                // nanoMuse: preserve the route for process restoration. ChatScreen reports actual
+                // visibility for classic routes and the retained Muse tab through one shared hook.
                 DisposableEffect(navController) {
                     val job = lifecycleScope.launch {
                         navController.currentBackStackEntryFlow.collect { entry ->
                             val isChatRoute = entry.destination.route == Routes.CHAT
                             val sid = entry.arguments?.getString("sessionId").takeIf { isChatRoute }
-                            val previous = currentChatSessionId
-                            if (sid != previous) {
-                                if (previous != null) {
-                                    SessionActivityTracker.setAbsent(previous)
-                                }
-                                if (sid != null) {
-                                    SessionActivityTracker.setPresent(sid)
-                                }
-                                currentChatSessionId = sid
-                            }
+                            // nanoMuse: ChatScreen owns visibility in both layouts; retain only restoration state here.
+                            currentChatSessionId = sid
                         }
                     }
                     onDispose { job.cancel() }
@@ -672,7 +660,6 @@ class MainActivity : ComponentActivity() {
      * to bias OOM through.
      */
     override fun onDestroy() {
-        currentChatSessionId?.let { SessionActivityTracker.setAbsent(it) }
         currentChatSessionId = null
         super.onDestroy()
     }
