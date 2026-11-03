@@ -19,6 +19,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { patchCapacityDefaults } from "./capacity-defaults.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(here, "..");
@@ -77,6 +78,7 @@ run(
   ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-package-lock", "--ignore-scripts", `--registry=${REGISTRY}`, `@deepseek-ai/dsh@${dshVersion}`, bundle],
   { cwd: out, shell, env: { ...process.env, npm_config_registry: REGISTRY } },
 );
+patchCapacityDefaults(out);
 // what @deepseek-ai/dsh-subprocess-local's postinstall does: the executable bit the tarball
 // stripped from node-pty's prebuilt spawn-helper (macOS and Linux)
 if (process.platform !== "win32") {

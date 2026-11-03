@@ -10,7 +10,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
+- **A legacy runtime's user agent is read the way the relay reads it.** The console's own classifier missed the `AsyncOpenAI/Python` token the Python runtime of 1.0.6 and earlier signed its model calls with, so those sessions and demo visitors showed as "other" wherever the console classifies client-side; the relay's `client.py` has carried the token since it first appeared, and the console's mirror of that list now does too.
 
+- Android and desktop inherited the relay's disclosed context and output limits when model fields were blank, refreshed those defaults without another sign-in, and preserved manual overrides. Discovered model capacities survived vision probes and individual lookups.
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
 - **A turn keeps its own time in the record, and a slower record cannot overtake a later turn.** Each turn row took the second its background write landed in, and the account's turn list orders by that timestamp with the write's rowid beside it: a turn whose picture was still decoding could land behind a plain turn that answered after it, and read above it, newest first upside down. The timestamp is now taken when the answer leaves and each account's writes are chained in that order, so the list says what happened in the order it happened without making other accounts wait for its media.
 - **An expanded "More (N)" table keeps its rows through a poll.** Every poll hands the admin tables a freshly parsed array, and the expansion was reset on the array's arrival: click "More" on People or a Usage day's top accounts, wait out the two-minute poll, and the list snapped back to its first hundred or twenty-five rows while you were reading it. The expansion is kept unless the list itself no longer reaches it (`keptShown`), so a refresh of the same rows leaves the person where they scrolled to.
@@ -24,6 +26,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
+
+- Fixed the ChatGPT proxy failing to start after sign-in, which kept the desktop from adding its models.
 
 - Included data-directory skills, uploaded contact sources, phone and computer traces, pending scheduled deliveries and cached nudges in runtime data exports. The archive README named the deliberately excluded device credentials and sync state.
 
@@ -61,6 +65,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept stable message IDs when retrying conversation uploads after a lost relay response.
 
 - Stopped coding-run child processes on Windows along with their parent CLI.
+- **A coding run's Chinese output arrives whole even when a pipe splits a character.** The run's line reader decoded each pipe read on its own, and a multi-byte character straddling two reads became replacement characters in the run's output and view, which for stream-JSON output is intermittent mojibake in the person's own text. Whole lines are now cut out of the accumulated bytes and decoded once complete.
 
 - Kept another device's working indicator when a different device finished a turn.
 
@@ -84,6 +89,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A chat another device sends a task to, and every chat the rooms open, start in the `~/nanoMuse` workspace** instead of the bare home folder. On Windows a workspace that is the whole profile folder could not run a single `workspace-write` command: the sandbox's temp root lies inside it, and a session begun from the web console or the phone failed at the first step. ([#705](https://github.com/nano-muse/nanoMuse/issues/705))
 
 ### Android
+
+- Android displayed emoji avatars and their background colours from the account profile, kept them across restarts and account changes, and preserved them when renaming the agent or updating connectors.
 
 - **Kept built-in skills managed by the app.** Their contents remained readable and exportable, with enable switches available, while editing, importing over them and deleting them were blocked. For [#756](https://github.com/nano-muse/nanoMuse/issues/756).
 

@@ -421,3 +421,9 @@ daemon 的上限，不修改仓库配置。例如在同一 Gradle 工程目录�
 | `connectors/`、`ui/connectors/` | 连接器目录（`ConnectorsCatalogue` 读取资源文件）、MCP 授权发现与注册（`McpAuthDiscovery`）、连接和令牌刷新（`Connectors`）、这台手机连接了什么并发布到 profile、其他设备连接了什么（`SharedConnectors`）、「设置 → 连接器」页面 |
 | `ui/cloud/` | 登录、账号屏、设备部分 |
 | `res/values*/nm_strings.xml` | nanoMuse 的全部字符串，App 支持的十七种语言各一份（英语、简体中文、繁體中文、德语、西班牙语、菲律宾语、法语、印尼语、日语、韩语、马来语、波兰语、巴西葡萄牙语、罗马尼亚语、俄语、泰语、土耳其语）；每个文件的键相同，只有英语文件里标了 `translatable="false"` 的两条（中继地址示例和产品名 `nanoMuse Cloud`）例外，缺的回落到英语 |
+
+## 来自其他设备的 Emoji 形象 {#emoji-avatars-from-another-device}
+
+在桌面或网页选择的 emoji 形象也会显示在 Android 上，并保留背景色。emoji 与生成的形象存放在同一目录，重启后仍保留，也沿用现有的账号隔离。emoji 为空时显示 ✨，颜色无效时使用蓝色（`#0064d4`）。
+
+生成的形象和个人短片仍按原有优先级显示。修改智能体名字或连接器不会覆盖未改变的远端形象；明确重置形象才会恢复小龙。本次不增加 Android 上的 emoji 选择器。

@@ -463,7 +463,7 @@ class HandsCapsule(private val context: Context) {
         }
     }
 
-    private fun faceBitmap(): Bitmap? = runCatching { AvatarStore.current.value?.forMood(AgentMood.WORKING)?.asAndroidBitmap() }.getOrNull()
+    private fun faceBitmap(): Bitmap? = runCatching { AvatarStore.bitmap(AgentMood.WORKING) }.getOrNull()
 
     private fun statusBarHeight(): Int {
         val id = context.resources.getIdentifier("status_bar_height", "dimen", "android")
