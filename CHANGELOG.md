@@ -4,6 +4,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+
 ### Cloud
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
@@ -99,6 +100,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A chat another device sends a task to, and every chat the rooms open, start in the `~/nanoMuse` workspace** instead of the bare home folder. On Windows a workspace that is the whole profile folder could not run a single `workspace-write` command: the sandbox's temp root lies inside it, and a session begun from the web console or the phone failed at the first step. ([#705](https://github.com/nano-muse/nanoMuse/issues/705))
 
 ### Android
+
+- Marked successful background replies unread in both Android layouts and collapsed classic groups, cleared them when the visible conversation opened, and followed tab visibility and draft promotion.
 
 - Android listed online task-capable devices above files in the leading @ menu, showed device identity, and qualified duplicate names with their stable IDs.
 

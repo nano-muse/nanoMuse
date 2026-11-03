@@ -583,6 +583,12 @@ like the Python package's version does.
 | `ui/cloud/` | Sign-in, the Account screen, the Devices section |
 | `res/values*/nm_strings.xml` | Every nanoMuse string in the seventeen languages the app has (English, 简体中文, 繁體中文, German, Spanish, Filipino, French, Indonesian, Japanese, Korean, Malay, Polish, Brazilian Portuguese, Romanian, Russian, Thai, Turkish); every file carries the same keys, apart from the two the English file marks `translatable="false"` (the relay address example and the product name `nanoMuse Cloud`), and a missing one falls back to English |
 
+## Unread replies {#unread-replies}
+
+A successful reply completed while its chat is not visible is marked unread in the Muse drawer and classic session list. Collapsed classic groups retain the unread signal. Opening the conversation clears it. Failed, cancelled and duplicate completions do not create unread indicators. This state is local, kept only for the current process, and independent of running and paused badges. This covers unread replies from issue #531, not its entire working-state and approval proposal.
+
+Visibility follows the resumed chat in both layouts, including a draft after its first message. Switching to another tab, covering the chat with another page, or putting the app in the background makes subsequent replies unread.
+
 ## Picking a device with @
 
 At the beginning of a message, type `@` to see online devices that accept tasks above the usual file matches. Filter by name, then tap a row or use the existing arrow keys and Return. Each device row shows its name, phone or computer icon, operating system, online state and device ID.

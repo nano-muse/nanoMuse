@@ -1198,4 +1198,5 @@
     <string name="nm_context_compact_idle_timeout">模型连续 %1$d 秒未返回数据，已停止整理上下文（调用模型 %2$d 次）。</string>
     <string name="nm_context_compact_no_gain">摘要未缩短上下文，已保留原有内容。</string>
     <string name="nm_context_compact_incomplete">模型未返回完整摘要，已保留原有上下文。</string>
+    <string name="nm_reply_unread">未读回复</string>
 </resources>

@@ -540,6 +540,8 @@ fun ChatScreen(
     // nanoMuse: height of the floating pill bar overlaying the bottom. The
     // composer sits above it; the message list slides behind it for the blur.
     nmBottomOverlay: androidx.compose.ui.unit.Dp = 0.dp,
+    // nanoMuse: retained Muse tabs must not mark their hidden conversation as read.
+    nmConversationVisible: Boolean = true,
 ) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -561,6 +563,9 @@ fun ChatScreen(
             mcpRepository = mcpRepository,
         ),
     )
+    // nanoMuse: one lifecycle-aware presence hook for Muse and classic, including draft promotion.
+    val nmDisplayedSessionId by viewModel.displayedSessionId.collectAsState()
+    io.github.nanomuse.ui.chat.ReplyPresenceEffect(nmDisplayedSessionId, nmConversationVisible)
     // [T-android-larky-longsession-followup] Consume the tail-windowed
     // view instead of the canonical full list. For sessions with ≤300
     // messages this is the SAME reference (zero overhead); for longer

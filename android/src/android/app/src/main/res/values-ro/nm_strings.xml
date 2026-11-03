@@ -1229,4 +1229,5 @@
     <string name="nm_context_compact_idle_timeout">Comprimarea s-a oprit după %1$d secunde fără răspuns (%2$d apeluri către model).</string>
     <string name="nm_context_compact_no_gain">Rezumatul nu a redus contextul. Conținutul original a fost păstrat.</string>
     <string name="nm_context_compact_incomplete">Modelul nu a returnat un rezumat complet. Contextul original a fost păstrat.</string>
+    <string name="nm_reply_unread">Răspuns necitit</string>
 </resources>
