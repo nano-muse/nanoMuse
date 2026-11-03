@@ -374,9 +374,8 @@ def test_rdate_beside_a_rule_doubles_nothing_and_keeps_all_day_dates():
     ]
     rent = [o for o in month if o.summary == "Rent"]
     assert [o.start.date() for o in rent] == [date(2026, 11, 1), date(2026, 11, 15)]
-    assert all(
-        o.all_day and o.end - o.start == timedelta(days=1) for o in rent
-    ), "PERIOD is skipped"
+    assert {o.end - o.start for o in rent} == {timedelta(days=1)}, "PERIOD is skipped"
+    assert all(o.all_day for o in rent)
     assert any(o.rdates for o in events)
 
 
