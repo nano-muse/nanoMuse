@@ -1,5 +1,5 @@
 import { Brain, Loader2, Plus, Sparkles, Trash2, Undo2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { PageBar } from "../components/BackBar";
 import { LoadError } from "../components/LoadError";
@@ -24,10 +24,24 @@ export function MemoryScreen() {
   const name = state.profile?.name ?? "nanoMuse";
   const t = useT();
 
-  const load = () =>
-    Promise.all([api.memory().then(setItems), api.memoryChanges().then(setChanges)])
-      .then(() => setLoadError(null))
-      .catch((e: Error) => (items === null ? setLoadError(e.message) : toast(e.message)));
+  // saves arrive together (one turn can store several memories): a slower earlier load
+  // must not land over a newer one's answer
+  const loadGen = useRef(0);
+  const load = () => {
+    const mine = ++loadGen.current;
+    return Promise.all([api.memory(), api.memoryChanges()])
+      .then(([nextItems, nextChanges]) => {
+        if (loadGen.current !== mine) return;
+        setItems(nextItems);
+        setChanges(nextChanges);
+        setLoadError(null);
+      })
+      .catch((e: Error) => {
+        if (loadGen.current !== mine) return;
+        if (items === null) setLoadError(e.message);
+        else toast(e.message);
+      });
+  };
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

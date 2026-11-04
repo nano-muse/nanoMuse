@@ -3,17 +3,24 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api";
 import { setLocaleSetting } from "../i18n";
-import type { MemoryChange } from "../types";
+import type { MemoryChange, MemoryItem } from "../types";
 import { MemoryScreen } from "./MemoryScreen";
 
-vi.mock("../store", () => ({
-  useStore: () => ({
-    state: { profile: null, memoryVersion: 0 },
-    toast: () => {},
-    openThread: () => {},
-    setTab: () => {},
-  }),
+const store = vi.hoisted(() => ({
+  state: { profile: null as null, memoryVersion: 0 },
+  toast: () => {},
+  openThread: () => {},
+  setTab: () => {},
 }));
+vi.mock("../store", () => ({ useStore: () => store }));
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 // A forget logged by the runtime: the removed line in before, nothing after.
 const forgetChange: MemoryChange = {
@@ -49,6 +56,7 @@ function renderedText(): string {
 }
 
 beforeEach(() => {
+  store.state = { profile: null, memoryVersion: 0 };
   vi.spyOn(api, "memory").mockResolvedValue([]);
   vi.spyOn(api, "memoryChanges").mockResolvedValue([forgetChange]);
 });
@@ -77,5 +85,41 @@ describe("MemoryScreen recent changes", () => {
       screen = create(createElement(MemoryScreen));
     });
     expect(renderedText()).toContain("已忘记");
+  });
+});
+
+describe("MemoryScreen reload race", () => {
+  it("a slower earlier load does not land over a newer one", async () => {
+    setLocaleSetting("en");
+    // one turn stores several memories: the server bumps the version twice in a row and
+    // the first reload is still on its way when the second answers
+    const older: MemoryItem[] = [
+      { id: "memory-old", content: "Older snapshot sentence", category: "profile", created_at: "2026-10-20T12:00:00Z", source: "user" },
+    ];
+    const newer: MemoryItem[] = [
+      { id: "memory-new", content: "Newer snapshot sentence", category: "profile", created_at: "2026-10-21T12:00:00Z", source: "user" },
+    ];
+    const first = deferred<MemoryItem[]>();
+    const second = deferred<MemoryItem[]>();
+    vi.mocked(api.memory)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    await act(async () => {
+      screen = create(createElement(MemoryScreen));
+    });
+    store.state = { ...store.state, memoryVersion: 1 };
+    await act(async () => {
+      screen.update(createElement(MemoryScreen));
+    });
+    await act(async () => {
+      second.resolve(newer);
+    });
+    expect(renderedText()).toContain("Newer snapshot sentence");
+    await act(async () => {
+      first.resolve(older);
+    });
+    expect(renderedText()).toContain("Newer snapshot sentence");
+    expect(renderedText()).not.toContain("Older snapshot sentence");
+    expect(api.memory).toHaveBeenCalledTimes(2);
   });
 });
