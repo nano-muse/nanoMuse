@@ -70,6 +70,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **The desktop's own log steps aside at the runtime's rotation mark.** Every line the Host printed — stdout and stderr alike — was appended to `desktop.log` without ever being looked at again, so a long-lived install grew it without bound; the file the issue dialog asks for now steps aside as `desktop.log.1` once it passes 10 MB, the mark the runtime's own log rotates at.
 - **A port file keeps the origin the host remembered.** When something already held the remembered port — an orphaned Host of the app's own, after a kill — the app bound a fallback and wrote that fallback into the port file, so the origin the browser's storage lives at (`127.0.0.1:<port>`, the key to the preferences, the star asks' memory, the stage's place) drifted for good and everything kept there was left behind. A taken port now binds a fallback for that one launch and leaves the memory alone, so the origin comes back once the port's taker is gone.
 - **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
 

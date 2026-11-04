@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerSaveBlocker, screen, shell, systemPreferences, Tray } from "electron";
 import { randomBytes } from "node:crypto";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +19,7 @@ import { BUNDLE, ensureProfile, PROFILE } from "./profile";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
 import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
 import { chooseHostPort } from "./host-port";
+import { rotateLogIfNeeded } from "./log-rotate";
 import { HostWork } from "./host-work";
 import { ProtectedExit, type ExitDialog, type ExitIntent, type WorkItem, type WorkSource } from "./protected-exit";
 import { WindowsUpdates, RestartNsisUpdater } from "./windows-updates";
@@ -162,6 +163,19 @@ function log(line: string): void {
   console.log(`[nanomuse-desktop] ${line}`);
   try {
     mkdirSync(harnessHome(), { recursive: true });
+    rotateLogIfNeeded(harnessHome(), {
+      sizeOf(path) {
+        try {
+          return statSync(path).size;
+        } catch {
+          return undefined;
+        }
+      },
+      remove(path) {
+        rmSync(path, { force: true });
+      },
+      rename: renameSync,
+    });
     appendFileSync(join(harnessHome(), "desktop.log"), `${stamped}\n`);
   } catch {
     /* the line is still in memory for the dialog */
