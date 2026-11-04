@@ -90,6 +90,9 @@ class HandsOperator(private val context: Context) {
     private val stopReason = AtomicReference<String?>(null)
     private val userSignal = AtomicReference<CountDownLatch?>(null)
     private val capsule = HandsCapsule(context)
+    private var memoryTicket: HandsRunMemory.Ticket? = null
+    private var memoryTask = ""
+    private var memoryApp: String? = null
 
     /** The session this run's approval cards are filed under; see [ownPendingRequest]. */
     @Volatile private var gateSession: String? = null
@@ -115,6 +118,9 @@ class HandsOperator(private val context: Context) {
     }
 
     fun run(opts: Options): Result {
+        memoryTicket = null
+        memoryTask = opts.task
+        memoryApp = null
         val runId = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val log = mutableListOf<String>()
         // where each model call sits, for the relay (relay 0.31): this run as the trajectory, the
@@ -162,6 +168,8 @@ class HandsOperator(private val context: Context) {
             opts.appHint?.takeIf { it.isNotBlank() }?.let { hint ->
                 val app = HandsApps.resolve(context, hint)
                 lastResult = if (app != null && HandsApps.open(context, app)) {
+                    memoryApp = app.packageName
+                    memoryTicket = HandsRunMemory.shared.begin(opts.sessionId, app.packageName)
                     Thread.sleep(OPEN_APP_SETTLE_MS); "opened ${app.label}."
                 } else "no installed app matches “$hint”; open the one you need yourself."
                 log += "open $hint → $lastResult"
@@ -195,7 +203,9 @@ class HandsOperator(private val context: Context) {
                 blackScreens = 0
 
                 // ── think ──
-                val messages = buildMessages(turns, HandsPrompt.turnText(steps, lastResult), jpeg.bytes)
+                val turnText = HandsPrompt.turnText(steps, lastResult,
+                    previousRun = memoryTicket?.previous.takeIf { turns.isEmpty() })
+                val messages = buildMessages(turns, turnText, jpeg.bytes)
                 where.step = steps
                 val thinkingFrom = System.currentTimeMillis()
                 val reply = try {
@@ -214,7 +224,7 @@ class HandsOperator(private val context: Context) {
                 }
                 val thoughtMs = System.currentTimeMillis() - thinkingFrom
                 if (stop.get()) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
-                val turn = Turn(HandsPrompt.turnText(steps, lastResult), jpeg.bytes, reply)
+                val turn = Turn(turnText, jpeg.bytes, reply)
                 turns += turn
                 val parsed = try {
                     HandsAction.parse(reply)
@@ -310,16 +320,7 @@ class HandsOperator(private val context: Context) {
                         Thread.sleep(SWIPE_SETTLE_MS)
                     }
                     is HandsAction.Scroll -> {
-                        val cx = screenW / 2
-                        val cy = screenH / 2
-                        val dx = screenW * 35 / 100
-                        val dy = screenH * 30 / 100
-                        val (from, to) = when (action.direction) {
-                            "down" -> (cx to cy + dy / 2 + dy / 4) to (cx to cy - dy / 2 - dy / 4)
-                            "up" -> (cx to cy - dy / 2 - dy / 4) to (cx to cy + dy / 2 + dy / 4)
-                            "left" -> (cx + dx to cy) to (cx - dx to cy)
-                            else -> (cx - dx to cy) to (cx + dx to cy)
-                        }
+                        val (from, to) = HandsScroll.gesture(action.direction, action.distance, screenW, screenH)
                         val ok = sweep(svc, from.first, from.second, to.first, to.second, SCROLL_MS, fxLabel(action))
                         lastResult = if (ok) "scrolled ${action.direction}." else "the scroll was rejected by the system."
                         Thread.sleep(SWIPE_SETTLE_MS)
@@ -351,6 +352,8 @@ class HandsOperator(private val context: Context) {
                     is HandsAction.OpenApp -> {
                         val app = HandsApps.resolve(context, action.appName)
                         lastResult = if (app != null && HandsApps.open(context, app)) {
+                            // A note from a multi-app run must not be reused as one app's history.
+                            if (app.packageName != memoryApp) memoryTicket = null
                             capsule.stage.say(context.getString(com.openminis.app.R.string.nm_hands_fx_open, app.label))
                             Thread.sleep(OPEN_APP_SETTLE_MS); "opened ${app.label}."
                         } else {
@@ -402,6 +405,14 @@ class HandsOperator(private val context: Context) {
             is Outcome.Failed -> "failed"
         }
         step(runId, steps, "end", word, null)
+        val summary = when (outcome) {
+            is Outcome.Done -> outcome.answer
+            is Outcome.NeedsUser -> outcome.question
+            is Outcome.Infeasible -> outcome.message
+            is Outcome.Stopped -> outcome.message
+            is Outcome.Failed -> outcome.message
+        }
+        HandsRunMemory.shared.finish(memoryTicket, memoryTask, outcome.code, summary, log)
         return Result(outcome, steps, runId, lastScreen, traceDir?.let { "/var/minis/attachments/hands/$runId/trace.jsonl" }, log, model)
     }
 

@@ -102,12 +102,14 @@ class RoomChats(private val context: Context, private val repo: ChatRepository) 
     }
 
     override suspend fun deleteSession(id: String) {
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(id)
         dao.deleteMessages(id)
         dao.deleteSession(id)
         io.github.nanomuse.guard.Grants.clearSession(id)
     }
 
     override suspend fun clearMessages(sessionId: String) {
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(sessionId)
         dao.deleteMessages(sessionId)
         dao.updateLastMessage(sessionId, null, System.currentTimeMillis())
     }
