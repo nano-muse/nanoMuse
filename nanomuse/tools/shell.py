@@ -79,7 +79,11 @@ def kill_tree(proc: Any) -> None:
 
 _DANGEROUS = [
     (
-        re.compile(r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*f|\brm\s+-[a-zA-Z]*f[a-zA-Z]*r"),
+        re.compile(
+            r"\brm\b"
+            r"(?=(?:[^\n|;&]*\s-|[^\n|;&]*\s--)[a-zA-Z]*[rR])"  # a recursive flag
+            r"(?=(?:[^\n|;&]*\s-|[^\n|;&]*\s--)[a-zA-Z]*f)"  # a force flag
+        ),
         "recursive force delete",
     ),
     (re.compile(r"\bsudo\b"), "privilege escalation (sudo)"),
