@@ -49,7 +49,9 @@ export function Onboarding() {
   // the server can bump the connections version twice in a row (a connect and its
   // follow-up): a slower earlier answer must not land over a newer one's cards
   const connGen = useRef(0);
+  const active = useRef(false);
   const loadConn = async () => {
+    if (!active.current) return;
     const mine = ++connGen.current;
     try {
       setConnError(null);
@@ -62,7 +64,12 @@ export function Onboarding() {
     }
   };
   useEffect(() => {
+    active.current = true;
     void loadConn();
+    return () => {
+      active.current = false;
+      connGen.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the server says connections changed
   }, [state.connectionsVersion]);
 

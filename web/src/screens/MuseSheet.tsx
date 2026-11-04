@@ -293,7 +293,9 @@ function UpcomingView({ onSettings }: { onSettings: () => void }) {
   // a finished goal and a neighbouring reminder bump the two versions together: a
   // slower earlier answer must not land over a newer one's view
   const loadGen = useRef(0);
+  const active = useRef(false);
   const load = () => {
+    if (!active.current) return Promise.resolve();
     const mine = ++loadGen.current;
     return api
       .upcoming()
@@ -309,7 +311,12 @@ function UpcomingView({ onSettings }: { onSettings: () => void }) {
       });
   };
   useEffect(() => {
+    active.current = true;
     void load();
+    return () => {
+      active.current = false;
+      loadGen.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.goalsVersion, state.remindersVersion, state.profile?.proactive, state.profile?.goal_interval_minutes]);
 

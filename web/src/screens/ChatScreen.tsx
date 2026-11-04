@@ -890,7 +890,7 @@ export function Composer({
     };
   }, [skillsOn, state.skillsVersion]);
   const slash = /^\/([a-z0-9-]*)$/i.exec(text);
-  const matches = slash ? skills.filter((sk) => sk.name.startsWith(slash[1].toLowerCase())).slice(0, 6) : [];
+  const matches = skillsOn && slash ? skills.filter((sk) => sk.name.startsWith(slash[1].toLowerCase())).slice(0, 6) : [];
   const pick = (sk: SkillInfo) => {
     setText(`/${sk.name} `);
     ref.current?.focus();

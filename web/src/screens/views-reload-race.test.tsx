@@ -15,6 +15,7 @@ import { Onboarding } from "./Onboarding";
 // the three views' only window use is the studio's mood animation timer and the sheet's
 // listeners; the timer never fires in the test and the listeners never arrive
 (globalThis as Record<string, unknown>).window = {
+  location: { href: "https://console.example/" },
   setTimeout: () => 0,
   clearTimeout: () => undefined,
   setInterval: () => 0,
@@ -38,7 +39,7 @@ const store = vi.hoisted(() => ({
   },
   setTab: () => {},
   draft: {},
-  toast: () => {},
+  toast: vi.fn(),
   refreshSettings: async () => {},
   decide: async () => {},
   openThread: () => {},
@@ -48,10 +49,12 @@ vi.mock("../store", () => ({ useStore: () => store }));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function textOf(node: ReactTestRenderer | ReactTestRenderer["root"]): string {
@@ -72,11 +75,20 @@ function textOf(node: ReactTestRenderer | ReactTestRenderer["root"]): string {
 
 let screen: ReactTestRenderer;
 afterEach(() => {
-  screen?.unmount();
+  if (screen) act(() => screen.unmount());
   vi.restoreAllMocks();
 });
 beforeEach(() => {
   setLocaleSetting("en");
+  store.toast.mockClear();
+  store.state = {
+    ...store.state,
+    goalsVersion: 0,
+    remindersVersion: 0,
+    connectionsVersion: 0,
+    settings: { llm: { model: "model-a" } },
+    studio: null,
+  };
 });
 
 const upcoming = (title: string): UpcomingData =>
@@ -98,6 +110,19 @@ const upcoming = (title: string): UpcomingData =>
   }) as unknown as UpcomingData;
 
 describe("MuseSheet Daily reload race", () => {
+  it("does not report a refresh failure after the Daily pane closes", async () => {
+    vi.spyOn(api, "upcoming").mockResolvedValue(upcoming("Loaded goal"));
+    await act(async () => { screen = create(createElement(MuseSheet, { open: true, onClose: () => {} })); });
+    await act(async () => { screen.root.findByProps({ "aria-label": "Daily" }).props.onClick(); });
+    const pending = deferred<UpcomingData>();
+    vi.mocked(api.upcoming).mockImplementationOnce(() => pending.promise);
+    store.state = { ...store.state, goalsVersion: 1 };
+    await act(async () => { screen.update(createElement(MuseSheet, { open: true, onClose: () => {} })); });
+    await act(async () => { screen.update(createElement(MuseSheet, { open: false, onClose: () => {} })); });
+    await act(async () => { pending.reject(new Error("closed pane")); });
+    expect(store.toast).not.toHaveBeenCalled();
+  });
+
   it("a slower earlier upcoming answer does not land over a newer one", async () => {
     const first = deferred<UpcomingData>();
     const second = deferred<UpcomingData>();
@@ -142,6 +167,20 @@ describe("Onboarding connections reload race", () => {
       contacts: { sources: [] },
     }) as unknown as ConnectionsData;
 
+  it("ignores an old failure after a newer connection is displayed", async () => {
+    const first = deferred<ConnectionsData>();
+    vi.spyOn(api, "connections").mockImplementationOnce(() => first.promise).mockResolvedValue(connections("selected-model"));
+    await act(async () => { screen = create(createElement(Onboarding)); });
+    await act(async () => {
+      screen.root.findAll((n) => n.type === "button" && textOf(n).includes("Get started"))[0].props.onClick();
+    });
+    store.state = { ...store.state, connectionsVersion: 1 };
+    await act(async () => { screen.update(createElement(Onboarding)); });
+    await act(async () => { first.reject(new Error("older connection failure")); });
+    expect(textOf(screen)).toContain("selected-model");
+    expect(textOf(screen)).not.toContain("older connection failure");
+  });
+
   it("a slower earlier connections answer does not land over a newer one", async () => {
     const first = deferred<ConnectionsData>();
     const second = deferred<ConnectionsData>();
@@ -176,6 +215,43 @@ describe("avatar studio reload race", () => {
   const view = (model: string): StudioView =>
     ({ available: true, image_model: model, video_model: "", cloud: false, host: "", current: null, face: null }) as StudioView;
 
+  it("keeps the loaded view on errors and ignores failures after leaving", async () => {
+    vi.spyOn(api, "avatarView").mockResolvedValue(view("loaded-model"));
+    await act(async () => { screen = create(createElement(AvatarStudioScreen)); });
+    vi.mocked(api.avatarView).mockRejectedValueOnce(new Error("refresh failed"));
+    store.state = { ...store.state, connectionsVersion: 1 };
+    await act(async () => { screen.update(createElement(AvatarStudioScreen)); });
+    expect(textOf(screen)).toContain("loaded-model");
+    expect(store.toast).toHaveBeenCalledWith("refresh failed");
+    const pending = deferred<StudioView>();
+    vi.mocked(api.avatarView).mockImplementationOnce(() => pending.promise);
+    store.state = { ...store.state, connectionsVersion: 2 };
+    await act(async () => { screen.update(createElement(AvatarStudioScreen)); });
+    act(() => screen.unmount());
+    await act(async () => { pending.reject(new Error("left studio")); });
+    expect(store.toast).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a choice on refresh but clears it for another candidate session", async () => {
+    const candidates = (session: string): StudioView => ({
+      ...view("image-model"),
+      current: { session, stage: "choose", description: "A drawn animal", candidates: [`avatar/${session}/candidate.png`] },
+    });
+    vi.spyOn(api, "avatarView").mockResolvedValue(candidates("first"));
+    await act(async () => { screen = create(createElement(AvatarStudioScreen)); });
+    const candidate = () => screen.root.findByProps({ "aria-label": "Candidate 1" });
+    act(() => candidate().props.onClick());
+    expect(candidate().props["aria-pressed"]).toBe(true);
+    store.state = { ...store.state, connectionsVersion: 1 };
+    await act(async () => { screen.update(createElement(AvatarStudioScreen)); });
+    expect(candidate().props["aria-pressed"]).toBe(true);
+    vi.mocked(api.avatarView).mockResolvedValue(candidates("second"));
+    store.state = { ...store.state, connectionsVersion: 2 };
+    await act(async () => { screen.update(createElement(AvatarStudioScreen)); });
+    expect(candidate().props["aria-pressed"]).toBe(false);
+    expect(textOf(screen)).not.toContain("Use this one");
+  });
+
   it("a slower earlier studio answer does not land over a newer one", async () => {
     const first = deferred<StudioView>();
     const second = deferred<StudioView>();
@@ -185,6 +261,7 @@ describe("avatar studio reload race", () => {
     await act(async () => {
       screen = create(createElement(AvatarStudioScreen));
     });
+    act(() => screen.root.findByProps({ "aria-label": "Describe a new look" }).props.onChange({ target: { value: "My unfinished description" } }));
     // the model and the connections can both move while a view is on its way
     store.state = { ...store.state, settings: { llm: { model: "model-b" } } };
     await act(async () => {
@@ -199,6 +276,7 @@ describe("avatar studio reload race", () => {
     });
     expect(textOf(screen)).toContain("newer-image-model");
     expect(textOf(screen)).not.toContain("older-image-model");
+    expect(screen.root.findByProps({ "aria-label": "Describe a new look" }).props.value).toBe("My unfinished description");
     expect(api.avatarView).toHaveBeenCalledTimes(2);
   });
 });

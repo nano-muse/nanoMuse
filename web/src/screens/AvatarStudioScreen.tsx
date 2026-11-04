@@ -60,7 +60,9 @@ export function AvatarStudioScreen() {
   // the model and the connections can both change while a view is on its way: a slower
   // earlier answer must not land over a newer one's view
   const loadGen = useRef(0);
+  const active = useRef(false);
   const load = () => {
+    if (!active.current) return Promise.resolve();
     const mine = ++loadGen.current;
     return api.avatarView().then(
       (d) => {
@@ -74,13 +76,18 @@ export function AvatarStudioScreen() {
     );
   };
   useEffect(() => {
+    active.current = true;
     void load();
+    return () => {
+      active.current = false;
+      loadGen.current += 1;
+    };
     // the face's record (face.json) and the endpoint are re-read when the look changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.avatar, state.settings?.llm.model, state.connectionsVersion]);
   useEffect(() => {
-    if (stage !== "choose") setSelected(null);
-  }, [stage]);
+    setSelected(null);
+  }, [stage, session?.session]);
 
   const act = async (what: string, run: () => Promise<unknown>) => {
     setBusy(what);
