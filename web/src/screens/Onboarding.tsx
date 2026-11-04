@@ -1,5 +1,5 @@
 import { ArrowRight, Check, ChevronRight, Cloud, Loader2, Lock } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { DRAGON } from "../avatars";
 import { Avatar } from "../components/Avatar";
@@ -46,11 +46,18 @@ export function Onboarding() {
   };
 
   const [connError, setConnError] = useState<string | null>(null);
+  // the server can bump the connections version twice in a row (a connect and its
+  // follow-up): a slower earlier answer must not land over a newer one's cards
+  const connGen = useRef(0);
   const loadConn = async () => {
+    const mine = ++connGen.current;
     try {
       setConnError(null);
-      setConn(await api.connections());
+      const next = await api.connections();
+      if (connGen.current !== mine) return;
+      setConn(next);
     } catch (e) {
+      if (connGen.current !== mine) return;
       setConnError(t((e as Error).message) || t("Could not load the connections."));
     }
   };

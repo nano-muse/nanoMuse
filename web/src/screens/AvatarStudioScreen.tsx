@@ -57,7 +57,22 @@ export function AvatarStudioScreen() {
   const candidates = session?.candidates ?? [];
   const haveCandidates = (stage === "drawing" || stage === "choose") && candidates.length > 0;
 
-  const load = () => api.avatarView().then(setView, (e: Error) => toast(e.message));
+  // the model and the connections can both change while a view is on its way: a slower
+  // earlier answer must not land over a newer one's view
+  const loadGen = useRef(0);
+  const load = () => {
+    const mine = ++loadGen.current;
+    return api.avatarView().then(
+      (d) => {
+        if (loadGen.current !== mine) return;
+        setView(d);
+      },
+      (e: Error) => {
+        if (loadGen.current !== mine) return;
+        toast(e.message);
+      },
+    );
+  };
   useEffect(() => {
     void load();
     // the face's record (face.json) and the endpoint are re-read when the look changes
