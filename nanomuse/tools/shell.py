@@ -133,7 +133,8 @@ _REACH: list[tuple[str, re.Pattern[str]]] = [
     (
         "deletion",
         re.compile(
-            r"\b(shutil\.rmtree|os\.(remove|unlink|rmdir|removedirs)|Path\([^)]*\)\.unlink)\b"
+            r"\b(shutil\.rmtree|os\.(remove|unlink|rmdir|removedirs)"
+            r"|Path\([^)]*\)\.(unlink|rmdir))\b"
         ),
     ),
     (

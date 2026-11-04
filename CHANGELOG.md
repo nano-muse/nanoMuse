@@ -32,6 +32,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - Flagged recursive forced deletion when `rm` flags are separate arguments, without borrowing flags from another command or treating filenames after `--` as options.
+- Flagged Python directory removal through `Path(...).rmdir()` for approval, including inside the sandbox.
 
 - **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
 
