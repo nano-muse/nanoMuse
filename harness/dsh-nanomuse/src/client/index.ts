@@ -90,6 +90,7 @@ interface WorkspaceNavigation {
   openSession(target: string): void
   openWorkspace(workspaceId: string): Promise<void>
   archiveSession(sessionId: string, options?: { stopActivity?: boolean }): Promise<void>
+  unarchiveSession(sessionId: string): Promise<void>
   pinSession(sessionId: string): Promise<void>
   unpinSession(sessionId: string): Promise<void>
   pickDirectory(): Promise<string | null>
@@ -279,7 +280,7 @@ export function apply(ctx: ClientContext): void {
     pinSession: (id) => workspaces.pinSession(id),
     unpinSession: (id) => workspaces.unpinSession(id),
     renameSession,
-    openArchived: () => { shell.openSection('archived-sessions') },
+    unarchiveSession: (id) => workspaces.unarchiveSession(id),
   }
   // A room opened from the rail fills the main area; the split (a room beside
   // the chat) ends with it.

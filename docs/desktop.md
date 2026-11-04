@@ -309,6 +309,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+In the chat column, **More → Archived chats** opens the archive in that column. Search the archived chats or choose **Restore** to bring a chat back and open it. **Back to chats** returns to the normal list. Archiving keeps a chat on this computer; it does not delete its history.
+
 If two problem reports produce screenshots within the same second, the later screenshot receives a numbered filename instead of replacing the earlier one.
 
 When a conversation upload reaches the relay but its response is lost, a retry keeps the same message IDs so other devices do not receive duplicate messages. The conversation mapping is saved before upload so this also works after a restart; if that local save fails, the upload waits for a later attempt.
