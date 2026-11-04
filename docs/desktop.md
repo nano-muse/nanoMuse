@@ -311,6 +311,8 @@ process before removing the check's data directories.
 
 The desktop keeps one previous log as `desktop.log.1`. When `desktop.log` reaches 10 MiB, the next entry starts a new log and replaces the older backup. If rotation fails, logging still attempts to append the entry and retries rotation later.
 
+If the saved desktop port is occupied, that launch uses a temporary fallback without replacing the saved port. Once the original port is free, the next launch returns to it and its browser settings. Settings changed while using the fallback belong to that temporary origin.
+
 If two problem reports produce screenshots within the same second, the later screenshot receives a numbered filename instead of replacing the earlier one.
 
 When a conversation upload reaches the relay but its response is lost, a retry keeps the same message IDs so other devices do not receive duplicate messages. The conversation mapping is saved before upload so this also works after a restart; if that local save fails, the upload waits for a later attempt.
