@@ -20,17 +20,21 @@ import kotlinx.coroutines.launch
 
 /** Runs before the screen obtains its ViewModel, including deep-link and notification entry. */
 @Composable
-fun SessionAccessGate(sessionId: String): Boolean {
+fun SessionAccessGate(sessionId: String, visible: Boolean = true): Boolean {
     SessionAccess.initialize(LocalContext.current)
     val revision by SessionAccess.revision.collectAsState()
     var tick by remember(sessionId) { mutableIntStateOf(0) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(sessionId, lifecycle) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) SessionAccess.leave(sessionId)
-        }
+    val visibility = remember { io.github.nanomuse.guard.SessionAccessVisibility(SessionAccess::leave) }
+    val currentId by rememberUpdatedState(sessionId)
+    val currentVisible by rememberUpdatedState(visible)
+    SideEffect { visibility.update(sessionId, visible && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
+    DisposableEffect(lifecycle) {
+        fun update() = visibility.update(currentId, currentVisible && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+        val observer = LifecycleEventObserver { _, _ -> update() }
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); SessionAccess.leave(sessionId) }
+        update()
+        onDispose { lifecycle.removeObserver(observer); visibility.update(null, false) }
     }
     LaunchedEffect(sessionId) { while (true) { delay(1000); tick++ } }
     val locked = remember(sessionId, revision, tick) { SessionAccess.isLocked(sessionId) }
