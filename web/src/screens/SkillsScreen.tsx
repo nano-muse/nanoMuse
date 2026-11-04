@@ -48,7 +48,9 @@ export function SkillsScreen() {
   // "save as skill" bumps the reload version while the list is still loading: a slower
   // earlier answer must not land over a newer one's list
   const loadGen = useRef(0);
+  const active = useRef(false);
   const load = () => {
+    if (!active.current) return Promise.resolve();
     const mine = ++loadGen.current;
     return api
       .skills()
@@ -64,7 +66,12 @@ export function SkillsScreen() {
       });
   };
   useEffect(() => {
+    active.current = true;
     void load();
+    return () => {
+      active.current = false;
+      loadGen.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.skillsVersion]);
 

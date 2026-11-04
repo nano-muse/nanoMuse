@@ -2,6 +2,10 @@
 
 After signing in, signing out or changing a model, the provider catalogue is fetched again. An earlier request cannot repopulate the cache or be reused by a new reader after invalidation.
 
+Memory refreshes keep the latest list and recent changes together. A slow older response cannot restore a forgotten item, and a failed refresh keeps the last loaded view. Leaving the page dismisses pending refresh errors.
+
+The skills list also keeps the newest completed refresh. Failed reloads preserve the visible list, and pending errors are discarded when you leave the page.
+
 > The web console is the app `nanomuse serve` serves at `/`: the front door of
 > the desktop app and of a self-hosted runtime ([app.md](app.md)). This page is
 > about one part of it: how it picks the model that answers, and what it offers
