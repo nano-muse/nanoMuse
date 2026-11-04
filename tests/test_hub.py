@@ -31,8 +31,6 @@ from nanomuse.schema import Function, LLMResponse, ToolCall
 from nanomuse.server import create_app
 from nanomuse.server.service import MuseService
 
-pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="posix shell in the tests")
-
 PHONE = {
     "id": "phone-1",
     "name": "Pixel",
@@ -58,6 +56,7 @@ def wait_for(pred: Callable[[], Any], timeout: float = 8.0, interval: float = 0.
 
 
 # ----------------------------------------------------------------------------- local actions
+@pytest.mark.skipif(sys.platform == "win32", reason="the shell commands are posix")
 def test_info_and_shell(tmp_path: Path) -> None:
     info = actions.info(("task",))
     assert info["kind"] == "computer" and "task" in info["actions"] and info["runtime"]
@@ -1299,7 +1298,13 @@ def test_coding_actions_are_served_to_other_devices(
     home = tmp_path / "home"
     ws = tmp_path / "ws"
     ws.mkdir()
-    slug = str(ws).strip("/").replace("/", "-")
+    # the directory Cursor names a workspace: separators become hyphens and, on Windows,
+    # the drive loses its colon (_slug_to_path reads both shapes back)
+    slug = (
+        str(ws).replace(":", "").replace("\\", "-")
+        if sys.platform == "win32"
+        else str(ws).strip("/").replace("/", "-")
+    )
     path = home / ".cursor" / "projects" / slug / "agent-transcripts" / "s1" / "s1.jsonl"
     path.parent.mkdir(parents=True)
     path.write_text(
