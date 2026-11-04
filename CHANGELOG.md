@@ -31,7 +31,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
-- **The hub's tests run on Windows too.** A module-level skip had quieted the whole suite there, all forty-two of them, when only one test actually runs posix shell commands; the skip narrowed to that test. The one fixture that named a Cursor workspace with a posix-shaped slug now spells it the Windows way (drive without its colon, backslashes as hyphens), so the coding-actions tests find their transcript where the reader looks on both platforms, and the `windows-latest` CI leg sees the suite at all.
+- Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
 
 - **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
 
