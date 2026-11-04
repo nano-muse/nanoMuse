@@ -191,7 +191,10 @@ class ShareReceiverActivity : ComponentActivity() {
                     // the dropped file still lands somewhere useful.
                     finishWithAttachmentFlow(items)
                 }
-                .show()
+                .show().also { dialog ->
+                    // nanoMuse: this native import window must disappear when access expires.
+                    io.github.nanomuse.guard.NativeAccess.protect(this, dialog)
+                }
             true
         } catch (t: Throwable) {
             AppLogger.warning(TAG, "provider-import dialog could not be shown: ${t.message}")
@@ -201,6 +204,8 @@ class ShareReceiverActivity : ComponentActivity() {
 
     /** Run the existing provider-import logic and toast the outcome. */
     private fun importProviderJson(json: String) {
+        // nanoMuse: recheck at the mutation boundary if a tap races with access revocation.
+        if (io.github.nanomuse.guard.AppAccess.locked.value) return
         // [T-android-share-launch-crash] `providerRepositoryOrNull`, not the raw
         // lateinit: a share can arrive in a safe-mode process where the
         // repositories were never assigned, and reading the lateinit there

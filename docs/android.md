@@ -631,6 +631,8 @@ Android can require the device screen lock before showing the app. Enable it in 
 
 A pending diagnostic export requires its activity to be resumed and the app to be unlocked at the same time. Unlocking another window while the export window is paused does not release that export.
 
+Native provider-import and permission-repair dialogs also close when app access expires; pending permission choices are cancelled.
+
 ## Protected conversations {#session-lock}
 
 The conversation menu can protect an individual chat with the device screen lock. Authentication is required to protect it, remove protection, export or duplicate a locked chat, or regenerate its title from message content. A duplicate inherits protection and must be unlocked separately. Protecting a new conversation saves it first; cancelling authentication leaves the draft unchanged. Settings controls the re-lock interval, including locking when leaving the chat. Both layouts, notifications and deep links use the gate. Protected previews and body-search matches are hidden.

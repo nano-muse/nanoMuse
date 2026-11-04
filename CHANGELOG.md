@@ -105,6 +105,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Closed native provider-import and permission dialogs when app access expired, cancelling pending permission choices.
+
 - Kept pending diagnostic exports paused until their own activity was resumed and app access was unlocked together.
 
 - Re-locked protected conversations when leaving a retained Muse tab with the On exit setting.

@@ -338,7 +338,8 @@ class MainActivity : ComponentActivity() {
                 .filterNotNull()
                 .collect { req ->
                     // nanoMuse: native permission dialogs also wait behind the access gate.
-                    io.github.nanomuse.guard.AppAccess.awaitUnlocked()
+                    io.github.nanomuse.guard.awaitNativeAccess(lifecycle.currentStateFlow, io.github.nanomuse.guard.AppAccess.locked)
+                    if (OffloadPermissionManager.pendingAndroidPermission.value !== req) return@collect
                     val permanentlyDenied = req.permissions.any { permission ->
                         ContextCompat.checkSelfPermission(this@MainActivity, permission) !=
                             android.content.pm.PackageManager.PERMISSION_GRANTED &&
@@ -368,7 +369,8 @@ class MainActivity : ComponentActivity() {
                 .filterNotNull()
                 .collect { gate ->
                     // nanoMuse: do not expose pending permissions over the lock screen.
-                    io.github.nanomuse.guard.AppAccess.awaitUnlocked()
+                    io.github.nanomuse.guard.awaitNativeAccess(lifecycle.currentStateFlow, io.github.nanomuse.guard.AppAccess.locked)
+                    if (OffloadPermissionManager.pendingSettingsGate.value !== gate) return@collect
                     AlertDialog.Builder(this@MainActivity)
                         .setTitle(gate.title)
                         .setMessage(gate.message)
@@ -397,7 +399,14 @@ class MainActivity : ComponentActivity() {
                                 OffloadPermissionManager.SettingsGateDecision.CANCEL
                             )
                         }
-                        .show()
+                        .show().also { dialog ->
+                            // nanoMuse: revoke pending native permission choices with app access.
+                            io.github.nanomuse.guard.NativeAccess.protect(this@MainActivity, dialog) {
+                                if (OffloadPermissionManager.pendingSettingsGate.value === gate) {
+                                    OffloadPermissionManager.respondToSettingsGate(OffloadPermissionManager.SettingsGateDecision.CANCEL)
+                                }
+                            }
+                        }
                 }
         }
 
@@ -417,7 +426,8 @@ class MainActivity : ComponentActivity() {
                 .filterNotNull()
                 .collect { prompt ->
                     // nanoMuse: repair prompts wait until the person unlocks the app.
-                    io.github.nanomuse.guard.AppAccess.awaitUnlocked()
+                    io.github.nanomuse.guard.awaitNativeAccess(lifecycle.currentStateFlow, io.github.nanomuse.guard.AppAccess.locked)
+                    if (AccessibilityRecoveryManager.pendingPrompt.value !== prompt) return@collect
                     val b = AlertDialog.Builder(this@MainActivity)
                         .setTitle(getString(R.string.a11y_repair_dialog_title))
                         .setCancelable(true)
@@ -459,7 +469,12 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                     }
-                    b.show()
+                    // nanoMuse: native repair choices cannot remain above the lock screen.
+                    io.github.nanomuse.guard.NativeAccess.protect(this@MainActivity, b.show()) {
+                        if (AccessibilityRecoveryManager.pendingPrompt.value === prompt) {
+                            AccessibilityRecoveryManager.respond(AccessibilityRecoveryManager.Decision.CANCEL)
+                        }
+                    }
                 }
         }
 

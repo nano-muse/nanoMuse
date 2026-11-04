@@ -32,4 +32,19 @@ class CrashDiagnosticsAccessTest {
             locked.value = previousLocked
         }
     }
+    @Test fun lockedProviderImportCannotReachTheRepositoryOrShowAnOutcome() {
+        val state = AppAccess::class.java.getDeclaredField("_locked").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        val locked = state.get(AppAccess) as MutableStateFlow<Boolean>
+        val previousLocked = locked.value
+        val activity = mock(com.openminis.app.share.ShareReceiverActivity::class.java)
+        val import = com.openminis.app.share.ShareReceiverActivity::class.java
+            .getDeclaredMethod("importProviderJson", String::class.java).apply { isAccessible = true }
+        try {
+            locked.value = true
+            import.invoke(activity, "{}")
+            org.mockito.Mockito.verifyNoInteractions(activity)
+        } finally { locked.value = previousLocked }
+    }
+
 }
