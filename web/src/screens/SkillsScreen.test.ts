@@ -8,17 +8,19 @@ import { SkillsScreen } from "./SkillsScreen";
 
 const store = vi.hoisted(() => ({
   state: { profile: null as null, skillsVersion: 0 },
-  toast: () => {},
+  toast: vi.fn(),
   setTab: () => {},
 }));
 vi.mock("../store", () => ({ useStore: () => store }));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 const skill = (name: string): SkillInfo => ({
@@ -58,6 +60,7 @@ function renderedText(): string {
 
 beforeEach(() => {
   store.state = { profile: null, skillsVersion: 0 };
+  store.toast.mockClear();
   setLocaleSetting("en");
   vi.spyOn(api, "skills").mockResolvedValue(skillsData([]));
 });
@@ -69,6 +72,35 @@ afterEach(() => {
 });
 
 describe("SkillsScreen reload race", () => {
+  it("preserves the loaded list when a refresh fails", async () => {
+    vi.mocked(api.skills).mockResolvedValueOnce(skillsData(["saved-skill"]));
+    await act(async () => { screen = create(createElement(SkillsScreen)); });
+    vi.mocked(api.skills).mockRejectedValueOnce(new Error("refresh offline"));
+    store.state = { ...store.state, skillsVersion: 1 };
+    await act(async () => { screen.update(createElement(SkillsScreen)); });
+    expect(renderedText()).toContain("saved-skill");
+    expect(store.toast).toHaveBeenCalledWith("refresh offline");
+  });
+
+  it("ignores rejected older requests and errors after leaving the page", async () => {
+    await act(async () => { screen = create(createElement(SkillsScreen)); });
+    const older = deferred<SkillsData>();
+    vi.mocked(api.skills).mockImplementationOnce(() => older.promise);
+    store.state = { ...store.state, skillsVersion: 1 };
+    await act(async () => { screen.update(createElement(SkillsScreen)); });
+    store.state = { ...store.state, skillsVersion: 2 };
+    await act(async () => { screen.update(createElement(SkillsScreen)); });
+    await act(async () => { older.reject(new Error("older failure")); });
+    expect(store.toast).not.toHaveBeenCalled();
+    const pending = deferred<SkillsData>();
+    vi.mocked(api.skills).mockImplementationOnce(() => pending.promise);
+    store.state = { ...store.state, skillsVersion: 3 };
+    await act(async () => { screen.update(createElement(SkillsScreen)); });
+    act(() => screen.unmount());
+    await act(async () => { pending.reject(new Error("left page")); });
+    expect(store.toast).not.toHaveBeenCalled();
+  });
+
   it("a slower earlier answer does not land over a newer one", async () => {
     // saving a skill bumps the version while the first load is still on its way
     const first = deferred<SkillsData>();

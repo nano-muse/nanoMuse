@@ -175,6 +175,7 @@ async function menuAfterTyping(r: ReactTestRenderer, value: string) {
 }
 
 describe("Composer slash menu skills", () => {
+  let menu: ReactTestRenderer | undefined;
   beforeEach(() => {
     setLocaleSetting("en");
     store.state = {
@@ -185,6 +186,8 @@ describe("Composer slash menu skills", () => {
   });
 
   afterEach(() => {
+    if (menu) act(() => menu?.unmount());
+    menu = undefined;
     store.state = {
       ...store.state,
       settings: { skills: { enabled: false } },
@@ -202,6 +205,7 @@ describe("Composer slash menu skills", () => {
     let r!: ReactTestRenderer;
     act(() => {
       r = create(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+      menu = r;
     });
     store.state = { ...store.state, skillsVersion: 1 };
     await act(async () => {
@@ -227,6 +231,7 @@ describe("Composer slash menu skills", () => {
     let r!: ReactTestRenderer;
     act(() => {
       r = create(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+      menu = r;
     });
     expect(await menuAfterTyping(r, "/")).toContain("kept-skill");
     store.state = { ...store.state, skillsVersion: 1 };
@@ -235,5 +240,31 @@ describe("Composer slash menu skills", () => {
     });
     const text = await menuAfterTyping(r, "/");
     expect(text).toContain("kept-skill");
+  });
+
+  it("hides cached skills immediately when disabled and ignores a late refresh", async () => {
+    const pending = deferred<SkillsData>();
+    vi.spyOn(api, "skills")
+      .mockResolvedValueOnce(skillsData(["cached-skill"]))
+      .mockImplementationOnce(() => pending.promise);
+    await act(async () => {
+      menu = create(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    expect(await menuAfterTyping(menu!, "/")).toContain("cached-skill");
+    store.state = { ...store.state, skillsVersion: 1 };
+    await act(async () => {
+      menu!.update(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    store.state = { ...store.state, settings: { skills: { enabled: false } } };
+    await act(async () => {
+      menu!.update(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    expect(allText(menu!)).not.toContain("cached-skill");
+    await act(async () => { pending.resolve(skillsData(["late-skill"])); });
+    expect(allText(menu!)).not.toContain("late-skill");
+    expect(menu!.root.findAllByProps({ role: "listbox", "aria-label": "Skills" })).toHaveLength(0);
+    const preventDefault = vi.fn();
+    act(() => menu!.root.findByProps({ "aria-label": "Message" }).props.onKeyDown({ key: "Tab", preventDefault }));
+    expect(preventDefault).not.toHaveBeenCalled();
   });
 });

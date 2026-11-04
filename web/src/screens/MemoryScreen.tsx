@@ -27,7 +27,9 @@ export function MemoryScreen() {
   // saves arrive together (one turn can store several memories): a slower earlier load
   // must not land over a newer one's answer
   const loadGen = useRef(0);
+  const active = useRef(false);
   const load = () => {
+    if (!active.current) return Promise.resolve();
     const mine = ++loadGen.current;
     return Promise.all([api.memory(), api.memoryChanges()])
       .then(([nextItems, nextChanges]) => {
@@ -43,7 +45,12 @@ export function MemoryScreen() {
       });
   };
   useEffect(() => {
+    active.current = true;
     void load();
+    return () => {
+      active.current = false;
+      loadGen.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.memoryVersion]);
 
@@ -72,6 +79,8 @@ export function MemoryScreen() {
     try {
       await api.forgetMemory(m.id);
       setItems((prev) => prev?.filter((x) => x.id !== m.id) ?? prev);
+      // Retire reads from before the deletion and refresh its undo entry as well.
+      await load();
     } catch (e) {
       toast((e as Error).message);
     }
