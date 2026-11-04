@@ -8,7 +8,7 @@ import { MemoryScreen } from "./MemoryScreen";
 
 const store = vi.hoisted(() => ({
   state: { profile: null as null, memoryVersion: 0 },
-  toast: () => {},
+  toast: vi.fn(),
   openThread: () => {},
   setTab: () => {},
 }));
@@ -16,10 +16,12 @@ vi.mock("../store", () => ({ useStore: () => store }));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 // A forget logged by the runtime: the removed line in before, nothing after.
@@ -57,6 +59,7 @@ function renderedText(): string {
 
 beforeEach(() => {
   store.state = { profile: null, memoryVersion: 0 };
+  store.toast.mockClear();
   vi.spyOn(api, "memory").mockResolvedValue([]);
   vi.spyOn(api, "memoryChanges").mockResolvedValue([forgetChange]);
 });
@@ -65,6 +68,7 @@ afterEach(() => {
   if (screen) act(() => screen.unmount());
   setLocaleSetting("en");
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("MemoryScreen recent changes", () => {
@@ -89,6 +93,57 @@ describe("MemoryScreen recent changes", () => {
 });
 
 describe("MemoryScreen reload race", () => {
+  const remembered: MemoryItem = {
+    id: "remembered", content: "Keep this memory", category: "profile",
+    created_at: "2026-10-20T12:00:00Z", source: "user",
+  };
+
+  it("keeps the loaded list and undo history when a refresh fails", async () => {
+    vi.mocked(api.memory).mockResolvedValue([remembered]);
+    await act(async () => { screen = create(createElement(MemoryScreen)); });
+    vi.mocked(api.memoryChanges).mockRejectedValueOnce(new Error("refresh offline"));
+    store.state = { ...store.state, memoryVersion: 1 };
+    await act(async () => { screen.update(createElement(MemoryScreen)); });
+    expect(renderedText()).toContain(remembered.content);
+    expect(renderedText()).toContain("Forgot");
+    expect(store.toast).toHaveBeenCalledWith("refresh offline");
+  });
+
+  it("ignores failed loads after a newer answer or after leaving the page", async () => {
+    await act(async () => { screen = create(createElement(MemoryScreen)); });
+    const older = deferred<MemoryItem[]>();
+    const latest = deferred<MemoryItem[]>();
+    vi.mocked(api.memory).mockImplementationOnce(() => older.promise);
+    store.state = { ...store.state, memoryVersion: 1 };
+    await act(async () => { screen.update(createElement(MemoryScreen)); });
+    store.state = { ...store.state, memoryVersion: 2 };
+    await act(async () => { screen.update(createElement(MemoryScreen)); });
+    await act(async () => { older.reject(new Error("old failure")); });
+    expect(store.toast).not.toHaveBeenCalled();
+    vi.mocked(api.memory).mockImplementationOnce(() => latest.promise);
+    store.state = { ...store.state, memoryVersion: 3 };
+    await act(async () => { screen.update(createElement(MemoryScreen)); });
+    act(() => screen.unmount());
+    await act(async () => { latest.reject(new Error("left page")); });
+    expect(store.toast).not.toHaveBeenCalled();
+  });
+
+  it("does not restore a forgotten memory from a pending older list", async () => {
+    vi.stubGlobal("window", { confirm: () => true });
+    vi.mocked(api.memory).mockResolvedValue([remembered]);
+    vi.spyOn(api, "forgetMemory").mockResolvedValue({ ok: true });
+    await act(async () => { screen = create(createElement(MemoryScreen)); });
+    const older = deferred<MemoryItem[]>();
+    vi.mocked(api.memory).mockImplementationOnce(() => older.promise).mockResolvedValue([]);
+    store.state = { ...store.state, memoryVersion: 1 };
+    await act(async () => { screen.update(createElement(MemoryScreen)); });
+    await act(async () => { screen.root.findByProps({ "aria-label": "Forget" }).props.onClick(); });
+    expect(renderedText()).not.toContain(remembered.content);
+    await act(async () => { older.resolve([remembered]); });
+    expect(renderedText()).not.toContain(remembered.content);
+    expect(api.memory).toHaveBeenCalledTimes(3);
+  });
+
   it("a slower earlier load does not land over a newer one", async () => {
     setLocaleSetting("en");
     // one turn stores several memories: the server bumps the version twice in a row and
