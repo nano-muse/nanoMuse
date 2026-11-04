@@ -543,6 +543,46 @@ test('runner: a failed resume of an unknown session goes out again as a new chat
   })
 })
 
+/** A fake `cursor-agent`: a resume of a dead chat streams half a line before the CLI
+ * admits it knows no such session; the fresh chat that follows answers from a delta. */
+async function fakeCursorDeadDelta(dir) {
+  const script = join(dir, 'fake-cursor-dead-delta.mjs')
+  await writeFile(
+    script,
+    `
+const args = process.argv.slice(2)
+const text = args[args.length - 1]
+const out = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
+if (args.includes('--resume')) {
+  out({ type: 'assistant', message: { content: [{ type: 'text', text: 'half a sentence from the dead chat' }] }, timestamp_ms: 1 })
+  console.error('No conversation found with session ID: ghost')
+  process.exit(1)
+}
+out({ type: 'system', subtype: 'init', session_id: 'fresh-1', model: 'fake' })
+out({ type: 'assistant', message: { content: [{ type: 'text', text: 'Fresh start: ' + text }] }, timestamp_ms: 2 })
+out({ type: 'result', result: 'Fresh start: ' + text, session_id: 'fresh-1', duration_ms: 3 })
+`,
+  )
+  const bin = join(dir, 'bin')
+  await mkdir(bin, { recursive: true })
+  const cli = join(bin, 'cursor-agent')
+  await writeFile(cli, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
+  await chmod(cli, 0o755)
+  return cli
+}
+
+test('runner: the retry after an unknown session does not splice in the dead chat\'s half line', { skip: !posix }, async () => {
+  await scratch(async (dir) => {
+    const cli = await fakeCursorDeadDelta(dir)
+    const events = []
+    const run = await startRun({ agent: 'cursor', text: 'again', sessionId: 'ghost', which: () => cli, onEvent: (e) => events.push(e), timeoutMs: 20_000, readerEnv: { NANOMUSE_CODING_HOME: join(dir, 'nohome') } })
+    assert.equal(run.status, 'done', run.error)
+    assert.equal(run.view().output, 'Fresh start: again')
+    assert.equal(run.view().session_id, 'fresh-1')
+    assert.ok(events.some((e) => e.kind === 'tool' && e.phase === 'note'), 'the apps are told the chat went out as a new one')
+  })
+})
+
 test('runner: an error result and a missing CLI are failed runs', { skip: !posix }, async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir, { fail: true })

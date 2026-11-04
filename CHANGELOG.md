@@ -70,6 +70,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **A coding retry after a dead chat starts its output from the new chat's first line.** The retry that follows a resume the CLI cannot serve cleared the accumulated output but kept the half-streamed line the dead chat had begun, and the new chat's first words arrived glued behind it. The stale partial line is dropped with the rest of the old attempt.
+
 - **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
 
 - Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
