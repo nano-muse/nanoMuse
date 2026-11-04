@@ -1823,7 +1823,7 @@ async function loadHost(win: BrowserWindow, url: string): Promise<void> {
   try {
     await win.loadURL(url);
   } catch (exc) {
-    if (closedDuringLoad(win, exc)) {
+    if (closedDuringLoad(win)) {
       return;
     }
     throw exc;
