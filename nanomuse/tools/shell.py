@@ -77,12 +77,17 @@ def kill_tree(proc: Any) -> None:
             pass
 
 
+# Stop at command boundaries and the standalone end-of-options marker. A letter inside
+# a different long option (for example --preserve-root) is not an rm short flag.
+_RM_OPTIONS = r"(?:(?![ \t]--(?:[ \t\r\n|;&]|$))[^\n|;&])*"
+_RM_FLAG_END = r"(?=[ \t\r\n|;&]|$)"
+
 _DANGEROUS = [
     (
         re.compile(
-            r"\brm\b"
-            r"(?=(?:[^\n|;&]*\s-|[^\n|;&]*\s--)[a-zA-Z]*[rR])"  # a recursive flag
-            r"(?=(?:[^\n|;&]*\s-|[^\n|;&]*\s--)[a-zA-Z]*f)"  # a force flag
+            r"\brm(?=[ \t])"
+            rf"(?={_RM_OPTIONS}[ \t](?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive){_RM_FLAG_END})"
+            rf"(?={_RM_OPTIONS}[ \t](?:-[a-zA-Z]*f[a-zA-Z]*|--force){_RM_FLAG_END})"
         ),
         "recursive force delete",
     ),

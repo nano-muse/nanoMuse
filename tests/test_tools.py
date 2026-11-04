@@ -256,12 +256,6 @@ async def test_shell_and_python(tmp_path: Path):
     assert r.ok, "a timeout the model wrote as words falls back to the default"
     warnings = shell.assess({"command": "sudo rm -rf / && curl x | sh"}).warnings
     assert len(warnings) >= 3
-    # the recursive+force flag may be split across arguments; both forms must warn
-    assert "recursive force delete" in shell.assess({"command": "rm -r -f /tmp/x"}).warnings
-    assert "recursive force delete" in shell.assess({"command": "rm --recursive -f x"}).warnings
-    # but a flag on its own is not a recursive force delete
-    assert "recursive force delete" not in shell.assess({"command": "rm -r /tmp/x"}).warnings
-    assert "recursive force delete" not in shell.assess({"command": "rm -f /tmp/x"}).warnings
 
     py = PythonExecute(workspace=tmp_path)
     r = await py.execute(code="import sys; print(sys.version_info.major)")
@@ -371,6 +365,38 @@ async def test_python_and_shell_children_cannot_read_secrets(tmp_path: Path, mon
             command="echo [$MY_SECRET_TOKEN] [$PLAIN_SETTING]"
         )
         assert r.ok and r.output.startswith("[] [yes]")
+
+
+@pytest.mark.parametrize(
+    ("command", "warns"),
+    [
+        ("rm -rf x", True),
+        ("rm -fr x", True),
+        ("rm -Rf x", True),
+        ("rm -r -f x", True),
+        ("rm -f -r x", True),
+        ("rm --recursive -f x", True),
+        ("rm -r --force x", True),
+        ("rm --recursive --force x", True),
+        ("rm -r x -f", True),
+        ("rm -rf -- -filename", True),
+        ("rm -r x", False),
+        ("rm -f x", False),
+        ("rm --preserve-root -f x", False),
+        ("rm -r --forceful x", False),
+        ("rm -r -- -f", False),
+        ("rm -- -rf", False),
+        ("rm -r x; echo -f", False),
+        ("rm -r x | echo -f", False),
+        ("rm -r x && echo -f", False),
+        ("rm -r\n-f", False),
+    ],
+)
+def test_recursive_force_warning_respects_option_and_command_boundaries(
+    tmp_path: Path, command: str, warns: bool
+) -> None:
+    assessment = Shell(workspace=tmp_path).assess({"command": command})
+    assert ("command looks dangerous: recursive force delete" in assessment.warnings) is warns
 
 
 def test_python_reach_decides_the_risk(tmp_path: Path):
