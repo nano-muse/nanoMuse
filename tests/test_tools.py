@@ -394,6 +394,8 @@ def test_python_reach_decides_the_risk(tmp_path: Path):
     proc = py.assess({"code": "import subprocess\nsubprocess.run(['ls'])"})
     assert proc.risk == RiskLevel.SENSITIVE and proc.egress
     assert set(code_reach("import shutil\nshutil.rmtree('x')")) == {"deletion"}
+    # directory removal through pathlib is deletion too, not just os.rmdir / Path.unlink
+    assert set(code_reach("from pathlib import Path\nPath('x').rmdir()")) == {"deletion"}
     # modules fetched by name and attributes looked up by string are named on the card
     dynamic = py.assess({"code": "m = __import__('sub' + 'process')\nm.run(['ls'])"})
     assert (
