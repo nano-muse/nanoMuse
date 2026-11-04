@@ -207,7 +207,7 @@ export function ChatGptRow({ t, view, onChanged }: { t: Translate; view: Provide
   } else if (login.status === 'waiting') {
     state = h('div', { className: 'nm-way-sub nm-wrap' }, t('ownKeyChatGptWaiting'))
   } else if (login.status === 'error') {
-    state = h('div', { style: errorStyle }, t('ownKeyChatGptFailed', { error: login.error === 'no_runtime' ? t('ownKeyNoRuntime') : login.error }))
+    state = h('div', { style: errorStyle }, chatGptLoginError(t, login.error))
   } else if (!view.chatgpt.runtime) {
     state = h('div', { className: 'nm-way-sub nm-wrap' }, t('ownKeyNoRuntime'))
   }
@@ -516,6 +516,12 @@ export function OwnKeyStep({ t, onDone }: { t: Translate; onDone(done: boolean):
     more ? null : h('div', { style: { marginTop: 10 } }, h('button', { type: 'button', className: 'nm-ob-link nm-inline', onClick: () => setMore(true) }, t('ownKeyMoreWays'))))
 }
 
+/** The ChatGPT sign-in's failure in the person's words: the runtime's codes are worded here, its own messages kept. */
+export function chatGptLoginError(t: Translate, error: string): string {
+  if (error === 'no_result' || error === 'exited') return t('ownKeyChatGptIncomplete')
+  return t('ownKeyChatGptFailed', { error: error === 'no_runtime' ? t('ownKeyNoRuntime') : error })
+}
+
 /** Cloud sign-in state is supplied by the account, never by a local selection. */
 export function CloudChannelCard({ t, signedIn, onSignIn, onChoose }: { t: Translate; signedIn: boolean; onSignIn(): void; onChoose(): void }): ReactNode {
   return h('div', { className: `nm-model-channel-card${signedIn ? ' nm-channel-ready' : ''}` },
@@ -597,7 +603,7 @@ export function ModelChannelsStep({
           ? h('div', { className: 'nm-way-sub nm-wrap', style: { marginTop: 4, color: 'var(--nm-blue)' } }, t('ownKeyChatGptWaiting'))
           : null,
         cgError || cg?.login.status === 'error'
-          ? h('div', { style: { ...errorStyle, marginTop: 4 } }, cgError || t('ownKeyChatGptFailed', { error: cg?.login.error === 'no_runtime' ? t('ownKeyNoRuntime') : cg?.login.error ?? '' }))
+          ? h('div', { style: { ...errorStyle, marginTop: 4 } }, cgError || chatGptLoginError(t, cg?.login.error ?? ''))
           : null),
       h('div', { className: 'nm-model-channel-side' },
         cgSignedIn
