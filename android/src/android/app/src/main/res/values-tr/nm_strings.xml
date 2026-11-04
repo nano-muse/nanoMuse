@@ -1238,4 +1238,6 @@
     <string name="nm_backup_resume">Yedeklemeyi sürdür</string>
     <string name="nm_backup_discard">Kesilen yedeği sil</string>
     <string name="nm_backup_resume_hint">Kesilen bir yedek bekliyor. İlk seçeneklerle sürdürün ve gerekirse şifreyi yeniden girin ya da silip baştan başlayın.</string>
+    <string name="nm_coding_installed">Yüklü</string>
+    <string name="nm_coding_not_installed">Yüklü değil</string>
 </resources>

@@ -1239,4 +1239,6 @@
     <string name="nm_backup_resume">Reprendre la sauvegarde</string>
     <string name="nm_backup_discard">Abandonner la sauvegarde interrompue</string>
     <string name="nm_backup_resume_hint">Une sauvegarde interrompue attend. Reprenez avec les options initiales et saisissez de nouveau le mot de passe si nécessaire, ou abandonnez pour recommencer.</string>
+    <string name="nm_coding_installed">Installé</string>
+    <string name="nm_coding_not_installed">Non installé</string>
 </resources>

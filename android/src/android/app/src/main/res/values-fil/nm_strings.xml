@@ -1238,4 +1238,6 @@
     <string name="nm_backup_resume">Ipagpatuloy ang backup</string>
     <string name="nm_backup_discard">Itapon ang naudlot na backup</string>
     <string name="nm_backup_resume_hint">May naudlot na backup. Ipagpatuloy gamit ang orihinal na mga opsyon at ilagay muli ang password kung kailangan, o itapon ito para magsimulang muli.</string>
+    <string name="nm_coding_installed">Naka-install</string>
+    <string name="nm_coding_not_installed">Hindi naka-install</string>
 </resources>

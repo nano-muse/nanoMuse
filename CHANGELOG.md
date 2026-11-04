@@ -105,6 +105,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Kept coding-agent filters readable on narrow screens and showed running, installed and not-installed states. For #829.
+
 - Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
 
 - Recovered interrupted Android restore categories before opening their repositories, retaining snapshots when recovery failed.

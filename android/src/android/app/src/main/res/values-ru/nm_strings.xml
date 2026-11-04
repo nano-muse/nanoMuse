@@ -1246,4 +1246,6 @@
     <string name="nm_backup_resume">Продолжить копирование</string>
     <string name="nm_backup_discard">Удалить прерванную копию</string>
     <string name="nm_backup_resume_hint">Есть прерванная копия. Продолжите с исходными параметрами и при необходимости снова введите пароль, либо удалите её и начните заново.</string>
+    <string name="nm_coding_installed">Установлен</string>
+    <string name="nm_coding_not_installed">Не установлен</string>
 </resources>

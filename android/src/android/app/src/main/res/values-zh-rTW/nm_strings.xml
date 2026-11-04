@@ -1204,4 +1204,6 @@
     <string name="nm_backup_resume">繼續備份</string>
     <string name="nm_backup_discard">捨棄中斷的備份</string>
     <string name="nm_backup_resume_hint">有一份備份尚未完成。請使用原來的選項繼續，必要時重新輸入加密密碼；也可捨棄後重新開始。</string>
+    <string name="nm_coding_installed">已安裝</string>
+    <string name="nm_coding_not_installed">未安裝</string>
 </resources>
