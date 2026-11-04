@@ -8,6 +8,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -20,8 +21,9 @@ internal suspend fun awaitNativeResume(resumed: StateFlow<Lifecycle.State>) {
 }
 
 internal suspend fun awaitNativeAccess(resumed: StateFlow<Lifecycle.State>, locked: StateFlow<Boolean>) {
-    awaitNativeResume(resumed)
-    locked.first { !it }
+    combine(resumed, locked) { state, isLocked ->
+        state.isAtLeast(Lifecycle.State.RESUMED) && !isLocked
+    }.first { it }
 }
 
 object NativeAccess {

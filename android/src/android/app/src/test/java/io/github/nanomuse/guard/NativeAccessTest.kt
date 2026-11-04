@@ -27,6 +27,22 @@ class NativeAccessTest {
         assertEquals(1, exports)
         assertTrue(operation.isCompleted)
     }
+    @Test fun unlockingAnotherActivityDoesNotReleaseAnExportAfterItsOwnerPaused() = runTest {
+        val resumed = MutableStateFlow(Lifecycle.State.RESUMED)
+        val locked = MutableStateFlow(true)
+        var exports = 0
+        val operation = launch { awaitNativeAccess(resumed, locked); exports++ }
+        runCurrent()
+        resumed.value = Lifecycle.State.STARTED
+        runCurrent()
+        locked.value = false
+        runCurrent()
+        assertEquals("A resumed owner is still required when access returns", 0, exports)
+        resumed.value = Lifecycle.State.RESUMED
+        runCurrent()
+        assertEquals(1, exports)
+        assertTrue(operation.isCompleted)
+    }
     @Test fun relockingClosesAnAlreadyOpenDiagnosticWindowOnce() = runTest {
         val locked = MutableStateFlow(false)
         var closed = 0
