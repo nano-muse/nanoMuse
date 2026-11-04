@@ -14,8 +14,10 @@ import { call, errorCode, failureText, type Translate } from './api.ts'
 import { buildPrompt, KEEP, MOOD_INSTRUCTIONS, png, still, type Estimate } from './AvatarStudio.tsx'
 import { AvatarShareSheet } from './AvatarShare.tsx'
 import { composerCard, composerEditable } from './composer.ts'
-import { IconClose, IconSpinner } from './icons.tsx'
+import { settingsBus } from './bus.ts'
+import { IconClose, IconImage, IconSpinner } from './icons.tsx'
 import { useLive } from './live.ts'
+import { MODELS_SECTION } from './ModelsSection.tsx'
 import { peekWin } from './win.ts'
 
 type Phase = 'idle' | 'cost' | 'drawing' | 'pick' | 'finalizing' | 'done' | 'failed'
@@ -66,7 +68,13 @@ export const avatarChat = {
       })
       .catch((err: unknown) => {
         if (round !== mine) return
-        set({ estimateError: errorCode(err) === 'signed_out' ? 'signed_out' : (err as Error).message })
+        const code = errorCode(err)
+        const msg = String((err as Error)?.message ?? err ?? '')
+        if (code === 'no_image_model') {
+          set({ phase: 'failed', error: err })
+        } else {
+          set({ estimateError: code === 'signed_out' ? 'signed_out' : msg })
+        }
       })
   },
   draw(): void {
@@ -221,9 +229,23 @@ export function makeAvatarChat(t: Translate) {
       h('div', { className: 'nm-ac-actions' },
         h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => set({ share: true }) }, t('acShare')),
         h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: avatarChat.close }, t('acLater'))))
+    const isFailed = flow.phase === 'failed' || Boolean(flow.error && flow.phase !== 'drawing')
+    const errCode = errorCode(flow.error)
+    const isNoImage = isFailed && errCode === 'no_image_model'
+    const headTitle = flow.phase === 'cost'
+      ? t('fcTitle')
+      : flow.phase === 'done'
+        ? t('acTitle')
+        : flow.phase === 'finalizing'
+          ? t('acFinalizing')
+          : isFailed
+            ? (isNoImage ? t('acNoModelTitle') : t('acFailedTitle'))
+            : flow.phase === 'drawing'
+              ? t('acDrawingTitle')
+              : t('acOptions')
     return h('div', { className: 'nm-ac', role: 'dialog', 'aria-label': t('acTitle') },
       h('div', { className: 'nm-ac-head' },
-        h('span', { className: 'nm-ac-title' }, flow.phase === 'cost' ? t('fcTitle') : flow.phase === 'done' ? t('acTitle') : flow.phase === 'finalizing' ? t('acFinalizing') : t('acOptions')),
+        h('span', { className: 'nm-ac-title' }, headTitle),
         flow.phase !== 'finalizing' ? h('button', { type: 'button', className: 'nm-icon-btn', 'aria-label': t('close'), onClick: avatarChat.close }, h(IconClose, { size: 14 })) : null),
       body,
       flow.share ? h(AvatarShareSheet, { t, name, onClose: () => set({ share: false }) }) : null)
@@ -252,8 +274,51 @@ function Cost({ t, flow }: { t: Translate; flow: FlowState }): ReactNode {
 
 function Options({ t, flow, quoted }: { t: Translate; flow: FlowState; quoted: string }): ReactNode {
   const drawing = flow.phase === 'drawing'
+  const isFailed = flow.phase === 'failed' || Boolean(flow.error && !drawing)
+  const errCode = errorCode(flow.error)
+  const isNoImage = isFailed && errCode === 'no_image_model'
+
+  // When no image model is configured, show a clean, native empty-state card instead of empty retry tiles
+  if (isFailed && isNoImage) {
+    return h('div', { className: 'nm-ac-options', style: { display: 'flex', flexDirection: 'column', gap: 14 } },
+      h('div', { className: 'nm-ac-empty-card' },
+        h('div', { className: 'nm-ac-empty-icon' }, h(IconImage, { size: 24 })),
+        h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+          h('div', { className: 'nm-ac-empty-title' }, t('acNoModelTitle')),
+          h('div', { className: 'nm-ac-empty-desc' }, t('acNoModelDesc')))),
+      h('div', { className: 'nm-ac-actions', style: { justifyContent: 'flex-end', gap: 10 } },
+        h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: avatarChat.close }, t('cancel')),
+        h('button', {
+          type: 'button',
+          className: 'nm-pill nm-pill-sm',
+          onClick: () => {
+            avatarChat.close()
+            settingsBus.openSection?.(MODELS_SECTION)
+          }
+        }, t('acGoModels'))))
+  }
+
+  const hasSuccessCandidate = flow.candidates.some((c) => Boolean(c))
+
+  // When failed and NO candidates succeeded, show a clean failure card instead of 4 empty retry tiles
+  if (isFailed && !hasSuccessCandidate) {
+    return h('div', { className: 'nm-ac-options', style: { display: 'flex', flexDirection: 'column', gap: 14 } },
+      h('div', { className: 'nm-ac-empty-card' },
+        h('div', { className: 'nm-ac-empty-icon', style: { color: 'var(--dsw-alias-state-error-primary, #b42318)', background: 'color-mix(in srgb, var(--dsw-alias-state-error-primary, #b42318) 12%, transparent)' } }, h(IconImage, { size: 24 })),
+        h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+          h('div', { className: 'nm-ac-empty-title' }, t('acFailedTitle')),
+          h('div', { className: 'nm-ac-empty-desc' }, flow.error ? failureText(t, flow.error) : t('acFailedSimple')))),
+      h('div', { className: 'nm-ac-actions', style: { justifyContent: 'flex-end', gap: 10 } },
+        h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: avatarChat.close }, t('cancel')),
+        h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: avatarChat.draw }, t('acAgain'))))
+  }
   return h('div', { className: 'nm-ac-options' },
-    h('p', { className: 'nm-ac-desc' }, drawing ? t('acDrawing', { desc: flow.desc }) : flow.phase === 'failed' ? t('acFailed') : t('acReady', { desc: flow.desc })),
+    h('p', { className: 'nm-ac-desc', style: { marginBottom: 10 } },
+      drawing
+        ? t('acDrawing', { desc: flow.desc })
+        : isFailed
+          ? t('acFailedSimple')
+          : t('acReady', { desc: flow.desc })),
     h('div', { className: 'nm-ac-grid' }, flow.candidates.map((c, i) => c
       ? h('button', { key: i, type: 'button', className: 'nm-ac-tile', disabled: drawing, 'aria-label': t('acOption', { n: i + 1 }), onClick: () => void avatarChat.choose(i) },
           h('img', { src: `data:image/png;base64,${c}`, alt: quoted }),
@@ -261,9 +326,18 @@ function Options({ t, flow, quoted }: { t: Translate; flow: FlowState; quoted: s
       : c === ''
         ? h('button', { key: i, type: 'button', className: 'nm-ac-tile nm-ac-tile-retry', disabled: drawing, onClick: () => avatarChat.retry(i) }, t('acRetry'))
         : h('div', { key: i, className: 'nm-ac-tile nm-ac-tile-wait' }, h(IconSpinner, { size: 18 })))),
-    drawing ? h('div', { className: 'nm-ac-status nm-live' }, h(IconSpinner, { size: 14 }), t('acGenerating')) : h('p', { className: 'nm-ac-hint' }, t('acPickHint')),
-    flow.error && !drawing ? h('p', { className: 'nm-ac-err' }, failureText(t, flow.error)) : null,
-    h('div', { className: 'nm-ac-actions' },
+    drawing
+      ? h('div', { className: 'nm-ac-status nm-live', style: { marginTop: 8 } }, h(IconSpinner, { size: 14 }), t('acGenerating'))
+      : hasSuccessCandidate
+        ? h('p', { className: 'nm-ac-hint', style: { marginTop: 8 } }, t('acPickHint'))
+        : null,
+    flow.error && !drawing
+      ? h('p', { className: 'nm-ac-err', style: { marginTop: 6 } }, failureText(t, flow.error))
+      : null,
+    h('div', { className: 'nm-ac-actions', style: { marginTop: 10 } },
+      isFailed
+        ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: avatarChat.draw }, t('acResume'))
+        : null,
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: drawing, onClick: avatarChat.draw }, t('acAgain')),
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: avatarChat.close }, t('acKeep'))))
 }

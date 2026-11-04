@@ -29,10 +29,11 @@ import { gatedPermissions, openLink, type PermissionKind } from './bridge.ts'
 import { permissionSub, permissionTitle, usePermissions, type Permissions } from './permissions.ts'
 import { BlackScreenNotice, HandsTryRows } from './HandsCheck.tsx'
 import { RelaunchButton } from './RelaunchButton.tsx'
-import { IconCheck, IconHand, IconMessage, IconMonitor, IconSettings, IconUsers } from './icons.tsx'
+import { IconCheck, IconChevronLeft, IconHand, IconMessage, IconMonitor, IconSettings, IconUsers } from './icons.tsx'
 import { useLive } from './live.ts'
 import { setMainChatId } from './MuseChats.tsx'
-import { OwnKeyStep } from './OwnKey.tsx'
+import { prefillComposer } from './composer.ts'
+import { ModelChannelsStep, OwnKeyStep } from './OwnKey.tsx'
 import { nav, roomsCall, useRooms } from './rooms.ts'
 
 /** The owner share the onboarding coordinator passes to a step. */
@@ -127,6 +128,9 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
     const [fresh, setFresh] = useState(false)
     const [passwordSeen, setPasswordSeen] = useState(false)
     const [modelsSkipped, setModelsSkipped] = useState(false)
+    const [selectedTask, setSelectedTask] = useState(0)
+    const [chosenPrompt, setChosenPrompt] = useState<string>('')
+    const [welcomeSeen, setWelcomeSeen] = useState(false)
     const [starting, setStarting] = useState(false)
     const [fading, setFading] = useState(false)
     const layer = useRef<HTMLDivElement>(null)
@@ -163,16 +167,20 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
     }, [live.streaming, live.cloud.signedIn])
     const gated = gatedPermissions()
     const stage: Stage | null = status
-      ? stageOf({
-          signedIn: status.signedIn,
-          hasModel: status.ready,
-          freshAccount: fresh,
-          passwordSeen,
-          sourceChosen: rooms.firstRun.sourceChosen,
-          modelsSkipped,
-          gated,
-          permissionsSeen: rooms.firstRun.permissionsSeen,
-        })
+      ? (!rooms.firstRun.done && !welcomeSeen)
+        ? 'welcome'
+        : welcomeSeen && rooms.firstRun.sourceChosen === 'own' && !modelsSkipped && !fresh
+          ? 'models'
+          : stageOf({
+            signedIn: status.signedIn,
+            hasModel: status.ready,
+            freshAccount: fresh,
+            passwordSeen,
+            sourceChosen: rooms.firstRun.sourceChosen,
+            modelsSkipped,
+            gated,
+            permissionsSeen: rooms.firstRun.permissionsSeen,
+          })
       : null
     // the own-key step stays until Continue or Skip: a key saved there does not flip the page by itself
 
@@ -191,10 +199,13 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
         .then((result) => {
           setMainChatId(result.sessionId)
           nav.openSession(result.sessionId)
+          if (chosenPrompt) {
+            prefillComposer(chosenPrompt)
+          }
         })
         .catch(() => roomsCall('firstrun/finish', {}).catch(() => undefined))
         .finally(() => { window.clearTimeout(timer); settle() })
-    }, [finish])
+    }, [finish, chosenPrompt])
 
     const run = async (work: () => Promise<void>) => {
       setBusy(true)
@@ -228,6 +239,7 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
         const sheet = await call<AccountSheet>('me').catch(() => undefined)
         setFresh(sheet?.account?.has_password === false)
       }
+      await roomsCall('firstrun/set', { sourceChosen: 'cloud' })
       setStatus(next)
       setSignIn(null)
     }
@@ -279,6 +291,12 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
     const profile = live.streaming ? live.profile : status.profile
     const name = profile?.name || 'nanoMuse'
 
+    const showcases = [
+      { id: 'avatar', icon: '🎨', title: t('frTask1Title'), desc: t('frTask1Desc'), prompt: t('frTask1Prompt'), reqHint: t('frTaskReqAvatar') },
+      { id: 'screen', icon: '📱', title: t('frTask2Title'), desc: t('frTask2Desc'), prompt: t('frTask2Prompt'), reqHint: t('frTaskReqTicket') },
+      { id: 'twoapps', icon: '📱', title: t('frTask3Title'), desc: t('frTask3Desc'), prompt: t('frTask3Prompt'), reqHint: t('frTaskReqApps') },
+      { id: 'memory', icon: '☕', title: t('frTask4Title'), desc: t('frTask4Desc'), prompt: t('frTask4Prompt'), reqHint: t('frTaskReqMemory') },
+    ]
     let body: ReactNode
     if (starting) {
       body = h('div', { className: 'nm-ob-center' }, h(Spinner))
@@ -325,26 +343,37 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
           h('span', { className: 'nm-ob-sep', 'aria-hidden': true }, '·'),
           h('button', { type: 'button', className: 'nm-ob-link', onClick: () => { setError(undefined); setPassword(''); setSignIn('identifier') } }, t('obChangeIdentifier'))))
     } else if (stage === 'welcome') {
-      // the app's mark, as on the phone (the face comes with the conversation, on the Meet page);
-      // two doors: the account, or a key of one's own (the models page; the sign-in can come later)
       body = h(Page, {
-        hero: h(BrandMark, { size: 104, className: 'nm-fr-hero-mark' }),
-        title: t('frWelcomeTitle'),
-        sub: t('frTagline'),
-        primary: { label: t('frSignIn'), onClick: () => { setError(undefined); setSignIn('identifier') } },
-        secondary: { label: t('frWelcomeOwnKey'), onClick: () => { setModelsSkipped(false); choose('own') } },
-        fine: config.allowance_cny ? `${t('frWelcomeFine')} ${t('obFreeAmount', { allowance: config.allowance_cny })}` : t('frWelcomeFine'),
+        hero: h(BrandMark, { size: 72, className: 'nm-fr-hero-mark' }),
+        title: t('frTaskTitle'),
+        sub: t('frTaskSub'),
+        wide: true,
+        primary: {
+          label: t('frTaskGo'),
+          onClick: () => {
+            const chosen = showcases[selectedTask]
+            if (chosen) setChosenPrompt(chosen.prompt)
+            setWelcomeSeen(true)
+            setModelsSkipped(false)
+            choose('own')
+          },
+        },
+        fine: t('frNoticeClosing'),
         learnMore: PRIVACY_URL,
         t,
       },
-        h('div', { className: 'nm-fr-features' },
-          h(FeatureRow, { icon: h(IconMessage, { size: 18 }), title: t('frFeatChat'), sub: t('frFeatChatSub') }),
-          h(FeatureRow, { icon: h(IconHand, { size: 18 }), title: t('frFeatHands'), sub: t('frFeatHandsSub') }),
-          h(FeatureRow, { icon: h(IconUsers, { size: 18 }), title: t('frFeatReach'), sub: t('frFeatReachSub') })),
-        h('div', { className: 'nm-fr-notice' },
-          h('div', { className: 'nm-fr-notice-title' }, t('frNoticeTitle')),
-          h('p', null, t('frNotice')),
-          h('p', { className: 'nm-fr-notice-closing' }, t('frNoticeClosing'))))
+        h('div', { className: 'nm-ob-showcase-grid' },
+          showcases.map((sc, idx) =>
+            h('button', {
+              key: sc.id,
+              type: 'button',
+              className: `nm-ob-showcase-card${selectedTask === idx ? ' nm-selected' : ''}`,
+              onClick: () => setSelectedTask(idx),
+            },
+              h('span', { className: 'nm-ob-showcase-icon' }, sc.icon),
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                h('div', { className: 'nm-ob-showcase-title' }, sc.title),
+                h('div', { className: 'nm-ob-showcase-desc' }, sc.desc))))))
     } else if (stage === 'password') {
       body = h('form', { className: 'nm-ob-center nm-fr-page', onSubmit: setPasswordNow },
         h('h1', { className: 'nm-ob-title nm-ob-title-sm' }, t('frPasswordTitle')),
@@ -365,17 +394,29 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
           h(ChoiceRow, { title: t('frSourceCloud'), sub: t('frSourceCloudSub'), disabled: !status.signedIn, onClick: () => choose('cloud') }),
           h(ChoiceRow, { title: t('frOwnKey'), sub: t('frSourceOwnSub'), onClick: () => choose('own') })))
     } else if (stage === 'models') {
-      // the own-key step (C11): the region's first group with the ChatGPT row, more ways behind a link;
-      // a saved key or a finished sign-in turns Skip for now into Continue
+      const currentTask = showcases[selectedTask] ?? showcases[0]!
+      const hasModelReady = ownDone
+
       body = h(Page, {
-        title: t('frModelsTitle'),
-        sub: t('ownKeyStepSub'),
-        primary: ownDone ? { label: t('ownKeyStepDone'), onClick: leaveOwnKeyStep } : undefined,
-        secondary: ownDone ? undefined : { label: t('frSkipModels'), onClick: leaveOwnKeyStep },
+        title: t('frModelsHeading'),
+        sub: t('frModelsSub'),
+        wide: true,
         fine: t('frModelsFine'),
         t,
       },
-        h(OwnKeyStep, { t, onDone: onOwnDone }))
+        h('div', { className: 'nm-ob-task-context' },
+          h('span', { className: 'nm-ob-task-context-icon' }, currentTask.icon),
+          h('div', { className: 'nm-ob-task-context-main' },
+            h('span', { className: 'nm-ob-task-context-label' }, t('frTaskContextLabel')),
+            h('strong', { className: 'nm-ob-task-context-title' }, currentTask.title),
+            h('span', { className: 'nm-ob-task-context-hint' }, currentTask.reqHint))),
+        h(ModelChannelsStep, { t, statusReady: status.ready, cloudSignedIn: status.signedIn, onDone: onOwnDone, onCloudSignIn: () => setSignIn('identifier'), onCloudChoose: () => choose('cloud') }),
+        h('div', { className: 'nm-ob-footer-bar' },
+          h('div', { className: `nm-ob-footer-status${hasModelReady ? ' nm-status-ready' : ''}` },
+            hasModelReady ? `✓ ${t('frModelReady')}` : t('frModelNotReady')),
+          h('div', { className: 'nm-ob-footer-right' },
+            h(Pill, { onClick: leaveOwnKeyStep, className: 'nm-fr-primary' },
+              hasModelReady ? t('obContinue') : t('frSkipModels')))))
     } else if (stage === 'permissions') {
       body = h(PermissionsPage, { t, name, onDone: permissionsDone })
     } else {
@@ -389,15 +430,45 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
       })
     }
 
+    const canGoBack = stage === 'models' && !signIn
+    const goBack = () => {
+      if (stage === 'models') {
+        setWelcomeSeen(false)
+        setModelsSkipped(false)
+        void roomsCall('firstrun/set', { sourceChosen: null }).catch(() => undefined)
+      }
+    }
+
     return createPortal(
       h('div', { ref: layer, tabIndex: -1, className: `nm-ob${fading ? ' nm-ob-fading' : ''}`, role: 'dialog', 'aria-modal': true, 'aria-label': t('frWelcomeTitle'), 'data-shortcut-modal': 'onboarding' },
         h('div', { className: 'nm-ob-drag', 'data-window-drag': true }),
         h('div', { className: 'nm-fr-top' },
-          h(Dots, { count: 3, index: dotOf(stage) }),
+          canGoBack
+            ? h('button', { type: 'button', className: 'nm-fr-back-btn', 'aria-label': t('frPrevStep'), onClick: goBack },
+                h(IconChevronLeft, { size: 16 }),
+                h('span', null, t('frPrevStep')))
+            : null,
+          h(StepBar, { stage, t }),
           h('button', { type: 'button', className: 'nm-fr-gear', 'aria-label': t('frSettings'), title: t('frSettings'), onClick: () => { openSection('general'); finish() } }, h(IconSettings, { size: 18 }))),
         h('div', { className: 'nm-fr-scroll' }, body)),
       document.body)
   }
+}
+
+function StepBar({ stage, t }: { stage: Stage | null; t: Translate }): ReactNode {
+  const current = stage === 'welcome' ? 1 : stage === 'models' ? 2 : 3
+  const steps = [
+    { num: 1, label: t('frStepTask') },
+    { num: 2, label: t('frStepModel') },
+    { num: 3, label: t('frStepStart') },
+  ]
+  return h('div', { className: 'nm-ob-step-bar', 'aria-label': t('frProgress') },
+    steps.map((st, idx) =>
+      h(Fragment, { key: st.num },
+        idx > 0 ? h('div', { className: 'nm-ob-step-line' }) : null,
+        h('div', { className: `nm-ob-step-item${st.num < current ? ' nm-done' : st.num === current ? ' nm-active' : ''}` },
+          h('span', { className: 'nm-ob-step-num' }, st.num < current ? '✓' : String(st.num)),
+          h('span', { className: 'nm-ob-step-label' }, st.label)))))
 }
 
 function Dots({ count, index }: { count: number; index: number }): ReactNode {
@@ -409,21 +480,22 @@ function Dots({ count, index }: { count: number; index: number }): ReactNode {
  * One page as the phone lays it out: a hero, a title, a line under it, the content, the
  * primary pill, a plain-text secondary, fine print, and "Learn more" when there is a page.
  */
-function Page({ hero, title, sub, children, primary, secondary, fine, learnMore, t }: {
+function Page({ hero, title, sub, children, primary, secondary, fine, learnMore, t, wide = false }: {
   hero?: ReactNode
   title: string
-  sub: string
+  sub?: string
   children?: ReactNode
   primary?: { label: string; onClick(): void; disabled?: boolean } | undefined
   secondary?: { label: string; onClick(): void } | undefined
   fine?: string | undefined
   learnMore?: string | undefined
   t: Translate
+  wide?: boolean
 }): ReactNode {
-  return h('div', { className: 'nm-ob-center nm-fr-page' },
+  return h('div', { className: `nm-ob-center nm-fr-page${wide ? ' nm-fr-page-wide' : ''}` },
     hero ?? null,
     h('h1', { className: 'nm-ob-title nm-ob-title-sm' }, title),
-    h('p', { className: 'nm-ob-sub' }, sub),
+    sub ? h('p', { className: 'nm-ob-sub' }, sub) : null,
     children ?? null,
     primary ? h(Pill, { onClick: primary.onClick, disabled: primary.disabled, className: 'nm-ob-wide nm-fr-primary' }, primary.label) : null,
     secondary ? h('button', { type: 'button', className: 'nm-ob-skip', onClick: secondary.onClick }, secondary.label) : null,
