@@ -35,12 +35,11 @@ object NativeAccess {
         }
     }
 
-    fun protect(activity: Activity, dialog: Dialog) {
+    fun protect(activity: Activity, dialog: Dialog, onRevoked: () -> Unit = {}) {
         val owner = activity as? LifecycleOwner
-        if (owner == null) { dialog.dismiss(); activity.finish(); return }
+        if (owner == null) { onRevoked(); dialog.dismiss(); activity.finish(); return }
         val job = watchNativeAccess(AppAccess.locked, owner.lifecycleScope) {
-            dialog.dismiss()
-            activity.finish()
+            try { onRevoked() } finally { dialog.dismiss(); activity.finish() }
         }
         dialog.setOnDismissListener { job.cancel() }
     }
