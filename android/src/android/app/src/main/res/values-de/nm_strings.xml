@@ -1225,4 +1225,32 @@
     <string name="nm_context_compact_idle_timeout">Die Komprimierung wurde nach %1$d Sekunden ohne Antwort gestoppt (%2$d Modellaufrufe).</string>
     <string name="nm_context_compact_no_gain">Die Zusammenfassung hat den Kontext nicht verkürzt. Der ursprüngliche Inhalt wurde beibehalten.</string>
     <string name="nm_context_compact_incomplete">Das Modell hat keine vollständige Zusammenfassung zurückgegeben. Der ursprüngliche Kontext wurde beibehalten.</string>
+    <string name="nm_remote_ambiguous">Mehrere Geräte passen. Wähle ein Gerät unter Konto → Geräte.</string>
+    <string name="nm_remote_attachments">Geräteerwähnungen senden nur Text. Entferne vor dem Senden die Anhänge.</string>
+    <string name="nm_remote_no_answer">%1$s wurde ohne Antwort beendet.</string>
+    <string name="nm_remote_failed">%1$s hat nicht geantwortet: %2$s</string>
+    <string name="nm_remote_offline">%1$s ist offline.</string>
+    <string name="nm_remote_chat_busy">Warte, bis diese Unterhaltung fertig ist, bevor du eine Geräteaufgabe sendest.</string>
+
+    <string name="nm_reply_unread">Ungelesene Antwort</string>
+    <string name="nm_restore_recovered">Die unterbrochene Wiederherstellung wurde zurückgesetzt. Bei einem Fehler bleiben die Wiederherstellungsdaten für einen weiteren Versuch erhalten.</string>
+    <string name="nm_restore_recovery_failed">Die Wiederherstellung ist fehlgeschlagen. Die Wiederherstellungsdaten bleiben erhalten. App zum erneuten Versuch neu starten.</string>
+    <string name="nm_backup_resume">Sicherung fortsetzen</string>
+    <string name="nm_backup_discard">Unterbrochene Sicherung verwerfen</string>
+    <string name="nm_backup_resume_hint">Eine unterbrochene Sicherung wartet. Mit den ursprünglichen Optionen fortsetzen und bei Bedarf das Verschlüsselungspasswort erneut eingeben, oder verwerfen und neu beginnen.</string>
+<string name="nm_access_locked">nanoMuse ist gesperrt</string>
+<string name="nm_access_hint">Mit der Bildschirmsperre dieses Geräts bestätigen.</string>
+<string name="nm_access_unlock">Entsperren</string>
+<string name="nm_access_settings">App-Sperre</string>
+<string name="nm_access_on_exit">Beim Verlassen sperren</string>
+<string name="nm_access_never">Nie automatisch sperren</string>
+<string name="nm_access_seconds">%1$d Sekunden</string>
+<string name="nm_access_unavailable">Zuerst eine Bildschirmsperre auf diesem Gerät einrichten.</string>
+<string name="nm_session_protected">Geschützte Unterhaltung</string>
+<string name="nm_session_protect">Unterhaltung schützen</string>
+<string name="nm_session_unprotect">Unterhaltungsschutz entfernen</string>
+<string name="nm_session_settings">Sperrzeit für Unterhaltungen</string>
+
+    <string name="nm_coding_installed">Installiert</string>
+    <string name="nm_coding_not_installed">Nicht installiert</string>
 </resources>

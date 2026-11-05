@@ -4,24 +4,42 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+
 ### Cloud
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
+- **A visit that is both running and recent counts once in the demo per-day bars.** The bars concatenated the active and recent lists without the dedup the page's own table applies, so a running visit sat in both lists and its day counted it twice, and the bar total disagreed with the visits number printed beside it.
 
 - Kept stale admin-console responses from overwriting newer data, including responses that arrived after sign-out.
+- **One account's samples stay out of another account's drawer.** The account drawer re-targets in place when another account's link is clicked, and its samples tab ran its loads without a generation: an answer that started under the first account could land its rows under the second account's title. The tab now runs through the same `LatestRequest` guard the drawer's paged readers use.
 - Made the hub flood test use a controlled token-bucket clock so its burst and disconnect checks no longer depend on the test machine's speed.
+- **A legacy runtime's user agent is read the way the relay reads it.** The console's own classifier missed the `AsyncOpenAI/Python` token the Python runtime of 1.0.6 and earlier signed its model calls with, so those sessions and demo visitors showed as "other" wherever the console classifies client-side; the relay's `client.py` has carried the token since it first appeared, and the console's mirror of that list now does too.
 
+- Android and desktop inherited the relay's disclosed context and output limits when model fields were blank, refreshed those defaults without another sign-in, and preserved manual overrides. Discovered model capacities survived vision probes and individual lookups.
 - **A page that was asked for under an old filter no longer lands under the new one.** Both paged readers — the Turns page and an account's ledger and events tabs — had no guard on their in-flight requests: type in the search box while a "More" page is still loading over a slow link, and the old filter's rows appended themselves to the filtered list (its `finally` also cleared the new load's busy flag). Each load now carries a generation; a superseded page is dropped on arrival, in `useTurnPages` and `usePaged` alike.
+- **The activity feed keeps its filter's events under a slow answer.** The feed's own loader carried no generation: switch a kind chip while its first page was still in flight and the old kind's rows (or its error) landed under the new chip, and the 30-second visibility poll could replace a half-read "More" history mid-scroll. The feed now runs through the same `LatestRequest` guard the paged readers use, dropped on arrival when its filter moved.
 - **A turn keeps its own time in the record, and a slower record cannot overtake a later turn.** Each turn row took the second its background write landed in, and the account's turn list orders by that timestamp with the write's rowid beside it: a turn whose picture was still decoding could land behind a plain turn that answered after it, and read above it, newest first upside down. The timestamp is now taken when the answer leaves and each account's writes are chained in that order, so the list says what happened in the order it happened without making other accounts wait for its media.
 - **An expanded "More (N)" table keeps its rows through a poll.** Every poll hands the admin tables a freshly parsed array, and the expansion was reset on the array's arrival: click "More" on People or a Usage day's top accounts, wait out the two-minute poll, and the list snapped back to its first hundred or twenty-five rows while you were reading it. The expansion is kept unless the list itself no longer reaches it (`keptShown`), so a refresh of the same rows leaves the person where they scrolled to.
+- **A settings poll no longer replaces what the operator is typing.** The allowance and bonus fields and the whole nudges form reseeded their drafts on every poll answer, and every answer is a fresh object even when its values are unchanged: an operator two minutes into an edit silently had the fields snapped back to the server's values, and a Save after that wrote them. The drafts now reseed only when the server's values actually moved.
 - **The Usage page names a day with the site's calendar date, not the operator's browser.** The relay's day stamp is the site-local day's start, but the matrix labels, the day rows and weekday, the drill-down title and the hour tooltips all rendered it in the browser's timezone, so any operator outside the site's offset read every bar as the day before — and the date picker parsed the picked date at browser-local noon, which lands on the next site-day for browsers west of about UTC−4. Labels, weekday and picker now work at the site's `day_offset_h`, through `siteDay`/`siteWeekday`/`siteDayStamp` in the console's format library.
 - **The People page's sign-ups-per-day chart counts site-local days.** The bars were bucketed at UTC midnight while their labels rendered the browser's calendar, so for the primary UTC+8 audience a sign-up made between midnight and eight in the morning landed on the previous day's bar, and for a browser west of UTC every bar wore the date before. The buckets now start at the site's day boundary (`siteDayStart`), the same day the Usage page and the relay itself count.
+- **Every analytics chart names a day at the site's calendar, not the operator's browser.** The Usage and People pages learned to read day stamps at the site's `day_offset_h`; the shared `dayLabels` the other five pages use still rendered them browser-local, so an operator outside the site's offset read the Overview trend, the Activity feed, Data, Hands and Quality bars as the day before, and the same stamp wore different dates on different pages. The shared labels now take the offset (the overview answer carries it), and the inline day titles on Hands and Quality use it too.
 - **The relay's checks ran on Windows as well as Linux.** Both platforms checked the cloud service and built and tested its admin console. Changes to the showcase mirror also ran these checks because the cloud tests load those scripts. The committed-build check remained on Linux. ([#670](https://github.com/nano-muse/nanoMuse/pull/670))
 - **The local self-hosting script printed a working command for sign-in codes.** Its hint now enters `cloud/` before reading the relay logs, so it can be copied from the repository root. ([#716](https://github.com/nano-muse/nanoMuse/pull/716))
 - Added `--with-runtime` to self-hosting setup to start the web runtime beside the relay, retain its token and connect both containers on the relay network. The runtime stayed on loopback unless LAN access was explicitly selected.
 - Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
+
+- Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
+- Flagged recursive forced deletion when `rm` flags are separate arguments, without borrowing flags from another command or treating filenames after `--` as options.
+- Flagged Python directory removal through `Path(...).rmdir()` for approval, including inside the sandbox.
+
+- **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
+
+- Stopped timed-out remote tasks by their original call id, allowed the full 15-minute task budget from the runtime and iPhone, and kept late stop requests from cancelling a newer task. For #805.
+
+- Fixed the ChatGPT proxy failing to start after sign-in, which kept the desktop from adding its models.
 
 - Included data-directory skills, uploaded contact sources, phone and computer traces, pending scheduled deliveries and cached nudges in runtime data exports. The archive README named the deliberately excluded device credentials and sync state.
 
@@ -51,7 +69,29 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **Kept Daily, setup and avatar views on the newest refresh.** Overlapping loads no longer replace newer information or report old errors after leaving. Avatar refreshes preserve drafts and the current candidate choice, while a different drawing session requires a new choice.
+- **Kept skill suggestions through failed refreshes.** The chat slash menu retained its loaded skills when a reload failed and ignored superseded answers. Turning skills off also hid cached suggestions and disabled their keyboard completion.
+- **Kept the newest skills list when saves overlap.** Older responses no longer hide newly saved skills, failed refreshes keep the loaded list, and pending reads do not report errors after leaving the page.
+- **Kept memory lists and recent changes on the newest refresh.** Older responses no longer hide newly saved memories or restore a forgotten item. Failed refreshes preserve the loaded view, and pending reads no longer report errors after leaving the page.
+- **A provider answer that started before a sign-out no longer repopulates the cache after it.** Signing out invalidates the loaded provider view, but an `/api/providers` request already in flight kept its `then` attached, and when it landed it wrote the signed-out view back into the cache for every later reader until a forced reload. Each load now carries the generation it started under, and an answer whose generation was invalidated lands for its caller without repopulating the cache.
+- **A slower search answer no longer lands under a newer query.** The contacts search and the coding screen's recent-workspaces list both fired a request per query (or per picked agent) and took whatever answer arrived last: type past a slow request, or switch agents while one was still loading, and the earlier answer's results replaced the newer one's on screen. Both effects now drop answers that were superseded before they landed.
+
 ### Desktop
+
+- Kept in-flight conversation sync isolated across account changes and sign-out. Interrupted account changes kept sync paused across restarts until sign-in succeeded.
+- Remembered conversation-clear notifications across restarts and blocked cleared chats from task records, history, search, duplication and resume. Automatic subagent histories followed their parent; saved copies and ordinary archives stayed available. Local JSONL logs remained on disk. For #832.
+- Opened archived chats inside the chat column, with search and restore controls, instead of opening general settings. For #833.
+
+- **A coding retry after a dead chat starts its output from the new chat's first line.** The retry that follows a resume the CLI cannot serve cleared the accumulated output but kept the half-streamed line the dead chat had begun, and the new chat's first words arrived glued behind it. The stale partial line is dropped with the rest of the old attempt.
+- Kept a closed desktop window from turning an in-progress page load into a startup error. Errors from windows that remained open still surfaced, and tray reopen failures were handled.
+- **The desktop's own log steps aside at the runtime's rotation mark.** Every line the Host printed — stdout and stderr alike — was appended to `desktop.log` without ever being looked at again, so a long-lived install grew it without bound; the file the issue dialog asks for now steps aside as `desktop.log.1` once it passes 10 MB, the mark the runtime's own log rotates at.
+- **A port file keeps the origin the host remembered.** When something already held the remembered port — an orphaned Host of the app's own, after a kill — the app bound a fallback and wrote that fallback into the port file, so the origin the browser's storage lives at (`127.0.0.1:<port>`, the key to the preferences, the star asks' memory, the stage's place) drifted for good and everything kept there was left behind. A taken port now binds a fallback for that one launch and leaves the memory alone, so the origin comes back once the port's taker is gone.
+
+- **Staged the harness under a path with spaces.** On Windows npm and pnpm are .cmd shims, and a .cmd child can only be started through the shell, where cmd.exe splits an unquoted argument at its spaces: a staging directory or a checkout under a name like `John Doe` reached `pnpm pack` as two arguments and staging failed with "pnpm pack left no tarball". Child arguments with spaces are now quoted, so each one arrives as the single argument it was passed.
+
+- **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
+
+- Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
 
 - Changed desktop first run to choose an example task, connect a model and start a conversation.
 - Fixed the ChatGPT sign-in on the desktop showing the end of the terms notice as its error when the sign-in stopped early; it now says the sign-in closed before it finished.
@@ -62,6 +102,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept stable message IDs when retrying conversation uploads after a lost relay response.
 
 - Stopped coding-run child processes on Windows along with their parent CLI.
+- **A coding run's Chinese output arrives whole even when a pipe splits a character.** The run's line reader decoded each pipe read on its own, and a multi-byte character straddling two reads became replacement characters in the run's output and view, which for stream-JSON output is intermittent mojibake in the person's own text. Whole lines are now cut out of the accumulated bytes and decoded once complete.
 
 - Kept another device's working indicator when a different device finished a turn.
 
@@ -86,6 +127,33 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Allowed API-key Gemini providers to generate and edit avatar images through their native image models, recognised Nano Banana model names, and excluded Imagen from that route. For #834.
+
+- Closed native provider-import and permission dialogs when app access expired, cancelling pending permission choices.
+
+- Kept pending diagnostic exports paused until their own activity was resumed and app access was unlocked together.
+
+- Re-locked protected conversations when leaving a retained Muse tab with the On exit setting.
+
+- Added local device authentication for protected Android conversations, guarded exports and duplication, retained protection on copies, and saved new conversations before protecting them.
+
+- Added device authentication and configurable re-locking before Android app content or safe-mode diagnostics are shown, including diagnostic export after an external file picker.
+
+- Kept coding-agent filters readable on narrow screens and showed running, installed and not-installed states. For #829.
+- Carried bounded screen-task notes into subsequent requests for the same app and conversation, added an optional larger vertical scroll, and instructed the agent to retain complete Hands JSON results. For #817.
+
+- Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
+
+- Recovered interrupted Android restore categories before opening their repositories, retaining snapshots when recovery failed.
+
+- Android sent explicit device mentions directly through the Hub, displayed remote steps and streamed text, reused scoped approval cards, and stopped the exact remote call without starting a local model turn.
+
+- Marked successful background replies unread in both Android layouts and collapsed classic groups, cleared them when the visible conversation opened, and followed tab visibility and draft promotion.
+
+- Android listed online task-capable devices above files in the leading @ menu, showed device identity, and qualified duplicate names with their stable IDs.
+
+- Android displayed emoji avatars and their background colours from the account profile, kept them across restarts and account changes, and preserved them when renaming the agent or updating connectors.
+
 - **Kept built-in skills managed by the app.** Their contents remained readable and exportable, with enable switches available, while editing, importing over them and deleting them were blocked. For [#756](https://github.com/nano-muse/nanoMuse/issues/756).
 
 - **A `nanomuse-pc task` that does not run says so, instead of an empty answer.** The phone took the computer's wordless answer as success and told the model to pass it on, which read as *Done*; a task that did not run now comes back as a failure with the computer's own sentence, and a refusal names what happened instead of a status code. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
@@ -99,6 +167,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Kept System Auto reply speech on the chosen language-specific voice.** An inactive concrete voice later in the Voice Output group no longer overrides Auto. A concrete System voice explicitly selected for Voice Output still takes priority. For [#722](https://github.com/nano-muse/nanoMuse/issues/722).
 
 ### Project
+
+- Clarified the distinction between manual Cloud retries and automatic phone model-group fallback, including trigger differences, single-model groups and provider billing. For #838.
+
+- Documented launching Windows Desktop against a self-hosted relay, including profile override priority, separate account data and the Cloud proxy bypass. For #830.
 
 - Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
 

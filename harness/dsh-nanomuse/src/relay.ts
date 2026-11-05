@@ -110,6 +110,11 @@ export interface RecordView {
   keepDays: number
 }
 
+/** Capacities share Android's signed 32-bit range; booleans and coercions are not counts. */
+function positiveCapacity(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 2147483647 ? value : undefined
+}
+
 /** One model the account may use, as `GET /v1/models` lists it. */
 export interface RelayModel {
   id: string
@@ -122,6 +127,8 @@ export interface RelayModel {
   inputModalities: string[]
   /** What the relay says it is for (relay 0.1.34+): `chat`, `gui`, or both; absent on an older relay. */
   for?: string[]
+  contextWindow?: number
+  maxTokens?: number
 }
 
 export interface SignIn {
@@ -550,6 +557,8 @@ export class Relay {
     return (body.data ?? []).map((m) => {
       const arch = (m.architecture ?? {}) as Record<string, unknown>
       const extra = (m.nanomuse ?? {}) as Record<string, unknown>
+      const contextWindow = positiveCapacity(m.context_length)
+      const maxTokens = positiveCapacity(m.max_output_tokens)
       return {
         id: String(m.id ?? ''),
         name: String(m.name ?? m.id ?? ''),
@@ -557,6 +566,8 @@ export class Relay {
         recommended: Boolean(extra.recommended),
         ...(Array.isArray(extra.recommended_for) ? { recommendedFor: extra.recommended_for.map(String) } : {}),
         inputModalities: Array.isArray(arch.input_modalities) ? arch.input_modalities.map(String) : ['text'],
+        ...(contextWindow === undefined ? {} : { contextWindow }),
+        ...(maxTokens === undefined ? {} : { maxTokens }),
         ...(Array.isArray(extra.for) ? { for: extra.for.map(String) } : {}),
       }
     })

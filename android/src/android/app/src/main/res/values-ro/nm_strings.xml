@@ -1229,4 +1229,32 @@
     <string name="nm_context_compact_idle_timeout">Comprimarea s-a oprit după %1$d secunde fără răspuns (%2$d apeluri către model).</string>
     <string name="nm_context_compact_no_gain">Rezumatul nu a redus contextul. Conținutul original a fost păstrat.</string>
     <string name="nm_context_compact_incomplete">Modelul nu a returnat un rezumat complet. Contextul original a fost păstrat.</string>
+    <string name="nm_remote_ambiguous">Se potrivesc mai multe dispozitive. Alege din Cont → Dispozitive.</string>
+    <string name="nm_remote_attachments">Mențiunile dispozitivelor trimit doar text. Elimină atașamentele înainte de trimitere.</string>
+    <string name="nm_remote_no_answer">%1$s a terminat fără răspuns.</string>
+    <string name="nm_remote_failed">%1$s nu a răspuns: %2$s</string>
+    <string name="nm_remote_offline">%1$s este offline.</string>
+    <string name="nm_remote_chat_busy">Așteaptă încheierea acestei conversații înainte să trimiți o sarcină unui dispozitiv.</string>
+
+    <string name="nm_reply_unread">Răspuns necitit</string>
+    <string name="nm_restore_recovered">Restaurarea întreruptă a fost recuperată. Dacă recuperarea eșuează, datele se păstrează pentru o nouă încercare.</string>
+    <string name="nm_restore_recovery_failed">Recuperarea a eșuat. Datele de recuperare au fost păstrate. Repornește aplicația pentru a reîncerca.</string>
+    <string name="nm_backup_resume">Reia copia</string>
+    <string name="nm_backup_discard">Renunță la copia întreruptă</string>
+    <string name="nm_backup_resume_hint">Există o copie întreruptă. Reia cu opțiunile originale și introdu din nou parola dacă este necesar, sau renunță pentru a începe din nou.</string>
+<string name="nm_access_locked">nanoMuse este blocat</string>
+<string name="nm_access_hint">Confirmă cu blocarea ecranului acestui dispozitiv.</string>
+<string name="nm_access_unlock">Deblochează</string>
+<string name="nm_access_settings">Blocarea aplicației</string>
+<string name="nm_access_on_exit">Blochează la ieșire</string>
+<string name="nm_access_never">Nu bloca automat</string>
+<string name="nm_access_seconds">%1$d secunde</string>
+<string name="nm_access_unavailable">Configurează mai întâi blocarea ecranului acestui dispozitiv.</string>
+<string name="nm_session_protected">Conversație protejată</string>
+<string name="nm_session_protect">Protejează conversația</string>
+<string name="nm_session_unprotect">Elimină protecția conversației</string>
+<string name="nm_session_settings">Interval de blocare a conversațiilor</string>
+
+    <string name="nm_coding_installed">Instalat</string>
+    <string name="nm_coding_not_installed">Neinstalat</string>
 </resources>

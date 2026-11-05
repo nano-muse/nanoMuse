@@ -114,3 +114,9 @@ export const csvEscape = (v: unknown): string => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 export const toCsv = (cols: string[], rows: unknown[][]): string => [cols.join(","), ...rows.map((r) => r.map(csvEscape).join(","))].join("\n");
+
+/** Labels for site-local day starts, including a site configured for UTC. */
+export const dayLabels = (days: number[], offsetH = 0): string[] =>
+  days.map((d) => siteDay(d, offsetH).slice(5));
+export const dayTitles = (days: number[], offsetH = 0): string[] =>
+  days.map((d) => siteDay(d, offsetH));

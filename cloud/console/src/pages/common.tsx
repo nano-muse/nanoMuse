@@ -3,7 +3,7 @@
 
 import type { ReactNode } from "react";
 import { errorText } from "../App";
-import { dateOf, fmt, money, shortDay } from "../lib/format";
+import { fmt, money } from "../lib/format";
 import type { Query } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
 import type { KindRow, ModelRow } from "../lib/types";
@@ -26,9 +26,7 @@ export const Updated = ({ at }: { at: number }) => {
   return <span className="hint">{T.top.updated(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`)}</span>;
 };
 
-/** Day labels for a window of day starts. */
-export const dayLabels = (days: number[]) => days.map((d) => shortDay(d));
-export const dayTitles = (days: number[]) => days.map((d) => dateOf(d));
+export { dayLabels, dayTitles } from "../lib/format";
 
 export function KindRanks({ rows, metric = "cost" }: { rows: KindRow[]; metric?: "cost" | "requests" }) {
   const T = useT();

@@ -107,6 +107,8 @@ class WebAppActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // nanoMuse: a pinned web app waits behind the same device authentication gate.
+        if (io.github.nanomuse.guard.AppAccess.deferIfLocked(this)) return
 
         // Default state: draw under system bars but keep them visible.
         // Fullscreen toggle hides them on demand. Both bars are made

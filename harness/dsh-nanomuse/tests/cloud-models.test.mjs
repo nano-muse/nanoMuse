@@ -101,6 +101,37 @@ async function cloud({ signedIn = false, defaultModel, baseURL = 'https://relay.
 
 const BAILIAN_MODELS = ['deepseek-v4.1-flash', 'qwen3.8-27b', 'qwen3-vl-plus', 'qwen-image-3.0', 'wan2.2-i2v-flash']
 
+test('Cloud refresh persists capacity-only changes and preserves editable model limits', async () => {
+  const out = await cloud({ signedIn: true })
+  try {
+    out.svc.state.models = out.svc.state.models.map((m) => ({ ...m, inputModalities: ['text'] }))
+    let models = ACCOUNT_MODELS.filter((m) => m.kind === 'chat').map((m) => ({
+      ...m, inputModalities: ['text'], contextWindow: 98304, maxTokens: 4096,
+    }))
+    out.svc.relay.me = async () => (await out.state()).account
+    out.svc.relay.models = async () => models
+    out.svc.profile.pull = async () => undefined
+    out.settings[LLM_ROW].providers[PROVIDER_ID] = {
+      models: [{ id: models[0].id, contextWindow: 32000, maxTokens: 1024 }],
+    }
+    await NanomuseCloud.prototype.refresh.call(out.svc)
+    assert.equal(out.svc.capacityModels()[0].contextWindow, 98304)
+    assert.equal(out.settings[LLM_ROW].providers[PROVIDER_ID].models[0].contextWindow, 32000)
+    assert.equal(out.settings[LLM_ROW].providers[PROVIDER_ID].models[0].maxTokens, 1024)
+    assert.equal((await out.state()).models[0].contextWindow, 98304)
+    const raw = { nanomuse: { models: [{ id: models[0].id }] } }
+    const first = out.svc.providerDefaults(raw)
+    assert.equal(first.nanomuse.models[0].contextWindow, 98304)
+    assert.equal(out.svc.providerDefaults(raw), first)
+    models = models.map((m, i) => i === 0 ? { ...m, contextWindow: 65536 } : m)
+    await NanomuseCloud.prototype.refresh.call(out.svc)
+    assert.equal((await out.state()).models[0].contextWindow, 65536)
+    assert.equal(out.svc.providerDefaults(raw).nanomuse.models[0].contextWindow, 65536)
+    assert.notEqual(out.svc.providerDefaults(raw), first)
+    assert.equal(out.settings[LLM_ROW].providers[PROVIDER_ID].models[0].contextWindow, 32000)
+  } finally { await out.done() }
+})
+
 test('the public Cloud ignores retired media models left in an older local snapshot', async () => {
   assert.equal(relayMediaEnabled('https://cloud.nanomuse.cn/'), false)
   assert.equal(relayMediaEnabled('https://relay.example/v1'), true)
@@ -604,7 +635,7 @@ function fakeSessions(selections) {
       selections[sessionId] = { provider, model }
     },
   }
-  return { moved, ctx: { sessionController, get() { return undefined } } }
+  return { moved, ctx: { sessionController, sessions: { get() { return undefined } }, get() { return undefined } } }
 }
 
 test('picking the chat model moves the main chat and only it; the same pick twice writes nothing; without a main chat nothing moves', async () => {
@@ -615,7 +646,7 @@ test('picking the chat model moves the main chat and only it; the same pick twic
     // no main chat known yet: the slot moves, no session does
     assert.equal((await out.api('POST', '/chat-model', { model: 'deepseek-v4.1-flash', provider: PROVIDER_ID })).status, 200)
     assert.deepEqual(sessions.moved, [])
-    out.svc.sync = { state: { mainSession: 's-main' } }
+    out.svc.sync = { state: { mainSession: 's-main' }, isCleared: () => false }
     assert.equal((await out.api('POST', '/chat-model', { model: 'deepseek-v4.1', provider: PROVIDER_ID })).status, 200)
     // the main chat already answers through deepseek-v4.1: nothing written
     assert.deepEqual(sessions.moved, [])
@@ -638,7 +669,7 @@ test('the "Use it for" card moves the main chat to the own key too; a main chat 
   try {
     const sessions = fakeSessions({ 's-main': { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' } })
     out.svc.sessionCtx = sessions.ctx
-    out.svc.sync = { state: { mainSession: 's-main' } }
+    out.svc.sync = { state: { mainSession: 's-main' }, isCleared: () => false }
     await out.api('POST', '/providers/save', { id: 'bailian', apiKey: 'sk-own', baseURL: server.url })
     assert.deepEqual(sessions.moved, [])
     const adopted = await out.api('POST', '/providers/adopt', { id: 'bailian', slots: ['chat'] })
@@ -655,4 +686,14 @@ test('the "Use it for" card moves the main chat to the own key too; a main chat 
     await server.close()
     await out.done()
   }
+})
+
+
+test('an unreadable account state cannot silently discard cleared-session rules', async () => {
+  const out = await cloud()
+  try {
+    await writeFile(out.statePath, '{invalid-json')
+    await assert.rejects(out.svc.readState(), /refusing to discard saved conversation access rules/)
+    assert.equal(await readFile(out.statePath, 'utf8'), '{invalid-json')
+  } finally { await out.done() }
 })

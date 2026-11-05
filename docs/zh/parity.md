@@ -71,6 +71,8 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 | 编程助手（电脑上的 Cursor、Codex、Claude Code；还有 DeepSeek Harness，桌面版 1.0.4 起读取、运行时 1.0.5 起读取） | ✓ | ✓ 0.1.34 经 hub *(9)* | ✓ 「设置 → 编程助手」，先这台电脑；自己声明并应答 `coding.*` *(8)* | ✓ |
 | 账号的设备：远程控制、改名、忘记 | ✓ | ◐ 列表，Reach 面板 0.1.33 | ✓ | ✓ |
 | hub，出站：模型够得到账号的其他设备（`devices`、`device_*`、`delegate`、`@<device>`） | ✓ 「电脑」，Reach 的转派 | ◐ 手动的 Reach 面板，`@device` 发到 hub；第 9 轮起，在账号的设备列表里点一台在线设备也行，和 Android 一样；模型手里没有工具 *(29)* | ✓ `reach.ts` | ✓ 运行时的 `tools/devices.py` |
+| 明确的 @ 任务直达设备，显示文字、步骤并可停止 | ✓ 不经过本机模型委派，只发送文字 | ✓ #513 | #515 已支持作为目标流式回复；本次未核查发起端界面 | 本次未核查发起端界面 |
+| 消息开头的 @ 菜单中，在线设备列在文件之前 | ✓ 名称、图标，同名时用 ID 区分 | ✓ #506 | 本次未核查 | 本次未核查 |
 | hub，入站：这台设备回应别的设备（shell · 文件 · 打开 · 屏幕 · 通知 · 任务） | ✓ `HubActions` | ◐ 信息 · 打开 · 通知 · 任务；shell、文件和屏幕回答*不支持* *(10)* | ✓ `actions.ts` | ✓ 运行时；浏览器标签页不算一台设备 |
 | 手：这台设备自己的屏幕当手 | ✓ | n/a *(10)* | ✓ Linux X11（Wayland *(21)*）；macOS 上一次一个窗口、鼠标仍归人、按 App 授权、光晕和胶囊不进截图 *(19)*；Windows 待试 *(31)* | n/a |
 | 反馈问题：点一下打开一个 GitHub issue | ✓ 设置 → 账号 | ✓ 关于 → 「报告问题」 | ✓ 角落菜单；在外壳里截图存到「下载」，issue 带着内容打开 | ✓ 设置 → 反馈 |
@@ -85,7 +87,7 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 |---|---|---|---|---|
 | 形象工作室：生成、挑选、摆姿势；形象在各设备间共享 | ✓ | ✓ 0.1.33 *(11)* | ✓ | ✓ |
 | 画出来的形象的短视频（待命 · 干活中 · 等你回复 · 搞定；`wan2.2-i2v-flash`；「换形象后自动生成动态」） | ✓ | ✓ 0.1.35 | ✓ 0.1.35 页眉、侧栏、胶囊 | — *(27)* |
-| Emoji 形象 | ◐ 退回小龙 *(12)* | ✓ 1.0.5 *(12)* | ✓ | ✓ |
+| Emoji 形象 | ✓ 接收档案中的 emoji 和颜色，保存在本机 *(12)* | ✓ 1.0.5 *(12)* | ✓ | ✓ |
 | 主题色色块 | — | — | — 0.1.33 移除 *(13)* | — |
 | 强调色跟着形象走 | ✓ | ✓ | ✓ | ✓ |
 | 房间：动态 · 点子 · 目标 · 资源库 | ✓ | ✓ 0.1.34，带调度器 *(11)* | ✓ 0.1.34 用手机的围栏协议 | ✓ |
@@ -121,7 +123,7 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 9. **iOS · 编程助手。** 0.1.34 做完（`NanoMuseCoding.swift`，hub 的 `coding.*`）。
 10. **iOS · 手。** iOS 不让一个 App 操控另一个；App Intents / 快捷指令是那扇门。不打算做成「手」。0.1.36 定下：设置里有那一行（「Hands：iPhone 上不可用」），点开是一页，说明为什么，以及账号上的一台电脑能做什么；App 开着时，iPhone 自己的 Muse 接受其他设备发来的 `task` 调用（`@iPhone …`）。
 11. **iOS · Muse 外壳。** 0.1.33 在 iPhone 上做完；0.1.34 起动态和目标是真的（`NanoMuseScheduler.swift`：回到前台时补跑、`BGAppRefreshTask`、到点的本地通知），iPad 也跑这个外壳，外壳和页眉的开关在 nanoMuse 设置页里，工作室通过你自己的百炼 key 画图（或者使用由运营者明确开启旧媒体代理的自建中继）。还剩的：例程在 iOS 上从不在后台跑，刷新任务只负责发提醒；文案就是这么写的（*到点时手机提醒你打开它*）；hub 这条路（账号上的一台电脑替它跑）仍然是稳妥的那条。iPad 的布局就是放大的 iPhone 布局。0.1.35 定下：不单独做分栏布局。
-12. **Android · Emoji 形象。** 在网页或桌面上把形象设成 emoji，Android 上显示的是小龙。小问题。iOS 从 1.0.5 起会显示它。
+12. **Android · Emoji 形象。** 已完成：网页或桌面选定的 emoji 和颜色会显示在 Android 上，重启和切换账号后仍保留。在手机上选择 emoji 留待后续。
 13. **主题色色块。** 0.1.33 定下：从桌面移除；到处一条规则，强调色跟着形象走。
 14. **Android · 记忆作为一个房间。** 手机上它是一个设置页，别处是一个房间。设计上的取舍。
 15. **桌面上的浏览器视图。** 聊天里的轨迹展示手的动作；像网页版那样的页面视图没有。设计上的取舍。
@@ -161,3 +163,14 @@ nanoMuse 是同一个智能体，在每台设备上都是它：手机（Android�
 - 版本检查在每个客户端上按同样的顺序读同样的两个来源：`https://nanomuse.cn/dl/index.json`，然后 GitHub 的 `releases/latest`；缓存一天；那一行永远也显示已安装的版本。
 - 对话同步从四个客户端和一个中继说同一种线路格式（`docs/cloud.md` 里的约定 C7）：`cloud/nanomuse_cloud/sync.py`、`nanomuse/sync/`（运行时和网页）、`harness/dsh-nanomuse/src/sync.ts`（桌面）、`io.github.nanomuse.sync`（Android）、`NanoMuse/NanoMuseSync.swift`（iOS）。每个客户端都先应用一页的对话再应用它的消息，只在拉取时移动游标；每个客户端只推送这个人的话和最终答复（绝不推送工具步骤、工具结果或系统提示），例程、目标、动态和替另一台设备干的活都留在家里。
 - `ideas.en.json` / `ideas.zh.json` 是同一个文件存四份（Android 资源、iOS Resources、`harness/dsh-nanomuse/assets`、`web/src/ideas`）；某一份漂移时 harness 和网页的测试会失败。
+
+| 功能 | Android | iOS |
+|---|---|---|
+| 继续中断的备份 | ✓ 未发布，见 [Android](android.md#export-resume) | ✓ |
+| 中断还原的恢复 | ✓ 未发布，见 [Android](android.md#restore-recovery) | ✓ |
+| 未读回复 | ✓ 未发布，见 [Android](android.md#unread-replies) | ✓ |
+| 应用锁 | ✓ 未发布，见 [Android](android.md#app-lock) | ✓ |
+
+| 功能 | Android | iOS |
+|---|---|---|
+| 受保护的对话 | ✓ 未发布，见 [Android](android.md#session-lock) | ✓ |

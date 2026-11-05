@@ -1602,11 +1602,15 @@ class ChatViewModel(
     /** Live-filtered candidate list. Combines the index's [FileMentionIndex.entries]
      * with [mentionFilter] so matches refresh as the user types and as the
      * background scan emits more entries. Capped at 50 like iOS. */
+    // nanoMuse: online devices share the file menu, only for a leading mention.
     val mentionEntries: StateFlow<List<FileMentionIndex.Entry>> = combine(
-        fileMentionIndex.entries,
-        _mentionFilter,
-    ) { _, filter -> fileMentionIndex.matches(filter, limit = 50) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        fileMentionIndex.entries, _mentionFilter, _mentionAnchor, _inputText, io.github.nanomuse.hub.Hub.devices,
+    ) { _, filter, anchor, text, devices ->
+        io.github.nanomuse.sync.DeviceMentionMenu.entries(
+            text, anchor, filter, devices.filter { it.id != io.github.nanomuse.hub.Hub.deviceId(context) },
+            fileMentionIndex.matches(filter, limit = 50),
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val isMentionScanning: StateFlow<Boolean>
         get() = fileMentionIndex.isScanning
@@ -1700,8 +1704,9 @@ class ChatViewModel(
         return if (groupLimit != null) minOf(window, groupLimit) else window
     }
 
+    // nanoMuse: the usage sheet follows refreshed endpoint metadata and live overrides.
     val currentModelMaxOutputTokens: Int?
-        get() = currentModel?.maxOutputTokens
+        get() = (currentProvider?.let(::nmResolvedModel) ?: currentModel)?.maxOutputTokens
 
     // ── Session token usage (iOS parity: TokenUsageSheet data) ─────────────
 
@@ -3418,8 +3423,14 @@ class ChatViewModel(
         sessionId.substringAfter("__fld__", "").substringBefore("__grp__")
             .takeIf { it.isNotEmpty() }
 
-    /** The real session ID (same as sessionId for existing sessions, generated on first message for drafts). */
+    // nanoMuse: observe draft promotion so presence follows the ID used by completion events.
+    private val nmDisplayedSessionId = MutableStateFlow(sessionId)
+    val displayedSessionId: StateFlow<String> = nmDisplayedSessionId.asStateFlow()
     internal var realSessionId: String = if (isDraft) "" else sessionId
+        set(value) {
+            field = value
+            nmDisplayedSessionId.value = value.ifEmpty { sessionId }
+        }
 
     // nanoMuse: the first conversation — scripted opening, "what should I call
     // you?", then the name chooser. Logic lives in io.github.nanomuse.onboarding;
@@ -3756,6 +3767,9 @@ class ChatViewModel(
     }
 
     /** Ensure the session exists in the database. Called before first message. */
+    // nanoMuse: called only after device authentication, never persist protection against a draft key.
+    suspend fun ensureSessionForProtection(): String = ensureSession()
+
     private suspend fun ensureSession(): String {
         if (realSessionId.isNotEmpty()) return realSessionId
         val modelId = currentModel?.id ?: providerRepository.allVisibleEntries().firstOrNull()?.model?.id ?: "unknown"
@@ -4992,6 +5006,8 @@ class ChatViewModel(
         runCatching {
             java.io.File(context.filesDir, "browser_tabs/$sid.json").delete()
         }
+        // nanoMuse: invalidate completed and in-flight Hands notes before clearing this conversation.
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(sid)
         // Persist: drop messages + compact markers. Files (workspace,
         // attachments, offloads) intentionally retained.
         viewModelScope.launch {
@@ -5664,8 +5680,8 @@ class ChatViewModel(
                     // non-null excerpt. Reading _messages here is safe:
                     // we're in the finally block of the agent loop and
                     // the stream has already flushed its last delta.
-                    publishOverlayReplyExcerpt(activeSessionId)
-                    SessionActivityTracker.setInactive(activeSessionId)
+
+                    finishTrackedReply(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
                     AppLogger.info(TAG_STREAM, "$label streamJob FINALLY exit")
                 }
@@ -6275,16 +6291,75 @@ class ChatViewModel(
     fun nmTakeCountableTurn(): Boolean = nmCountableTurn.also { nmCountableTurn = false }
 
     fun sendMessage(text: String) {
-        // nanoMuse: "change your avatar to …" (and a pick while the options are
-        // up) is handled in the app, not by the model.
+        // nanoMuse: explicit device work is routed before any local model or avatar action.
+        if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
+                _attachments.value.isNotEmpty() || _pastedTexts.value.isNotEmpty(), _isCompacting.value)) return
+        if (_isStreaming.value) { enqueuePrompt(text); return }
         if (nmInterceptAvatar(text)) { nmCountableTurn = false; return }
-        // nanoMuse: "@Mac …" opens a turn for that device — the mention comes out of the text,
-        // a one-turn note sends the work there through nanomuse-pc (contract C7, rule 8).
-        val nmText = io.github.nanomuse.sync.DeviceMention.apply(context, realSessionId.ifEmpty { sessionId }, text)
-        // nanoMuse: during the first conversation the text goes to the model as
-        // it is; the model says what it meant in a `nanomuse-naming` block and
-        // nmAfterTurn moves the phase (see FirstConversation).
-        sendMessage(nmText, skipContextCheck = false)
+        sendMessage(text, skipContextCheck = false)
+    }
+
+    // nanoMuse: only the adapter touches upstream state; the lifecycle lives in RemoteChatBridge.
+    private val nmRemoteBridge: io.github.nanomuse.sync.RemoteChatBridge by lazy {
+        val host = object : io.github.nanomuse.sync.RemoteChatBridge.Host {
+            override val busy: Boolean get() = _isStreaming.value
+            override fun setBusy(value: Boolean) { _isStreaming.value = value }
+            override fun error(issue: io.github.nanomuse.sync.RemoteChatBridge.Issue, device: String) {
+                val resource = when (issue) {
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.AMBIGUOUS -> R.string.nm_remote_ambiguous
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.OFFLINE -> R.string.nm_remote_offline
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.ATTACHMENTS -> R.string.nm_remote_attachments
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.BUSY -> R.string.nm_remote_chat_busy
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.FAILED -> R.string.nm_hub_err_generic
+                }
+                _error.value = context.getString(resource, device)
+            }
+            override fun clearDraft() {
+                _error.value = null; _inputText.value = ""; _canResume.value = false
+            }
+            override fun restoreDraft(text: String) { if (_inputText.value.isEmpty()) _inputText.value = text }
+            override suspend fun session(): String = ensureSession()
+            override suspend fun user(sessionId: String, text: String) = nmAppendUserLine(sessionId, text)
+            override fun started(sessionId: String) {
+                SessionActivityTracker.setActive(sessionId) { nmRemoteBridge.cancel() }
+            }
+            override fun ended(sessionId: String, completed: Boolean) {
+                if (!completed) SessionActivityTracker.markReplyIncomplete(sessionId)
+                publishOverlayReplyExcerpt(sessionId)
+                SessionActivityTracker.setInactive(sessionId)
+            }
+            override fun show(id: String, task: io.github.nanomuse.sync.RemoteChatBridge.Task) {
+                val message = ChatMessage(id = "nm_remote_$id", role = "assistant", content = task.text,
+                    toolBlocks = task.blocks, isStreaming = true, isAwaitingModelResponse = task.blocks.size <= 1)
+                _messages.value = if (_messages.value.any { it.id == message.id }) _messages.value.map { if (it.id == message.id) message else it } else _messages.value + message
+            }
+            override suspend fun finish(sessionId: String, id: String, task: io.github.nanomuse.sync.RemoteChatBridge.Task) {
+                nmAppendAssistantLine(sessionId, task.text)
+                val savedId = _messages.value.lastOrNull()?.id
+                _messages.value = _messages.value.filterNot { it.id == "nm_remote_$id" }.map {
+                    if (it.id == savedId) it.copy(toolBlocks = task.blocks, error = if (task.failed) task.text else null) else it
+                }
+            }
+            override fun afterTurn() { nmSendNextQueued() }
+        }
+        io.github.nanomuse.sync.RemoteChatBridge(viewModelScope, host) { device, text, id ->
+            io.github.nanomuse.sync.RemoteTaskChat(context, device, text, id)
+        }
+    }
+
+    private fun nmSendNextQueued() {
+        if (_isStreaming.value || _promptQueue.value.isEmpty()) return
+        val next = _promptQueue.value.first()
+        _promptQueue.value = _promptQueue.value.drop(1)
+        _messages.value = _messages.value.filterNot { it.queuedPromptId == next.id }
+        val draft = _inputText.value
+        val draftAttachments = _attachments.value
+        _attachments.value = next.attachments
+        sendMessage(next.text)
+        if (_inputText.value.isEmpty() || _inputText.value == draft) {
+            _inputText.value = draft
+            _attachments.value = draftAttachments
+        }
     }
 
     // ─── nanoMuse: changing the face from the chat ─────────────────────────
@@ -6998,8 +7073,8 @@ class ChatViewModel(
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "send streamJob FINALLY exit")
                     }
@@ -7356,8 +7431,8 @@ class ChatViewModel(
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "retryLast streamJob FINALLY exit")
                     }
@@ -11599,8 +11674,19 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }?.content
         SessionActivityTracker.publishLastReply(sessionId, text)
     }
+    // nanoMuse: every stream path shares completion classification before publishing its badge.
+    private suspend fun finishTrackedReply(id: String) {
+        if (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isCancelled == true) {
+            SessionActivityTracker.markReplyIncomplete(id)
+        }
+        publishOverlayReplyExcerpt(id)
+        SessionActivityTracker.setInactive(id)
+    }
+
 
     fun cancelStream() {
+        // nanoMuse: Stop belongs to the remote call; no local shell was started.
+        if (nmRemoteBridge.cancel()) return
         AppLogger.info(TAG_STREAM, "cancelStream invoked _isStreaming=false (sid=$activeSessionId)")
         if (_isStreaming.value) io.github.nanomuse.ui.feedback.TurnFeedback.stopped(activeSessionId) // nanoMuse: the record hears the Stop; the chat asks why, once (relay 0.31)
         streamJob?.cancel()
@@ -11620,10 +11706,13 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // surface any reply we already streamed + tag outcome as
         // Cancelled so the overlay's glyph reflects the actual end
         // state (⊘) instead of carrying over the prior tool's outcome.
+        // nanoMuse: cancellation must be recorded before the immediate tracker teardown.
+        SessionActivityTracker.markReplyIncomplete(activeSessionId)
         publishOverlayReplyExcerpt(activeSessionId)
         SessionActivityTracker.clearToolRunning(com.openminis.app.service.ToolOutcome.Cancelled)
         SessionActivityTracker.setInactive(activeSessionId)
         if (isDraft && realSessionId.isNotEmpty() && activeSessionId != sessionId) {
+            SessionActivityTracker.markReplyIncomplete(sessionId)
             SessionActivityTracker.setInactive(sessionId)
         }
         // Stop whichever shell the agent loop is actually dispatching against.
@@ -11752,6 +11841,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         AppLogger.error(TAG_STREAM, "resumeQueueAfterCancel drain EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "Queued drain error (resumeQueueAfterCancel)", e)
                         setInlineError(e.message ?: "Unknown error")
+                        // nanoMuse: a failed resumed run is not a new unread answer.
+                        SessionActivityTracker.markReplyIncomplete(activeSessionId)
                     } finally {
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY enter")
                         // [T-android-overlay-reply-status-34599] Surface
@@ -11761,8 +11852,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY exit")
                     }
@@ -12039,6 +12129,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         AppLogger.error(TAG_STREAM, "resume runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "Agent loop error (resume)", e)
                         setInlineError(e.message ?: "Unknown error")
+                        // nanoMuse: a failed resumed run is not a new unread answer.
+                        SessionActivityTracker.markReplyIncomplete(activeSessionId)
                     } finally {
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY enter")
                         // [T-android-overlay-reply-status-34599] Surface
@@ -12048,8 +12140,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY exit")
                     }
@@ -12101,12 +12192,16 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
     fun cleanupIfEmptyOnExit() {
         val sid = realSessionId
         if (sid.isEmpty()) return
+        // nanoMuse: explicitly protected empty conversations are intentional saved rows.
+        if (io.github.nanomuse.guard.SessionAccess.isProtected(sid)) return
         if (_isStreaming.value) return
         if (_attachments.value.isNotEmpty()) return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val count = chatRepository.messageCount(sid)
                 if (count > 0) return@launch
+                // nanoMuse: protection may have been enabled while the message count was loading.
+                if (io.github.nanomuse.guard.SessionAccess.isProtected(sid)) return@launch
                 AppLogger.info(
                     TAG,
                     "cleanupIfEmptyOnExit: deleting empty session $sid (no persisted messages)",

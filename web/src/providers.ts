@@ -161,11 +161,13 @@ export interface ProvidersInfo extends Omit<ProvidersView, "capabilities" | "reg
 
 let cached: ProvidersInfo | null = null;
 let inflight: Promise<ProvidersInfo> | null = null;
+let generation = 0;
 
 export async function loadProviders(force = false): Promise<ProvidersInfo> {
   if (cached && !force) return cached;
   if (inflight && !force) return inflight;
-  inflight = api
+  const mine = ++generation;
+  const load = api
     .providers()
     .then((v) => ({ ...v, capabilities: v.capabilities ?? null, source: "runtime" as const }))
     .catch(() => ({
@@ -177,16 +179,21 @@ export async function loadProviders(force = false): Promise<ProvidersInfo> {
       source: "bundled" as const,
     }))
     .then((v) => {
-      cached = v;
-      inflight = null;
+      // an invalidation since this load started (a sign-out, a finished sign-in)
+      // must not have the old view written back over it
+      if (mine === generation) cached = v;
+      if (inflight === load) inflight = null;
       return v;
     });
-  return inflight;
+  inflight = load;
+  return load;
 }
 
 /** Forget what was loaded (after the model was changed or a sign-in finished). */
 export function invalidateProviders(): void {
   cached = null;
+  inflight = null;
+  generation += 1;
 }
 
 export function useProviders(version = 0): ProvidersInfo | null {

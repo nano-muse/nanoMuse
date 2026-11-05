@@ -1221,4 +1221,32 @@
     <string name="nm_context_compact_idle_timeout">Pemadatan berhenti setelah %1$d detik tanpa respons (%2$d panggilan model).</string>
     <string name="nm_context_compact_no_gain">Ringkasan tidak memperpendek konteks. Konten asli tetap disimpan.</string>
     <string name="nm_context_compact_incomplete">Model tidak mengembalikan ringkasan lengkap. Konteks asli tetap disimpan.</string>
+    <string name="nm_remote_ambiguous">Lebih dari satu perangkat cocok. Pilih di Akun → Perangkat.</string>
+    <string name="nm_remote_attachments">Sebutan perangkat hanya mengirim teks. Hapus lampiran sebelum mengirim.</string>
+    <string name="nm_remote_no_answer">%1$s selesai tanpa jawaban.</string>
+    <string name="nm_remote_failed">%1$s tidak menjawab: %2$s</string>
+    <string name="nm_remote_offline">%1$s sedang offline.</string>
+    <string name="nm_remote_chat_busy">Tunggu percakapan ini selesai sebelum mengirim tugas ke perangkat.</string>
+
+    <string name="nm_reply_unread">Balasan belum dibaca</string>
+    <string name="nm_restore_recovered">Pemulihan yang terhenti telah dipulihkan. Jika gagal, data pemulihan disimpan untuk percobaan berikutnya.</string>
+    <string name="nm_restore_recovery_failed">Pemulihan gagal. Data pemulihan disimpan. Mulai ulang aplikasi untuk mencoba lagi.</string>
+    <string name="nm_backup_resume">Lanjutkan pencadangan</string>
+    <string name="nm_backup_discard">Buang cadangan yang terhenti</string>
+    <string name="nm_backup_resume_hint">Ada pencadangan yang terhenti. Lanjutkan dengan opsi asli dan masukkan kembali kata sandi jika diperlukan, atau buang untuk memulai ulang.</string>
+<string name="nm_access_locked">nanoMuse terkunci</string>
+<string name="nm_access_hint">Konfirmasi dengan kunci layar perangkat ini.</string>
+<string name="nm_access_unlock">Buka kunci</string>
+<string name="nm_access_settings">Kunci aplikasi</string>
+<string name="nm_access_on_exit">Kunci saat keluar</string>
+<string name="nm_access_never">Jangan kunci otomatis</string>
+<string name="nm_access_seconds">%1$d detik</string>
+<string name="nm_access_unavailable">Atur kunci layar pada perangkat ini terlebih dahulu.</string>
+<string name="nm_session_protected">Percakapan terlindungi</string>
+<string name="nm_session_protect">Lindungi percakapan</string>
+<string name="nm_session_unprotect">Hapus perlindungan percakapan</string>
+<string name="nm_session_settings">Batas waktu kunci percakapan</string>
+
+    <string name="nm_coding_installed">Terinstal</string>
+    <string name="nm_coding_not_installed">Belum terinstal</string>
 </resources>

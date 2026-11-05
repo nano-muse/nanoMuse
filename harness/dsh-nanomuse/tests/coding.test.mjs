@@ -543,6 +543,46 @@ test('runner: a failed resume of an unknown session goes out again as a new chat
   })
 })
 
+/** A fake `cursor-agent`: a resume of a dead chat streams half a line before the CLI
+ * admits it knows no such session; the fresh chat that follows answers from a delta. */
+async function fakeCursorDeadDelta(dir) {
+  const script = join(dir, 'fake-cursor-dead-delta.mjs')
+  await writeFile(
+    script,
+    `
+const args = process.argv.slice(2)
+const text = args[args.length - 1]
+const out = (o) => process.stdout.write(JSON.stringify(o) + '\\n')
+if (args.includes('--resume')) {
+  out({ type: 'assistant', message: { content: [{ type: 'text', text: 'half a sentence from the dead chat' }] }, timestamp_ms: 1 })
+  console.error('No conversation found with session ID: ghost')
+  process.exit(1)
+}
+out({ type: 'system', subtype: 'init', session_id: 'fresh-1', model: 'fake' })
+out({ type: 'assistant', message: { content: [{ type: 'text', text: 'Fresh start: ' + text }] }, timestamp_ms: 2 })
+out({ type: 'result', result: 'Fresh start: ' + text, session_id: 'fresh-1', duration_ms: 3 })
+`,
+  )
+  const bin = join(dir, 'bin')
+  await mkdir(bin, { recursive: true })
+  const cli = join(bin, 'cursor-agent')
+  await writeFile(cli, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
+  await chmod(cli, 0o755)
+  return cli
+}
+
+test('runner: the retry after an unknown session does not splice in the dead chat\'s half line', { skip: !posix }, async () => {
+  await scratch(async (dir) => {
+    const cli = await fakeCursorDeadDelta(dir)
+    const events = []
+    const run = await startRun({ agent: 'cursor', text: 'again', sessionId: 'ghost', which: () => cli, onEvent: (e) => events.push(e), timeoutMs: 20_000, readerEnv: { NANOMUSE_CODING_HOME: join(dir, 'nohome') } })
+    assert.equal(run.status, 'done', run.error)
+    assert.equal(run.view().output, 'Fresh start: again')
+    assert.equal(run.view().session_id, 'fresh-1')
+    assert.ok(events.some((e) => e.kind === 'tool' && e.phase === 'note'), 'the apps are told the chat went out as a new one')
+  })
+})
+
 test('runner: an error result and a missing CLI are failed runs', { skip: !posix }, async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir, { fail: true })
@@ -674,4 +714,65 @@ test('service: another computer’s agents through the hub, and a remote send fo
   assert.equal(done.device, 'Studio')
   assert.ok(bus.every((m) => m.device === 'Studio'))
   assert.deepEqual(hub.calls[hub.calls.length - 1].args, { agent: 'codex', text: 'build it', wait: true })
+})
+
+test('remote: a tool call counts once whatever phases the CLI emits, and notes never', async () => {
+  const svc = new CodingService({ hub: fakeHub(), env: { ...process.env, NANOMUSE_CODING_HOME: '/nonexistent/nanomuse-test' } })
+  svc.remote = async (_device, _action, _args, onEvent) => {
+    onEvent({ kind: 'tool', text: 'started a call', phase: 'started' })
+    onEvent({ kind: 'tool', text: 'the call finished', phase: 'completed' })
+    onEvent({ kind: 'tool', text: 'an IDE-only note', phase: 'note' })
+    onEvent({ kind: 'text', text: 'done text' })
+    return { id: 'run_x', agent: 'codex', session_id: 's1', asked_session_id: 's1', workspace: '', text: 'do it',
+      started_at: 1, ended_at: 2, status: 'done', output: 'done text', resumed: false, error: '', tools: 1 }
+  }
+  const view = await svc.remoteSend('other-pc', { agent: 'codex', text: 'do it' })
+  assert.equal(view.tools, 1, 'one tool call is one step, on whatever computer it ran')
+})
+
+test('remote: streamed tool counts match each runner before a final result arrives', async () => {
+  const cases = {
+    codex: [
+      { type: 'item.started', item: { type: 'command_execution', command: 'test' } },
+      { type: 'item.completed', item: { type: 'command_execution', command: 'test' } },
+      { type: 'item.completed', item: { type: 'patch' } },
+    ],
+    dsh: [{ type: 'tool_call', tool: 'shell' }, { type: 'tool_result', status: 'completed' }],
+    cursor: [{ type: 'tool_call', subtype: 'started' }, { type: 'tool_call', subtype: 'completed' }],
+    claude: [{ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'shell' }] } }],
+  }
+  for (const [agent, frames] of Object.entries(cases)) {
+    const svc = new CodingService({ hub: fakeHub(), env: { ...process.env, NANOMUSE_CODING_HOME: '/nonexistent/nanomuse-test' } })
+    const local = new Run('local', agent, '', '', 'test')
+    let onEvent
+    let reject
+    svc.remote = (_device, _action, _args, callback) => {
+      onEvent = callback
+      return new Promise((_resolve, fail) => { reject = fail })
+    }
+    const shadow = await svc.remoteSend('other-pc', { agent, text: 'test' })
+    for (const frame of frames) {
+      for (const event of normalise(agent, frame, local)) onEvent(event)
+      assert.equal(svc.listRuns().find((run) => run.id === shadow.id).tools, local.tools, agent)
+    }
+    onEvent({ kind: 'tool', phase: 'note', text: 'note' })
+    reject(new Error('connection lost before the final result'))
+    await new Promise((resolve) => setImmediate(resolve))
+    const failed = svc.listRuns().find((run) => run.id === shadow.id)
+    assert.equal(failed.status, 'failed')
+    assert.equal(failed.tools, local.tools, 'a missing result must not change the count')
+  }
+})
+
+test('remote: a final count reconciles missed events and ignores invalid values', async () => {
+  for (const [tools, expected] of [[3, 3], [0, 0], [undefined, 1], [-1, 1], [NaN, 1], ['3', 1]]) {
+    const svc = new CodingService({ hub: fakeHub(), env: { ...process.env, NANOMUSE_CODING_HOME: '/nonexistent/nanomuse-test' } })
+    svc.remote = async (_device, _action, _args, onEvent) => {
+      onEvent({ kind: 'tool', phase: 'completed' })
+      return { status: 'done', tools }
+    }
+    const shadow = await svc.remoteSend('other-pc', { agent: 'codex', text: 'test' })
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(svc.listRuns().find((run) => run.id === shadow.id).tools, expected)
+  }
 })

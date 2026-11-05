@@ -58,4 +58,22 @@ class HubTasksTest {
         assertFalse("forgotten after it finished", t.finished("c1"))
         assertNull(t.find("desk", "c1", null))
     }
+
+    @Test fun `a delayed stop for a finished call never falls back to the next conversation run`() {
+        val t = HubTasks()
+        t.started("old", "desk", "from-desk", "old-session")
+        t.finished("old")
+        t.started("next", "desk", "from-desk", "new-session")
+        assertNull(t.find("desk", "old", null))
+        assertNull(t.find("desk", "missing", "from-desk"))
+        assertEquals("new-session", t.find("desk", null, null))
+    }
+
+    @Test fun `conversation lookup selects only the requesting device's run`() {
+        val t = HubTasks()
+        t.started("other", "laptop", "notes", "other-session")
+        t.started("own", "desk", "notes", "own-session")
+        assertEquals("own-session", t.find("desk", null, "notes"))
+        assertNull(t.find("desk", "other", "notes"))
+    }
 }

@@ -720,6 +720,47 @@ def test_the_cli_usage_refuses_when_signed_out(cli_home: Path):
     assert json.loads(out.stdout.strip())["code"] == "not_signed_in"
 
 
+def test_the_cli_proxy_emits_ready_with_models(cli_home: Path, monkeypatch: pytest.MonkeyPatch):
+    import uvicorn
+
+    from nanomuse import chatgpt_cli
+    from nanomuse.cli import app
+    from nanomuse.llm.chatgpt_proxy import ModelList
+
+    TokenStore.in_dir(cli_home).save(token())
+
+    async def models(_self: ModelList) -> list[str]:
+        return ["test-model"]
+
+    server: uvicorn.Server
+    server_type = uvicorn.Server
+    original_emit = chatgpt_cli._emit
+
+    def make_server(config: uvicorn.Config) -> uvicorn.Server:
+        nonlocal server
+        server = server_type(config)
+        return server
+
+    def emit(as_json: bool, event: dict[str, Any], *args: Any) -> None:
+        original_emit(as_json, event, *args)
+        if event.get("event") == "ready":
+            # Let the real server shut down after the startup event reaches stdout.
+            server.should_exit = True
+
+    monkeypatch.setattr(ModelList, "ids", models)
+    monkeypatch.setattr(uvicorn, "Server", make_server)
+    monkeypatch.setattr(chatgpt_cli, "_emit", emit)
+    result = CliRunner().invoke(app, ["chatgpt", "proxy", "--json"])
+    assert result.exit_code == 0, result.exception
+    events = [json.loads(line) for line in result.stdout.splitlines()]
+    assert [event["event"] for event in events] == ["ready", "exit"]
+    ready = events[0]
+    assert ready["models"] == ["test-model"]
+    assert ready["label"] == "ChatGPT Plus"
+    assert ready["url"].startswith("http://127.0.0.1:") and ready["url"].endswith("/v1")
+    assert ready["token"]
+
+
 # ----------------------------------------------------------------------------- the CLI
 @pytest.fixture()
 def cli_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:

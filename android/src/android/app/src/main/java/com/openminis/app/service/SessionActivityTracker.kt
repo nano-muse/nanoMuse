@@ -26,6 +26,10 @@ object SessionActivityTracker {
 
     private const val TAG = "SessionTracker"
 
+    // nanoMuse: cancellation is distinct from both failure and a completed reply.
+    private val cancelledReplies = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    fun markReplyIncomplete(sessionId: String) { cancelledReplies.add(sessionId) }
+
     private val _activeSessions = MutableStateFlow<Set<String>>(emptySet())
     val activeSessions: StateFlow<Set<String>> = _activeSessions.asStateFlow()
 
@@ -296,6 +300,9 @@ object SessionActivityTracker {
      * action can fan out to every running session.
      */
     fun setActive(sessionId: String, onStop: (() -> Unit)? = null) {
+        // nanoMuse: begin a distinct unread-completion lifecycle.
+        SessionBadgeStore.replies.started(sessionId)
+        cancelledReplies.remove(sessionId)
         val wasIdle = !shouldRunService()
         // [T-android-live-update-completed] Capture BEFORE mutating: a run
         // "begins" only on the empty → non-empty edge. A second concurrent
@@ -341,6 +348,9 @@ object SessionActivityTracker {
         _activeSessions.value = _activeSessions.value - sessionId
         synchronized(streamCancellers) { streamCancellers.remove(sessionId) }
         val wasError = synchronized(pendingErrorFlag) { pendingErrorFlag.remove(sessionId) }
+        // nanoMuse: duplicate, failed, cancelled, and visible completions do not create unread badges.
+        val cancelled = cancelledReplies.remove(sessionId)
+        SessionBadgeStore.replies.finished(sessionId, wasActive && !wasError && !cancelled, sessionId in _presentSessions.value)
         Log.d(TAG, "Session deactivated: $sessionId (total: ${_activeSessions.value.size})")
 
         if (_activeSessions.value.isEmpty()) {
@@ -403,6 +413,8 @@ object SessionActivityTracker {
      * stream is in flight.
      */
     fun setPresent(sessionId: String) {
+        // nanoMuse: opening a reply marks it read, without clearing its pause indicator.
+        SessionBadgeStore.replies.opened(sessionId)
         if (sessionId in _presentSessions.value) return
         val wasIdle = !shouldRunService()
         _presentSessions.value = _presentSessions.value + sessionId

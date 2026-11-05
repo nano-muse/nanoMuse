@@ -426,23 +426,27 @@ export function normalise(agent: AgentId, obj: Obj, run: Run): RunEvent[] {
 // ------------------------------------------------------------------------- the run
 
 /** Lines from a stream, taken one at a time with an optional patience. */
-class LineQueue {
+export class LineQueue {
   private readonly lines: (string | null)[] = []
   private waiter: ((line: string | null) => void) | undefined
-  private rest = ''
+  private buf: Buffer = Buffer.alloc(0)
 
   push(chunk: Buffer | string): void {
-    this.rest += chunk.toString()
+    // a pipe hands over whatever bytes have arrived; decoding a chunk on its own
+    // replaces a multi-byte character that straddles two reads, so whole lines
+    // are cut out of the accumulated bytes and decoded only once complete
+    const more = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    this.buf = this.buf.length ? Buffer.concat([this.buf, more]) : more
     let at: number
-    while ((at = this.rest.indexOf('\n')) >= 0) {
-      this.deliver(this.rest.slice(0, at))
-      this.rest = this.rest.slice(at + 1)
+    while ((at = this.buf.indexOf(0x0a)) >= 0) {
+      this.deliver(this.buf.subarray(0, at).toString('utf8'))
+      this.buf = this.buf.subarray(at + 1)
     }
   }
 
   end(): void {
-    if (this.rest) this.deliver(this.rest)
-    this.rest = ''
+    if (this.buf.length) this.deliver(this.buf.toString("utf8"))
+    this.buf = Buffer.alloc(0)
     this.deliver(null)
   }
 
@@ -685,6 +689,8 @@ export async function startRun(options: StartOptions): Promise<Run> {
       attemptText = prior ? continuation(prior, text) : text
       resume = false
       run.output = ''
+      // the half-streamed line of the dead chat is not the new chat's first word either
+      run.current = ''
       await emit({ kind: 'tool', text: 'that chat cannot be resumed from the command line; starting a new one in the same workspace', phase: 'note' })
       continue
     }

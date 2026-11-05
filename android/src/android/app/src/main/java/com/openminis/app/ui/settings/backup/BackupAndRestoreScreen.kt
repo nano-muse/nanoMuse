@@ -220,6 +220,8 @@ private fun BackupTab(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val selected by vm.selected.collectAsState()
+    // nanoMuse: interactive exports include protected chat content; scheduled backups remain unchanged.
+    val protectedBackupAction = io.github.nanomuse.ui.guard.rememberProtectedBackupAction()
     val encrypt by vm.encrypt.collectAsState()
     val maxFileSizeMB by vm.maxFileSizeMB.collectAsState()
     val running by vm.isRunning.collectAsState()
@@ -392,6 +394,12 @@ private fun BackupTab(
 
     // -- Action --
     Column(Modifier.padding(16.dp)) {
+        // nanoMuse: starting a fresh backup never silently replaces an interrupted one.
+        io.github.nanomuse.ui.guard.BackupResumeActions(running) {
+            protectedBackupAction(BackupCategory.CHATS in selected) {
+                vm.startExport(passphrase.takeIf { encrypt }, resumeInterrupted = true)
+            }
+        }
         // [T-android-backup-stop] ONE button that toggles. While a backup runs
         // it says "Stop Backup" and stops it — nothing else about the row
         // changes.
@@ -406,7 +414,7 @@ private fun BackupTab(
         MinisButton(
             onClick = {
                 if (running) vm.stopExport()
-                else vm.startExport(passphrase.takeIf { encrypt })
+                else protectedBackupAction(BackupCategory.CHATS in selected) { vm.startExport(passphrase.takeIf { encrypt }) }
             },
             // The start-time requirements gate STARTING only. Applying them
             // while running would disable the button mid-run and leave no way
@@ -1524,16 +1532,8 @@ internal fun categoryLabel(key: String): String =
     BackupCategory.fromKey(key)?.let { stringResource(categoryNameRes(it)) } ?: key
 
 /** Localized display name per category. */
-internal fun categoryNameRes(cat: BackupCategory): Int = when (cat) {
-    BackupCategory.CHATS -> R.string.backup_category_chats
-    BackupCategory.SHARED_FILES -> R.string.backup_category_shared_files
-    BackupCategory.SKILLS -> R.string.backup_category_skills
-    BackupCategory.MEMORY -> R.string.backup_category_memory
-    BackupCategory.PROVIDERS -> R.string.backup_category_providers
-    BackupCategory.MCP_SERVERS -> R.string.backup_category_mcp
-    BackupCategory.ENVIRONMENT_VARIABLES -> R.string.backup_category_env_vars
-    BackupCategory.VOICE_CORRECTIONS -> R.string.backup_category_voice
-}
+// nanoMuse: the exporter and page share the same category vocabulary.
+internal fun categoryNameRes(cat: BackupCategory): Int = io.github.nanomuse.backup.BackupLabels.categoryNameRes(cat)
 
 /**
  * Circular colored category icon — the Android counterpart of iOS
