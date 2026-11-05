@@ -347,6 +347,10 @@ process before removing the check's data directories.
 
 ## Config and data
 
+Conversation sync pauses before sign-in or sign-out changes the account credentials. Responses from the previous account cannot update the new account's conversations, main chat or sync position, or add context to its model. A local chat created by an earlier sync request remains assigned to that request's account, even if creation finishes during an account switch. Requests already sent to the relay may still finish there.
+
+If sign-in or sign-out stops partway through, sync stays paused after a restart. Sign in again successfully to resume it.
+
 When this desktop receives an explicit conversation-clear notification from sync, it remembers the cleared session IDs across restarts and account changes. Task Records, chat search, history, duplicate and resume operations cannot reopen those sessions. Automatic subagent conversations are included; a separately saved duplicate and an ordinary archived chat remain available. Clearing an active main chat starts a fresh main chat.
 
 This is an access rule for conversations in the app. The underlying dsh JSONL logs remain on this computer and may still be read through separately authorized file access or included in a full data backup. It does not add desktop history deletion. Older versions discarded some cleared-session mappings after archiving, so this protection covers newly received clear notifications and older notifications still pending acknowledgement; it cannot reliably identify every conversation cleared before the update.
