@@ -49,6 +49,13 @@ the desktop; empty means *Automatic*: the chat model's provider when it draws (q
 on Model Studio), else another image provider configured by the person, else none, and then the chat
 says so plainly instead of trying.
 
+On Android, a Google Gemini provider added with an API key can supply the image model
+for drawing and editing the avatar. Choose its image-capable model in *Settings → Models*;
+image model IDs containing `nano-banana` are recognised too. The app uses Gemini's native
+`generateContent` endpoint with text and image output, and sends the selected picture when
+creating its poses. Imagen models are excluded from this native Gemini list because they
+use a different API. OpenAI-compatible providers keep their existing image route.
+
 Once the stills are on, the studio makes the four short clips the phone's does (idle,
 working, waiting, happy; the same fixed motions) from them, when the endpoint has a video
 model from a provider configured by the person, such as Wan on Model Studio, through the asynchronous
