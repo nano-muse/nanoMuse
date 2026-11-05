@@ -1273,3 +1273,24 @@ test('automatic child access rules survive a restart after their live sessions d
   assert.equal(restarted.isCleared('saved-copy'), false)
   first.engine.stop(); restarted.stop()
 })
+
+
+test('a sidebar refresh during main-chat cleanup cannot adopt an independent chat', async (t) => {
+  const relay = fakeRelay(); relay.add('main', 'main', 'Old main')
+  relay.say('main', 'user', 'Earlier conversation')
+  const sessions = fakeSessions(); sessions.add('side', 'Separate work')
+  let finishCleanup
+  const cleanup = new Promise(resolve => { finishCleanup = resolve })
+  const { engine: e } = engine(relay, sessions, { options: { onCleared: () => cleanup } })
+  t.after(() => e.stop())
+  await e.pull(); const old = e.state.mainSession
+  relay.tombstone('main')
+  const pull = e.pull()
+  await until(() => e.isCleared(old))
+  assert.equal(await e.setMain('side'), '')
+  assert.equal(e.state.mainSession, old)
+  finishCleanup(); await pull
+  assert.notEqual(e.state.mainSession, old)
+  assert.notEqual(e.state.mainSession, 'side')
+  assert.equal(e.isCleared('side'), false)
+})
