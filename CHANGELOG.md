@@ -105,6 +105,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Allowed API-key Gemini providers to generate and edit avatar images through their native image models, recognised Nano Banana model names, and excluded Imagen from that route. For #834.
+
 - Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
 
 - Recovered interrupted Android restore categories before opening their repositories, retaining snapshots when recovery failed.
