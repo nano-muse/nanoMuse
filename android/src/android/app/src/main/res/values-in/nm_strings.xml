@@ -1234,4 +1234,6 @@
     <string name="nm_backup_resume">Lanjutkan pencadangan</string>
     <string name="nm_backup_discard">Buang cadangan yang terhenti</string>
     <string name="nm_backup_resume_hint">Ada pencadangan yang terhenti. Lanjutkan dengan opsi asli dan masukkan kembali kata sandi jika diperlukan, atau buang untuk memulai ulang.</string>
+    <string name="nm_coding_installed">Terinstal</string>
+    <string name="nm_coding_not_installed">Belum terinstal</string>
 </resources>

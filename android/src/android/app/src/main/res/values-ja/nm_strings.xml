@@ -1234,4 +1234,6 @@
     <string name="nm_backup_resume">バックアップを再開</string>
     <string name="nm_backup_discard">中断したバックアップを破棄</string>
     <string name="nm_backup_resume_hint">中断したバックアップがあります。元の設定で再開し、必要なら暗号化パスワードを再入力するか、破棄して最初から開始してください。</string>
+    <string name="nm_coding_installed">インストール済み</string>
+    <string name="nm_coding_not_installed">未インストール</string>
 </resources>

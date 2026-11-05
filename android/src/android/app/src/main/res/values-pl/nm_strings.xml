@@ -1246,4 +1246,6 @@
     <string name="nm_backup_resume">Wznów kopię</string>
     <string name="nm_backup_discard">Odrzuć przerwaną kopię</string>
     <string name="nm_backup_resume_hint">Przerwana kopia czeka. Wznów z pierwotnymi opcjami i ponownie podaj hasło, jeśli jest potrzebne, albo odrzuć i zacznij od nowa.</string>
+    <string name="nm_coding_installed">Zainstalowany</string>
+    <string name="nm_coding_not_installed">Niezainstalowany</string>
 </resources>

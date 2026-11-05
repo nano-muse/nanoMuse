@@ -1239,4 +1239,6 @@
     <string name="nm_backup_resume">Retomar backup</string>
     <string name="nm_backup_discard">Descartar backup interrompido</string>
     <string name="nm_backup_resume_hint">Há um backup interrompido. Retome com as opções originais e digite novamente a senha se necessário, ou descarte para começar de novo.</string>
+    <string name="nm_coding_installed">Instalado</string>
+    <string name="nm_coding_not_installed">Não instalado</string>
 </resources>

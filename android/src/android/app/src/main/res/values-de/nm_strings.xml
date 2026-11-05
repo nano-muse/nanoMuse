@@ -1238,4 +1238,6 @@
     <string name="nm_backup_resume">Sicherung fortsetzen</string>
     <string name="nm_backup_discard">Unterbrochene Sicherung verwerfen</string>
     <string name="nm_backup_resume_hint">Eine unterbrochene Sicherung wartet. Mit den ursprünglichen Optionen fortsetzen und bei Bedarf das Verschlüsselungspasswort erneut eingeben, oder verwerfen und neu beginnen.</string>
+    <string name="nm_coding_installed">Installiert</string>
+    <string name="nm_coding_not_installed">Nicht installiert</string>
 </resources>

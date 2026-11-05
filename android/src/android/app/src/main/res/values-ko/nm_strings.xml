@@ -1234,4 +1234,6 @@
     <string name="nm_backup_resume">백업 재개</string>
     <string name="nm_backup_discard">중단된 백업 삭제</string>
     <string name="nm_backup_resume_hint">중단된 백업이 있습니다. 원래 옵션으로 재개하고 필요하면 암호를 다시 입력하거나, 삭제하고 처음부터 시작하세요.</string>
+    <string name="nm_coding_installed">설치됨</string>
+    <string name="nm_coding_not_installed">설치되지 않음</string>
 </resources>
