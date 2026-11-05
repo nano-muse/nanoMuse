@@ -23,6 +23,9 @@ agent ◄── redact(result)   ◄── taint bookkeeping ◄─────�
 
 `shell` 和 `python_execute` 启动的子进程拿到的是清洗过的环境：名字像凭据的变量（`*KEY*`、`*TOKEN*`、`*SECRET*`、`*PASSW*`、`*CREDENTIAL*`、`*AUTH*`、`*COOKIE*`、`*SESSION*`）、所有 `NANOMUSE_`、`AWS_`、`AZURE_`、`GOOGLE_`、`GH_`、`GITHUB_`、`NPM_` 开头的，再加 `SSH_AUTH_SOCK`，都在子进程启动前移除，所以模型写的代码读不到模型自己的 API key，也读不到 `os.environ` 里的保险库密钥。这两个工具都不接受 `{{vault:NAME}}` 占位符：带占位符的命令会被拒绝并说明原因，而不是拿字面文本去跑；保险库里的值只送达用它们配置的连接器。编程 CLI（`coding_tool`：Codex、Claude Code、Cursor）拿到同样清洗过的环境，再加上它们各自的账号变量（`OPENAI_*`/`CODEX_*`、`ANTHROPIC_*`/`CLAUDE_*` 以及当 `CLAUDE_CODE_USE_BEDROCK`/`_VERTEX` 这么要求时的云凭据、`CURSOR_*`），运行时的其他东西一概没有。
 
+递归强制删除警告既识别 `rm -rf` 这样的组合参数，也识别 `rm -r -f`、`rm --recursive --force` 这样的分开参数。后续命令的参数、其他长选项或 `--` 后的文件名不会被拼成这一组合。这些检查用于识别常见命令模式，不能覆盖所有 shell 程序。
+通过 `Path(...).rmdir()` 删除目录时，与 `Path(...).unlink()` 和 `os.rmdir()` 一样会显示删除警告。即使在正常工作的沙箱内，这类 Python 调用也属于 `sensitive`；已有的持续授权不会跳过这条警告。
+
 ## 沙箱 {#the-sandbox}
 
 Meta Muse 给每个用户的智能体一台独立的 VM。nanoMuse 跑在你的机器上，所以在 Linux 上做了退而求其次的事：每一次 `shell` 和 `python_execute` 调用都在自己的命名空间里运行，由 [bubblewrap](https://github.com/containers/bubblewrap) 创建（Flatpak 背后的那个工具；无需特权，`apt install bubblewrap` / `dnf install bubblewrap`）。箱子里面：
