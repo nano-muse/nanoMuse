@@ -18,6 +18,7 @@ import { readPrivateJson, writePrivateJson } from "./private-json";
 import { BUNDLE, ensureProfile, PROFILE } from "./profile";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
 import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
+import { chooseHostPort } from "./host-port";
 import { HostWork } from "./host-work";
 import { ProtectedExit, type ExitDialog, type ExitIntent, type WorkItem, type WorkSource } from "./protected-exit";
 import { WindowsUpdates, RestartNsisUpdater } from "./windows-updates";
@@ -198,38 +199,33 @@ function tryPort(port: number): Promise<number> {
   });
 }
 
-/** The port tried first on a fresh install (the connectors' loopback is 38417). */
-const HOST_PORT_DEFAULT = 38421;
-
 /**
- * The host's port, kept across launches. The window's origin is `127.0.0.1:<port>`, and
- * the origin is the browser's storage key — the preferences, the star asks' memory, the
- * live stage's place, the harness's own settings all live in that origin's localStorage —
- * so a port that changed on every launch meant an app that forgot everything on every
- * launch. The port used last time is tried first (it is written to `<home>/port`), then
- * the default, then any free one.
+ * The host's port, kept across launches (the choosing lives in host-port.ts, with the
+ * story of why a taken port never overwrites the memory).
  */
 async function hostPort(home: string): Promise<number> {
   const file = join(home, "port");
-  let last = 0;
-  try {
-    last = Number.parseInt(readFileSync(file, "utf8").trim(), 10) || 0;
-  } catch {
-    last = 0;
-  }
-  const candidates = last > 0 ? [last, HOST_PORT_DEFAULT, 0] : [HOST_PORT_DEFAULT, 0];
-  for (const candidate of candidates) {
-    const port = await tryPort(candidate);
-    if (port > 0) {
+  const choice = await chooseHostPort({
+    readRemembered() {
+      try {
+        return Number.parseInt(readFileSync(file, "utf8").trim(), 10) || 0;
+      } catch {
+        return 0;
+      }
+    },
+    writeRemembered(port) {
       try {
         writeFileSync(file, `${port}\n`);
       } catch (exc) {
         log(`port: could not remember ${port}: ${String(exc)}`);
       }
-      return port;
-    }
+    },
+    tryPort,
+  });
+  if (!choice.remembered) {
+    log(`port: ${choice.port} for this launch; the remembered port stays remembered`);
   }
-  throw new Error("no free loopback port for the host");
+  return choice.port;
 }
 
 /**

@@ -78,6 +78,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **A port file keeps the origin the host remembered.** When something already held the remembered port — an orphaned Host of the app's own, after a kill — the app bound a fallback and wrote that fallback into the port file, so the origin the browser's storage lives at (`127.0.0.1:<port>`, the key to the preferences, the star asks' memory, the stage's place) drifted for good and everything kept there was left behind. A taken port now binds a fallback for that one launch and leaves the memory alone, so the origin comes back once the port's taker is gone.
 - **Staged the harness under a path with spaces.** On Windows npm and pnpm are .cmd shims, and a .cmd child can only be started through the shell, where cmd.exe splits an unquoted argument at its spaces: a staging directory or a checkout under a name like `John Doe` reached `pnpm pack` as two arguments and staging failed with "pnpm pack left no tarball". Child arguments with spaces are now quoted, so each one arrives as the single argument it was passed.
 
 - **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
