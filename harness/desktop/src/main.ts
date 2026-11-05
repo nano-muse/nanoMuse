@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerSaveBlocker, screen, shell, systemPreferences, Tray } from "electron";
 import { randomBytes } from "node:crypto";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +18,9 @@ import { readPrivateJson, writePrivateJson } from "./private-json";
 import { BUNDLE, ensureProfile, PROFILE } from "./profile";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
 import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
+import { chooseHostPort } from "./host-port";
+import { closedDuringLoad } from "./load-close";
+import { rotateLogIfNeeded } from "./log-rotate";
 import { HostWork } from "./host-work";
 import { ProtectedExit, type ExitDialog, type ExitIntent, type WorkItem, type WorkSource } from "./protected-exit";
 import { WindowsUpdates, RestartNsisUpdater } from "./windows-updates";
@@ -161,6 +164,19 @@ function log(line: string): void {
   console.log(`[nanomuse-desktop] ${line}`);
   try {
     mkdirSync(harnessHome(), { recursive: true });
+    rotateLogIfNeeded(harnessHome(), {
+      sizeOf(path) {
+        try {
+          return statSync(path).size;
+        } catch {
+          return undefined;
+        }
+      },
+      remove(path) {
+        rmSync(path, { force: true });
+      },
+      rename: renameSync,
+    });
     appendFileSync(join(harnessHome(), "desktop.log"), `${stamped}\n`);
   } catch {
     /* the line is still in memory for the dialog */
@@ -198,38 +214,33 @@ function tryPort(port: number): Promise<number> {
   });
 }
 
-/** The port tried first on a fresh install (the connectors' loopback is 38417). */
-const HOST_PORT_DEFAULT = 38421;
-
 /**
- * The host's port, kept across launches. The window's origin is `127.0.0.1:<port>`, and
- * the origin is the browser's storage key — the preferences, the star asks' memory, the
- * live stage's place, the harness's own settings all live in that origin's localStorage —
- * so a port that changed on every launch meant an app that forgot everything on every
- * launch. The port used last time is tried first (it is written to `<home>/port`), then
- * the default, then any free one.
+ * The host's port, kept across launches (the choosing lives in host-port.ts, with the
+ * story of why a taken port never overwrites the memory).
  */
 async function hostPort(home: string): Promise<number> {
   const file = join(home, "port");
-  let last = 0;
-  try {
-    last = Number.parseInt(readFileSync(file, "utf8").trim(), 10) || 0;
-  } catch {
-    last = 0;
-  }
-  const candidates = last > 0 ? [last, HOST_PORT_DEFAULT, 0] : [HOST_PORT_DEFAULT, 0];
-  for (const candidate of candidates) {
-    const port = await tryPort(candidate);
-    if (port > 0) {
+  const choice = await chooseHostPort({
+    readRemembered() {
+      try {
+        return Number.parseInt(readFileSync(file, "utf8").trim(), 10) || 0;
+      } catch {
+        return 0;
+      }
+    },
+    writeRemembered(port) {
       try {
         writeFileSync(file, `${port}\n`);
       } catch (exc) {
         log(`port: could not remember ${port}: ${String(exc)}`);
       }
-      return port;
-    }
+    },
+    tryPort,
+  });
+  if (!choice.remembered) {
+    log(`port: ${choice.port} for this launch; the remembered port stays remembered`);
   }
-  throw new Error("no free loopback port for the host");
+  return choice.port;
 }
 
 /**
@@ -778,7 +789,7 @@ function writePrefs(next: Prefs = prefs, strict = false): void {
 function showWindow(): BrowserWindow | null {
   if (!mainWindow && hostUrl) {
     mainWindow = createWindow();
-    void loadHost(mainWindow, hostUrl);
+    void loadHost(mainWindow, hostUrl).catch((exc) => log(`window: could not load the host: ${String(exc)}`));
   }
   if (!mainWindow) return null;
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1803,9 +1814,20 @@ function createWindow(): BrowserWindow {
 /**
  * Show the Host's web app in `win`, then drop the splash from the window's history: a back
  * press (a mouse's side button too) would otherwise land on loading.html, which never moves on.
+ *
+ * A load the window's own close cancelled is not a failure: booting used to turn it into
+ * the "could not start" dialog and a quit, on a person who had only closed the window
+ * while the page was still coming up. Any other rejection still fails the start.
  */
 async function loadHost(win: BrowserWindow, url: string): Promise<void> {
-  await win.loadURL(url);
+  try {
+    await win.loadURL(url);
+  } catch (exc) {
+    if (closedDuringLoad(win)) {
+      return;
+    }
+    throw exc;
+  }
   if (!win.isDestroyed()) win.webContents.navigationHistory.clear();
 }
 

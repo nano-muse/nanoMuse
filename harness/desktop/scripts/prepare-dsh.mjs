@@ -21,6 +21,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { patchClearedSessionAccess } from "./cleared-session-access.mjs";
 import { patchCapacityDefaults } from "./capacity-defaults.mjs";
+import { shellArgs } from "./shell-args.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(here, "..");
@@ -35,13 +36,14 @@ const opt = (name) => {
 const out = resolve(appDir, opt("--out") ?? "dsh");
 let bundle = opt("--bundle");
 
-const run = (cmd, cmdArgs, options = {}) => {
-  console.log("+", cmd, cmdArgs.join(" "));
-  return execFileSync(cmd, cmdArgs, { stdio: "inherit", ...options });
-};
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const shell = process.platform === "win32";
+const run = (cmd, cmdArgs, options = {}) => {
+  console.log("+", cmd, cmdArgs.join(" "));
+  const argv = shell ? shellArgs(cmdArgs) : cmdArgs;
+  return execFileSync(cmd, argv, { stdio: "inherit", ...options });
+};
 
 // ---------------------------------------------------------------- the versions
 const bundleManifest = JSON.parse(readFileSync(join(bundleDir, "package.json"), "utf8"));

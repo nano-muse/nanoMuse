@@ -1,5 +1,5 @@
 import { ChevronRight, FileCode2, Link2, Loader2, Pencil, Play, Plus, Trash2, Wand2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { PageBar } from "../components/BackBar";
 import { LoadError } from "../components/LoadError";
@@ -45,16 +45,33 @@ export function SkillsScreen() {
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
-  const load = () =>
-    api
+  // "save as skill" bumps the reload version while the list is still loading: a slower
+  // earlier answer must not land over a newer one's list
+  const loadGen = useRef(0);
+  const active = useRef(false);
+  const load = () => {
+    if (!active.current) return Promise.resolve();
+    const mine = ++loadGen.current;
+    return api
       .skills()
       .then((d) => {
+        if (loadGen.current !== mine) return;
         setData(d);
         setLoadError(null);
       })
-      .catch((e: Error) => (data === null ? setLoadError(e.message) : toast(e.message)));
+      .catch((e: Error) => {
+        if (loadGen.current !== mine) return;
+        if (data === null) setLoadError(e.message);
+        else toast(e.message);
+      });
+  };
   useEffect(() => {
+    active.current = true;
     void load();
+    return () => {
+      active.current = false;
+      loadGen.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.skillsVersion]);
 

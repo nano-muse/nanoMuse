@@ -54,6 +54,8 @@ class SessionForkManager(
      *   - `id` / `createdAt` / `updatedAt` (new identity, current timestamps)
      */
     suspend fun duplicateSession(sessionId: String): String? {
+        // nanoMuse: every duplication entry point uses the same protected-content boundary.
+        io.github.nanomuse.guard.SessionAccess.requireUnlocked(sessionId)
         val source = chatRepository.getSession(sessionId) ?: run {
             AppLogger.warning(TAG, "duplicateSession: $sessionId not found")
             return null
@@ -64,6 +66,8 @@ class SessionForkManager(
             modelId = source.modelId,
             title = dupTitle,
         )
+        // nanoMuse: protect the new identity before writing any copied content; unlocks are independent.
+        io.github.nanomuse.guard.SessionAccess.inheritProtection(sessionId, new.id)
         // Mirror iOS: carry over the source's category onto the copy so the
         // session-list icon + colour stay consistent with the original.
         if (source.category != null) {

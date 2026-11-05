@@ -115,8 +115,12 @@ class ChatRepository(internal val dao: ChatDao) {
     }
 
     suspend fun deleteSession(id: String) {
+        // nanoMuse: deleted history must not reappear as a later Hands run note.
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(id)
         dao.deleteMessages(id)
         dao.deleteSession(id)
+        // nanoMuse: local access metadata must not outlive a deleted conversation.
+        io.github.nanomuse.guard.SessionAccess.deleted(id)
         io.github.nanomuse.guard.Grants.clearSession(id) // nanoMuse
         io.github.nanomuse.sync.ConversationSync.changed() // nanoMuse: a tombstone goes to the other devices
     }
@@ -322,6 +326,8 @@ class ChatRepository(internal val dao: ChatDao) {
     }
 
     suspend fun deleteMessagesAfter(sessionId: String, keepCount: Int) {
+        // nanoMuse: edited or regenerated history invalidates prior screen-task context.
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(sessionId)
         dao.deleteMessagesAfter(sessionId, keepCount)
         io.github.nanomuse.sync.ConversationSync.changed() // nanoMuse: an edit or regenerate — the cut rows become tombstones
     }

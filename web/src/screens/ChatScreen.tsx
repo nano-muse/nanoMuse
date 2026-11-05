@@ -876,12 +876,21 @@ export function Composer({
   const skillsOn = state.settings?.skills?.enabled !== false;
   useEffect(() => {
     if (!skillsOn) return;
+    // the version moves when a skill is saved: a slower earlier answer must not land
+    // over a newer one's list, and a failed refresh keeps the list it has — an empty
+    // menu would say the skills are gone when they are not
+    let alive = true;
     api.skills()
-      .then((d) => setSkills(d.skills.filter((sk) => sk.enabled)))
-      .catch(() => setSkills([]));
+      .then((d) => {
+        if (alive) setSkills(d.skills.filter((sk) => sk.enabled));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, [skillsOn, state.skillsVersion]);
   const slash = /^\/([a-z0-9-]*)$/i.exec(text);
-  const matches = slash ? skills.filter((sk) => sk.name.startsWith(slash[1].toLowerCase())).slice(0, 6) : [];
+  const matches = skillsOn && slash ? skills.filter((sk) => sk.name.startsWith(slash[1].toLowerCase())).slice(0, 6) : [];
   const pick = (sk: SkillInfo) => {
     setText(`/${sk.name} `);
     ref.current?.focus();

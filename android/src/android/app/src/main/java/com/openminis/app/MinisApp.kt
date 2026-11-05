@@ -238,6 +238,10 @@ class MinisApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // nanoMuse: session protection is device-local and ready before navigation.
+        io.github.nanomuse.guard.SessionAccess.initialize(this)
+        // nanoMuse: initialize access policy before the first Activity or incoming share.
+        io.github.nanomuse.guard.AppAccess.initialize(this)
 
         // T287-followup: ACRA spawns a separate reporter process named
         // "<package>:acra" (declared by the library's manifest) to send
@@ -718,7 +722,10 @@ class MinisApp : Application(), ImageLoaderFactory {
                 // Activity that resumes. One-shot — clears the pending
                 // list internally so config-change re-resumes don't
                 // re-prompt. Safe no-op when nothing is pending.
-                com.openminis.app.crash.CrashFrequencyDetector.maybeShowOnActivity(activity)
+                // nanoMuse: normal-start diagnostics wait for the same app access gate as safe mode.
+                io.github.nanomuse.guard.NativeAccess.afterUnlock(activity) {
+                    com.openminis.app.crash.CrashFrequencyDetector.maybeShowOnActivity(activity)
+                }
                 // T219-1: re-probe mounted-folder writability on every
                 // foreground resume so OS permission revocations (user
                 // toggled "Allow access" off in system Files, removable

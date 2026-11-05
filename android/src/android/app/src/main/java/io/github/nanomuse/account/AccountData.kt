@@ -101,6 +101,7 @@ object AccountData {
      * signed-in key, and inside `ConversationSync.exclusive` so no push sees the chats go.
      */
     suspend fun leave(context: Context, account: String, keep: Boolean) {
+        io.github.nanomuse.hands.HandsRunMemory.shared.clearAll()
         val ctx = context.applicationContext
         stopWork()
         runCatching { reconcile(ctx, account) }.onFailure { AppLogger.warning(TAG, "reconcile before leaving: ${it.message}") }

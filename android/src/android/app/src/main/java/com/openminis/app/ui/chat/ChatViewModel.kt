@@ -3767,6 +3767,9 @@ class ChatViewModel(
     }
 
     /** Ensure the session exists in the database. Called before first message. */
+    // nanoMuse: called only after device authentication, never persist protection against a draft key.
+    suspend fun ensureSessionForProtection(): String = ensureSession()
+
     private suspend fun ensureSession(): String {
         if (realSessionId.isNotEmpty()) return realSessionId
         val modelId = currentModel?.id ?: providerRepository.allVisibleEntries().firstOrNull()?.model?.id ?: "unknown"
@@ -5003,6 +5006,8 @@ class ChatViewModel(
         runCatching {
             java.io.File(context.filesDir, "browser_tabs/$sid.json").delete()
         }
+        // nanoMuse: invalidate completed and in-flight Hands notes before clearing this conversation.
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(sid)
         // Persist: drop messages + compact markers. Files (workspace,
         // attachments, offloads) intentionally retained.
         viewModelScope.launch {
@@ -12187,12 +12192,16 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
     fun cleanupIfEmptyOnExit() {
         val sid = realSessionId
         if (sid.isEmpty()) return
+        // nanoMuse: explicitly protected empty conversations are intentional saved rows.
+        if (io.github.nanomuse.guard.SessionAccess.isProtected(sid)) return
         if (_isStreaming.value) return
         if (_attachments.value.isNotEmpty()) return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val count = chatRepository.messageCount(sid)
                 if (count > 0) return@launch
+                // nanoMuse: protection may have been enabled while the message count was loading.
+                if (io.github.nanomuse.guard.SessionAccess.isProtected(sid)) return@launch
                 AppLogger.info(
                     TAG,
                     "cleanupIfEmptyOnExit: deleting empty session $sid (no persisted messages)",

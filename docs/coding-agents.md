@@ -1,5 +1,7 @@
 # Coding agents
 
+On Android, the agent filters scroll horizontally and keep each name on one line. Each filter shows whether the agent is running, installed or not installed. Uninstalled agents remain selectable so their saved sessions can still be found.
+
 The Cursor, Codex, Claude Code and DeepSeek Harness sessions on your computer, seen and steered
 from any device of your account (the phone on the way home, the browser, another
 computer) and from the Muse itself.
@@ -15,6 +17,8 @@ On Windows, process discovery decodes command output using the console encoding 
 The desktop preserves Chinese text and other UTF-8 characters when a coding agent's output arrives across several pipe reads, including the last line without a newline.
 
 ## In the apps
+
+When a coding agent cannot resume a saved session, the retry starts a new session with clean output. A partially streamed line from the failed attempt is discarded along with its accumulated output.
 
 - **Phone**: the drawer's *Coding* row (or *Settings → Coding agents*, or the
   `nanomuse://coding` link). Pick a computer, an agent, a session; read the

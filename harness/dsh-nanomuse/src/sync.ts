@@ -810,6 +810,9 @@ export class SyncEngine {
    */
   async setMain(sessionId: string): Promise<string> {
     const current = this.state.mainSession
+    // A clear is still saving or creating the replacement. A sidebar refresh must
+    // not adopt an unrelated side chat as the account's main conversation.
+    if (current && this.isCleared(current)) return ''
     if (!sessionId || current === sessionId) return current
     if (!this.owns(sessionId)) return current
     if (current && this.holdsMain(current)) return current

@@ -501,6 +501,8 @@ fun SessionListScreen(
     draftPlaceholderId: String? = null,
 ) {
     val context = LocalContext.current
+    // nanoMuse: one authenticator serves every content-revealing context-menu action.
+    val protectedSessionAction = io.github.nanomuse.ui.guard.rememberProtectedSessionAction()
     // T46: hoist VM ownership to the NavBackStackEntry's ViewModelStore so
     // [searchQuery] / [isSearchActive] survive navigation. The previous
     // `remember {}` scoping tied the VM to the composable's lifetime — pushing
@@ -1044,10 +1046,10 @@ fun SessionListScreen(
                                     onPinToggle = { viewModel.togglePin(it) },
                                     onEditRequest = { editSession = it },
                                     onExportRequest = { s, fmt ->
-                                        exportSession(context, s, chatRepository, scope, fmt)
+                                        protectedSessionAction(s.id) { exportSession(context, s, chatRepository, scope, fmt) }
                                     },
-                                    onRegenerateTitle = { viewModel.regenerateTitle(it) },
-                                    onDuplicate = { viewModel.duplicateSession(it) },
+                                    onRegenerateTitle = { id -> protectedSessionAction(id) { viewModel.regenerateTitle(id) } },
+                                    onDuplicate = { id -> protectedSessionAction(id) { viewModel.duplicateSession(id) } },
                                     onDeleteRequest = { id ->
                                         deleteTargetId = id
                                         showDeleteDialog = true
@@ -2865,7 +2867,11 @@ private fun SessionRow(
             // During an active search, prefer the matched message snippet
             // (content hit) over the generic lastMessage preview. Falls back
             // to lastMessage when match was title-only (snippet is null).
-            if (searchQuery.isNotBlank() && searchSnippet != null) {
+            // nanoMuse: protected conversation previews never reveal message snippets.
+            val protectedIds by io.github.nanomuse.guard.SessionAccess.protected.collectAsState()
+            if (session.id in protectedIds) {
+                Text(stringResource(R.string.nm_session_protected), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (searchQuery.isNotBlank() && searchSnippet != null) {
                 Text(
                     text = highlightedAnnotatedString(searchSnippet, searchQuery),
                     fontSize = 14.sp,
@@ -3374,6 +3380,9 @@ private fun exportSession(
                 repository = chatRepository,
                 format = format,
             )
+            // nanoMuse: an export may finish after the access lease expires; never grant its URI while locked.
+            if (io.github.nanomuse.guard.AppAccess.locked.value) throw SecurityException("App access expired")
+            io.github.nanomuse.guard.SessionAccess.requireUnlocked(session.id)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/zip"
                 putExtra(Intent.EXTRA_SUBJECT, session.title ?: "Conversation")

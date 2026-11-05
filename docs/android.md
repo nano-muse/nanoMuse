@@ -625,3 +625,25 @@ An emoji avatar chosen on desktop or web also appears on Android, with its backg
 
 Drawn faces and personal clips retain their existing priority. Renaming the agent or changing connectors leaves an unchanged remote appearance alone. Resetting the avatar explicitly returns to the dragon. Choosing an emoji on Android is not part of this change.
 
+## App lock
+
+Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts, incoming shares and safe-mode diagnostics use the same gate. Native diagnostic windows close if the app re-locks, and returning from the export file picker requires access again before any diagnostic data is written. This protects access in the app, not encryption of stored data. Background tasks continue.
+
+A pending diagnostic export requires its activity to be resumed and the app to be unlocked at the same time. Unlocking another window while the export window is paused does not release that export.
+
+Native provider-import and permission-repair dialogs also close when app access expires; pending permission choices are cancelled.
+
+## Protected conversations {#session-lock}
+
+The conversation menu can protect an individual chat with the device screen lock. Authentication is required to protect it, remove protection, export or duplicate a locked chat, or regenerate its title from message content. A duplicate inherits protection and must be unlocked separately. Protecting a new conversation saves it first; cancelling authentication leaves the draft unchanged. Settings controls the re-lock interval, including locking when leaving the chat. Both layouts, notifications and deep links use the gate. Protected previews and body-search matches are hidden.
+
+Interactive backups ask for confirmation when they include locked conversations. This approval applies only to the backup and does not unlock every chat. Scheduled backups, sync and background work keep their existing behavior. Protection metadata survives restarts locally, while unlocks do not; neither is shared through conversation sync or backups. This does not encrypt chat storage.
+
+Selecting another Muse tab counts as leaving the protected conversation for the On exit setting, even while the chat remains retained in the background.
+
+
+## Continuing screen tasks {#hands-continuity}
+
+When another explicit Hands task names the same resolved app in the same conversation, Android supplies a short note from the preceding run: its task, outcome, result and last eight steps. Notes are kept in memory for at most 30 minutes, with at most 32 conversation/app pairs. They are historical observations, not permission to repeat actions or resume a stopped task; the current task and fresh screenshot take precedence. Runs without a conversation or a resolved app do not reuse notes, and a run that explicitly switches to another app does not save a shared note. Clearing, editing or deleting the conversation, syncing a replacement history, signing out or restarting discards the corresponding notes.
+
+The screen model can add `"distance":"large"` to a `scroll` action for a vertical sweep of about 65% of the screen. Omitting it preserves the existing approximately 45% vertical gesture; horizontal gestures are unchanged. The main agent is told to preserve the complete `nanomuse-hands run` JSON, including its outcome and final answer, rather than cut it with `head` or `tail`.

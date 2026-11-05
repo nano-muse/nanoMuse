@@ -1234,4 +1234,19 @@
     <string name="nm_backup_resume">백업 재개</string>
     <string name="nm_backup_discard">중단된 백업 삭제</string>
     <string name="nm_backup_resume_hint">중단된 백업이 있습니다. 원래 옵션으로 재개하고 필요하면 암호를 다시 입력하거나, 삭제하고 처음부터 시작하세요.</string>
+<string name="nm_access_locked">nanoMuse가 잠겼습니다</string>
+<string name="nm_access_hint">이 기기의 화면 잠금으로 인증하세요.</string>
+<string name="nm_access_unlock">잠금 해제</string>
+<string name="nm_access_settings">앱 잠금</string>
+<string name="nm_access_on_exit">나갈 때 잠금</string>
+<string name="nm_access_never">자동으로 잠그지 않음</string>
+<string name="nm_access_seconds">%1$d초</string>
+<string name="nm_access_unavailable">먼저 이 기기의 화면 잠금을 설정하세요.</string>
+<string name="nm_session_protected">보호된 대화</string>
+<string name="nm_session_protect">대화 보호</string>
+<string name="nm_session_unprotect">대화 보호 해제</string>
+<string name="nm_session_settings">대화 잠금 시간</string>
+
+    <string name="nm_coding_installed">설치됨</string>
+    <string name="nm_coding_not_installed">설치되지 않음</string>
 </resources>
