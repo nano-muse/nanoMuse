@@ -23,6 +23,7 @@
  */
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
+import { cliSpawnCommand } from './coding-readers.ts'
 import { CAPABILITIES, reasoningFor, REASONING_WIRES, THINKING_LEVELS, type Auth, type Capability, type ModelReasoning, type Protocol, type ProviderEntry, type ReasoningHint, type ReasoningRule, type ReasoningWire, type Region, type ThinkingLevel } from './catalogue.ts'
 
 // The shapes and the pure rules (the groups, the region, the gate) live in `catalogue.ts`, which the browser half imports too.
@@ -550,7 +551,11 @@ export class ChatGptDesk {
   }
 
   private spawn(): SpawnLike {
-    return this.options.spawn ?? ((command, args, options) => nodeSpawn(command, args, options))
+    // an npm-installed runtime is a `.cmd` on Windows, which a bare spawn cannot start at all
+    return this.options.spawn ?? ((command, args, options) => {
+      const [file, argv] = cliSpawnCommand(process.platform, command, args)
+      return nodeSpawn(file, argv, options)
+    })
   }
 
   /**
