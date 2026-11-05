@@ -74,6 +74,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **Staged the harness under a path with spaces.** On Windows npm and pnpm are .cmd shims, and a .cmd child can only be started through the shell, where cmd.exe splits an unquoted argument at its spaces: a staging directory or a checkout under a name like `John Doe` reached `pnpm pack` as two arguments and staging failed with "pnpm pack left no tarball". Child arguments with spaces are now quoted, so each one arrives as the single argument it was passed.
+
 - **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
 
 - Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
