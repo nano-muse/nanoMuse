@@ -16,6 +16,8 @@ The desktop preserves Chinese text and other UTF-8 characters when a coding agen
 
 ## In the apps
 
+When a coding agent cannot resume a saved session, the retry starts a new session with clean output. A partially streamed line from the failed attempt is discarded along with its accumulated output.
+
 - **Phone**: the drawer's *Coding* row (or *Settings → Coding agents*, or the
   `nanomuse://coding` link). Pick a computer, an agent, a session; read the
   transcript; type a message and watch the run (the text as it streams, the

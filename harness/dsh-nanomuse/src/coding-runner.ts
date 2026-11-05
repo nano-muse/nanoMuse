@@ -689,6 +689,8 @@ export async function startRun(options: StartOptions): Promise<Run> {
       attemptText = prior ? continuation(prior, text) : text
       resume = false
       run.output = ''
+      // the half-streamed line of the dead chat is not the new chat's first word either
+      run.current = ''
       await emit({ kind: 'tool', text: 'that chat cannot be resumed from the command line; starting a new one in the same workspace', phase: 'note' })
       continue
     }

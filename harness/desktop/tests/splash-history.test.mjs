@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
+import * as load_close_1 from "../out/load-close.js";
 
 // The window opens on loading.html and then loads the Host; a back press (a mouse's side
 // button too) must not return to the splash, which never moves on by itself.
@@ -23,7 +24,7 @@ function fakeWindow(destroyed = false) {
 }
 
 function run(win) {
-  const context = vm.createContext({ win });
+  const context = vm.createContext({ win, load_close_1 });
   vm.runInContext(loadHost, context);
   return vm.runInContext("loadHost(win, 'http://127.0.0.1:1/')", context);
 }
@@ -57,4 +58,19 @@ test("a window closed while the Host loads is left alone", async () => {
 
 test("every Host load in the shell goes through loadHost", () => {
   assert.deepEqual(loadURLCallers(), ["loadHost"]);
+});
+
+test("a live window's aborted navigation still rejects startup", async () => {
+  const win = fakeWindow();
+  const aborted = Object.assign(new Error("Navigation replaced"), { code: "ERR_ABORTED" });
+  win.loadURL = async () => { throw aborted; };
+  await assert.rejects(run(win), (error) => error === aborted);
+  assert.deepEqual(win.calls, []);
+});
+
+test("closing a loading window consumes its rejection without touching its history", async () => {
+  const win = fakeWindow(true);
+  win.loadURL = async () => { throw Object.assign(new Error("Window closed"), { code: "ERR_ABORTED" }); };
+  await run(win);
+  assert.deepEqual(win.calls, []);
 });

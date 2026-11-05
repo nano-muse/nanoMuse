@@ -79,6 +79,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Desktop
 
 - Opened archived chats inside the chat column, with search and restore controls, instead of opening general settings. For #833.
+
+- **A coding retry after a dead chat starts its output from the new chat's first line.** The retry that follows a resume the CLI cannot serve cleared the accumulated output but kept the half-streamed line the dead chat had begun, and the new chat's first words arrived glued behind it. The stale partial line is dropped with the rest of the old attempt.
+- Kept a closed desktop window from turning an in-progress page load into a startup error. Errors from windows that remained open still surfaced, and tray reopen failures were handled.
+- **The desktop's own log steps aside at the runtime's rotation mark.** Every line the Host printed — stdout and stderr alike — was appended to `desktop.log` without ever being looked at again, so a long-lived install grew it without bound; the file the issue dialog asks for now steps aside as `desktop.log.1` once it passes 10 MB, the mark the runtime's own log rotates at.
+- **A port file keeps the origin the host remembered.** When something already held the remembered port — an orphaned Host of the app's own, after a kill — the app bound a fallback and wrote that fallback into the port file, so the origin the browser's storage lives at (`127.0.0.1:<port>`, the key to the preferences, the star asks' memory, the stage's place) drifted for good and everything kept there was left behind. A taken port now binds a fallback for that one launch and leaves the memory alone, so the origin comes back once the port's taker is gone.
+
 - **Staged the harness under a path with spaces.** On Windows npm and pnpm are .cmd shims, and a .cmd child can only be started through the shell, where cmd.exe splits an unquoted argument at its spaces: a staging directory or a checkout under a name like `John Doe` reached `pnpm pack` as two arguments and staging failed with "pnpm pack left no tarball". Child arguments with spaces are now quoted, so each one arrives as the single argument it was passed.
 
 - **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
@@ -116,6 +122,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Carried bounded screen-task notes into subsequent requests for the same app and conversation, added an optional larger vertical scroll, and instructed the agent to retain complete Hands JSON results. For #817.
+
 - Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
 
 - Recovered interrupted Android restore categories before opening their repositories, retaining snapshots when recovery failed.
@@ -141,6 +149,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Kept System Auto reply speech on the chosen language-specific voice.** An inactive concrete voice later in the Voice Output group no longer overrides Auto. A concrete System voice explicitly selected for Voice Output still takes priority. For [#722](https://github.com/nano-muse/nanoMuse/issues/722).
 
 ### Project
+
+- Documented launching Windows Desktop against a self-hosted relay, including profile override priority, separate account data and the Cloud proxy bypass. For #830.
 
 - Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
 

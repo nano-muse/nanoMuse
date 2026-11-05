@@ -73,6 +73,44 @@ in-app updater must first be upgraded with the downloaded installer. Development
 builds do not run an installer. This uses the existing installation behaviour;
 mixed copies or stale installation registration need to be sorted out separately.
 
+## Using your own relay on Windows
+
+If you run a relay, Desktop can use its address. Follow [Running your own](cloud.md#running-your-own)
+to set up the server first. The example below needs your relay's HTTPS origin and the path
+to the installed `nanomuse-desktop.exe`; `relay.example` and the installation path are placeholders.
+Accounts, devices and server-side conversation history belong to each relay separately.
+An account on the hosted service does not become an account on a new relay.
+
+1. Choose **Quit** in nanoMuse, including its tray menu, and let it finish quitting.
+   Closing the window can leave the app running. A second launch would then reuse that
+   process, including its previous environment.
+2. Open PowerShell and start the app with your relay and a separate data directory:
+
+   ```powershell
+   $env:NANOMUSE_CLOUD_URL = 'https://relay.example'
+   $env:NANOMUSE_DESKTOP_HOME = Join-Path $env:LOCALAPPDATA 'nanoMuse-self-hosted'
+   Start-Process -FilePath 'C:\Path\To\nanomuse-desktop.exe'
+   ```
+
+3. Sign in or register on that relay. Keep the same data directory when launching it
+   again; your existing desktop data stays in its original directory. These variables
+   affect this PowerShell session and programs it starts, not the permanent Windows
+   environment. A later launch from the Start menu does not inherit this example's
+   variables; use the same commands for subsequent launches of this relay profile.
+
+The bundled profile uses `NANOMUSE_CLOUD_URL` as the `nanomuse-cloud` plugin's
+`config.baseURL`. A saved override for that plugin in
+`<desktop-home>/profiles/nanomuse/cordis.patch.yml` is applied after the bundled profile
+and takes priority. If reusing a customised profile, remove that specific override or
+set it to the same relay address. The separate home above starts with its own profile
+and credentials. Changing an own-key model provider's base URL does not change the
+account relay.
+
+The app's **Network** proxy setting bypasses nanoMuse Cloud, including the relay's
+sign-in, Hub and sync traffic. `DEFAULT_RELAY_HOST` in the shell's `proxy.ts` contributes
+to `NO_PROXY`; it does not select another relay. This launch option points Desktop at
+your server. It does not repair a connection reset on the hosted relay's network path.
+
 ## What it is
 
 Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
@@ -310,6 +348,11 @@ process before removing the check's data directories.
 ## Config and data
 
 In the chat column, **More → Archived chats** opens the archive in that column. Search the archived chats or choose **Restore** to bring a chat back and open it. **Back to chats** returns to the normal list. Archiving keeps a chat on this computer; it does not delete its history.
+
+The desktop keeps one previous log as `desktop.log.1`. When `desktop.log` reaches 10 MiB, the next entry starts a new log and replaces the older backup. If rotation fails, logging still attempts to append the entry and retries rotation later.
+
+If the saved desktop port is occupied, that launch uses a temporary fallback without replacing the saved port. Once the original port is free, the next launch returns to it and its browser settings. Settings changed while using the fallback belong to that temporary origin.
+
 Staging the desktop harness on Windows accepts checkout and temporary-directory paths containing spaces. The staging script keeps each npm and pnpm argument intact when calling their command shims.
 
 If two problem reports produce screenshots within the same second, the later screenshot receives a numbered filename instead of replacing the earlier one.
@@ -327,6 +370,8 @@ The desktop keeps at most 64 conversation logs in its sync cache. Older cached e
 Dates beside entries in `MEMORY.md` use the computer's local calendar day.
 
 The development desktop smoke test imports Electron through a file URL on Windows and other platforms. Checkout paths may contain spaces, Unicode, `#` or `%`.
+
+Closing the window while its page loads no longer reports a startup failure or quits the app. A page load that fails while the window remains open still reports its error.
 
 `~/.nanomuse/desktop` (`NANOMUSE_DESKTOP_HOME` moves it) is the app's dsh home: the
 profile under `profiles/nanomuse` (the bundle list, the person's own `cordis.patch.yml`
