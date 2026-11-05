@@ -8,6 +8,8 @@ The skills list also keeps the newest completed refresh. Failed reloads preserve
 
 The chat `/` menu keeps its loaded skills if a refresh fails and ignores older answers. Turning skills off hides these suggestions immediately, including keyboard completion.
 
+Daily, the setup checklist and the avatar studio ignore older refresh responses and errors from a page you have left. Refreshing the studio preserves your description and current choice; a different drawing session clears the candidate selection so it must be confirmed again.
+
 > The web console is the app `nanomuse serve` serves at `/`: the front door of
 > the desktop app and of a self-hosted runtime ([app.md](app.md)). This page is
 > about one part of it: how it picks the model that answers, and what it offers
