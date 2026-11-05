@@ -635,7 +635,7 @@ function fakeSessions(selections) {
       selections[sessionId] = { provider, model }
     },
   }
-  return { moved, ctx: { sessionController, get() { return undefined } } }
+  return { moved, ctx: { sessionController, sessions: { get() { return undefined } }, get() { return undefined } } }
 }
 
 test('picking the chat model moves the main chat and only it; the same pick twice writes nothing; without a main chat nothing moves', async () => {
@@ -646,7 +646,7 @@ test('picking the chat model moves the main chat and only it; the same pick twic
     // no main chat known yet: the slot moves, no session does
     assert.equal((await out.api('POST', '/chat-model', { model: 'deepseek-v4.1-flash', provider: PROVIDER_ID })).status, 200)
     assert.deepEqual(sessions.moved, [])
-    out.svc.sync = { state: { mainSession: 's-main' } }
+    out.svc.sync = { state: { mainSession: 's-main' }, isCleared: () => false }
     assert.equal((await out.api('POST', '/chat-model', { model: 'deepseek-v4.1', provider: PROVIDER_ID })).status, 200)
     // the main chat already answers through deepseek-v4.1: nothing written
     assert.deepEqual(sessions.moved, [])
@@ -669,7 +669,7 @@ test('the "Use it for" card moves the main chat to the own key too; a main chat 
   try {
     const sessions = fakeSessions({ 's-main': { provider: PROVIDER_ID, model: 'deepseek-v4.1-flash' } })
     out.svc.sessionCtx = sessions.ctx
-    out.svc.sync = { state: { mainSession: 's-main' } }
+    out.svc.sync = { state: { mainSession: 's-main' }, isCleared: () => false }
     await out.api('POST', '/providers/save', { id: 'bailian', apiKey: 'sk-own', baseURL: server.url })
     assert.deepEqual(sessions.moved, [])
     const adopted = await out.api('POST', '/providers/adopt', { id: 'bailian', slots: ['chat'] })
@@ -686,4 +686,14 @@ test('the "Use it for" card moves the main chat to the own key too; a main chat 
     await server.close()
     await out.done()
   }
+})
+
+
+test('an unreadable account state cannot silently discard cleared-session rules', async () => {
+  const out = await cloud()
+  try {
+    await writeFile(out.statePath, '{invalid-json')
+    await assert.rejects(out.svc.readState(), /refusing to discard saved conversation access rules/)
+    assert.equal(await readFile(out.statePath, 'utf8'), '{invalid-json')
+  } finally { await out.done() }
 })

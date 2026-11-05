@@ -1,3 +1,4 @@
+import { call, failureText } from './api.ts'
 /**
  * The nanoMuse browser half: the Muse look on the harness's Web client. The
  * left column (an icon rail beside the harness's chats browser), the agent
@@ -273,8 +274,12 @@ export function apply(ctx: ClientContext): void {
     })
     if (!result.ok) throw new Error(result.error?.message ?? 'rename failed')
   }
+  const openChat = (id: string): void => {
+    void call('sync/access', { sessionId: id }).then(() => workspaces.openSession(id))
+      .catch((error: unknown) => { window.alert(failureText(t, error)) })
+  }
   const chatActions: ChatActions = {
-    openSession: (id) => { workspaces.openSession(id) },
+    openSession: openChat,
     startSession: () => { workspaces.startSession() },
     archiveSession: (id) => workspaces.archiveSession(id, { stopActivity: true }),
     pinSession: (id) => workspaces.pinSession(id),
@@ -325,7 +330,7 @@ export function apply(ctx: ClientContext): void {
   // The rooms behind the rail's icons — Feed, Ideas, Goals, Library — and the
   // Devices page. The rooms send the person to chats through `nav`.
   let activePanel: string | null = null
-  roomsNav.openSession = (id) => { workspaces.openSession(id) }
+  roomsNav.openSession = openChat
   roomsNav.showChats = () => { selectPanel(null) }
   roomsNav.startSession = () => { workspaces.startSession() }
   roomsNav.activePanel = () => activePanel

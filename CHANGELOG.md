@@ -78,6 +78,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Remembered conversation-clear notifications across restarts and blocked cleared chats from task records, history, search, duplication and resume. Automatic subagent histories followed their parent; saved copies and ordinary archives stayed available. Local JSONL logs remained on disk. For #832.
 - Opened archived chats inside the chat column, with search and restore controls, instead of opening general settings. For #833.
 
 - **A coding retry after a dead chat starts its output from the new chat's first line.** The retry that follows a resume the CLI cannot serve cleared the accumulated output but kept the half-streamed line the dead chat had begun, and the new chat's first words arrived glued behind it. The stale partial line is dropped with the rest of the old attempt.

@@ -347,6 +347,9 @@ process before removing the check's data directories.
 
 ## Config and data
 
+When this desktop receives an explicit conversation-clear notification from sync, it remembers the cleared session IDs across restarts and account changes. Task Records, chat search, history, duplicate and resume operations cannot reopen those sessions. Automatic subagent conversations are included; a separately saved duplicate and an ordinary archived chat remain available. Clearing an active main chat starts a fresh main chat.
+
+This is an access rule for conversations in the app. The underlying dsh JSONL logs remain on this computer and may still be read through separately authorized file access or included in a full data backup. It does not add desktop history deletion. Older versions discarded some cleared-session mappings after archiving, so this protection covers newly received clear notifications and older notifications still pending acknowledgement; it cannot reliably identify every conversation cleared before the update.
 In the chat column, **More → Archived chats** opens the archive in that column. Search the archived chats or choose **Restore** to bring a chat back and open it. **Back to chats** returns to the normal list. Archiving keeps a chat on this computer; it does not delete its history.
 
 The desktop keeps one previous log as `desktop.log.1`. When `desktop.log` reaches 10 MiB, the next entry starts a new log and replaces the older backup. If rotation fails, logging still attempts to append the entry and retries rotation later.

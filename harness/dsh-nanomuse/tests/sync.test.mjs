@@ -7,7 +7,7 @@
 // the working presence both ways, and the host doing no work while nothing changes.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { SyncEngine, SyncRelay, MAX_POST_MESSAGES, TAIL, emptyState, migrate, RemoteStore, meanwhileNote, toWorking, lineKey } from '../lib/sync.js'
+import { SyncEngine, SyncRelay, clearedDescendants, MAX_POST_MESSAGES, TAIL, emptyState, migrate, RemoteStore, meanwhileNote, toWorking, lineKey } from '../lib/sync.js'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -1187,4 +1187,110 @@ test('a failed local mapping save prevents upload and the next attempt can recov
   failSave = false
   await e.push()
   assert.equal(relay.msgs.size, 1)
+})
+
+test('cleared sessions stay blocked after archival acknowledgement, restart and account switch', async () => {
+  const relay = fakeRelay(); relay.add('old', 'side', 'Old chat'); relay.say('old', 'user', 'old words')
+  const sessions = fakeSessions(); const cleared = []
+  const first = engine(relay, sessions, { options: { onCleared: async ids => { cleared.push(...ids) } } })
+  await first.engine.pull()
+  const sid = first.engine.view().sessions[0]
+  relay.tombstone('old'); await first.engine.pull(); await first.engine.archived([sid])
+  assert.deepEqual(first.engine.view().cleared, [sid]); assert.deepEqual(cleared, [sid])
+  assert.equal(first.engine.owns(sid), false)
+  const restarted = engine(relay, sessions, { state: first.saved() }).engine
+  assert.equal(restarted.isCleared(sid), true)
+  restarted.signedOut(); assert.equal(restarted.owns(sid), false)
+  restarted.state.accountId = 'account-before'
+  await restarted.accountChanged('account-after')
+  assert.equal(restarted.isCleared(sid), true)
+  const pushes = relay.pushes.length
+  restarted.messageSent(sid); restarted.turnEnded(sid); await restarted.push()
+  assert.equal(relay.pushes.length, pushes)
+  first.engine.stop(); restarted.stop()
+})
+
+test('clearing the main chat replaces it and leaves independent conversations intact', async () => {
+  const relay = fakeRelay(); relay.add('main', 'main', 'Old main'); relay.say('main', 'user', 'old words')
+  const sessions = fakeSessions(); sessions.add('independent', 'Kept chat')
+  const { engine: e } = engine(relay, sessions)
+  await e.pull(); const old = e.state.mainSession
+  relay.tombstone('main'); await e.pull()
+  assert.equal(e.isCleared(old), true)
+  assert.notEqual(e.state.mainSession, old); assert.ok(e.state.mainSession)
+  assert.equal(e.isCleared('independent'), false)
+  assert.equal(await e.setMain(old), e.state.mainSession)
+  e.stop()
+})
+
+test('a failed tombstone write blocks access without acknowledging the relay cursor, then retries', async () => {
+  const relay = fakeRelay(); relay.add('old', 'side', 'Old chat'); relay.say('old', 'user', 'words')
+  const sessions = fakeSessions(); let fail = false; let durable; let cleaned = 0
+  const { engine: e } = engine(relay, sessions, { options: {
+    save: async state => { if (fail) throw new Error('disk full'); durable = structuredClone(state) },
+    onCleared: async () => { cleaned++ },
+  } })
+  await e.pull(); const cursor = e.state.cursor; const sid = e.view().sessions[0]
+  relay.tombstone('old'); fail = true
+  await assert.rejects(e.pull(), /disk full/)
+  assert.equal(e.state.cursor, cursor); assert.equal(durable.cursor, cursor)
+  assert.equal(e.isCleared(sid), true); assert.equal(cleaned, 1)
+  fail = false; await e.pull()
+  assert.equal(durable.cleared[sid], 'old'); assert.equal(cleaned, 2)
+  assert.ok(durable.cursor > cursor)
+  e.stop()
+})
+
+test('ordinary archival acknowledgement and an offline pull never create tombstones', async () => {
+  const relay = fakeRelay(); const sessions = fakeSessions(); sessions.add('archived', 'Archived')
+  const { engine: e } = engine(relay, sessions)
+  await e.archived(['archived'])
+  assert.deepEqual(e.view().cleared, [])
+  relay.refuse = { status: 503, code: 'unavailable' }
+  await assert.rejects(e.pull())
+  assert.deepEqual(e.view().cleared, []); assert.equal(e.owns('archived'), true)
+  e.stop()
+})
+
+
+test('clearing follows cold automatic descendants but leaves explicit saved copies independent', () => {
+  const ids = clearedDescendants(['parent'], [
+    { id: 'grandchild', parentSession: 'child', origin: 'subagent' },
+    { id: 'saved-copy', parentSession: 'parent' },
+    { id: 'copy-child', parentSession: 'saved-copy', origin: 'subagent' },
+    { id: 'child', parentSession: 'parent', origin: 'subagent' },
+  ])
+  assert.deepEqual(new Set(ids), new Set(['parent', 'child', 'grandchild']))
+})
+
+
+test('automatic child access rules survive a restart after their live sessions disappear', async () => {
+  const relay = fakeRelay(), sessions = fakeSessions()
+  const first = engine(relay, sessions)
+  await first.engine.clearDerivedSessions(['automatic-child'])
+  const restarted = engine(relay, sessions, { state: first.saved() }).engine
+  assert.equal(restarted.isCleared('automatic-child'), true)
+  assert.equal(restarted.isCleared('saved-copy'), false)
+  first.engine.stop(); restarted.stop()
+})
+
+
+test('a sidebar refresh during main-chat cleanup cannot adopt an independent chat', async (t) => {
+  const relay = fakeRelay(); relay.add('main', 'main', 'Old main')
+  relay.say('main', 'user', 'Earlier conversation')
+  const sessions = fakeSessions(); sessions.add('side', 'Separate work')
+  let finishCleanup
+  const cleanup = new Promise(resolve => { finishCleanup = resolve })
+  const { engine: e } = engine(relay, sessions, { options: { onCleared: () => cleanup } })
+  t.after(() => e.stop())
+  await e.pull(); const old = e.state.mainSession
+  relay.tombstone('main')
+  const pull = e.pull()
+  await until(() => e.isCleared(old))
+  assert.equal(await e.setMain('side'), '')
+  assert.equal(e.state.mainSession, old)
+  finishCleanup(); await pull
+  assert.notEqual(e.state.mainSession, old)
+  assert.notEqual(e.state.mainSession, 'side')
+  assert.equal(e.isCleared('side'), false)
 })

@@ -38,8 +38,9 @@ interface SyncList {
   /** Sessions of another account than the one signed in (C10): not listed, not searched; empty when signed out. */
   foreign: Set<string>
   toArchive: string[]
+  cleared: Set<string>
 }
-const NO_SYNC: SyncList = { enabled: true, mainSession: '', sessions: new Set(), foreign: new Set(), toArchive: [] }
+const NO_SYNC: SyncList = { enabled: true, mainSession: '', sessions: new Set(), foreign: new Set(), toArchive: [], cleared: new Set() }
 
 /** The host's sync view; read again whenever the host's sync revision moves. */
 export function useSyncList(): SyncList {
@@ -47,8 +48,8 @@ export function useSyncList(): SyncList {
   const [list, setList] = useState<SyncList>(NO_SYNC)
   useEffect(() => {
     let alive = true
-    call<{ enabled: boolean; mainSession?: string; sessions?: string[]; foreign?: string[]; toArchive?: string[] }>('sync/state')
-      .then((v) => { if (alive) setList({ enabled: v.enabled, mainSession: v.mainSession ?? '', sessions: new Set(v.sessions ?? []), foreign: new Set(v.foreign ?? []), toArchive: v.toArchive ?? [] }) })
+    call<{ enabled: boolean; mainSession?: string; sessions?: string[]; foreign?: string[]; toArchive?: string[]; cleared?: string[] }>('sync/state')
+      .then((v) => { if (alive) setList({ enabled: v.enabled, mainSession: v.mainSession ?? '', sessions: new Set(v.sessions ?? []), foreign: new Set(v.foreign ?? []), toArchive: v.toArchive ?? [], cleared: new Set(v.cleared ?? []) }) })
       .catch(() => undefined)
     return () => { alive = false }
   }, [rev])
@@ -242,7 +243,7 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
   // signed in, the column shows this account's chats and the ones never synced (C10); another account's stay, hidden
   const chats = state.ids
     .map((id) => state.byId[id])
-    .filter((s): s is ChatSummary => s !== undefined && s.origin !== 'subagent' && !s.parentId && !sync.foreign.has(s.id) && !batches.has(s.id))
+    .filter((s): s is ChatSummary => s !== undefined && s.origin !== 'subagent' && !s.parentId && !sync.cleared.has(s.id) && !sync.foreign.has(s.id) && !batches.has(s.id))
   const visible = chats.filter((s) => !archivedSet.has(s.id))
   const current = Object.values(state.byId).find((s) => (s.retainedBy.mainView ?? 0) > 0)?.id
 
@@ -278,6 +279,24 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
       .catch(() => undefined)
       .finally(() => { for (const id of due) archiving.current.delete(id) })
   }, [sync.toArchive])
+
+  const previousCurrent = useRef<string | undefined>(current)
+  const awaitingMain = useRef<string | undefined>()
+  const redirectedCurrent = useRef<string | undefined>()
+  useEffect(() => {
+    const old = current ?? previousCurrent.current
+    if (old && sync.cleared.has(old) && old !== redirectedCurrent.current) awaitingMain.current = old
+    else if (current) awaitingMain.current = undefined
+    previousCurrent.current = current
+    // Archiving clears the old selection. Wait for the host's replacement instead
+    // of creating extra blank sessions while the sync state is being saved.
+    if (awaitingMain.current && sync.mainSession && !sync.cleared.has(sync.mainSession)) {
+      redirectedCurrent.current = awaitingMain.current
+      awaitingMain.current = undefined
+      previousCurrent.current = undefined
+      actions.openSession(sync.mainSession)
+    }
+  }, [current, sync.cleared, sync.mainSession])
 
   const main = visible.find((s) => s.id === mainId)
   const q = query.trim().toLowerCase()
