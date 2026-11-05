@@ -69,6 +69,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **Kept Daily, setup and avatar views on the newest refresh.** Overlapping loads no longer replace newer information or report old errors after leaving. Avatar refreshes preserve drafts and the current candidate choice, while a different drawing session requires a new choice.
 - **Kept skill suggestions through failed refreshes.** The chat slash menu retained its loaded skills when a reload failed and ignored superseded answers. Turning skills off also hid cached suggestions and disabled their keyboard completion.
 - **Kept the newest skills list when saves overlap.** Older responses no longer hide newly saved skills, failed refreshes keep the loaded list, and pending reads do not report errors after leaving the page.
 - **Kept memory lists and recent changes on the newest refresh.** Older responses no longer hide newly saved memories or restore a forgotten item. Failed refreshes preserve the loaded view, and pending reads no longer report errors after leaving the page.
