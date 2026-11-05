@@ -77,9 +77,18 @@ def kill_tree(proc: Any) -> None:
             pass
 
 
+# Stop at command boundaries and the standalone end-of-options marker. A letter inside
+# a different long option (for example --preserve-root) is not an rm short flag.
+_RM_OPTIONS = r"(?:(?![ \t]--(?:[ \t\r\n|;&]|$))[^\n|;&])*"
+_RM_FLAG_END = r"(?=[ \t\r\n|;&]|$)"
+
 _DANGEROUS = [
     (
-        re.compile(r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*f|\brm\s+-[a-zA-Z]*f[a-zA-Z]*r"),
+        re.compile(
+            r"\brm(?=[ \t])"
+            rf"(?={_RM_OPTIONS}[ \t](?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive){_RM_FLAG_END})"
+            rf"(?={_RM_OPTIONS}[ \t](?:-[a-zA-Z]*f[a-zA-Z]*|--force){_RM_FLAG_END})"
+        ),
         "recursive force delete",
     ),
     (re.compile(r"\bsudo\b"), "privilege escalation (sudo)"),
@@ -124,7 +133,8 @@ _REACH: list[tuple[str, re.Pattern[str]]] = [
     (
         "deletion",
         re.compile(
-            r"\b(shutil\.rmtree|os\.(remove|unlink|rmdir|removedirs)|Path\([^)]*\)\.unlink)\b"
+            r"\b(shutil\.rmtree|os\.(remove|unlink|rmdir|removedirs)"
+            r"|Path\([^)]*\)\.(unlink|rmdir))\b"
         ),
     ),
     (
