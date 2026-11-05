@@ -175,11 +175,12 @@ A choice you made always wins; nanoMuse Cloud
 never steps in front of a provider you chose. Each device keeps its own choice,
 because keys never leave the device where they were entered.
 
-**Cloud retry stays explicit.** A failed turn on a model of your own does not
-automatically switch to nanoMuse Cloud. The error card offers *Use nanoMuse Cloud this time*
-(signed in only), which runs that one turn on the account's model and changes
-no row. A failed picture or clip has no Cloud retry: fix or choose a media
-provider of your own and retry there.
+**The Cloud retry button needs your action.** After a failed turn, the error card
+offers *Use nanoMuse Cloud this time* while signed in. Clicking it runs that one
+turn on the account's model and changes no row. This button does not govern model
+group routing: a Cloud model included in a phone's group can still be selected
+automatically by that group. A failed picture or clip has no Cloud retry: fix or
+choose a media provider of your own and retry there.
 
 **Model groups can switch automatically.** This is separate from the Cloud retry
 button. On Android and iPhone, a chat bound to a group can try another available
