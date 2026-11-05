@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -230,12 +231,18 @@ fun CodingScreen(onBack: () -> Unit, onOpenDevices: () -> Unit) {
                     if (agents.isNotEmpty()) {
                         MuseRowDivider(inset = 16.dp)
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             AgentChip(stringResource(R.string.nm_coding_all), selected = filter == null, running = 0, installed = true) { filter = null }
                             agents.forEach { a ->
-                                AgentChip(a.name, selected = filter == a.id, running = a.running, installed = a.installed) {
+                                val status = stringResource(when {
+                                    a.running > 0 -> R.string.nm_coding_running
+                                    a.installed -> R.string.nm_coding_installed
+                                    else -> R.string.nm_coding_not_installed
+                                })
+                                AgentChip("${a.name} · $status", selected = filter == a.id, running = a.running, installed = a.installed) {
                                     filter = if (filter == a.id) null else a.id
                                 }
                             }
@@ -334,6 +341,8 @@ private fun AgentChip(label: String, selected: Boolean, running: Int, installed:
         }
         Text(
             text = label,
+            maxLines = 1,
+            softWrap = false,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = when {

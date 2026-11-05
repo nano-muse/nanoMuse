@@ -1226,4 +1226,6 @@
 <string name="nm_access_never">Never auto-lock</string>
 <string name="nm_access_seconds">%1$d seconds</string>
 <string name="nm_access_unavailable">Set a screen lock on this device first.</string>
+    <string name="nm_coding_installed">Installed</string>
+    <string name="nm_coding_not_installed">Not installed</string>
 </resources>

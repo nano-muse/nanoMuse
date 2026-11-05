@@ -1246,4 +1246,6 @@
 <string name="nm_access_never">No bloquear automáticamente</string>
 <string name="nm_access_seconds">%1$d segundos</string>
 <string name="nm_access_unavailable">Primero configura un bloqueo de pantalla en este dispositivo.</string>
+    <string name="nm_coding_installed">Instalado</string>
+    <string name="nm_coding_not_installed">No instalado</string>
 </resources>
