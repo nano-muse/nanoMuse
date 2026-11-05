@@ -78,6 +78,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Kept in-flight conversation sync isolated across account changes and sign-out. Interrupted account changes kept sync paused across restarts until sign-in succeeded.
 - Remembered conversation-clear notifications across restarts and blocked cleared chats from task records, history, search, duplication and resume. Automatic subagent histories followed their parent; saved copies and ordinary archives stayed available. Local JSONL logs remained on disk. For #832.
 - Opened archived chats inside the chat column, with search and restore controls, instead of opening general settings. For #833.
 

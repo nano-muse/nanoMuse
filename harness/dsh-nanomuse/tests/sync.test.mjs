@@ -148,8 +148,9 @@ function fakeSessions() {
   s.api = {
     list: async () => { s.listCalls += 1; return [...s.rows.values()] },
     lines: async (id) => { s.lineCalls += 1; return s.lines.get(id) ?? [] },
-    create: async (title) => {
-      const id = `session-${++s.created}`
+    create: async (title, reservedId) => {
+      s.created += 1
+      const id = reservedId ?? `session-${s.created}`
       s.add(id, title, [], Date.now())
       return id
     },
@@ -1293,4 +1294,247 @@ test('a sidebar refresh during main-chat cleanup cannot adopt an independent cha
   assert.notEqual(e.state.mainSession, old)
   assert.notEqual(e.state.mainSession, 'side')
   assert.equal(e.isCleared('side'), false)
+})
+
+test('C10 epoch: a delayed account A page cannot populate account B', async (t) => {
+  const old = fakeRelay(); old.add('a-main', 'main', 'A private chat'); old.say('a-main', 'user', 'A private words')
+  const current = fakeRelay(); const sessions = fakeSessions()
+  const started = Promise.withResolvers(); const release = Promise.withResolvers()
+  let token = 'a-key'
+  const relay = { fetch: async (url, init) => {
+    if (init.headers.authorization === 'Bearer a-key') {
+      const response = await old.fetch(url, init)
+      started.resolve(); await release.promise
+      return response
+    }
+    return current.fetch(url, init)
+  } }
+  const { engine: e } = engine(relay, sessions, { state: { ...emptyState(), accountId: 'acct-a' }, options: { token: async () => token, pushDelayMs: 60_000 } })
+  t.after(() => { token = undefined; e.stop() })
+  const pulling = e.pull(); await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b')
+  release.resolve(); await pulling
+  assert.equal(e.state.accountId, 'acct-b')
+  assert.deepEqual(e.state.conversations, {})
+  assert.equal(e.state.mainSession, '')
+  assert.deepEqual(e.state.owners, {})
+  assert.equal(e.state.cursor, 0)
+  assert.deepEqual(sessions.appended, [])
+  assert.deepEqual(sessions.injected, [])
+})
+
+test('C10 epoch: signing out discards a page already requested', async (t) => {
+  const old = fakeRelay(); old.add('a-main', 'main', 'A private chat'); old.say('a-main', 'user', 'A private words')
+  const sessions = fakeSessions(); const started = Promise.withResolvers(); const release = Promise.withResolvers()
+  let token = 'a-key'
+  const relay = { fetch: async (url, init) => { const response = await old.fetch(url, init); started.resolve(); await release.promise; return response } }
+  const { engine: e } = engine(relay, sessions, { state: { ...emptyState(), accountId: 'acct-a' }, options: { token: async () => token } })
+  t.after(() => e.stop())
+  const pulling = e.pull(); await started.promise
+  token = undefined; e.signedOut(); release.resolve(); await pulling
+  assert.deepEqual(e.state.conversations, {})
+  assert.equal(e.state.cursor, 0)
+  assert.deepEqual(sessions.appended, [])
+})
+
+for (const replacement of [false, true]) test(`C10 epoch: account switch during ${replacement ? 'cleared main replacement' : 'remote chat creation'} keeps the new account untouched`, async (t) => {
+  const old = fakeRelay(); old.add('a-main', 'main', 'A private chat'); old.say('a-main', 'user', 'A private words')
+  const current = fakeRelay(); const sessions = fakeSessions()
+  let token = 'a-key'
+  const relay = { fetch: (url, init) => (init.headers.authorization === 'Bearer a-key' ? old : current).fetch(url, init) }
+  const { engine: e } = engine(relay, sessions, { state: { ...emptyState(), accountId: 'acct-a' }, options: { token: async () => token, pushDelayMs: 60_000 } })
+  t.after(() => { token = undefined; e.stop() })
+  if (replacement) { await e.pull(); old.tombstone('a-main') }
+  const create = sessions.api.create; const started = Promise.withResolvers(); const release = Promise.withResolvers()
+  let created
+  sessions.api.create = async (title, reservedId) => { started.resolve(); await release.promise; created = await create(title, reservedId); return created }
+  const pulling = e.pull(); await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b')
+  release.resolve(); await pulling
+  assert.equal(e.state.mainSession, '')
+  assert.equal(e.state.cursor, 0)
+  assert.deepEqual(e.state.conversations, {})
+  assert.notEqual(e.state.owners[created], 'acct-b')
+  assert.equal(e.owns(created), false, 'an already-created old-account session must not become an ownerless chat visible to B')
+  assert.equal(e.state.owners[created], 'acct-a')
+})
+
+for (const stage of ['active', 'token', 'list', 'lines', 'save', 'response']) test(`C10 epoch: a push paused at ${stage} cannot use its old token for the new account`, async (t) => {
+  const old = fakeRelay(); const current = fakeRelay(); const sessions = fakeSessions()
+  sessions.add('a-local', 'A private chat', [{ id: 'a-line', role: 'user', text: 'A private words', at: 1 }])
+  const started = Promise.withResolvers(); const release = Promise.withResolvers()
+  let blocked = false; let token = 'a-key'; let tokenReads = 0
+  const pause = async (at) => {
+    if (stage !== at || blocked) return
+    blocked = true; started.resolve(); await release.promise
+  }
+  const list = sessions.api.list; const lines = sessions.api.lines
+  sessions.api.list = async () => { await pause('list'); return list() }
+  sessions.api.lines = async (id) => { await pause('lines'); return lines(id) }
+  const relay = { fetch: async (url, init) => {
+    const response = await (init.headers.authorization === 'Bearer a-key' ? old : current).fetch(url, init)
+    if (init.method === 'POST' && new URL(url).pathname === '/v1/sync/changes') await pause('response')
+    return response
+  } }
+  const { engine: e } = engine(relay, sessions, {
+    state: { ...emptyState(), accountId: 'acct-a', sideChats: true, owners: { 'a-local': 'acct-a' } },
+    options: {
+      token: async () => { const captured = token; await pause(++tokenReads === 1 ? 'active' : 'token'); return captured },
+      save: async () => { await pause('save') }, pushDelayMs: 60_000,
+    },
+  })
+  t.after(() => { token = undefined; e.stop() })
+  e.messageSent('a-local'); const pushing = e.push(); await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b')
+  sessions.add('b-local', 'B chat', [{ id: 'b-line', role: 'user', text: 'B words', at: 2 }])
+  e.messageSent('b-local'); release.resolve(); await pushing
+  assert.deepEqual(e.state.conversations, {})
+  assert.deepEqual(e.state.mids, {})
+  assert.equal(old.pushes.length, stage === 'response' ? 1 : 0)
+  assert.ok(old.pushes.every((p) => p.messages.every((m) => m.text === 'A private words')))
+  await e.push()
+  assert.ok(current.pushes.length > 0, 'the new account still pushes its own pending work')
+  assert.ok(current.pushes.every((p) => p.messages.every((m) => m.text === 'B words')))
+})
+
+test('C10 epoch: signing back into the same account cannot revive its old request', async (t) => {
+  const relay = fakeRelay(); relay.add('old-main', 'main', 'Old request'); relay.say('old-main', 'user', 'Old words')
+  const sessions = fakeSessions(); const started = Promise.withResolvers(); const release = Promise.withResolvers()
+  let token = 'old-key'
+  const source = { fetch: async (url, init) => {
+    const response = await relay.fetch(url, init)
+    if (init.headers.authorization === 'Bearer old-key') { started.resolve(); await release.promise }
+    return response
+  } }
+  const { engine: e } = engine(source, sessions, { state: { ...emptyState(), accountId: 'same-account' }, options: { token: async () => token, pushDelayMs: 60_000 } })
+  t.after(() => { token = undefined; e.stop() })
+  const pulling = e.pull(); await started.promise
+  e.signedOut(); token = 'new-key'; await e.accountChanged('same-account')
+  release.resolve(); await pulling
+  assert.deepEqual(e.state.conversations, {})
+  assert.equal(e.state.cursor, 0)
+  assert.deepEqual(sessions.appended, [])
+  await e.pull()
+  assert.equal(e.state.cursor, relay.seq, 'a new request with the replacement credential still succeeds')
+})
+
+test('C10 epoch: an old refused key cannot pause the new account', async (t) => {
+  const current = fakeRelay(); const sessions = fakeSessions()
+  const started = Promise.withResolvers(); const release = Promise.withResolvers(); let token = 'a-key'
+  const source = { fetch: async (url, init) => {
+    if (init.headers.authorization === 'Bearer a-key') {
+      started.resolve(); await release.promise
+      return new Response(JSON.stringify({ error: { code: 'bad_key', message: 'old key refused' } }), { status: 401 })
+    }
+    return current.fetch(url, init)
+  } }
+  const { engine: e } = engine(source, sessions, { state: { ...emptyState(), accountId: 'acct-a' }, options: { token: async () => token } })
+  t.after(() => { token = undefined; e.stop() })
+  const pulling = e.pull(); await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b'); release.resolve(); await pulling
+  assert.equal(e.error, '')
+  assert.equal(await e.active(), true)
+  await e.pull()
+})
+
+test('C10 epoch: a late failed cursor save cannot roll the new account back', async (t) => {
+  const relay = fakeRelay(); relay.add('a-main', 'main', 'A chat'); relay.say('a-main', 'user', 'A words')
+  const sessions = fakeSessions(); const started = Promise.withResolvers(); const release = Promise.withResolvers()
+  let blocked = false; let token = 'a-key'
+  const { engine: e } = engine(relay, sessions, {
+    state: { ...emptyState(), accountId: 'acct-a' },
+    options: { token: async () => token, save: async (state) => {
+      if (state.accountId === 'acct-a' && state.cursor > 0 && !blocked) { blocked = true; started.resolve(); await release.promise; throw new Error('old save failed') }
+    } },
+  })
+  t.after(() => { token = undefined; e.stop() })
+  const pulling = e.pull(); await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b')
+  e.state.cursor = 17; release.resolve(); await pulling
+  assert.equal(e.state.cursor, 17)
+  assert.deepEqual(e.state.conversations, {})
+  assert.equal(e.error, '')
+})
+
+test('C10 epoch: a delayed model-context callback rechecks the account before injecting', async (t) => {
+  const relay = fakeRelay(); relay.add('a-main', 'main', 'A chat'); relay.say('a-main', 'user', 'A words')
+  const sessions = fakeSessions(); const started = Promise.withResolvers(); const release = Promise.withResolvers()
+  const inject = sessions.api.inject; let token = 'a-key'
+  sessions.api.inject = async (sid, text, isCurrent) => { started.resolve(); await release.promise; if (isCurrent()) await inject(sid, text) }
+  const { engine: e } = engine(relay, sessions, { state: { ...emptyState(), accountId: 'acct-a' }, options: { token: async () => token } })
+  t.after(() => { token = undefined; e.stop() })
+  const pulling = e.pull(); await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b'); release.resolve(); await pulling
+  assert.deepEqual(sessions.injected, [])
+  assert.equal(e.state.cursor, 0)
+})
+
+for (const action of ['relayStatus', 'setEnabled', 'deleteRemote']) test(`C10 epoch: a delayed ${action} response cannot overwrite the new account`, async (t) => {
+  const old = fakeRelay(); old.add('a-main', 'main', 'A chat')
+  const current = fakeRelay(); const sessions = fakeSessions()
+  const started = Promise.withResolvers(); const release = Promise.withResolvers(); let token = 'a-key'
+  const source = { fetch: async (url, init) => {
+    const response = await (init.headers.authorization === 'Bearer a-key' ? old : current).fetch(url, init)
+    if (init.headers.authorization === 'Bearer a-key') { started.resolve(); await release.promise }
+    return response
+  } }
+  const { engine: e } = engine(source, sessions, { state: { ...emptyState(), accountId: 'acct-a' }, options: { token: async () => token } })
+  t.after(() => { token = undefined; e.stop() })
+  const pending = action === 'setEnabled' ? e.setEnabled(false) : e[action]()
+  await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b', false)
+  e.state.cursor = 17; e.state.titles['b-local'] = 'B chat'; e.state.mids['b-line'] = 'b-mid'
+  release.resolve(); await pending
+  assert.equal(e.state.cursor, 17)
+  assert.equal(e.state.enabled, true)
+  assert.deepEqual(e.state.titles, { 'b-local': 'B chat' })
+  assert.deepEqual(e.state.mids, { 'b-line': 'b-mid' })
+  assert.equal(e.view().relay, null)
+})
+
+test('C10 epoch: an old oversized push cannot retry or mark new-account messages refused', async (t) => {
+  const old = fakeRelay(); old.refusePush = { status: 413, code: 'too_large' }
+  const current = fakeRelay(); const sessions = fakeSessions()
+  sessions.add('a-local', 'A chat', [1, 2].map((n) => ({ id: `a-${n}`, role: 'user', text: `A words ${n}`, at: n })))
+  const started = Promise.withResolvers(); const release = Promise.withResolvers(); let token = 'a-key'
+  const source = { fetch: async (url, init) => {
+    const response = await (init.headers.authorization === 'Bearer a-key' ? old : current).fetch(url, init)
+    if (init.method === 'POST' && new URL(url).pathname === '/v1/sync/changes') { started.resolve(); await release.promise }
+    return response
+  } }
+  const { engine: e } = engine(source, sessions, { state: { ...emptyState(), accountId: 'acct-a', sideChats: true, owners: { 'a-local': 'acct-a' } }, options: { token: async () => token, pushDelayMs: 60_000 } })
+  t.after(() => { token = undefined; e.stop() })
+  e.messageSent('a-local'); const pushing = e.push(); await started.promise
+  token = 'b-key'; await e.accountChanged('acct-b', false)
+  release.resolve(); await pushing
+  assert.equal(old.pushes.length, 1)
+  assert.equal(current.pushes.length, 0)
+  assert.deepEqual(e.state.mids, {})
+  assert.equal(e.error, '')
+})
+
+test('C10 epoch: a host-published session stays with its original account before create resolves', async (t) => {
+  const old = fakeRelay(); old.add('a-main', 'main', 'A chat'); old.say('a-main', 'user', 'A words')
+  const current = fakeRelay(); const sessions = fakeSessions()
+  const started = Promise.withResolvers(); const release = Promise.withResolvers(); let token = 'a-key'; let lateId
+  const source = { fetch: (url, init) => (init.headers.authorization === 'Bearer a-key' ? old : current).fetch(url, init) }
+  sessions.api.create = async (title, reservedId) => {
+    lateId = reservedId ?? 'late-a'
+    sessions.add(lateId, title, [{ id: 'late-line', role: 'user', text: 'A words', at: 1 }])
+    started.resolve(); await release.promise
+    return lateId
+  }
+  const { engine: e, saved } = engine(source, sessions, { state: { ...emptyState(), accountId: 'acct-a', sideChats: true }, options: { token: async () => token, pushDelayMs: 60_000 } })
+  t.after(() => { release.resolve(); token = undefined; e.stop() })
+  const pulling = e.pull(); await started.promise
+  assert.equal(saved().owners[lateId], 'acct-a', 'the owner is saved before the host publishes the chat')
+  token = 'b-key'; await e.accountChanged('acct-b')
+  assert.equal(e.owns(lateId), false, 'ownership must exist while the host is still finishing create')
+  assert.equal(await e.setMain(lateId), '')
+  e.messageSent(lateId); await e.push()
+  assert.equal(current.pushes.length, 0)
+  release.resolve(); await pulling
+  assert.equal(e.state.mainSession, '')
+  assert.equal(e.state.owners[lateId], 'acct-a')
+  assert.equal(e.state.cids[lateId], undefined)
 })

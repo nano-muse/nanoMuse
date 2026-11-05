@@ -54,7 +54,7 @@ import { TaskRunner, textOf } from './task.ts'
 import { Turns, aggregateWork, type WorkItem } from './work.ts'
 import { SCREEN_RUN_IDLE_MS, ScreenRuns, Trajectory, type ScreenRun, type StepAction, type TrajectoryView } from './trajectory.ts'
 import { describeCall } from './steps.ts'
-import { clearedDescendants, RemoteStore, SyncEngine, SyncRelay, type RemoteLine, type SessionInfo, type SessionLine, type SyncState } from './sync.ts'
+import { clearedDescendants, forAccount, migrate, RemoteStore, SyncEngine, SyncRelay, type RemoteLine, type SessionInfo, type SessionLine, type SyncState } from './sync.ts'
 import { AvatarMotion, ANIMATED, type MotionMood, type MotionView } from './motion.ts'
 import { OwnClip, isOwnClipMood, type OwnClipMood, type OwnClipView } from './own-clip.ts'
 import { OwnTurns } from './record.ts'
@@ -409,6 +409,8 @@ const STUDIO_PICTURES = 8
 const NO_STAGE: StageState = { seq: 0, at: 0, source: 'computer', device: '', width: 0, height: 0, title: '', mode: 'screen', action: null, sessionId: '' }
 
 interface State {
+  /** A credential change not yet fully committed; sync stays stopped across a restart. */
+  accountTransition?: true
   account?: Account
   models?: RelayModel[]
   deviceId?: string
@@ -658,6 +660,8 @@ export default class NanomuseCloud extends Service {
   private runTimer: NodeJS.Timeout | undefined
   private stageTimer: NodeJS.Timeout | undefined
   private signedInCache = false
+  private accountEpoch = 0
+  private changingAccount = false
   /** When the account was last re-read for the allowance (after a turn, after a refusal). */
   private lastAllowanceCheck = 0
   /** Tasks from other devices, once the session API is up. */
@@ -993,12 +997,7 @@ export default class NanomuseCloud extends Service {
             return rows
           },
           lines: (sessionId) => this.sessionLines(ctx, sessionId),
-          create: async (title) => {
-            // In the home workspace (`~/nanoMuse`), as the first conversation is.
-            const created = await ctx.sessionController.create(await homeWorkspace(ctx))
-            await ctx.sessionController.rename({ sessionId: created.sessionId, title }).catch(() => undefined)
-            return String(created.sessionId)
-          },
+          create: (title, sessionId) => this.createSyncedSession(ctx, title, sessionId),
           rename: async (sessionId, title) => {
             await ctx.sessionController.rename({ sessionId: sessionId as SessionId, title })
           },
@@ -1009,12 +1008,7 @@ export default class NanomuseCloud extends Service {
             kept.clear()
             this.logCache.clear()
           },
-          inject: async (sessionId, text) => {
-            const resolved = await ctx.sessionController.resolveAgent(sessionId as SessionId)
-            if ('error' in resolved) throw new Error(String(resolved.error))
-            // model-facing: a `nanomuse-sync` source, so the push (`sessionLines`, `user` sources only) never sends it back
-            resolved.agent.inject(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'nanomuse-sync', role: 'user', mid: '', device: '', deviceName: '', at: Date.now() } }))
-          },
+          inject: (sessionId, text, isCurrent) => this.injectSyncedContext(ctx, sessionId, text, isCurrent),
         },
         token: () => this.token(),
         deviceId: () => this.state.deviceId ?? '',
@@ -1057,7 +1051,7 @@ export default class NanomuseCloud extends Service {
           }),
         'nanomuse cloud: sync on hub connect',
       )
-      if (this.state.account) sync.start()
+      void this.startAccountSync(sync).catch((error: unknown) => this.ctx.logger.warn('nanomuse cloud: sync account not ready: %s', message(error)))
       ctx.effect(() => () => {
         sync.stop()
         this.sync = undefined
@@ -2678,35 +2672,95 @@ export default class NanomuseCloud extends Service {
     return this.serialize(async () => this.adopt(await this.relay.login(identifier.trim(), password, this.deviceName())))
   }
 
+  /** Invalidate work before changing credentials, including a sync service injected mid-transition. */
+  private async beginAccountChange(): Promise<void> {
+    this.accountEpoch += 1
+    this.changingAccount = true
+    this.state.accountTransition = true
+    this.sync?.signedOut()
+    this.sync?.stop()
+    this.signedInCache = false
+    this.hub.stop('account credentials changing')
+    // If this write fails, credentials are untouched. If a later step fails, a restart stays paused.
+    await this.writeState()
+  }
+
+  private async finishAccountChange(): Promise<void> {
+    delete this.state.accountTransition
+    try {
+      await this.writeState()
+    } catch (error) {
+      this.state.accountTransition = true
+      // A concurrent state save may have succeeded while this one failed. Preserve the pause too.
+      await this.writeState().catch(() => undefined)
+      throw error
+    }
+    this.changingAccount = false
+  }
+
+  private async startAccountSync(sync: SyncEngine): Promise<void> {
+    const accountId = this.state.account?.id
+    if (!accountId || this.changingAccount || this.state.accountTransition) {
+      sync.signedOut()
+      sync.stop()
+      return
+    }
+    const epoch = this.accountEpoch
+    await sync.accountChanged(accountId, false)
+    if (epoch !== this.accountEpoch || this.sync !== sync || this.changingAccount || this.state.accountTransition) return
+    sync.start()
+  }
+
+  private async createSyncedSession(ctx: Context, title: string, sessionId: string): Promise<string> {
+    // The engine reserved this ID and persisted its owner before the host can publish the session.
+    const created = await ctx.sessionController.create({ ...await homeWorkspace(ctx), sessionId: sessionId as SessionId })
+    await ctx.sessionController.rename({ sessionId: created.sessionId, title }).catch(() => undefined)
+    return String(created.sessionId)
+  }
+
+  private async injectSyncedContext(ctx: Context, sessionId: string, text: string, isCurrent: () => boolean): Promise<void> {
+    if (!isCurrent()) return
+    const resolved = await ctx.sessionController.resolveAgent(sessionId as SessionId)
+    if (!isCurrent()) return
+    if ('error' in resolved) throw new Error(String(resolved.error))
+    // Model-facing context only; sessionLines sends only user sources back to the relay.
+    resolved.agent.inject(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'nanomuse-sync', role: 'user', mid: '', device: '', deviceName: '', at: Date.now() } }))
+  }
+
   /** A fresh key from either way in: wire the provider, remember the account, wear its look. */
   private async adopt(signIn: SignIn): Promise<CloudStatus> {
-    // C10: a different account than the one this device last held (the sync state remembers it through a
-    // sign-out) — the account-scoped state starts over
     const last = this.sync?.state.accountId || this.state.sync?.accountId || ''
     const switched = Boolean(last) && last !== signIn.account.id
+    await this.beginAccountChange()
     await this.ctx.credentials.set(credentialRef(TOKEN_REF), signIn.apiKey)
     const models = await this.relay.models(signIn.apiKey)
     await this.writeProvider(models)
     await this.adoptDefaultModel(models)
     this.state = { ...this.state, account: signIn.account, models }
     await this.writeState()
+    await this.profile.pull(signIn.apiKey, true).catch((error: unknown) => this.ctx.logger.warn('nanomuse: profile pull failed: %s', message(error)))
+    if (this.sync) {
+      await this.sync.accountChanged(signIn.account.id, false)
+    } else {
+      // Sign-in can finish before the session service exists. Bind its persisted state too.
+      const previous = migrate(this.state.sync)
+      this.state.sync = switched ? forAccount(previous, signIn.account.id) : { ...previous, accountId: signIn.account.id }
+      if (switched) {
+        const kept = this.kept ?? new RemoteStore(join(dshHome(), 'nanomuse', 'sync-remote.json'), (error) => this.ctx.logger.warn('nanomuse cloud: remote turns not saved: %s', message(error)))
+        kept.clear()
+        await kept.flush()
+        this.logCache.clear()
+      }
+    }
+    await this.finishAccountChange()
     await this.writeHands().catch((error: unknown) => this.ctx.logger.warn('nanomuse cloud: hands model not written: %s', message(error)))
     this.lastSharedConnectors = ''
     void this.publishConnectors().catch(() => undefined)
     this.signedInCache = true
     this.ctx.logger.info('nanomuse cloud: signed in as %s (%s)', signIn.account.hint, signIn.account.channel)
-    await this.profile.pull(signIn.apiKey, true).catch((error: unknown) => this.ctx.logger.warn('nanomuse: profile pull failed: %s', message(error)))
-    if (switched) {
-      // the last account's device list and notices are not this account's
-      this.hub.stop('another account signed in')
-      this.notices = []
-      this.hub.start()
-    } else this.hub.restart()
-    if (this.sync) {
-      // the account first: the pull that `start` makes runs against the new account's cursor
-      await this.sync.accountChanged(signIn.account.id)
-      this.sync.start()
-    }
+    if (switched) this.notices = []
+    this.hub.start()
+    if (this.sync) await this.startAccountSync(this.sync)
     this.broadcast()
     return this.status()
   }
@@ -3384,7 +3438,10 @@ export default class NanomuseCloud extends Service {
 
   /** The current account key, for a plugin that speaks to the relay itself. */
   token(): Promise<string | undefined> {
-    return this.ctx.credentials.resolve(credentialRef(TOKEN_REF)).then((r) => r?.value)
+    const epoch = this.accountEpoch
+    if (this.changingAccount || this.state.accountTransition) return Promise.resolve(undefined)
+    return this.ctx.credentials.resolve(credentialRef(TOKEN_REF)).then((r) =>
+      epoch === this.accountEpoch && !this.changingAccount && !this.state.accountTransition ? r?.value : undefined)
   }
 
   /** The persisted relay catalogue, reused by the adapter's default-capacity layer. */
@@ -3481,7 +3538,7 @@ export default class NanomuseCloud extends Service {
   }
 
   private async forget(): Promise<void> {
-    this.hub.stop('signed out')
+    await this.beginAccountChange()
     await this.ctx.credentials.unset(credentialRef(TOKEN_REF))
     try {
       await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', PROVIDER_ID] }])
@@ -3494,6 +3551,7 @@ export default class NanomuseCloud extends Service {
     // the own keys and the ChatGPT sign-in are this computer's, not the account's (C11): they stay too
     const { deviceId, deviceName, remoteControl, sync, providers, chatgpt, media, handsProvider, handsModel } = this.state
     this.state = {
+      accountTransition: true,
       ...(deviceId ? { deviceId } : {}),
       ...(deviceName ? { deviceName } : {}),
       ...(remoteControl === true ? { remoteControl } : {}),
@@ -3503,9 +3561,6 @@ export default class NanomuseCloud extends Service {
       ...(media ? { media } : {}),
       ...(handsProvider && handsModel ? { handsProvider, handsModel } : {}),
     }
-    this.sync?.stop()
-    this.sync?.signedOut()
-    this.signedInCache = false
     this.events.forget()
     this.lastSharedConnectors = ''
     // the account's route is gone from the model layer: a chat slot left on it would fail every turn with NO_ADAPTER
@@ -3513,6 +3568,7 @@ export default class NanomuseCloud extends Service {
     await this.writeState()
     await this.writeHands().catch(() => rm(join(this.dir(), 'hands.json'), { force: true }).catch(() => undefined))
     await this.profile.reset()
+    await this.finishAccountChange()
     this.broadcast()
   }
 
@@ -3778,6 +3834,7 @@ export default class NanomuseCloud extends Service {
     try {
       const raw = JSON.parse(await readFile(this.statePath(), 'utf8')) as State
       return {
+        ...(raw.accountTransition === true ? { accountTransition: true as const } : {}),
         ...(raw.account ? { account: raw.account } : {}),
         ...(raw.models ? { models: raw.models } : {}),
         ...(typeof raw.deviceId === 'string' && raw.deviceId ? { deviceId: raw.deviceId } : {}),
