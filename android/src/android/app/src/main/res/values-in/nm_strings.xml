@@ -1242,6 +1242,11 @@
 <string name="nm_access_never">Jangan kunci otomatis</string>
 <string name="nm_access_seconds">%1$d detik</string>
 <string name="nm_access_unavailable">Atur kunci layar pada perangkat ini terlebih dahulu.</string>
+<string name="nm_session_protected">Percakapan terlindungi</string>
+<string name="nm_session_protect">Lindungi percakapan</string>
+<string name="nm_session_unprotect">Hapus perlindungan percakapan</string>
+<string name="nm_session_settings">Batas waktu kunci percakapan</string>
+
     <string name="nm_coding_installed">Terinstal</string>
     <string name="nm_coding_not_installed">Belum terinstal</string>
 </resources>

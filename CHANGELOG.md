@@ -123,6 +123,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Kept pending diagnostic exports paused until their own activity was resumed and app access was unlocked together.
 
+- Re-locked protected conversations when leaving a retained Muse tab with the On exit setting.
+
+- Added local device authentication for protected Android conversations, guarded exports and duplication, retained protection on copies, and saved new conversations before protecting them.
+
 - Added device authentication and configurable re-locking before Android app content or safe-mode diagnostics are shown, including diagnostic export after an external file picker.
 
 - Kept coding-agent filters readable on narrow screens and showed running, installed and not-installed states. For #829.

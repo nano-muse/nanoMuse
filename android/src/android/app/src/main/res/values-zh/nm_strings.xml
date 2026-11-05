@@ -1219,6 +1219,11 @@
 <string name="nm_access_never">不自动锁定</string>
 <string name="nm_access_seconds">%1$d 秒</string>
 <string name="nm_access_unavailable">请先为本设备设置锁屏密码。</string>
+<string name="nm_session_protected">受保护的对话</string>
+<string name="nm_session_protect">保护对话</string>
+<string name="nm_session_unprotect">移除对话保护</string>
+<string name="nm_session_settings">对话锁定时间</string>
+
     <string name="nm_coding_installed">已安装</string>
     <string name="nm_coding_not_installed">未安装</string>
 </resources>

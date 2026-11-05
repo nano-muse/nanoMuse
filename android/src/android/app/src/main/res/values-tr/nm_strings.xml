@@ -1246,6 +1246,11 @@
 <string name="nm_access_never">Asla otomatik kilitleme</string>
 <string name="nm_access_seconds">%1$d saniye</string>
 <string name="nm_access_unavailable">Önce bu cihazda bir ekran kilidi ayarlayın.</string>
+<string name="nm_session_protected">Korumalı konuşma</string>
+<string name="nm_session_protect">Konuşmayı koru</string>
+<string name="nm_session_unprotect">Konuşma korumasını kaldır</string>
+<string name="nm_session_settings">Konuşma kilidi süresi</string>
+
     <string name="nm_coding_installed">Yüklü</string>
     <string name="nm_coding_not_installed">Yüklü değil</string>
 </resources>

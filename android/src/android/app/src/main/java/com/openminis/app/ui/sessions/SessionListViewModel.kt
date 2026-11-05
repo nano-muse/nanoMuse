@@ -158,9 +158,11 @@ class SessionListViewModel(
 
     // The list to actually show: search results when searching, otherwise all sessions
     val displayedSessions: StateFlow<List<ChatSessionEntity>> = combine(
-        _allSessions, searchResults, searchQuery, isSearchActive
-    ) { all, results, q, active ->
-        if (active && q.isNotBlank()) results else all
+        _allSessions, searchResults, searchQuery, isSearchActive,
+        io.github.nanomuse.guard.SessionAccess.protected,
+    ) { all, results, q, active, protected ->
+        // nanoMuse: protected message bodies do not participate in visible search results.
+        if (active && q.isNotBlank()) results.filter { it.id !in protected || it.title.orEmpty().contains(q, true) } else all
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ─── Session groups ("folders") ────────────────────────────────────────
@@ -776,6 +778,8 @@ class SessionListViewModel(
 
     fun regenerateTitle(id: String) {
         viewModelScope.launch(Dispatchers.IO) {
+            // nanoMuse: manual title generation reads protected message content too.
+            if (io.github.nanomuse.guard.SessionAccess.isLocked(id)) return@launch
             withContext(Dispatchers.Main) {
                 regeneratingIds.value = regeneratingIds.value + id
             }
@@ -1095,20 +1099,12 @@ class SessionListViewModel(
 
     fun duplicateSession(id: String) {
         viewModelScope.launch {
-            val session = chatRepository.getSession(id) ?: return@launch
-            val messages = chatRepository.loadMessages(id)
-            val newSession = chatRepository.createSession(
-                modelId = session.modelId,
-                title = "${session.title ?: "Chat"} (Copy)",
-            )
-            for (msg in messages) {
-                chatRepository.appendMessage(
-                    sessionId = newSession.id,
-                    role = msg.role,
-                    partsJson = msg.partsJson,
-                    tokenUsage = msg.tokenUsage,
-                    reasoningContent = msg.reasoningContent,
-                )
+            // nanoMuse: reuse metadata/marker copying and protection instead of a second copy loop.
+            try {
+                io.github.nanomuse.guard.SessionAccess.requireUnlocked(id)
+                com.openminis.app.data.SessionForkManager(chatRepository, filesDir = context.filesDir).duplicateSession(id)
+            } catch (_: SecurityException) {
+                AppLogger.warning(TAG, "Device authentication required before duplicating a protected conversation")
             }
         }
     }

@@ -408,3 +408,7 @@ notes above; a settled item keeps its number and says how it went.
 | Interrupted restore recovery | ✓ Unreleased, see [Android](android.md#restore-recovery) | ✓ |
 | Unread replies | ✓ Unreleased, see [Android](android.md#unread-replies) | ✓ |
 | App lock | ✓ Unreleased, see [Android](android.md#app-lock) | ✓ |
+
+| Feature | Android | iOS |
+|---|---|---|
+| Protected conversations | ✓ Unreleased, see [Android](android.md#session-lock) | ✓ |

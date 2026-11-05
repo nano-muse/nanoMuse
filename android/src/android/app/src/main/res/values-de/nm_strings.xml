@@ -1246,6 +1246,11 @@
 <string name="nm_access_never">Nie automatisch sperren</string>
 <string name="nm_access_seconds">%1$d Sekunden</string>
 <string name="nm_access_unavailable">Zuerst eine Bildschirmsperre auf diesem Gerät einrichten.</string>
+<string name="nm_session_protected">Geschützte Unterhaltung</string>
+<string name="nm_session_protect">Unterhaltung schützen</string>
+<string name="nm_session_unprotect">Unterhaltungsschutz entfernen</string>
+<string name="nm_session_settings">Sperrzeit für Unterhaltungen</string>
+
     <string name="nm_coding_installed">Installiert</string>
     <string name="nm_coding_not_installed">Nicht installiert</string>
 </resources>

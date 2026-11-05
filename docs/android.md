@@ -633,6 +633,14 @@ A pending diagnostic export requires its activity to be resumed and the app to b
 
 Native provider-import and permission-repair dialogs also close when app access expires; pending permission choices are cancelled.
 
+## Protected conversations {#session-lock}
+
+The conversation menu can protect an individual chat with the device screen lock. Authentication is required to protect it, remove protection, export or duplicate a locked chat, or regenerate its title from message content. A duplicate inherits protection and must be unlocked separately. Protecting a new conversation saves it first; cancelling authentication leaves the draft unchanged. Settings controls the re-lock interval, including locking when leaving the chat. Both layouts, notifications and deep links use the gate. Protected previews and body-search matches are hidden.
+
+Interactive backups ask for confirmation when they include locked conversations. This approval applies only to the backup and does not unlock every chat. Scheduled backups, sync and background work keep their existing behavior. Protection metadata survives restarts locally, while unlocks do not; neither is shared through conversation sync or backups. This does not encrypt chat storage.
+
+Selecting another Muse tab counts as leaving the protected conversation for the On exit setting, even while the chat remains retained in the background.
+
 
 ## Continuing screen tasks {#hands-continuity}
 

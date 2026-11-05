@@ -119,6 +119,8 @@ class ChatRepository(internal val dao: ChatDao) {
         io.github.nanomuse.hands.HandsRunMemory.shared.clear(id)
         dao.deleteMessages(id)
         dao.deleteSession(id)
+        // nanoMuse: local access metadata must not outlive a deleted conversation.
+        io.github.nanomuse.guard.SessionAccess.deleted(id)
         io.github.nanomuse.guard.Grants.clearSession(id) // nanoMuse
         io.github.nanomuse.sync.ConversationSync.changed() // nanoMuse: a tombstone goes to the other devices
     }

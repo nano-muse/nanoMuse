@@ -238,6 +238,8 @@ class MinisApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // nanoMuse: session protection is device-local and ready before navigation.
+        io.github.nanomuse.guard.SessionAccess.initialize(this)
         // nanoMuse: initialize access policy before the first Activity or incoming share.
         io.github.nanomuse.guard.AppAccess.initialize(this)
 

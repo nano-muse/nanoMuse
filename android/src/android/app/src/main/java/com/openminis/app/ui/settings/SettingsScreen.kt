@@ -166,6 +166,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
             // nanoMuse: device authentication settings are shared by both layouts.
             io.github.nanomuse.ui.guard.AppAccessSettings()
+            io.github.nanomuse.ui.guard.SessionAccessSettings()
 
             // -- The model (Muse: the plan card) --
             io.github.nanomuse.ui.muse.MuseCard {

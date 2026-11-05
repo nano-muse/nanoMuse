@@ -543,6 +543,8 @@ fun ChatScreen(
     // nanoMuse: retained Muse tabs must not mark their hidden conversation as read.
     nmConversationVisible: Boolean = true,
 ) {
+    // nanoMuse: every entry route authenticates before reading conversation content.
+    if (!io.github.nanomuse.ui.guard.SessionAccessGate(sessionId, nmConversationVisible)) return
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -565,6 +567,8 @@ fun ChatScreen(
     )
     // nanoMuse: one lifecycle-aware presence hook for Muse and classic, including draft promotion.
     val nmDisplayedSessionId by viewModel.displayedSessionId.collectAsState()
+    // nanoMuse: a retained draft route must also gate its promoted, persisted identity.
+    if (nmDisplayedSessionId != sessionId && !io.github.nanomuse.ui.guard.SessionAccessGate(nmDisplayedSessionId, nmConversationVisible)) return
     io.github.nanomuse.ui.chat.ReplyPresenceEffect(nmDisplayedSessionId, nmConversationVisible)
     // [T-android-larky-longsession-followup] Consume the tail-windowed
     // view instead of the canonical full list. For sessions with ≤300
@@ -3081,6 +3085,9 @@ fun ChatScreen(
                             expanded = showChatMenu,
                             onDismissRequest = { showChatMenu = false },
                         ) {
+                            // nanoMuse: both layouts use this menu and the same local protection policy.
+                            io.github.nanomuse.ui.guard.SessionAccessMenuItem(nmDisplayedSessionId,
+                                persistSessionId = { viewModel.ensureSessionForProtection() }) { showChatMenu = false }
                             // [T-android-memory-enabled-minisconfig] Gate the
                             // "Memories in Session" item below on the session's
                             // live memoryEnabled — when memory is off the entry

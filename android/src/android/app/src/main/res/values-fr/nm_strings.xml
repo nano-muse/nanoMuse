@@ -1247,6 +1247,11 @@
 <string name="nm_access_never">Ne jamais verrouiller automatiquement</string>
 <string name="nm_access_seconds">%1$d secondes</string>
 <string name="nm_access_unavailable">Configurez d’abord un verrouillage sur cet appareil.</string>
+<string name="nm_session_protected">Conversation protégée</string>
+<string name="nm_session_protect">Protéger la conversation</string>
+<string name="nm_session_unprotect">Retirer la protection de la conversation</string>
+<string name="nm_session_settings">Délai de verrouillage des conversations</string>
+
     <string name="nm_coding_installed">Installé</string>
     <string name="nm_coding_not_installed">Non installé</string>
 </resources>
