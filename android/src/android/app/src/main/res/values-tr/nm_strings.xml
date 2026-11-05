@@ -1250,4 +1250,7 @@
 <string name="nm_session_protect">Konuşmayı koru</string>
 <string name="nm_session_unprotect">Konuşma korumasını kaldır</string>
 <string name="nm_session_settings">Konuşma kilidi süresi</string>
+
+    <string name="nm_coding_installed">Yüklü</string>
+    <string name="nm_coding_not_installed">Yüklü değil</string>
 </resources>

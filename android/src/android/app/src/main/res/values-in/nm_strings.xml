@@ -1246,4 +1246,7 @@
 <string name="nm_session_protect">Lindungi percakapan</string>
 <string name="nm_session_unprotect">Hapus perlindungan percakapan</string>
 <string name="nm_session_settings">Batas waktu kunci percakapan</string>
+
+    <string name="nm_coding_installed">Terinstal</string>
+    <string name="nm_coding_not_installed">Belum terinstal</string>
 </resources>

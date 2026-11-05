@@ -1246,4 +1246,7 @@
 <string name="nm_session_protect">会話を保護</string>
 <string name="nm_session_unprotect">会話の保護を解除</string>
 <string name="nm_session_settings">会話のロック時間</string>
+
+    <string name="nm_coding_installed">インストール済み</string>
+    <string name="nm_coding_not_installed">未インストール</string>
 </resources>

@@ -1246,4 +1246,7 @@
 <string name="nm_session_protect">ป้องกันการสนทนา</string>
 <string name="nm_session_unprotect">นำการป้องกันการสนทนาออก</string>
 <string name="nm_session_settings">เวลาล็อกการสนทนา</string>
+
+    <string name="nm_coding_installed">ติดตั้งแล้ว</string>
+    <string name="nm_coding_not_installed">ยังไม่ได้ติดตั้ง</string>
 </resources>

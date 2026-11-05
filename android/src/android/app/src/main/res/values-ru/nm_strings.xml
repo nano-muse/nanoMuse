@@ -1258,4 +1258,7 @@
 <string name="nm_session_protect">Защитить разговор</string>
 <string name="nm_session_unprotect">Снять защиту разговора</string>
 <string name="nm_session_settings">Время блокировки разговоров</string>
+
+    <string name="nm_coding_installed">Установлен</string>
+    <string name="nm_coding_not_installed">Не установлен</string>
 </resources>

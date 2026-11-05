@@ -1250,4 +1250,7 @@
 <string name="nm_session_protect">Unterhaltung schützen</string>
 <string name="nm_session_unprotect">Unterhaltungsschutz entfernen</string>
 <string name="nm_session_settings">Sperrzeit für Unterhaltungen</string>
+
+    <string name="nm_coding_installed">Installiert</string>
+    <string name="nm_coding_not_installed">Nicht installiert</string>
 </resources>

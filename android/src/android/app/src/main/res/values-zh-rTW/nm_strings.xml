@@ -1216,4 +1216,7 @@
 <string name="nm_session_protect">保護對話</string>
 <string name="nm_session_unprotect">移除對話保護</string>
 <string name="nm_session_settings">對話鎖定時間</string>
+
+    <string name="nm_coding_installed">已安裝</string>
+    <string name="nm_coding_not_installed">未安裝</string>
 </resources>

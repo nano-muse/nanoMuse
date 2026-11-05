@@ -1251,4 +1251,7 @@
 <string name="nm_session_protect">Protéger la conversation</string>
 <string name="nm_session_unprotect">Retirer la protection de la conversation</string>
 <string name="nm_session_settings">Délai de verrouillage des conversations</string>
+
+    <string name="nm_coding_installed">Installé</string>
+    <string name="nm_coding_not_installed">Non installé</string>
 </resources>

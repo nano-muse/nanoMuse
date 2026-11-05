@@ -1250,4 +1250,7 @@
 <string name="nm_session_protect">Protektahan ang pag-uusap</string>
 <string name="nm_session_unprotect">Alisin ang proteksyon ng pag-uusap</string>
 <string name="nm_session_settings">Oras ng pag-lock ng pag-uusap</string>
+
+    <string name="nm_coding_installed">Naka-install</string>
+    <string name="nm_coding_not_installed">Hindi naka-install</string>
 </resources>

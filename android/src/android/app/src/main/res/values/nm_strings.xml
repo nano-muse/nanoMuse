@@ -1230,4 +1230,7 @@
 <string name="nm_session_protect">Protect conversation</string>
 <string name="nm_session_unprotect">Remove conversation protection</string>
 <string name="nm_session_settings">Conversation lock timeout</string>
+
+    <string name="nm_coding_installed">Installed</string>
+    <string name="nm_coding_not_installed">Not installed</string>
 </resources>

@@ -1246,4 +1246,7 @@
 <string name="nm_session_protect">대화 보호</string>
 <string name="nm_session_unprotect">대화 보호 해제</string>
 <string name="nm_session_settings">대화 잠금 시간</string>
+
+    <string name="nm_coding_installed">설치됨</string>
+    <string name="nm_coding_not_installed">설치되지 않음</string>
 </resources>

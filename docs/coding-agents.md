@@ -1,5 +1,7 @@
 # Coding agents
 
+On Android, the agent filters scroll horizontally and keep each name on one line. Each filter shows whether the agent is running, installed or not installed. Uninstalled agents remain selectable so their saved sessions can still be found.
+
 The Cursor, Codex, Claude Code and DeepSeek Harness sessions on your computer, seen and steered
 from any device of your account (the phone on the way home, the browser, another
 computer) and from the Muse itself.

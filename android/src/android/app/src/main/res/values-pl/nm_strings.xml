@@ -1258,4 +1258,7 @@
 <string name="nm_session_protect">Chroń rozmowę</string>
 <string name="nm_session_unprotect">Usuń ochronę rozmowy</string>
 <string name="nm_session_settings">Czas blokady rozmów</string>
+
+    <string name="nm_coding_installed">Zainstalowany</string>
+    <string name="nm_coding_not_installed">Niezainstalowany</string>
 </resources>

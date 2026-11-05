@@ -1251,4 +1251,7 @@
 <string name="nm_session_protect">Proteger conversa</string>
 <string name="nm_session_unprotect">Remover proteção da conversa</string>
 <string name="nm_session_settings">Tempo de bloqueio das conversas</string>
+
+    <string name="nm_coding_installed">Instalado</string>
+    <string name="nm_coding_not_installed">Não instalado</string>
 </resources>

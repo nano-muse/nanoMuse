@@ -1254,4 +1254,7 @@
 <string name="nm_session_protect">Protejează conversația</string>
 <string name="nm_session_unprotect">Elimină protecția conversației</string>
 <string name="nm_session_settings">Interval de blocare a conversațiilor</string>
+
+    <string name="nm_coding_installed">Instalat</string>
+    <string name="nm_coding_not_installed">Neinstalat</string>
 </resources>
