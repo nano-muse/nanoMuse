@@ -19,6 +19,7 @@ import { BUNDLE, ensureProfile, PROFILE } from "./profile";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
 import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
 import { chooseHostPort } from "./host-port";
+import { closedDuringLoad } from "./load-close";
 import { rotateLogIfNeeded } from "./log-rotate";
 import { HostWork } from "./host-work";
 import { ProtectedExit, type ExitDialog, type ExitIntent, type WorkItem, type WorkSource } from "./protected-exit";
@@ -788,7 +789,7 @@ function writePrefs(next: Prefs = prefs, strict = false): void {
 function showWindow(): BrowserWindow | null {
   if (!mainWindow && hostUrl) {
     mainWindow = createWindow();
-    void loadHost(mainWindow, hostUrl);
+    void loadHost(mainWindow, hostUrl).catch((exc) => log(`window: could not load the host: ${String(exc)}`));
   }
   if (!mainWindow) return null;
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1813,9 +1814,20 @@ function createWindow(): BrowserWindow {
 /**
  * Show the Host's web app in `win`, then drop the splash from the window's history: a back
  * press (a mouse's side button too) would otherwise land on loading.html, which never moves on.
+ *
+ * A load the window's own close cancelled is not a failure: booting used to turn it into
+ * the "could not start" dialog and a quit, on a person who had only closed the window
+ * while the page was still coming up. Any other rejection still fails the start.
  */
 async function loadHost(win: BrowserWindow, url: string): Promise<void> {
-  await win.loadURL(url);
+  try {
+    await win.loadURL(url);
+  } catch (exc) {
+    if (closedDuringLoad(win)) {
+      return;
+    }
+    throw exc;
+  }
   if (!win.isDestroyed()) win.webContents.navigationHistory.clear();
 }
 
