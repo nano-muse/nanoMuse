@@ -57,6 +57,36 @@ Windows x64 桌面版在启动后和每六小时检查一次较新的正式稳�
 harness 保留外部下载方式。不带软件内更新能力的版本，需先下载安装包升级一次。
 开发构建不会运行安装器。更新沿用现有安装行为，混合安装副本或过期的安装登记需另行整理。
 
+## Windows 上连接自己的中继 {#using-your-own-relay-on-windows}
+
+桌面版可以连接你自己部署的中继。先按 [自己部署](cloud.md#running-your-own) 搭好服务，
+再把下面的 `relay.example` 换成中继的 HTTPS 地址，把安装路径换成实际的 `nanomuse-desktop.exe` 路径。
+不同中继的账号、设备和服务端对话历史各自独立；托管服务上的账号不会自动成为新中继的账号。
+
+1. 在 nanoMuse 菜单或托盘菜单里选择「退出」，等应用完全退出。只关窗口可能仍在后台运行，
+   再次启动会复用原进程及其原来的环境变量。
+2. 打开 PowerShell，用自己的中继地址和单独的数据目录启动：
+
+   ```powershell
+   $env:NANOMUSE_CLOUD_URL = 'https://relay.example'
+   $env:NANOMUSE_DESKTOP_HOME = Join-Path $env:LOCALAPPDATA 'nanoMuse-self-hosted'
+   Start-Process -FilePath 'C:\Path\To\nanomuse-desktop.exe'
+   ```
+
+3. 在这个中继上登录或注册。以后仍用同一数据目录启动这个中继的桌面配置，原有桌面数据留在
+   原目录中。这里的变量只影响当前 PowerShell 会话及它启动的程序，不会写入 Windows 的永久
+   环境变量。从开始菜单另行启动不会继承示例中的变量，因此后续仍需使用上面的命令。
+
+随应用提供的 profile 用 `NANOMUSE_CLOUD_URL` 设置 `nanomuse-cloud` 插件的 `config.baseURL`。
+如果 `<desktop-home>/profiles/nanomuse/cordis.patch.yml` 保存了该插件的显式覆盖值，
+它会在随附 profile 之后应用，优先级更高。复用自己修改过的 profile 时，应删除这一项覆盖，
+或把它改成同一个中继地址。上面的独立目录会使用自己的 profile 和凭据；修改自带 key 的模型
+服务商地址不会改变账号所连接的中继。
+
+应用的「网络」代理设置会绕过 nanoMuse Cloud，包括中继登录、Hub 和同步流量。
+外壳 `proxy.ts` 中的 `DEFAULT_RELAY_HOST` 只用于生成 `NO_PROXY`，不能靠修改它切换中继。
+这个启动方法用于连接你自己的服务，不会修复托管中继网络路径上的连接重置。
+
 ## 它是什么 {#what-it-is}
 
 页面里的「复制」按钮可以把文字写入剪贴板。选中文字后右键可以复制，在输入框里右键可以
