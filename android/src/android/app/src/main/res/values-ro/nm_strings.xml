@@ -1242,4 +1242,19 @@
     <string name="nm_backup_resume">Reia copia</string>
     <string name="nm_backup_discard">Renunță la copia întreruptă</string>
     <string name="nm_backup_resume_hint">Există o copie întreruptă. Reia cu opțiunile originale și introdu din nou parola dacă este necesar, sau renunță pentru a începe din nou.</string>
+<string name="nm_access_locked">nanoMuse este blocat</string>
+<string name="nm_access_hint">Confirmă cu blocarea ecranului acestui dispozitiv.</string>
+<string name="nm_access_unlock">Deblochează</string>
+<string name="nm_access_settings">Blocarea aplicației</string>
+<string name="nm_access_on_exit">Blochează la ieșire</string>
+<string name="nm_access_never">Nu bloca automat</string>
+<string name="nm_access_seconds">%1$d secunde</string>
+<string name="nm_access_unavailable">Configurează mai întâi blocarea ecranului acestui dispozitiv.</string>
+<string name="nm_session_protected">Conversație protejată</string>
+<string name="nm_session_protect">Protejează conversația</string>
+<string name="nm_session_unprotect">Elimină protecția conversației</string>
+<string name="nm_session_settings">Interval de blocare a conversațiilor</string>
+
+    <string name="nm_coding_installed">Instalat</string>
+    <string name="nm_coding_not_installed">Neinstalat</string>
 </resources>

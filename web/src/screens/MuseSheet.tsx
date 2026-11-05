@@ -21,7 +21,7 @@ import {
   Webhook,
   X,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { Avatar } from "../components/Avatar";
 import { AvatarShareSheet } from "../components/AvatarShareSheet";
@@ -290,16 +290,33 @@ function UpcomingView({ onSettings }: { onSettings: () => void }) {
   const name = state.profile?.name ?? "nanoMuse";
   const t = useT();
 
-  const load = () =>
-    api
+  // a finished goal and a neighbouring reminder bump the two versions together: a
+  // slower earlier answer must not land over a newer one's view
+  const loadGen = useRef(0);
+  const active = useRef(false);
+  const load = () => {
+    if (!active.current) return Promise.resolve();
+    const mine = ++loadGen.current;
+    return api
       .upcoming()
       .then((d) => {
+        if (loadGen.current !== mine) return;
         setData(d);
         setLoadError(null);
       })
-      .catch((e: Error) => (data === null ? setLoadError(e.message) : toast(e.message)));
+      .catch((e: Error) => {
+        if (loadGen.current !== mine) return;
+        if (data === null) setLoadError(e.message);
+        else toast(e.message);
+      });
+  };
   useEffect(() => {
+    active.current = true;
     void load();
+    return () => {
+      active.current = false;
+      loadGen.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.goalsVersion, state.remindersVersion, state.profile?.proactive, state.profile?.goal_interval_minutes]);
 

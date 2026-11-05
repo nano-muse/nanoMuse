@@ -1211,4 +1211,19 @@
     <string name="nm_backup_resume">继续备份</string>
     <string name="nm_backup_discard">丢弃中断的备份</string>
     <string name="nm_backup_resume_hint">有一份备份尚未完成。请使用原来的选项继续，必要时重新输入加密密码；也可丢弃后重新开始。</string>
+<string name="nm_access_locked">nanoMuse 已锁定</string>
+<string name="nm_access_hint">请使用本设备的锁屏方式验证。</string>
+<string name="nm_access_unlock">解锁</string>
+<string name="nm_access_settings">应用锁</string>
+<string name="nm_access_on_exit">退出时锁定</string>
+<string name="nm_access_never">不自动锁定</string>
+<string name="nm_access_seconds">%1$d 秒</string>
+<string name="nm_access_unavailable">请先为本设备设置锁屏密码。</string>
+<string name="nm_session_protected">受保护的对话</string>
+<string name="nm_session_protect">保护对话</string>
+<string name="nm_session_unprotect">移除对话保护</string>
+<string name="nm_session_settings">对话锁定时间</string>
+
+    <string name="nm_coding_installed">已安装</string>
+    <string name="nm_coding_not_installed">未安装</string>
 </resources>

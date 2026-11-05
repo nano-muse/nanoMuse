@@ -1218,4 +1218,19 @@
     <string name="nm_backup_resume">Resume backup</string>
     <string name="nm_backup_discard">Discard interrupted backup</string>
     <string name="nm_backup_resume_hint">An interrupted backup is waiting. Resume with the original options and enter the encryption password again if needed, or discard it to start over.</string>
+<string name="nm_access_locked">nanoMuse is locked</string>
+<string name="nm_access_hint">Confirm with the screen lock of this device.</string>
+<string name="nm_access_unlock">Unlock</string>
+<string name="nm_access_settings">App lock</string>
+<string name="nm_access_on_exit">Lock on exit</string>
+<string name="nm_access_never">Never auto-lock</string>
+<string name="nm_access_seconds">%1$d seconds</string>
+<string name="nm_access_unavailable">Set a screen lock on this device first.</string>
+<string name="nm_session_protected">Protected conversation</string>
+<string name="nm_session_protect">Protect conversation</string>
+<string name="nm_session_unprotect">Remove conversation protection</string>
+<string name="nm_session_settings">Conversation lock timeout</string>
+
+    <string name="nm_coding_installed">Installed</string>
+    <string name="nm_coding_not_installed">Not installed</string>
 </resources>

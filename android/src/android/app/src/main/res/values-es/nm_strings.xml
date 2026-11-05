@@ -1238,4 +1238,19 @@
     <string name="nm_backup_resume">Reanudar copia</string>
     <string name="nm_backup_discard">Descartar copia interrumpida</string>
     <string name="nm_backup_resume_hint">Hay una copia interrumpida. Reanúdala con las opciones originales y vuelve a introducir la contraseña si hace falta, o descártala para empezar de nuevo.</string>
+<string name="nm_access_locked">nanoMuse está bloqueado</string>
+<string name="nm_access_hint">Confirma con el bloqueo de pantalla de este dispositivo.</string>
+<string name="nm_access_unlock">Desbloquear</string>
+<string name="nm_access_settings">Bloqueo de la aplicación</string>
+<string name="nm_access_on_exit">Bloquear al salir</string>
+<string name="nm_access_never">No bloquear automáticamente</string>
+<string name="nm_access_seconds">%1$d segundos</string>
+<string name="nm_access_unavailable">Primero configura un bloqueo de pantalla en este dispositivo.</string>
+<string name="nm_session_protected">Conversación protegida</string>
+<string name="nm_session_protect">Proteger conversación</string>
+<string name="nm_session_unprotect">Quitar protección de la conversación</string>
+<string name="nm_session_settings">Tiempo de bloqueo de conversaciones</string>
+
+    <string name="nm_coding_installed">Instalado</string>
+    <string name="nm_coding_not_installed">No instalado</string>
 </resources>
