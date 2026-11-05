@@ -31,6 +31,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Enabled Windows test coverage for the harness coding suite: the reader and service tests that need no CLI now run there, and the six that start a fake `#!/bin/sh` CLI skip with the reason named instead of a whole-file POSIX gate.
 - Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
 - Flagged recursive forced deletion when `rm` flags are separate arguments, without borrowing flags from another command or treating filenames after `--` as options.
 - Flagged Python directory removal through `Path(...).rmdir()` for approval, including inside the sandbox.
