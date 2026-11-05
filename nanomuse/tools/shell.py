@@ -100,6 +100,15 @@ _DANGEROUS = [
 ]
 
 
+def _spliced(command: str) -> str:
+    # A backslash before a newline never reaches word splitting: the shell removes the
+    # pair, so `rm \<newline>-rf x` runs as `rm -rf x` and `su\<newline>do` as `sudo`.
+    # The guard reads the spliced text, never the raw one, or a split flag or a split
+    # word hides from every pattern above. Inside quotes a shell keeps the pair; dropping
+    # it there too can only add a warning, never remove one.
+    return command.replace("\\\n", "")
+
+
 _SKIP_PROGRAMS = {"cd", "export", "set", "true", "time", "env", "nohup", "exec"}
 
 # What a Python script can reach beyond plain computation and the workspace. Each hit
@@ -353,7 +362,7 @@ class Shell(BaseTool):
 
     def assess(self, args: dict[str, Any]) -> CallAssessment:
         command = str(args.get("command", ""))
-        warnings = [label for pattern, label in _DANGEROUS if pattern.search(command)]
+        warnings = [label for pattern, label in _DANGEROUS if pattern.search(_spliced(command))]
         # a box that takes the network away decides which commands get it; one that
         # cannot (see Sandbox.blocks_network), like no box, leaves every command able to
         boxed = self.sandbox is not None and self.sandbox.active and self.sandbox.blocks_network
