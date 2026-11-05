@@ -146,6 +146,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
+- Clarified the distinction between manual Cloud retries and automatic phone model-group fallback, including trigger differences, single-model groups and provider billing. For #838.
+
 - Documented launching Windows Desktop against a self-hosted relay, including profile override priority, separate account data and the Cloud proxy bypass. For #830.
 
 - Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
