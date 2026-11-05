@@ -5006,6 +5006,8 @@ class ChatViewModel(
         runCatching {
             java.io.File(context.filesDir, "browser_tabs/$sid.json").delete()
         }
+        // nanoMuse: invalidate completed and in-flight Hands notes before clearing this conversation.
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(sid)
         // Persist: drop messages + compact markers. Files (workspace,
         // attachments, offloads) intentionally retained.
         viewModelScope.launch {
