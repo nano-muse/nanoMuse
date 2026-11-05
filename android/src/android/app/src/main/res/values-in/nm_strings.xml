@@ -1234,6 +1234,14 @@
     <string name="nm_backup_resume">Lanjutkan pencadangan</string>
     <string name="nm_backup_discard">Buang cadangan yang terhenti</string>
     <string name="nm_backup_resume_hint">Ada pencadangan yang terhenti. Lanjutkan dengan opsi asli dan masukkan kembali kata sandi jika diperlukan, atau buang untuk memulai ulang.</string>
+<string name="nm_access_locked">nanoMuse terkunci</string>
+<string name="nm_access_hint">Konfirmasi dengan kunci layar perangkat ini.</string>
+<string name="nm_access_unlock">Buka kunci</string>
+<string name="nm_access_settings">Kunci aplikasi</string>
+<string name="nm_access_on_exit">Kunci saat keluar</string>
+<string name="nm_access_never">Jangan kunci otomatis</string>
+<string name="nm_access_seconds">%1$d detik</string>
+<string name="nm_access_unavailable">Atur kunci layar pada perangkat ini terlebih dahulu.</string>
     <string name="nm_coding_installed">Terinstal</string>
     <string name="nm_coding_not_installed">Belum terinstal</string>
 </resources>

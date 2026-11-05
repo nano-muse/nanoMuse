@@ -1204,6 +1204,14 @@
     <string name="nm_backup_resume">繼續備份</string>
     <string name="nm_backup_discard">捨棄中斷的備份</string>
     <string name="nm_backup_resume_hint">有一份備份尚未完成。請使用原來的選項繼續，必要時重新輸入加密密碼；也可捨棄後重新開始。</string>
+<string name="nm_access_locked">nanoMuse 已鎖定</string>
+<string name="nm_access_hint">請使用本裝置的鎖定螢幕方式驗證。</string>
+<string name="nm_access_unlock">解鎖</string>
+<string name="nm_access_settings">應用程式鎖定</string>
+<string name="nm_access_on_exit">離開時鎖定</string>
+<string name="nm_access_never">不自動鎖定</string>
+<string name="nm_access_seconds">%1$d 秒</string>
+<string name="nm_access_unavailable">請先為本裝置設定螢幕鎖定。</string>
     <string name="nm_coding_installed">已安裝</string>
     <string name="nm_coding_not_installed">未安裝</string>
 </resources>

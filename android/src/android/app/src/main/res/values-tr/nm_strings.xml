@@ -1238,6 +1238,14 @@
     <string name="nm_backup_resume">Yedeklemeyi sürdür</string>
     <string name="nm_backup_discard">Kesilen yedeği sil</string>
     <string name="nm_backup_resume_hint">Kesilen bir yedek bekliyor. İlk seçeneklerle sürdürün ve gerekirse şifreyi yeniden girin ya da silip baştan başlayın.</string>
+<string name="nm_access_locked">nanoMuse kilitli</string>
+<string name="nm_access_hint">Bu cihazın ekran kilidiyle doğrulayın.</string>
+<string name="nm_access_unlock">Kilidi aç</string>
+<string name="nm_access_settings">Uygulama kilidi</string>
+<string name="nm_access_on_exit">Çıkışta kilitle</string>
+<string name="nm_access_never">Asla otomatik kilitleme</string>
+<string name="nm_access_seconds">%1$d saniye</string>
+<string name="nm_access_unavailable">Önce bu cihazda bir ekran kilidi ayarlayın.</string>
     <string name="nm_coding_installed">Yüklü</string>
     <string name="nm_coding_not_installed">Yüklü değil</string>
 </resources>

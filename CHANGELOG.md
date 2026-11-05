@@ -119,6 +119,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Closed native provider-import and permission dialogs when app access expired, cancelling pending permission choices.
+
+- Kept pending diagnostic exports paused until their own activity was resumed and app access was unlocked together.
+
+- Added device authentication and configurable re-locking before Android app content or safe-mode diagnostics are shown, including diagnostic export after an external file picker.
+
 - Kept coding-agent filters readable on narrow screens and showed running, installed and not-installed states. For #829.
 - Carried bounded screen-task notes into subsequent requests for the same app and conversation, added an optional larger vertical scroll, and instructed the agent to retain complete Hands JSON results. For #817.
 

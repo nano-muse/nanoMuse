@@ -625,6 +625,14 @@ An emoji avatar chosen on desktop or web also appears on Android, with its backg
 
 Drawn faces and personal clips retain their existing priority. Renaming the agent or changing connectors leaves an unchanged remote appearance alone. Resetting the avatar explicitly returns to the dragon. Choosing an emoji on Android is not part of this change.
 
+## App lock
+
+Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts, incoming shares and safe-mode diagnostics use the same gate. Native diagnostic windows close if the app re-locks, and returning from the export file picker requires access again before any diagnostic data is written. This protects access in the app, not encryption of stored data. Background tasks continue.
+
+A pending diagnostic export requires its activity to be resumed and the app to be unlocked at the same time. Unlocking another window while the export window is paused does not release that export.
+
+Native provider-import and permission-repair dialogs also close when app access expires; pending permission choices are cancelled.
+
 
 ## Continuing screen tasks {#hands-continuity}
 
