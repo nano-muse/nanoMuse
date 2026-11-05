@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { MAX_RUNS, MAX_STEPS, MAX_WORDS, REST_MS, SCREEN_RUN_IDLE_MS, ScreenRuns, Trajectory } from '../lib/trajectory.js'
-import { stageAction } from '../lib/cloud.js'
+import Cloud, { stageAction } from '../lib/cloud.js'
 
 const act = (kind, extra = {}) => ({ kind, label: '', text: '', x: -1, y: -1, x2: -1, y2: -1, dy: 0, at: 1, ...extra })
 const png = (n = 3) => Buffer.alloc(n, 1)
@@ -228,4 +228,25 @@ test('the newest of several sessions on the screen is the one shown, and the idl
   runs.ended('new', 2000 + SCREEN_RUN_IDLE_MS)
   assert.equal(runs.sweep(2000 + 2 * SCREEN_RUN_IDLE_MS, () => false), true)
   assert.equal(runs.current(), null)
+})
+
+test('clearing a session removes its frames and keeps other sessions available', () => {
+  const tr = new Trajectory()
+  tr.began('cleared', 'c1'); tr.began('kept', 'c2')
+  const old = tr.frame(png(), 'image/png', { sessionId: 'cleared', callId: 'c1' })
+  const kept = tr.frame(png(), 'image/png', { sessionId: 'kept', callId: 'c2' })
+  tr.clearSession('cleared')
+  assert.equal(tr.frameOf(old), undefined)
+  assert.ok(tr.frameOf(kept))
+  assert.deepEqual(tr.view().runs.map(run => run.sessionId), ['kept'])
+})
+
+
+test('late frames and actions cannot recreate a cleared session on the stage', () => {
+  const previous = { sessionId: 'kept' }
+  const self = { isClearedSession: id => id === 'old', stage: previous, trajectory: new Proxy({}, { get() { throw new Error('cleared trajectory must not be updated') } }) }
+  Cloud.prototype.stageFrame.call(self, png(), 'image/png', { sessionId: 'old' })
+  Cloud.prototype.acted.call(self, act('click'), 'old', 'call')
+  Cloud.prototype.began.call(self, 'call', 'computer_click', {}, 'old')
+  assert.equal(self.stage, previous)
 })

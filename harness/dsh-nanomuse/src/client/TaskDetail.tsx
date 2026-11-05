@@ -33,7 +33,7 @@ export function TaskDetail({ t, sessionId, useSessions, onClose }: TaskDetailPro
     let alive = true
     roomsCall<ActivityRecord>(`activity?session=${encodeURIComponent(sessionId)}`)
       .then((r) => { if (alive) setRecord(r) })
-      .catch((err: unknown) => { if (alive) setError(failureText(t, err)) })
+      .catch((err: unknown) => { if (alive) { setRecord(null); setError(failureText(t, err)) } })
     return () => { alive = false }
   }, [sessionId, live?.updatedAt])
   useEffect(() => {
@@ -72,7 +72,7 @@ export function TaskDetail({ t, sessionId, useSessions, onClose }: TaskDetailPro
       h('div', { className: 'nm-task-head' },
         h('span', { className: `nm-task-pill ${pill[0]}`.trim() }, status === 'running' || status === 'waiting' ? h(IconSpinner, { size: 12 }) : null, pill[1]),
         h('div', { className: 'nm-task-title' }, title || record?.request || t('chUntitled')),
-        h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => { onClose(); nav.openSession(sessionId) } }, t('taskOpenChat')),
+        h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: !record || Boolean(error), onClick: () => { onClose(); nav.openSession(sessionId) } }, t('taskOpenChat')),
         h('button', { type: 'button', className: 'nm-icon-btn', 'aria-label': t('close'), onClick: onClose }, h(IconClose, { size: 16 }))),
       error ? h('div', { className: 'nm-doc-error', role: 'alert' }, error) : null,
       !record && !error ? h('div', { className: 'nm-task-loading' }, t('loading')) : null,

@@ -431,6 +431,12 @@ export class RemoteStore {
     await rename(tmp, this.path)
   }
 
+  /** Drop only the remote transcript belonging to a cleared local session. */
+  clearSession(sessionId: string): void {
+    this.load()
+    if (this.lines.delete(sessionId)) this.saveSoon()
+  }
+
   /** Everything forgotten (C10: another account signed in; its turns are pulled afresh). */
   clear(): void {
     this.load()
@@ -505,12 +511,30 @@ export interface SyncState {
   hidden: string[]
   /** Sessions whose conversation was deleted elsewhere: the browser half archives them (the host has no archive) and reports back. */
   toArchive: string[]
+  /** Permanently inaccessible local session IDs after an explicit relay tombstone. */
+  cleared: Record<string, string>
   /** 0.1.36 kept the other devices' chats as mirrors; a state that still has them is migrated (`migrate`). */
   mirrors?: Record<string, unknown>
 }
 
+/** Automatic subagents inherit clearing; an explicit saved fork is independent. */
+export function clearedDescendants(roots: readonly string[], headers: readonly { id: string; origin?: 'subagent' | undefined; parentSession?: string | undefined }[]): string[] {
+  const blocked = new Set(roots)
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const header of headers) {
+      if (header.origin === 'subagent' && header.parentSession && blocked.has(header.parentSession) && !blocked.has(header.id)) {
+        blocked.add(header.id)
+        changed = true
+      }
+    }
+  }
+  return [...blocked]
+}
+
 export function emptyState(): SyncState {
-  return { accountId: '', cursor: 0, enabled: true, mainSession: '', sideChats: false, cids: {}, owners: {}, mids: {}, titles: {}, conversations: {}, pulled: {}, hidden: [], toArchive: [] }
+  return { accountId: '', cursor: 0, enabled: true, mainSession: '', sideChats: false, cids: {}, owners: {}, mids: {}, titles: {}, conversations: {}, pulled: {}, hidden: [], toArchive: [], cleared: {} }
 }
 
 /**
@@ -522,7 +546,7 @@ export function emptyState(): SyncState {
  */
 export function migrate(state: SyncState | undefined): SyncState {
   if (!state) return emptyState()
-  const next: SyncState = { ...emptyState(), ...state, sideChats: state.sideChats === true, owners: { ...(state.owners ?? {}) } }
+  const next: SyncState = { ...emptyState(), ...state, sideChats: state.sideChats === true, owners: { ...(state.owners ?? {}) }, cleared: { ...Object.fromEntries((state.toArchive ?? []).map((id) => [id, state.cids?.[id] ?? ''])), ...(state.cleared ?? {}) } }
   if ('mirrors' in next || !state.conversations) {
     delete next.mirrors
     next.cursor = 0
@@ -563,6 +587,7 @@ export interface SyncEngineOptions {
   load(): SyncState | undefined
   save(state: SyncState): Promise<void>
   /** The view changed: tell the browser half. */
+  onCleared?(sessionIds: string[]): Promise<void>
   onChange?(): void
   log?(level: 'info' | 'warn' | 'debug', text: string): void
   pushDelayMs?: number
@@ -593,6 +618,7 @@ export interface SyncView {
   hidden: string[]
   /** Sessions whose conversation was deleted elsewhere: to be archived by the browser half. */
   toArchive: string[]
+  cleared: string[]
 }
 
 /** Another device working on a conversation that lives in a session here (C9), for the browser half's line. */
@@ -665,11 +691,12 @@ export class SyncEngine {
       cursor: this.state.cursor,
       relay: this.relayState,
       rev: this.rev,
-      mainSession: this.state.mainSession,
+      mainSession: this.isCleared(this.state.mainSession) ? '' : this.state.mainSession,
       sessions: Object.keys(this.state.cids).filter((sid) => this.owns(sid)),
       foreign: this.foreign(),
       hidden: [...this.state.hidden],
       toArchive: [...this.state.toArchive],
+      cleared: Object.keys(this.state.cleared),
     }
   }
 
@@ -682,7 +709,21 @@ export class SyncEngine {
    * Whether a session is the signed-in account's or nobody's yet (C10): what is shown, pushed
    * and dressed with the other devices' turns. Signed out, every session is.
    */
+  /** Automatic child sessions inherit a cleared parent's access rule, even after disposal. */
+  async clearDerivedSessions(ids: string[]): Promise<void> {
+    const fresh = ids.filter((id) => !this.isCleared(id))
+    if (fresh.length === 0) return
+    for (const id of fresh) this.state.cleared[id] = ''
+    await this.options.save(this.state)
+    this.changed()
+  }
+
+  isCleared(sessionId: string): boolean {
+    return Object.hasOwn(this.state.cleared, sessionId)
+  }
+
   owns(sessionId: string): boolean {
+    if (this.isCleared(sessionId)) return false
     if (!this.signedIn || !this.state.accountId) return true
     const owner = this.state.owners[sessionId]
     return !owner || owner === this.state.accountId
@@ -1157,6 +1198,11 @@ export class SyncEngine {
           conversations.push({ cid, kind: sessionId === this.state.mainSession ? 'main' : 'side', title, created_at: Math.floor(info.createdAt / 1000), updated_at: Math.floor(info.updatedAt / 1000) })
         }
         const lines = await this.options.sessions.lines(sessionId)
+        if (this.isCleared(sessionId)) {
+          const index = conversations.findIndex((c) => c.cid === cid)
+          if (index >= 0) conversations.splice(index, 1)
+          continue
+        }
         for (const line of lines) {
           if (this.state.mids[lineKey(sessionId, line.id)] || this.state.mids[line.id]) continue
           if (messages.length >= batch) {
@@ -1180,6 +1226,12 @@ export class SyncEngine {
       // conversation mapping and account ownership before sending, including retries.
       for (const sid of touched) this.adopt(sid)
       await this.options.save(this.state)
+      // A concurrent pull may have cleared a session while its log/save was awaited.
+      const clearedCids = new Set(Object.values(this.state.cleared))
+      for (let i = conversations.length - 1; i >= 0; i--) if (clearedCids.has(String(conversations[i]!.cid))) conversations.splice(i, 1)
+      for (let i = messages.length - 1; i >= 0; i--) if (clearedCids.has(String(messages[i]!.cid))) messages.splice(i, 1)
+      for (let i = pending.length - 1; i >= 0; i--) if (this.isCleared(pending[i]!.sessionId)) pending.splice(i, 1)
+      if (conversations.length === 0 && messages.length === 0) break
       let out: PushResult
       try {
         out = await this.options.relay.push(token, device, conversations, messages)
@@ -1297,12 +1349,19 @@ export class SyncEngine {
         await this.applyMessage(m, notes)
         applied += 1
       }
-      this.state.cursor = Math.max(this.state.cursor, out.cursor)
-      await this.save()
+      const cursor = this.state.cursor
+      this.state.cursor = Math.max(cursor, out.cursor)
+      try {
+        await this.options.save(this.state)
+      } catch (error) {
+        this.state.cursor = cursor
+        throw error
+      }
       if (!out.more || tail) break
     }
     this.lastError = ''
     for (const [sessionId, lines] of notes) {
+      if (this.isCleared(sessionId)) continue
       await this.options.sessions.inject(sessionId, meanwhileNote(lines)).catch((error: unknown) => this.log('warn', `nanomuse sync: context not injected: ${message(error)}`))
     }
     if (applied > 0) {
@@ -1315,12 +1374,34 @@ export class SyncEngine {
   private async applyConversation(c: WireConversation): Promise<void> {
     let sessionId = this.sessionOf(c.cid)
     if (c.deleted) {
+      const ids = new Set([
+        ...Object.entries(this.state.cids).filter(([, cid]) => cid === c.cid).map(([id]) => id),
+        ...Object.entries(this.state.cleared).filter(([, cid]) => cid === c.cid).map(([id]) => id),
+      ])
+      const replaceMain = ids.has(this.state.mainSession)
       delete this.state.conversations[c.cid]
-      if (sessionId) {
-        // the harness has no delete: the session stops syncing under that id, and the chats column archives it
-        delete this.state.cids[sessionId]
-        delete this.state.titles[sessionId]
-        if (sessionId !== this.state.mainSession && !this.state.toArchive.includes(sessionId)) this.state.toArchive.push(sessionId)
+      for (const id of ids) {
+        this.state.cleared[id] = c.cid
+        delete this.state.cids[id]
+        delete this.state.titles[id]
+        this.dirty.delete(id)
+        this.running.delete(id)
+        this.presence.delete(id)
+        this.forgetStep(id)
+        if (!this.state.toArchive.includes(id)) this.state.toArchive.push(id)
+      }
+      // Do not acknowledge a tombstone or advance the cursor until it is durable.
+      // On failure the IDs remain blocked in memory and the same page is retried.
+      this.changed()
+      let failure: unknown
+      try { await this.options.save(this.state) } catch (error) { failure = error }
+      // Revoke current access and stop work even when the disk is temporarily full.
+      try { await this.options.onCleared?.([...ids]) } catch (error) { failure ??= error }
+      if (failure) throw failure
+      if (replaceMain) {
+        this.state.mainSession = await this.options.sessions.create('Main chat')
+        this.adopt(this.state.mainSession)
+        await this.options.save(this.state)
       }
       return
     }

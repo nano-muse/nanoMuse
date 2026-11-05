@@ -19,6 +19,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { patchClearedSessionAccess } from "./cleared-session-access.mjs";
 import { patchCapacityDefaults } from "./capacity-defaults.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -79,6 +80,7 @@ run(
   { cwd: out, shell, env: { ...process.env, npm_config_registry: REGISTRY } },
 );
 patchCapacityDefaults(out);
+patchClearedSessionAccess(out);
 // what @deepseek-ai/dsh-subprocess-local's postinstall does: the executable bit the tarball
 // stripped from node-pty's prebuilt spawn-helper (macOS and Linux)
 if (process.platform !== "win32") {

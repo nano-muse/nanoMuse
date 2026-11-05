@@ -54,7 +54,7 @@ import { TaskRunner, textOf } from './task.ts'
 import { Turns, aggregateWork, type WorkItem } from './work.ts'
 import { SCREEN_RUN_IDLE_MS, ScreenRuns, Trajectory, type ScreenRun, type StepAction, type TrajectoryView } from './trajectory.ts'
 import { describeCall } from './steps.ts'
-import { RemoteStore, SyncEngine, SyncRelay, type RemoteLine, type SessionInfo, type SessionLine, type SyncState } from './sync.ts'
+import { clearedDescendants, RemoteStore, SyncEngine, SyncRelay, type RemoteLine, type SessionInfo, type SessionLine, type SyncState } from './sync.ts'
 import { AvatarMotion, ANIMATED, type MotionMood, type MotionView } from './motion.ts'
 import { OwnClip, isOwnClipMood, type OwnClipMood, type OwnClipView } from './own-clip.ts'
 import { OwnTurns } from './record.ts'
@@ -629,6 +629,7 @@ export default class NanomuseCloud extends Service {
   readonly profile: ProfileStore
   readonly hub: HubClient
   private state: State = {}
+  private sessionStateLoaded = false
   private capacityCache: { providers: CapacityProviders; models: readonly RelayModel[]; result: CapacityProviders } | undefined
   private busy: Promise<unknown> = Promise.resolve()
   private stateWrites: Promise<void> = Promise.resolve()
@@ -828,6 +829,7 @@ export default class NanomuseCloud extends Service {
 
   async [Service.init](): Promise<void> {
     this.state = await this.readState()
+    this.sessionStateLoaded = true
     if (!this.state.deviceId) {
       this.state.deviceId = `pc-dsh-${randomBytes(6).toString('hex')}`
       await this.writeState()
@@ -914,6 +916,13 @@ export default class NanomuseCloud extends Service {
     // A task from another device runs in a dsh session here; needs the session API, so only once it is up.
     this.ctx.inject(['sessionController', 'approval'], (ctx) => {
       this.sessionCtx = ctx
+      ctx.effect(() => ctx.on('agent/created', ({ agent }) => {
+        if (this.isClearedSession(String(agent.id))) {
+          agent.cancel({ kind: 'user' })
+          void this.clearSyncedSessions([String(agent.id)]).catch((error: unknown) => this.ctx.logger.warn('nanomuse: cleared child cleanup failed: %s', message(error)))
+        }
+        return undefined
+      }), 'nanomuse cloud: cleared sessions stay stopped')
       ctx.effect(() => () => {
         this.sessionCtx = undefined
       })
@@ -1017,10 +1026,12 @@ export default class NanomuseCloud extends Service {
           this.state.sync = state
           await this.writeState()
         },
+        onCleared: (ids) => this.clearSyncedSessions(ids),
         onChange: () => this.broadcast(),
         log: (level, text) => this.ctx.logger[level](text),
       })
       this.sync = sync
+      void this.clearSyncedSessions(sync.view().cleared).catch((error: unknown) => this.ctx.logger.warn('nanomuse: cleared session cleanup failed: %s', message(error)))
       ctx.effect(
         () =>
           ctx.on('session/event', (session: Session, event: SessionEvent) => {
@@ -1119,7 +1130,7 @@ export default class NanomuseCloud extends Service {
           const id = String(session.id)
           this.provenance.observe(id, event)
           this.noteSessionEvent(id, event)
-          if (event.type === 'assistant/message') this.trajectory.said(id, textOf(event.data.message.content))
+          if (event.type === 'assistant/message' && !this.isClearedSession(id)) this.trajectory.said(id, textOf(event.data.message.content))
           else if (event.type === 'turn/end') {
             let changed = this.screenRuns.turnEnded(id)
             if (this.trajectory.running(id)) {
@@ -2565,7 +2576,7 @@ export default class NanomuseCloud extends Service {
         capabilities: this.capabilities(),
         chatgpt: { signedIn: Boolean(this.state.chatgpt), label: this.state.chatgpt?.label ?? '', proxy: Boolean(this.chatgpt.ready), login: this.chatgpt.login },
       },
-      trajectory: { rev: this.trajectory.view().rev, sessions: [...new Set(this.trajectory.view().runs.map((r) => r.sessionId))] },
+      trajectory: { rev: this.trajectory.view().rev, sessions: [...new Set(this.trajectoryView().runs.map((r) => r.sessionId))] },
       headsUp: this.headsUp(),
       waiting: [...this.waits.values()].sort((a, b) => a.since - b.since),
       stopped: [...this.stops.entries()].map(([session, s]) => ({ session, ...s })),
@@ -2574,12 +2585,52 @@ export default class NanomuseCloud extends Service {
 
   /** The hands' runs of a session (or all), without pictures: `GET /trajectory?session=`. */
   trajectoryView(sessionId?: string): TrajectoryView {
-    return this.trajectory.view(sessionId)
+    const view = this.trajectory.view(sessionId)
+    return { ...view, runs: view.runs.filter((run) => !this.isClearedSession(run.sessionId)) }
   }
 
   /** The session that holds the account's main conversation (C8), '' before one is known. */
+  /** Host policy used by the pinned Harness access guard, including before sync starts. */
+  isClearedSession(sessionId: string): boolean {
+    if (!this.sessionStateLoaded) return true
+    const seen = new Set<string>()
+    let id: string | undefined = sessionId
+    while (id && !seen.has(id)) {
+      seen.add(id)
+      if (this.sync?.isCleared(id) ?? (Object.hasOwn(this.state.sync?.cleared ?? {}, id) || this.state.sync?.toArchive?.includes(id) === true)) return true
+      const header: Session['header'] | undefined = this.sessionCtx?.sessions.get(id as SessionId)?.header
+      id = header?.origin === 'subagent' ? header.parentSession : undefined
+    }
+    return false
+  }
+
+  private async clearSyncedSessions(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    // Include cold automatic descendants so a later restart or a stale child ID cannot
+    // recover inherited history. User-created forks have no subagent origin and stay.
+    const records = await this.sessionCtx?.sessionQuery.listSessions() ?? []
+    const blocked = new Set(clearedDescendants(ids, records.map((record) => record.header)))
+    let failure: unknown
+    try { await this.sync?.clearDerivedSessions([...blocked]) } catch (error) { failure = error }
+    for (const id of blocked) {
+      // Cancel only the existing Agent. Resolving would resume a cleared session.
+      this.sessionCtx?.agents.get(id as SessionId)?.cancel({ kind: 'user' })
+      this.screenRuns.turnEnded(id)
+      for (const [callId, call] of this.calls) if (call.sessionId === id) this.calls.delete(callId)
+      this.kept?.clearSession(id)
+      this.trajectory.clearSession(id)
+      if (this.stage.sessionId === id) this.clearStage()
+      this.sessionCtx?.emit('api-session/removed', id as SessionId)
+      this.logCache.delete(id)
+    }
+    const rooms = this.ctx.get('nanomuseRooms') as { clearActivity?(ids: string[]): Promise<void> } | undefined
+    await rooms?.clearActivity?.([...blocked])
+    if (failure) throw failure
+  }
+
   syncMainSession(): string {
-    return this.sync?.state.mainSession ?? ''
+    const id = this.sync?.state.mainSession ?? ''
+    return this.isClearedSession(id) ? '' : id
   }
 
   /** How many turns from the account's other devices a session here shows (C8). */
@@ -3518,6 +3569,7 @@ export default class NanomuseCloud extends Service {
   // -- hands and notices ----------------------------------------------------------------
 
   private began(callId: string, name: string, args: unknown, sessionId: string): void {
+    if (this.isClearedSession(sessionId)) return
     const now = Date.now()
     if (now - this.lastCallAt > 60_000 && this.calls.size === 0) this.steps = 0
     this.lastCallAt = now
@@ -3568,7 +3620,7 @@ export default class NanomuseCloud extends Service {
 
   /** A frame of a screen the agent is working on; `meta.device` names another device, else it is this computer's. */
   stageFrame(bytes: Buffer, mime: string, meta: { device?: string; width?: number; height?: number; title?: string; mode?: 'screen' | 'window'; sessionId: string; callId?: string }): void {
-    if (bytes.length === 0 || bytes.length > 12 * 1024 * 1024) return
+    if (this.isClearedSession(meta.sessionId) || bytes.length === 0 || bytes.length > 12 * 1024 * 1024) return
     const seq = this.trajectory.frame(bytes, mime, meta)
     const sameScreen = this.stage.source === (meta.device ? 'device' : 'computer') && this.stage.device === (meta.device ?? '')
     this.stage = {
@@ -3589,6 +3641,7 @@ export default class NanomuseCloud extends Service {
 
   /** What the hands are about to do on this computer's screen: the stage's marker, and a step of the trajectory. */
   private acted(action: StageAction, sessionId: string, callId: string): void {
+    if (this.isClearedSession(sessionId)) return
     this.stage = { ...this.stage, action, sessionId: sessionId || this.stage.sessionId }
     this.trajectory.acted(sessionId, callId, action)
     this.broadcast()
@@ -3744,8 +3797,9 @@ export default class NanomuseCloud extends Service {
         ...(raw.chatgpt && typeof raw.chatgpt === 'object' && typeof (raw.chatgpt as ChatGptState).label === 'string' ? { chatgpt: { label: (raw.chatgpt as ChatGptState).label, at: Number((raw.chatgpt as ChatGptState).at) || 0 } } : {}),
         ...(raw.cloudModelsOff === true ? { cloudModelsOff: true } : {}),
       }
-    } catch {
-      return {}
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
+      throw new Error('Could not read desktop account state; refusing to discard saved conversation access rules', { cause: error })
     }
   }
 
@@ -4184,6 +4238,13 @@ export default class NanomuseCloud extends Service {
         }
         if (req.method === 'POST' && route === '/sync/delete') return send(res, 200, await sync.deleteRemote())
         if (req.method === 'POST' && route === '/sync/pull') return send(res, 200, { applied: await sync.pull(), ...sync.view() })
+        if (req.method === 'POST' && route === '/sync/access') {
+          const body = await json(req)
+          const id = String(body.sessionId ?? '')
+          return this.isClearedSession(id)
+            ? send(res, 404, { error: { code: 'conversation_cleared', message: 'This conversation was cleared on another device' } })
+            : send(res, 204)
+        }
         if (req.method === 'POST' && route === '/sync/main') {
           // the session the column named, or the one the account's main conversation already lives in
           const body = await json(req)

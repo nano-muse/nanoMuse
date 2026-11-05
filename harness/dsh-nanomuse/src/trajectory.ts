@@ -223,6 +223,13 @@ export class Trajectory {
     return this.openRun(sessionId) !== undefined
   }
 
+  /** A synced conversation was cleared. Remove its runs and retained frames only. */
+  clearSession(sessionId: string): void {
+    for (const run of [...this.runs]) if (run.sessionId === sessionId) this.forget(run)
+    this.words.delete(sessionId)
+    this.bump()
+  }
+
   /** Everything goes (the person cleared the stage). */
   clear(): void {
     this.runs = []

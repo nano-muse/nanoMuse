@@ -70,6 +70,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Remembered conversation-clear notifications across restarts and blocked cleared chats from task records, history, search, duplication and resume. Automatic subagent histories followed their parent; saved copies and ordinary archives stayed available. Local JSONL logs remained on disk. For #832.
+
 - **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
 
 - Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.

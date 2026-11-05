@@ -527,7 +527,7 @@ export default class NanomuseRooms extends Service {
 
   view(): RoomsView {
     // the records travel without their steps' texts; `/activity?session=` has one in full
-    const activity = this.store.activity.map((r) => ({ ...r, steps: r.steps.map((s) => ({ ...s, detail: '', result: '' })) }))
+    const activity = this.store.activity.filter((r) => !this.ctx.nanomuseCloud.isClearedSession(r.sessionId)).map((r) => ({ ...r, steps: r.steps.map((s) => ({ ...s, detail: '', result: '' })) }))
     return {
       ...this.store,
       ideas: { ...this.store.ideas, items: this.ideaItems() },
@@ -779,7 +779,15 @@ export default class NanomuseRooms extends Service {
   }
 
   /** One task in full, for the detail view. */
+  /** Remove task records once sync has durably blocked the corresponding sessions. */
+  async clearActivity(ids: string[]): Promise<void> {
+    const cleared = new Set(ids)
+    this.store.activity = this.store.activity.filter((record) => !cleared.has(record.sessionId))
+    await this.save()
+  }
+
   activityOf(sessionId: string): ActivityRecord | undefined {
+    if (this.ctx.nanomuseCloud.isClearedSession(sessionId)) return undefined
     return this.store.activity.find((r) => r.sessionId === sessionId)
   }
 
@@ -884,6 +892,7 @@ export default class NanomuseRooms extends Service {
   }
 
   private trackActivity(session: Session, event: SessionEvent): void {
+    if (this.ctx.nanomuseCloud.isClearedSession(String(session.id))) return
     const type: string = event.type
     if (type === 'turn/start') {
       const record = this.recordFor(session.id, true)!
