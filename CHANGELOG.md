@@ -69,6 +69,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **Kept skill suggestions through failed refreshes.** The chat slash menu retained its loaded skills when a reload failed and ignored superseded answers. Turning skills off also hid cached suggestions and disabled their keyboard completion.
 - **Kept the newest skills list when saves overlap.** Older responses no longer hide newly saved skills, failed refreshes keep the loaded list, and pending reads do not report errors after leaving the page.
 - **Kept memory lists and recent changes on the newest refresh.** Older responses no longer hide newly saved memories or restore a forgotten item. Failed refreshes preserve the loaded view, and pending reads no longer report errors after leaving the page.
 - **A provider answer that started before a sign-out no longer repopulates the cache after it.** Signing out invalidates the loaded provider view, but an `/api/providers` request already in flight kept its `then` attached, and when it landed it wrote the signed-out view back into the cache for every later reader until a forced reload. Each load now carries the generation it started under, and an answer whose generation was invalidated lands for its caller without repopulating the cache.

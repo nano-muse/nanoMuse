@@ -6,6 +6,8 @@ Memory refreshes keep the latest list and recent changes together. A slow older 
 
 The skills list also keeps the newest completed refresh. Failed reloads preserve the visible list, and pending errors are discarded when you leave the page.
 
+The chat `/` menu keeps its loaded skills if a refresh fails and ignores older answers. Turning skills off hides these suggestions immediately, including keyboard completion.
+
 > The web console is the app `nanomuse serve` serves at `/`: the front door of
 > the desktop app and of a self-hosted runtime ([app.md](app.md)). This page is
 > about one part of it: how it picks the model that answers, and what it offers
