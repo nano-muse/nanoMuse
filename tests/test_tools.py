@@ -367,6 +367,38 @@ async def test_python_and_shell_children_cannot_read_secrets(tmp_path: Path, mon
         assert r.ok and r.output.startswith("[] [yes]")
 
 
+@pytest.mark.parametrize(
+    ("command", "warns"),
+    [
+        ("rm -rf x", True),
+        ("rm -fr x", True),
+        ("rm -Rf x", True),
+        ("rm -r -f x", True),
+        ("rm -f -r x", True),
+        ("rm --recursive -f x", True),
+        ("rm -r --force x", True),
+        ("rm --recursive --force x", True),
+        ("rm -r x -f", True),
+        ("rm -rf -- -filename", True),
+        ("rm -r x", False),
+        ("rm -f x", False),
+        ("rm --preserve-root -f x", False),
+        ("rm -r --forceful x", False),
+        ("rm -r -- -f", False),
+        ("rm -- -rf", False),
+        ("rm -r x; echo -f", False),
+        ("rm -r x | echo -f", False),
+        ("rm -r x && echo -f", False),
+        ("rm -r\n-f", False),
+    ],
+)
+def test_recursive_force_warning_respects_option_and_command_boundaries(
+    tmp_path: Path, command: str, warns: bool
+) -> None:
+    assessment = Shell(workspace=tmp_path).assess({"command": command})
+    assert ("command looks dangerous: recursive force delete" in assessment.warnings) is warns
+
+
 def test_python_reach_decides_the_risk(tmp_path: Path):
     from nanomuse.config import SandboxSettings
     from nanomuse.sandbox import Sandbox
