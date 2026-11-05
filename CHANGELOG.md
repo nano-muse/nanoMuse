@@ -115,6 +115,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Carried bounded screen-task notes into subsequent requests for the same app and conversation, added an optional larger vertical scroll, and instructed the agent to retain complete Hands JSON results. For #817.
+
 - Resumed interrupted Android backup exports with verified category checkpoints and explicit resume or discard choices.
 
 - Recovered interrupted Android restore categories before opening their repositories, retaining snapshots when recovery failed.
