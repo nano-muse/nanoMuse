@@ -914,7 +914,7 @@ export default class NanomuseCloud extends Service {
     }
     void this.coding.load()
     // A task from another device runs in a dsh session here; needs the session API, so only once it is up.
-    this.ctx.inject(['sessionController', 'approval'], (ctx) => {
+    this.ctx.inject(['sessionController', 'approval', 'sessions', 'agents', 'sessionQuery'], (ctx) => {
       this.sessionCtx = ctx
       ctx.effect(() => ctx.on('agent/created', ({ agent }) => {
         if (this.isClearedSession(String(agent.id))) {
@@ -2589,7 +2589,6 @@ export default class NanomuseCloud extends Service {
     return { ...view, runs: view.runs.filter((run) => !this.isClearedSession(run.sessionId)) }
   }
 
-  /** The session that holds the account's main conversation (C8), '' before one is known. */
   /** Host policy used by the pinned Harness access guard, including before sync starts. */
   isClearedSession(sessionId: string): boolean {
     if (!this.sessionStateLoaded) return true
@@ -2628,6 +2627,7 @@ export default class NanomuseCloud extends Service {
     if (failure) throw failure
   }
 
+  /** The session that holds the account's main conversation (C8), '' before one is known. */
   syncMainSession(): string {
     const id = this.sync?.state.mainSession ?? ''
     return this.isClearedSession(id) ? '' : id
