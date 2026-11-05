@@ -77,6 +77,20 @@ test('shell bounds tens of megabytes while receiving them and keeps both ends', 
   })
 })
 
+test('shell: a command with quotes in it survives the Windows shell', { skip: posix }, async () => {
+  // the interpreter's own path is the everyday quoted-with-spaces command: "C:\Program Files\...\node.exe"
+  const command = `${JSON.stringify(process.execPath)} -e "console.log('quoted ok')"`
+  const ok = await shell({ command, timeout: 30 })
+  assert.equal(ok.exit_code, 0)
+  assert.equal(ok.stdout.trim(), 'quoted ok')
+
+  // an argument in quotes next to it, the shape every spaced path arrives in
+  const withArg = `${JSON.stringify(process.execPath)} -e "console.log(process.argv[1])" "${JSON.stringify('a value with spaces').slice(1, -1)}"`
+  const passed = await shell({ command: withArg, timeout: 30 })
+  assert.equal(passed.exit_code, 0)
+  assert.equal(passed.stdout.trim(), 'a value with spaces')
+})
+
 test('shell timeout kills the descendant process tree', async () => {
   await scratch(async (dir) => {
     const marker = join(dir, 'leaked')
