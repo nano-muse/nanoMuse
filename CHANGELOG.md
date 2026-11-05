@@ -32,6 +32,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
+- Ran the hub suite's own shell commands on Windows too: the stop tests' `sleep 20` spells became the suite interpreter's `-c` payload, which `cmd.exe` runs unchanged (the posix spell died instantly, so the run answered before the stop landed), and the shell contract test lost its win32 skip to the same payload.
 - Flagged recursive forced deletion when `rm` flags are separate arguments, without borrowing flags from another command or treating filenames after `--` as options.
 - **A line-spliced `rm` still reads as what it runs.** A backslash before a newline is removed before the shell splits words, so `rm \` plus a newline plus `-rf x` ran as a recursive force delete while the guard scanned the raw text and saw neither flag, and a word split in the middle (`su` plus `do`) hid from the other patterns the same way. The guard reads the spliced command now.
 - Flagged Python directory removal through `Path(...).rmdir()` for approval, including inside the sandbox.

@@ -45,6 +45,14 @@ def tc(name: str, **args: Any) -> ToolCall:
     return ToolCall(function=Function(name=name, arguments=json.dumps(args)))
 
 
+def py_cmd(payload: str) -> str:
+    """A command both shells run as written: `sleep 20` and `echo hi; echo err 1>&2;
+    exit 3` are posix spells, while this interpreter's own -c payload answers the same
+    contracts (outlive a stop, write both streams, exit with a code) unchanged under
+    cmd.exe."""
+    return f'"{sys.executable}" -c "{payload}"'
+
+
 def wait_for(pred: Callable[[], Any], timeout: float = 8.0, interval: float = 0.03) -> Any:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -56,13 +64,20 @@ def wait_for(pred: Callable[[], Any], timeout: float = 8.0, interval: float = 0.
 
 
 # ----------------------------------------------------------------------------- local actions
-@pytest.mark.skipif(sys.platform == "win32", reason="the shell commands are posix")
 def test_info_and_shell(tmp_path: Path) -> None:
     info = actions.info(("task",))
     assert info["kind"] == "computer" and "task" in info["actions"] and info["runtime"]
-    r = actions.run("shell", {"command": "echo hi; echo err 1>&2; exit 3", "cwd": str(tmp_path)})
+    r = actions.run(
+        "shell",
+        {
+            "command": py_cmd(
+                "import sys; print('hi'); print('err', file=sys.stderr); sys.exit(3)"
+            ),
+            "cwd": str(tmp_path),
+        },
+    )
     assert r["stdout"].strip() == "hi" and r["stderr"].strip() == "err" and r["exit_code"] == 3
-    slow = actions.run("shell", {"command": "sleep 5", "timeout": 1})
+    slow = actions.run("shell", {"command": py_cmd("import time; time.sleep(5)"), "timeout": 1})
     assert slow["exit_code"] == 124 and slow["timed_out"] is True
     with pytest.raises(actions.ActionError):
         actions.run("shell", {"command": ""})
@@ -935,7 +950,9 @@ def test_old_task_forwarding_cannot_stop_a_successor(
         tid = next(t.id for t in service.threads.values() if t.remote_from)
         old_worker = service.threads[tid].worker
         wait_for(lambda: old_worker is not None and old_worker.done())
-        llm.script.append(LLMResponse(tool_calls=[tc("shell", command="sleep 20")]))
+        llm.script.append(
+            LLMResponse(tool_calls=[tc("shell", command=py_cmd("import time; time.sleep(20)"))])
+        )
         relay.call_runtime("task", {"text": "second", "conversation": "same"}, "new")
         event = relay.next_frame("event")
         assert event["id"] == "new" and event["body"]["stage"] == "tool"
@@ -971,7 +988,9 @@ def test_a_stopped_task_fails_with_cancelled_and_only_for_its_asker(hub_server) 
     relay.call_runtime("task", {"text": "first", "conversation": "conv-s"}, "t1")
     assert relay.next_frame("result")["body"]["text"] == "Earlier answer"
 
-    llm.script.append(LLMResponse(tool_calls=[tc("shell", command="sleep 20")]))
+    llm.script.append(
+        LLMResponse(tool_calls=[tc("shell", command=py_cmd("import time; time.sleep(20)"))])
+    )
     relay.call_runtime("task", {"text": "take a while", "conversation": "conv-s"}, "t2")
     assert relay.next_frame("event")["body"]["stage"] == "tool"
     # another device of the account cannot stop it, by call id or by conversation
@@ -1002,7 +1021,9 @@ def test_a_stopped_task_fails_with_cancelled_and_only_for_its_asker(hub_server) 
     assert results["t2"]["ok"] is False and results["t2"]["error"] == "cancelled"
     wait_for(lambda: client.get("/api/state").json()["status"]["state"] == "idle")
     # the stop button here does the same for a task under way
-    llm.script.append(LLMResponse(tool_calls=[tc("shell", command="sleep 20")]))
+    llm.script.append(
+        LLMResponse(tool_calls=[tc("shell", command=py_cmd("import time; time.sleep(20)"))])
+    )
     relay.call_runtime("task", {"text": "once more", "conversation": "conv-s"}, "t3")
     assert relay.next_frame("event")["body"]["stage"] == "tool"
     side = [t for t in client.get("/api/threads").json() if t["title"] == "From Pixel"][0]
