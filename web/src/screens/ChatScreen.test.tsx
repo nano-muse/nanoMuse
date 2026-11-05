@@ -1,7 +1,9 @@
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { api } from "../api";
 import { setLocaleSetting } from "../i18n";
+import type { SkillInfo, SkillsData } from "../types";
 import { Composer, WorkingLine } from "./ChatScreen";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -11,14 +13,19 @@ import { Composer, WorkingLine } from "./ChatScreen";
   removeEventListener: () => undefined,
 };
 
-vi.mock("../store", () => ({
-  useStore: () => ({
-    state: { draft: null, draftFiles: null, settings: { skills: { enabled: false } }, hub: null },
-    draft: () => undefined,
-    draftFiles: () => undefined,
-    toast: () => undefined,
-  }),
+const store = vi.hoisted(() => ({
+  state: {
+    draft: null,
+    draftFiles: null,
+    settings: { skills: { enabled: false } },
+    hub: null,
+    skillsVersion: 0,
+  },
+  draft: () => undefined,
+  draftFiles: () => undefined,
+  toast: () => undefined,
 }));
+vi.mock("../store", () => ({ useStore: () => store }));
 
 function discs(r: ReactTestRenderer) {
   return {
@@ -112,5 +119,152 @@ describe("WorkingLine", () => {
     expect(
       line({ thread: "main", cid: "c", device: "phone-1", device_name: "", state: "waiting", at: 1 }),
     ).toBe("phone-1 is waiting for you");
+  });
+});
+
+// The "/" menu lists the skills; its refresh rides the version the server bumps on
+// every save, so two answers can be in flight at once and a refresh can also fail.
+
+const skill = (name: string): SkillInfo => ({
+  name,
+  description: `What ${name} does`,
+  source: "built-in",
+  enabled: true,
+  path: `skills/${name}`,
+  files: [],
+  allowed_tools: [],
+  metadata: {},
+  updated_at: null,
+});
+
+const skillsData = (names: string[]): SkillsData => ({
+  count: names.length,
+  built_in: names.length,
+  yours: 0,
+  dir: "skills",
+  errors: {},
+  skills: names.map(skill),
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function allText(r: ReactTestRenderer): string {
+  const walk = (node: unknown): string => {
+    if (typeof node === "string") return node;
+    if (Array.isArray(node)) return node.map(walk).join(" ");
+    if (node && typeof node === "object" && "children" in node) {
+      return walk((node as { children: unknown }).children);
+    }
+    return "";
+  };
+  return walk(r.toJSON());
+}
+
+async function menuAfterTyping(r: ReactTestRenderer, value: string) {
+  const box = r.root.findByProps({ "aria-label": "Message" });
+  await act(async () => {
+    box.props.onChange({ target: { value } });
+  });
+  return allText(r);
+}
+
+describe("Composer slash menu skills", () => {
+  let menu: ReactTestRenderer | undefined;
+  beforeEach(() => {
+    setLocaleSetting("en");
+    store.state = {
+      ...store.state,
+      settings: { skills: { enabled: true } },
+      skillsVersion: 0,
+    };
+  });
+
+  afterEach(() => {
+    if (menu) act(() => menu?.unmount());
+    menu = undefined;
+    store.state = {
+      ...store.state,
+      settings: { skills: { enabled: false } },
+      skillsVersion: 0,
+    };
+    vi.restoreAllMocks();
+  });
+
+  it("a slower earlier answer does not land over a newer one", async () => {
+    const first = deferred<SkillsData>();
+    const second = deferred<SkillsData>();
+    vi.spyOn(api, "skills")
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+      menu = r;
+    });
+    store.state = { ...store.state, skillsVersion: 1 };
+    await act(async () => {
+      r.update(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    await act(async () => {
+      second.resolve(skillsData(["fresh-skill"]));
+    });
+    expect(await menuAfterTyping(r, "/")).toContain("fresh-skill");
+    await act(async () => {
+      first.resolve(skillsData(["stale-skill"]));
+    });
+    const text = await menuAfterTyping(r, "/");
+    expect(text).toContain("fresh-skill");
+    expect(text).not.toContain("stale-skill");
+    expect(api.skills).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps its list when a refresh fails", async () => {
+    vi.spyOn(api, "skills")
+      .mockResolvedValueOnce(skillsData(["kept-skill"]))
+      .mockRejectedValueOnce(new Error("offline"));
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+      menu = r;
+    });
+    expect(await menuAfterTyping(r, "/")).toContain("kept-skill");
+    store.state = { ...store.state, skillsVersion: 1 };
+    await act(async () => {
+      r.update(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    const text = await menuAfterTyping(r, "/");
+    expect(text).toContain("kept-skill");
+  });
+
+  it("hides cached skills immediately when disabled and ignores a late refresh", async () => {
+    const pending = deferred<SkillsData>();
+    vi.spyOn(api, "skills")
+      .mockResolvedValueOnce(skillsData(["cached-skill"]))
+      .mockImplementationOnce(() => pending.promise);
+    await act(async () => {
+      menu = create(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    expect(await menuAfterTyping(menu!, "/")).toContain("cached-skill");
+    store.state = { ...store.state, skillsVersion: 1 };
+    await act(async () => {
+      menu!.update(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    store.state = { ...store.state, settings: { skills: { enabled: false } } };
+    await act(async () => {
+      menu!.update(<Composer name="Muse" busy={false} waiting={false} onSend={vi.fn(async () => undefined)} />);
+    });
+    expect(allText(menu!)).not.toContain("cached-skill");
+    await act(async () => { pending.resolve(skillsData(["late-skill"])); });
+    expect(allText(menu!)).not.toContain("late-skill");
+    expect(menu!.root.findAllByProps({ role: "listbox", "aria-label": "Skills" })).toHaveLength(0);
+    const preventDefault = vi.fn();
+    act(() => menu!.root.findByProps({ "aria-label": "Message" }).props.onKeyDown({ key: "Tab", preventDefault }));
+    expect(preventDefault).not.toHaveBeenCalled();
   });
 });

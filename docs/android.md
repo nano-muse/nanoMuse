@@ -632,3 +632,10 @@ Android can require the device screen lock before showing the app. Enable it in 
 A pending diagnostic export requires its activity to be resumed and the app to be unlocked at the same time. Unlocking another window while the export window is paused does not release that export.
 
 Native provider-import and permission-repair dialogs also close when app access expires; pending permission choices are cancelled.
+
+
+## Continuing screen tasks {#hands-continuity}
+
+When another explicit Hands task names the same resolved app in the same conversation, Android supplies a short note from the preceding run: its task, outcome, result and last eight steps. Notes are kept in memory for at most 30 minutes, with at most 32 conversation/app pairs. They are historical observations, not permission to repeat actions or resume a stopped task; the current task and fresh screenshot take precedence. Runs without a conversation or a resolved app do not reuse notes, and a run that explicitly switches to another app does not save a shared note. Clearing, editing or deleting the conversation, syncing a replacement history, signing out or restarting discards the corresponding notes.
+
+The screen model can add `"distance":"large"` to a `scroll` action for a vertical sweep of about 65% of the screen. Omitting it preserves the existing approximately 45% vertical gesture; horizontal gestures are unchanged. The main agent is told to preserve the complete `nanomuse-hands run` JSON, including its outcome and final answer, rather than cut it with `head` or `tail`.
