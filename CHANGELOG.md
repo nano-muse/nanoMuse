@@ -137,6 +137,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
+- Documented launching Windows Desktop against a self-hosted relay, including profile override priority, separate account data and the Cloud proxy bypass. For #830.
+
 - Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
 
 - **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. Expense checks kept signs and fractions instead of accepting an incorrect total's integer prefix. [Goal evaluation](docs/goal-eval.md).
