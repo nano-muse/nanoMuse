@@ -310,6 +310,7 @@ process before removing the check's data directories.
 ## Config and data
 
 In the chat column, **More → Archived chats** opens the archive in that column. Search the archived chats or choose **Restore** to bring a chat back and open it. **Back to chats** returns to the normal list. Archiving keeps a chat on this computer; it does not delete its history.
+Staging the desktop harness on Windows accepts checkout and temporary-directory paths containing spaces. The staging script keeps each npm and pnpm argument intact when calling their command shims.
 
 If two problem reports produce screenshots within the same second, the later screenshot receives a numbered filename instead of replacing the earlier one.
 
