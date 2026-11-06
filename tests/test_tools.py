@@ -390,6 +390,9 @@ async def test_python_and_shell_children_cannot_read_secrets(tmp_path: Path, mon
         ("rm -r x | echo -f", False),
         ("rm -r x && echo -f", False),
         ("rm -r\n-f", False),
+        ("rm \\\n-rf x", True),
+        ("rm -r\\\nf x", True),
+        ("rm -r \\\nx", False),
     ],
 )
 def test_recursive_force_warning_respects_option_and_command_boundaries(
@@ -397,6 +400,11 @@ def test_recursive_force_warning_respects_option_and_command_boundaries(
 ) -> None:
     assessment = Shell(workspace=tmp_path).assess({"command": command})
     assert ("command looks dangerous: recursive force delete" in assessment.warnings) is warns
+
+
+def test_a_line_splice_cannot_hide_the_guard_words_either(tmp_path: Path) -> None:
+    assessment = Shell(workspace=tmp_path).assess({"command": "su\\\ndo id"})
+    assert "command looks dangerous: privilege escalation (sudo)" in assessment.warnings
 
 
 def test_python_reach_decides_the_risk(tmp_path: Path):

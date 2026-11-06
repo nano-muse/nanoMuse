@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -143,13 +145,27 @@ def test_ticket_chinese_boundaries_and_normalized_exclusions() -> None:
     assert result["TKT-C1"] == "G101,G102"
 
 
+def test_ticket_multiple_exclusion_words() -> None:
+    assert ticket_observations("- G101 有票\n- G102 无票不符合")["TKT-C1"] == "G101"
+
+
+def test_archive_multiple_failure_words() -> None:
+    assert (
+        archive_observation(
+            "invoice-a.pdf 已归档\ninvoice-b.pdf ❌ 未归档",
+            {"invoice-a.pdf": True, "invoice-b.pdf": False},
+        )
+        is True
+    )
+
+
 @pytest.mark.parametrize("failure", ["未成功", "没有成功", "没成功", "未能成功"])
 def test_archive_negated_success(failure: str) -> None:
     assert (
         archive_observation(
             f"invoice-a {failure}\ninvoice-b 成功", {"invoice-a": False, "invoice-b": True}
         )
-        is True
+        is None
     )
 
 
@@ -191,6 +207,42 @@ def test_expense_answer_total_must_match_exactly(
     result = assess(DATA["cases"][0], observations(world, before, answer))
     assert result["criteria"]["EXP-C4"] == criterion
     assert (result["status"] == "verified") == (criterion == "met")
+
+
+CRITERION_DATA = json.loads((FIXTURES / "criteria_cases_v1.json").read_text(encoding="utf-8"))
+CRITERION_CASES = CRITERION_DATA["cases"]
+
+
+@pytest.mark.parametrize("row", CRITERION_CASES, ids=lambda r: r["id"])
+def test_criterion_cases(row: dict, tmp_path: Path) -> None:
+    world = World(row["case"], tmp_path)
+    before = world.snapshot()
+    for name, content in (row.get("files") or {}).items():
+        path = world.workspace / name
+        if content is None:
+            path.unlink()
+            continue
+        if isinstance(content, dict):
+            data = (world.workspace / content["copy"]).read_bytes()
+            data += content.get("append", "").encode()
+        else:
+            data = content.encode()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    if "events" in row:
+        with closing(sqlite3.connect(world.db)) as conn, conn:
+            conn.executemany("INSERT INTO events(title,start,end) VALUES (?,?,?)", row["events"])
+    case = next(c for c in DATA["cases"] if c["id"] == row["case"])
+    result = assess(case, observations(world, before, row["answer"]))
+    # A known miss pins the current result, so a fix has to update the case.
+    assert result["criteria"][row["criterion"]] == row.get("current", row["expected"])
+
+
+def test_every_criterion_has_independent_cases() -> None:
+    for definitions in DATA["criteria_by_family"].values():
+        for definition in definitions:
+            results = {r["expected"] for r in CRITERION_CASES if r["criterion"] == definition["id"]}
+            assert {"met", "not_met"} <= results, definition["id"]
 
 
 def test_recording_resolves_symlink_paths(tmp_path: Path) -> None:

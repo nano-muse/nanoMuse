@@ -100,6 +100,14 @@ _DANGEROUS = [
 ]
 
 
+def _spliced(command: str) -> str:
+    # POSIX shells remove an unquoted backslash-newline pair before splitting words,
+    # and also remove it inside double quotes. Thus `rm \<newline>-rf x` runs as
+    # `rm -rf x`, and `su\<newline>do` as `sudo`. This pattern scan is not a shell parser:
+    # it also joins pairs inside single quotes, so literal text can trigger a warning.
+    return command.replace("\\\n", "")
+
+
 _SKIP_PROGRAMS = {"cd", "export", "set", "true", "time", "env", "nohup", "exec"}
 
 # What a Python script can reach beyond plain computation and the workspace. Each hit
@@ -353,7 +361,7 @@ class Shell(BaseTool):
 
     def assess(self, args: dict[str, Any]) -> CallAssessment:
         command = str(args.get("command", ""))
-        warnings = [label for pattern, label in _DANGEROUS if pattern.search(command)]
+        warnings = [label for pattern, label in _DANGEROUS if pattern.search(_spliced(command))]
         # a box that takes the network away decides which commands get it; one that
         # cannot (see Sandbox.blocks_network), like no box, leaves every command able to
         boxed = self.sandbox is not None and self.sandbox.active and self.sandbox.blocks_network
