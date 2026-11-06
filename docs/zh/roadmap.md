@@ -36,7 +36,7 @@ Meta 的 Muse 定下了这类智能体的样子；下面是我们还落后于它
 
 ### 让手更常成功 {#hands-that-succeed-more-often}
 
-把屏幕当手，在 Android 和桌面上都能用（桌面的操作器移植自 UI-TARS-desktop）。它失败在定位上（模型指错元素），以及碰到意外弹窗之后的恢复；而且我们还没有一组固定的任务来衡量它。
+把屏幕当手，在 Android 和桌面上都能用（桌面的操作器移植自 UI-TARS-desktop）。它失败在定位上（模型指错元素），以及碰到意外弹窗之后的恢复。[GUI 回归任务集](gui-regression.md) 已提供固定模拟场景，用于运行时回归和按需比较模型；真实设备的定位与恢复仍需收集失败轨迹。
 
 - 模块：`nanomuse/computer/`（`operator.py`、`coords.py`、`screen.py`）、`nanomuse/phone/`（`operator.py`、`trace.py`）、`harness/desktop/src/operator.ts`、Android 的 `io.github.nanomuse.hands`。
 - 阅读：[gui.md](gui.md)，操作器的约定；[troubleshooting.md](troubleshooting.md)。
@@ -106,3 +106,4 @@ Meta 的 Muse 定下了这类智能体的样子；下面是我们还落后于它
 | 1.0.6 | Beacon | Lookout 之后九天的第三次体检：nanoMuse Cloud 只提供一个多模态模型 Qwen3.6-27B，聊天和操作屏幕都用它，不再替人出生图和生视频的钱，图片和短片在每个客户端都来自你自己的服务商；中继对错密码和不存在的账号给同样的回答，限额在一个事务里判定，一把 Hub 凭据只认一台设备；运行时把重启打断的计划任务补跑完，浏览器拒绝内网地址，忘掉一条记忆看得见也能撤销；桌面端重启前先问一句，导出数据不再被一个链接卡住，没登录也能穿上自己画的脸，设置里能搜索；手机能读到你点赞的动态，记住的审批只覆盖那一步，短片列表里有 Wan 2.7；iPhone 隐藏的步骤保持隐藏，能看到远端任务的进度；README 的贡献者名单是最新的 |
 | 1.0.7 | Logbook | Beacon 之后两天的第四次通读，围绕记录：nanoMuse Cloud 完整保存它回答的每一轮聊天，截图存成文件，App 把用自己 key 跑的轮次补上去，每台设备共用一份历史；脸的短片跟着脸走；每台设备说明由哪个服务商和模型回答；模型只回答 nanoMuse 的 App；运营者控制台重做，能实时看到模型端点，并在请求路径之外读数据；运行时每次调用都报上名字，边想边显示推理，能用 Parallel 搜索；桌面端核对是谁在停止或批准远端任务；手机的定时任务一天能跑几次，备份能不带文件、也能从 shell 发起；iPhone 把两个账号分开；隐私政策写明 hub 对每台设备保存什么 |
 | 1.0.8 | Crew | Logbook 之后四天的第五次通读，围绕几台设备互通消息：电脑上的定时任务会到手机上问你，每台设备都能看到另一台走到哪一步、什么时候在等你，第一个字出来之前会说排在第几位，记录里写着每次调用是谁发起的、你对回答的评价；中继让慢的一轮保持连接，按问题计数并逐问查看记录；运行时在 Windows 上把私密文件只留给主人，按 Windows 写的方式读写文件，压缩网页又能抓了；桌面端资源库能放你自己的文档；手机停止说话不再闪退，发出的提示词更小；iPhone 不再打断你的音乐，繁體中文覆盖全部；Opper、AtmoRouter、API Route 和 Keenable 进了目录 |
+| 1.0.9 | Tiller | 和 Crew 同一天的修复版：登录过的桌面端又能启动了（[#703](https://github.com/nano-muse/nanoMuse/pull/703)，对应 [#701](https://github.com/nano-muse/nanoMuse/issues/701)），中继的控制台在大记录上也能打开（[#708](https://github.com/nano-muse/nanoMuse/pull/708)），运行时可以给一个任务定预算、在整个记忆库里找回忆（[#697](https://github.com/nano-muse/nanoMuse/pull/697)、[#696](https://github.com/nano-muse/nanoMuse/pull/696)）。 |

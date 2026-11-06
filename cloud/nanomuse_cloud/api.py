@@ -116,6 +116,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import dataclasses
 import hashlib
 import json
 import logging
@@ -560,6 +561,18 @@ def create_app(
                     if n and (analytics.keys_rows - n) // 20000 != analytics.keys_rows // 20000:
                         log.info("analytics: %d kept calls assigned to their turns so far", analytics.keys_rows)
                     await asyncio.sleep(pause(t0, n))
+                    continue
+                if not analytics.figures_done:
+                    # 0.31.1: the figures rows of the own turns kept before the relay wrote
+                    # them, a page at a time, paced like the other backfills
+                    t0 = time.monotonic()
+                    n = await asyncio.to_thread(analytics.own_figures_step, 200)
+                    if n and (analytics.figures_rows - n) // 20000 != analytics.figures_rows // 20000:
+                        log.info("analytics: figures of %d own turns written so far", analytics.figures_rows)
+                    if analytics.figures_done:
+                        log.info("analytics: the own turns' figures are complete (%d read this run)", analytics.figures_rows)
+                    # through (a file with no own turns is through at once): on to the hourly work
+                    await asyncio.sleep(0.5 if analytics.figures_done else pause(t0, n))
                     continue
                 if optimized_at is None or time.monotonic() - optimized_at > 3600:
                     # the planner's statistics (Database.optimize): milliseconds, once an hour
@@ -1178,7 +1191,11 @@ def create_app(
             spec = settings.unlisted_model(e.id, e.kind)
             if spec is None:
                 continue
-            pub = spec.to_public()
+            pub = dataclasses.replace(
+                spec,
+                context_length=e.context_length,
+                max_output_tokens=e.max_output_tokens,
+            ).to_public()
             pub["nanomuse"]["catalog"] = True
             pub["nanomuse"]["vision"] = e.vision
             pub["nanomuse"]["verified"] = e.verified  # the probe's word, not the name's
@@ -1202,6 +1219,11 @@ def create_app(
         if m is None:
             more = " on the menu; add ?kind=chat|image|video to ask for one beyond it" if cloud.any_model(caller) else ""
             raise CloudError(404, "model_not_offered", f"nanoMuse Cloud does not offer {model_id!r}{more}")
+        if not m.listed and settings.catalog_enabled:
+            entries = await catalog.get(app.state.http, settings.upstream_base, settings.upstream_key)
+            found = next((entry for entry in entries if entry.id == m.id), None)
+            if found is not None:
+                m = dataclasses.replace(m, context_length=found.context_length, max_output_tokens=found.max_output_tokens)
         return m.to_public()
 
     # -- chat -----------------------------------------------------------------------------
@@ -1275,23 +1297,40 @@ def create_app(
     # a test can wait for them: app.state.record_tasks)
     record_tasks: set[asyncio.Task] = set()
     app.state.record_tasks = record_tasks
+    # the turn list reads newest first by (ts, rowid). ts is taken below, as the answer
+    # leaves — a record written seconds later under load keeps the turn's own time — and
+    # writes for each account are chained in that order. A slow media write keeps its
+    # place within that account without holding up another account's history.
+    record_prev: dict[str, asyncio.Task] = {}
 
-    def record_later(*args: Any, **kwargs: Any) -> None:
+    def record_later(caller: Caller, *args: Any, **kwargs: Any) -> None:
         """The turn's record (service.record_turn) written off the loop after the answer
         has left — the pictures are decoded, hashed and written to disk there, and the
         row after them. A failure is logged; it is never the person's problem."""
         if not settings.record_turns:
             return
+        kwargs.setdefault("ts", int(time.time()))
+        account_id = caller.account_id
+        prev = record_prev.get(account_id)
 
         async def run() -> None:
             try:
-                await asyncio.to_thread(cloud.record_turn, *args, **kwargs)
+                if prev is not None:
+                    await prev  # its own run() swallows its failure; nothing propagates here
+                await asyncio.to_thread(cloud.record_turn, caller, *args, **kwargs)
             except Exception:
                 log.exception("record turn")
 
         task = asyncio.create_task(run(), name="record-turn")
         record_tasks.add(task)
-        task.add_done_callback(record_tasks.discard)
+        record_prev[account_id] = task
+
+        def recorded(done: asyncio.Task) -> None:
+            record_tasks.discard(done)
+            if record_prev.get(account_id) is done:
+                record_prev.pop(account_id)
+
+        task.add_done_callback(recorded)
 
     async def chat_post(url: str, headers: dict[str, str], payload: bytes, call: InFlightCall) -> tuple[httpx.Response, int]:
         """One non-streaming turn, queued globally and retried before an answer exists;

@@ -549,6 +549,114 @@ test("an app under App Translocation does not start its helper, and says why", a
   assert.match(helper.failure(), /Applications folder/);
 });
 
+/** Controlled promises keep these restart races independent of timers and real processes. */
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+function controlledHelper(options = {}) {
+  const dir = scratch();
+  const state = { launches: 0, quits: 0, pending: null };
+  const helper = new MacHelper({
+    appPath: fakeBundle(dir), dataDir: join(dir, "data"),
+    quarantine: () => ({ result: "none", detail: "" }),
+    launch: async (_app, args) => {
+      state.launches += 1;
+      if (state.launches === 1) await options.firstLaunch?.();
+      writeFileSync(args[args.indexOf("--port-file") + 1], JSON.stringify({ port: 4242 }));
+    },
+    fetch: async (url) => {
+      if (url.endsWith("/quit")) { state.quits += 1; return Response.json({ ok: true }); }
+      if (state.pending) {
+        const pending = state.pending;
+        state.pending = null;
+        return pending;
+      }
+      return Response.json({ screen: "granted", accessibility: true, pid: state.launches });
+    },
+  });
+  return { helper, state };
+}
+
+test("restart during startup waits for that process, quits it and launches a replacement", async (t) => {
+  const entered = deferred(), release = deferred();
+  const { helper, state } = controlledHelper({ firstLaunch: () => { entered.resolve(); return release.promise; } });
+  t.after(() => helper.stop());
+  const starting = helper.ready();
+  await entered.promise;
+  const restarting = helper.restart();
+  assert.equal(helper.ready(), restarting, "callers wait for the replacement, not the old startup");
+  release.resolve();
+  assert.deepEqual(await Promise.all([starting, restarting]), [true, true]);
+  assert.equal(state.launches, 2);
+  assert.equal(state.quits, 1);
+  assert.equal(helper.cachedStatus().pid, 2);
+});
+
+test("stop during startup waits for it and leaves no helper running", async () => {
+  const entered = deferred(), release = deferred();
+  const { helper, state } = controlledHelper({ firstLaunch: () => { entered.resolve(); return release.promise; } });
+  const starting = helper.ready();
+  await entered.promise;
+  const stopping = helper.stop();
+  release.resolve();
+  await Promise.all([starting, stopping]);
+  assert.equal(state.launches, 1);
+  assert.equal(state.quits, 1);
+  assert.equal(helper.running(), false);
+  assert.equal(helper.busy(), false);
+});
+
+test("stop during restart waits for the replacement and shuts it down too", async () => {
+  const entered = deferred(), release = deferred();
+  const { helper, state } = controlledHelper({ firstLaunch: () => { entered.resolve(); return release.promise; } });
+  const starting = helper.ready();
+  await entered.promise;
+  const restarting = helper.restart();
+  const stopping = helper.stop();
+  release.resolve();
+  await Promise.all([starting, restarting, stopping]);
+  assert.equal(state.launches, 2);
+  assert.equal(state.quits, 2);
+  assert.equal(helper.running(), false);
+  assert.equal(helper.busy(), false);
+});
+
+test("a late old request failure does not disconnect the restarted helper", async (t) => {
+  const { helper, state } = controlledHelper();
+  t.after(() => helper.stop());
+  assert.equal(await helper.ready(), true);
+  const pending = deferred();
+  state.pending = pending.promise;
+  const old = helper.status();
+  assert.equal(await helper.restart(), true);
+  pending.reject(new Error("the old process stopped"));
+  await assert.rejects(old, (e) => e instanceof MacHelperError && e.code === "not_running");
+  assert.equal(helper.running(), true);
+  assert.equal(helper.cachedStatus().pid, 2);
+  assert.equal(await helper.ready(), true);
+  assert.equal(state.launches, 2, "the replacement stays connected");
+});
+
+for (const route of ["status", "request"]) {
+  test(`an old ${route} body arriving after restart cannot overwrite the new permissions`, async (t) => {
+    const { helper, state } = controlledHelper();
+    t.after(() => helper.stop());
+    assert.equal(await helper.ready(), true);
+    const entered = deferred(), body = deferred();
+    state.pending = Promise.resolve({ ok: true, json: () => { entered.resolve(); return body.promise; } });
+    const old = route === "status" ? helper.status() : helper.request("screen");
+    await entered.promise;
+    assert.equal(await helper.restart(), true);
+    body.resolve({ screen: "denied", accessibility: false, pid: 1 });
+    await assert.rejects(old, (e) => e instanceof MacHelperError && e.code === "not_running");
+    assert.deepEqual(helper.cachedStatus(), { screen: "granted", accessibility: true, pid: 2 });
+    assert.deepEqual(helper.lastKnownStatus(), helper.cachedStatus());
+  });
+}
+
 test("defaultHelperPath: the env override, Contents/Helpers when packaged, the build dir in development", () => {
   assert.equal(defaultHelperPath("/x/nanoMuse.app/Contents/MacOS/nanomuse-desktop", true, "/proj", { NANOMUSE_COMPUTER_USE_APP: "/elsewhere/Helper.app" }), "/elsewhere/Helper.app");
   assert.equal(posix(defaultHelperPath("/x/nanoMuse.app/Contents/MacOS/nanomuse-desktop", true, "/proj", {})), "/x/nanoMuse.app/Contents/Helpers/nanoMuse Computer Use.app");

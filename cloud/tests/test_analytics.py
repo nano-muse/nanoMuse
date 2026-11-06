@@ -729,6 +729,34 @@ async def test_the_usage_page_says_how_much_of_the_prompts_the_cache_served(stac
     assert sorted((r[0], r[1], r[2]) for r in turns) == sorted(
         [("cloud", 100, 0), ("cloud", 100, 80), ("cloud", 40, 30), ("own", 2_000, 1_500), ("own", 1_000, 1_000), ("own", 300, 0)]
     )
+    # 0.31.1: the table is read from the own turns' figures rows (own_figures), one small row
+    # per own turn written with it, never from the turns' bodies; an own turn sent up again
+    # under the same id replaces its row rather than adding one
+    assert cloud.db.own_figures_count() == 3
+    assert (await client.post("/v1/turns", headers=headers, json=turn)).status_code == 201
+    assert cloud.db.own_figures_count() == 3
+    # the own turns kept before 0.31.1 have no figures row: the backfill writes them a page
+    # at a time, oldest first, and the table counts them as they come (the steps run here
+    # without a wait between them, so the loop's own step cannot come in between)
+    analytics = app.state.analytics
+    with cloud.db.tx() as c:
+        c.execute("DELETE FROM own_figures")
+    cloud.db.settings_put("own_figures.cursor", [0, 0])
+    analytics.figures_done = False
+    assert cloud.db.own_usage_by_provider(0) == []
+    assert analytics.own_figures_step(2) == 2 and cloud.db.own_figures_count() == 2 and analytics.figures_done is False
+    assert analytics.own_figures_step(2) == 1 and cloud.db.own_figures_count() == 3 and analytics.figures_done is True
+    assert analytics.own_figures_step(2) == 0
+    usage = (await client.get("/v1/admin/analytics/usage?days=7", headers=ADMIN)).json()
+    assert {(o["provider"], o["model"]): (o["turns"], o["prompt_tokens"], o["cached_tokens"]) for o in usage["own_keys"]} == {
+        ("openai", "gpt-5.6"): (2, 3_000, 2_500),
+        ("anthropic", "claude-5"): (1, 300, 0),
+    }
+    assert usage["own_keys_pending"] is False
+    # Data controls' delete takes the figures rows with the turns
+    assert (await client.delete("/v1/me/samples", headers=headers)).status_code == 200
+    assert cloud.db.own_figures_count() == 0
+    assert (await client.get("/v1/admin/analytics/usage?days=7", headers=ADMIN)).json()["own_keys"] == []
 
 
 async def test_kept_turns_get_a_shape_row_and_older_ones_are_backfilled(stack):

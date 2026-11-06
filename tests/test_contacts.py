@@ -409,3 +409,18 @@ def test_contacts_cli(settings: Settings, tmp_path: Path, monkeypatch: pytest.Mo
     assert r.exit_code == 1
     r = runner.invoke(cli_app, ["doctor", "--no-model", "-c", str(cfg)])
     assert "contacts: 1 people" in strip(r.output) or "contacts: 1 person" in strip(r.output)
+
+
+def test_render_folds_a_long_chinese_note_without_cutting_a_character():
+    (base, _) = parse_vcards(GOOGLE)
+    base.note = "备注" * 40  # 240 octets on one physical line without folding
+    text = render_vcard(base)
+    physical = text.split("\r\n")
+    # every physical line respects RFC 6350's 75-octet content-line limit
+    assert all(len(line.encode("utf-8")) <= 75 for line in physical), [
+        len(line.encode("utf-8")) for line in physical
+    ]
+    # the fold and parse_vcards's unfold are byte-exact inverses: nothing is cut or lost
+    (back,) = parse_vcards(text)
+    assert back.note == base.note
+    assert back.name == base.name

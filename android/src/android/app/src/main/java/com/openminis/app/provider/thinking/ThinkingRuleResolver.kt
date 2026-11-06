@@ -444,23 +444,13 @@ object ThinkingRuleResolver {
             }
 
             is ThinkingWireFormat.QwenDual -> {
-                // [T-thinking-rules-phase1] ANDROID-SPECIFIC OFF SEMANTICS — do not
-                // "align" this with iOS without a deliberate behaviour change.
-                //
-                // Android's pre-refactor chain dispatched OFF through a separate block
-                // from the enabled path, and in that block Qwen/DashScope hit an early
-                // `return` ("keep their native enable_thinking mechanism — never route
-                // them through reasoning_effort"), so NOTHING was emitted at OFF. iOS
-                // instead falls into its qwen branch at every level and emits
-                // `enable_thinking:false` + a null-budget extra_body.
-                //
-                // Both platforms therefore leave Qwen thinking-off to the vendor default,
-                // but by different wire shapes. Phase 1 is a pure refactor, so each
-                // platform keeps its own shape and the golden snapshots pin them
-                // separately. Unifying them is a real behaviour decision for Phase 2 —
-                // and the fact that this discrepancy was invisible until the snapshots
-                // existed is itself an argument for having built them.
-                if (!ctx.level.isEnabled) return null to null
+                // nanoMuse: Qwen3.8 Max defaults to thinking, so summary requests must
+                // explicitly disable it. Other Qwen models retain their existing OFF
+                // behavior until their ability to disable thinking is verified (#719).
+                if (!ctx.level.isEnabled) {
+                    io.github.nanomuse.models.QwenThinking.applyOff(ctx.modelId, body)
+                    return null to null
+                }
 
                 val enabled = true
                 var budget = when (ctx.level) {

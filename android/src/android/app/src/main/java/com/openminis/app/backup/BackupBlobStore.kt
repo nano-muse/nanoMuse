@@ -76,33 +76,44 @@ class BackupBlobStore(stagingRoot: File, private val maxFileBytes: Long?) {
      * digest stays out of [seen], so the next pass re-stores that file. That is
      * what stops a resumed package from referencing content it doesn't contain.
      */
-    fun rehydrateFromFileIndex(fileIndex: File) {
+    fun rehydrateFromFileIndex(fileIndex: File, strict: Boolean = false) {
         if (!fileIndex.exists()) return
         var restored = 0
         fileIndex.bufferedReader().useLines { lines ->
             for (line in lines) {
                 if (line.isBlank()) continue
-                val entry = runCatching {
+                // nanoMuse: verify every committed reference before reusing its staged payload.
+                val entry = try {
                     BackupFormat.json.decodeFromString(BackupFileIndexEntry.serializer(), line)
-                }.getOrNull() ?: continue
+                } catch (error: Exception) {
+                    if (strict) throw error else continue
+                }
+                if (entry.skipped == "size") {
+                    skippedFiles++
+                    skippedBytes += entry.size
+                    skippedPaths.add(SkippedPath(entry.path, entry.size))
+                }
                 val sha = entry.sha256 ?: continue
                 if (entry.skipped != null || entry.isDirectory == true) continue
-                if (!seen.add(sha)) continue
+                check(sha.matches(Regex("[a-f0-9]{64}"))) { "Invalid staged blob digest" }
                 val blob = blobFile(sha)
-                if (!blob.exists()) {
-                    seen.remove(sha)
-                    continue
+                if (!blob.isFile || blob.length() != entry.size) {
+                    if (strict) error("Staged backup blob is incomplete") else continue
                 }
+                if (!seen.add(sha)) continue
+                check(blob.inputStream().use { sha256(it) } == sha) { "Staged backup blob failed integrity verification" }
+                java.io.FileOutputStream(blob, true).use { it.fd.sync() }
                 totalBytesStored += entry.size
-                _blobIndex.add(
-                    BackupBlobIndexEntry(sha, entry.size, entry.path, null, mimeType(entry.path))
-                )
-                restored += 1
+                val session = entry.path.takeIf { it.startsWith("chats/") }?.split('/')?.getOrNull(1)
+                _blobIndex.add(BackupBlobIndexEntry(sha, entry.size, entry.path, session, mimeType(entry.path)))
+                restored++
             }
         }
-        if (restored > 0) {
-            AppLogger.info(TAG, "[Backup] resume: recovered $restored blob(s) from a previous attempt")
+        // nanoMuse: discard payload left by the unfinished category, outside the committed index.
+        blobsRoot.takeIf { strict && it.exists() }?.walkBottomUp()?.forEach { file ->
+            if (file.isFile && file.name !in seen) check(file.delete())
         }
+        if (restored > 0) AppLogger.info(TAG, "[Backup] resume: recovered $restored blob(s)")
     }
 
     /**

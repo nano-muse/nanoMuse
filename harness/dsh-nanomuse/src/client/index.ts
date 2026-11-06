@@ -1,3 +1,4 @@
+import { call, failureText } from './api.ts'
 /**
  * The nanoMuse browser half: the Muse look on the harness's Web client. The
  * left column (an icon rail beside the harness's chats browser), the agent
@@ -90,6 +91,7 @@ interface WorkspaceNavigation {
   openSession(target: string): void
   openWorkspace(workspaceId: string): Promise<void>
   archiveSession(sessionId: string, options?: { stopActivity?: boolean }): Promise<void>
+  unarchiveSession(sessionId: string): Promise<void>
   pinSession(sessionId: string): Promise<void>
   unpinSession(sessionId: string): Promise<void>
   pickDirectory(): Promise<string | null>
@@ -272,14 +274,18 @@ export function apply(ctx: ClientContext): void {
     })
     if (!result.ok) throw new Error(result.error?.message ?? 'rename failed')
   }
+  const openChat = (id: string): void => {
+    void call('sync/access', { sessionId: id }).then(() => workspaces.openSession(id))
+      .catch((error: unknown) => { window.alert(failureText(t, error)) })
+  }
   const chatActions: ChatActions = {
-    openSession: (id) => { workspaces.openSession(id) },
+    openSession: openChat,
     startSession: () => { workspaces.startSession() },
     archiveSession: (id) => workspaces.archiveSession(id, { stopActivity: true }),
     pinSession: (id) => workspaces.pinSession(id),
     unpinSession: (id) => workspaces.unpinSession(id),
     renameSession,
-    openArchived: () => { shell.openSection('archived-sessions') },
+    unarchiveSession: (id) => workspaces.unarchiveSession(id),
   }
   // A room opened from the rail fills the main area; the split (a room beside
   // the chat) ends with it.
@@ -324,7 +330,7 @@ export function apply(ctx: ClientContext): void {
   // The rooms behind the rail's icons — Feed, Ideas, Goals, Library — and the
   // Devices page. The rooms send the person to chats through `nav`.
   let activePanel: string | null = null
-  roomsNav.openSession = (id) => { workspaces.openSession(id) }
+  roomsNav.openSession = openChat
   roomsNav.showChats = () => { selectPanel(null) }
   roomsNav.startSession = () => { workspaces.startSession() }
   roomsNav.activePanel = () => activePanel

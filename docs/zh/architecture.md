@@ -33,7 +33,7 @@ sequenceDiagram
 | 区域 | 文件 | 说明 |
 |---|---|---|
 | 组合根 | `nanomuse/app.py` | `NanoMuseApp` 把设置接到 LLM、工具、保险库、哨兵、记忆、目标、智能体上 |
-| 智能体循环 | `nanomuse/agent/core.py` | 组装提示、裁剪上下文、卡住检测、会话持久化、收件箱 |
+| 智能体循环 | `nanomuse/agent/core.py` | 组装提示、裁剪上下文、卡住检测、会话持久化、收件箱；可选的共享[任务预算](runtime-budgets.md)，缩短工具结果时写入日志 |
 | 提示 | `nanomuse/prompts.py` | 系统提示、语言规则和文字系统检测、推进目标的提示 |
 | 哨兵 | `nanomuse/sentinel/gate.py`、`policy.py`、`audit.py` | 守卫、决策顺序、审批、污点、保险库解析、脱敏、JSONL 审计 |
 | 保险库 | `nanomuse/vault/vault.py` | Fernet 存储，`{{vault:NAME}}` 占位符 |
@@ -43,7 +43,7 @@ sequenceDiagram
 | 在手机上 | `nanomuse/runtime.py`、`nanomuse/bridge/` | `device()` 读 `NANOMUSE_DEVICE*`；`DEVICE_TOOLS`（手机那些工具在哨兵里的默认值）和 `device_mcp_server()`（App 的 MCP 服务器作为 `device` 条目，工具名 `device__*`）；CLI 桥（`/api/bridge/*`，一次一条命令的令牌），背后是 `nanomuse-device` / `nanomuse-browser` / `nanomuse-open`；见 [device.md](device.md)、[local-runtime.md](local-runtime.md) |
 | 手机 | `nanomuse/phone/link.py`、`screen.py`、`operator.py`、`trace.py`、`nanomuse/tools/phone.py` | 已连接的设备，以及经 App 的 WebSocket 走的请求/响应；屏幕是一张截图加一段说明文字；操作器循环（MemGUI 的 `mobile_use` 方言，坐标落在 999 网格上），用它自己的模型；JSONL 轨迹和它的 HTML 渲染；`phone_screen` / `phone_act` / `phone_task` 和它们在哨兵里的评估（见 [gui.md](gui.md)） |
 | LLM | `nanomuse/llm/base.py`、`openai_chat.py`、`openai_responses.py`、`prompt_tools.py`、`factory.py`、`mock.py`；`catalogue.py` + `providers.json`、`chatgpt.py`、`codex.py`、`chatgpt_proxy.py` | `BaseLLM`、带 `<think>` 过滤的流式输出、重试、基于提示的工具调用、给测试用的 `MockLLM`；服务商目录（谁覆盖对话、视觉、图像、视频）；ChatGPT 登录（PKCE、令牌存储）以及 `provider = "chatgpt"` 和 `nanomuse chatgpt proxy` 背后 Chat Completions ↔ Codex Responses 的转换 |
-| 记忆、目标 | `nanomuse/memory/store.py`、`nanomuse/memory/consolidate.py`、`nanomuse/goals/store.py` | SQLite；注入记忆时按罕见词（IDF）排序，词按任何字母文字切分，中日韩按双字；整理计划器和它的检查，判不了的合并一律拒绝；带撤销的变更日志 |
+| 记忆、目标 | `nanomuse/memory/store.py`、`nanomuse/memory/consolidate.py`、`nanomuse/goals/store.py` | SQLite；关键词和向量检索覆盖全部记忆，不受列表接口默认 1000 条限制；数据库变更前复用关键词索引；注入记忆时按罕见词（IDF）排序，词按任何字母文字切分，中日韩按双字；整理计划器和它的检查，判不了的合并一律拒绝；带撤销的变更日志 |
 | App 服务器 | `nanomuse/server/service.py`、`outbox.py`、`api.py`、`webui.py`、`events.py` | 线程和工作任务、排定工作持久化且至少执行一次的交接、REST + WebSocket、把回调变成事件的 `UI` 实现、时间线持久化 |
 | 前端 | `web/src/` | React + TypeScript + Tailwind；`store.tsx`（状态、WebSocket）、`screens/`（各个标签页）、`components/`（卡片、形象、Markdown） |
 | 终端 | `nanomuse/console.py`、`nanomuse/cli.py` | 基于 Rich 的控制台界面，审批就在行内；Typer 命令 |
@@ -83,3 +83,8 @@ cd web && npm run build             # type-checks and rebuilds the app
 ```
 
 `tests/test_server.py` 用一个写好脚本的 `MockLLM` 把 App 服务器从头到尾跑一遍：发消息、审批卡片、提问、目标、记忆、文件、设置。
+
+[GUI 回归](gui-regression.md)介绍固定模拟场景、独立状态校验和离线及真实模型入口；
+其用量记录不依赖任务预算功能。
+
+[目标评测任务](goal-eval.md)介绍十条录制的任务轨迹及可选的真实模型运行。

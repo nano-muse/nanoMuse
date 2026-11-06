@@ -1,36 +1,54 @@
 package io.github.nanomuse.chat
 
-import com.openminis.app.data.ContextPolicy
-
-/**
- * The phone's own ceiling on how much of a conversation goes to the model per call. The
- * policy's tiers compact a conversation 20k tokens short of the model's window, 108k on the
- * 128k window the hosted model is read as, and move old big tool results to disk from 88k.
- * Over the hosted model's last week the time to the first token grew with the prompt: 4.7 s
- * at the median for 8 to 12k tokens, 9 s for 16 to 24k, 25 s for 24 to 40k, 54 s above 40k
- * (and 80 to 138 s at the 95th percentile), with 38 % of the calls over 16k; each day about
- * 770 calls waited the relay's full 180 s for nothing. So from 1.0.8 the phone compacts at
- * [COMPACT_TOKENS] whatever the window and offloads from [OFFLOAD_TOKENS], keeping the last
- * three exchanges whole as before; the tiers under 64k, which never reach these figures, are
- * untouched. The model still has its whole window for the reply.
- */
+/** Request budgets derived from the active model, including its configured context cap. */
 object ContextBudget {
-    /** Above this the conversation is summarised before the next call. */
-    const val COMPACT_TOKENS = 32_000
+    private const val DEFAULT_OUTPUT_TOKENS = 4_096
 
-    /** Above this the next big tool result of an older message is written to disk. */
-    const val OFFLOAD_TOKENS = 28_000
+    data class Plan(
+        val window: Int,
+        val fixedTokens: Int,
+        val outputReserve: Int,
+        val hardLimit: Int,
+        val compactThreshold: Int,
+        val offloadThreshold: Int,
+        val targetTokens: Int,
+        val offloadTarget: Int,
+    ) {
+        /** Budget for replayed turns after charging the system prompt, schemas and summary. */
+        fun replayBudget(summaryTokens: Int = 0): Int =
+            (targetTokens.toLong() - fixedTokens - summaryTokens.coerceAtLeast(0))
+                .coerceAtLeast(0).toInt()
+    }
 
-    /** What offloading works down to. */
-    const val OFFLOAD_TARGET_TOKENS = 22_000
-
-    /** [tier] with its lines pulled down to the budget where they were above it. */
-    fun cap(tier: ContextPolicy): ContextPolicy {
-        if (tier.compactThreshold <= 0 || tier.compactThreshold <= COMPACT_TOKENS) return tier
-        return tier.copy(
-            compactThreshold = COMPACT_TOKENS,
-            offloadThreshold = minOf(tier.offloadThreshold, OFFLOAD_TOKENS),
-            offloadTarget = minOf(tier.offloadTarget, OFFLOAD_TARGET_TOKENS),
+    /**
+     * Reserve the requested output, up to 15% of the window (at least 4096 when available).
+     * Fixed instructions and schemas are counted before applying history watermarks. This
+     * avoids a large fixed prompt causing repeated attempts to reach an impossible target.
+     * This reserve sets maintenance watermarks, not the maximum generated reply. The caller
+     * separately limits actual requested output to the space left by the outgoing input.
+     */
+    fun forModel(contextWindow: Int, maxOutputTokens: Int, fixedTokens: Int = 0): Plan {
+        val window = contextWindow.coerceAtLeast(0)
+        val fixed = fixedTokens.coerceAtLeast(0)
+        val requested = maxOutputTokens.takeIf { it > 0 } ?: DEFAULT_OUTPUT_TOKENS
+        val reserveCap = maxOf(DEFAULT_OUTPUT_TOKENS, share(window, 15))
+        val reserve = minOf(requested, reserveCap, window)
+        val hard = window - reserve
+        val usable = (hard.toLong() - fixed).coerceAtLeast(0).toInt()
+        fun watermark(percent: Int): Int =
+            (fixed.toLong() + share(usable, percent)).coerceAtMost(hard.toLong()).toInt()
+        val target = watermark(50)
+        return Plan(
+            window = window,
+            fixedTokens = fixed,
+            outputReserve = reserve,
+            hardLimit = hard,
+            compactThreshold = watermark(90),
+            offloadThreshold = watermark(75),
+            targetTokens = target,
+            offloadTarget = target,
         )
     }
+
+    private fun share(tokens: Int, percent: Int): Int = (tokens.toLong() * percent / 100).toInt()
 }

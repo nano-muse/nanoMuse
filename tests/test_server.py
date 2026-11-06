@@ -2437,7 +2437,9 @@ def _chromium_available() -> bool:
 
 
 @pytest.mark.skipif(not _chromium_available(), reason="playwright + chromium not installed")
-async def test_browser_tool_reports_frames_and_user_takeover(tmp_path):
+async def test_browser_tool_reports_frames_and_user_takeover(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import http.server
     import threading
 
@@ -2464,6 +2466,13 @@ async def test_browser_tool_reports_frames_and_user_takeover(tmp_path):
 
     frames: list[BrowserFrame] = []
     tool = Browser(workspace=tmp_path, on_frame=frames.append)
+    url_allowed = tool._url_allowed
+
+    async def allow_fixture(url: str) -> bool:
+        # This test serves its page on loopback; keep the guard for every other URL.
+        return url == page or await url_allowed(url)
+
+    monkeypatch.setattr(tool, "_url_allowed", allow_fixture)
     try:
         result = await tool.execute(action="navigate", url=page)
         assert not result.error and "Sign in" in result.output and "[0]" in result.output
@@ -2905,10 +2914,11 @@ def test_data_export_is_the_agent_data_as_a_zip(server):
     """*Download your agent data* for the web (parity note 37): the runtime answers the
     token with the zip itself, and a credential is never inside it."""
     import io
+    import sqlite3
     import zipfile
 
     client, service, _ = server
-    service.app.triggers.create("mail", "summarise it", match="landlord")
+    trigger = service.app.triggers.create("mail", "summarise it", match="landlord")
 
     r = client.get("/api/data/export")
     assert r.status_code == 200, r.text
@@ -2919,6 +2929,18 @@ def test_data_export_is_the_agent_data_as_a_zip(server):
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         names = z.namelist()
         readme = z.read("README.txt").decode()
+        exported = sqlite3.connect(":memory:")
+        try:
+            exported.deserialize(z.read("triggers.db"))
+            assert exported.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert (
+                exported.execute(
+                    "SELECT text FROM triggers WHERE id = ?", (trigger.id,)
+                ).fetchone()[0]
+                == "summarise it"
+            )
+        finally:
+            exported.close()
     assert "README.txt" in names and "triggers.db" in names
     # the chats go in as the runtime keeps them, index first (written at startup)
     assert "threads/index.json" in names
@@ -3066,3 +3088,33 @@ def test_the_hub_devices_frame_fires_them(server):
     client.portal.call(lambda: service.hub._on_devices([me, phone]))
     wait_idle(service, "main")
     assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
+
+
+def test_data_export_keeps_pending_scheduled_delivery_rows(server):
+    import io
+    import sqlite3
+    import zipfile
+
+    client, service, _ = server
+    delivery = service.deliveries.claim(
+        "export-fixture",
+        kind="reminder",
+        source_id="fixture-reminder",
+        occurrence="2026-01-01T12:00:00+00:00",
+        thread="main",
+        text="delivery fixture",
+        label="fixture",
+    )
+    assert delivery is not None
+    response = client.get("/api/data/export")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        check = sqlite3.connect(":memory:")
+        try:
+            check.deserialize(archive.read("scheduled-deliveries.db"))
+            assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert check.execute(
+                "SELECT status, text FROM scheduled_deliveries WHERE id = ?", (delivery.id,)
+            ).fetchone() == ("pending", "delivery fixture")
+        finally:
+            check.close()

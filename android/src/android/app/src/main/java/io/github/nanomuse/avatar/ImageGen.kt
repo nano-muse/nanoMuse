@@ -8,11 +8,12 @@ import com.openminis.app.MinisApp
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.provider.ProviderFactory
+import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.gemini.GeminiProvider
 import com.openminis.app.provider.openai.OpenAIProvider
 import io.github.nanomuse.cloud.NanoMuseCloud
 import io.github.nanomuse.media.RelayMediaPolicy
@@ -30,10 +31,11 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Text-to-image and image-edit through the user's own providers — the same instances, keys and
+ * Text-to-image and image-edit through the user's own providers, using the same instances, keys and
  * model entries OpenMinis' `model-use` CLI drives. Generation and OpenAI-style edits go through
  * [OpenAIProvider.generateImage] / [OpenAIProvider.editImage] (Azure paths, header overrides and
- * the `response_format` retry included). Alibaba Model Studio's compatible host has neither
+ * the `response_format` retry included). Native Gemini uses generateContent with text and image
+ * response modalities for both drawing and editing. Alibaba Model Studio's compatible host has neither
  * `images/generations` nor `images/edits`; there both drawing and posing go through DashScope's
  * native multimodal endpoint with the same qwen-image-3.x / wan-image (or a `qwen-image-edit-*`)
  * model on the same host and key.
@@ -66,8 +68,8 @@ object ImageGen {
     }
 
     /**
-     * API-key providers that speak the OpenAI images API (OpenAI itself, xAI, OpenRouter, any
-     * custom base) — and, of the vendors the catalogue knows, only those with image models
+     * API-key providers that speak the OpenAI images API or Gemini's native image API,
+     * and, of the vendors the catalogue knows, only those with image models
      * (contract C11, [io.github.nanomuse.cloud.Capabilities]): a DeepSeek or Groq key draws
      * nothing, and a ChatGPT plan signed in through the Codex OAuth is chat and vision only.
      */
@@ -81,11 +83,8 @@ object ImageGen {
                 ?.let { availableModels(context, it).isNotEmpty() } == true
         return repo.config.value.instances.filter { inst ->
             (inst.id != cloudId || relayCanDraw) &&
-                inst.isEnabled && inst.credentialType == ProviderCredential.apiKey && when (inst.providerType) {
-                ProviderType.openAI, ProviderType.openAIResponses, ProviderType.openRouter, ProviderType.xAI -> true
-                ProviderType.anthropic, ProviderType.gemini, ProviderType.kimiCode, ProviderType.antigravity, ProviderType.unsupported -> false
-                else -> inst.customBaseURL != null
-            } && io.github.nanomuse.cloud.Capabilities.allows(context, inst, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE)
+                ImageModelRequests.supports(inst) &&
+                io.github.nanomuse.cloud.Capabilities.allows(context, inst, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE)
         }
     }
 
@@ -112,7 +111,8 @@ object ImageGen {
                 // rest go through a different (asynchronous) API this build does not speak.
                 val native = id.startsWith("qwen-image", ignoreCase = true) ||
                     (id.startsWith("wan", ignoreCase = true) && id.contains("-image", ignoreCase = true))
-                draws && !id.contains("edit", ignoreCase = true) && (!dashScope || native)
+                draws && !id.contains("edit", ignoreCase = true) && (!dashScope || native) &&
+                    ImageModelRequests.supportsModel(instance.providerType, id)
             }
         }
     }
@@ -121,7 +121,7 @@ object ImageGen {
     fun looksLikeImageModel(id: String): Boolean {
         val s = id.lowercase()
         if (s.contains("embedding") || s.contains("-vl") || s.contains("vision") || s.contains("caption")) return false
-        return listOf("image", "dall-e", "flux", "stable-diffusion", "sdxl", "sd3", "seedream", "kolors", "imagen", "ideogram", "recraft", "hidream", "cogview")
+        return listOf("image", "nano-banana", "dall-e", "flux", "stable-diffusion", "sdxl", "sd3", "seedream", "kolors", "imagen", "ideogram", "recraft", "hidream", "cogview")
             .any { s.contains(it) }
     }
 
@@ -163,6 +163,7 @@ object ImageGen {
             base.contains("api.openai.com") -> "gpt-image-1"
             base.contains("api.x.ai") -> "grok-2-image"
             base.contains("openrouter.ai") -> "google/gemini-2.5-flash-image"
+            instance.providerType == ProviderType.gemini -> "gemini-2.5-flash-image"
             else -> ""
         }
     }
@@ -189,6 +190,7 @@ object ImageGen {
         inst.effectiveBaseURL ?: when (inst.providerType) {
             ProviderType.openRouter -> "https://openrouter.ai/api/v1"
             ProviderType.xAI -> "https://api.x.ai/v1"
+            ProviderType.gemini -> "https://generativelanguage.googleapis.com/v1beta"
             else -> "https://api.openai.com/v1"
         }
 
@@ -238,7 +240,10 @@ object ImageGen {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_INSTANCE).remove(KEY_MODEL).apply()
     }
 
-    private fun provider(context: Context, ep: Endpoint, modelId: String): OpenAIProvider {
+    private fun provider(context: Context, ep: Endpoint, modelId: String): LLMProvider {
+        if (!ImageModelRequests.supportsModel(ep.instance.providerType, modelId)) {
+            throw ImageGenException(context.getString(com.openminis.app.R.string.nm_avatar_no_model))
+        }
         val app = context.applicationContext as MinisApp
         val entry = app.providerRepositoryOrNull?.config?.value?.modelEntries
             ?.firstOrNull { it.providerInstanceId == ep.instanceId && it.model.id == modelId }
@@ -249,8 +254,12 @@ object ImageGen {
             outputModalities = listOf("image"),
         )
         // record = false: a picture is not a chat turn, and the concrete provider is needed
-        return ProviderFactory.create(ep.instance, ep.apiKey, model, context, record = false) as? OpenAIProvider
-            ?: throw ImageGenException("${ep.label} is not an OpenAI-compatible provider")
+        val provider = ProviderFactory.create(
+            ep.instance, ep.apiKey, ImageModelRequests.modelFor(ep.instance.providerType, model),
+            context, record = false,
+        )
+        return provider.takeIf { it is OpenAIProvider || it is GeminiProvider }
+            ?: throw ImageGenException(context.getString(com.openminis.app.R.string.nm_avatar_no_model))
     }
 
     suspend fun generate(context: Context, ep: Endpoint, prompt: String, size: String = "1024x1024"): Bitmap = withContext(Dispatchers.IO) {
@@ -259,7 +268,7 @@ object ImageGen {
         // answers 404 to every model); its native endpoint draws with the same key.
         if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size)
         val response = try {
-            provider(context, ep, ep.model).generateImage(prompt = prompt, n = 1, size = size)
+            ImageModelRequests.request(provider(context, ep, ep.model), prompt, size)
         } catch (e: ImageGenException) {
             throw e
         } catch (e: CancellationException) {
@@ -277,10 +286,10 @@ object ImageGen {
         val png = pngBytes(image)
         val response = try {
             // gpt-image-* edits with the same model; other hosts get the configured one.
-            provider(context, ep, ep.model).editImage(
+            ImageModelRequests.request(
+                provider = provider(context, ep, ep.model),
                 prompt = instruction,
                 images = listOf(LLMMessage.ImagePart(data = png, mimeType = "image/png")),
-                n = 1,
                 size = "1024x1024",
             )
         } catch (e: CancellationException) {

@@ -384,17 +384,10 @@ enum VoiceProviderResolver {
     /// The System TTS voice identifier for the currently-resolved output selection
     /// (override → configured group member), or nil to auto-select by language.
     static func resolvedSystemOutputVoiceId() -> String? {
-        if let vid = selectedSystemVoiceId(VoiceSelectionStore.shared.outputEntryId) {
-            return vid
+        // nanoMuse: Auto is a selection too; only the active output entry can choose a voice.
+        systemOutputVoiceId(override: VoiceSelectionStore.shared.outputEntryId) {
+            resolvedOutputEntry()?.id
         }
-        // Also honor a specific System voice pinned as a member of the configured
-        // output group (first system member that names a concrete voice).
-        guard let gid = ProviderConfigStore.shared.voiceOutputGroupId,
-              let group = ProviderConfigStore.shared.group(for: gid) else { return nil }
-        for mid in group.memberEntryIds {
-            if let vid = selectedSystemVoiceId(mid) { return vid }
-        }
-        return nil
     }
 
     /// Which System ASR variant the user selected. Offline = on-device (privacy,

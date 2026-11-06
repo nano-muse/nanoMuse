@@ -17,7 +17,8 @@
  */
 import { createElement as h, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { call, type Translate } from './api.ts'
-import { IconCheck, IconMonitor, IconRefresh } from './icons.tsx'
+import { IconCheck, IconMonitor } from './icons.tsx'
+import { RelaunchButton } from './RelaunchButton.tsx'
 import type { Permissions } from './permissions.ts'
 
 export interface ScreenshotResult {
@@ -184,7 +185,7 @@ function ShotResult({ t, shot, perms }: { t: Translate; shot: ScreenshotResult; 
           'span',
           { className: 'nm-hc-actions' },
           h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => perms.settings('screen') }, t('obOpenSettings')),
-          h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => perms.relaunch() }, t(perms.helper ? 'pmBlackRelaunchHelper' : 'pmBlackRelaunch')),
+          h(RelaunchButton, { t, relaunch: perms.relaunch, label: t(perms.helper ? 'pmBlackRelaunchHelper' : 'pmBlackRelaunch') }),
         )
       : null,
   )
@@ -218,7 +219,7 @@ export function BlackScreenNotice({ t, perms, compact = false }: { t: Translate;
     h(
       'div',
       { className: 'nm-hc-actions' },
-      h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => perms.relaunch() }, h(IconRefresh, { size: 14 }), ' ', t(perms.helper ? 'pmBlackRelaunchHelper' : 'pmBlackRelaunch')),
+      h(RelaunchButton, { t, relaunch: perms.relaunch, label: t(perms.helper ? 'pmBlackRelaunchHelper' : 'pmBlackRelaunch') }),
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => perms.clearBlackScreen() }, t('pmBlackLater')),
     ),
   )

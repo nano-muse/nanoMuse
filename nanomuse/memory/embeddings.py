@@ -248,7 +248,7 @@ class MemoryIndex:
     async def search(self, query: str, limit: int = 10) -> list[MemoryItem]:
         """Keyword hits and meaning hits, fused; the keyword ranking alone when the
         endpoint is not available."""
-        items = self.store.all()
+        items = self.store.all(limit=None)
         by_keyword = self.store.search(query, limit=max(limit, 2 * limit))
         if not items or not query.strip() or not await self.ensure(items):
             return by_keyword[:limit]
@@ -263,7 +263,7 @@ class MemoryIndex:
     async def closest(self, text: str, limit: int = 5) -> list[tuple[float, MemoryItem]]:
         """Memories closest in meaning to ``text`` with their cosines — for the CLI and
         the connections test, not the agent."""
-        items = self.store.all()
+        items = self.store.all(limit=None)
         if not items or not await self.ensure(items):
             return []
         vec = await self.embedder.embed([text])

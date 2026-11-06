@@ -8,6 +8,11 @@ plugins ([harness.md](harness.md)). Windows 10+, macOS 12+ and Linux x64; one
 installer each, nothing to install first: the harness, the nanoMuse bundle and the
 runtime for the hands are inside.
 
+Device authorization cards follow the selected light or dark appearance. In the
+chat, each user message keeps its timestamp and Copy button below its text and
+attachments, aligned to the right. Hover over the message or focus its controls
+with the keyboard to reveal Copy.
+
 | | |
 | --- | --- |
 | Windows | `nanoMuse-Desktop-<version>-win-x64.exe` (NSIS; no certificate, so SmartScreen asks for *Run anyway*) |
@@ -68,7 +73,50 @@ in-app updater must first be upgraded with the downloaded installer. Development
 builds do not run an installer. This uses the existing installation behaviour;
 mixed copies or stale installation registration need to be sorted out separately.
 
+## Using your own relay on Windows
+
+If you run a relay, Desktop can use its address. Follow [Running your own](cloud.md#running-your-own)
+to set up the server first. The example below needs your relay's HTTPS origin and the path
+to the installed `nanomuse-desktop.exe`; `relay.example` and the installation path are placeholders.
+Accounts, devices and server-side conversation history belong to each relay separately.
+An account on the hosted service does not become an account on a new relay.
+
+1. Choose **Quit** in nanoMuse, including its tray menu, and let it finish quitting.
+   Closing the window can leave the app running. A second launch would then reuse that
+   process, including its previous environment.
+2. Open PowerShell and start the app with your relay and a separate data directory:
+
+   ```powershell
+   $env:NANOMUSE_CLOUD_URL = 'https://relay.example'
+   $env:NANOMUSE_DESKTOP_HOME = Join-Path $env:LOCALAPPDATA 'nanoMuse-self-hosted'
+   Start-Process -FilePath 'C:\Path\To\nanomuse-desktop.exe'
+   ```
+
+3. Sign in or register on that relay. Keep the same data directory when launching it
+   again; your existing desktop data stays in its original directory. These variables
+   affect this PowerShell session and programs it starts, not the permanent Windows
+   environment. A later launch from the Start menu does not inherit this example's
+   variables; use the same commands for subsequent launches of this relay profile.
+
+The bundled profile uses `NANOMUSE_CLOUD_URL` as the `nanomuse-cloud` plugin's
+`config.baseURL`. A saved override for that plugin in
+`<desktop-home>/profiles/nanomuse/cordis.patch.yml` is applied after the bundled profile
+and takes priority. If reusing a customised profile, remove that specific override or
+set it to the same relay address. The separate home above starts with its own profile
+and credentials. Changing an own-key model provider's base URL does not change the
+account relay.
+
+The app's **Network** proxy setting bypasses nanoMuse Cloud, including the relay's
+sign-in, Hub and sync traffic. `DEFAULT_RELAY_HOST` in the shell's `proxy.ts` contributes
+to `NO_PROXY`; it does not select another relay. This launch option points Desktop at
+your server. It does not repair a connection reset on the hosted relay's network path.
+
 ## What it is
+
+Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
+right-click an editable field to cut, copy, paste or select all. The Edit menu and the
+usual keyboard shortcuts also work. Page scripts cannot read the clipboard; pasting
+through the native menu or a keyboard shortcut is your explicit editing action.
 
 A dsh Host started by the shell as a child process, showing the harness's web app in a
 window of ours: the rail (Chats, Search, Feed, Ideas, Goals, Library, Devices, the
@@ -115,13 +163,19 @@ speaking as nanoMuse through the `nanomuse` preset, with:
 - **the rooms**: Feed, Ideas, Goals and Library as the phone has them, kept by the host in
   `nanomuse/rooms.json` and written by the agent in hidden chats (feed and ideas) or
   chats of their own (goals, with the harness's schedule plugin for their automations;
-  Library creations under `~/nanoMuse/Library`), plus memory: what it remembers about
+  Library creations under `~/nanoMuse/Library`; every chat the plugin opens, for the person,
+  for a batch of its own or for a task another device sent, starts in the `~/nanoMuse`
+  workspace, never in the bare home folder — on Windows a workspace that is the whole profile
+  folder cannot run a `workspace-write` command at all, since the sandbox's temp root lies
+  inside it, [#705](https://github.com/nano-muse/nanoMuse/issues/705)), plus memory: what it remembers about
   you, read into every chat ([desktop-muse.md](desktop-muse.md#rail-rooms));
 - **Reach**: this computer on the account's device list over the [hub](hub.md); the
   tools `devices`, `device_screen`, `device_shell`, `device_files`, `device_open`,
   `device_notify` and `delegate` for the phone and the other computers; the phone's
   `delegate` landing here as a dsh session "From <device>" with its approvals relayed
-  back, and its text sent while the model writes it when the asker asks (`stream`); remote control (`shell`, `files`, `open`, `screen`) behind a switch;
+  back, and its text sent while the model writes it when the asker asks (`stream`); a
+  task for a conversation whose chat was archived since the last one brings the chat back,
+  as opening it and typing does; remote control (`shell`, `files`, `open`, `screen`) behind a switch;
 - **Coding agents**: *Settings → Coding agents*, with this computer's Cursor, Codex,
   Claude Code and DeepSeek Harness chats (read from disk, a message starts the agent's own
   CLI, the run streams in with its tools, *Stop* ends it) and then the account's other computers',
@@ -172,8 +226,12 @@ speaking as nanoMuse through the `nanomuse` preset, with:
 - **Each model call tells the account's record where it sat** (relay 0.31). The harness's
   model adapter sends a provider's headers the same on every request, and a call's
   provenance changes with each, so the `nanoMuse Cloud` provider row points at a loopback
-  door of the plugin's own (`http://127.0.0.1:<port>/v1`; the port is each start's, and the
-  row is pointed at it again at start). The door sends a request on only when it carries the
+  door of the plugin's own (`http://127.0.0.1:<port>/v1`). The door asks for the port it had
+  at the last start (kept in the plugin's state as `doorPort`), so the row is right as it is;
+  when that port is taken, or the row was written by 1.0.7 and names the relay itself, the row
+  is pointed at today's door once the Host is up — not while the plugins are still starting,
+  where waiting for the write held the Host before it announced its address (1.0.8, #701).
+  The door sends a request on only when it carries the
   account's own key (anything else is a 401 here, as it would be at the relay), with the
   device, the platform (`X-NanoMuse-Platform: desktop`) and what the `llm/stream` hook
   announced for that call: who started the turn (`X-NanoMuse-Run`: `person`, `schedule`,
@@ -289,6 +347,39 @@ process before removing the check's data directories.
 
 ## Config and data
 
+Conversation sync pauses before sign-in or sign-out changes the account credentials. Responses from the previous account cannot update the new account's conversations, main chat or sync position, or add context to its model. A local chat created by an earlier sync request remains assigned to that request's account, even if creation finishes during an account switch. Requests already sent to the relay may still finish there.
+
+If sign-in or sign-out stops partway through, sync stays paused after a restart. Sign in again successfully to resume it.
+
+When this desktop receives an explicit conversation-clear notification from sync, it remembers the cleared session IDs across restarts and account changes. Task Records, chat search, history, duplicate and resume operations cannot reopen those sessions. Automatic subagent conversations are included; a separately saved duplicate and an ordinary archived chat remain available. Clearing an active main chat starts a fresh main chat.
+
+This is an access rule for conversations in the app. The underlying dsh JSONL logs remain on this computer and may still be read through separately authorized file access or included in a full data backup. It does not add desktop history deletion. Older versions discarded some cleared-session mappings after archiving, so this protection covers newly received clear notifications and older notifications still pending acknowledgement; it cannot reliably identify every conversation cleared before the update.
+In the chat column, **More → Archived chats** opens the archive in that column. Search the archived chats or choose **Restore** to bring a chat back and open it. **Back to chats** returns to the normal list. Archiving keeps a chat on this computer; it does not delete its history.
+
+The desktop keeps one previous log as `desktop.log.1`. When `desktop.log` reaches 10 MiB, the next entry starts a new log and replaces the older backup. If rotation fails, logging still attempts to append the entry and retries rotation later.
+
+If the saved desktop port is occupied, that launch uses a temporary fallback without replacing the saved port. Once the original port is free, the next launch returns to it and its browser settings. Settings changed while using the fallback belong to that temporary origin.
+
+Staging the desktop harness on Windows accepts checkout and temporary-directory paths containing spaces. The staging script keeps each npm and pnpm argument intact when calling their command shims.
+
+If two problem reports produce screenshots within the same second, the later screenshot receives a numbered filename instead of replacing the earlier one.
+
+When a conversation upload reaches the relay but its response is lost, a retry keeps the same message IDs so other devices do not receive duplicate messages. The conversation mapping is saved before upload so this also works after a restart; if that local save fails, the upload waits for a later attempt.
+
+On Windows, stopping a coding run also asks the system to terminate its child processes, including detached helpers.
+
+A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
+
+Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
+
+The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
+
+Dates beside entries in `MEMORY.md` use the computer's local calendar day.
+
+The development desktop smoke test imports Electron through a file URL on Windows and other platforms. Checkout paths may contain spaces, Unicode, `#` or `%`.
+
+Closing the window while its page loads no longer reports a startup failure or quits the app. A page load that fails while the window remains open still reports its error.
+
 `~/.nanomuse/desktop` (`NANOMUSE_DESKTOP_HOME` moves it) is the app's dsh home: the
 profile under `profiles/nanomuse` (the bundle list, the person's own `cordis.patch.yml`
 where Settings and the sign-in write the `nanoMuse Cloud` provider), dsh's credential
@@ -314,6 +405,31 @@ last good settings, and a damaged file is replaced from the copy at the next sta
 are readable by the owner alone, as the proxy address may carry a password. *Download your
 agent data* writes its zip one file at a time, leaves out links and anything over 64 MB,
 and removes a password from the proxy address in the `desktop.json` it packs.
+
+Settings → Plugins saves the selected bundles in `profiles/nanomuse/package.json`.
+Startup preserves that list and its order, including plugins you enabled and those you
+turned off. Defaults are written only when no bundle selection has been saved: Schedule
+starts enabled, while agent teams and automatic authorization review remain optional.
+If an earlier version already reset your choices, enable the plugins you want again;
+the lost selection cannot be recovered automatically. Your existing `cordis.yml` and
+`cordis.patch.yml` are kept.
+
+## The agent's desktop guide
+
+The preset also includes `skill-creator`, a guide for writing and checking reusable skills. Its model-neutral instructions are shared with Android and the Python runtime. Both bundled guides load only when requested and do not change approval permissions.
+
+The nanoMuse preset includes a `nanomuse-desktop` skill. Its description appears in the
+native DeepSeek Harness skill catalog; the `skill` tool loads its full guide only when
+needed. Ask how to connect a second-brain folder or configure a desktop capability, and
+the agent has local instructions for the current desktop instead of searching app source.
+The guide covers settings, workspaces, permissions, connectors and MCP, skills, memory,
+and rooms, with the current workspace and harness-home paths supplied by the host.
+
+For a folder you want every chat to find, the guide explains how to keep a pointer in
+the workspace's `AGENTS.md`, or in `$DSH_HOME/AGENTS.md` across workspaces. It does not
+copy the folder or grant access: writes outside a chat's workspace still need approval,
+including when reached through a Windows junction or a symlink. Credential entry and
+settings without an agent-facing tool stay in their existing settings pages.
 
 ## Models
 
@@ -531,7 +647,10 @@ More to know:
 - Screen Recording reaches freshly started processes only; that process is the helper. When
   the switch flips while the app runs, the app restarts the helper by itself (the log says
   `restarting the helper for the new grant`); the *Restart* button on the Permissions page
-  restarts the helper too, never the app, and two clicks are one restart.
+  restarts the helper too, never the app, and two clicks are one restart. If the helper is
+  still starting, the restart waits for that process and replaces it. The button shows
+  *Restarting…* until the replacement answers, reports a failed restart, and clears the
+  old black-screen notice only after success. A fresh test screenshot checks the grant.
 - The picture is the main display, at most 2 Mpx (a 3456×2234 Retina panel comes down to
   1758×1137), coordinates in points. Only the main display is captured and driven. Holding a
   key across actions (`press` / `release`, UI-TARS's names) works since 0.1.39.

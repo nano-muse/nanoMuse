@@ -1212,4 +1212,41 @@
     <string name="nm_stop_reason_done">이미 다 됐어요</string>
     <string name="nm_stop_reason_other">기타</string>
     <string name="nm_feed_limit_notice">일일 한도 12개로 인해 생성된 게시물 %1$d개를 추가하지 못했습니다.</string>
+
+    <!-- Context maintenance -->
+    <string name="nm_context_compacting">대화 맥락을 줄이고 있습니다(추정 %1$d / %2$d 토큰).</string>
+    <string name="nm_context_compact_deferred">맥락을 줄이지 못했습니다. 아직 모델 한도 내이므로 계속 진행합니다.</string>
+    <string name="nm_context_limit_reached">맥락이 모델 한도에 가까워졌고 줄이지 못했습니다. 다시 압축하거나 새 채팅을 시작하세요.</string>
+    <string name="nm_context_compact_timeout">맥락 압축이 %1$d초 후 시간 초과되었습니다(모델 호출 %2$d회).</string>
+    <string name="nm_context_compact_idle_timeout">%1$d초 동안 응답이 없어 컨텍스트 압축을 중지했습니다(모델 호출 %2$d회).</string>
+    <string name="nm_context_compact_no_gain">요약으로 컨텍스트가 줄어들지 않아 원래 내용을 유지했습니다.</string>
+    <string name="nm_context_compact_incomplete">모델이 완전한 요약을 반환하지 않아 원래 컨텍스트를 유지했습니다.</string>
+    <string name="nm_remote_ambiguous">일치하는 기기가 여러 개입니다. 계정 → 기기에서 선택하세요.</string>
+    <string name="nm_remote_attachments">기기 멘션은 텍스트만 전송합니다. 첨부 파일을 먼저 제거하세요.</string>
+    <string name="nm_remote_no_answer">%1$s에서 응답 없이 종료되었습니다.</string>
+    <string name="nm_remote_failed">%1$s에서 응답하지 않았습니다: %2$s</string>
+    <string name="nm_remote_offline">%1$s 기기가 오프라인입니다.</string>
+    <string name="nm_remote_chat_busy">이 대화의 처리가 끝난 후 기기에 작업을 보내세요.</string>
+
+    <string name="nm_reply_unread">읽지 않은 답변</string>
+    <string name="nm_restore_recovered">중단된 복원을 복구했습니다. 복구에 실패하면 재시도할 수 있도록 복구 데이터를 보관합니다.</string>
+    <string name="nm_restore_recovery_failed">복구에 실패했습니다. 복구 데이터는 보관되었습니다. 앱을 다시 시작하여 재시도하세요.</string>
+    <string name="nm_backup_resume">백업 재개</string>
+    <string name="nm_backup_discard">중단된 백업 삭제</string>
+    <string name="nm_backup_resume_hint">중단된 백업이 있습니다. 원래 옵션으로 재개하고 필요하면 암호를 다시 입력하거나, 삭제하고 처음부터 시작하세요.</string>
+<string name="nm_access_locked">nanoMuse가 잠겼습니다</string>
+<string name="nm_access_hint">이 기기의 화면 잠금으로 인증하세요.</string>
+<string name="nm_access_unlock">잠금 해제</string>
+<string name="nm_access_settings">앱 잠금</string>
+<string name="nm_access_on_exit">나갈 때 잠금</string>
+<string name="nm_access_never">자동으로 잠그지 않음</string>
+<string name="nm_access_seconds">%1$d초</string>
+<string name="nm_access_unavailable">먼저 이 기기의 화면 잠금을 설정하세요.</string>
+<string name="nm_session_protected">보호된 대화</string>
+<string name="nm_session_protect">대화 보호</string>
+<string name="nm_session_unprotect">대화 보호 해제</string>
+<string name="nm_session_settings">대화 잠금 시간</string>
+
+    <string name="nm_coding_installed">설치됨</string>
+    <string name="nm_coding_not_installed">설치되지 않음</string>
 </resources>

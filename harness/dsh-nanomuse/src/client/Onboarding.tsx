@@ -28,6 +28,7 @@ import { BrandMark } from './BrandMark.tsx'
 import { gatedPermissions, openLink, type PermissionKind } from './bridge.ts'
 import { permissionSub, permissionTitle, usePermissions, type Permissions } from './permissions.ts'
 import { BlackScreenNotice, HandsTryRows } from './HandsCheck.tsx'
+import { RelaunchButton } from './RelaunchButton.tsx'
 import { IconCheck, IconHand, IconMessage, IconMonitor, IconSettings, IconUsers } from './icons.tsx'
 import { useLive } from './live.ts'
 import { setMainChatId } from './MuseChats.tsx'
@@ -465,7 +466,7 @@ export function RelaunchNotice({ t, perms }: { t: Translate; perms: Permissions 
   if (!perms.needsRelaunch) return null
   return h('div', { className: 'nm-ob-relaunch', role: 'status' },
     h('span', null, t('obRelaunch')),
-    h(Pill, { small: true, onClick: () => perms.relaunch() }, t('obRelaunchNow')))
+    h(RelaunchButton, { t, relaunch: perms.relaunch, label: t('obRelaunchNow') }))
 }
 
 /**

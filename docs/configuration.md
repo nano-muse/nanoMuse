@@ -14,6 +14,8 @@ Three layers, later ones win: the file, then environment overrides, then whateve
 
 A key the runtime has no setting for (a misspelt `modle`, a key from another version) is ignored and the default applies; the loader says so in the log with the key's path (`llm.modle`), and `nanomuse doctor` lists such keys as a problem. Free-form tables (`[llm.extra_headers]`, an MCP server's `env`) and the `[channels.<name>]` tables of [channels.md](channels.md) take any key.
 
+Calendar drafts with the same day and title receive numbered filenames such as `calendar/<date>-<title>-2.ics`; earlier drafts stay intact.
+
 ## Environment overrides
 
 These win over the file. They cover the settings people change most often and what Docker needs.
@@ -38,6 +40,8 @@ These win over the file. They cover the settings people change most often and wh
 | `NANOMUSE_IN_CONTAINER=1` | says the runtime is inside a container (the image sets it; `/.dockerenv` is read too), so `sandbox.mode = auto` treats the container as the box instead of reporting bubblewrap missing |
 | `NANOMUSE_CODING_HOME` | where the coding CLIs' own homes (`~/.codex`, `~/.claude`, …) are looked for, default the user's home ([coding-agents.md](coding-agents.md)) |
 | `NANOMUSE_LOG_LEVEL` | `log_level` |
+
+For the root Docker compose file, `NANOMUSE_RUNTIME_PORT` selects the web app's published host port (default 8787). It is a compose variable, not a runtime setting or a replacement for `NANOMUSE_SERVER_PORT`; see [deployment.md](deployment.md#docker).
 
 ## `[llm]`
 
@@ -101,6 +105,8 @@ What it covers: chat and vision (the hands read screenshots). The Codex backend 
 **The honest line**, printed on every login: *OpenAI's terms cover using a ChatGPT plan inside OpenAI's own Codex; other apps have had this access cut off before (OpenCode, January 2026). If it stops working, an API key does.*
 
 **The callback has to reach the runtime.** OpenAI sends the browser back to `http://localhost:1455/auth/callback`, so the browser must be on the machine the runtime runs on (or forward that port to it). When it is not (a runtime on a server, the console open on a laptop), the sign-in page still works; the browser then lands on an address that does not answer. Copy that whole address (`http://localhost:1455/auth/callback?code=…&state=…`) out of the address bar and give it to the runtime: the CLI asks for it when the port is busy or nothing arrives in time; with `--json` it reads one line from stdin; the web console's card has a box for it; the server takes `POST /api/chatgpt/callback {"url": "<the address>"}` while a login started from `/api/chatgpt/login` is waiting. A `state` that is not the pending login's is refused (400 `state_mismatch`) and nothing is exchanged. `nanomuse chatgpt proxy` serves the sign-in as a loopback OpenAI-compatible endpoint (`GET /v1/models`, `POST /v1/chat/completions`, `GET /v1/usage`, a local bearer token) for other programs on the same machine; `--proxy` (or `[llm] proxy`) sends its upstream calls through a proxy.
+
+On desktop, completing browser authorization saves the sign-in; the ChatGPT models appear after the local proxy starts. `nanomuse chatgpt proxy --json` reports a `ready` event containing its model list, which the desktop uses to register the provider. The list comes from OpenAI when available, with the built-in list as a fallback.
 
 **What is left of the plan.** OpenAI counts a plan's use in two windows (a few hours and a week) and says so in the response headers of every Codex call (`x-codex-primary-used-percent`, `…-window-minutes`, `…-reset-after-seconds`, the same for `secondary`) and on `GET https://chatgpt.com/backend-api/wham/usage`, the endpoint Codex CLI's `/status` reads. `nanomuse chatgpt usage` prints both windows (`--json` for the raw `{label, plan, limits}`), the runtime serves them at `GET /api/chatgpt/usage` for the console, and the loopback proxy at `GET /v1/usage`; the runtime also keeps the headers of the last call (`CodexClient.limits`). Nothing is cached longer than a minute.
 
@@ -172,6 +178,10 @@ show_thinking        = false
 user_profile         = ""              # free text injected into the system prompt
 instructions         = ""              # extra rules appended to the system prompt
 ```
+
+On Windows, the runtime's `files` tool and hub file actions reject reserved device names
+(including `NUL.txt`) and path components ending in a dot or space. Choose another name
+instead of relying on Windows to rename it. Other platforms retain their own filename rules.
 
 With `language = "auto"` the system prompt names the reply language and tells the model to answer in it: the language of the client's screens when the client sends one with the message (the web console does, as `language` on `POST /api/threads/{id}/send`; a `task` over the hub may), else the language of the latest user message, detected by script. A generic "reply in the user's language" instruction turned out to be unreliable with some models; naming it works. A fixed `language` wins over both.
 
@@ -263,7 +273,7 @@ dir      = ""                        # your skills; empty → <data_dir>/skills
 disabled = ["inbox-triage"]          # built-in ones to leave out of the model's list
 ```
 
-A skill is a folder with a `SKILL.md` (YAML front matter with `name` and `description`, then the steps in Markdown) in the [Agent Skills](https://agentskills.io) format, so skills written for other agents work here. nanoMuse reads one more key, `channel`: which rung of the [ladder](gui.md#the-ladder) the skill works on: `api` (an MCP server or connector), `cli`, `web` (a fetch), `browser`, `gui` (the phone's screen; `app-only` is accepted) or `mixed`. A `gui` skill is marked *on the phone's screen* in the agent's index, so it knows the job needs the phone before it starts; `metadata.channel` works too for skills that must stay strictly in the shared format. Eleven are built in (`weekly-review`, `trip-plan`, `inbox-triage`, `compare-options`, `meeting-prep`; `phone-messages` for the phone's screen; five for Chinese services that need no screen: `feishu` through lark-cli, `tencent-meeting` through tmeet, `amap` through the 高德 MCP server, `kuaidi100` through the 快递100 server, and `train-tickets`, which searches through the 12306 server and books on the phone only when told to; [services.md](services.md) says which have been run where); a folder in `dir` with the same name as a built-in replaces it. The model gets the index (name and description of every enabled skill) in its system prompt and reads a skill's steps with the `skills` tool when a request fits; `/name` at the start of a chat message runs one directly. Saving or removing a skill from chat is a sensitive call: it asks first, whatever the Sentinel mode. Skills switched off in the app are remembered in `app-settings.json`; the list here and that one are merged. Inside the [sandbox](sentinel.md#the-sandbox) a skill's folder (its scripts and reference files) is visible read-only. See [the app → Skills](app.md#skills) and `nanomuse skills` in the [CLI](cli.md#skills).
+A skill is a folder with a `SKILL.md` (YAML front matter with `name` and `description`, then the steps in Markdown) in the [Agent Skills](https://agentskills.io) format, so skills written for other agents work here. nanoMuse reads one more key, `channel`: which rung of the [ladder](gui.md#the-ladder) the skill works on: `api` (an MCP server or connector), `cli`, `web` (a fetch), `browser`, `gui` (the phone's screen; `app-only` is accepted) or `mixed`. A `gui` skill is marked *on the phone's screen* in the agent's index, so it knows the job needs the phone before it starts; `metadata.channel` works too for skills that must stay strictly in the shared format. Twelve are built in (`skill-creator`, `weekly-review`, `trip-plan`, `inbox-triage`, `compare-options`, `meeting-prep`; `phone-messages` for the phone's screen; five for Chinese services that need no screen: `feishu` through lark-cli, `tencent-meeting` through tmeet, `amap` through the 高德 MCP server, `kuaidi100` through the 快递100 server, and `train-tickets`, which searches through the 12306 server and books on the phone only when told to; [services.md](services.md) says which have been run where); a folder in `dir` with the same name as a built-in replaces it. The model gets the index (name and description of every enabled skill) in its system prompt and reads a skill's steps with the `skills` tool when a request fits; `/name` at the start of a chat message runs one directly. Saving or removing a skill from chat is a sensitive call: it asks first, whatever the Sentinel mode. Skills switched off in the app are remembered in `app-settings.json`; the list here and that one are merged. Inside the [sandbox](sentinel.md#the-sandbox) a skill's folder (its scripts and reference files) is visible read-only. See [the app → Skills](app.md#skills) and `nanomuse skills` in the [CLI](cli.md#skills).
 
 ## Connectors
 
@@ -287,6 +297,8 @@ Store the values with `nanomuse vault set EMAIL_ADDRESS` and `nanomuse vault set
 ### Calendar
 
 Any calendar that offers a private iCalendar link (Google (*Settings → Integrate calendar → Secret address in iCal format*), Outlook (*Shared calendars → Publish*), iCloud (*Share Calendar → Public Calendar*), Fastmail, Nextcloud) or an `.ics` file on disk. `webcal://` links are fetched over HTTPS. The feed text is cached in `<data_dir>/calendar-cache.json` (mode 0600) so the agenda is there at startup and between refreshes.
+
+The agenda includes dates added to a recurring event with `RDATE`, including all-day dates. Duplicate dates appear once, and `EXDATE` still removes an occurrence. `RDATE` entries with their own duration (`VALUE=PERIOD`) are not supported and are skipped.
 
 ```toml
 [connectors.calendar]

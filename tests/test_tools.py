@@ -133,6 +133,36 @@ async def test_files_workspace_scoping(tmp_path: Path):
     assert r.ok and r.output == str(tmp_path / "docs" / "x.md")
 
 
+async def test_a_windows_device_name_is_refused_before_the_write_reaches_the_device(
+    tmp_path, monkeypatch
+):
+    from nanomuse.tools import files as files_module
+
+    files = Files(workspace=tmp_path)
+    # the module's own switch, not os.name: patching os.name makes Path() build a
+    # WindowsPath on Python 3.11 and earlier, which is not what these tests are about
+    monkeypatch.setattr(files_module, "ON_WINDOWS", True, raising=False)
+    r = await files.execute(action="write", path="NUL", content="gone")
+    assert r.error and "device name" in r.error
+    assert list(tmp_path.iterdir()) == []
+
+
+async def test_a_name_windows_would_change_is_refused_with_the_name_it_would_land_as(
+    tmp_path, monkeypatch
+):
+    from nanomuse.tools import files as files_module
+
+    files = Files(workspace=tmp_path)
+    monkeypatch.setattr(files_module, "ON_WINDOWS", True, raising=False)
+    r = await files.execute(action="write", path="report.", content="x")
+    assert r.error and "'report'" in r.error
+    assert list(tmp_path.iterdir()) == []
+    # Win32 reserves the device basename even when an extension follows it.
+    r = await files.execute(action="write", path="NUL.txt", content="kept")
+    assert r.error and "device name" in r.error
+    assert list(tmp_path.iterdir()) == []
+
+
 async def test_files_says_when_a_listing_or_a_search_was_cut(tmp_path: Path):
     from nanomuse.tools import files as files_module
 
@@ -337,6 +367,38 @@ async def test_python_and_shell_children_cannot_read_secrets(tmp_path: Path, mon
         assert r.ok and r.output.startswith("[] [yes]")
 
 
+@pytest.mark.parametrize(
+    ("command", "warns"),
+    [
+        ("rm -rf x", True),
+        ("rm -fr x", True),
+        ("rm -Rf x", True),
+        ("rm -r -f x", True),
+        ("rm -f -r x", True),
+        ("rm --recursive -f x", True),
+        ("rm -r --force x", True),
+        ("rm --recursive --force x", True),
+        ("rm -r x -f", True),
+        ("rm -rf -- -filename", True),
+        ("rm -r x", False),
+        ("rm -f x", False),
+        ("rm --preserve-root -f x", False),
+        ("rm -r --forceful x", False),
+        ("rm -r -- -f", False),
+        ("rm -- -rf", False),
+        ("rm -r x; echo -f", False),
+        ("rm -r x | echo -f", False),
+        ("rm -r x && echo -f", False),
+        ("rm -r\n-f", False),
+    ],
+)
+def test_recursive_force_warning_respects_option_and_command_boundaries(
+    tmp_path: Path, command: str, warns: bool
+) -> None:
+    assessment = Shell(workspace=tmp_path).assess({"command": command})
+    assert ("command looks dangerous: recursive force delete" in assessment.warnings) is warns
+
+
 def test_python_reach_decides_the_risk(tmp_path: Path):
     from nanomuse.config import SandboxSettings
     from nanomuse.sandbox import Sandbox
@@ -364,6 +426,10 @@ def test_python_reach_decides_the_risk(tmp_path: Path):
     proc = py.assess({"code": "import subprocess\nsubprocess.run(['ls'])"})
     assert proc.risk == RiskLevel.SENSITIVE and proc.egress
     assert set(code_reach("import shutil\nshutil.rmtree('x')")) == {"deletion"}
+    # directory removal through pathlib is deletion too, not just os.rmdir / Path.unlink
+    assert set(code_reach("from pathlib import Path\nPath('x').rmdir()")) == {"deletion"}
+    removal = py.assess({"code": "from pathlib import Path\nPath('x').rmdir()"})
+    assert removal.risk == RiskLevel.SENSITIVE and "deletes files" in removal.warnings[0]
     # modules fetched by name and attributes looked up by string are named on the card
     dynamic = py.assess({"code": "m = __import__('sub' + 'process')\nm.run(['ls'])"})
     assert (

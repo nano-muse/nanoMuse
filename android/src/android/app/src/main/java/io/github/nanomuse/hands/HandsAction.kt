@@ -22,7 +22,7 @@ sealed class HandsAction {
     data class LongPress(val at: Point, val target: String) : HandsAction()
     data class Swipe(val from: Point, val to: Point) : HandsAction()
     /** Scroll the content in [direction]: `down` reveals what is below. */
-    data class Scroll(val direction: String) : HandsAction()
+    data class Scroll(val direction: String, val distance: String = "normal") : HandsAction()
     data class InputText(val text: String, val field: String) : HandsAction()
     object KeyboardEnter : HandsAction()
     data class OpenApp(val appName: String) : HandsAction()
@@ -162,7 +162,9 @@ sealed class HandsAction {
                 "scroll" -> {
                     val dir = o.optString("direction", "down").lowercase()
                     if (dir !in setOf("up", "down", "left", "right")) throw FormatError("scroll direction must be up|down|left|right")
-                    Scroll(dir)
+                    val distance = o.optString("distance", "normal").lowercase()
+                    if (distance !in setOf("normal", "large")) throw FormatError("scroll distance must be normal|large")
+                    Scroll(dir, distance)
                 }
                 "input_text" -> InputText(o.optString("text"), o.optString("field").ifBlank { target })
                 "keyboard_enter" -> KeyboardEnter

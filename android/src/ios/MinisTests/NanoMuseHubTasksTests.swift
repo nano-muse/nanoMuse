@@ -46,6 +46,10 @@ final class NanoMuseHubTasksTests: XCTestCase {
         NanoMuseHubTasks.running["c1"] = .init(senderId: "mac", conversation: "from-mac")
         XCTAssertEqual(NanoMuseHubTasks.find(senderId: "mac", callId: "c1", conversation: nil), "c1")
         XCTAssertNil(NanoMuseHubTasks.find(senderId: "mac", callId: "c9", conversation: "elsewhere"))
+        XCTAssertNil(NanoMuseHubTasks.find(senderId: "mac", callId: "c9", conversation: nil))
+        XCTAssertNil(NanoMuseHubTasks.find(senderId: "mac", callId: "c9", conversation: "from-mac"))
+        XCTAssertFalse(NanoMuseHubTasks.stop(args: ["call": "c9"], from: ["id": "mac"]))
+        XCTAssertEqual(NanoMuseHubTasks.running["c1"]?.stopped, false)
     }
 
     func testStopByConversationDefaultsToTheSendersOwn() {

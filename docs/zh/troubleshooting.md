@@ -20,6 +20,8 @@
 
 **429 / 频率限制。** 请求会按指数退避重试（`max_retries`，默认 5）。调低 `agent.max_steps`，或者把 `web_fetch` 加进 `always_ask_tools` 让循环慢下来。
 
+**网页控制台里、或者桌面版聊天里的审批卡片，手机上收不到。** 这是规则，不是链路坏了：电脑只把 nanoMuse 桌面版上定时任务运行时的卡片推给账号下的手机，因为那时电脑旁边可能没人；有人正在聊的那条会话，卡片留在原地；Python 运行时（`nanomuse serve`）目前还不推送。如果桌面版定时任务的卡片也没到，检查中继是否是 0.31 及以上（`welcome` 里带 `event_push`）、手机是否用同一账号登录且 App 在前台或开着 hub 通知，以及那一步是否真的问过——被「此定时任务中始终允许」或「设置 → 权限」里的授权盖住的一步，在哪儿都不会出卡片（[hub.md](hub.md#a-computer-s-own-cards-on-the-phone)）。
+
 **终端里一直不出现审批卡片。** `nanomuse daemon` 和 `--auto` 按设计跑在哨兵（Sentinel）的 `auto` 模式下。要交互式审批，用 `nanomuse chat` 或者 App。
 
 **你想做的事被提示「Sentinel blocked」。** 查 `nanomuse audit -n 20` 看原因：一条拒绝规则、`deny_tools`，或者污染（这段对话早先读过私密数据，又出现了新的网络目的地）。把主机加进 `egress_allowlist`，或者允许一次。

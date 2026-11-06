@@ -247,6 +247,7 @@ export class MacHelper {
   private token = "";
   private starting: Promise<boolean> | null = null;
   private restarting: Promise<boolean> | null = null;
+  private stopping: Promise<void> | null = null;
   private lastStatus: HelperStatus | null = null;
   /** The last status of any process of the helper, kept across a restart (see `lastKnownStatus`). */
   private knownStatus: HelperStatus | null = null;
@@ -276,7 +277,7 @@ export class MacHelper {
    * whole app) wait this out instead.
    */
   busy(): boolean {
-    return this.starting !== null || this.restarting !== null;
+    return this.starting !== null || this.restarting !== null || this.stopping !== null;
   }
 
   /** Why the helper is not in use ("" when it is). */
@@ -306,8 +307,14 @@ export class MacHelper {
    * reason; only without a bundle at all does it use the Electron path.
    */
   ready(): Promise<boolean> {
-    if (this.base) return Promise.resolve(true);
+    if (this.restarting) return this.restarting;
+    if (this.stopping) return this.stopping.then(() => this.ready());
+    return this.ensureStarted();
+  }
+
+  private ensureStarted(): Promise<boolean> {
     if (this.starting) return this.starting;
+    if (this.base) return Promise.resolve(true);
     if (!this.present()) return Promise.resolve(false);
     if (this.lastFailureAt && Date.now() - this.lastFailureAt < (this.options.retryAfterMs ?? 30_000)) return Promise.resolve(false);
     this.starting = this.start().finally(() => {
@@ -406,30 +413,41 @@ export class MacHelper {
 
   private async call<T>(method: "GET" | "POST", path: string, body?: unknown, timeoutMs = 15_000): Promise<T> {
     if (!this.base) throw new MacHelperError("the helper is not running", 503, "not_running");
+    const base = this.base;
+    const token = this.token;
+    const current = () => this.base === base && this.token === token;
     const doFetch = this.options.fetch ?? fetch;
     let res: Response;
     try {
-      res = await doFetch(this.base + path, {
+      res = await doFetch(base + path, {
         method,
-        headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json" },
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (exc) {
-      // refused or timed out: the process is gone (or hung); the next ready() starts it again
-      this.log(`${method} ${path}: ${String((exc as Error).message ?? exc)} — treating the helper as gone`);
-      this.base = null;
-      this.token = "";
-      this.lastStatus = null;
+      // An old process can fail after its replacement is ready. Only retire the process
+      // this request belonged to; its failure must not disconnect the replacement.
+      if (current()) {
+        this.log(`${method} ${path}: ${String((exc as Error).message ?? exc)}; treating the helper as gone`);
+        this.base = null;
+        this.token = "";
+        this.lastStatus = null;
+      }
       throw new MacHelperError("the helper is not answering", 503, "not_running");
     }
     const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    // Also reject a late success, including one whose JSON body arrived after the restart,
+    // so status() and request() cannot replace the new process's permission cache.
+    if (!current()) throw new MacHelperError("the helper restarted before the request completed", 503, "not_running");
     if (!res.ok) throw new MacHelperError(String(json.message ?? json.error ?? `HTTP ${res.status}`), res.status, String(json.error ?? ""));
     return json as T;
   }
 
   async status(): Promise<HelperStatus> {
+    const token = this.token;
     const raw = await this.call<Record<string, unknown>>("GET", "/status");
+    if (token !== this.token) throw new MacHelperError("the helper restarted before the status arrived", 503, "not_running");
     const screen = raw.screen === "granted" || raw.screen === "denied" ? raw.screen : "unknown";
     const display = raw.display && typeof raw.display === "object" ? (raw.display as HelperStatus["display"]) : undefined;
     const status: HelperStatus = {
@@ -448,7 +466,9 @@ export class MacHelper {
 
   /** The system's dialog for one permission (and the pane, when asked); the status afterwards. */
   async request(what: "screen" | "accessibility", pane = false): Promise<HelperStatus> {
+    const token = this.token;
     const raw = await this.call<Record<string, unknown>>("POST", "/request", { what, pane });
+    if (token !== this.token) throw new MacHelperError("the helper restarted before the permission response arrived", 503, "not_running");
     const screen = raw.screen === "granted" || raw.screen === "denied" ? raw.screen : "unknown";
     const status: HelperStatus = { screen, accessibility: raw.accessibility === true };
     this.lastStatus = { ...(this.lastStatus ?? {}), ...status };
@@ -485,29 +505,56 @@ export class MacHelper {
     if (this.restarting) return this.restarting;
     this.restarting = (async () => {
       this.log("restarting");
-      await this.stop();
+      // Wait for an in-flight launch, then quit that process. Calling ready() here
+      // would reuse this restart promise rather than start the replacement.
+      await this.stopCurrent();
       this.lastFailureAt = 0;
-      return this.ready();
+      return this.ensureStarted();
     })().finally(() => {
       this.restarting = null;
     });
     return this.restarting;
   }
 
-  /** `/quit`; quiet when it is already gone. */
-  async stop(): Promise<void> {
-    if (this.statusTimer) clearInterval(this.statusTimer);
-    this.statusTimer = null;
-    if (!this.base) return;
-    try {
-      await this.call("POST", "/quit", undefined, 2000);
-    } catch {
-      /* already gone */
-    }
-    this.base = null;
-    this.token = "";
-    this.lastStatus = null;
-    rmSync(join(this.options.dataDir, "port"), { force: true });
-    rmSync(join(this.options.dataDir, "token"), { force: true });
+  /** `/quit`; finish a pending restart or launch so it cannot outlive the stop. */
+  stop(): Promise<void> {
+    if (this.restarting) return this.restarting.then(() => this.stopCurrent());
+    return this.stopCurrent();
+  }
+
+  private stopCurrent(): Promise<void> {
+    if (this.stopping) return this.stopping;
+    this.stopping = (async () => {
+      if (this.starting) await this.starting;
+      if (this.statusTimer) clearInterval(this.statusTimer);
+      this.statusTimer = null;
+      const base = this.base;
+      const token = this.token;
+      // Invalidate pending calls before waiting for /quit. ready() waits for this stop,
+      // and old replies cannot put their permissions back into the cache.
+      this.base = null;
+      this.token = "";
+      this.lastStatus = null;
+      if (base) {
+        try {
+          const doFetch = this.options.fetch ?? fetch;
+          await doFetch(base + "/quit", {
+            method: "POST",
+            headers: { authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(2000),
+          });
+        } catch {
+          /* already gone */
+        }
+      } else {
+        // A launch whose status probe failed may still have a live process on disk.
+        await this.quitStale(join(this.options.dataDir, "port"), join(this.options.dataDir, "token"));
+      }
+      rmSync(join(this.options.dataDir, "port"), { force: true });
+      rmSync(join(this.options.dataDir, "token"), { force: true });
+    })().finally(() => {
+      this.stopping = null;
+    });
+    return this.stopping;
   }
 }

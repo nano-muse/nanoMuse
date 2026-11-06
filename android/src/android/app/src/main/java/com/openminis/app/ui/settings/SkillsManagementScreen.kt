@@ -704,14 +704,17 @@ fun SkillDetailScreen(
                     Spacer(Modifier.weight(1f))
                     Text(skill.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(4.dp))
-                    Icon(
-                        Icons.Default.Edit, contentDescription = "Edit name",
-                        modifier = Modifier.size(14.dp).clickable {
-                            editName = skill.name
-                            showEditNameDialog = true
-                        },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    )
+                    // nanoMuse: bundled skill names are managed by the app.
+                    if (!skill.isReadOnly) {
+                        Icon(
+                            Icons.Default.Edit, contentDescription = "Edit name",
+                            modifier = Modifier.size(14.dp).clickable {
+                                editName = skill.name
+                                showEditNameDialog = true
+                            },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        )
+                    }
                 }
                 DetailDivider()
 
@@ -744,82 +747,85 @@ fun SkillDetailScreen(
             // already exist (updateFromURL / update / rescanFromDisk); the
             // previous TODOs and the "always show Done" flag were stubs.
             val isBusy = updateStatus is UpdateStatus.InProgress
-            DetailSection {
-                if (skill.importSource == SkillRepository.ImportSource.URL) {
+            // nanoMuse: app updates own the contents of bundled skills.
+            if (!skill.isReadOnly) {
+                DetailSection {
+                    if (skill.importSource == SkillRepository.ImportSource.URL) {
+                        DetailRow(clickable = !isBusy, onClick = {
+                            if (isBusy) return@DetailRow
+                            updateStatus = UpdateStatus.InProgress(context.getString(R.string.skill_detail_status_downloading))
+                            scope.launch {
+                                updateStatus = when (val r = skillRepository.updateFromURL(skill.id)) {
+                                    is SkillRepository.UpdateResult.Success -> UpdateStatus.Done
+                                    // T152: SKILL.md updated but sibling-file recursion
+                                    // failed (e.g. GitHub API 403 rate limit). Surface
+                                    // the actual cause so the user knows scripts/ may
+                                    // be incomplete instead of a silent green check.
+                                    is SkillRepository.UpdateResult.PartialSuccess -> UpdateStatus.Failed("Updated, but: ${r.reason}")
+                                    is SkillRepository.UpdateResult.Failure -> UpdateStatus.Failed(r.reason)
+                                }
+                            }
+                        }) {
+                            SettingsActionIcon(Icons.Default.Refresh, SettingsIconBlue)
+                            Spacer(Modifier.width(14.dp))
+                            Text(stringResource(R.string.skill_detail_update_url), color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                            Text(relativeTime(skill.updatedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        DetailDivider()
+                    }
+
                     DetailRow(clickable = !isBusy, onClick = {
                         if (isBusy) return@DetailRow
-                        updateStatus = UpdateStatus.InProgress(context.getString(R.string.skill_detail_status_downloading))
-                        scope.launch {
-                            updateStatus = when (val r = skillRepository.updateFromURL(skill.id)) {
-                                is SkillRepository.UpdateResult.Success -> UpdateStatus.Done
-                                // T152: SKILL.md updated but sibling-file recursion
-                                // failed (e.g. GitHub API 403 rate limit). Surface
-                                // the actual cause so the user knows scripts/ may
-                                // be incomplete instead of a silent green check.
-                                is SkillRepository.UpdateResult.PartialSuccess -> UpdateStatus.Failed("Updated, but: ${r.reason}")
-                                is SkillRepository.UpdateResult.Failure -> UpdateStatus.Failed(r.reason)
-                            }
-                        }
+                        fileUpdateLauncher.launch("*/*")
                     }) {
-                        SettingsActionIcon(Icons.Default.Refresh, SettingsIconBlue)
+                        SettingsActionIcon(Icons.Outlined.Description, SettingsIconBlue)
                         Spacer(Modifier.width(14.dp))
-                        Text(stringResource(R.string.skill_detail_update_url), color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                        Text(relativeTime(skill.updatedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.skill_detail_update_file), color = MaterialTheme.colorScheme.primary)
                     }
                     DetailDivider()
-                }
 
-                DetailRow(clickable = !isBusy, onClick = {
-                    if (isBusy) return@DetailRow
-                    fileUpdateLauncher.launch("*/*")
-                }) {
-                    SettingsActionIcon(Icons.Outlined.Description, SettingsIconBlue)
-                    Spacer(Modifier.width(14.dp))
-                    Text(stringResource(R.string.skill_detail_update_file), color = MaterialTheme.colorScheme.primary)
-                }
-                DetailDivider()
+                    DetailRow(clickable = !isBusy, onClick = {
+                        if (isBusy) return@DetailRow
+                        updateStatus = UpdateStatus.InProgress(context.getString(R.string.skill_detail_status_rescanning))
+                        val refreshed = skillRepository.rescanFromDisk(skill.id)
+                        updateStatus = if (refreshed != null) UpdateStatus.Done
+                            else UpdateStatus.Failed(context.getString(R.string.skill_detail_error_missing))
+                    }) {
+                        SettingsActionIcon(Icons.Default.Refresh, SettingsIconGreen)
+                        Spacer(Modifier.width(14.dp))
+                        Text(stringResource(R.string.skill_detail_rescan), color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                    }
 
-                DetailRow(clickable = !isBusy, onClick = {
-                    if (isBusy) return@DetailRow
-                    updateStatus = UpdateStatus.InProgress(context.getString(R.string.skill_detail_status_rescanning))
-                    val refreshed = skillRepository.rescanFromDisk(skill.id)
-                    updateStatus = if (refreshed != null) UpdateStatus.Done
-                        else UpdateStatus.Failed(context.getString(R.string.skill_detail_error_missing))
-                }) {
-                    SettingsActionIcon(Icons.Default.Refresh, SettingsIconGreen)
-                    Spacer(Modifier.width(14.dp))
-                    Text(stringResource(R.string.skill_detail_rescan), color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                }
-
-                // Inline status row — only rendered while there's something to
-                // say. Holds for ~3 s on Done/Failed before LaunchedEffect
-                // clears it back to Idle.
-                when (val s = updateStatus) {
-                    is UpdateStatus.InProgress -> {
-                        DetailDivider()
-                        DetailRow {
-                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(10.dp))
-                            Text(s.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Inline status row — only rendered while there's something to
+                    // say. Holds for ~3 s on Done/Failed before LaunchedEffect
+                    // clears it back to Idle.
+                    when (val s = updateStatus) {
+                        is UpdateStatus.InProgress -> {
+                            DetailDivider()
+                            DetailRow {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(10.dp))
+                                Text(s.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
-                    }
-                    is UpdateStatus.Done -> {
-                        DetailDivider()
-                        DetailRow {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text(stringResource(R.string.skill_detail_updated), style = MaterialTheme.typography.bodySmall, color = Color(0xFF34C759))
+                        is UpdateStatus.Done -> {
+                            DetailDivider()
+                            DetailRow {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(stringResource(R.string.skill_detail_updated), style = MaterialTheme.typography.bodySmall, color = Color(0xFF34C759))
+                            }
                         }
-                    }
-                    is UpdateStatus.Failed -> {
-                        DetailDivider()
-                        DetailRow {
-                            Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text(s.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        is UpdateStatus.Failed -> {
+                            DetailDivider()
+                            DetailRow {
+                                Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(s.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            }
                         }
+                        UpdateStatus.Idle -> Unit
                     }
-                    UpdateStatus.Idle -> Unit
                 }
             }
 
@@ -870,17 +876,20 @@ fun SkillDetailScreen(
             }
 
             // ── Delete ──
-            Spacer(Modifier.height(16.dp))
-            MinisButton(
-                onClick = { showDeleteDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                ),
-            ) {
-                Text(stringResource(R.string.skill_detail_delete))
+            // nanoMuse: keep built-in skills installed; the list still offers their enable switch.
+            if (!skill.isReadOnly) {
+                Spacer(Modifier.height(16.dp))
+                MinisButton(
+                    onClick = { showDeleteDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) {
+                    Text(stringResource(R.string.skill_detail_delete))
+                }
             }
 
             Spacer(Modifier.height(32.dp))
@@ -1175,7 +1184,7 @@ fun SkillFileViewerScreen(
                             isEditing = false
                             onBack()
                         }) { Text(stringResource(R.string.skill_file_save)) }
-                    } else {
+                    } else if (!skill.isReadOnly) { // nanoMuse: bundled source files are read-only.
                         MinisTextButton(onClick = {
                             editContent = initialContent
                             isEditing = true

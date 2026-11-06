@@ -48,6 +48,7 @@ jobs:
               - ".github/workflows/ci.yml"
             relay:
               - "cloud/**"
+              - "demo/showcase/mirror/**" # the cloud's tests load the mirror scripts (#656)
               - ".github/workflows/ci.yml"
       # Every npm lock file in the repository, on every pull request, whatever it touched:
       # a private mirror's host must never land in one. harness.yml repeats it for tag builds
@@ -87,7 +88,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.RUN == 'true'
 
-      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         if: env.RUN == 'true'
         with:
           enable-cache: true
@@ -146,23 +147,36 @@ jobs:
           uv pip install --python /tmp/smoke/bin/python dist/*.whl
           /tmp/smoke/bin/nanomuse version
 
+      - name: GUI regression report (offline reference)
+        if: env.RUN == 'true' && (matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12')
+        run: uv run python scripts/gui_regression.py
+
   relay:
-    name: relay · ruff and pytest
+    name: relay · ${{ matrix.os }}
     needs: changes
     # Same shape as `test`: the job always runs so the check always appears; its steps skip
-    # together when nothing under cloud/ changed.
+    # together when nothing under cloud/ changed. The suite has no POSIX-shell surface (its
+    # one skip is the privileged-user check), so Windows fails the build like Linux does:
+    # while these checks were Linux-only, the showcase mirror's `fcntl` import died on every
+    # Windows run of the cloud's own tests and nothing saw it (#656).
     env:
       RUN: ${{ needs.changes.outputs.relay == 'true' || github.ref_type == 'tag' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     defaults:
       run:
+        # bash on Windows too: the steps are POSIX shell, and the runner's default there is pwsh
+        shell: bash
         working-directory: cloud
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.RUN == 'true'
 
-      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         if: env.RUN == 'true'
         with:
           enable-cache: true
@@ -202,8 +216,10 @@ jobs:
           npm run check
           npm run build
 
+      # Keep one canonical committed-build comparison on Linux; both platforms build and
+      # test the console above. The console sources use LF on both platforms.
       - name: Admin console build is committed
-        if: env.RUN == 'true' && github.actor != 'dependabot[bot]'
+        if: env.RUN == 'true' && github.actor != 'dependabot[bot]' && matrix.os == 'ubuntu-latest'
         run: |
           if [ -n "$(git status --porcelain nanomuse_cloud/console/admin)" ]; then
             echo "cloud/nanomuse_cloud/console/admin is out of date: run 'cd cloud/console && npm run build' and commit the result"

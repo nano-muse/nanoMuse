@@ -20,6 +20,8 @@ Start with `nanomuse doctor`: it prints the config file in use, the data directo
 
 **429 / rate limits.** Requests retry with exponential back-off (`max_retries`, default 5). Lower `agent.max_steps`, or add `web_fetch` to `always_ask_tools` to slow the loop down.
 
+**A card in the web console, or in a chat on the desktop, never reaches the phone.** That is the rule, not a broken link: a computer pushes to the account's phones only the cards of a scheduled task running on nanoMuse Desktop, since nobody may be at the computer then; a chat somebody is typing in stays where it is, and the Python runtime (`nanomuse serve`) does not push yet. If a desktop task's card does not arrive either, check that the relay is 0.31 or later (`event_push` in its `welcome`), that the phone is signed in to the same account with the app open or its hub notification on, and that the step actually asked — a step covered by *Always in this task* or by a grant under Settings → Permissions produces no card anywhere ([hub.md](hub.md#a-computer-s-own-cards-on-the-phone)).
+
 **An approval card never appears in the terminal.** `nanomuse daemon` and `--auto` run in Sentinel `auto` mode by design. Use `nanomuse chat` or the app for interactive approvals.
 
 **"Sentinel blocked" for something you wanted.** Check `nanomuse audit -n 20` for the reason: a deny rule, `deny_tools`, or taint (private data read earlier in the conversation plus a new network destination). Add the host to `egress_allowlist` or approve once.

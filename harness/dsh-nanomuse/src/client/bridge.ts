@@ -92,7 +92,8 @@ export interface HarnessBridge {
   reveal?(path: string): Promise<void>
   onQuickChat?(listener: () => void): () => void
   // since 0.1.33
-  relaunch?(): Promise<void>
+  // New shells report whether the restart completed; older shells return void.
+  relaunch?(): Promise<boolean | void>
   // since 0.1.34
   guidePermissions?(): Promise<Record<PermissionKind, PermissionState>>
   setContentProtection?(on: boolean): Promise<void>

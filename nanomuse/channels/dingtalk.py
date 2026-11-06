@@ -22,6 +22,8 @@ import mimetypes
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Coroutine
+from concurrent.futures import Future
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -109,12 +111,34 @@ class DingTalkChannel(Channel):
             async def process(self, message: Any) -> tuple[Any, str]:
                 data = getattr(message, "data", None)
                 if isinstance(data, dict):
-                    loop = channel._loop
-                    if loop is not None and not loop.is_closed():
-                        asyncio.run_coroutine_threadsafe(channel._handle(dict(data)), loop)
+                    channel.hand_over(channel._handle(dict(data)))
                 return sdk.AckMessage.STATUS_OK, "OK"
 
         return Handler()
+
+    def hand_over(self, coro: Coroutine[Any, Any, None]) -> None:
+        """A message from the stream thread crosses to the loop; the stream has already
+        acked it, so when the handed-over handling fails, the exception must not sit in a
+        future nobody reads."""
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            coro.close()
+            return
+        try:
+            done = asyncio.run_coroutine_threadsafe(coro, loop)
+        except RuntimeError:
+            coro.close()
+            logger.warning("dingtalk: the runtime loop stopped before message handover")
+            return
+        done.add_done_callback(self._log_failed_handover)
+
+    @staticmethod
+    def _log_failed_handover(future: Future[Any]) -> None:
+        if future.cancelled():
+            return
+        exc = future.exception()
+        if exc is not None:
+            logger.warning("dingtalk: a handed-over message failed: {}", exc)
 
     def _run_stream(self, sdk: Any, handler: Any) -> None:
         loop = asyncio.new_event_loop()

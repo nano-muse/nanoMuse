@@ -7,7 +7,7 @@ import { bytes, compact, dateOf, fmt, nowS } from "../lib/format";
 import { useData } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
 import { hashOf } from "../lib/router";
-import type { ClientEventsSummary, DataView, Deletions, RecordView, Sync } from "../lib/types";
+import type { ClientEventsSummary, DataView, Deletions, Overview, RecordView, Sync } from "../lib/types";
 import { Bars, Legend, Ranks, modelColor, platformColor } from "../ui/charts";
 import { Btn, DataTable, Grid, Kpi, Kpis, Note, Panel, Pill, useToast } from "../ui/primitives";
 import { Ago, Who } from "../ui/who";
@@ -22,6 +22,8 @@ export function Data({ days }: PageProps) {
   const re = useData<RecordView>(`/v1/admin/record?days=${days}`, { poll: 300_000 });
   const ev = useData<ClientEventsSummary>(`/v1/admin/client-events/summary?days=${days}`, { poll: 300_000 });
   const de = useData<Deletions>("/v1/admin/deletions", { poll: 600_000 });
+  const ov = useData<Overview>("/v1/admin/overview?days=7", { maxAge: 300_000 });
+  const offsetH = Number(ov.data?.settings.day_offset_h || 0);
   const expEvents = (since: number) => download(`/v1/admin/client-events/export?since=${since}`, `nanomuse-client-events-${since}.jsonl`).catch((e) => toast(String(e.message || e), "bad"));
   const exp = (since: number) => download(`/v1/admin/samples/export?since=${since}`, `nanomuse-samples-${since}.jsonl`).catch((e) => toast(String(e.message || e), "bad"));
   const expRecord = (since: number) => download(`/v1/admin/turns/export?since=${since}`, `nanomuse-turns-${since}.jsonl`).catch((e) => toast(String(e.message || e), "bad"));
@@ -64,8 +66,8 @@ export function Data({ days }: PageProps) {
                   { name: T.da.legend.turned_on, values: d.days.map((x) => x.turned_on), color: "var(--ok)" },
                   { name: T.da.legend.turned_off, values: d.days.map((x) => x.turned_off), color: "var(--bad)" },
                 ]}
-                labels={dayLabels(d.days.map((x) => x.day))}
-                titles={dayTitles(d.days.map((x) => x.day))}
+                labels={dayLabels(d.days.map((x) => x.day), offsetH)}
+                titles={dayTitles(d.days.map((x) => x.day), offsetH)}
                 height={150}
               />
               <Legend className="mt-2" items={[{ name: T.da.legend.samples, color: "var(--c1)" }, { name: T.da.legend.turns, color: "var(--c2)" }, { name: T.da.legend.turned_on, color: "var(--ok)" }, { name: T.da.legend.turned_off, color: "var(--bad)" }]} />
@@ -147,8 +149,8 @@ export function Data({ days }: PageProps) {
                     { name: T.da.reLegend.questions, values: r.days.map((x) => x.questions), color: "var(--c1)" },
                   ]}
                   lines={[{ name: T.da.reLegend.media, values: r.days.map((x) => x.media), color: "var(--c4)" }]}
-                  labels={dayLabels(r.days.map((x) => x.day))}
-                  titles={dayTitles(r.days.map((x) => x.day))}
+                  labels={dayLabels(r.days.map((x) => x.day), offsetH)}
+                  titles={dayTitles(r.days.map((x) => x.day), offsetH)}
                   height={120}
                 />
                 <Legend className="mt-2" items={[{ name: T.da.reLegend.turns, color: "var(--c2)" }, { name: T.da.reLegend.questions, color: "var(--c1)" }, { name: T.da.reLegend.media, color: "var(--c4)" }]} />

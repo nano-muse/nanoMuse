@@ -13,6 +13,14 @@ docker compose up -d app                  # the phone app on http://<host>:8787
 docker compose logs app                   # shows the URL with the access token
 ```
 
+如果 8787 端口已被占用，比如同一台机器上还运行着本地中继，可以换一个宿主机端口：
+
+```bash
+NANOMUSE_RUNTIME_PORT=8788 docker compose up -d app
+```
+
+用同一个访问令牌打开 `http://<host>:8788`。在仓库根目录的 `.env` 中加入 `NANOMUSE_RUNTIME_PORT=8788`，后续 compose 命令就会沿用这个端口。改变的只有宿主机发布的端口，容器、健康检查和容器日志里的 URL 仍使用 8787。不设置这个变量时，宿主机端口也是 8787。
+
 其他入口：
 
 ```bash

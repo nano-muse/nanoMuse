@@ -8,7 +8,6 @@ import com.openminis.app.sandbox.NativeOffloadResult
 import com.openminis.app.sandbox.PRootKernel
 import io.github.nanomuse.sandbox.SandboxPaths
 import io.github.nanomuse.guard.GateOutcome
-import io.github.nanomuse.guard.GuardKind
 import io.github.nanomuse.guard.RiskAssessment
 import io.github.nanomuse.guard.RiskClass
 import io.github.nanomuse.guard.RiskGate
@@ -67,7 +66,9 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
                 else -> NativeOffloadResult(2, "nanomuse-pc: unknown subcommand '$sub'\n$HELP")
             }
         } catch (e: Computers.ReachException) {
-            failed(sub, computer, "${computer.name} answered ${e.code}: ${e.message}")
+            // A task can fail before starting or after doing some work. Keep its reason without
+            // claiming nothing ran; a raw status code would only get in the way of it (#718).
+            failed(sub, computer, if (sub == "task") "${computer.name} could not finish the task: ${e.message}" else "${computer.name} answered ${e.code}: ${e.message}")
         } catch (e: java.io.IOException) {
             AppLogger.warning(TAG, "$sub on ${computer.name}: ${e.message}")
             failed(sub, computer, "${computer.name} does not answer: ${e.message ?: e.javaClass.simpleName}. Is nanoMuse still running there?")
@@ -107,7 +108,7 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
                 "approval" -> {
                     val id = ev.optString("approval_id")
                     val preview = ev.optString("preview").ifBlank { ev.optString("summary") }
-                    val assessment = RiskAssessment(riskClass(ev.optString("risk")), ev.optString("reason").ifBlank { "asked by ${c.name}" }, RemoteApprovalKey.target(ev))
+                    val assessment = RemoteApprovalGate.assessment(ev, c.name)
                     val gate = approve(sessionId, c, assessment, "${c.name}: $preview")
                     Computers.approve(c, id, allow = gate.denied == null)
                     steps.put(JSONObject().put("approval", preview).put("allowed", gate.denied == null).apply { gate.notice?.let { put("notice", it) } })
@@ -126,19 +127,15 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
                 "step", "thinking", "text" -> ev.optString("text").ifBlank { ev.optString("tool") }.takeIf { it.isNotBlank() }?.let { steps.put(JSONObject().put("step", it.take(200))) }
             }
         }
+        // An empty answer cannot confirm the task's result (#718), even if earlier steps ran.
+        // Report the missing answer instead of "ok" that reads as "Done".
+        val answer = r.optString("text").trim()
+        if (answer.isEmpty()) return failed("task", c, "${c.name} finished the task without an answer.")
         return ok(
-            JSONObject().put("ok", true).put("computer", c.name).put("answer", r.optString("text"))
+            JSONObject().put("ok", true).put("computer", c.name).put("answer", answer)
                 .put("steps", steps).put("conversation", r.optString("conversation"))
                 .put("tell_user", "Relay ${c.name}'s answer to the user in their language, as coming from ${c.name}."),
         )
-    }
-
-    private fun riskClass(risk: String): RiskClass = when (risk.lowercase()) {
-        "destructive", "delete" -> RiskClass.DESTRUCTIVE
-        "outbound", "send", "network" -> RiskClass.OUTBOUND
-        "money", "payment" -> RiskClass.MONEY
-        "install" -> RiskClass.INSTALL
-        else -> RiskClass.DESTRUCTIVE // "system" and anything unnamed: ask, with the reason on the card
     }
 
     private fun run(args: MediaOffloadHandler.Args, c: Computers.Computer, sessionId: String?): NativeOffloadResult {
@@ -216,8 +213,7 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     /** The card for an action on the computer. Grants are kept apart from the phone's. */
     private fun approve(sessionId: String?, c: Computers.Computer, assessment: RiskAssessment, preview: String): Gate {
-        val scoped = assessment.copy(target = assessment.target?.let { "pc:$it" })
-        val outcome = runBlocking { RiskGate.check(sessionId ?: "pc", GuardKind.COMPUTER, scoped, preview, pageUrl = c.name) }
+        val outcome = runBlocking { RemoteApprovalGate.check(sessionId, c.name, assessment, preview) }
         return when (outcome) {
             is GateOutcome.Allowed -> Gate(notice = outcome.notice)
             is GateOutcome.Denied -> Gate(denied = outcome.message)

@@ -604,6 +604,9 @@ class Analytics:
         # 0.31: the turn keys of the rows kept before the relay told turns from calls
         self.keys_done = False
         self.keys_rows = 0
+        # 0.31.1: the figures rows of the own turns kept before the relay wrote them
+        self.figures_done = False
+        self.figures_rows = 0
 
     # -- helpers ------------------------------------------------------------------------------
 
@@ -736,6 +739,9 @@ class Analytics:
             "models": model_rows,
             "totals": totals,
             "own_keys": own_keys,
+            # 0.31.1: the own turns kept before this version join the table as the backfill
+            # writes their figures rows; until then the table is short of them
+            "own_keys_pending": not self.figures_done,
         }
 
     def day(self, day: int) -> dict[str, Any]:
@@ -1559,6 +1565,33 @@ class Analytics:
         if through:
             self.keys_done = True
         return read
+
+    def own_figures_step(self, batch: int = 500) -> int:
+        """0.31.1: the figures rows (own_figures) of the own turns kept before the relay wrote
+        one with each turn, oldest first, a page at a time; returns how many turns were read,
+        0 when through. The cursor lives in the settings table like the other backfills'.
+        Each page reads its turns' rows on the read-only connection — the provider is in the
+        meta and the cached count past the bodies, so this is the one pass that walks them,
+        a page's worth at a time between the console's reads — and writes small rows."""
+        if self.figures_done:
+            return 0
+        after_ts, after_rowid, done = self._cursor("own_figures.cursor")
+        if done:
+            self.figures_done = True
+            return 0
+        rows = self.db.own_unfigured_page(after_ts, after_rowid, batch)
+        if not rows:
+            self.figures_done = True
+            self.store.settings_put("own_figures.cursor", [-1, -1])
+            return 0
+        self.store.add_own_figures(rows)
+        last = rows[-1]
+        self.store.settings_put("own_figures.cursor", [int(last["ts"]), int(last["rowid"])])
+        self.figures_rows += len(rows)
+        if len(rows) < batch:
+            self.figures_done = True
+            self.store.settings_put("own_figures.cursor", [-1, -1])
+        return len(rows)
 
     #: how far back the daily repair looks for a kept turn without its shape row
     REPAIR_WINDOW_S = 3 * 86400

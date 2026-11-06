@@ -29,7 +29,9 @@ web  ───┘        /v1/hub          └── another phone / computer
 hub 上传递两类请求：
 
 - **动作。** `info`、`shell`、`files`、`file.get`、`file.put`、`open`、`screen`、`notify`。原始、即时。一条 `shell` 命令在发出之前先在*发起方*判定，用的和本地命令同一套阶梯（手机的 ShellGuard、桌面的 `guard.py`）：读取和构建静默放行，删除 / 发送 / 付款 / 系统命令则等发起设备上的审批卡片。
-- **任务。** `task {text, conversation?, language?, stream?}`：用自然语言描述的一整件事，交给目标设备自己的 Muse，在它自己的一个对话里完成（`conversation` 指定是哪个对话，缺省时用发起方的 id）。`language`（运行时 1.0.0 起，可选）是发起设备界面语言的 BCP-47 标签；目标设备用这个语言作答，而不是从文字里猜。可能要几分钟。那个 Muse 碰到需要审批的事时不会自己拿主意：问题以 `event {stage:"approval"}` 传回来，发起设备显示它惯常的卡片（手机上是 RiskGate，桌面上是终端提示，网页控制台里是一张卡片）。回答以 `approve {approval_id, allow}` 传回去。发起设备可以用 `stop {call}`（它那条 `task` 帧的 id）或 `stop {conversation}`（它指定的对话，没指定时就是它自己的那个按设备分的对话）结束自己发起的任务：目标设备在进行中的一步之后取消运行，回答 `{stopped: true}`，随后那条 `task` 调用本身以 `cancelled` 失败。`{stopped: false}` 表示没有属于发起方的可停之事；一台设备绝不会停掉别的设备发起的任务。运行时、桌面版和手机都这样做。对一个已经在跑任务的对话再发 `task`，会立刻以 `busy` 失败（运行时）：发起方等前一个答完，或者先停掉它，再问一次。超过 hub 时限还没答的任务以 `timeout` 失败，目标那边的 Muse 跑不起来的以 `failed` 失败。`stream: true` 表示发起方把每条 `text` 画在上一个 `tool` 之后那段文字的位置上；nanoMuse 桌面版这时还会发 `text {text, interim, partial: true}`，带着模型正在写的那条消息的文字，最多每 250 毫秒一次，写完的消息照旧发。没有要求的发起方每条消息只收到一次（Android 的 `nanomuse-pc task` 把每条 `text` 列成一步）；运行时暂时忽略 `stream`。
+- **任务。** `task {text, conversation?, language?, stream?}`：用自然语言描述的一整件事，交给目标设备自己的 Muse，在它自己的一个对话里完成（`conversation` 指定是哪个对话，缺省时用发起方的 id）。`language`（运行时 1.0.0 起，可选）是发起设备界面语言的 BCP-47 标签；目标设备用这个语言作答，而不是从文字里猜。可能要几分钟。那个 Muse 碰到需要审批的事时不会自己拿主意：问题以 `event {stage:"approval"}` 传回来，发起设备显示它惯常的卡片（手机上是 RiskGate，桌面上是终端提示，网页控制台里是一张卡片）。回答以 `approve {approval_id, allow}` 传回去。发起设备可以用 `stop {call}`（它那条 `task` 帧的 id）或 `stop {conversation}`（它指定的对话，没指定时就是它自己的那个按设备分的对话）结束自己发起的任务：目标设备在进行中的一步之后取消运行，回答 `{stopped: true}`，随后那条 `task` 调用本身以 `cancelled` 失败。`{stopped: false}` 表示没有属于发起方的可停之事；一台设备绝不会停掉别的设备发起的任务。运行时、桌面版和手机都这样做。对一个已经在跑任务的对话再发 `task`，会立刻以 `busy` 失败（运行时）：发起方等前一个答完，或者先停掉它，再问一次。超过 hub 时限还没答的任务以 `timeout` 失败，目标那边的 Muse 跑不起来的以 `failed` 失败。任务已经送达对话，但在请求模型前就被拒绝、没有开始执行时，也会以 `failed` 失败，不再返回空答案；发起设备会显示失败说明。nanoMuse 桌面版会在新任务到来时恢复上次任务后被归档的聊天，和打开聊天继续输入一样。`stream: true` 表示发起方把每条 `text` 画在上一个 `tool` 之后那段文字的位置上；nanoMuse 桌面版这时还会发 `text {text, interim, partial: true}`，带着模型正在写的那条消息的文字，最多每 250 毫秒一次，写完的消息照旧发。没有要求的发起方每条消息只收到一次（Android 的 `nanomuse-pc task` 把每条 `text` 列成一步）；运行时暂时忽略 `stream`。
+
+  运行时和 iPhone 发起任务时最多等待 15 分钟，与桌面版和运行时目标设备的任务时限一致。本地等待到期或收到中继的 `timeout` 后，发起方会用原始任务 id 发送 `stop {call}`，另外最多等待 15 秒完成清理。运行时取消任务时也按原始调用 id 停止。清理只是尽力而为：断线的目标设备可能收不到，所以发起方保留原来的失败信息，不会声称远程工作已经停止；目标设备自己的执行时限仍然有效。明确指定的调用 id 已经不在运行时，目标设备返回 `{stopped: false}`，不能改为停止同一对话里的后续任务。帧格式不变，旧客户端仍然兼容。
 
   任务运行期间，目标设备发送 `event` 帧，`body.stage` 告诉发起方该画什么，于是这次运行在发起方的聊天里读起来和在目标设备自己那里一样：工具开始时是 `tool {id, name, summary}`，结束时是 `tool_result {id, name, ok, summary}`（同一个 `id`）；`approval {approval_id, preview, risk, reason, device, timeout, grant_key}`，以及任一方作出决定后的 `approval_result {approval_id, status}`；`text {text, interim}` 是 Muse 一路上说的话；`image` 和 `file` 是它做出来的东西；`error`。`result` 帧带着最终答案。发起方把一条 `text` 画在上一个 `tool` 之后那段文字的位置上，所以目标设备可以把同一条消息越写越长地发好几次，发起方随之显示；每条消息只发一次的目标设备显示效果不变。`grant_key`（1.0.6 起）是发起方记住的回答所覆盖的范围：运行时发的是它自己的授权所用的键（工具和目标，如 `shell:git`），桌面版发的是工具加完整的主参数；没有这个字段的发送方，照旧按 `preview` 的前 60 个字符记，而两个不同的步骤可能开头相同。
 
@@ -39,7 +41,7 @@ hub 上传递两类请求：
 
 ### 电脑自己的卡片送到手机上 {#a-computer-s-own-cards-on-the-phone}
 
-nanoMuse 桌面版上的定时任务运行时，电脑旁边可能没人，所以这次运行的审批卡片也会送到账号下的手机上。这种卡片背后没有调用，所以作为推送发出（中继 0.31，见[帧](#frames)）：电脑只在 `welcome.server.features` 列出 `event_push` 时才发，中继只转给在 `hello` 里声明了 `approve.any` 的设备（Android 和 iPhone 的 App）：
+nanoMuse 桌面版上的定时任务运行时，电脑旁边可能没人，所以这次运行的审批卡片也会送到账号下的手机上。这种卡片背后没有调用，所以作为推送发出（中继 0.31，见[帧](#frames)）：电脑只在 `welcome.server.features` 列出 `event_push` 时才发，中继只转给在 `hello` 里声明了 `approve.any` 的设备（Android 和 iPhone 的 App）。推送的就只有这些：有人正在电脑上或网页控制台里聊着的那条会话，它的卡片留在发问的地方（人就在那里）；别的设备发来的任务里的卡片，顺着那次调用回到发起的设备（见[上文](#what-you-can-say)）；Python 运行时（`nanomuse serve`）目前不推送，它的定时任务的卡片留在网页版里等着（[#704](https://github.com/nano-muse/nanoMuse/issues/704)）：
 
 ```
 → event {to:"*", body:{stage:"approval", approval_id, preview, preview_zh, reason, app,
@@ -108,6 +110,11 @@ nanoMuse 桌面版上的定时任务运行时，电脑旁边可能没人，所�
 中继不认识的帧（没有处理器的 `type`、不是 JSON 对象的文本帧、二进制帧）都回 `error bad_frame`，连接保持打开，所以新客户端对着旧中继只会丢一帧，不会掉线。超过 `frame_limit` 的帧回 `too_large`；每秒超过 60 帧或 8 MB 回 `rate_limited`（每秒最多提醒一次，多出的帧被丢弃），持续下去则以 `4008` 关闭。15 分钟内没人应答的 `call` 向发起方回 `timeout`（中继在有 call 或 `ping` 到达时检查，所以一个会 ping 的发起方在期限过后一分钟内就能听到）；对当前在线的设备发 `forget` 会被拒绝，回 `device_online`。
 
 设备 id 按安装生成（`phone-…`、`pc-…`）；名字是给人看的，可以在设备上改。`web` 设备从不作为目标，也不会被记住。`file.get`、`file.put` 和 `screen` 的正文以 base64 携带字节（`data`）并附 `mime`；桌面拒绝超过 8 MB 的文件，中继拒绝超过 `HUB_FRAME_LIMIT` 的帧。
+
+Python 运行时的 `files` 动作最多返回 2,000 个目录条目。还有更多可读条目时，结果会附带
+`truncated: true` 和 `total`，后者是逐项读取之前在目录中看到的名称总数。读取前消失或
+无法读取的条目可能被跳过。恰好达到上限的完整列表不会标记为截断。这两个字段是可选的
+新增字段，客户端仍需接受不含它们的旧响应。
 
 从中继 0.27 起，一份凭据只属于一个 Hub 身份。凭据签发时可以用 `device_id` 和
 `device_kind` 固定 `device.id` 与 `device.kind`（`POST /v1/auth/verify` 和 `/login`）；

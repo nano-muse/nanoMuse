@@ -2,20 +2,25 @@ import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerSaveBlocker, screen, shell, systemPreferences, Tray } from "electron";
 import { randomBytes } from "node:crypto";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { nextScreenshotPath } from "./screenshot-path.js";
 import { GLOW_HIDE_MS, GLOW_SETTLE_MS, type Leak, LeakLog, leakIsEvidence, leakIsReal, pointerAction, REARM_DELAYS_MS, staleInstance } from "./glow";
 import { defaultHelperPath, HELPER_NAME, MacHelper } from "./mac-helper";
 import * as macPermissions from "./mac-permissions";
 import { Operator, SCREEN_PERMISSION_TEXT, type Marker } from "./operator";
 import { startOperatorServer, type OperatorServer } from "./operator-server";
-import { EXTERNAL_URL, mediaPermissionAllowed, navigationVerdict, sameOrigin } from "./navigation";
+import { EXTERNAL_URL, navigationVerdict, sameOrigin } from "./navigation";
+import { editContextMenu, installWindowPermissions } from "./window-permissions";
 import { readPrivateJson, writePrivateJson } from "./private-json";
-import { relink } from "./profile-link";
+import { BUNDLE, ensureProfile, PROFILE } from "./profile";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
 import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
+import { chooseHostPort } from "./host-port";
+import { closedDuringLoad } from "./load-close";
+import { rotateLogIfNeeded } from "./log-rotate";
 import { HostWork } from "./host-work";
 import { ProtectedExit, type ExitDialog, type ExitIntent, type WorkItem, type WorkSource } from "./protected-exit";
 import { WindowsUpdates, RestartNsisUpdater } from "./windows-updates";
@@ -40,11 +45,6 @@ import { windowsNetworkCost } from "./windows-network-cost";
  * (docs/desktop.md, docs/harness.md).
  */
 
-const PROFILE = "nanomuse";
-// The composition: the harness's base and Web app, its Schedule (the goals' automations and
-// the agent's reminders — an optional bundle of the harness, on by default here), then ours.
-const BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@deepseek-ai/dsh-experimental-schedule-bundle", "dsh-nanomuse"];
-const BUNDLE = "dsh-nanomuse";
 const RELEASES_PAGE = "https://github.com/nano-muse/nanoMuse/releases/latest";
 const ISSUES_PAGE = "https://github.com/nano-muse/nanoMuse/issues";
 const DOCS_PAGE = "https://nanomuse.cn/docs/desktop";
@@ -164,6 +164,19 @@ function log(line: string): void {
   console.log(`[nanomuse-desktop] ${line}`);
   try {
     mkdirSync(harnessHome(), { recursive: true });
+    rotateLogIfNeeded(harnessHome(), {
+      sizeOf(path) {
+        try {
+          return statSync(path).size;
+        } catch {
+          return undefined;
+        }
+      },
+      remove(path) {
+        rmSync(path, { force: true });
+      },
+      rename: renameSync,
+    });
     appendFileSync(join(harnessHome(), "desktop.log"), `${stamped}\n`);
   } catch {
     /* the line is still in memory for the dialog */
@@ -187,57 +200,6 @@ function bundledRuntime(): string | undefined {
   return existsSync(exe) ? exe : undefined;
 }
 
-/**
- * The profile the Host boots: `~/.nanomuse/desktop/profiles/nanomuse`. Three small files the
- * harness reads (the manifest with the bundle list, the empty root, the person's own patch
- * layer, which dsh writes settings into) and one link: `node_modules/dsh-nanomuse` → the copy
- * under resources, which is how the Loader finds a bundle that is not among the harness's own
- * packages. The link is refreshed every start, so moving the app or updating it is enough.
- */
-function ensureProfile(dshDir: string): string {
-  const dir = join(harnessHome(), "profiles", PROFILE);
-  mkdirSync(join(dir, "node_modules"), { recursive: true });
-  const manifestPath = join(dir, "package.json");
-  let manifest: Record<string, unknown> = {};
-  if (existsSync(manifestPath)) {
-    try {
-      manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
-    } catch (exc) {
-      log(`profile manifest unreadable, rewriting: ${String(exc)}`);
-    }
-  }
-  const deps = (manifest.dependencies as Record<string, string> | undefined) ?? {};
-  const dsh = (manifest.dsh as { profile?: { bundles?: string[] } } | undefined) ?? {};
-  const bundles = dsh.profile?.bundles ?? [];
-  const same = bundles.length === BUNDLES.length && bundles.every((b, i) => b === BUNDLES[i]);
-  if (!same || deps[BUNDLE] !== "*" || manifest.name !== `dsh-profile-${PROFILE}`) {
-    const next = {
-      ...manifest,
-      name: `dsh-profile-${PROFILE}`,
-      private: true,
-      dependencies: { ...deps, [BUNDLE]: "*" },
-      dsh: { ...dsh, profile: { ...dsh.profile, bundles: [...BUNDLES] } },
-    };
-    writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}\n`);
-  }
-  if (!existsSync(join(dir, "cordis.yml"))) {
-    writeFileSync(
-      join(dir, "cordis.yml"),
-      "# dsh profile root — an empty entry list. The tree is composed as patches:\n# each bundle in package.json's dsh.profile.bundles, then cordis.patch.yml.\n# Edit cordis.patch.yml, not this file.\n[]\n",
-    );
-  }
-  if (!existsSync(join(dir, "cordis.patch.yml"))) {
-    writeFileSync(
-      join(dir, "cordis.patch.yml"),
-      "# Your patch layer for this dsh profile, applied after every bundle layer:\n# a top-level YAML array of loader patch entries. nanoMuse Desktop and dsh\n# write settings here; you may edit it too.\n[]\n",
-    );
-  }
-  const link = join(dir, "node_modules", BUNDLE);
-  const target = join(dshDir, "node_modules", BUNDLE);
-  if (relink(link, target)) log(`profile: ${BUNDLE} → ${target}`);
-  return dir;
-}
-
 /** Try to bind one loopback port (0 = any); the port bound, or 0 when it is taken. */
 function tryPort(port: number): Promise<number> {
   return new Promise((resolve) => {
@@ -252,38 +214,33 @@ function tryPort(port: number): Promise<number> {
   });
 }
 
-/** The port tried first on a fresh install (the connectors' loopback is 38417). */
-const HOST_PORT_DEFAULT = 38421;
-
 /**
- * The host's port, kept across launches. The window's origin is `127.0.0.1:<port>`, and
- * the origin is the browser's storage key — the preferences, the star asks' memory, the
- * live stage's place, the harness's own settings all live in that origin's localStorage —
- * so a port that changed on every launch meant an app that forgot everything on every
- * launch. The port used last time is tried first (it is written to `<home>/port`), then
- * the default, then any free one.
+ * The host's port, kept across launches (the choosing lives in host-port.ts, with the
+ * story of why a taken port never overwrites the memory).
  */
 async function hostPort(home: string): Promise<number> {
   const file = join(home, "port");
-  let last = 0;
-  try {
-    last = Number.parseInt(readFileSync(file, "utf8").trim(), 10) || 0;
-  } catch {
-    last = 0;
-  }
-  const candidates = last > 0 ? [last, HOST_PORT_DEFAULT, 0] : [HOST_PORT_DEFAULT, 0];
-  for (const candidate of candidates) {
-    const port = await tryPort(candidate);
-    if (port > 0) {
+  const choice = await chooseHostPort({
+    readRemembered() {
+      try {
+        return Number.parseInt(readFileSync(file, "utf8").trim(), 10) || 0;
+      } catch {
+        return 0;
+      }
+    },
+    writeRemembered(port) {
       try {
         writeFileSync(file, `${port}\n`);
       } catch (exc) {
         log(`port: could not remember ${port}: ${String(exc)}`);
       }
-      return port;
-    }
+    },
+    tryPort,
+  });
+  if (!choice.remembered) {
+    log(`port: ${choice.port} for this launch; the remembered port stays remembered`);
   }
-  throw new Error("no free loopback port for the host");
+  return choice.port;
 }
 
 /**
@@ -317,7 +274,7 @@ function startHost(): Promise<string> {
   }
   const home = harnessHome();
   mkdirSync(home, { recursive: true });
-  ensureProfile(dshDir);
+  ensureProfile(home, dshDir, log);
   return new Promise<string>((resolve, reject) => {
     Promise.all([hostPort(home), ensureOperator()])
       .then(([port, operatorServer]) => {
@@ -832,7 +789,7 @@ function writePrefs(next: Prefs = prefs, strict = false): void {
 function showWindow(): BrowserWindow | null {
   if (!mainWindow && hostUrl) {
     mainWindow = createWindow();
-    void loadHost(mainWindow, hostUrl);
+    void loadHost(mainWindow, hostUrl).catch((exc) => log(`window: could not load the host: ${String(exc)}`));
   }
   if (!mainWindow) return null;
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -941,7 +898,7 @@ async function reportBug(): Promise<{ screenshot: string; url: string }> {
     try {
       const image = await mainWindow.webContents.capturePage();
       const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      screenshot = join(app.getPath("downloads"), `nanoMuse-${stamp}.png`);
+      screenshot = nextScreenshotPath(app.getPath("downloads"), stamp);
       writeFileSync(screenshot, image.toPNG());
     } catch (exc) {
       log(`report: no screenshot: ${String(exc)}`);
@@ -990,9 +947,7 @@ function registerBridge(): void {
   // macOS applies Screen Recording only to freshly started processes: after granting it, the
   // process that takes the screenshots has to start again — the helper when it is in use,
   // the whole app otherwise.
-  ipcMain.handle("nanomuse:relaunch", () => {
-    relaunchNow();
-  });
+  ipcMain.handle("nanomuse:relaunch", () => relaunchNow());
   ipcMain.handle("nanomuse:updates:snapshot", () => windowsUpdates?.snapshot() ?? null);
   ipcMain.handle("nanomuse:updates:auto-download", async (_e, enabled: boolean) => {
     await windowsUpdates?.setAutoDownload(enabled);
@@ -1716,23 +1671,25 @@ let relaunching = false;
  * `nanomuse mcp` — started before the permission was granted, and so still without it —
  * does not outlive the relaunch.
  */
-function relaunchNow(): void {
+async function relaunchNow(): Promise<boolean> {
   // with a helper bundle the helper is what restarts — also while it is between two processes
   // or failed to start (then this is the retry); in 0.1.38 a restart that found the helper
   // "not running" fell through here and relaunched the whole app, twice when clicked twice
   if (helper()?.present()) {
     log("permissions: restarting the helper for the new grant");
-    void macHelper?.restart();
-    return;
+    const restarted = await macHelper?.restart();
+    if (!restarted) throw new Error(macHelper?.failure() || "the helper could not restart");
+    return true;
   }
-  if (relaunching) return;
-  if (!exitGuard) return;
-  void exitGuard.requestRestart("relaunch", () => {
+  if (relaunching) return true;
+  if (!exitGuard) return false;
+  return exitGuard.requestRestart("relaunch", () => {
     relaunching = true;
     app.relaunch();
     app.quit();
   }, true).then((accepted) => {
     if (!accepted) relaunching = false;
+    return accepted;
   });
 }
 
@@ -1779,7 +1736,7 @@ function watchScreenGrant(): void {
         cancelId: 1,
       })
       .then(({ response }) => {
-        if (response === 0) relaunchNow();
+        if (response === 0) return relaunchNow();
       })
       .catch(() => undefined);
   }, 1500);
@@ -1841,10 +1798,10 @@ function createWindow(): BrowserWindow {
     e.preventDefault();
     if (verdict === "external") void shell.openExternal(url);
   });
-  win.webContents.session.setPermissionRequestHandler((_wc, permission, callback, details) => {
-    // Dictation receives audio only. Video, mixed capture and cross-origin frames are denied.
-    const media = details as Electron.MediaAccessPermissionRequest;
-    callback(mediaPermissionAllowed(permission, details.requestingUrl, media.securityOrigin, media.mediaTypes, hostUrl));
+  installWindowPermissions(win.webContents, () => hostUrl);
+  win.webContents.on("context-menu", (_event, params) => {
+    const items = editContextMenu(params);
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
   });
   win.on("closed", mainWindowClosed);
   // Windows logoff/shutdown may close the last window without before-quit.
@@ -1857,9 +1814,20 @@ function createWindow(): BrowserWindow {
 /**
  * Show the Host's web app in `win`, then drop the splash from the window's history: a back
  * press (a mouse's side button too) would otherwise land on loading.html, which never moves on.
+ *
+ * A load the window's own close cancelled is not a failure: booting used to turn it into
+ * the "could not start" dialog and a quit, on a person who had only closed the window
+ * while the page was still coming up. Any other rejection still fails the start.
  */
 async function loadHost(win: BrowserWindow, url: string): Promise<void> {
-  await win.loadURL(url);
+  try {
+    await win.loadURL(url);
+  } catch (exc) {
+    if (closedDuringLoad(win)) {
+      return;
+    }
+    throw exc;
+  }
   if (!win.isDestroyed()) win.webContents.navigationHistory.clear();
 }
 

@@ -20,6 +20,7 @@ import sqlite3
 import uuid
 from array import array
 from dataclasses import asdict, dataclass, field
+from dataclasses import replace as copy_item
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -103,6 +104,10 @@ class MemoryStore:
         self.path = str(path)
         # recall by meaning, when an embedding endpoint is set up (see embeddings.py)
         self.index: MemoryIndex | None = None
+        self._search_stamp: tuple[int, int] | None = None
+        self._search_items: dict[str, MemoryItem] = {}
+        self._search_tokens: dict[str, set[str]] = {}
+        self._postings: dict[str, set[str]] = {}
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute(
@@ -198,9 +203,11 @@ class MemoryStore:
         row = self._conn.execute("SELECT * FROM memories WHERE id = ?", (memory_id,)).fetchone()
         return self._row(row) if row else None
 
-    def all(self, limit: int = 1000) -> list[MemoryItem]:
+    def all(self, limit: int | None = 1000) -> list[MemoryItem]:
+        """A bounded listing by default; ``None`` is the whole retrieval corpus."""
         rows = self._conn.execute(
-            "SELECT * FROM memories ORDER BY created_at DESC LIMIT ?", (limit,)
+            "SELECT * FROM memories ORDER BY created_at DESC LIMIT ?",
+            (-1 if limit is None else limit,),
         ).fetchall()
         return [self._row(r) for r in rows]
 
@@ -271,31 +278,52 @@ class MemoryStore:
         ``log(N / df)`` over the shared tokens, plus a bonus when the whole query appears
         verbatim.
         """
+        if limit <= 0:
+            return []
         q_tokens = tokenize(query)
-        items = self.all()
+        self._prepare_search()
+        items = self._search_items
         if not q_tokens:
-            return items[:limit]
-        tokens = {item.id: tokenize(item.content) for item in items}
-        df: dict[str, int] = {}
-        for toks in tokens.values():
-            for tok in toks:
-                df[tok] = df.get(tok, 0) + 1
+            return [copy_item(item) for item in list(items.values())[:limit]]
         n = max(1, len(items))
         needle = query.strip().lower()
+        scores: dict[str, float] = {}
+        for tok in q_tokens:
+            hits = self._postings.get(tok, set())
+            for mid in hits:
+                scores[mid] = scores.get(mid, 0.0) + math.log((n + 1) / len(hits))
         scored: list[tuple[float, MemoryItem]] = []
-        for item in items:
-            shared = q_tokens & tokens[item.id]
-            score = sum(math.log((n + 1) / df[tok]) for tok in shared)
+        for item in items.values():
+            score = scores.get(item.id, 0.0)
             if needle and needle in item.content.lower():
                 score += math.log(n + 1) + 1.0
             if score > 0:
                 scored.append((score, item))
         scored.sort(key=lambda p: (-p[0], p[1].created_at))
-        return [item for _, item in scored[:limit]]
+        return [copy_item(item) for _, item in scored[:limit]]
+
+    def _prepare_search(self) -> None:
+        # total_changes covers this connection, data_version covers other connections.
+        # Embedding writes may invalidate this cache too; correctness comes first.
+        stamp = (self._conn.total_changes, self._conn.execute("PRAGMA data_version").fetchone()[0])
+        if stamp == self._search_stamp:
+            return
+        items = self.all(limit=None)
+        tokens = {item.id: tokenize(item.content) for item in items}
+        postings: dict[str, set[str]] = {}
+        for mid, toks in tokens.items():
+            for token in toks:
+                postings.setdefault(token, set()).add(mid)
+        self._search_items = {item.id: item for item in items}
+        self._search_tokens = tokens
+        self._postings = postings
+        self._search_stamp = stamp
 
     def relevant(self, context: str, limit: int = 20) -> list[MemoryItem]:
         """Memories to inject into the system prompt: matches first, then most recent."""
-        items = self._recent()
+        if limit <= 0:
+            return []
+        items = self._recent(limit + 1)
         if len(items) <= limit:
             return items
         return self._fill(self.search(context, limit=limit), items, limit)
@@ -321,7 +349,9 @@ class MemoryStore:
 
     async def relevant_async(self, context: str, limit: int = 20) -> list[MemoryItem]:
         """``relevant`` with the meaning-based ranking fused in when an index is set up."""
-        items = self._recent()
+        if limit <= 0:
+            return []
+        items = self._recent(limit + 1)
         if len(items) <= limit:
             return items
         if self.index is not None:
@@ -331,9 +361,25 @@ class MemoryStore:
     def similar(
         self, content: str, threshold: float = 0.5, limit: int = 3
     ) -> list[tuple[float, MemoryItem]]:
-        """Memories that say roughly the same thing as ``content``, most alike first."""
-        pairs = [(similarity(content, item.content), item) for item in self.all()]
-        pairs = [(s, item) for s, item in pairs if s >= threshold]
+        """Memories that say roughly the same thing as ``content``, most alike first.
+
+        The same Jaccard overlap as ``similarity``, over the token sets the search index
+        already holds, so a ``remember`` on a large store does not tokenize every row again.
+        """
+        if limit <= 0:
+            return []
+        self._prepare_search()
+        mine = tokenize(content)
+        plain = content.strip().lower()
+        pairs: list[tuple[float, MemoryItem]] = []
+        for mid, item in self._search_items.items():
+            theirs = self._search_tokens.get(mid, set())
+            if not mine or not theirs:
+                score = 1.0 if plain == item.content.strip().lower() else 0.0
+            else:
+                score = len(mine & theirs) / len(mine | theirs)
+            if score >= threshold:
+                pairs.append((score, copy_item(item)))
         pairs.sort(key=lambda p: -p[0])
         return pairs[:limit]
 

@@ -25,7 +25,7 @@
  * (`/events`) carrying the live state — registered when the web server is
  * present; the headless and SDK profiles get the service without routes.
  */
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ApprovalDesk, appLabel, appOf, type ApprovalScope, isOwnApp, checkForUpdate, compareVersions, DEVICE_GRANT_PREFIX, grantCovers, HoldDesk, modelFor, pickChatModel, pickHandsModel, REMOTE_CONTROL_GRANT_ID, scheduleRunIds, sharedConnectors, standingGrants, takesImages, UPDATE_RETRY_MS, updateCacheFresh, withGrant, type Grant, type Hold, type HoldTool, type PendingApproval, type StandingGrant, type UpdateInfo } from './desk.ts'
 import { arch, homedir, hostname, release, type, userInfo } from 'node:os'
@@ -38,7 +38,6 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type { ToolDispatchExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { createUserMessage, type ContentBlock, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId, AgentCancelCause } from '@deepseek-ai/dsh-session'
-import type { SessionCreateRequest } from '@deepseek-ai/dsh-api-session-controller/types'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-user-approval'
 import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval/types'
@@ -50,11 +49,12 @@ import { helloLlm, HubClient, HubError, type Caller, type HubDevice, type Incomi
 import { ProfileStore, type Profile } from './profile.ts'
 import { cloudOffFailure, relayFailure, transportFailure, type RelayRefusal } from './refusals.ts'
 import { Relay, RelayError, type Account, type Estimate, type Invite, type ProfileWrite, type RelayModel, type SignIn } from './relay.ts'
+import { homeWorkspace } from './home.ts'
 import { TaskRunner, textOf } from './task.ts'
 import { Turns, aggregateWork, type WorkItem } from './work.ts'
 import { SCREEN_RUN_IDLE_MS, ScreenRuns, Trajectory, type ScreenRun, type StepAction, type TrajectoryView } from './trajectory.ts'
 import { describeCall } from './steps.ts'
-import { RemoteStore, SyncEngine, SyncRelay, type RemoteLine, type SessionInfo, type SessionLine, type SyncState } from './sync.ts'
+import { clearedDescendants, forAccount, migrate, RemoteStore, SyncEngine, SyncRelay, type RemoteLine, type SessionInfo, type SessionLine, type SyncState } from './sync.ts'
 import { AvatarMotion, ANIMATED, type MotionMood, type MotionView } from './motion.ts'
 import { OwnClip, isOwnClipMood, type OwnClipMood, type OwnClipView } from './own-clip.ts'
 import { OwnTurns } from './record.ts'
@@ -66,6 +66,9 @@ import { PHONE_CARD_SECONDS, PhoneApprovals, type CardStatus } from './phone-app
 import { editImage as ownEditImage, generateImage as ownGenerateImage, imageShapeOf, type ImageEndpoint } from './images.ts'
 import { checkMove, checkScreenshot, displayInfo, isBlack, runtimeInfo, screenHead, type MoveCheck, type RuntimeInfo, type ScreenshotCheck } from './hands-check.ts'
 import { apiOf, baseUrlFor, CAPABILITIES, capabilitiesForAuth, capabilitiesOf, CHATGPT_KEY_REF, CHATGPT_PROVIDER, ChatGptDesk, hasUserinfo, keyRefFor, kindOf, listModelRows, listModels, loadCatalogue, modelsOf, ownProviderRow, parseModelReasoning, regionOf, sighted, typedModelIds, USERINFO_TEXT, type Capability, type ChatGptState, type LoginView, type OwnModel, type OwnProvider, type ProviderEntry, type Region } from './providers.ts'
+import { inheritCloudCapacity, type CapacityProviders } from './cloud-llm.ts'
+
+const EMPTY_RELAY_MODELS: readonly RelayModel[] = []
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -406,10 +409,14 @@ const STUDIO_PICTURES = 8
 const NO_STAGE: StageState = { seq: 0, at: 0, source: 'computer', device: '', width: 0, height: 0, title: '', mode: 'screen', action: null, sessionId: '' }
 
 interface State {
+  /** A credential change not yet fully committed; sync stays stopped across a restart. */
+  accountTransition?: true
   account?: Account
   models?: RelayModel[]
   deviceId?: string
   deviceName?: string
+  /** The loopback port the relay door had last; the next start asks for it again so the provider row stays right. */
+  doorPort?: number
   /** `true` lets every device of the account run things here without asking; absent or `false` means ask. */
   remoteControl?: boolean
   /** Devices allowed without asking (device id → name and when), while remote control is off. */
@@ -464,6 +471,8 @@ export interface MediaState {
 export const VIDEO_OFF = 'off'
 /** How long a video-model check against a provider is trusted. */
 const VIDEO_CHECK_TTL_MS = 24 * 60 * 60_000
+/** Sessions whose log facts stay cached for the sync; the newest chats the column shows are a few dozen. */
+const LOG_CACHE_SESSIONS = 64
 
 /** What Settings → Media shows. */
 export interface MediaView {
@@ -622,7 +631,10 @@ export default class NanomuseCloud extends Service {
   readonly profile: ProfileStore
   readonly hub: HubClient
   private state: State = {}
+  private sessionStateLoaded = false
+  private capacityCache: { providers: CapacityProviders; models: readonly RelayModel[]; result: CapacityProviders } | undefined
   private busy: Promise<unknown> = Promise.resolve()
+  private stateWrites: Promise<void> = Promise.resolve()
   private readonly streams = new Set<ServerResponse>()
   private readonly changeListeners = new Set<() => void>()
   private readonly calls = new Map<string, HandsCall>()
@@ -648,6 +660,8 @@ export default class NanomuseCloud extends Service {
   private runTimer: NodeJS.Timeout | undefined
   private stageTimer: NodeJS.Timeout | undefined
   private signedInCache = false
+  private accountEpoch = 0
+  private changingAccount = false
   /** When the account was last re-read for the allowance (after a turn, after a refusal). */
   private lastAllowanceCheck = 0
   /** Tasks from other devices, once the session API is up. */
@@ -660,6 +674,9 @@ export default class NanomuseCloud extends Service {
    * What the sync needs of a session's log, read once per change: a session's log is read
    * in full (and decompressed) by `inspect`, so the title, the lines and the prompts'
    * positions are kept here until the session's next event (`session/event`) drops them.
+   * Capped: an entry holds a session's whole decompressed transcript, and the chats the
+   * sync and the column actually touch are a few dozen of the account's newest; the
+   * oldest untouched entries go, to be re-read if ever asked for again.
    */
   private readonly logCache = new Map<string, { title?: { at: number; title: string }; lines?: SessionLine[]; prompts?: Array<{ key: string; time: number }> }>()
   /** Approvals the stage may answer (C2) and holds of the hands (C1). */
@@ -685,6 +702,8 @@ export default class NanomuseCloud extends Service {
   readonly provenance = new Provenance()
   /** The loopback door the model adapter reaches the relay through, so each call carries its provenance. */
   readonly relayDoor: RelayProxy
+  /** The provider row pointed at this start's door (or found pointing there already); settled after the loader is through. */
+  doorPointed: Promise<void> = Promise.resolve()
   /** What happened around turns, told to the record as codes (relay 0.31, `POST /v1/events`). */
   readonly events: ClientEvents
   /** How the question about each tool call of a session was settled, by call id (else the tool's name), until its result is seen. */
@@ -814,24 +833,31 @@ export default class NanomuseCloud extends Service {
 
   async [Service.init](): Promise<void> {
     this.state = await this.readState()
+    this.sessionStateLoaded = true
     if (!this.state.deviceId) {
       this.state.deviceId = `pc-dsh-${randomBytes(6).toString('hex')}`
       await this.writeState()
     }
-    // The door to the relay for the model adapter (relay 0.31): a port of this start's own, so
-    // the provider row written at an earlier start is pointed at it again before anything
-    // calls through it; without a loopback port the row is pointed at the relay itself.
+    // The door to the relay for the model adapter (relay 0.31): the port the last start had
+    // when it is free, so the provider row written then still points here; without a loopback
+    // port the row is pointed at the relay itself.
     try {
-      await this.relayDoor.listen()
+      await this.relayDoor.listen(this.state.doorPort)
+      if (this.relayDoor.port !== this.state.doorPort) {
+        this.state = { ...this.state, doorPort: this.relayDoor.port }
+        await this.writeState()
+      }
     } catch (error: unknown) {
       this.ctx.logger.warn('nanomuse cloud: no loopback door to the relay (%s); calls go direct, without their provenance', message(error))
     }
     this.ctx.effect(() => () => void this.relayDoor.close(), 'nanomuse cloud: relay door')
-    try {
-      await this.repointProvider()
-    } catch (error: unknown) {
+    // A row that points elsewhere (the door got another port, or 1.0.7 wrote it with the relay's
+    // address) is rewritten — but not waited for: a settings write goes through the loader, which
+    // is still bringing the plugins up while this runs, so waiting here held the host before it
+    // announced its address (#701). The write lands as soon as the loader is through.
+    this.doorPointed = this.repointProvider().catch((error: unknown) => {
       this.ctx.logger.warn('nanomuse cloud: could not point the provider row at the relay door: %s', message(error))
-    }
+    })
     this.provenance.hands((sessionId) => this.handsOf(sessionId))
     this.catalogue = await loadCatalogue()
     if (!this.catalogue.length) this.ctx.logger.warn('nanomuse: assets/providers.json missing or empty; the own-key step lists nothing')
@@ -892,8 +918,15 @@ export default class NanomuseCloud extends Service {
     }
     void this.coding.load()
     // A task from another device runs in a dsh session here; needs the session API, so only once it is up.
-    this.ctx.inject(['sessionController', 'approval'], (ctx) => {
+    this.ctx.inject(['sessionController', 'approval', 'sessions', 'agents', 'sessionQuery'], (ctx) => {
       this.sessionCtx = ctx
+      ctx.effect(() => ctx.on('agent/created', ({ agent }) => {
+        if (this.isClearedSession(String(agent.id))) {
+          agent.cancel({ kind: 'user' })
+          void this.clearSyncedSessions([String(agent.id)]).catch((error: unknown) => this.ctx.logger.warn('nanomuse: cleared child cleanup failed: %s', message(error)))
+        }
+        return undefined
+      }), 'nanomuse cloud: cleared sessions stay stopped')
       ctx.effect(() => () => {
         this.sessionCtx = undefined
       })
@@ -905,6 +938,7 @@ export default class NanomuseCloud extends Service {
       ctx.effect(() => ctx.on('schedule/changed' as never, (() => void this.refreshGrantTasks()) as never), 'nanomuse cloud: the tasks behind the grants')
       const runner = new TaskRunner(ctx, {
         deviceName: () => this.deviceName(),
+        home: () => homeWorkspace(ctx),
         log: (level, text) => this.ctx.logger[level](text),
         notice: (from, text) => this.notice('call', from, '', text, 'task'),
         recall: (key) => this.state.taskSessions?.[key],
@@ -963,19 +997,7 @@ export default class NanomuseCloud extends Service {
             return rows
           },
           lines: (sessionId) => this.sessionLines(ctx, sessionId),
-          create: async (title) => {
-            // In the home workspace (`~/nanoMuse`), as the first conversation is: a session the
-            // browser cannot place in a workspace shows a disabled composer and no transcript.
-            const folder = join(homedir(), 'nanoMuse')
-            await mkdir(folder, { recursive: true }).catch(() => undefined)
-            const registry = ctx.get('workspaceRegistry') as { create(path: string, title?: string): Promise<{ id: string }> } | undefined
-            const workspaceId = await registry?.create(folder, 'nanoMuse').then((w) => w.id).catch(() => undefined)
-            const created = await ctx.sessionController.create(
-              workspaceId ? { agentPreset: 'nanomuse', workspaceId: workspaceId as NonNullable<SessionCreateRequest['workspaceId']> } : { agentPreset: 'nanomuse', cwd: folder },
-            )
-            await ctx.sessionController.rename({ sessionId: created.sessionId, title }).catch(() => undefined)
-            return String(created.sessionId)
-          },
+          create: (title, sessionId) => this.createSyncedSession(ctx, title, sessionId),
           rename: async (sessionId, title) => {
             await ctx.sessionController.rename({ sessionId: sessionId as SessionId, title })
           },
@@ -986,25 +1008,24 @@ export default class NanomuseCloud extends Service {
             kept.clear()
             this.logCache.clear()
           },
-          inject: async (sessionId, text) => {
-            const resolved = await ctx.sessionController.resolveAgent(sessionId as SessionId)
-            if ('error' in resolved) throw new Error(String(resolved.error))
-            // model-facing: a `nanomuse-sync` source, so the push (`sessionLines`, `user` sources only) never sends it back
-            resolved.agent.inject(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'nanomuse-sync', role: 'user', mid: '', device: '', deviceName: '', at: Date.now() } }))
-          },
+          inject: (sessionId, text, isCurrent) => this.injectSyncedContext(ctx, sessionId, text, isCurrent),
         },
         token: () => this.token(),
         deviceId: () => this.state.deviceId ?? '',
         isTaskSession: (sessionId) => Object.values(this.state.taskSessions ?? {}).includes(sessionId),
+        // the rooms come up after this service, so they are looked up at the time of asking
+        isBatchSession: (sessionId) => (this.ctx.get('nanomuseRooms') as { isBatch?(id: string): boolean } | undefined)?.isBatch?.(sessionId) === true,
         load: () => this.state.sync,
         save: async (state) => {
           this.state.sync = state
           await this.writeState()
         },
+        onCleared: (ids) => this.clearSyncedSessions(ids),
         onChange: () => this.broadcast(),
         log: (level, text) => this.ctx.logger[level](text),
       })
       this.sync = sync
+      void this.clearSyncedSessions(sync.view().cleared).catch((error: unknown) => this.ctx.logger.warn('nanomuse: cleared session cleanup failed: %s', message(error)))
       ctx.effect(
         () =>
           ctx.on('session/event', (session: Session, event: SessionEvent) => {
@@ -1030,7 +1051,7 @@ export default class NanomuseCloud extends Service {
           }),
         'nanomuse cloud: sync on hub connect',
       )
-      if (this.state.account) sync.start()
+      void this.startAccountSync(sync).catch((error: unknown) => this.ctx.logger.warn('nanomuse cloud: sync account not ready: %s', message(error)))
       ctx.effect(() => () => {
         sync.stop()
         this.sync = undefined
@@ -1103,7 +1124,7 @@ export default class NanomuseCloud extends Service {
           const id = String(session.id)
           this.provenance.observe(id, event)
           this.noteSessionEvent(id, event)
-          if (event.type === 'assistant/message') this.trajectory.said(id, textOf(event.data.message.content))
+          if (event.type === 'assistant/message' && !this.isClearedSession(id)) this.trajectory.said(id, textOf(event.data.message.content))
           else if (event.type === 'turn/end') {
             let changed = this.screenRuns.turnEnded(id)
             if (this.trajectory.running(id)) {
@@ -2549,7 +2570,7 @@ export default class NanomuseCloud extends Service {
         capabilities: this.capabilities(),
         chatgpt: { signedIn: Boolean(this.state.chatgpt), label: this.state.chatgpt?.label ?? '', proxy: Boolean(this.chatgpt.ready), login: this.chatgpt.login },
       },
-      trajectory: { rev: this.trajectory.view().rev, sessions: [...new Set(this.trajectory.view().runs.map((r) => r.sessionId))] },
+      trajectory: { rev: this.trajectory.view().rev, sessions: [...new Set(this.trajectoryView().runs.map((r) => r.sessionId))] },
       headsUp: this.headsUp(),
       waiting: [...this.waits.values()].sort((a, b) => a.since - b.since),
       stopped: [...this.stops.entries()].map(([session, s]) => ({ session, ...s })),
@@ -2558,12 +2579,52 @@ export default class NanomuseCloud extends Service {
 
   /** The hands' runs of a session (or all), without pictures: `GET /trajectory?session=`. */
   trajectoryView(sessionId?: string): TrajectoryView {
-    return this.trajectory.view(sessionId)
+    const view = this.trajectory.view(sessionId)
+    return { ...view, runs: view.runs.filter((run) => !this.isClearedSession(run.sessionId)) }
+  }
+
+  /** Host policy used by the pinned Harness access guard, including before sync starts. */
+  isClearedSession(sessionId: string): boolean {
+    if (!this.sessionStateLoaded) return true
+    const seen = new Set<string>()
+    let id: string | undefined = sessionId
+    while (id && !seen.has(id)) {
+      seen.add(id)
+      if (this.sync?.isCleared(id) ?? (Object.hasOwn(this.state.sync?.cleared ?? {}, id) || this.state.sync?.toArchive?.includes(id) === true)) return true
+      const header: Session['header'] | undefined = this.sessionCtx?.sessions.get(id as SessionId)?.header
+      id = header?.origin === 'subagent' ? header.parentSession : undefined
+    }
+    return false
+  }
+
+  private async clearSyncedSessions(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    // Include cold automatic descendants so a later restart or a stale child ID cannot
+    // recover inherited history. User-created forks have no subagent origin and stay.
+    const records = await this.sessionCtx?.sessionQuery.listSessions() ?? []
+    const blocked = new Set(clearedDescendants(ids, records.map((record) => record.header)))
+    let failure: unknown
+    try { await this.sync?.clearDerivedSessions([...blocked]) } catch (error) { failure = error }
+    for (const id of blocked) {
+      // Cancel only the existing Agent. Resolving would resume a cleared session.
+      this.sessionCtx?.agents.get(id as SessionId)?.cancel({ kind: 'user' })
+      this.screenRuns.turnEnded(id)
+      for (const [callId, call] of this.calls) if (call.sessionId === id) this.calls.delete(callId)
+      this.kept?.clearSession(id)
+      this.trajectory.clearSession(id)
+      if (this.stage.sessionId === id) this.clearStage()
+      this.sessionCtx?.emit('api-session/removed', id as SessionId)
+      this.logCache.delete(id)
+    }
+    const rooms = this.ctx.get('nanomuseRooms') as { clearActivity?(ids: string[]): Promise<void> } | undefined
+    await rooms?.clearActivity?.([...blocked])
+    if (failure) throw failure
   }
 
   /** The session that holds the account's main conversation (C8), '' before one is known. */
   syncMainSession(): string {
-    return this.sync?.state.mainSession ?? ''
+    const id = this.sync?.state.mainSession ?? ''
+    return this.isClearedSession(id) ? '' : id
   }
 
   /** How many turns from the account's other devices a session here shows (C8). */
@@ -2611,35 +2672,95 @@ export default class NanomuseCloud extends Service {
     return this.serialize(async () => this.adopt(await this.relay.login(identifier.trim(), password, this.deviceName())))
   }
 
+  /** Invalidate work before changing credentials, including a sync service injected mid-transition. */
+  private async beginAccountChange(): Promise<void> {
+    this.accountEpoch += 1
+    this.changingAccount = true
+    this.state.accountTransition = true
+    this.sync?.signedOut()
+    this.sync?.stop()
+    this.signedInCache = false
+    this.hub.stop('account credentials changing')
+    // If this write fails, credentials are untouched. If a later step fails, a restart stays paused.
+    await this.writeState()
+  }
+
+  private async finishAccountChange(): Promise<void> {
+    delete this.state.accountTransition
+    try {
+      await this.writeState()
+    } catch (error) {
+      this.state.accountTransition = true
+      // A concurrent state save may have succeeded while this one failed. Preserve the pause too.
+      await this.writeState().catch(() => undefined)
+      throw error
+    }
+    this.changingAccount = false
+  }
+
+  private async startAccountSync(sync: SyncEngine): Promise<void> {
+    const accountId = this.state.account?.id
+    if (!accountId || this.changingAccount || this.state.accountTransition) {
+      sync.signedOut()
+      sync.stop()
+      return
+    }
+    const epoch = this.accountEpoch
+    await sync.accountChanged(accountId, false)
+    if (epoch !== this.accountEpoch || this.sync !== sync || this.changingAccount || this.state.accountTransition) return
+    sync.start()
+  }
+
+  private async createSyncedSession(ctx: Context, title: string, sessionId: string): Promise<string> {
+    // The engine reserved this ID and persisted its owner before the host can publish the session.
+    const created = await ctx.sessionController.create({ ...await homeWorkspace(ctx), sessionId: sessionId as SessionId })
+    await ctx.sessionController.rename({ sessionId: created.sessionId, title }).catch(() => undefined)
+    return String(created.sessionId)
+  }
+
+  private async injectSyncedContext(ctx: Context, sessionId: string, text: string, isCurrent: () => boolean): Promise<void> {
+    if (!isCurrent()) return
+    const resolved = await ctx.sessionController.resolveAgent(sessionId as SessionId)
+    if (!isCurrent()) return
+    if ('error' in resolved) throw new Error(String(resolved.error))
+    // Model-facing context only; sessionLines sends only user sources back to the relay.
+    resolved.agent.inject(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'nanomuse-sync', role: 'user', mid: '', device: '', deviceName: '', at: Date.now() } }))
+  }
+
   /** A fresh key from either way in: wire the provider, remember the account, wear its look. */
   private async adopt(signIn: SignIn): Promise<CloudStatus> {
-    // C10: a different account than the one this device last held (the sync state remembers it through a
-    // sign-out) — the account-scoped state starts over
     const last = this.sync?.state.accountId || this.state.sync?.accountId || ''
     const switched = Boolean(last) && last !== signIn.account.id
+    await this.beginAccountChange()
     await this.ctx.credentials.set(credentialRef(TOKEN_REF), signIn.apiKey)
     const models = await this.relay.models(signIn.apiKey)
     await this.writeProvider(models)
     await this.adoptDefaultModel(models)
     this.state = { ...this.state, account: signIn.account, models }
     await this.writeState()
+    await this.profile.pull(signIn.apiKey, true).catch((error: unknown) => this.ctx.logger.warn('nanomuse: profile pull failed: %s', message(error)))
+    if (this.sync) {
+      await this.sync.accountChanged(signIn.account.id, false)
+    } else {
+      // Sign-in can finish before the session service exists. Bind its persisted state too.
+      const previous = migrate(this.state.sync)
+      this.state.sync = switched ? forAccount(previous, signIn.account.id) : { ...previous, accountId: signIn.account.id }
+      if (switched) {
+        const kept = this.kept ?? new RemoteStore(join(dshHome(), 'nanomuse', 'sync-remote.json'), (error) => this.ctx.logger.warn('nanomuse cloud: remote turns not saved: %s', message(error)))
+        kept.clear()
+        await kept.flush()
+        this.logCache.clear()
+      }
+    }
+    await this.finishAccountChange()
     await this.writeHands().catch((error: unknown) => this.ctx.logger.warn('nanomuse cloud: hands model not written: %s', message(error)))
     this.lastSharedConnectors = ''
     void this.publishConnectors().catch(() => undefined)
     this.signedInCache = true
     this.ctx.logger.info('nanomuse cloud: signed in as %s (%s)', signIn.account.hint, signIn.account.channel)
-    await this.profile.pull(signIn.apiKey, true).catch((error: unknown) => this.ctx.logger.warn('nanomuse: profile pull failed: %s', message(error)))
-    if (switched) {
-      // the last account's device list and notices are not this account's
-      this.hub.stop('another account signed in')
-      this.notices = []
-      this.hub.start()
-    } else this.hub.restart()
-    if (this.sync) {
-      // the account first: the pull that `start` makes runs against the new account's cursor
-      await this.sync.accountChanged(signIn.account.id)
-      this.sync.start()
-    }
+    if (switched) this.notices = []
+    this.hub.start()
+    if (this.sync) await this.startAccountSync(this.sync)
     this.broadcast()
     return this.status()
   }
@@ -3317,7 +3438,23 @@ export default class NanomuseCloud extends Service {
 
   /** The current account key, for a plugin that speaks to the relay itself. */
   token(): Promise<string | undefined> {
-    return this.ctx.credentials.resolve(credentialRef(TOKEN_REF)).then((r) => r?.value)
+    const epoch = this.accountEpoch
+    if (this.changingAccount || this.state.accountTransition) return Promise.resolve(undefined)
+    return this.ctx.credentials.resolve(credentialRef(TOKEN_REF)).then((r) =>
+      epoch === this.accountEpoch && !this.changingAccount && !this.state.accountTransition ? r?.value : undefined)
+  }
+
+  /** The persisted relay catalogue, reused by the adapter's default-capacity layer. */
+  capacityModels(): readonly RelayModel[] { return this.state.models ?? EMPTY_RELAY_MODELS }
+
+  /** Runtime defaults only: the editable settings remain the person's original values. */
+  providerDefaults<T extends CapacityProviders>(providers: T): T {
+    const models = this.capacityModels()
+    const cached = this.capacityCache
+    if (cached?.providers === providers && cached.models === models) return cached.result as T
+    const result = inheritCloudCapacity(providers, models)
+    this.capacityCache = { providers, models, result }
+    return result
   }
 
   // -- the provider row -----------------------------------------------------------
@@ -3330,14 +3467,23 @@ export default class NanomuseCloud extends Service {
    * budget) and each is scaled to the pixel budget before it is encoded.
    */
   providerRow(models: RelayModel[]): Record<string, unknown> {
-    return providerRowFor(this.relayDoor.openaiBase || this.relay.openaiBase, models, this.state.deviceId ?? '')
+    const section = this.ctx.settings.describe().find((row) => row.ns === LLM_ROW)
+    const providers = (section?.value as { providers?: Record<string, Record<string, unknown>> } | undefined)?.providers
+    const previous = providers?.[PROVIDER_ID] ?? {}
+    const base = providerRowFor(this.relayDoor.openaiBase || this.relay.openaiBase, models, this.state.deviceId ?? '')
+    const oldModels = Array.isArray(previous.models) ? previous.models as Record<string, unknown>[] : []
+    return { ...previous, ...base, models: (base.models as Record<string, unknown>[]).map((model) => ({
+      ...oldModels.find((old) => old.id === model.id), ...model,
+    })) }
   }
 
   /**
-   * The row written at an earlier start points at that start's door; before the first call of
-   * this one it is pointed at today's — or at the relay itself when no door opened — and the
-   * models and the rest of the row stay as they were. Nothing to do when there is no row yet,
-   * or when it already says so.
+   * The row written at an earlier start points at that start's door; usually today's door is
+   * on the same port, and nothing is written. When it is not — the port was taken, or the row
+   * is 1.0.7's and names the relay itself — the row is pointed at today's door (or at the relay
+   * when no door opened), and the models and the rest of the row stay as they were. Nothing to
+   * do when there is no row yet. Not to be awaited from `Service.init`: the write waits for the
+   * loader, and the loader waits for init (#701).
    */
   private async repointProvider(): Promise<void> {
     const base = this.relayDoor.openaiBase || this.relay.openaiBase
@@ -3392,7 +3538,7 @@ export default class NanomuseCloud extends Service {
   }
 
   private async forget(): Promise<void> {
-    this.hub.stop('signed out')
+    await this.beginAccountChange()
     await this.ctx.credentials.unset(credentialRef(TOKEN_REF))
     try {
       await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', PROVIDER_ID] }])
@@ -3405,6 +3551,7 @@ export default class NanomuseCloud extends Service {
     // the own keys and the ChatGPT sign-in are this computer's, not the account's (C11): they stay too
     const { deviceId, deviceName, remoteControl, sync, providers, chatgpt, media, handsProvider, handsModel } = this.state
     this.state = {
+      accountTransition: true,
       ...(deviceId ? { deviceId } : {}),
       ...(deviceName ? { deviceName } : {}),
       ...(remoteControl === true ? { remoteControl } : {}),
@@ -3414,9 +3561,6 @@ export default class NanomuseCloud extends Service {
       ...(media ? { media } : {}),
       ...(handsProvider && handsModel ? { handsProvider, handsModel } : {}),
     }
-    this.sync?.stop()
-    this.sync?.signedOut()
-    this.signedInCache = false
     this.events.forget()
     this.lastSharedConnectors = ''
     // the account's route is gone from the model layer: a chat slot left on it would fail every turn with NO_ADAPTER
@@ -3424,6 +3568,7 @@ export default class NanomuseCloud extends Service {
     await this.writeState()
     await this.writeHands().catch(() => rm(join(this.dir(), 'hands.json'), { force: true }).catch(() => undefined))
     await this.profile.reset()
+    await this.finishAccountChange()
     this.broadcast()
   }
 
@@ -3480,6 +3625,7 @@ export default class NanomuseCloud extends Service {
   // -- hands and notices ----------------------------------------------------------------
 
   private began(callId: string, name: string, args: unknown, sessionId: string): void {
+    if (this.isClearedSession(sessionId)) return
     const now = Date.now()
     if (now - this.lastCallAt > 60_000 && this.calls.size === 0) this.steps = 0
     this.lastCallAt = now
@@ -3530,7 +3676,7 @@ export default class NanomuseCloud extends Service {
 
   /** A frame of a screen the agent is working on; `meta.device` names another device, else it is this computer's. */
   stageFrame(bytes: Buffer, mime: string, meta: { device?: string; width?: number; height?: number; title?: string; mode?: 'screen' | 'window'; sessionId: string; callId?: string }): void {
-    if (bytes.length === 0 || bytes.length > 12 * 1024 * 1024) return
+    if (this.isClearedSession(meta.sessionId) || bytes.length === 0 || bytes.length > 12 * 1024 * 1024) return
     const seq = this.trajectory.frame(bytes, mime, meta)
     const sameScreen = this.stage.source === (meta.device ? 'device' : 'computer') && this.stage.device === (meta.device ?? '')
     this.stage = {
@@ -3551,6 +3697,7 @@ export default class NanomuseCloud extends Service {
 
   /** What the hands are about to do on this computer's screen: the stage's marker, and a step of the trajectory. */
   private acted(action: StageAction, sessionId: string, callId: string): void {
+    if (this.isClearedSession(sessionId)) return
     this.stage = { ...this.stage, action, sessionId: sessionId || this.stage.sessionId }
     this.trajectory.acted(sessionId, callId, action)
     this.broadcast()
@@ -3687,10 +3834,12 @@ export default class NanomuseCloud extends Service {
     try {
       const raw = JSON.parse(await readFile(this.statePath(), 'utf8')) as State
       return {
+        ...(raw.accountTransition === true ? { accountTransition: true as const } : {}),
         ...(raw.account ? { account: raw.account } : {}),
         ...(raw.models ? { models: raw.models } : {}),
         ...(typeof raw.deviceId === 'string' && raw.deviceId ? { deviceId: raw.deviceId } : {}),
         ...(typeof raw.deviceName === 'string' && raw.deviceName ? { deviceName: raw.deviceName } : {}),
+        ...(Number.isInteger(raw.doorPort) && (raw.doorPort as number) > 0 && (raw.doorPort as number) < 65536 ? { doorPort: raw.doorPort } : {}),
         ...(typeof raw.handsModel === 'string' && raw.handsModel ? { handsModel: raw.handsModel } : {}),
         // a grant 0.1.37 kept for the "app" "Done. Screen now:" (the mis-read head line) names nothing — dropped
         ...(Array.isArray(raw.grants) ? { grants: (raw.grants as Grant[]).filter((g) => g && typeof g.id === 'string' && typeof g.target === 'string' && !MISREAD_GRANT.test(g.target) && !isOwnApp(g.target.slice('computer_app:'.length))).map((g) => ({ id: g.id, target: g.target, at: Number(g.at) || 0, ...(typeof g.sessionId === 'string' && g.sessionId ? { sessionId: g.sessionId, sessionTitle: String(g.sessionTitle ?? '') } : {}), ...(typeof g.sessionId === 'string' && g.sessionId && typeof g.scheduleId === 'string' && g.scheduleId ? { scheduleId: g.scheduleId, scheduleTitle: String(g.scheduleTitle ?? '') } : {}) })) } : {}),
@@ -3705,8 +3854,9 @@ export default class NanomuseCloud extends Service {
         ...(raw.chatgpt && typeof raw.chatgpt === 'object' && typeof (raw.chatgpt as ChatGptState).label === 'string' ? { chatgpt: { label: (raw.chatgpt as ChatGptState).label, at: Number((raw.chatgpt as ChatGptState).at) || 0 } } : {}),
         ...(raw.cloudModelsOff === true ? { cloudModelsOff: true } : {}),
       }
-    } catch {
-      return {}
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
+      throw new Error('Could not read desktop account state; refusing to discard saved conversation access rules', { cause: error })
     }
   }
 
@@ -3720,7 +3870,16 @@ export default class NanomuseCloud extends Service {
     if (!entry) {
       entry = {}
       this.logCache.set(sessionId, entry)
+      // Entries are refreshed on reads below; the head is the least recently used.
+      while (this.logCache.size > LOG_CACHE_SESSIONS) {
+        const oldest = this.logCache.keys().next().value
+        if (oldest === undefined) break
+        this.logCache.delete(oldest)
+      }
     }
+    // Reading an existing entry refreshes its place in the eviction order too.
+    this.logCache.delete(sessionId)
+    this.logCache.set(sessionId, entry)
     return entry
   }
 
@@ -3820,8 +3979,22 @@ export default class NanomuseCloud extends Service {
 
   private async writeState(): Promise<void> {
     const path = this.statePath()
-    await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, JSON.stringify(this.state, null, 2) + '\n', { mode: 0o600 })
+    // Capture each requested snapshot before yielding, and commit writes in that order.
+    const contents = JSON.stringify(this.state, null, 2) + '\n'
+    const write = async (): Promise<void> => {
+      await mkdir(dirname(path), { recursive: true })
+      const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+      try {
+        await writeFile(tmp, contents, { mode: 0o600, flag: 'wx' })
+        await rename(tmp, path)
+        await chmod(path, 0o600).catch(() => undefined)
+      } finally {
+        await rm(tmp, { force: true }).catch(() => undefined)
+      }
+    }
+    const next = this.stateWrites.then(write, write)
+    this.stateWrites = next.catch(() => undefined)
+    await next
   }
 
   private serialize<T>(work: () => Promise<T>): Promise<T> {
@@ -4122,6 +4295,13 @@ export default class NanomuseCloud extends Service {
         }
         if (req.method === 'POST' && route === '/sync/delete') return send(res, 200, await sync.deleteRemote())
         if (req.method === 'POST' && route === '/sync/pull') return send(res, 200, { applied: await sync.pull(), ...sync.view() })
+        if (req.method === 'POST' && route === '/sync/access') {
+          const body = await json(req)
+          const id = String(body.sessionId ?? '')
+          return this.isClearedSession(id)
+            ? send(res, 404, { error: { code: 'conversation_cleared', message: 'This conversation was cleared on another device' } })
+            : send(res, 204)
+        }
         if (req.method === 'POST' && route === '/sync/main') {
           // the session the column named, or the one the account's main conversation already lives in
           const body = await json(req)
@@ -4475,7 +4655,7 @@ function sameModels(a: RelayModel[], b: RelayModel[]): boolean {
   const key = (models: RelayModel[]) =>
     models
       .filter((m) => m.kind === 'chat')
-      .map((m) => `${m.id}:${m.name}:${m.inputModalities.join(',')}`)
+      .map((m) => `${m.id}:${m.name}:${m.inputModalities.join(',')}:${m.contextWindow ?? ''}:${m.maxTokens ?? ''}`)
       .sort()
       .join('|')
   return key(a) === key(b)

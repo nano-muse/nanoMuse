@@ -90,6 +90,8 @@ object ChatExporter {
         repository: ChatRepository,
         format: String,
     ): Pair<Uri, Summary> = withContext(Dispatchers.IO) {
+        // nanoMuse: reject protected content before creating staging files or reading messages.
+        io.github.nanomuse.guard.SessionAccess.requireUnlocked(session.id)
         val isJson = format == "json"
         val ext = if (isJson) "json" else "txt"
         val stagingRoot = File(context.cacheDir, "export-staging")

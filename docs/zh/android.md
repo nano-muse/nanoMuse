@@ -1,5 +1,7 @@
 # Android App
 
+设置 → 技能中的内置技能可以查看、导出和停用。名称、内容和文件由 App 管理，因此不提供编辑、更新和删除。需要自定义时，可以导出后换一个名称再导入。内置 `skill-creator` 指南使用与模型服务商无关的说明。
+
 `android/` 是手机上的 nanoMuse：[OpenMinis](https://github.com/OpenMinis/OpenMinis)
 1.13（GPL-3.0）：一个原生 App，智能体**在手机上**运行，Linux shell、浏览器、MCP 服务器、
 技能和定时任务都装在 APK 里，再加上 nanoMuse 自己的身份、设计和功能。属于 nanoMuse 的一切
@@ -89,7 +91,19 @@ Play 商店：「设置 → 版本」把已安装的构建和最新版本并排�
 
 Shell 的进度更新会保留较短覆盖后未被改写的文字。终端的颜色和标题控制码会先移除，避免覆盖后在输出中留下转义序列的残片。
 
-每次调用带给模型的东西，手机自己也设了一个预算（1.0.8，`io.github.nanomuse.chat`）。托管模型最近一周的数据里，首字时间随提示大小增长（12k token 以下中位数 4.7 秒，24k 到 40k 之间 25 秒，40k 以上 54 秒），所以 `ContextBudget` 把压缩线拉到 32k token，64k 以上的窗口一律如此（托管模型按 128k 窗口处理时，原来是 108k），旧的大段工具结果从 28k 起写到磁盘；压缩本身，以及它完整保留的最近几轮，都还是上游的。`PromptDiet` 把基础提示里最胖的两块改写得更紧凑，不删任何能力：`browser_use` 的 schema（每个动作和参数都在，cookie、视口、无限滚动那几段写短了）和 Android 工具一节里 `minis-*` 的几段（其余的在各个 CLI 的 `--help` 里）。合起来大约 5k 字符，约为过去每次调用在一条消息之前就带上的内容的八分之一。
+手机按当前模型的上下文窗口计算每次请求的预算，模型组设置了更小的窗口时，以那个限制为准。`ContextBudget` 为回复预留的空间，取请求输出上限与 `max(4096, 窗口的 15%)` 中较小的值，且不超过窗口本身；再扣掉系统提示和工具定义，剩下的才是对话历史可用的空间。历史占到这部分空间的 75% 时，可以把旧工具内容移到文件；到 90% 时尝试生成摘要，整理后的目标是 50%。每条检查线都另外计入固定提示词的成本。这些预留用于判断何时整理上下文，实际回复长度仍根据请求发出时剩余的空间计算，不再给所有模型套用 32k 压缩线。
+
+上下文检查覆盖实际要发送的普通正文、结构化内容、摘要、回传给服务商的思考内容、系统提示、工具定义和图片。中文等非 ASCII 文字单独估算；成功请求返回的输入用量会逐步向上或向下修正估算，异常样本不参与校准。校准记录按服务商配置和模型分别保存，点击「继续」或重启 App 后仍可使用。同次运行中，已有请求的完整前缀没有变化时，以最近一次服务商报出的输入用量为基础，只为新增消息补上估算；更换服务商、提示词、工具定义或旧消息内容后，这个用量锚点即失效。新增或改写内容的计数仍是估算，不等于模型自己的分词结果。原生音频以服务商报出的用量为准，不把传输用的 base64 当普通文字计算。工具内容移到文件后、历史生成摘要后，都会重新测量请求。
+
+生成摘要前，手机可以先从待发送内容中去掉较早的思考文本，把旧工具结果和较大的工具参数写到模型可读取的文件。最新用户请求受到保护；通常保留最近三个工具步骤，空间更紧张时至少保留最近一个。最新一个已完成步骤的结果本身过大时，也可把完整结果移到文件，同时保留调用、思考内容和结果引用。工具调用和结果始终配对，文件写入失败时保留原内容。摘要仍无法腾出足够空间时，还可以把符合条件的旧工具步骤归档，并留下文件引用。保存的聊天记录保留原文。去掉思考文本、用摘要替代较早历史都可能损失细节，模型不再在每次调用中收到全部原文。
+
+提前生成摘要超时或没有缩短请求时，只要仍低于容量保护线，就继续处理，本次运行不会每收到一个工具结果都再次尝试。每次运行最多尝试三次自动摘要。如果只有校准倍率使估算超过保护线，而未校准的估算仍能放下，本次运行允许向服务商发送一次请求来检验估算；其他无法缩短到足够大小的请求会停止。摘要流连续 120 秒没有任何数据块时超时，包含分段和重试的整次摘要操作最多 900 秒。停止当前轮也会取消摘要请求。
+
+摘要区分历史背景、已完成的工作和当前请求，单独记录当前任务尚未完成的步骤及下一步；没有正在进行的任务时会明确写出，不会把旧问题重新当作任务。摘要完成后，先为固定提示词、摘要和受保护的当前轮留出空间，再决定能带回多少较早轮次的原文。这份回填预算随模型和请求变化，不再固定为 8k。单个任务特别长时，已被摘要覆盖的旧步骤由摘要接替，完整用户要求和最近的工具步骤继续保留。最新问题及其保留的工具调用、结果始终成组留下；如果这些受保护的内容本身太大，由上下文检查决定能否发送。后续消息带有结构化正文或附件时，摘要也会一起发送。相关提示跟随 App 语言。Android 使用这套原生流程，与 Python 运行时的任务预算各自独立。
+
+`PromptDiet` 缩短 `browser_use` 的 schema 说明，但保留每个动作和参数，同时精简 Android 工具一节中 `minis-*` 的介绍。各个 CLI 的 `--help` 提供完整用法。
+
+使用默认思考规则时，Qwen3.8-Max 的摘要请求会明确发送 `enable_thinking: false`。只在 App 内选择关闭、却省略这个参数，服务商仍会按默认行为处理。参数用法见[阿里云思考模式文档](https://help.aliyun.com/zh/model-studio/deep-thinking)。超时本身仍不能说明延迟来自网络还是服务商。
 
 一轮还没等到第一个字的时候，输入中的点点下面有一行小字（`NmWaitLine`）：前十秒什么都不显示，然后是「模型接口比较忙，已等待 15 秒」和「取消」；nanoMuse Cloud 说请求正在等它的模型名额时（中继 0.31 每 5 秒发一段没有 `choices`、带 `nanomuse: {phase, ahead}` 字段的 chunk，[cloud.md](cloud.md#protocol)），一知道就改为「前面还有 3 个」或「下一个就到你」（`NmStreamStatus`，`OpenAIProvider` 里标记的一行）。用到工具的一轮里，每一步各自计时。
 
@@ -300,6 +314,79 @@ keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
 
 仅用于聊天测试的模拟器构建（`-Pnm.abi=x86_64`）会排除缓存中的 arm64 proot 和 Alpine 根文件系统资源。切回默认的 arm64 构建后会重新包含这些资源，无需删除缓存。
 
+### 在 Windows 上使用 WSL {#windows-wsl}
+
+在 x64 Windows 上，使用 WSL 2 中的 x86_64 Ubuntu 完成整个构建。原生构建脚本支持
+Linux 和 macOS 主机，不支持 Windows shell。尚未安装时，先按
+[WSL 安装说明](https://learn.microsoft.com/zh-cn/windows/wsl/install)操作，再打开 Ubuntu。
+只有下面第一条命令在管理员 PowerShell 中运行：
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+后续命令都在 Ubuntu 中运行。把代码、SDK 和缓存放在 Linux 文件系统中，而不是
+`/mnt/c` 下；shell 脚本保持 LF 换行：
+
+```bash
+sudo apt update
+sudo apt install -y git curl unzip zip build-essential pkg-config openjdk-21-jdk-headless
+mkdir -p ~/src
+git clone --config core.autocrlf=false https://github.com/nano-muse/nanoMuse.git ~/src/nanoMuse
+cd ~/src/nanoMuse
+git submodule update --init android/deps/proot
+```
+
+安装 [Linux 版 Go](https://go.dev/doc/install)，把它的 `go` 命令加入 Ubuntu 的 `PATH`；
+[Android 工作流](https://github.com/nano-muse/nanoMuse/blob/main/.github/workflows/android.yml)
+使用 Go 1.26。下载 **Linux 版** Android SDK Command-Line Tools，按
+[sdkmanager 安装说明](https://developer.android.com/tools/sdkmanager)设置，以
+`$HOME/Android/Sdk` 为 SDK 目录。可执行文件应位于
+`$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager`。Windows 版 Android Studio
+安装的 SDK 不包含这次构建所需的 Linux NDK 可执行文件。
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+export GOROOT="$(go env GOROOT)"
+export GOPATH="$(go env GOPATH)"
+export PATH="$GOPATH/bin:$PATH"
+export GOTOOLCHAIN=auto
+
+java -version
+go version                         # 应显示 linux/amd64
+sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-36" \
+  "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.2.12479018"
+
+bash scripts/android/build-natives.sh
+cd android/src/android
+./gradlew :app:assembleDebug --console=plain --no-daemon
+```
+
+APK 位于 Gradle 工程目录下的 `app/build/outputs/apk/debug/app-debug.apk`。
+需要时把生成的 APK 复制到 Windows，构建目录仍保留在 Linux 中。
+
+Gradle 在 Ubuntu 内的 `$HOME/.android/debug.keystore` 创建 debug 签名密钥。
+如果后续 debug 构建需要覆盖安装这个 APK，保留这把位于代码目录之外的密钥。
+它可能与 Windows 用户目录里的密钥不同。debug APK 不能覆盖另一把密钥签名的官方 APK；
+使用自己的 release 密钥时，按上面的 release 签名说明操作。
+
+如果 Kotlin 报 Java 堆内存不足，先用 `free -h` 查看 WSL 可用内存。
+机器能同时满足 Windows 和 WSL 的内存需求时，可以只为这次构建提高 Gradle 与 Kotlin
+daemon 的上限，不修改仓库配置。例如在同一 Gradle 工程目录中运行：
+
+```bash
+./gradlew :app:assembleDebug --console=plain --no-daemon \
+  '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' \
+  '-Pkotlin.daemon.jvmargs=-Xmx6g'
+```
+
+这些是可选的堆内存上限，不是最低要求。按 WSL 实际可用内存选择，并为其他进程留出空间。
+
+
 ## 发布 {#releases}
 
 `.github/workflows/android.yml` 在 `android/` 下每有改动就构建 debug APK（「debug APK · arm64-v8a」
@@ -334,3 +421,68 @@ keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
 | `connectors/`、`ui/connectors/` | 连接器目录（`ConnectorsCatalogue` 读取资源文件）、MCP 授权发现与注册（`McpAuthDiscovery`）、连接和令牌刷新（`Connectors`）、这台手机连接了什么并发布到 profile、其他设备连接了什么（`SharedConnectors`）、「设置 → 连接器」页面 |
 | `ui/cloud/` | 登录、账号屏、设备部分 |
 | `res/values*/nm_strings.xml` | nanoMuse 的全部字符串，App 支持的十七种语言各一份（英语、简体中文、繁體中文、德语、西班牙语、菲律宾语、法语、印尼语、日语、韩语、马来语、波兰语、巴西葡萄牙语、罗马尼亚语、俄语、泰语、土耳其语）；每个文件的键相同，只有英语文件里标了 `translatable="false"` 的两条（中继地址示例和产品名 `nanoMuse Cloud`）例外，缺的回落到英语 |
+
+## 继续中断的备份 {#export-resume}
+
+备份与还原页面可继续或丢弃中断的导出。继续时必须使用原来的类别、文件大小上限、对话文件和凭据选项，并保留原标识及时间截止点，复用已验证的完成类别。加密备份需要重新输入密码，不能改为明文继续；日志从不保存密码。加密和打包使用可丢弃的副本，需要为该副本预留临时空间。失败的任务会保留私有暂存数据，直到继续或丢弃。计划任务会报告需要用户选择，而不会替换中断任务。成品仍使用可互操作的 .minisbak 格式。
+
+恢复导出时还会校验已保存的文件索引，以及暂存数据和内容文件；即使索引长度未变，目标路径或元数据被改动也会拒绝继续。
+
+## 中断还原的恢复 {#restore-recovery}
+
+Android 在还原共享文件、技能、记忆、MCP 配置、服务商或环境变量前保存恢复快照。类别还原失败时会回滚；若进程中断，下次启动会在打开数据仓库前恢复该类别。恢复失败会保留快照并阻止正常启动，以便重试。对话仍按原有规则合并，此功能不提供完整的对话历史回滚。恢复元数据不包含在导出内容中。
+
+环境变量恢复也会刷新当前进程中的列表；原来没有元数据文件时，部分导入留下的条目会被清除。
+
+## 直接向另一台设备发送任务 {#direct-tasks-to-another-device}
+
+以 `@设备名称` 开头发送文字，任务会直接通过 Hub 到达该设备，本机模型不再先用一轮对话决定如何委派。远端设备使用自己的模型、工具和配置。这仍是单次任务，不会把后续消息的执行位置固定到该设备。
+
+聊天会实时显示设备名称、工具步骤和回复文字。分段文字会替换当前段落，不会重复添加消息。不支持流式回复的设备仍可返回最终答案。审批沿用模型委派任务使用的本机卡片和限定范围的授权；「停止」会取消远端的本次调用，并撤回它尚未回答的卡片。
+
+设备离线或名称有歧义时，消息留在输入框。设备任务只接收文字，请先移除附件和粘贴的文件内容。当前一轮结束后才能发送下一条设备任务；普通本机消息仍沿用现有队列。调用失败前可能已有部分步骤执行，因此会明确显示失败或没有回复。最终文字和设备来源只保存一次；重新打开聊天时不会重建实时工具卡片。
+
+Android 跨设备任务最多等待十五分钟，与中继的任务时限一致。调用方超时或取消时，会尝试按原调用编号停止目标任务，清理最多等待十五秒。已经结束的调用编号不会停止同一对话中的后续任务。
+
+远端任务也沿用本地回复的前台服务跟踪。离开对话后成功完成并保存的回复会显示未读标记；取消、失败或未能保存的回复不会标为未读。
+
+## 未读回复 {#unread-replies}
+
+对话不可见时成功完成的回复，会在 Muse 抽屉和经典对话列表中标记为未读。折叠的经典分组也会显示未读提示。打开对话即可清除标记。失败、取消或重复的完成事件不会产生未读标记。该状态仅在本机当前进程内保存，与运行和暂停标记独立。此功能覆盖 #531 的未读回复部分，不代表完成其中所有运行状态和审批提议。
+
+两种布局都以当前处于前台且可见的对话为准，草稿发送首条消息后也会继续跟踪其实际标识。切换到其他标签页、打开覆盖对话的页面或将应用置于后台后，后续完成的回复会标记为未读。
+
+## 用 @ 选择设备 {#picking-a-device-with}
+
+在消息开头输入 `@`，可接收任务的在线设备会列在文件之前。按名称筛选后点击，也可用现有的方向键和回车选择。设备行显示名称、手机或电脑图标、操作系统、在线状态和设备 ID。
+
+选择后会插入完整名称。同名设备用 `@名称 [设备ID]` 区分；有歧义的简称或未限定的同名不会默认选第一台。委派指令使用稳定的设备 ID。消息中间的提及仍只列出文件。
+
+## 来自其他设备的 Emoji 形象 {#emoji-avatars-from-another-device}
+
+在桌面或网页选择的 emoji 形象也会显示在 Android 上，并保留背景色。emoji 与生成的形象存放在同一目录，重启后仍保留，也沿用现有的账号隔离。emoji 为空时显示 ✨，颜色无效时使用蓝色（`#0064d4`）。
+
+生成的形象和个人短片仍按原有优先级显示。修改智能体名字或连接器不会覆盖未改变的远端形象；明确重置形象才会恢复小龙。本次不增加 Android 上的 emoji 选择器。
+
+## 应用锁 {#app-lock}
+
+Android 可在显示应用内容前要求使用本机锁屏方式验证。在设置中启用应用锁并选择重新锁定的时间，保存更改需要验证。解锁状态仅在当前进程内有效。两种布局、传入分享和安全模式诊断使用同一入口保护。应用重新锁定时，原生诊断窗口会关闭；从导出文件选择器返回后，写入诊断数据前仍需通过访问验证。这是应用内访问保护，不是存储加密。后台任务继续运行。
+
+等待中的诊断导出，只有在所属页面回到前台且应用同时处于解锁状态时才会继续。在其他窗口解锁，不会让后台的导出页面开始写入。
+
+应用重新锁定时，服务商导入和权限修复的原生对话框也会关闭，等待中的权限选择按取消处理。
+
+## 受保护的对话 {#session-lock}
+
+对话菜单可使用本机锁屏方式保护单个对话。启用或移除保护、导出或复制已锁定的对话，以及根据消息内容重新生成标题，都需要验证。副本继承保护，但需要单独解锁。保护新对话时会先将其保存；取消验证则保留原来的草稿。设置中可选择重新锁定的间隔，也可选择离开对话时立即锁定。两种布局以及通知、深层链接入口均受保护。受保护对话的消息预览和正文搜索匹配不会显示。
+
+手动备份包含已锁定的对话时会请求验证。此次授权只用于备份，不会同时解锁所有对话。计划备份、同步和后台任务保持原有行为。保护元数据在本地持久保存，解锁状态不会跨进程保存；两者均不通过对话同步或备份传输。此功能不加密对话存储。
+
+设置为「退出时」后，切换到其他 Muse 标签页也会重新锁定对话，即使聊天页面仍保留在后台。
+
+
+## 继续操作屏幕 {#hands-continuity}
+
+同一对话再次明确请求「手」操作同一个已识别应用时，Android 会提供上次运行的简短记录，包括任务、结果、结束状态和最后八步。记录只保存在内存中，最多保留三十分钟、三十二组对话与应用。它只是历史观察，不代表允许重复操作或继续已停止的任务；当前请求和最新截图优先。没有对话或无法识别应用时不复用记录，运行中明确切换到其他应用时不保存共享记录。清空、编辑或删除对话、同步替换历史、退出账号或重启后，相应记录会被清除。
+
+屏幕模型可在 `scroll` 动作中增加 `"distance":"large"`，将纵向滑动距离增至约屏幕高度的 65%。省略时保留原来约 45% 的纵向距离，横向手势不变。主智能体会收到提示，保留 `nanomuse-hands run` 的完整 JSON，包括结束状态和最终回答，不用 `head` 或 `tail` 截断。

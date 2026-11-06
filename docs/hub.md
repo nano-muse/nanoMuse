@@ -66,12 +66,26 @@ Two kinds of request travel over the hub:
   for a conversation that is already running one fails at once with `busy`
   (the runtime): the caller waits for the first to answer, or stops it, and
   asks again. A task that has not answered within the hub's limit fails with
-  `timeout`, one the target's Muse could not run with `failed`.
+  `timeout`, one the target's Muse could not run with `failed`. A task that reached its
+  conversation but never started (the step was refused before the model was asked) fails
+  too, with `failed`, rather than answering with no words: the asking device shows that
+  sentence and not an empty result. On nanoMuse Desktop a chat of the conversation that
+  was archived since the last delivery is brought back when a task arrives, as opening the
+  chat and typing in it does.
   `stream: true` says the caller draws each `text` in place of the text since the last `tool`;
   nanoMuse Desktop then also sends `text {text, interim, partial: true}` with the text of the
   message the model is writing, at most every 250 ms, and the finished message as before. A
   caller that does not ask gets each message once (Android's `nanomuse-pc task` lists every
   `text` as a step); the runtime ignores `stream` for now.
+
+  The runtime and iPhone callers wait up to 15 minutes, matching the desktop and
+  runtime task budget. A local deadline or a `timeout` from the relay makes the caller
+  send `stop {call}` for the original task, with a separate 15-second cleanup limit.
+  Runtime cancellation uses the same exact call id. Cleanup is best effort: a disconnected
+  target may not receive it, so the caller keeps the original failure and does not claim
+  the remote work stopped. The target's own deadline still applies. An explicit call id
+  that is no longer running returns `{stopped: false}`; it must not select a later task
+  in that conversation. The frame format is unchanged and older clients still work.
 
   While a task runs the target sends `event` frames whose `body.stage` tells
   the caller what to draw, so the run reads the same in the caller's chat as in
@@ -124,7 +138,12 @@ A scheduled task on nanoMuse Desktop runs while nobody may be at the computer, s
 its run also go to the account's phones. No call stands behind such a card, so it travels as a
 push (relay 0.31, [below](#frames)); the computer sends it only when `welcome.server.features`
 lists `event_push`, and the relay passes it only to devices whose `hello` announces
-`approve.any` (the Android app and the iPhone app):
+`approve.any` (the Android app and the iPhone app). That is the whole of it: a card of a
+chat somebody is typing in on the computer or in the web console stays where it was asked (a
+person is there), a card inside a task another device sent goes back to that device inside the
+call ([above](#what-you-can-say)), and the Python runtime (`nanomuse serve`) pushes nothing yet — its
+scheduled tasks' cards wait in the web app
+([#704](https://github.com/nano-muse/nanoMuse/issues/704)):
 
 ```
 → event {to:"*", body:{stage:"approval", approval_id, preview, preview_zh, reason, app,
@@ -292,6 +311,12 @@ can be changed on the device. A `web` device is never a target and is not
 remembered. Bodies for `file.get`, `file.put` and `screen` carry the bytes in
 base64 (`data`) with `mime`; the desktop refuses files over 8 MB, the relay
 refuses frames over `HUB_FRAME_LIMIT`.
+
+The Python runtime's `files` action returns at most 2,000 directory entries. When more
+readable entries exist, the result also includes `truncated: true` and `total`, the number
+of names observed in the directory before per-entry reads. An entry that disappears or
+cannot be read may be omitted. An exactly full listing is not marked truncated. These
+fields are optional additions; clients must also accept responses without them.
 
 From relay 0.27, a credential owns one Hub identity: its `device.id` and
 `device.kind` are fixed when the credential is issued with `device_id` and

@@ -13,7 +13,19 @@ function fakeContext() {
   const sessions = new Map()
   const agents = new Map()
   const log = []
+  // The workspace registry, as the chats column keeps it: a set of archived ids it can bring back.
+  const registry = {
+    archivedSessionIds: [],
+    unarchived: [],
+    async unarchiveSession(sessionId) {
+      this.unarchived.push(sessionId)
+      this.archivedSessionIds = this.archivedSessionIds.filter((id) => id !== sessionId)
+    },
+  }
   const ctx = {
+    get(name) {
+      return name === 'workspaceRegistry' ? registry : undefined
+    },
     on(name, listener, prepend) {
       if (prepend) listeners[name].unshift(listener)
       else listeners[name].push(listener)
@@ -72,7 +84,7 @@ function fakeContext() {
     const run = (i) => (i < chain.length ? chain[i](Object.assign({ agent: agents.get(sessionId) }, req), () => run(i + 1)) : Promise.resolve('unavailable'))
     return run(0)
   }
-  return { ctx, emit, ask, stream, agents, log }
+  return { ctx, emit, ask, stream, agents, log, registry }
 }
 
 function fakeCall(id, from = { id: 'phone-1', name: 'Phone', kind: 'phone' }) {
@@ -80,9 +92,9 @@ function fakeCall(id, from = { id: 'phone-1', name: 'Phone', kind: 'phone' }) {
   return { id, from, events, event: (body) => events.push(body) }
 }
 
-function runner(h) {
+function runner(h, extra = {}) {
   const notices = []
-  const r = new TaskRunner(h.ctx, { deviceName: () => 'Desk', log: (level, text) => h.log.push([level, text]), notice: (from, text) => notices.push([from, text]) })
+  const r = new TaskRunner(h.ctx, { deviceName: () => 'Desk', log: (level, text) => h.log.push([level, text]), notice: (from, text) => notices.push([from, text]), ...extra })
   const off = r.attach()
   return { r, off, notices }
 }
@@ -112,11 +124,12 @@ test('frame, textOf and preview', () => {
 
 test('a task opens a named session, streams the run and resolves with the answer', async () => {
   const h = fakeContext()
-  const { r, off, notices } = runner(h)
+  // the chat lives where the host says (the home workspace, #705), not in dsh's default folder
+  const { r, off, notices } = runner(h, { home: async () => ({ agentPreset: 'nanomuse', workspaceId: 'ws-home' }) })
   const call = fakeCall('c1')
   const p = r.task({ text: 'what time is it' }, call)
   await tick()
-  assert.deepEqual(h.ctx.sessionController.created, [{ agentPreset: 'nanomuse' }])
+  assert.deepEqual(h.ctx.sessionController.created, [{ agentPreset: 'nanomuse', workspaceId: 'ws-home' }])
   assert.deepEqual(h.ctx.sessionController.renamed, [{ sessionId: 'session-1', title: 'From Phone' }])
   const agent = h.agents.get('session-1')
   assert.equal(agent.sent.length, 1)
@@ -229,6 +242,48 @@ test('a remembered conversation reuses its session after a restart; a vanished o
   h.emit('session-2', 'turn/end', { turn: 1, reason: { kind: 'completed' } })
   assert.equal((await p3).thread, 'session-2')
   second.off()
+})
+
+test('a chat archived since the last task is brought back, not delivered into a gate (#718)', async () => {
+  const h = fakeContext()
+  const memory = new Map()
+  const make = () => {
+    const r = new TaskRunner(h.ctx, { deviceName: () => 'Desk', log: () => undefined, recall: (k) => memory.get(k), remember: (k, id) => memory.set(k, id) })
+    return { r, off: r.attach() }
+  }
+  const first = make()
+  const p1 = first.r.task({ text: 'one' }, fakeCall('c1'))
+  await tick()
+  h.emit('session-1', 'turn/end', { turn: 1, reason: { kind: 'completed' } })
+  await p1
+  first.off()
+
+  // somebody tidied the chats column while the runner remembered the conversation
+  h.registry.archivedSessionIds = ['session-1']
+  h.agents.get('session-1').status = 'idle'
+  const second = make()
+  const p2 = second.r.task({ text: 'two' }, fakeCall('c2'))
+  await tick()
+  assert.deepEqual(h.registry.unarchived, ['session-1'], 'the archived chat came back before the delivery')
+  assert.deepEqual(h.registry.archivedSessionIds, [])
+  assert.equal(h.ctx.sessionController.created.length, 1, 'the conversation stayed where it was')
+  h.emit('session-1', 'turn/end', { turn: 2, reason: { kind: 'completed' } })
+  assert.equal((await p2).thread, 'session-1')
+  second.off()
+})
+
+test('a delivery a chat refused to start says it did not run, instead of an empty answer (#718)', async () => {
+  const h = fakeContext()
+  const { r, off } = runner(h)
+  const call = fakeCall('c1')
+  const p = r.task({ text: 'open the report' }, call)
+  await tick()
+  // the step was refused before the model was asked: no request, no answer, the turn ends blocked
+  h.emit('session-1', 'turn/start', { turn: 1 })
+  h.emit('session-1', 'turn/end', { turn: 1, reason: { kind: 'blocked' } })
+  await assert.rejects(p, (e) => e.code === 'failed' && e.message === 'the step was refused before the model was asked')
+  assert.deepEqual(call.events, [{ stage: 'error', message: 'the step was refused before the model was asked' }])
+  off()
 })
 
 test('busy, usage, a model error and a pending approval cancelled with the run', async () => {

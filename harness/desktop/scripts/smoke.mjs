@@ -9,6 +9,7 @@
 //   node scripts/smoke.mjs --operator      # also: the app's own hands (src/operator.ts) load and answer
 //                                          # /info and /screenshot — needs a display (DISPLAY on Linux)
 
+import { electronPath } from "./electron-path.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -39,8 +40,7 @@ if (args.includes("--app") && appArg) {
   }
 } else {
   const electronPkg = join(appDir, "node_modules", "electron");
-  const { default: path } = await import(join(electronPkg, "index.js")).catch(() => ({ default: undefined }));
-  electron = path;
+  electron = await electronPath(electronPkg).catch(() => undefined);
   dshDir = join(appDir, "dsh");
 }
 if (!electron || !existsSync(electron)) throw new Error(`no Electron binary at ${electron}`);
@@ -50,6 +50,11 @@ if (!existsSync(bin)) throw new Error(`no staged dsh at ${bin} — run scripts/p
 // the profile, as src/main.ts writes it
 const home = mkdtempSync(join(tmpdir(), "nanomuse-desktop-smoke-"));
 const profile = join(home, "profiles", "nanomuse");
+// Exercise persisted access rules after boot, without an account or a model call.
+mkdirSync(join(home, "nanomuse"), { recursive: true });
+writeFileSync(join(home, "nanomuse", "cloud.json"), JSON.stringify({
+  sync: { cleared: { "smoke-cleared": "smoke-conversation" } },
+}));
 mkdirSync(join(profile, "node_modules"), { recursive: true });
 writeFileSync(
   join(profile, "package.json"),
@@ -135,6 +140,25 @@ for (const route of ["/nanomuse/cloud/status", "/nanomuse/rooms/state"]) {
   }
 }
 console.log(`ours: ${Object.entries(ours).map(([k, v]) => `${k} → ${v}`).join(", ")}`);
+// A healthy status route alone does not exercise Cordis service injection or the
+// staged session policy. An ordinary blank session must still be creatable, while
+// a stale cleared ID must be rejected before the Harness adopts or resumes it.
+const createSession = async (sessionId) => {
+  const response = await fetch(origin + "/api/session/create", {
+    method: "POST",
+    headers: { cookie, origin, "sec-fetch-site": "same-origin", "content-type": "application/json" },
+    body: JSON.stringify({
+      type: "client-request", rpcId: "smoke", method: "session/create",
+      payload: { args: { request: { sessionId, cwd: home } } },
+    }),
+  });
+  return response.json();
+};
+const created = await createSession("smoke-live");
+const blocked = await createSession("smoke-cleared");
+const admissionPassed = created.result?.ok === true && created.result?.value?.sessionId === "smoke-live"
+  && blocked.result?.ok === false && blocked.result?.error?.code === "session/not-found";
+console.log(`session admission: ordinary ${created.result?.ok === true ? "created" : JSON.stringify(created.result)}, cleared ${blocked.result?.error?.code ?? JSON.stringify(blocked.result)}`);
 const warnings = (out.match(/did not activate/g) ?? []).length;
 if (process.platform === "win32" && child.pid) spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
 else child.kill("SIGTERM");
@@ -142,6 +166,7 @@ await new Promise((r) => setTimeout(r, 1500));
 cleanup();
 if (noToken !== 401 || withToken >= 400) throw new Error("the Host did not answer as dsh's web app does");
 if (Object.values(ours).some((status) => status !== 200)) throw new Error("the nanoMuse routes did not answer: the cloud or rooms row did not come up");
+if (!admissionPassed) throw new Error("the staged session access policy did not admit a new chat and reject a cleared ID");
 if (warnings > 0) {
   console.error(redact(out));
   throw new Error("some entries did not activate");

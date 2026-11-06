@@ -2,6 +2,9 @@ package com.openminis.app.data
 
 import com.openminis.app.data.model.LLMError
 import com.openminis.app.ui.chat.ChatViewModel.Companion.shouldSplitOnError
+// nanoMuse: idle and incomplete summaries must not multiply the same unsuccessful call.
+import io.github.nanomuse.chat.CompactSummaryIdleTimeoutException
+import io.github.nanomuse.chat.CompactSummaryOutputException
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,6 +23,15 @@ import java.net.SocketTimeoutException
  * now reserved for failures a smaller request could plausibly fix.
  */
 class CompactSplitPredicateTest {
+
+    // nanoMuse: a smaller transcript cannot repair provider inactivity or a missing checkpoint.
+    @Test
+    fun `idle empty and truncated summary failures do not split`() {
+        assertFalse(shouldSplitOnError(CompactSummaryIdleTimeoutException(120_000)))
+        for (reason in CompactSummaryOutputException.Reason.entries) {
+            assertFalse(shouldSplitOnError(CompactSummaryOutputException(reason)))
+        }
+    }
 
     // ── Must NOT split: retrying smaller cannot help ────────────────────
 

@@ -741,7 +741,11 @@ and queue P95; *Usage* (`/v1/admin/analytics/usage`): the day × model matrix
 by requests, cost, tokens, cached tokens or accounts, how much of the prompts
 the provider's cache served (overall and per model, from the ledger; and for
 the turns people ran on keys of their own and sent up, per provider and
-model, from the record), and a click on a day opens it
+model, from the figures the relay keeps beside the record — `own_figures`,
+one small row per own turn, written with the turn and filled in for older
+turns by a paced backfill after the 0.31.1 start; the console's
+`own_keys_pending` says when that is still running), and a click on a day
+opens it
 (`/v1/admin/analytics/day`): hours × models, platforms, outcomes by model,
 latency by hour, the provider's error reasons, the top accounts; *Platforms*
 (`/v1/admin/analytics/platforms`): Android, iOS, desktop, the runtime, the

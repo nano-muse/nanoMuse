@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { call, type Translate } from './api.ts'
 import { bridge, gatedPermissions, type PermissionKind, type PermissionState } from './bridge.ts'
 import { useLive } from './live.ts'
+import { relaunchHands } from './RelaunchButton.tsx'
 
 export type PermissionStates = Partial<Record<PermissionKind, PermissionState>>
 
@@ -36,7 +37,7 @@ export interface Permissions {
   /** Screen Recording was granted while the app ran; the runtime must start again to see it. */
   needsRelaunch: boolean
   /** Quit and start again (the desktop shell — the helper alone when it is in use), or nothing elsewhere. */
-  relaunch(): void
+  relaunch(): Promise<boolean | void>
   /**
    * The shell's helper app, "nanoMuse Computer Use", holds the grants (macOS, 0.1.38+): the
    * panes list it, not nanoMuse Desktop, and the shell restarts it by itself when Screen
@@ -129,7 +130,14 @@ export function usePermissions(kinds: PermissionKind[]): Permissions {
     }
   }, [])
   const settings = useCallback((kind: PermissionKind) => { void bridge()?.openPermissionSettings(kind) }, [])
-  const relaunch = useCallback(() => { void bridge()?.relaunch?.() }, [])
+  const relaunch = useCallback(async () => {
+    const completed = await relaunchHands()
+    if (completed === true) {
+      setNeedsRelaunch(false)
+      refresh()
+    }
+    return completed
+  }, [refresh])
   return {
     states,
     allow,

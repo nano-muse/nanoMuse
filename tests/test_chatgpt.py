@@ -192,7 +192,13 @@ async def test_the_loop_keeps_turning_while_another_process_holds_the_lock(tmp_p
         beat = asyncio.create_task(ticker())
         refresh = asyncio.create_task(auth.token())
         await asyncio.sleep(0.3)
-        assert not refresh.done() and ticks >= 10, "the wait for the lock blocked the loop"
+        # the ticker beats every 10 ms; a loaded runner stretches a beat far past that,
+        # so the count itself is not the point — only that beats keep coming at all
+        # while the refresh waits for the lock. A blocked loop delivers none.
+        assert not refresh.done(), "the refresh finished without the lock"
+        before = ticks
+        await asyncio.sleep(0.3)
+        assert not refresh.done() and ticks > before, "the wait for the lock blocked the loop"
         release.set()
         fresh = await asyncio.wait_for(refresh, 5)
         beat.cancel()
@@ -712,6 +718,47 @@ def test_the_cli_usage_refuses_when_signed_out(cli_home: Path):
     out = CliRunner().invoke(app, ["chatgpt", "usage", "--json"])
     assert out.exit_code == 1
     assert json.loads(out.stdout.strip())["code"] == "not_signed_in"
+
+
+def test_the_cli_proxy_emits_ready_with_models(cli_home: Path, monkeypatch: pytest.MonkeyPatch):
+    import uvicorn
+
+    from nanomuse import chatgpt_cli
+    from nanomuse.cli import app
+    from nanomuse.llm.chatgpt_proxy import ModelList
+
+    TokenStore.in_dir(cli_home).save(token())
+
+    async def models(_self: ModelList) -> list[str]:
+        return ["test-model"]
+
+    server: uvicorn.Server
+    server_type = uvicorn.Server
+    original_emit = chatgpt_cli._emit
+
+    def make_server(config: uvicorn.Config) -> uvicorn.Server:
+        nonlocal server
+        server = server_type(config)
+        return server
+
+    def emit(as_json: bool, event: dict[str, Any], *args: Any) -> None:
+        original_emit(as_json, event, *args)
+        if event.get("event") == "ready":
+            # Let the real server shut down after the startup event reaches stdout.
+            server.should_exit = True
+
+    monkeypatch.setattr(ModelList, "ids", models)
+    monkeypatch.setattr(uvicorn, "Server", make_server)
+    monkeypatch.setattr(chatgpt_cli, "_emit", emit)
+    result = CliRunner().invoke(app, ["chatgpt", "proxy", "--json"])
+    assert result.exit_code == 0, result.exception
+    events = [json.loads(line) for line in result.stdout.splitlines()]
+    assert [event["event"] for event in events] == ["ready", "exit"]
+    ready = events[0]
+    assert ready["models"] == ["test-model"]
+    assert ready["label"] == "ChatGPT Plus"
+    assert ready["url"].startswith("http://127.0.0.1:") and ready["url"].endswith("/v1")
+    assert ready["token"]
 
 
 # ----------------------------------------------------------------------------- the CLI

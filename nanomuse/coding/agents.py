@@ -39,6 +39,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from nanomuse.stdio import decode_output
+
 # The agents nanoMuse knows how to read and drive; `bins` are tried in order.
 AGENTS: dict[str, dict[str, Any]] = {
     "cursor": {
@@ -213,14 +215,12 @@ def _processes() -> list[tuple[str, str]]:
         return rows
     if plat == "win32":
         try:
-            tl = subprocess.run(
-                ["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True, timeout=8
-            )
+            tl = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, timeout=8)
         except (OSError, subprocess.TimeoutExpired):
             return []
         rows = []
         node_lines: list[str] | None = None
-        for line in tl.stdout.splitlines():
+        for line in decode_output(tl.stdout).splitlines():
             name = line.split('","', 1)[0].strip('" ')
             if not name:
                 continue
@@ -245,12 +245,11 @@ def _windows_node_command_lines() -> list[str]:
                 "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | ForEach-Object { $_.CommandLine }",
             ],
             capture_output=True,
-            text=True,
             timeout=15,
         )
     except (OSError, subprocess.TimeoutExpired):
         return []
-    return [line.strip() for line in ps.stdout.splitlines() if line.strip()]
+    return [line.strip() for line in decode_output(ps.stdout).splitlines() if line.strip()]
 
 
 def sessions_root(agent: str) -> Path:
@@ -498,7 +497,7 @@ def _cursor_session(
 
 
 # -- Codex -------------------------------------------------------------------------------
-def _codex_files(limit: int) -> list[Path]:
+def _codex_files(limit: int, workspace: str | None = None) -> list[Path]:
     root = sessions_root("codex")
     if not root.is_dir():
         return []
@@ -509,7 +508,10 @@ def _codex_files(limit: int) -> list[Path]:
         except OSError:
             continue
     files.sort(key=lambda t: -t[0])
-    return [f for _, f in files[: max(limit * 3, 30)]]
+    # A filtered list may need to pass many newer transcripts from other workspaces.
+    # The session reader below uses the transcript's cwd before counting toward limit.
+    candidates = files if workspace else files[: max(limit * 3, 30)]
+    return [f for _, f in candidates]
 
 
 def _codex_session(f: Path, full: bool) -> Session | None:
@@ -590,7 +592,7 @@ def _codex_session(f: Path, full: bool) -> Session | None:
 
 def _codex_sessions(limit: int, workspace: str | None) -> list[Session]:
     out = []
-    for f in _codex_files(limit):
+    for f in _codex_files(limit, workspace):
         s = _codex_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)
@@ -618,7 +620,10 @@ def _claude_sessions(limit: int, workspace: str | None) -> list[Session]:
                 continue
     files.sort(key=lambda t: -t[0])
     out = []
-    for _, f in files[: max(limit * 2, 20)]:
+    # Directory slugs are lossy: repo-tools and repo/tools can share a slug. Only
+    # the transcript's cwd below can decide whether it belongs to this workspace.
+    candidates = files if workspace else files[: max(limit * 2, 20)]
+    for _, f in candidates:
         s = _claude_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)
@@ -863,7 +868,10 @@ def _dsh_sessions(limit: int, workspace: str | None) -> list[Session]:
                 continue
     files.sort(key=lambda t: -t[0])
     out = []
-    for _, f in files[: max(limit * 2, 20)]:
+    # Directory slugs are lossy: repo-tools and repo/tools can share a slug. Only
+    # the transcript's cwd below can decide whether it belongs to this workspace.
+    candidates = files if workspace else files[: max(limit * 2, 20)]
+    for _, f in candidates:
         s = _dsh_session(f, full=False)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)

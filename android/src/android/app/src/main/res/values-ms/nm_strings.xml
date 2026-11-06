@@ -1212,4 +1212,41 @@
     <string name="nm_stop_reason_done">Sudah siap</string>
     <string name="nm_stop_reason_other">Perkara lain</string>
     <string name="nm_feed_limit_notice">%1$d hantaran yang dijana tidak dimuatkan kerana had harian 12.</string>
+
+    <!-- Context maintenance -->
+    <string name="nm_context_compacting">Memendekkan konteks (anggaran %1$d / %2$d token).</string>
+    <string name="nm_context_compact_deferred">Konteks tidak dapat dipendekkan. Pemprosesan diteruskan kerana masih muat dalam tetingkap konteks model.</string>
+    <string name="nm_context_limit_reached">Konteks menghampiri had model dan tidak dapat dipendekkan. Cuba ringkaskan semula atau mulakan perbualan baharu.</string>
+    <string name="nm_context_compact_timeout">Peringkasan konteks tamat masa selepas %1$d saat (%2$d panggilan model).</string>
+    <string name="nm_context_compact_idle_timeout">Pemadatan dihentikan selepas %1$d saat tanpa respons (%2$d panggilan model).</string>
+    <string name="nm_context_compact_no_gain">Ringkasan tidak memendekkan konteks. Kandungan asal dikekalkan.</string>
+    <string name="nm_context_compact_incomplete">Model tidak mengembalikan ringkasan lengkap. Konteks asal dikekalkan.</string>
+    <string name="nm_remote_ambiguous">Lebih daripada satu peranti sepadan. Pilih dalam Akaun → Peranti.</string>
+    <string name="nm_remote_attachments">Sebutan peranti hanya menghantar teks. Alih keluar lampiran sebelum menghantar.</string>
+    <string name="nm_remote_no_answer">%1$s selesai tanpa jawapan.</string>
+    <string name="nm_remote_failed">%1$s tidak menjawab: %2$s</string>
+    <string name="nm_remote_offline">%1$s di luar talian.</string>
+    <string name="nm_remote_chat_busy">Tunggu perbualan ini selesai sebelum menghantar tugas kepada peranti.</string>
+
+    <string name="nm_reply_unread">Balasan belum dibaca</string>
+    <string name="nm_restore_recovered">Pemulihan terganggu telah dipulihkan. Jika gagal, data pemulihan disimpan untuk cubaan seterusnya.</string>
+    <string name="nm_restore_recovery_failed">Pemulihan gagal. Data pemulihan disimpan. Mulakan semula aplikasi untuk mencuba lagi.</string>
+    <string name="nm_backup_resume">Sambung sandaran</string>
+    <string name="nm_backup_discard">Buang sandaran terganggu</string>
+    <string name="nm_backup_resume_hint">Sandaran terganggu sedang menunggu. Sambung dengan pilihan asal dan masukkan semula kata laluan jika perlu, atau buang untuk bermula semula.</string>
+<string name="nm_access_locked">nanoMuse dikunci</string>
+<string name="nm_access_hint">Sahkan dengan kunci skrin peranti ini.</string>
+<string name="nm_access_unlock">Buka kunci</string>
+<string name="nm_access_settings">Kunci aplikasi</string>
+<string name="nm_access_on_exit">Kunci apabila keluar</string>
+<string name="nm_access_never">Jangan kunci secara automatik</string>
+<string name="nm_access_seconds">%1$d saat</string>
+<string name="nm_access_unavailable">Tetapkan kunci skrin pada peranti ini dahulu.</string>
+<string name="nm_session_protected">Perbualan dilindungi</string>
+<string name="nm_session_protect">Lindungi perbualan</string>
+<string name="nm_session_unprotect">Buang perlindungan perbualan</string>
+<string name="nm_session_settings">Tempoh kunci perbualan</string>
+
+    <string name="nm_coding_installed">Dipasang</string>
+    <string name="nm_coding_not_installed">Belum dipasang</string>
 </resources>

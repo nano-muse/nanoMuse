@@ -175,11 +175,36 @@ A choice you made always wins; nanoMuse Cloud
 never steps in front of a provider you chose. Each device keeps its own choice,
 because keys never leave the device where they were entered.
 
-**No silent fallback.** When a model of your own fails under a turn, nothing
-switches by itself: the error card offers *Use nanoMuse Cloud this time*
-(signed in only), which runs that one turn on the account's model and changes
-no row. A failed picture or clip has no Cloud retry: fix or choose a media
-provider of your own and retry there.
+**The Cloud retry button needs your action.** After a failed turn, the error card
+offers *Use nanoMuse Cloud this time* while signed in. Clicking it runs that one
+turn on the account's model and changes no row. This button does not govern model
+group routing: a Cloud model included in a phone's group can still be selected
+automatically by that group. A failed picture or clip has no Cloud retry: fix or
+choose a media provider of your own and retry there.
+
+**Model groups can switch automatically.** This is separate from the Cloud retry
+button. On Android and iPhone, a chat bound to a group can try another available
+member after an error. Its alternatives come from that group's members, not every
+model listed under every provider. A rate-limit error can trigger this without a
+confirmation before the next request.
+
+| Chat group setting | Android | iPhone |
+| --- | --- | --- |
+| Default | Rate-limit errors and provider errors identified as 5xx can advance to another member. Retryable network and server errors are retried on the current model first. | Rate limits, invalid keys and provider rejections can advance immediately. Network and transient server errors can advance after retries on the current model are exhausted. |
+| Always | Other errors can also advance to another member after any applicable retries on the current model. | Other errors can advance immediately, without the usual retries on the current model. |
+
+These group settings do not currently have an **Off** choice. To keep a phone chat
+on one model, use a group containing only that model; on Android, selecting a
+specific model entry instead of a group also removes the group fallback chain.
+Keep other models in your provider catalogue if you need them for separate chats.
+A group's current model can change after fallback, including when that chat is
+opened again, so check the model and provider shown for the chat.
+
+Each alternative receives the request context needed to answer, using its own
+configured provider and credential. Its prices and billing policy can differ;
+retries and fallback requests may each be billed by the provider. Review the
+members before using a group with multiple models. The Cloud retry button is not
+an approval gate for requests to those group members.
 
 **Thinking level (desktop).** The composer's model picker offers a thinking
 level for a model of yours where the vendor documents one, in the vendor's own

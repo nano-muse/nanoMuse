@@ -1182,4 +1182,41 @@
     <string name="nm_stop_reason_done">已經做完了</string>
     <string name="nm_stop_reason_other">其他原因</string>
     <string name="nm_feed_limit_notice">因每日 12 則上限，有 %1$d 則生成內容未能加入動態。</string>
+
+    <!-- Context maintenance -->
+    <string name="nm_context_compacting">正在整理對話上下文（估計 %1$d / %2$d token）。</string>
+    <string name="nm_context_compact_deferred">暫時無法縮短上下文，但仍在模型容量範圍內，繼續處理。</string>
+    <string name="nm_context_limit_reached">上下文已接近模型容量上限，暫時無法縮短。請重試壓縮，或開啟新對話。</string>
+    <string name="nm_context_compact_timeout">整理上下文在 %1$d 秒後逾時（呼叫模型 %2$d 次）。</string>
+    <string name="nm_context_compact_idle_timeout">模型連續 %1$d 秒未傳回資料，已停止整理上下文（呼叫模型 %2$d 次）。</string>
+    <string name="nm_context_compact_no_gain">摘要未縮短上下文，已保留原有內容。</string>
+    <string name="nm_context_compact_incomplete">模型未傳回完整摘要，已保留原有上下文。</string>
+    <string name="nm_remote_ambiguous">有多台裝置符合。請在帳號 → 裝置中選擇。</string>
+    <string name="nm_remote_attachments">裝置提及只傳送文字。請先移除附件。</string>
+    <string name="nm_remote_no_answer">%1$s 已結束，但沒有回覆。</string>
+    <string name="nm_remote_failed">%1$s 未回覆：%2$s</string>
+    <string name="nm_remote_offline">%1$s 目前離線。</string>
+    <string name="nm_remote_chat_busy">請等本次對話執行完畢後再傳送裝置任務。</string>
+
+    <string name="nm_reply_unread">未讀回覆</string>
+    <string name="nm_restore_recovered">已復原中斷的還原作業。若復原失敗，復原資料會保留供重試。</string>
+    <string name="nm_restore_recovery_failed">還原復原失敗。復原資料已保留，請重新啟動應用程式重試。</string>
+    <string name="nm_backup_resume">繼續備份</string>
+    <string name="nm_backup_discard">捨棄中斷的備份</string>
+    <string name="nm_backup_resume_hint">有一份備份尚未完成。請使用原來的選項繼續，必要時重新輸入加密密碼；也可捨棄後重新開始。</string>
+<string name="nm_access_locked">nanoMuse 已鎖定</string>
+<string name="nm_access_hint">請使用本裝置的鎖定螢幕方式驗證。</string>
+<string name="nm_access_unlock">解鎖</string>
+<string name="nm_access_settings">應用程式鎖定</string>
+<string name="nm_access_on_exit">離開時鎖定</string>
+<string name="nm_access_never">不自動鎖定</string>
+<string name="nm_access_seconds">%1$d 秒</string>
+<string name="nm_access_unavailable">請先為本裝置設定螢幕鎖定。</string>
+<string name="nm_session_protected">受保護的對話</string>
+<string name="nm_session_protect">保護對話</string>
+<string name="nm_session_unprotect">移除對話保護</string>
+<string name="nm_session_settings">對話鎖定時間</string>
+
+    <string name="nm_coding_installed">已安裝</string>
+    <string name="nm_coding_not_installed">未安裝</string>
 </resources>

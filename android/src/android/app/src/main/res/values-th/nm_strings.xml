@@ -1212,4 +1212,41 @@
     <string name="nm_stop_reason_done">เสร็จแล้ว</string>
     <string name="nm_stop_reason_other">อย่างอื่น</string>
     <string name="nm_feed_limit_notice">โพสต์ที่สร้างขึ้น %1$d รายการไม่พอดีกับจำนวนจำกัด 12 รายการต่อวัน</string>
+
+    <!-- Context maintenance -->
+    <string name="nm_context_compacting">กำลังย่อบริบท (ประมาณ %1$d / %2$d โทเค็น)</string>
+    <string name="nm_context_compact_deferred">ไม่สามารถย่อบริบทได้ แต่ยังอยู่ภายในขีดจำกัดของโมเดล จึงดำเนินการต่อ</string>
+    <string name="nm_context_limit_reached">บริบทใกล้ถึงขีดจำกัดของโมเดลและไม่สามารถย่อได้ ลองย่ออีกครั้งหรือเริ่มแชตใหม่</string>
+    <string name="nm_context_compact_timeout">การย่อบริบทหมดเวลาหลังจาก %1$d วินาที (เรียกใช้โมเดล %2$d ครั้ง)</string>
+    <string name="nm_context_compact_idle_timeout">หยุดย่อบริบทหลังจากไม่มีการตอบกลับเป็นเวลา %1$d วินาที (เรียกโมเดล %2$d ครั้ง)</string>
+    <string name="nm_context_compact_no_gain">สรุปไม่ได้ทำให้บริบทสั้นลง จึงเก็บเนื้อหาเดิมไว้</string>
+    <string name="nm_context_compact_incomplete">โมเดลไม่ได้ส่งคืนสรุปที่สมบูรณ์ จึงเก็บบริบทเดิมไว้</string>
+    <string name="nm_remote_ambiguous">พบอุปกรณ์ที่ตรงกันมากกว่าหนึ่งเครื่อง เลือกในบัญชี → อุปกรณ์</string>
+    <string name="nm_remote_attachments">การกล่าวถึงอุปกรณ์ส่งได้เฉพาะข้อความ โปรดนำไฟล์แนบออกก่อนส่ง</string>
+    <string name="nm_remote_no_answer">%1$s ทำงานเสร็จโดยไม่มีคำตอบ</string>
+    <string name="nm_remote_failed">%1$s ไม่ตอบกลับ: %2$s</string>
+    <string name="nm_remote_offline">%1$s ออฟไลน์อยู่</string>
+    <string name="nm_remote_chat_busy">รอให้การสนทนานี้ทำงานเสร็จก่อนส่งงานไปยังอุปกรณ์</string>
+
+    <string name="nm_reply_unread">คำตอบที่ยังไม่ได้อ่าน</string>
+    <string name="nm_restore_recovered">กู้คืนการคืนค่าที่ขัดจังหวะแล้ว หากกู้คืนไม่สำเร็จ จะเก็บข้อมูลการกู้คืนไว้เพื่อลองอีกครั้ง</string>
+    <string name="nm_restore_recovery_failed">กู้คืนไม่สำเร็จ เก็บข้อมูลการกู้คืนไว้แล้ว เริ่มแอปใหม่เพื่อลองอีกครั้ง</string>
+    <string name="nm_backup_resume">สำรองข้อมูลต่อ</string>
+    <string name="nm_backup_discard">ทิ้งการสำรองข้อมูลที่ขัดจังหวะ</string>
+    <string name="nm_backup_resume_hint">มีการสำรองข้อมูลที่ขัดจังหวะอยู่ ดำเนินการต่อด้วยตัวเลือกเดิมและป้อนรหัสผ่านอีกครั้งหากจำเป็น หรือทิ้งเพื่อเริ่มใหม่</string>
+<string name="nm_access_locked">nanoMuse ถูกล็อก</string>
+<string name="nm_access_hint">ยืนยันด้วยการล็อกหน้าจอของอุปกรณ์นี้</string>
+<string name="nm_access_unlock">ปลดล็อก</string>
+<string name="nm_access_settings">ล็อกแอป</string>
+<string name="nm_access_on_exit">ล็อกเมื่อออก</string>
+<string name="nm_access_never">ไม่ล็อกอัตโนมัติ</string>
+<string name="nm_access_seconds">%1$d วินาที</string>
+<string name="nm_access_unavailable">ตั้งค่าการล็อกหน้าจอบนอุปกรณ์นี้ก่อน</string>
+<string name="nm_session_protected">การสนทนาที่ได้รับการป้องกัน</string>
+<string name="nm_session_protect">ป้องกันการสนทนา</string>
+<string name="nm_session_unprotect">นำการป้องกันการสนทนาออก</string>
+<string name="nm_session_settings">เวลาล็อกการสนทนา</string>
+
+    <string name="nm_coding_installed">ติดตั้งแล้ว</string>
+    <string name="nm_coding_not_installed">ยังไม่ได้ติดตั้ง</string>
 </resources>

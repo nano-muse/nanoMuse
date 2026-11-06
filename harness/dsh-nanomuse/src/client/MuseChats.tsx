@@ -17,7 +17,7 @@
  * says where a chat was written — the bubbles do (`RemoteBubbles.ts`).
  */
 import { createElement as h, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { call, type Translate } from './api.ts'
+import { call, failureText, type Translate } from './api.ts'
 import { IconMore, IconPlus, IconSearch } from './icons.tsx'
 import { composing } from './keys.ts'
 import { useLive } from './live.ts'
@@ -38,8 +38,9 @@ interface SyncList {
   /** Sessions of another account than the one signed in (C10): not listed, not searched; empty when signed out. */
   foreign: Set<string>
   toArchive: string[]
+  cleared: Set<string>
 }
-const NO_SYNC: SyncList = { enabled: true, mainSession: '', sessions: new Set(), foreign: new Set(), toArchive: [] }
+const NO_SYNC: SyncList = { enabled: true, mainSession: '', sessions: new Set(), foreign: new Set(), toArchive: [], cleared: new Set() }
 
 /** The host's sync view; read again whenever the host's sync revision moves. */
 export function useSyncList(): SyncList {
@@ -47,8 +48,8 @@ export function useSyncList(): SyncList {
   const [list, setList] = useState<SyncList>(NO_SYNC)
   useEffect(() => {
     let alive = true
-    call<{ enabled: boolean; mainSession?: string; sessions?: string[]; foreign?: string[]; toArchive?: string[] }>('sync/state')
-      .then((v) => { if (alive) setList({ enabled: v.enabled, mainSession: v.mainSession ?? '', sessions: new Set(v.sessions ?? []), foreign: new Set(v.foreign ?? []), toArchive: v.toArchive ?? [] }) })
+    call<{ enabled: boolean; mainSession?: string; sessions?: string[]; foreign?: string[]; toArchive?: string[]; cleared?: string[] }>('sync/state')
+      .then((v) => { if (alive) setList({ enabled: v.enabled, mainSession: v.mainSession ?? '', sessions: new Set(v.sessions ?? []), foreign: new Set(v.foreign ?? []), toArchive: v.toArchive ?? [], cleared: new Set(v.cleared ?? []) }) })
       .catch(() => undefined)
     return () => { alive = false }
   }, [rev])
@@ -86,7 +87,7 @@ export interface ChatActions {
   pinSession(id: string): Promise<void>
   unpinSession(id: string): Promise<void>
   renameSession(id: string, title: string): Promise<void>
-  openArchived(): void
+  unarchiveSession(id: string): Promise<void>
 }
 
 export interface MuseChatsProps {
@@ -222,6 +223,9 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
   const archived = typeof useWorkspaces === 'function' ? useWorkspaces((w) => w.archivedSessionIds) : []
   const pinned = typeof useWorkspaces === 'function' ? useWorkspaces((w) => w.pinnedSessionIds) : []
   const [query, setQuery] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
+  const [restoring, setRestoring] = useState<string | null>(null)
+  const [restoreError, setRestoreError] = useState('')
   const [mainStored, setMainStored] = useState<string | undefined>(readMain)
   useEffect(() => {
     const listener = () => setMainStored(readMain())
@@ -237,9 +241,10 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
   // the rooms' running batches (the feed being written) are the agent's work, not chats of the person's
   const batches = new Set(useRooms().batches)
   // signed in, the column shows this account's chats and the ones never synced (C10); another account's stay, hidden
-  const visible = state.ids
+  const chats = state.ids
     .map((id) => state.byId[id])
-    .filter((s): s is ChatSummary => s !== undefined && s.origin !== 'subagent' && !s.parentId && !archivedSet.has(s.id) && !sync.foreign.has(s.id) && !batches.has(s.id))
+    .filter((s): s is ChatSummary => s !== undefined && s.origin !== 'subagent' && !s.parentId && !sync.cleared.has(s.id) && !sync.foreign.has(s.id) && !batches.has(s.id))
+  const visible = chats.filter((s) => !archivedSet.has(s.id))
   const current = Object.values(state.byId).find((s) => (s.retainedBy.mainView ?? 0) > 0)?.id
 
   // The main chat: the one the account's main conversation lives in (C8) while it exists, else
@@ -275,6 +280,24 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
       .finally(() => { for (const id of due) archiving.current.delete(id) })
   }, [sync.toArchive])
 
+  const previousCurrent = useRef<string | undefined>(current)
+  const awaitingMain = useRef<string | undefined>()
+  const redirectedCurrent = useRef<string | undefined>()
+  useEffect(() => {
+    const old = current ?? previousCurrent.current
+    if (old && sync.cleared.has(old) && old !== redirectedCurrent.current) awaitingMain.current = old
+    else if (current) awaitingMain.current = undefined
+    previousCurrent.current = current
+    // Archiving clears the old selection. Wait for the host's replacement instead
+    // of creating extra blank sessions while the sync state is being saved.
+    if (awaitingMain.current && sync.mainSession && !sync.cleared.has(sync.mainSession)) {
+      redirectedCurrent.current = awaitingMain.current
+      awaitingMain.current = undefined
+      previousCurrent.current = undefined
+      actions.openSession(sync.mainSession)
+    }
+  }, [current, sync.cleared, sync.mainSession])
+
   const main = visible.find((s) => s.id === mainId)
   const q = query.trim().toLowerCase()
   // a synced chat is listed from the moment it exists here, though no turn ran here yet
@@ -294,8 +317,42 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
     else actions.startSession()
   }
   const headItems: MenuItem[] = [
-    { id: 'archived', label: t('chArchived'), onSelect: actions.openArchived },
+    { id: 'archived', label: t('chArchived'), onSelect: () => { setQuery(''); setShowArchived(true) } },
   ]
+
+  if (showArchived) {
+    const rows = chats.filter((chat) => archivedSet.has(chat.id) && (q === '' || chat.displayTitle.toLowerCase().includes(q)))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+    const restore = async (id: string): Promise<void> => {
+      if (restoring) return
+      setRestoring(id)
+      setRestoreError('')
+      try {
+        await actions.unarchiveSession(id)
+        actions.openSession(id)
+        setShowArchived(false)
+        setQuery('')
+      } catch (error) {
+        setRestoreError(failureText(t, error))
+      } finally {
+        setRestoring(null)
+      }
+    }
+    return h('div', { className: 'nm-chats' },
+      h('div', { className: 'nm-chats-section' },
+        h('span', null, t('chArchived')),
+        h('button', { type: 'button', className: 'nm-seg-btn', onClick: () => { setShowArchived(false); setQuery('') } }, t('chBack'))),
+      h('div', { className: 'nm-chats-head' },
+        h('label', { className: 'nm-chats-search' },
+          h(IconSearch, { size: 15 }),
+          h('input', { ref: searchRef, type: 'search', value: query, placeholder: t('chSearch'), 'aria-label': t('chSearch'), onChange: (e: FormEvent<HTMLInputElement>) => setQuery(e.currentTarget.value) }))),
+      restoreError ? h('div', { className: 'nm-chats-empty', role: 'alert' }, restoreError) : null,
+      h('div', { className: 'nm-chats-list' },
+        rows.length === 0 ? h('div', { className: 'nm-chats-empty' }, q === '' ? t('chArchivedEmpty') : t('chNoMatch'))
+          : rows.map((chat) => h('div', { key: chat.id, className: 'nm-chat-row', 'data-session-id': chat.id },
+            h('span', { className: 'nm-chat-open' }, h('span', { className: 'nm-chat-title' }, chat.displayTitle || t('chBlank'))),
+            h('button', { type: 'button', className: 'nm-seg-btn', disabled: restoring !== null, onClick: () => { void restore(chat.id) } }, t('chRestore'))))))
+  }
 
   return h('div', { className: 'nm-chats' },
     h('div', { className: 'nm-chats-head' },

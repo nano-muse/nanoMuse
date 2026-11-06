@@ -14,6 +14,8 @@ nanoMuse 只读一个 TOML 文件。`nanomuse config init` 把带注释的 [`con
 
 运行时没有对应设置的键（拼错的 `modle`、来自另一个版本的键）会被忽略，取默认值；加载时会在日志里带着键的路径（`llm.modle`）说明，`nanomuse doctor` 把这类键列为问题。自由格式的表（`[llm.extra_headers]`、MCP 服务器的 `env`）和 [channels.md](channels.md) 里的 `[channels.<name>]` 表接受任何键。
 
+日期和标题相同的日历草稿会使用带序号的文件名，如 `calendar/<date>-<title>-2.ics`，已有草稿会保留。
+
 ## 环境变量覆盖 {#environment-overrides}
 
 这些优先于文件。它们覆盖了人们最常改的设置，以及 Docker 需要的东西。
@@ -38,6 +40,8 @@ nanoMuse 只读一个 TOML 文件。`nanomuse config init` 把带注释的 [`con
 | `NANOMUSE_IN_CONTAINER=1` | 说明运行时在容器里（镜像会设置它；`/.dockerenv` 也会被读取），于是 `sandbox.mode = auto` 把容器当作箱子，而不是报告缺少 bubblewrap |
 | `NANOMUSE_CODING_HOME` | 到哪里找编程 CLI 各自的家目录（`~/.codex`、`~/.claude`……），默认是用户的家目录（[coding-agents.md](coding-agents.md)） |
 | `NANOMUSE_LOG_LEVEL` | `log_level` |
+
+仓库根目录的 Docker compose 文件使用 `NANOMUSE_RUNTIME_PORT` 选择网页版在宿主机上发布的端口，默认 8787。它是 compose 变量，不是运行时设置，也不代替 `NANOMUSE_SERVER_PORT`；详见[部署](deployment.md#docker)。
 
 ## `[llm]` {#llm}
 
@@ -101,6 +105,8 @@ model    = ""            # empty → gpt-5.6-sol (also gpt-6.1-sol, gpt-6-sol, g
 **实话一句**，每次登录都会打印：*OpenAI 的条款只允许在 OpenAI 自己的 Codex 里使用 ChatGPT 套餐；别的应用曾被切断过这种访问（OpenCode，2026 年 1 月）。哪天它不能用了，API key 还能用。*
 
 **回调必须到得了运行时。** OpenAI 把浏览器送回 `http://localhost:1455/auth/callback`，所以浏览器必须和运行时在同一台机器上（或者把这个端口转发过去）。不在同一台时（运行时在服务器上、控制台开在笔记本上），登录页照样能用，只是浏览器最后落在一个没人应答的地址上。把地址栏里那整个地址（`http://localhost:1455/auth/callback?code=…&state=…`）复制出来交给运行时：端口被占或者迟迟没有回调时，CLI 会问你要；带 `--json` 时它从 stdin 读一行；网页控制台的卡片上有一个输入框；从 `/api/chatgpt/login` 发起的登录还在等待期间，服务器接受 `POST /api/chatgpt/callback {"url": "<the address>"}`。`state` 和正在等待的那次登录对不上会被拒绝（400 `state_mismatch`），什么都不会交换。`nanomuse chatgpt proxy` 把这个登录以回环地址上一个 OpenAI 兼容端点的形式提供出来（`GET /v1/models`、`POST /v1/chat/completions`、`GET /v1/usage`，一个本地 bearer 令牌），给同一台机器上的其他程序用；`--proxy`（或 `[llm] proxy`）让它的上游调用走代理。
+
+桌面版完成浏览器授权后会保存登录凭据；本地代理启动后，ChatGPT 模型才会出现。`nanomuse chatgpt proxy --json` 发出的 `ready` 事件包含模型列表，桌面版用它注册服务商。能从 OpenAI 获取列表时使用该列表，否则使用内置列表。
 
 **套餐还剩多少。** OpenAI 按两个窗口（几小时和一周）统计套餐用量，并在每次 Codex 调用的响应头里（`x-codex-primary-used-percent`、`…-window-minutes`、`…-reset-after-seconds`，`secondary` 也有同样一组）和 `GET https://chatgpt.com/backend-api/wham/usage`（Codex CLI 的 `/status` 读的就是这个端点）上写明。`nanomuse chatgpt usage` 打印两个窗口（`--json` 给原始的 `{label, plan, limits}`），运行时在 `GET /api/chatgpt/usage` 提供给控制台，回环代理在 `GET /v1/usage` 提供；运行时还保留最近一次调用的响应头（`CodexClient.limits`）。没有什么会缓存超过一分钟。
 
@@ -172,6 +178,10 @@ show_thinking        = false
 user_profile         = ""              # free text injected into the system prompt
 instructions         = ""              # extra rules appended to the system prompt
 ```
+
+在 Windows 上，运行时的 `files` 工具和 hub 文件操作会拒绝保留设备名（包括 `NUL.txt`），
+也会拒绝以点或空格结尾的路径分量。请换一个名称，不要依赖 Windows 自动改名。其他平台
+仍使用各自的文件命名规则。
 
 `language = "auto"` 时，系统提示词会点明回复语言并告诉模型用它回答：客户端随消息送来了界面语言（网页控制台会送，即 `POST /api/threads/{id}/send` 的 `language`；hub 上的 `task` 也可以带）就用界面语言，否则按最近一条用户消息的文字书写系统判断。笼统的一句「用用户的语言回复」在某些模型上不可靠；点名就管用。固定的 `language` 优先于两者。
 
@@ -263,7 +273,7 @@ dir      = ""                        # your skills; empty → <data_dir>/skills
 disabled = ["inbox-triage"]          # built-in ones to leave out of the model's list
 ```
 
-一个技能就是一个带 `SKILL.md` 的文件夹（YAML front matter 里有 `name` 和 `description`，后面是 Markdown 写的步骤），采用 [Agent Skills](https://agentskills.io) 格式，所以给其他智能体写的技能在这里也能用。nanoMuse 多读一个键 `channel`：技能在[阶梯](gui.md#the-ladder)的哪一级上工作：`api`（MCP 服务器或连接器）、`cli`、`web`（一次抓取）、`browser`、`gui`（手机屏幕；也接受 `app-only`）或 `mixed`。`gui` 技能在智能体的索引里标为*在手机屏幕上*，这样它开始之前就知道这活需要手机；必须严格遵守共享格式的技能可以改用 `metadata.channel`。内置十一个（`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`；`phone-messages` 用于手机屏幕；五个面向不需要屏幕的中国服务：`feishu` 经 lark-cli、`tencent-meeting` 经 tmeet、`amap` 经高德 MCP 服务器、`kuaidi100` 经快递100 服务器，以及 `train-tickets`，它通过 12306 服务器查询，只在被明确要求时才在手机上订票；哪些在哪里跑过，见 [services.md](services.md)）；`dir` 里一个和内置同名的文件夹会替换掉内置的那个。模型在系统提示词里拿到索引（每个启用技能的名字和描述），请求合适时用 `skills` 工具读取技能的步骤；聊天消息开头的 `/name` 直接运行一个。从聊天里保存或删除技能是敏感调用：无论哨兵是什么模式，都先问。在 App 里关掉的技能记在 `app-settings.json`；这里的列表和那份会合并。在[沙箱](sentinel.md#the-sandbox)里，技能的文件夹（它的脚本和参考文件）以只读方式可见。见 [App → 技能](app.md#skills)和 [CLI](cli.md#skills) 里的 `nanomuse skills`。
+一个技能就是一个带 `SKILL.md` 的文件夹（YAML front matter 里有 `name` 和 `description`，后面是 Markdown 写的步骤），采用 [Agent Skills](https://agentskills.io) 格式，所以给其他智能体写的技能在这里也能用。nanoMuse 多读一个键 `channel`：技能在[阶梯](gui.md#the-ladder)的哪一级上工作：`api`（MCP 服务器或连接器）、`cli`、`web`（一次抓取）、`browser`、`gui`（手机屏幕；也接受 `app-only`）或 `mixed`。`gui` 技能在智能体的索引里标为*在手机屏幕上*，这样它开始之前就知道这活需要手机；必须严格遵守共享格式的技能可以改用 `metadata.channel`。内置十二个（`skill-creator`、`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`；`phone-messages` 用于手机屏幕；五个面向不需要屏幕的中国服务：`feishu` 经 lark-cli、`tencent-meeting` 经 tmeet、`amap` 经高德 MCP 服务器、`kuaidi100` 经快递100 服务器，以及 `train-tickets`，它通过 12306 服务器查询，只在被明确要求时才在手机上订票；哪些在哪里跑过，见 [services.md](services.md)）；`dir` 里一个和内置同名的文件夹会替换掉内置的那个。模型在系统提示词里拿到索引（每个启用技能的名字和描述），请求合适时用 `skills` 工具读取技能的步骤；聊天消息开头的 `/name` 直接运行一个。从聊天里保存或删除技能是敏感调用：无论哨兵是什么模式，都先问。在 App 里关掉的技能记在 `app-settings.json`；这里的列表和那份会合并。在[沙箱](sentinel.md#the-sandbox)里，技能的文件夹（它的脚本和参考文件）以只读方式可见。见 [App → 技能](app.md#skills)和 [CLI](cli.md#skills) 里的 `nanomuse skills`。
 
 ## 连接器 {#connectors}
 
@@ -287,6 +297,8 @@ scrub_secrets = true   # remove one-time codes and reset links before the model 
 ### 日历 {#calendar}
 
 任何提供私密 iCalendar 链接的日历都行（Google（「设置 → 整合日历 → iCal 格式的私密地址」）、Outlook（「共享日历 → 发布」）、iCloud（「共享日历 → 公共日历」）、Fastmail、Nextcloud），或者磁盘上的一个 `.ics` 文件。`webcal://` 链接通过 HTTPS 抓取。订阅源的文本缓存在 `<data_dir>/calendar-cache.json`（权限 0600），这样启动时和两次刷新之间都有日程可看。
+
+日程会显示通过 `RDATE` 为重复事件补充的日期，包括全天事件。重复日期只显示一次，`EXDATE` 仍可取消其中某次日程。暂不支持带独立时长的 `RDATE` 条目（`VALUE=PERIOD`），这类条目会被跳过。
 
 ```toml
 [connectors.calendar]

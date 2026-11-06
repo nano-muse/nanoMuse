@@ -93,25 +93,20 @@ class PromptDietTest {
     }
 
     @Test
-    fun `compaction is at 32k on every window from 64k up`() {
+    fun `legacy policy keeps model tiers without a universal 32k cap`() {
         for (window in listOf(64_000, 100_000, 128_000, 200_000, 1_000_000)) {
-            val p = ContextPolicy.forContextWindow(window)
-            assertEquals(ContextBudget.COMPACT_TOKENS, p.compactThreshold)
-            assertEquals(ContextBudget.OFFLOAD_TOKENS, p.offloadThreshold)
-            assertEquals(ContextBudget.OFFLOAD_TARGET_TOKENS, p.offloadTarget)
-            assertFalse(p.exhaustedOnly)
-            assertTrue(p.manualCompactAllowed)
-            assertEquals(ContextPolicy.CheckResult.OK, p.check(31_999, window))
-            assertEquals(ContextPolicy.CheckResult.NEEDS_COMPACT, p.check(32_000, window))
-            assertTrue(p.shouldOffload(28_000))
-            assertFalse(p.shouldOffload(27_999))
+            val policy = ContextPolicy.forContextWindow(window)
+            val reserve = if (window < 128_000) 10_000 else 20_000
+            assertEquals(window - reserve, policy.compactThreshold)
+            assertFalse(policy.exhaustedOnly)
+            assertTrue(policy.manualCompactAllowed)
+            assertEquals(ContextPolicy.CheckResult.OK, policy.check(32_000, window))
+            assertEquals(ContextPolicy.CheckResult.NEEDS_COMPACT, policy.check(window - reserve, window))
         }
-        // the small tiers never reached the figures and are as upstream left them
         val small = ContextPolicy.forContextWindow(40_000)
         assertEquals(0, small.compactThreshold)
         assertEquals(30_000, small.offloadThreshold)
         assertTrue(small.exhaustedOnly)
-        val tiny = ContextPolicy.forContextWindow(16_000)
-        assertEquals(0, tiny.offloadThreshold)
+        assertEquals(0, ContextPolicy.forContextWindow(16_000).offloadThreshold)
     }
 }

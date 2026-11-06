@@ -42,7 +42,7 @@ const bridge = {
   /** Open the System Settings pane for one permission (macOS); a no-op elsewhere. */
   openPermissionSettings: (kind: PermissionKind): Promise<void> => ipcRenderer.invoke("nanomuse:permissions:settings", kind),
   /** Quit and start again (after a permission macOS applies only to new processes). */
-  relaunch: (): Promise<void> => ipcRenderer.invoke("nanomuse:relaunch"),
+  relaunch: (): Promise<boolean> => ipcRenderer.invoke("nanomuse:relaunch"),
   /** Open an http(s) link in the default browser. */
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke("nanomuse:open-external", url),
   /** Keep the display awake (while the agent works the computer). */

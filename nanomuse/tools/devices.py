@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ConfigDict
 
 from nanomuse.hub import actions
-from nanomuse.hub.client import HubError
+from nanomuse.hub.client import TASK_CALL_TIMEOUT_S, HubError
 from nanomuse.schema import RiskLevel, ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment, int_arg
 from nanomuse.tools.shell import _DANGEROUS, programs_of
@@ -379,10 +379,21 @@ class DeviceScreen(_DeviceTool):
         ext = "png" if "png" in mime else "jpg"
         folder = self.workspace / "screenshots"
         folder.mkdir(parents=True, exist_ok=True)
-        dest = folder / f"{_slug(str(d['name']))}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.{ext}"
         try:
-            dest.write_bytes(base64.b64decode(data))
+            picture = base64.b64decode(data)
         except (ValueError, OSError) as exc:
+            return ToolResult.fail(f"could not save the picture: {exc}")
+        # two looks inside one second (look, act, then look again to check) are two
+        # pictures: the second takes the next free name, not the first one's file
+        stem = f"{_slug(str(d['name']))}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        dest = folder / f"{stem}.{ext}"
+        n = 2
+        while dest.exists():
+            dest = folder / f"{stem}-{n}.{ext}"
+            n += 1
+        try:
+            dest.write_bytes(picture)
+        except OSError as exc:
             return ToolResult.fail(f"could not save the picture: {exc}")
         size = f"{r.get('width')}×{r.get('height')}" if r.get("width") else ""
         return ToolResult(
@@ -507,7 +518,7 @@ class Delegate(_DeviceTool):
                 str(d["id"]),
                 "task",
                 {"text": task, "from": hub.device_name},
-                timeout=600,
+                timeout=TASK_CALL_TIMEOUT_S,
                 on_event=on_event,
             )
         finally:

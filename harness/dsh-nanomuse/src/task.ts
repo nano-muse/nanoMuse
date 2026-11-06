@@ -22,6 +22,7 @@ import type { ApprovalOutcome, ApprovalRequestEvent } from '@deepseek-ai/dsh-use
 import { createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
+import type { SessionCreateRequest } from '@deepseek-ai/dsh-api-session-controller/types'
 import { HubError, type Caller, type IncomingCall } from './hub.ts'
 
 /** The runtime's TASK_TIMEOUT_S: a task may run this long before the hub gives up on it. */
@@ -52,9 +53,21 @@ interface Run {
   reject(error: HubError): void
 }
 
+/** The slice of the workspace registry the runner reads: a chat it was told to use may have been archived since. */
+interface ArchiveRegistry {
+  readonly archivedSessionIds: readonly string[]
+  unarchiveSession(sessionId: SessionId): Promise<void>
+}
+
 export interface TaskRunnerOptions {
   /** This computer's name on the account, for the result and the approval cards over there. */
   deviceName(): string
+  /**
+   * What to create a device's chat with: the home workspace (`~/nanoMuse`, `home.ts`), never the
+   * bare home folder, where a `workspace-write` command cannot run on Windows (#705). Absent
+   * means dsh's default folder.
+   */
+  home?(): Promise<SessionCreateRequest>
   log(level: 'info' | 'warn', text: string): void
   /** A task started or ended here; the client shows it as a notice. */
   notice?(from: string, text: string): void
@@ -238,16 +251,36 @@ export class TaskRunner {
       // Still there (live, or on disk and resumable)? Else a new one.
       const resolved = await this.ctx.sessionController.resolveAgent(known).catch(() => undefined)
       if (resolved && 'agent' in resolved) {
+        await this.restore(known)
         this.conversations.set(k, known)
         return known
       }
     }
-    const created = await this.ctx.sessionController.create({ agentPreset: 'nanomuse' })
+    const created = await this.ctx.sessionController.create((await this.options.home?.()) ?? { agentPreset: 'nanomuse' })
     const title = `From ${from.name || from.id}`
     await this.ctx.sessionController.rename({ sessionId: created.sessionId, title }).catch(() => undefined)
     this.conversations.set(k, created.sessionId)
     this.options.remember?.(k, created.sessionId)
     return created.sessionId
+  }
+
+  /**
+   * The conversation lived on in a chat somebody archived since (the chats column's archive, the
+   * keyboard shortcut): the archived-session gate would refuse every step of the new task and the
+   * turn would end `blocked` without the model ever being asked (#718). A task from another device
+   * brings the chat back, as unarchiving it in the chats column does.
+   */
+  private async restore(sessionId: SessionId): Promise<void> {
+    const registry = this.ctx.get('workspaceRegistry') as ArchiveRegistry | undefined
+    if (!registry || !registry.archivedSessionIds.includes(sessionId)) return
+    try {
+      await registry.unarchiveSession(sessionId)
+    } catch (error: unknown) {
+      // The delivery goes ahead and the refused turn says why it did not run, below.
+      this.options.log('warn', `nanomuse task: the archived chat could not be brought back: ${String(error)}`)
+      return
+    }
+    this.options.log('info', `nanomuse task: the chat for another device was archived; brought back (${String(sessionId)})`)
   }
 
   private onEvent(session: Session, event: SessionEvent): void {
@@ -287,6 +320,13 @@ export class TaskRunner {
         if (reason.kind === 'error') {
           run.call.event({ stage: 'error', message: String(reason.error.message ?? 'the model failed') })
           run.reject(new HubError('failed', String(reason.error.message ?? 'the model failed')))
+        } else if (reason.kind === 'blocked') {
+          // The step was refused before the model was asked (an archived chat the restore could not
+          // bring back, a hook of the person's own): an empty answer would read as "Done" at the
+          // other device, so the task says it did not run (#718).
+          const why = 'the step was refused before the model was asked'
+          run.call.event({ stage: 'error', message: why })
+          run.reject(new HubError('failed', why))
         } else if (reason.kind === 'aborted') {
           run.resolve(run.final || '(stopped)')
         } else {

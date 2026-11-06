@@ -1,5 +1,7 @@
 # 应用
 
+联系人搜索和最近编程工作区会忽略旧查询、旧编程助手或旧设备的响应；切换条件时，旧结果会清空。
+
 > **Python 线的设计记录**（`nanomuse/` + `web/`，标签 `pre-openminis`）：这里讲的是
 > `nanomuse serve` 提供的网页版，今天它是桌面版的门面，也是在浏览器标签页里打开的
 > 运行时的门面（nanomuse.cn/web 本身是跑在一台模拟手机上的演示）。`android/` 里的手机 App 基于 OpenMinis，
@@ -118,7 +120,7 @@ nanomuse serve --port 9000 --no-qr
 
 ### 技能 {#skills}
 
-技能是一份做法：一个文件夹，里面有一个 `SKILL.md`（开头是名字和一行描述，然后是 Markdown 写的步骤），用的是 [Agent Skills](https://agentskills.io) 的格式，所以给别的智能体写的技能在这里能用，你写的在那边也能用。应用自带十一个（`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`、`phone-messages`，以及对接服务的 `feishu`、`tencent-meeting`、`amap`、`kuaidi100`、`train-tickets`）；你自己的放在 `<data_dir>/skills/<name>/`，和内置技能同名的会替换掉内置的。
+技能是一份做法：一个文件夹，里面有一个 `SKILL.md`（开头是名字和一行描述，然后是 Markdown 写的步骤），用的是 [Agent Skills](https://agentskills.io) 的格式，所以给别的智能体写的技能在这里能用，你写的在那边也能用。应用自带十二个（`skill-creator`、`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`、`phone-messages`，以及对接服务的 `feishu`、`tencent-meeting`、`amap`、`kuaidi100`、`train-tickets`）；你自己的放在 `<data_dir>/skills/<name>/`，和内置技能同名的会替换掉内置的。
 
 模型在系统提示词里看到的是索引（每个启用技能的名字和描述），请求对得上就挑一个（「帮我规划在京都的一周」会去拿 `trip-plan`），开始之前用 `skills` 工具读完整的步骤。你也可以自己点名：在输入框里打 `/`，启用的技能就冒出来（`Tab` 补全第一个匹配）；`/trip-plan Kyoto, 5 days in November` 把这个技能的指令连同你的文字作为任务一起发出去。
 
@@ -196,7 +198,7 @@ nanomuse serve --port 9000 --no-qr
 | POST / DELETE | `/api/triggers/{id}/fire`、`/api/triggers/{id}` | 用一个样例事件现在就跑一次 / 取消 |
 | POST | `/api/hooks/{id}?key=` | 触发器的 webhook：不要应用令牌，key 就是凭据（也接受 `X-Hook-Key` 头）；请求体（≤ 64 KB，JSON 会格式化）就是上下文。id 或 key 错了返回 404，已取消返回 409，投递太密返回 429 |
 | GET | `/api/files` · `/api/files/{path}?download=1` | 列出 / 读取工作区文件（HTML 和 SVG 带着 `Content-Security-Policy: sandbox` 返回） |
-| GET | `/api/data/export` | 智能体数据打包成一个 zip（[parity.md](parity.md#open-for-a-decision-the-next-next-list) 备注 37）：形象、各房间、通讯录、已给过的审批、`threads/`、`sessions/`，以及一份写清每部分是什么的 README；永远不含 `vault.enc`、`vault.key`、`server_token`、`push-vapid.json`、设置文件、`logs/` 和 `workspace/`；单个文件超过 64 MB 会被跳过；以附件形式返回，带 `Cache-Control: private, no-store` |
+| GET | `/api/data/export` | 智能体数据打包成一个 zip（[parity.md](parity.md#open-for-a-decision-the-next-next-list) 备注 37）：形象、各房间、通讯录、已给过的审批、`threads/`、`sessions/`、数据目录内的技能、上传的联系人、手机和电脑轨迹、待投递的定时消息、nudges 缓存，以及一份写清每部分是什么的 README；永远不含 `vault.enc`、`vault.key`、`server_token`、`push-vapid.json`、设置文件、`logs/` 和 `workspace/`；配置的数据根目录可以是符号链接或 Windows 联接，导出前会解析一次并固定目标；根目录内跳过符号链接、硬链接、Windows 重解析点、读取时发生变化的文件和超过 64 MB 的文件；数据库通过运行时已打开的存储连接进行 SQLite 在线备份，包含已提交的 WAL 事务，不会重新打开源文件路径；未启用的存储、尚未提交的事务、忙碌或过大的数据库会跳过，并在 ZIP 的 README 中列明；备份重试预算为五秒，生成结果所用的临时文件会在返回前删除；压缩包中的时间戳限制在 ZIP 支持的 1980-2107 年范围内；其他文件始终通过已经校验的文件句柄读取，父目录也保持固定；以附件形式返回，带 `Cache-Control: private, no-store` |
 | GET / PUT | `/api/settings` | 查看 / 修改 `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, show_thinking, language}`；查看时还包含 `onboarded` 和 `llm_ready` |
 | GET | `/api/connections` | 模型（`key_source`：vault · config · missing · none；是列表里的接口时带 `endpoint`）、服务商预设、`endpoints`（列表里的自定义 OpenAI 兼容接口，每个是 `{id, label, base_url, key_source, models, slots}`，从不带 key）、邮件、浏览器、MCP 服务器（`connected`、`tools`、`from_app`）、保险库里的名字、`onboarded` |
 | PUT | `/api/connections/llm` `{provider, model, base_url, tool_mode, api_key}` 或 `{endpoint, model, tool_mode}` | 换模型；`api_key` 给了 → 存进保险库，`""` → 不用 key，没给 → 不变。`endpoint` 指向列表里的一个接口，槽位借用它的地址和它自己的 key（按引用）。在每个会话里立即生效。地址里带 `user:pass@` 会被拒绝并返回 400（key 应写在 `api_key`）；`/api/llm/models`、`/api/connections/gui`、`/image`、`/video` 和接口列表同样如此 |

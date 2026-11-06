@@ -14,6 +14,20 @@ import com.openminis.app.agent.ToolLoopDetector
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserTabPool
 import io.github.nanomuse.browser.nmBrowserHandOver // nanoMuse
+import io.github.nanomuse.chat.ContextMaintenance // nanoMuse
+import io.github.nanomuse.chat.CompactHistory // nanoMuse
+import io.github.nanomuse.chat.CompactSummary // nanoMuse
+import io.github.nanomuse.chat.CompactSummaryIdleTimeoutException // nanoMuse
+import io.github.nanomuse.chat.CompactSummaryOutputException // nanoMuse
+import io.github.nanomuse.chat.ContextBudget // nanoMuse
+import io.github.nanomuse.chat.ContextEstimate // nanoMuse
+import io.github.nanomuse.chat.ContextCalibrationStore // nanoMuse
+import io.github.nanomuse.chat.ContextTrimming // nanoMuse
+import io.github.nanomuse.chat.ContextTrimStore // nanoMuse
+import io.github.nanomuse.chat.ContextUsageMeter // nanoMuse
+import io.github.nanomuse.chat.ContextErrors // nanoMuse
+import io.github.nanomuse.chat.CheckpointReplay // nanoMuse
+import io.github.nanomuse.chat.ContextTurns // nanoMuse
 import com.openminis.app.data.db.MessageEntity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Compress
@@ -23,7 +37,6 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Extension
 import com.openminis.app.data.BPETokenizer
-import com.openminis.app.data.ContextOffload
 import com.openminis.app.data.ContextPolicy
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.data.FileMentionIndex
@@ -70,6 +83,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive // nanoMuse
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -82,7 +96,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull // nanoMuse
 import kotlinx.coroutines.yield
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -125,32 +139,9 @@ class ChatViewModel(
          */
         internal const val MAX_COMPACT_LLM_CALLS = 6
 
-        /** Floor for the dynamic wall-clock timeout. */
-        internal const val COMPACT_TIMEOUT_BASE_MS = 90_000L
-
-        /**
-         * Added per 10k characters of transcript, so a long first compaction is
-         * not cut off by a limit tuned for a short one.
-         */
-        internal const val COMPACT_TIMEOUT_PER_10K_CHARS_MS = 30_000L
-
-        /**
-         * Hard ceiling. Deliberately under the providers' 10-minute
-         * readTimeout: past this point the run is aborted by us — with the lock
-         * released and a clear message — rather than sitting on a socket that
-         * may never answer.
-         */
-        internal const val COMPACT_TIMEOUT_MAX_MS = 300_000L
-
-        /**
-         * Wall-clock budget for compacting a transcript of [transcriptChars].
-         * Grows with input so long histories get room, capped so nothing can
-         * hang indefinitely.
-         */
-        internal fun compactTimeoutMsFor(transcriptChars: Int): Long {
-            val growth = (transcriptChars / 10_000L) * COMPACT_TIMEOUT_PER_10K_CHARS_MS
-            return (COMPACT_TIMEOUT_BASE_MS + growth).coerceAtMost(COMPACT_TIMEOUT_MAX_MS)
-        }
+        // nanoMuse: OpenMinis 1.15 observes stream activity; this single deadline
+        // bounds every segment together, rather than cancelling a healthy stream at 150s.
+        internal const val COMPACT_MAX_TOTAL_MS = 900_000L
 
         /**
          * Should a failed summary attempt be retried by splitting the input in
@@ -166,7 +157,11 @@ class ChatViewModel(
          * what produced the 15-20 minute apparent hang.
          */
         internal fun shouldSplitOnError(error: Throwable): Boolean {
+            // nanoMuse: silence, empty output and truncated output are not oversized input.
+            if (error is CompactSummaryIdleTimeoutException || error is CompactSummaryOutputException) return false
             if (error is CancellationException) return false
+            // nanoMuse: invalid request parameters do not improve when the input is halved.
+            if (ContextErrors.isParameterRejection(error)) return false
             // nanoMuse: a content check saying no (the relay's `content_rejected`, a provider's
             // `DataInspectionFailed`) is about the words, not the size; halving sends the same
             // words twice, and one long chat was refused two hundred times in an hour that way.
@@ -415,7 +410,6 @@ class ChatViewModel(
          * Mirrors iOS AIChatViewModel.maxAgentTurns.
          */
         private const val MAX_AGENT_TURNS = 200
-        private const val MIN_MAX_TOKENS = 1024
         /**
          * Hard ceiling on max_tokens we ever send to a provider, regardless
          * of what the model itself claims. Some models advertise 128K+
@@ -456,7 +450,6 @@ class ChatViewModel(
          * I/O so it can answer follow-ups that need verbatim detail rather than
          * the summary's distilled form. Mirrors iOS `compactKeepRecentUserTurns`.
          */
-        private const val COMPACT_KEEP_RECENT_USER_TURNS = 3
         /// Max per-tool-call retained `accumulated` JSON snapshots from
         /// `ToolInputDelta`. Drained on preflight failure for diagnosis.
         private const val TOOL_INPUT_CHUNK_RING_MAX = 10
@@ -1133,6 +1126,8 @@ class ChatViewModel(
         val job = compactJob ?: return
         if (!job.isActive) return
         AppLogger.info(TAG, "[Compact] cancelled by user")
+        // nanoMuse: in-loop cancellation must also finalize the active bubble and resume state (#719).
+        if (_isStreaming.value) cancelStream()
         job.cancel(CancellationException("compact cancelled by user"))
     }
 
@@ -1156,6 +1151,12 @@ class ChatViewModel(
     private var streamJob: Job? = null
     private var currentProvider: LLMProvider? = null
     private var currentModel: LLMModel? = null
+
+    // nanoMuse: model-scoped calibration survives Continue and process restart. The request
+    // budget below is refreshed before each provider call, including model-group fallback.
+    private val nmCalibrationStore by lazy { ContextCalibrationStore(context) }
+    private var nmHistoryBudget: ContextBudget.Plan? = null
+    private var nmHistoryCalibration = ContextEstimate.Calibration()
 
     /**
      * Does the CURRENTLY RESOLVED main model natively consume image pixels?
@@ -1601,11 +1602,15 @@ class ChatViewModel(
     /** Live-filtered candidate list. Combines the index's [FileMentionIndex.entries]
      * with [mentionFilter] so matches refresh as the user types and as the
      * background scan emits more entries. Capped at 50 like iOS. */
+    // nanoMuse: online devices share the file menu, only for a leading mention.
     val mentionEntries: StateFlow<List<FileMentionIndex.Entry>> = combine(
-        fileMentionIndex.entries,
-        _mentionFilter,
-    ) { _, filter -> fileMentionIndex.matches(filter, limit = 50) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        fileMentionIndex.entries, _mentionFilter, _mentionAnchor, _inputText, io.github.nanomuse.hub.Hub.devices,
+    ) { _, filter, anchor, text, devices ->
+        io.github.nanomuse.sync.DeviceMentionMenu.entries(
+            text, anchor, filter, devices.filter { it.id != io.github.nanomuse.hub.Hub.deviceId(context) },
+            fileMentionIndex.matches(filter, limit = 50),
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val isMentionScanning: StateFlow<Boolean>
         get() = fileMentionIndex.isScanning
@@ -1680,20 +1685,28 @@ class ChatViewModel(
      *      on Android — persisted by the group editor but never consulted at
      *      runtime.
      */
-    private fun effectiveContextWindowTokens(): Int? {
+    // nanoMuse: resolve live overrides only for the route receiving this request. A temporary
+    // Cloud retry or group fallback must not borrow the previous provider's model window.
+    private fun nmResolvedModel(provider: LLMProvider): LLMModel =
+        if (provider === currentProvider) {
+            providerRepository.config.value.modelEntries.find {
+                it.id == _activeEntryId.value && it.model.id == provider.model.id
+            }?.model ?: provider.model
+        } else provider.model
+
+    private fun effectiveContextWindowTokens(provider: LLMProvider? = currentProvider): Int? {
         val config = providerRepository.config.value
-        val liveModel = _activeEntryId.value
-            ?.let { id -> config.modelEntries.find { it.id == id }?.model }
-            ?: currentModel
-        val window = liveModel?.contextWindowTokens ?: return null
+        val liveModel = provider?.let { nmResolvedModel(it) } ?: currentModel ?: return null
+        val window = liveModel.contextWindowTokens
         val groupLimit = _selectedGroupId.value
             ?.let { gid -> config.modelGroups.find { it.id == gid }?.contextLimitTokens }
             ?.takeIf { it > 0 }
         return if (groupLimit != null) minOf(window, groupLimit) else window
     }
 
+    // nanoMuse: the usage sheet follows refreshed endpoint metadata and live overrides.
     val currentModelMaxOutputTokens: Int?
-        get() = currentModel?.maxOutputTokens
+        get() = (currentProvider?.let(::nmResolvedModel) ?: currentModel)?.maxOutputTokens
 
     // ── Session token usage (iOS parity: TokenUsageSheet data) ─────────────
 
@@ -2195,7 +2208,8 @@ class ChatViewModel(
         // tuned for a short one. Measured on the same truncated transcript the
         // request will carry, not the raw history.
         val transcriptChars = buildConversationTextForSummary(toCompact).length
-        val timeoutMs = compactTimeoutMsFor(transcriptChars)
+        // nanoMuse: the idle clock lives in CompactSummary.collect; total covers all splits.
+        val timeoutMs = COMPACT_MAX_TOTAL_MS
         compactCallsIssued.set(0)
         _compactProgress.value = CompactProgress(
             startedAtMs = System.currentTimeMillis(),
@@ -2228,13 +2242,20 @@ class ChatViewModel(
                 // including every split segment. Without it the only ceiling was
                 // the provider's 10-minute readTimeout multiplied by however
                 // many sequential segments the split produced.
-                val summary = withTimeout(timeoutMs) {
+                // nanoMuse: only our own deadline returns null; provider/parent timeouts
+                // retain their cause instead of being reported as a 900-second timeout.
+                val summary = (withTimeoutOrNull(timeoutMs) {
                     generateCompactSummaryWithSplitting(
                         messages = toCompact,
                         previousSummary = existing,
                         depth = 0,
+                        summaryProvider = provider,
+                        // nanoMuse: Continue reminders carry no new task and cannot replace
+                        // the actual latest user request when constructing a checkpoint.
+                        activeTask = if (allowDuringProcessing) history.lastOrNull(ContextTurns::isUserRequest)
+                            ?.let { CompactSummary.activeTaskReference(it) } else null,
                     )
-                }.trim()
+                } ?: throw io.github.nanomuse.chat.CompactSummaryDeadlineException()).trim()
                 if (summary.isEmpty()) {
                     withContext(Dispatchers.Main) {
                         appendSystemInfo("Compaction produced no output — try again later.", "compact")
@@ -2256,23 +2277,14 @@ class ChatViewModel(
                 // (AIChatViewModel+Compaction.swift:644-657). Walk back from
                 // the original anchorIdx until we find an entry whose id is
                 // both non-empty AND present in rawDbIds.
-                val rawDbIds: Set<String> = try {
-                    chatRepository.dao.loadMessages(sid).map { it.id }.toSet()
-                } catch (e: Exception) {
-                    Log.w(TAG, "[Compact] loadMessages for raw-id verify failed: ${e.message}")
-                    emptySet()
-                }
-                val verifiedAnchorIdx: Int = if (rawDbIds.isEmpty()) {
-                    // DB read failed; trust the in-memory walk-back result.
-                    anchorIdx
-                } else {
-                    var i = anchorIdx
-                    while (i >= 0) {
-                        val id = history[i].dbMessageId
-                        if (!id.isNullOrEmpty() && id in rawDbIds) break
-                        i -= 1
-                    }
-                    i
+                // nanoMuse: verify the checkpoint anchor against durable messages. A failed
+                // read aborts this summary instead of committing an unverified replacement.
+                val rawDbIds = chatRepository.dao.loadMessages(sid).map { it.id }.toSet()
+                var verifiedAnchorIdx = anchorIdx
+                while (verifiedAnchorIdx >= 0) {
+                    val id = history[verifiedAnchorIdx].dbMessageId
+                    if (!id.isNullOrEmpty() && id in rawDbIds) break
+                    verifiedAnchorIdx -= 1
                 }
                 if (verifiedAnchorIdx < 0) {
                     Log.w(TAG, "[Compact] No agentHistory entry has a DB-persisted dbMessageId; aborting")
@@ -2309,10 +2321,19 @@ class ChatViewModel(
                     lastCompactedMessageId = lastCompactedDbId,
                     version = 2,
                 )
-                runCatching { chatRepository.dao.insertCompactMarker(marker) }
-                    .onFailure {
-                        Log.w(TAG, "Failed to persist compact marker: ${it.message}")
+                // nanoMuse: install only a complete, smaller checkpoint, and only after its
+                // marker is durable. Failed writes must leave the previous history usable.
+                val beforeSize = ContextEstimate.request(effectiveAgentHistory())
+                val candidate = dropOrphanedToolParts(effectiveAgentHistoryUncounted(summary, marker))
+                val afterSize = ContextEstimate.request(candidate)
+                if (afterSize >= beforeSize) {
+                    AppLogger.info(TAG, "[Compact] checkpoint rejected: before=$beforeSize after=$afterSize")
+                    withContext(Dispatchers.Main) {
+                        appendSystemInfo(context.getString(R.string.nm_context_compact_no_gain), "compact")
                     }
+                    return@launch
+                }
+                chatRepository.dao.insertCompactMarker(marker)
                 _compactSummary.value = summary
                 // Keep the marker in memory so effectiveAgentHistory() can
                 // resolve the boundary on the very next outgoing turn.
@@ -2377,7 +2398,17 @@ class ChatViewModel(
                     )
                 }
                 compactSucceeded = true
-            } catch (e: TimeoutCancellationException) {
+            } catch (e: CompactSummaryIdleTimeoutException) {
+                // nanoMuse: distinguish a silent stream from the absolute run deadline.
+                timedOut = true
+                withContext(Dispatchers.Main) {
+                    appendSystemInfo(
+                        context.getString(R.string.nm_context_compact_idle_timeout,
+                            (e.timeoutMs / 1000L).toInt(), compactCallsIssued.get()),
+                        "compact",
+                    )
+                }
+            } catch (e: io.github.nanomuse.chat.CompactSummaryDeadlineException) {
                 // [T-android-compact-runaway] MUST precede the CancellationException
                 // arm — TimeoutCancellationException extends it, so the generic
                 // re-throw would otherwise swallow our own timeout and surface it
@@ -2388,11 +2419,22 @@ class ChatViewModel(
                 Log.w(TAG, "[Compact] timed out after ${elapsed}s ($calls model call(s) issued)")
                 withContext(Dispatchers.Main) {
                     appendSystemInfo(
-                        text = "Compaction timed out after ${elapsed}s " +
-                            "($calls model call(s) attempted). The model may be slow or " +
-                            "rate-limited — you can try compacting again.",
+                        // nanoMuse: report timeout separately from capacity exhaustion (#719).
+                        text = context.getString(R.string.nm_context_compact_timeout, elapsed, calls),
                         iconKind = "compact",
                     )
+                }
+            } catch (e: CompactSummaryOutputException) {
+                // nanoMuse: failed summaries leave the previous checkpoint intact.
+                withContext(Dispatchers.Main) {
+                    appendSystemInfo(context.getString(R.string.nm_context_compact_incomplete), "compact")
+                }
+            } catch (e: TimeoutCancellationException) {
+                // nanoMuse: a provider-local deadline is not our 900s deadline; parent
+                // cancellation still propagates without a misleading completion notice.
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                withContext(Dispatchers.Main) {
+                    appendSystemInfo(context.getString(R.string.nm_context_compact_incomplete), "compact")
                 }
             } catch (e: CancellationException) {
                 // User-initiated (cancelCompact) or scope teardown. Tell the
@@ -2573,7 +2615,11 @@ class ChatViewModel(
      * Emits a one-shot [requestBudgetEvent] for the UI Snackbar so the
      * user knows older images were compacted into placeholders.
      */
-    private fun applyRequestImageBudget(messages: List<LLMMessage>): List<LLMMessage> {
+    // nanoMuse: estimates use a preview with no spillover writes or user notifications (#719).
+    private fun applyRequestImageBudget(
+        messages: List<LLMMessage>,
+        preview: Boolean = false,
+    ): List<LLMMessage> {
         // Collect every image in chronological order so the planner can
         // walk in reverse and protect the most recent images.
         // nanoMuse: `screenshot` marks a tool-result image (a screen the agent took), which the
@@ -2633,7 +2679,7 @@ class ChatViewModel(
             val existing = ref.image.linuxPath
             if (existing != null) {
                 resolvedPaths[id] = existing
-            } else if (attachmentsRoot != null) {
+            } else if (attachmentsRoot != null && !preview) { // nanoMuse: measuring must not write images (#719).
                 resolvedPaths[id] = ImageBudget.ensureSpillover(
                     attachmentsRoot, ref.image.data, ref.image.mimeType,
                 )
@@ -2676,11 +2722,13 @@ class ChatViewModel(
             mutated[mi] = msg.copy(contentParts = newParts)
         }
 
-        _requestBudgetEvent.tryEmit(plan)
-        AppLogger.info(
-            TAG,
-            "applyRequestImageBudget: dropped=${plan.droppedCount}/${plan.totalCount} keptBytes=${plan.keptBytes}B elidedBytes=${plan.elidedBytes}B",
-        )
+        if (!preview) { // nanoMuse: a size check is not a new image-budget event (#719).
+            _requestBudgetEvent.tryEmit(plan)
+            AppLogger.info(
+                TAG,
+                "applyRequestImageBudget: dropped=${plan.droppedCount}/${plan.totalCount} keptBytes=${plan.keptBytes}B elidedBytes=${plan.elidedBytes}B",
+            )
+        }
         return mutated
     }
 
@@ -2693,22 +2741,25 @@ class ChatViewModel(
     private fun effectiveAgentHistory(): List<LLMMessage> =
         dropOrphanedToolParts(effectiveAgentHistoryUncounted())
 
-    private fun effectiveAgentHistoryUncounted(): List<LLMMessage> {
-        val summary = _compactSummary.value
-        val marker = _cachedLatestMarker
+    // nanoMuse: explicit candidates let compaction validate a replacement before committing it.
+    private fun effectiveAgentHistoryUncounted(
+        summary: String? = _compactSummary.value,
+        marker: CompactMarkerEntity? = _cachedLatestMarker,
+    ): List<LLMMessage> {
         // No compact in play → return full history untouched.
         if (summary.isNullOrBlank() || marker == null) return agentHistory.toList()
 
         val summaryWrappedText = "<context-summary>\n" +
             "The following is a summary of the earlier conversation that was compacted to save context space.\n" +
-            "Treat it as background context only. The user's most recent message (below or in the next turn) takes precedence — if it changes the task, the goal, or any numbers/scope, follow the new instruction and do not resume the old plan from this summary. Do not re-run discovery (reading memory, scanning skills, re-reading files) unless the new instruction requires it.\n\n" +
+            // nanoMuse: the checkpoint can carry current work across an in-loop compaction.
+            "Completed work is background. Resume only the explicitly active task if it still agrees with the latest user request. New user instructions take precedence; never revive completed, cancelled or superseded work. Avoid repeating tools whose results are already available.\n\n" +
             summary +
             "\n</context-summary>"
 
         // ─── v2 markers (id-only anchor model) ─────────────────────────
         //
         // anchor = lastCompactedMessageId. What we send to the model:
-        //   1. last [COMPACT_KEEP_RECENT_USER_TURNS] user-text turns BEFORE
+        //   1. budgeted recent user-text turns BEFORE
         //      anchor (inclusive of anchor) — recent verbatim warm-up
         //   2. the summary, INLINED as a `<context-summary>` text part
         //      prepended to the first user message AFTER anchor (preserves
@@ -2730,113 +2781,49 @@ class ChatViewModel(
                 return agentHistory.toList()
             }
 
-            // Step 1: walk back from anchor collecting user-text turns. Stop
-            // when EITHER we've collected N user-text turns OR including the
-            // next turn would push preAnchor over 100 messages. Decisions
-            // happen only at user-message boundaries so we never split a
-            // user/assistant/tool round in half (which would orphan a
-            // tool_use with no matching tool_result).
-            //
-            // [T-compact-preanchor-prune, port iOS 8b76cd74]
-            val keepN = COMPACT_KEEP_RECENT_USER_TURNS
-            val preAnchorCap = 100
-            val walkBack = walkBackUserTurnsBounded(
-                anchorIdx = anchorIdx,
-                maxUserTextTurns = keepN,
-                maxMessages = preAnchorCap,
+            // nanoMuse: budget whole optional replay turns after charging the checkpoint,
+            // fixed instructions and all post-anchor messages. No 100-message cutoff or
+            // silent removal of >1k tool results from the active task.
+            val postAnchor = agentHistory.drop(anchorIdx + 1)
+            // nanoMuse: an internal Continue reminder does not make the real request optional.
+            val hasNewUser = postAnchor.any(ContextTurns::isUserRequest)
+            val plan = nmHistoryBudget ?: ContextBudget.forModel(
+                effectiveContextWindowTokens() ?: 128_000,
+                currentProvider?.let { it.effectiveMaxOutputTokens(it.model) } ?: 16_384,
             )
-            val priorIdxResolved: Int? = walkBack.priorIdx
-            val priorIdx = walkBack.priorIdx ?: (anchorIdx + 1) // empty preAnchor sentinel
-            if (walkBack.stopReason != "userTextTargetMet") {
-                AppLogger.info(TAG, "[CompactDiag] eAH v2 walkBack stopped: reason=${walkBack.stopReason} priorIdx=$priorIdx userTextTurnsFound=${walkBack.userTextTurnsFound} preAnchorMsgs=${walkBack.messageCount}")
+            val reserved = nmHistoryCalibration.estimate(ContextEstimate.request(
+                postAnchor + LLMMessage(LLMMessage.Role.USER, summaryWrappedText),
+                imageTokens = BPETokenizer::countImageTokens,
+            ))
+            val replayBudget = plan.replayBudget(reserved)
+            val wholeTurns = CompactHistory.retainRecentTurns(
+                agentHistory.subList(0, anchorIdx + 1),
+                maxTokens = replayBudget,
+                keepNewestTurn = !hasNewUser,
+                // nanoMuse: a manual anchor can separate a call from its uncovered result.
+                requiredToolIds = CompactHistory.externalToolResultIds(postAnchor),
+            ) { messages ->
+                nmHistoryCalibration.estimate(ContextEstimate.request(
+                    messages, imageTokens = BPETokenizer::countImageTokens,
+                ))
             }
-
-            // PRE-ANCHOR PRUNE (tool-heavy session fix):
-            // The walk-back-N-user-text strategy pulls in everything between
-            // the Nth-last and last user-text turn — in a heavy tool-call
-            // session that can be many messages of tool_result / tool_use,
-            // tens of thousands of tokens that the summary already covers.
-            // Drop any tool_result > 1000 chars in the preAnchor slice and
-            // strip the matching tool_use part (same id) from the assistant
-            // message so the model never sees a dangling tool_use/result.
-            val preAnchorRaw: List<LLMMessage> =
-                if (priorIdx <= anchorIdx) agentHistory.subList(priorIdx, anchorIdx + 1).toList()
-                else emptyList()
-
-            val droppedToolIds = mutableSetOf<String>()
-            var droppedToolResultCount = 0
-            for (msg in preAnchorRaw) {
-                for (part in msg.contentParts) {
-                    if (part is AgentContentPart.ToolResult && part.content.length > 1000) {
-                        droppedToolIds.add(part.id)
-                        droppedToolResultCount += 1
-                    }
-                }
+            // nanoMuse: the checkpoint covers the old steps of a very long single task.
+            // Replaying its entire tool chain would undo the space the summary recovered.
+            val recent = CheckpointReplay.retainCovered(wholeTurns, replayBudget) { messages ->
+                nmHistoryCalibration.estimate(ContextEstimate.request(
+                    messages, imageTokens = BPETokenizer::countImageTokens,
+                ))
             }
+            val result = recent.toMutableList()
 
-            val preAnchorPruned: MutableList<LLMMessage> = ArrayList(preAnchorRaw.size)
-            for (msg in preAnchorRaw) {
-                if (msg.contentParts.isEmpty()) {
-                    // Plain text-only message — nothing to prune.
-                    preAnchorPruned.add(msg)
-                    continue
-                }
-                val kept = msg.contentParts.filter { part ->
-                    when (part) {
-                        is AgentContentPart.ToolUse -> !droppedToolIds.contains(part.id)
-                        is AgentContentPart.ToolResult -> !droppedToolIds.contains(part.id)
-                        else -> true
-                    }
-                }
-                if (kept.isEmpty()) continue // skip empty shells
-                preAnchorPruned.add(msg.copy(contentParts = kept))
-            }
-
-            if (droppedToolResultCount > 0) {
-                AppLogger.info(TAG, "[CompactDiag] eAH v2 preAnchor prune: dropped $droppedToolResultCount toolResult(>1kc) + paired toolUse, ${preAnchorRaw.size - preAnchorPruned.size} messages emptied; pruned slice=${preAnchorPruned.size}")
-            }
-
-            // ROLE ALIGNMENT: the API requires the first message to be `user`.
-            // After clamp (cap may land on assistant) and after prune (the
-            // head user may have been emptied), peel any leading non-user
-            // messages so preAnchor starts on a user turn.
-            while (preAnchorPruned.isNotEmpty() && preAnchorPruned.first().role != LLMMessage.Role.USER) {
-                preAnchorPruned.removeAt(0)
-            }
-
-            // Step 2 & 3: copy the lookback window (post-prune), then splice
-            // in the summary as parts[0] of the first post-anchor user msg.
-            val result = mutableListOf<LLMMessage>()
-            result.addAll(preAnchorPruned)
-
-            val postAnchor = if (anchorIdx + 1 < agentHistory.size) {
-                agentHistory.subList(anchorIdx + 1, agentHistory.size)
-            } else {
-                emptyList()
-            }
-
-            // DIAG: explain how the slice was sized using post-prune /
-            // post-alignment counts so the log reflects what actually
-            // reaches the model.
-            val preAnchorRawCount = maxOf(0, anchorIdx - priorIdx + 1)
-            val priorIdxSource =
-                if (priorIdxResolved == null) "fallback=empty(<$keepN user-text turns before anchor or cap hit)"
-                else "userTextWalkBack(N=$keepN)"
-            AppLogger.info(TAG, "[CompactDiag] eAH v2 slice: priorIdx=$priorIdx anchorIdx=$anchorIdx agentHistory.size=${agentHistory.size} → preAnchorRaw=$preAnchorRawCount preAnchorSent=${preAnchorPruned.size} postAnchor=${postAnchor.size} summaryChars=${summary.length} priorIdxSource=$priorIdxSource markerId=${marker.id.take(8)}")
-
-            val firstUserOffset = postAnchor.indexOfFirst { it.role == LLMMessage.Role.USER }
+            val firstUserOffset = postAnchor.indexOfFirst(ContextTurns::isUserRequest)
             if (firstUserOffset >= 0) {
                 if (firstUserOffset > 0) {
                     result.addAll(postAnchor.subList(0, firstUserOffset))
                 }
                 val target = postAnchor[firstUserOffset]
-                // Prepend `<context-summary>...` to the user content. We
-                // edit `content` directly because Android LLMMessage uses
-                // `content: String` as the canonical text payload; any
-                // contentParts the message also carries get preserved.
-                val injected = target.copy(
-                    content = summaryWrappedText + "\n\n" + target.content,
-                )
+                // nanoMuse: providers read structured parts when present, so inject there too (#719).
+                val injected = CompactHistory.prependSummary(target, summaryWrappedText)
                 result.add(injected)
                 if (firstUserOffset + 1 < postAnchor.size) {
                     result.addAll(postAnchor.subList(firstUserOffset + 1, postAnchor.size))
@@ -3100,34 +3087,9 @@ class ChatViewModel(
      * output bodies so we stay well under any context window. Mirrors iOS
      * `buildConversationTextForSummary`.
      */
-    private fun buildConversationTextForSummary(history: List<LLMMessage>): String = buildString {
-        for (msg in history) {
-            val role = msg.role.name.lowercase()
-            val text = msg.content.take(500)
-            if (text.isNotEmpty()) {
-                append(role).append(": ").append(text).append('\n')
-            }
-            for (part in msg.contentParts) {
-                when (part) {
-                    is AgentContentPart.Text -> {
-                        append(role).append(": ").append(part.text.take(500)).append('\n')
-                    }
-                    is AgentContentPart.ToolUse -> {
-                        val preview = part.input.toString().take(200)
-                        append(role).append(" [tool:").append(part.name).append("]: ")
-                            .append(preview).append('\n')
-                    }
-                    is AgentContentPart.ToolResult -> {
-                        append(role).append(" [result:").append(part.name).append("]: ")
-                            .append(part.content.take(500)).append('\n')
-                    }
-                    is AgentContentPart.ImageData -> {
-                        append(role).append(" [image: ").append(part.mimeType).append("]\n")
-                    }
-                }
-            }
-        }
-    }
+    // nanoMuse: quote transcript records once, preserve user text, preview large tool bodies.
+    private fun buildConversationTextForSummary(history: List<LLMMessage>): String =
+        CompactSummary.transcript(history)
 
     /**
      * Summarize [messages], recursively halving when a whole-input attempt
@@ -3145,14 +3107,13 @@ class ChatViewModel(
         messages: List<LLMMessage>,
         previousSummary: String? = null,
         depth: Int = 0,
+        summaryProvider: LLMProvider,
+        activeTask: String?,
     ): String {
-        val transcript = buildConversationTextForSummary(messages)
-        val conversationText = if (previousSummary.isNullOrBlank()) {
-            transcript
-        } else {
-            "Previous context summary:\n$previousSummary\n\n" +
-                "New conversation to merge:\n$transcript"
-        }
+        // nanoMuse: keep the previous checkpoint and current task explicit at every split.
+        val conversationText = CompactSummary.userMessage(
+            buildConversationTextForSummary(messages), previousSummary, activeTask,
+        )
         // [T-android-compact-runaway] Spend one unit of the run's call budget.
         // The depth cap bounds how DEEP the recursion goes; this bounds how
         // WIDE it gets in total, which is what actually determines wall-clock
@@ -3170,7 +3131,7 @@ class ChatViewModel(
             callsIssued = spent,
         )
         return try {
-            generateCompactSummary(conversationText)
+            generateCompactSummary(conversationText, summaryProvider, activeTask != null)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -3194,31 +3155,14 @@ class ChatViewModel(
                 TAG,
                 "[Compact] Splitting ${messages.size} messages into ${firstHalf.size} + ${secondHalf.size} (depth=$depth)",
             )
-            val summary1 = generateCompactSummaryWithSplitting(firstHalf, null, depth + 1)
-            val summary2 = generateCompactSummaryWithSplitting(secondHalf, null, depth + 1)
-            // Join the partials textually — the caller stores a single summary
-            // string, so segmentation stays invisible downstream.
-            //
-            // This used to be a THIRD LLM call that re-summarised the two
-            // partials. Dropped, because the size premise behind it does not
-            // hold: each segment's output is already hard-capped (see
-            // maxOutputTokens in generateCompactSummary), so two partials are
-            // nowhere near a context boundary and not worth another round-trip
-            // to shrink.
-            //
-            // It was also the one genuinely fragile step: the merge went
-            // through generateCompactSummary directly, with no depth and no
-            // split retry of its own, so a failure there threw away the
-            // segments that had just succeeded. The mechanism that exists to
-            // rescue a failing compaction ended its own happy path on an
-            // unprotected call. A string join cannot fail.
-            //
-            // What is lost is the merge prompt's cross-part editing (prefer the
-            // newer half, de-duplicate shared background). Accepted: the parts
-            // are already ordered oldest-first, which is the same signal in
-            // positional form, and each is internally coherent because it was
-            // summarised under the full system prompt.
-            summary1 + "\n\n" + summary2
+            // nanoMuse: feed the first checkpoint into the second segment, preserving
+            // previous summaries without duplicating them or spending an extra merge call.
+            val summary1 = generateCompactSummaryWithSplitting(
+                firstHalf, previousSummary, depth + 1, summaryProvider, activeTask,
+            )
+            generateCompactSummaryWithSplitting(
+                secondHalf, summary1, depth + 1, summaryProvider, activeTask,
+            )
         }
     }
 
@@ -3227,48 +3171,27 @@ class ChatViewModel(
      * summary. Throws on provider error so the splitter above can detect
      * context-too-large failures and retry with halved input.
      */
-    private suspend fun generateCompactSummary(conversationText: String): String {
-        // Wrap the transcript in explicit BEGIN/END framing so the model
-        // treats it as material to summarize rather than as a chat turn to
-        // continue. Mirrors iOS AIChatViewModel+Compaction.swift
-        // `compactUserMessage` construction. Without this wrapper, fast models
-        // (e.g. deepseek-v4-flash) tend to "answer" whatever the last user
-        // turn in the transcript said — producing a single-line continuation
-        // instead of a structured summary.
-        val userMessage = buildString {
-            append("Compact this conversation into a context summary:\n\n")
-            append(conversationText)
-            append("\n\n---\nEND OF CONVERSATION TO COMPACT.\n\n")
-            append(
-                "Now generate a structured context summary following the system prompt " +
-                    "instructions. Do NOT continue the conversation above — summarize it. " +
-                    "Write everything in past tense, framed as \"what was discussed / what " +
-                    "was done\", NOT as an ongoing goal or todo list."
-            )
-        }
-        val model = currentModel
-        val contextWindow = model?.contextWindow ?: 128_000
-        val estimatedInput = userMessage.length / 4
-        val maxOut = maxOf(1024, minOf(8192, contextWindow - estimatedInput))
-        val provider = currentProvider
-            ?: throw IllegalStateException("No LLM provider available for compaction")
-        val response = provider.sendMessage(
-            messages = listOf(
-                LLMMessage(role = LLMMessage.Role.USER, content = userMessage)
-            ),
-            systemPrompt = compactSummarySystemPrompt,
+    // nanoMuse: observe every chunk, including reasoning, instead of waiting for sendMessage.
+    private suspend fun generateCompactSummary(
+        userMessage: String,
+        provider: LLMProvider,
+        hasActiveTask: Boolean,
+    ): String {
+        val prompt = CompactSummary.systemPrompt(hasActiveTask)
+        val messages = listOf(LLMMessage(LLMMessage.Role.USER, userMessage))
+        val window = effectiveContextWindowTokens(provider) ?: provider.model.contextWindowTokens
+        val input = ContextEstimate.request(messages, prompt)
+        if (input >= window) throw LLMError.ProviderError("Compaction input exceeds context window")
+        val maxOut = minOf(8192, provider.effectiveMaxOutputTokens(provider.model), window - input)
+        return CompactSummary.collect(provider.streamMessage(
+            messages = messages,
+            systemPrompt = prompt,
             maxTokens = maxOut,
-            // Mirror iOS AIChatViewModel.swift:12926 — null lets the
-            // provider/model use its default. gpt-5.x family rejects any
-            // temperature != 1 with HTTP 400, and Android
-            // OpenAIProvider.buildRequestBody omits the field entirely when
-            // temperature is null.
             temperature = null,
             imageParts = emptyList(),
             tools = emptyList(),
             thinkingLevel = ThinkingLevel.OFF,
-        )
-        return response.text
+        ))
     }
 
     /**
@@ -3312,28 +3235,8 @@ class ChatViewModel(
     private fun isSegmentRetryableError(error: Throwable): Boolean =
         shouldSplitOnError(error)
 
-    /**
-     * Match provider error text against the substring set iOS
-     * `isContextTooLargeError` used before T-compact-segment-retry-any-error.
-     *
-     * NO LONGER gates segment retry — [isSegmentRetryableError] does, for the
-     * reasons documented there. Retained only for user-facing wording, where
-     * guessing wrong costs a less specific message rather than a failed
-     * compaction.
-     */
-    @Suppress("unused")
-    private fun isContextTooLargeError(error: Throwable): Boolean {
-        val desc = (error.message ?: error.toString()).lowercase()
-        return desc.contains("too many tokens") ||
-            desc.contains("context length") ||
-            desc.contains("max_tokens") ||
-            desc.contains("content is too long") ||
-            desc.contains("exceeds the model") ||
-            desc.contains("request too large") ||
-            desc.contains("prompt is too long") ||
-            desc.contains("token limit") ||
-            desc.contains("context window")
-    }
+    // nanoMuse: only explicit input overflow permits a history-changing recovery attempt.
+    private fun isContextTooLargeError(error: Throwable): Boolean = ContextErrors.isContextOverflow(error)
 
     /**
      * Consult [ContextPolicy] before sending. Returns true to proceed. The
@@ -3417,13 +3320,9 @@ class ChatViewModel(
         _showCompactBeforeSendPrompt.value = false
         val text = pendingSendText ?: return
         pendingSendText = null
-        viewModelScope.launch {
-            val ok = awaitCompaction()
-            if (!ok) {
-                AppLogger.warning(TAG, "[Context] pre-send compaction failed — sending anyway")
-            }
-            sendMessage(text, skipContextCheck = true)
-        }
+        // nanoMuse: the outgoing-request guard performs one bounded attempt after the new
+        // message is saved. A pre-send failure must not start the same attempt again (#719).
+        sendMessage(text, skipContextCheck = true)
     }
 
     /** Dialog action: send without compacting. */
@@ -3441,102 +3340,32 @@ class ChatViewModel(
         pendingSendText = null
     }
 
-    /**
-     * [T-android-auto-compact-inloop] What the in-loop context guard decided.
-     */
-    private enum class InLoopContextAction {
-        /** Under threshold — issue the next API call as normal. */
-        PROCEED,
-
-        /** History was compacted in place; re-run the iteration. */
-        COMPACTED,
-
-        /** Cannot recover — stop the turn safely and let the user resume. */
-        STOP,
-    }
-
-    /**
-     * [T-android-auto-compact-inloop] Max in-loop compactions per runAgentLoop.
-     * Bounds compact-thrash within a single turn; the MAX_AGENT_TURNS ceiling is
-     * never reset by compaction, so this is a second, tighter backstop.
-     */
-    private val maxInLoopCompactions = 3
-
-    /**
-     * [T-android-auto-compact-inloop] Re-evaluate [ContextPolicy] between agent
-     * iterations and act on it (iOS f70ac173).
-     *
-     * Why this exists: [checkContextBeforeSend] only runs at the SEND entry
-     * point. A single turn that fans out into many tool iterations can cross the
-     * compact/exhausted thresholds mid-loop, and offload alone cannot recover
-     * when the bulk is the model's own text — the turn then slams into the
-     * provider's context ceiling.
-     *
-     * Blocks until the compaction attempt settles, because the next API call
-     * must read the freshly-compacted history.
-     */
-    private suspend fun inLoopContextCheck(compactionsSoFar: Int): InLoopContextAction {
-        val tokens = _lastTurnContextTokens.value
-        if (tokens <= 0) return InLoopContextAction.PROCEED
-        val window = effectiveContextWindowTokens() ?: return InLoopContextAction.PROCEED
-        val policy = ContextPolicy.forContextWindow(window)
-        return when (policy.check(tokens, window)) {
-            ContextPolicy.CheckResult.OK -> InLoopContextAction.PROCEED
-
-            ContextPolicy.CheckResult.NEEDS_COMPACT -> {
-                if (compactionsSoFar >= maxInLoopCompactions) {
-                    AppLogger.warning(
-                        TAG,
-                        "[AutoCompact] still over threshold after $compactionsSoFar compaction(s) — stopping",
-                    )
-                    return InLoopContextAction.STOP
-                }
-                // NOTE: deliberately NOT gated on AutoCompactPrefs. That flag
-                // governs the SEND-time decision (compact silently vs. ask
-                // first) — mid-loop there is nobody to ask, and the alternative
-                // to compacting is aborting the user's turn outright. iOS makes
-                // the same call: its in-loop branch
-                // (AIChatViewModel.swift:4739) never consults
-                // autoCompactEnabled either.
-                AppLogger.info(
-                    TAG,
-                    "[AutoCompact] mid-loop compact #${compactionsSoFar + 1}: $tokens / $window tokens " +
-                        "(autoCompactPref=${com.openminis.app.data.AutoCompactPrefs.isEnabled()}, not a gate here)",
-                )
-                appendSystemInfo(
-                    text = "Context is filling up ($tokens / $window tokens) — compacting to continue.",
-                    iconKind = "compact",
-                )
-                val ok = awaitCompaction()
-                if (!ok) return InLoopContextAction.STOP
-                // [T-android-auto-compact-inloop] Invalidate the stale reading.
-                // `_lastTurnContextTokens` is only refreshed by a usage chunk,
-                // which needs a COMPLETED API call — but this path compacts and
-                // `continue`s without one. Leaving the pre-compaction value in
-                // place made the very next iteration read the same number and
-                // compact again immediately, burning the whole budget in
-                // seconds (observed on device: two compactions 3s apart, both
-                // logging an identical 66358). Zeroing it makes the guard
-                // PROCEED once, so the next real response measures the
-                // post-compaction size and the decision is made on fresh data.
-                _lastTurnContextTokens.value = 0
-                InLoopContextAction.COMPACTED
-            }
-
-            // EXHAUSTED is only ever returned by `exhaustedOnly` tiers — windows
-            // under 64K, where ContextPolicy sets compactThreshold = 0 precisely
-            // BECAUSE the window is too small for auto-compact to pay for itself
-            // (the summary plus re-appended recent turns would eat the headroom
-            // it just freed). Attempting a "rescue" compaction here would
-            // contradict the policy, so stop and let the user decide.
-            ContextPolicy.CheckResult.EXHAUSTED -> {
-                AppLogger.warning(
-                    TAG,
-                    "[AutoCompact] exhausted on a no-auto-compact tier ($tokens / $window) — stopping",
-                )
-                InLoopContextAction.STOP
-            }
+    // nanoMuse: local trims precede summaries, and an early failure can still leave room.
+    private suspend fun inLoopContextCheck(
+        maintenance: ContextMaintenance,
+        budget: ContextBudget.Plan,
+        measureContextTokens: () -> Int,
+        measureRawTokens: () -> Int,
+        prepareAfterSummary: suspend () -> Unit,
+    ): ContextMaintenance.Action {
+        val wasDeferred = maintenance.softDeferred
+        val action = maintenance.check(budget, measureContextTokens, measureRawTokens) { tokens, attempt ->
+            AppLogger.info(TAG, "[AutoCompact] attempt=$attempt estimated=$tokens " +
+                "window=${budget.window} hardLimit=${budget.hardLimit}")
+            appendSystemInfo(
+                context.getString(R.string.nm_context_compacting, tokens, budget.window), "compact",
+            )
+            val installed = awaitCompaction()
+            prepareAfterSummary()
+            installed
         }
+        val afterTokens = measureContextTokens()
+        _lastTurnContextTokens.value = afterTokens
+        if (!wasDeferred && maintenance.softDeferred && maintenance.attempts > 0 && action == ContextMaintenance.Action.PROCEED) {
+            appendSystemInfo(context.getString(R.string.nm_context_compact_deferred), "compact")
+            AppLogger.info(TAG, "[AutoCompact] deferred: estimated=$afterTokens window=${budget.window}")
+        }
+        return action
     }
 
     /**
@@ -3547,44 +3376,25 @@ class ChatViewModel(
      * loop cannot simply call it and continue — the next API call would read the
      * pre-compaction history and the guard would fire again immediately.
      */
+    // nanoMuse: cancelling the turn also cancels its summary; user cancellation never resumes work (#719).
     private suspend fun awaitCompaction(): Boolean =
         kotlinx.coroutines.suspendCancellableCoroutine { cont ->
             var resumed = false
+            val previousJob = compactJob
+            var attemptJob: Job? = null
             compactAll(allowDuringProcessing = true) { ok ->
-                // compactAll guarantees exactly one callback, but guard anyway:
-                // resuming a continuation twice throws.
                 if (!resumed) {
                     resumed = true
-                    if (cont.isActive) cont.resume(ok) { _, _, _ -> }
+                    if (attemptJob?.isCancelled == true) {
+                        cont.cancel(CancellationException("compaction cancelled"))
+                    } else if (cont.isActive) {
+                        cont.resume(ok) { _, _, _ -> }
+                    }
                 }
             }
+            attemptJob = compactJob?.takeIf { it !== previousJob }
+            cont.invokeOnCancellation { attemptJob?.cancel() }
         }
-
-    /**
-     * System prompt for the single-shot summarisation call. Matches iOS
-     * wording so cross-device summaries stay stylistically aligned.
-     */
-    private val compactSummarySystemPrompt: String = """
-        You are a context compaction engine. Your summary will REPLACE the original messages in the conversation context window. The agent will read your summary as past context, then proceed based on the user's NEXT message — your summary is background, not a standing work order. Write the summary in the same language the user used in the conversation.
-
-        MUST PRESERVE (never omit or shorten):
-        - All file paths, directory names, URLs, UUIDs, and identifiers — copy verbatim
-        - Commands executed and their outcomes (success/failure/output)
-        - What was requested and what was done (record as past events, not as ongoing goals)
-        - Key decisions made and their rationale
-        - Errors encountered and how they were resolved
-        - Important constraints, rules, or user preferences mentioned
-        - Any tool calls and their results that affect current state
-
-        STRUCTURE:
-        1. Start with a one-line description of what the conversation was about (use past tense — "User asked X, agent did Y", NOT "Goal: X").
-        2. Then a concise narrative of what happened, preserving technical details.
-        3. End with a "What had been done so far" section listing completed work — NOT a "todo" or "pending" list. Do not invent ongoing objectives or carry-over tasks from old turns; if the user wants to continue, they will say so in their next message.
-
-        PRIORITIZE recent context over older history — recent decisions and recent file/path references are most useful for continuity.
-
-        Do NOT translate or alter code snippets, file paths, identifiers, or error messages. Be concise but never lose information the agent needs.
-    """.trimIndent()
 
     // T203 part 2: these MUST be declared before `init { loadSession() }` below.
     // viewModelScope.launch defaults to Dispatchers.Main.immediate, which runs
@@ -3613,8 +3423,14 @@ class ChatViewModel(
         sessionId.substringAfter("__fld__", "").substringBefore("__grp__")
             .takeIf { it.isNotEmpty() }
 
-    /** The real session ID (same as sessionId for existing sessions, generated on first message for drafts). */
+    // nanoMuse: observe draft promotion so presence follows the ID used by completion events.
+    private val nmDisplayedSessionId = MutableStateFlow(sessionId)
+    val displayedSessionId: StateFlow<String> = nmDisplayedSessionId.asStateFlow()
     internal var realSessionId: String = if (isDraft) "" else sessionId
+        set(value) {
+            field = value
+            nmDisplayedSessionId.value = value.ifEmpty { sessionId }
+        }
 
     // nanoMuse: the first conversation — scripted opening, "what should I call
     // you?", then the name chooser. Logic lives in io.github.nanomuse.onboarding;
@@ -3951,6 +3767,9 @@ class ChatViewModel(
     }
 
     /** Ensure the session exists in the database. Called before first message. */
+    // nanoMuse: called only after device authentication, never persist protection against a draft key.
+    suspend fun ensureSessionForProtection(): String = ensureSession()
+
     private suspend fun ensureSession(): String {
         if (realSessionId.isNotEmpty()) return realSessionId
         val modelId = currentModel?.id ?: providerRepository.allVisibleEntries().firstOrNull()?.model?.id ?: "unknown"
@@ -5187,6 +5006,8 @@ class ChatViewModel(
         runCatching {
             java.io.File(context.filesDir, "browser_tabs/$sid.json").delete()
         }
+        // nanoMuse: invalidate completed and in-flight Hands notes before clearing this conversation.
+        io.github.nanomuse.hands.HandsRunMemory.shared.clear(sid)
         // Persist: drop messages + compact markers. Files (workspace,
         // attachments, offloads) intentionally retained.
         viewModelScope.launch {
@@ -5859,8 +5680,8 @@ class ChatViewModel(
                     // non-null excerpt. Reading _messages here is safe:
                     // we're in the finally block of the agent loop and
                     // the stream has already flushed its last delta.
-                    publishOverlayReplyExcerpt(activeSessionId)
-                    SessionActivityTracker.setInactive(activeSessionId)
+
+                    finishTrackedReply(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
                     AppLogger.info(TAG_STREAM, "$label streamJob FINALLY exit")
                 }
@@ -6470,16 +6291,75 @@ class ChatViewModel(
     fun nmTakeCountableTurn(): Boolean = nmCountableTurn.also { nmCountableTurn = false }
 
     fun sendMessage(text: String) {
-        // nanoMuse: "change your avatar to …" (and a pick while the options are
-        // up) is handled in the app, not by the model.
+        // nanoMuse: explicit device work is routed before any local model or avatar action.
+        if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
+                _attachments.value.isNotEmpty() || _pastedTexts.value.isNotEmpty(), _isCompacting.value)) return
+        if (_isStreaming.value) { enqueuePrompt(text); return }
         if (nmInterceptAvatar(text)) { nmCountableTurn = false; return }
-        // nanoMuse: "@Mac …" opens a turn for that device — the mention comes out of the text,
-        // a one-turn note sends the work there through nanomuse-pc (contract C7, rule 8).
-        val nmText = io.github.nanomuse.sync.DeviceMention.apply(context, realSessionId.ifEmpty { sessionId }, text)
-        // nanoMuse: during the first conversation the text goes to the model as
-        // it is; the model says what it meant in a `nanomuse-naming` block and
-        // nmAfterTurn moves the phase (see FirstConversation).
-        sendMessage(nmText, skipContextCheck = false)
+        sendMessage(text, skipContextCheck = false)
+    }
+
+    // nanoMuse: only the adapter touches upstream state; the lifecycle lives in RemoteChatBridge.
+    private val nmRemoteBridge: io.github.nanomuse.sync.RemoteChatBridge by lazy {
+        val host = object : io.github.nanomuse.sync.RemoteChatBridge.Host {
+            override val busy: Boolean get() = _isStreaming.value
+            override fun setBusy(value: Boolean) { _isStreaming.value = value }
+            override fun error(issue: io.github.nanomuse.sync.RemoteChatBridge.Issue, device: String) {
+                val resource = when (issue) {
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.AMBIGUOUS -> R.string.nm_remote_ambiguous
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.OFFLINE -> R.string.nm_remote_offline
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.ATTACHMENTS -> R.string.nm_remote_attachments
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.BUSY -> R.string.nm_remote_chat_busy
+                    io.github.nanomuse.sync.RemoteChatBridge.Issue.FAILED -> R.string.nm_hub_err_generic
+                }
+                _error.value = context.getString(resource, device)
+            }
+            override fun clearDraft() {
+                _error.value = null; _inputText.value = ""; _canResume.value = false
+            }
+            override fun restoreDraft(text: String) { if (_inputText.value.isEmpty()) _inputText.value = text }
+            override suspend fun session(): String = ensureSession()
+            override suspend fun user(sessionId: String, text: String) = nmAppendUserLine(sessionId, text)
+            override fun started(sessionId: String) {
+                SessionActivityTracker.setActive(sessionId) { nmRemoteBridge.cancel() }
+            }
+            override fun ended(sessionId: String, completed: Boolean) {
+                if (!completed) SessionActivityTracker.markReplyIncomplete(sessionId)
+                publishOverlayReplyExcerpt(sessionId)
+                SessionActivityTracker.setInactive(sessionId)
+            }
+            override fun show(id: String, task: io.github.nanomuse.sync.RemoteChatBridge.Task) {
+                val message = ChatMessage(id = "nm_remote_$id", role = "assistant", content = task.text,
+                    toolBlocks = task.blocks, isStreaming = true, isAwaitingModelResponse = task.blocks.size <= 1)
+                _messages.value = if (_messages.value.any { it.id == message.id }) _messages.value.map { if (it.id == message.id) message else it } else _messages.value + message
+            }
+            override suspend fun finish(sessionId: String, id: String, task: io.github.nanomuse.sync.RemoteChatBridge.Task) {
+                nmAppendAssistantLine(sessionId, task.text)
+                val savedId = _messages.value.lastOrNull()?.id
+                _messages.value = _messages.value.filterNot { it.id == "nm_remote_$id" }.map {
+                    if (it.id == savedId) it.copy(toolBlocks = task.blocks, error = if (task.failed) task.text else null) else it
+                }
+            }
+            override fun afterTurn() { nmSendNextQueued() }
+        }
+        io.github.nanomuse.sync.RemoteChatBridge(viewModelScope, host) { device, text, id ->
+            io.github.nanomuse.sync.RemoteTaskChat(context, device, text, id)
+        }
+    }
+
+    private fun nmSendNextQueued() {
+        if (_isStreaming.value || _promptQueue.value.isEmpty()) return
+        val next = _promptQueue.value.first()
+        _promptQueue.value = _promptQueue.value.drop(1)
+        _messages.value = _messages.value.filterNot { it.queuedPromptId == next.id }
+        val draft = _inputText.value
+        val draftAttachments = _attachments.value
+        _attachments.value = next.attachments
+        sendMessage(next.text)
+        if (_inputText.value.isEmpty() || _inputText.value == draft) {
+            _inputText.value = draft
+            _attachments.value = draftAttachments
+        }
     }
 
     // ─── nanoMuse: changing the face from the chat ─────────────────────────
@@ -7193,8 +7073,8 @@ class ChatViewModel(
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "send streamJob FINALLY exit")
                     }
@@ -7551,8 +7431,8 @@ class ChatViewModel(
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "retryLast streamJob FINALLY exit")
                     }
@@ -7675,13 +7555,14 @@ class ChatViewModel(
     /**
      * Compute max output tokens that fits within the remaining context window.
      * Logic mirrors iOS's dynamicMaxTokens():
-     *   result = min(provider.defaultMaxTokens, max(contextWindow - inputTokens, MIN_MAX_TOKENS))
+     *   result = min(provider.defaultMaxTokens, max(contextWindow - inputTokens, 1))
      *
      * @param provider The current LLM provider (carries defaultMaxTokens).
      * @param lastContextTokens API-reported input token count from the last call (0 = first call).
      */
     private fun dynamicMaxTokens(provider: LLMProvider, lastContextTokens: Int = 0): Int {
-        val model = currentModel ?: return minOf(GLOBAL_MAX_TOKENS_CEILING, provider.defaultMaxOutputTokens)
+        // nanoMuse: use the provider that will actually receive this request, including fallback.
+        val model = nmResolvedModel(provider)
         // Ceiling: min(global cap, model.maxOutputTokens-or-provider-default).
         // The global cap means we never send more than 128K regardless of
         // what the model claims it can output.
@@ -7691,299 +7572,18 @@ class ChatViewModel(
         // LLMModel.contextWindowTokens so the corrected Claude-1M / Gemini-1M
         // values apply here too, instead of the stale local "everything 200K"
         // copy that under-reported modern Claude/Gemini windows.
-        val contextWindow = model.contextWindowTokens
+        // nanoMuse: honor the user's configured group cap as well as the selected model.
+        val contextWindow = effectiveContextWindowTokens(provider) ?: model.contextWindowTokens
         if (contextWindow <= 0) return maxOutputCeiling
         val inputTokens = if (lastContextTokens > 0) lastContextTokens else 0
         val remaining = contextWindow - inputTokens
-        val clamped = maxOf(remaining, MIN_MAX_TOKENS)
+        // nanoMuse: never ask for more output than the remaining window can hold.
+        val clamped = maxOf(remaining, 1)
         val result = minOf(maxOutputCeiling, clamped)
         if (result < maxOutputCeiling) {
             android.util.Log.i(TAG, "dynamicMaxTokens: $result (remaining=$remaining, ceiling=$maxOutputCeiling, window=$contextWindow, input=$inputTokens, model=${model.id})")
         }
         return result
-    }
-
-    // ─── Context Window Offload ──────────────────────────────────────────────
-    //
-    // Mirrors iOS `AIChatViewModel.swift`:
-    //   - estimateContextTokens()        (line 7451)
-    //   - offloadContextIfNeeded()       (line 7481)
-    // Per-tool writers live in [com.openminis.app.data.ContextOffload].
-    //
-    // The agent loop calls [offloadContextIfNeeded] once per turn just before
-    // the next API call. When token usage crosses the policy threshold, large
-    // tool outputs in older messages are written to disk under
-    // `filesDir/minis-sessions/<sid>/offloads/tools/` and replaced in
-    // [agentHistory] by `[CONTEXT OFFLOADED] … <linux path>` stubs. The model
-    // can later `file_read` the path to retrieve the original content.
-    //
-    // Why this matters: without offloading, a session that runs many large
-    // shell tools fills the context window and either trips compact (lossy)
-    // or hits the model's context-exhausted error. Offload is lossless —
-    // the data still exists, just on disk instead of in-prompt.
-
-    /**
-     * Char-based fallback estimate when the API hasn't reported a token
-     * baseline yet (first call in a turn). Mirrors iOS line 7451.
-     *
-     * Uses ~3.5 chars per token for mixed text + adds the tokenizer's
-     * image-aware count for image bytes. Underestimates JSON-heavy tool
-     * inputs slightly but is adequate as a "should we offload" gate —
-     * offload itself uses precise [BPETokenizer.countTokens] per-part
-     * for the candidate ranking.
-     */
-    private fun estimateContextTokens(): Int {
-        var totalChars = 0
-        var imageTokens = 0
-        for (msg in agentHistory) {
-            for (part in msg.contentParts) {
-                when (part) {
-                    is AgentContentPart.Text -> totalChars += part.text.length
-                    is AgentContentPart.ToolUse -> totalChars += part.input.toString().length
-                    is AgentContentPart.ToolResult -> {
-                        totalChars += part.content.length
-                        part.imageData?.let { imageTokens += BPETokenizer.countImageTokens(it) }
-                    }
-                    is AgentContentPart.ImageData -> {
-                        imageTokens += BPETokenizer.countImageTokens(part.data)
-                    }
-                }
-            }
-        }
-        return (totalChars / 3.5).toInt() + imageTokens
-    }
-
-    /**
-     * Approximate token count for a single agent content part. Used to rank
-     * offload candidates by size. Matches iOS `BPETokenizer.countPartTokens`
-     * — text uses BPE, images use the grid-cell heuristic.
-     */
-    private fun countPartTokens(part: AgentContentPart): Int = when (part) {
-        is AgentContentPart.Text -> BPETokenizer.countTokens(part.text)
-        is AgentContentPart.ToolUse -> BPETokenizer.countTokens(part.input.toString())
-        is AgentContentPart.ToolResult -> {
-            BPETokenizer.countTokens(part.content) +
-                (part.imageData?.let { BPETokenizer.countImageTokens(it) } ?: 0)
-        }
-        is AgentContentPart.ImageData -> BPETokenizer.countImageTokens(part.data)
-    }
-
-    /**
-     * Offload candidate descriptor. `msgIdx` and `partIdx` index back into
-     * [agentHistory] so we can mutate the part in place after writing the
-     * stub to disk.
-     */
-    private data class OffloadCandidate(
-        val msgIdx: Int,
-        val partIdx: Int,
-        val tokens: Int,
-        val bytes: Int,
-        val toolId: String,
-        val toolName: String,
-    )
-
-    /**
-     * Walk [agentHistory], identify large tool outputs in the older
-     * (non-protected) message range, and offload the highest-token ones to
-     * disk until we're back under [ContextPolicy.offloadTarget]. Mirrors iOS
-     * `offloadContextIfNeeded(model:lastContextTokens:force:)` (line 7481).
-     *
-     * Protection rules (parity with iOS line 7535):
-     *   - Last 4 messages are never offloaded — the model needs them
-     *     verbatim to plan the current turn coherently.
-     *   - Already-offloaded parts (prefix [ContextOffload.OFFLOADED_PREFIX])
-     *     are skipped — second pass would rewrite the stub uselessly.
-     *
-     * Eligibility (parity with iOS lines 7556-7596):
-     *   - `ToolResult` with content > 500 chars OR image data > 1 KB
-     *   - `ToolUse` for `file_write` / `file_edit` whose `content` arg > 500 chars
-     *   - bare `ImageData` part > 1 KB
-     *
-     * Candidates are sorted by token count descending and offloaded greedily
-     * until current usage drops below [policy.offloadTarget] (or all
-     * candidates are exhausted). When [force] is true, all eligible
-     * candidates are offloaded regardless of remaining headroom — used by
-     * post-compact code paths to slim down the kept-tail aggressively.
-     */
-    private fun offloadContextIfNeeded(
-        contextWindow: Int,
-        lastContextTokens: Int,
-        force: Boolean = false,
-    ) {
-        val sid = activeSessionId
-        val policy = ContextPolicy.forContextWindow(contextWindow)
-
-        if (!force && policy.offloadThreshold == 0) {
-            // Small-window tier: offload disabled — UI surfaces "exhausted"
-            // when the user crosses the threshold. Nothing to do here.
-            return
-        }
-
-        val effectiveTokens =
-            if (lastContextTokens > 0) lastContextTokens else estimateContextTokens()
-
-        if (!force && effectiveTokens < policy.offloadThreshold) {
-            // Below threshold — no work needed. Caller logs at debug level
-            // via dynamicMaxTokens; we stay silent to keep logs readable.
-            return
-        }
-
-        val targetTokens = if (force) 0 else policy.offloadTarget
-        val beforeTokens = effectiveTokens
-        var currentTokens = effectiveTokens
-        val pct = (effectiveTokens.toLong() * 100 / contextWindow.coerceAtLeast(1)).toInt()
-        val remaining = contextWindow - beforeTokens
-
-        AppLogger.info(TAG, "━━━ Context Offload Triggered ━━━")
-        AppLogger.info(TAG, "  Window: $contextWindow tokens")
-        AppLogger.info(TAG, "  Before: $beforeTokens tokens ($pct% of window, ~$remaining remaining)")
-        if (force) {
-            AppLogger.info(TAG, "  Mode: FORCE — offloading all eligible candidates")
-        } else {
-            AppLogger.info(TAG, "  Threshold: ${policy.offloadThreshold} → Target: $targetTokens")
-            AppLogger.info(TAG, "  Need to free: ~${beforeTokens - targetTokens} tokens")
-        }
-        AppLogger.info(TAG, "  Agent history: ${agentHistory.size} messages")
-
-        val protectedCount = minOf(4, agentHistory.size)
-        val candidateUpper = agentHistory.size - protectedCount
-        AppLogger.info(TAG, "  Scanning messages 0..<$candidateUpper (last $protectedCount protected)")
-
-        val candidates = mutableListOf<OffloadCandidate>()
-        var skippedAlreadyOffloaded = 0
-        var skippedTooSmall = 0
-
-        for (msgIdx in 0 until candidateUpper) {
-            val msg = agentHistory[msgIdx]
-            for ((partIdx, part) in msg.contentParts.withIndex()) {
-                when (part) {
-                    is AgentContentPart.ToolResult -> {
-                        if (part.content.startsWith(ContextOffload.OFFLOADED_PREFIX)) {
-                            skippedAlreadyOffloaded++
-                            continue
-                        }
-                        val hasLargeContent = part.content.length > 500
-                        val hasLargeImage = (part.imageData?.size ?: 0) > 1024
-                        if (!hasLargeContent && !hasLargeImage) {
-                            skippedTooSmall++
-                            continue
-                        }
-                        val tokens = countPartTokens(part)
-                        val bytes = part.content.toByteArray(Charsets.UTF_8).size +
-                            (part.imageData?.size ?: 0)
-                        candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, bytes, part.id, part.name))
-                    }
-                    is AgentContentPart.ToolUse -> {
-                        if (part.name != "file_write" && part.name != "file_edit") continue
-                        val content = part.input.optString("content", "")
-                        if (content.length <= 500) continue
-                        val tokens = countPartTokens(part)
-                        val bytes = content.toByteArray(Charsets.UTF_8).size
-                        candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, bytes, part.id, part.name))
-                    }
-                    is AgentContentPart.ImageData -> {
-                        if (part.data.size <= 1024) {
-                            skippedTooSmall++
-                            continue
-                        }
-                        val tokens = countPartTokens(part)
-                        // Synthesize a tool id since bare images don't carry one.
-                        val synthId = "img${msgIdx}_$partIdx"
-                        candidates.add(OffloadCandidate(msgIdx, partIdx, tokens, part.data.size, synthId, "image"))
-                    }
-                    is AgentContentPart.Text -> Unit
-                }
-            }
-        }
-
-        candidates.sortByDescending { it.tokens }
-        val totalCandidateTokens = candidates.sumOf { it.tokens }
-        AppLogger.info(TAG, "  Candidates: ${candidates.size} parts (~$totalCandidateTokens tokens total)")
-        AppLogger.info(TAG, "  Skipped: $skippedAlreadyOffloaded already offloaded, $skippedTooSmall too small")
-
-        var offloadedCount = 0
-        var freedTokens = 0
-
-        for (candidate in candidates) {
-            if (currentTokens <= targetTokens) break
-
-            val msg = agentHistory[candidate.msgIdx]
-            val parts = msg.contentParts.toMutableList()
-            val part = parts[candidate.partIdx]
-            var linuxPath = ""
-
-            val newPart: AgentContentPart? = when (part) {
-                is AgentContentPart.ToolResult -> {
-                    if (part.content.length > 500) {
-                        linuxPath = ContextOffload.offloadContent(
-                            context, sid, part.content,
-                            toolId = part.id, toolName = part.name,
-                        )
-                    }
-                    val imgPath = part.imageData?.let { data ->
-                        if (data.size > 1024) {
-                            ContextOffload.offloadImage(
-                                context, sid, data,
-                                toolId = part.id,
-                                mimeType = part.imageMimeType ?: "image/png",
-                            )
-                        } else ""
-                    } ?: ""
-                    if (linuxPath.isEmpty()) linuxPath = imgPath
-                    val stub = ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath)
-                    part.copy(content = stub, imageData = null, imageMimeType = null)
-                }
-                is AgentContentPart.ToolUse -> {
-                    val content = part.input.optString("content", "")
-                    linuxPath = ContextOffload.offloadContent(
-                        context, sid, content,
-                        toolId = part.id, toolName = part.name,
-                    )
-                    val newInput = org.json.JSONObject(part.input.toString())
-                    newInput.put(
-                        "content",
-                        ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
-                    )
-                    part.copy(input = newInput)
-                }
-                is AgentContentPart.ImageData -> {
-                    linuxPath = ContextOffload.offloadImage(
-                        context, sid, part.data,
-                        toolId = candidate.toolId,
-                        mimeType = part.mimeType,
-                    )
-                    // Bare ImageData has no toolUseId pairing — replace with a
-                    // text part carrying the stub. Mirrors iOS line 7653.
-                    AgentContentPart.Text(
-                        ContextOffload.stub(candidate.tokens, candidate.bytes, linuxPath),
-                    )
-                }
-                is AgentContentPart.Text -> null
-            }
-
-            if (newPart == null) continue
-            parts[candidate.partIdx] = newPart
-            agentHistory[candidate.msgIdx] = msg.copy(contentParts = parts)
-
-            currentTokens -= candidate.tokens
-            freedTokens += candidate.tokens
-            offloadedCount++
-            val afterPct = (currentTokens.toLong() * 100 / contextWindow.coerceAtLeast(1)).toInt()
-            AppLogger.info(
-                TAG,
-                "  ✂ Offloaded #$offloadedCount: [${candidate.toolName}] id:${candidate.toolId.take(8)} ~${candidate.tokens} tokens (${candidate.bytes} bytes) → $linuxPath [now $currentTokens ($afterPct%)]",
-            )
-        }
-
-        if (offloadedCount > 0) {
-            val afterPct = (currentTokens.toLong() * 100 / contextWindow.coerceAtLeast(1)).toInt()
-            AppLogger.info(TAG, "━━━ Context Offload Complete ━━━")
-            AppLogger.info(TAG, "  Parts offloaded: $offloadedCount")
-            AppLogger.info(TAG, "  Tokens freed: ~$freedTokens")
-            AppLogger.info(TAG, "  Before: $beforeTokens/$contextWindow ($pct%)")
-            AppLogger.info(TAG, "  After:  $currentTokens/$contextWindow ($afterPct%)")
-            AppLogger.info(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        }
     }
 
     private suspend fun runAgentLoop(
@@ -8108,6 +7708,93 @@ class ChatViewModel(
 
         // Fallback state — mirrors iOS streamWithGroupFallback
         var currentProvider = provider
+        // nanoMuse: prepare one outbound view and use it for both measurement and sending.
+        // Original messages remain intact. Rebuilding the view on Continue reuses hashed files.
+        var contextEstimate = ContextEstimate.Calibration()
+        val usageMeter = ContextUsageMeter()
+        var calibrationKey: String? = null
+        var calibratedModel: String? = null
+        var preparedMessages: List<LLMMessage>? = null
+        var requestBudget = ContextBudget.forModel(0, 0)
+        var contextOverflowRetried = false
+        val contextMaintenance = ContextMaintenance()
+        val trimStore = ContextTrimStore(java.io.File(context.filesDir,
+            "minis-sessions/${realSessionId.ifEmpty { sessionId }}/offloads/tools"))
+
+        fun alignContextEstimate() {
+            val config = providerRepository.config.value
+            val entry = config.modelEntries.find { it.id == _activeEntryId.value }
+                ?.takeIf { it.model.id == currentProvider.model.id }
+            val instance = entry?.let { e -> config.instances.find { it.id == e.providerInstanceId } }
+            // Store only the hashed identity. An unbound one-off provider gets an isolated key.
+            val key = if (instance != null && this@ChatViewModel.currentProvider === currentProvider) {
+                "${instance.id}|${instance.providerType}|${instance.customBaseURL.orEmpty()}|" +
+                    "${instance.appendV1Suffix}|${instance.useResponsesAPI}"
+            } else "${currentProvider.javaClass.name}|${System.identityHashCode(currentProvider)}"
+            if (key != calibrationKey || calibratedModel != currentProvider.model.id) {
+                contextEstimate = nmCalibrationStore.load(key, currentProvider.model.id)
+                usageMeter.clear()
+                calibrationKey = key
+                calibratedModel = currentProvider.model.id
+                preparedMessages = null
+            }
+            nmHistoryCalibration = contextEstimate
+            val window = effectiveContextWindowTokens(currentProvider) ?: currentProvider.model.contextWindowTokens
+            val fixed = contextEstimate.estimate(ContextEstimate.request(
+                emptyList(), systemPrompt, agentTools,
+            ))
+            requestBudget = ContextBudget.forModel(window,
+                currentProvider.effectiveMaxOutputTokens(nmResolvedModel(currentProvider)), fixed)
+            nmHistoryBudget = requestBudget
+        }
+        fun rawTokens(messages: List<LLMMessage>): Int = ContextEstimate.request(
+            messages, systemPrompt, agentTools, imageTokens = BPETokenizer::countImageTokens,
+        )
+        fun measureRawTokens(): Int = rawTokens(preparedMessages ?:
+            applyRequestImageBudget(effectiveAgentHistory(), preview = true))
+        fun usageSnapshot(messages: List<LLMMessage>) = usageMeter.snapshot(
+            calibrationKey.orEmpty(), currentProvider.model.id, messages, systemPrompt, agentTools,
+            requestVariant = "${currentProvider.javaClass.name}|${_thinkingLevel.value}",
+        )
+        fun measureContextTokens(): Int {
+            alignContextEstimate()
+            val messages = preparedMessages ?: applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+            return usageMeter.estimate(usageSnapshot(messages), rawTokens(messages), contextEstimate)
+                .also { lastContextTokens = it }
+        }
+        fun measureProbeTokens(): Int = if (usageMeter.lastEstimateUsedAnchor) {
+            // A provider's measured prefix cannot be overruled by a lower raw heuristic.
+            lastContextTokens
+        } else measureRawTokens()
+        suspend fun prepareContext(force: Boolean = false) {
+            alignContextEstimate()
+            val source = if (force) preparedMessages ?: effectiveAgentHistory() else effectiveAgentHistory()
+            val messages = applyRequestImageBudget(source)
+            preparedMessages = messages
+            // nanoMuse: trial/pre-trim views must not invalidate known usage. Only the final
+            // prepared request is fingerprint-checked by measureContextTokens before dispatch.
+            val before = contextEstimate.estimate(rawTokens(messages))
+            if (force || before >= requestBudget.offloadThreshold) {
+                val tight = force || before >= requestBudget.hardLimit
+                val result = ContextTrimming.trim(
+                    messages,
+                    targetTokens = if (force) minOf(requestBudget.targetTokens, (before.toLong() * 3 / 4).toInt())
+                        else requestBudget.targetTokens,
+                    measure = { contextEstimate.estimate(rawTokens(it)) },
+                    spill = { trimStore.write(it) },
+                    options = ContextTrimming.Options(
+                        keepRecentIterations = if (tight) 1 else 3,
+                        allowCollapse = tight && (force || contextMaintenance.attempts > 0),
+                        allowOversizedLatestResult = tight,
+                    ),
+                )
+                preparedMessages = result.messages
+                if (result.afterTokens < result.beforeTokens) {
+                    AppLogger.info(TAG, "[ContextTrim] ${result.beforeTokens} -> ${result.afterTokens}; " +
+                        "stages=${result.steps.joinToString()}")
+                }
+            }
+        }
         val remainingFallbacks = fallbackProviders.toMutableList()
         val fallbackReasons = mutableListOf<String>()
 
@@ -8138,11 +7825,6 @@ class ChatViewModel(
         // which previously slapped a fake "200 turns hit" error on every
         // ordinary completion.
         var loopExitedNormally = false
-        // [T-android-auto-compact-inloop] How many times the in-loop guard has
-        // compacted during THIS runAgentLoop. Bounds compact-thrash: once the
-        // cap is hit, a still-over-threshold history stops the turn rather than
-        // compacting forever. Mirrors iOS maxInLoopCompactions.
-        var inLoopCompactions = 0
         // [T-android-empty-after-toolresult-reminder] One-shot guard for the
         // "<system-reminder> + retry one round" recovery when the server returns
         // an empty response right after a tool result. Fires at most once per
@@ -8156,135 +7838,106 @@ class ChatViewModel(
         // that emits text across several turns doesn't re-fire it and cut off
         // its own speech mid-sentence.
         var didStopStaleReadAloud = false
-        for (turn in 0 until MAX_AGENT_TURNS) {
+        // nanoMuse: the same divider/bubble transition applies after a fallback summary.
+        suspend fun resumeAfterCompaction() {
+            // nanoMuse: the next request reads the new summary; ContextMaintenance
+            // owns the attempt limit and prevents immediate soft-budget retries (#719).
+
+            // [T-android-inloop-compact-divider-order / GH#235] Seal the
+            // bubble this run has been writing into and continue in a
+            // FRESH one below the divider.
+            //
+            // `assistantId` is normally ONE bubble for the whole agent
+            // loop, appended before the loop starts. compactAll() then
+            // tail-appends the "N messages compacted" divider, which
+            // lands AFTER that still-streaming bubble — and the loop
+            // `continue`s and keeps appending thinking / tool blocks
+            // into it. So every token produced after the compaction
+            // rendered ABOVE the divider, reading as if fresh output had
+            // been filed into already-compacted history. That is the
+            // reported symptom.
+            //
+            // Starting a new bubble rather than moving the divider is
+            // plan B, matching the iOS fix (e65540b69) so both platforms
+            // carry the same semantics: output produced BEFORE the
+            // compaction genuinely is pre-compaction history and belongs
+            // above the line; output after it belongs below. It also
+            // leaves compactAll()/appendSystemInfo untouched, so the
+            // user-initiated `/compact` path — which anchors on a
+            // finished message and is already correct — takes zero
+            // regression risk.
+            //
+            // Reuses the seal+swap contract the queued-prompt injection
+            // path already established (see injectQueuedPromptsAsNewTurn
+            // and its call site): flush the finished bubble, clear the
+            // per-turn accumulators, and point `assistantId` at a fresh
+            // placeholder so subsequent writes target it.
+            val sealedId = assistantId
+            val freshAssistantId = "assistant_${System.currentTimeMillis()}"
+            withContext(Dispatchers.Main) {
+                // Flush whatever the sealed bubble accumulated and stop
+                // it streaming, so it renders as finished history.
+                updateAssistantMessage(
+                    sealedId,
+                    accumulatedText,
+                    false,
+                    allToolBlocks,
+                    isAwaitingModelResponse = false,
+                )
+                // If compaction fired before the bubble produced
+                // anything, it would render as an empty row stranded
+                // above the divider — drop it. Mirrors the iOS branch.
+                val sealed = _messages.value.firstOrNull { it.id == sealedId }
+                if (sealed != null &&
+                    sealed.content.isEmpty() &&
+                    sealed.toolBlocks.isEmpty()
+                ) {
+                    _messages.value = _messages.value.filterNot { it.id == sealedId }
+                    AppLogger.info(
+                        TAG,
+                        "[Compact] in-loop: dropped empty sealed bubble $sealedId",
+                    )
+                }
+                _messages.value = _messages.value + ChatMessage(
+                    id = freshAssistantId,
+                    role = "assistant",
+                    content = "",
+                    isStreaming = true,
+                    isAwaitingModelResponse = true,
+                    thinkingLevel = turnThinkingLevel,
+                )
+            }
+            clearStreamFlushState(sealedId)
+            if (_streamingById.value.containsKey(sealedId)) {
+                _streamingById.value = _streamingById.value - sealedId
+            }
+            // Same loop-scope reset the queued-prompt swap performs, so
+            // the new bubble starts empty and buildTurnParts slices only
+            // the new turn's blocks.
+            assistantId = freshAssistantId
+            accumulatedText = ""
+            allToolBlocks.clear()
+            allToolInputs.clear()
+            toolInputChunkRings.clear()
+            AppLogger.info(
+                TAG,
+                "[Compact] in-loop: sealed $sealedId, continuing in $freshAssistantId below the divider",
+            )
+        }
+        agentTurns@ for (turn in 0 until MAX_AGENT_TURNS) {
             // Sanitize history before each API call (mirrors iOS pre-API validation)
             sanitizeAgentHistory()
 
-            // Context window management: offload large tool outputs in older
-            // messages to disk when the policy threshold for this model's
-            // context window is crossed. Stubs in agentHistory still tell the
-            // model where to file_read the original content. Mirrors iOS
-            // AIChatViewModel.swift:4549.
-            // [T-anthropic-context-window] Use contextWindowTokens (heuristic-
-            // backed) instead of the raw nullable field, so offload triggers at
-            // the correct fraction for heuristic-only Claude/Gemini models (1M)
-            // rather than never firing when contextWindow is unset.
-            // [T-context-window-live-read] Live read per loop turn — a stale
-            // snapshot inside a long-running agent turn is exactly the iOS
-            // fcc22b66 item-3 bug.
-            effectiveContextWindowTokens()?.takeIf { it > 0 }?.let { window ->
-                offloadContextIfNeeded(
-                    contextWindow = window,
-                    lastContextTokens = lastContextTokens,
-                )
-            }
-
-            // [T-android-auto-compact-inloop] In-loop context guard (iOS
-            // f70ac173). checkContextBeforeSend only runs at the SEND entry
-            // point, so a single turn that fans out into many tool iterations
-            // could blow past the thresholds mid-loop. Offload alone can't
-            // recover when the bulk is the model's own text, and the turn would
-            // slam into the provider's context ceiling.
-            //
-            // Runs AFTER offload so it judges the post-offload size.
-            when (inLoopContextCheck(inLoopCompactions)) {
-                InLoopContextAction.PROCEED -> {}
-                InLoopContextAction.COMPACTED -> {
-                    // The next API call reads the freshly-compacted
-                    // effectiveAgentHistory automatically — compaction already
-                    // re-appends the recent turns, so no resume handoff is
-                    // needed. A compaction iteration is space management, not
-                    // task progress, so it must NOT consume a turn slot:
-                    // decrementing cancels this iteration's advance. The
-                    // MAX_AGENT_TURNS ceiling is never reset, and
-                    // maxInLoopCompactions bounds compact-thrash within a turn,
-                    // so a loop that keeps compacting cannot defeat the runaway
-                    // backstop.
-                    inLoopCompactions++
-
-                    // [T-android-inloop-compact-divider-order / GH#235] Seal the
-                    // bubble this run has been writing into and continue in a
-                    // FRESH one below the divider.
-                    //
-                    // `assistantId` is normally ONE bubble for the whole agent
-                    // loop, appended before the loop starts. compactAll() then
-                    // tail-appends the "N messages compacted" divider, which
-                    // lands AFTER that still-streaming bubble — and the loop
-                    // `continue`s and keeps appending thinking / tool blocks
-                    // into it. So every token produced after the compaction
-                    // rendered ABOVE the divider, reading as if fresh output had
-                    // been filed into already-compacted history. That is the
-                    // reported symptom.
-                    //
-                    // Starting a new bubble rather than moving the divider is
-                    // plan B, matching the iOS fix (e65540b69) so both platforms
-                    // carry the same semantics: output produced BEFORE the
-                    // compaction genuinely is pre-compaction history and belongs
-                    // above the line; output after it belongs below. It also
-                    // leaves compactAll()/appendSystemInfo untouched, so the
-                    // user-initiated `/compact` path — which anchors on a
-                    // finished message and is already correct — takes zero
-                    // regression risk.
-                    //
-                    // Reuses the seal+swap contract the queued-prompt injection
-                    // path already established (see injectQueuedPromptsAsNewTurn
-                    // and its call site): flush the finished bubble, clear the
-                    // per-turn accumulators, and point `assistantId` at a fresh
-                    // placeholder so subsequent writes target it.
-                    val sealedId = assistantId
-                    val freshAssistantId = "assistant_${System.currentTimeMillis()}"
-                    withContext(Dispatchers.Main) {
-                        // Flush whatever the sealed bubble accumulated and stop
-                        // it streaming, so it renders as finished history.
-                        updateAssistantMessage(
-                            sealedId,
-                            accumulatedText,
-                            false,
-                            allToolBlocks,
-                            isAwaitingModelResponse = false,
-                        )
-                        // If compaction fired before the bubble produced
-                        // anything, it would render as an empty row stranded
-                        // above the divider — drop it. Mirrors the iOS branch.
-                        val sealed = _messages.value.firstOrNull { it.id == sealedId }
-                        if (sealed != null &&
-                            sealed.content.isEmpty() &&
-                            sealed.toolBlocks.isEmpty()
-                        ) {
-                            _messages.value = _messages.value.filterNot { it.id == sealedId }
-                            AppLogger.info(
-                                TAG,
-                                "[Compact] in-loop: dropped empty sealed bubble $sealedId",
-                            )
-                        }
-                        _messages.value = _messages.value + ChatMessage(
-                            id = freshAssistantId,
-                            role = "assistant",
-                            content = "",
-                            isStreaming = true,
-                            isAwaitingModelResponse = true,
-                            thinkingLevel = turnThinkingLevel,
-                        )
-                    }
-                    clearStreamFlushState(sealedId)
-                    if (_streamingById.value.containsKey(sealedId)) {
-                        _streamingById.value = _streamingById.value - sealedId
-                    }
-                    // Same loop-scope reset the queued-prompt swap performs, so
-                    // the new bubble starts empty and buildTurnParts slices only
-                    // the new turn's blocks.
-                    assistantId = freshAssistantId
-                    accumulatedText = ""
-                    allToolBlocks.clear()
-                    allToolInputs.clear()
-                    toolInputChunkRings.clear()
-                    AppLogger.info(
-                        TAG,
-                        "[Compact] in-loop: sealed $sealedId, continuing in $freshAssistantId below the divider",
-                    )
+            // nanoMuse: deterministic trimming runs first and never edits saved history.
+            prepareContext()
+            when (inLoopContextCheck(contextMaintenance, requestBudget,
+                ::measureContextTokens, ::measureProbeTokens, { prepareContext() })) {
+                ContextMaintenance.Action.PROCEED -> {}
+                ContextMaintenance.Action.COMPACTED -> {
+                    resumeAfterCompaction()
                     continue
                 }
-                InLoopContextAction.STOP -> {
+                ContextMaintenance.Action.STOP -> {
                     // The loop cannot present a modal mid-flight, so stop
                     // safely: user-visible notice + resumable, without the
                     // turn-limit error overwrite.
@@ -8331,8 +7984,8 @@ class ChatViewModel(
                     // are not in scope. Everything from previous turns was
                     // already persisted by those turns.
                     appendSystemInfo(
-                        text = "Context is full and could not be reduced further. " +
-                            "Tap Continue to resume, or start a new chat.",
+                        // nanoMuse: this path now means the actual capacity reserve was reached (#719).
+                        text = context.getString(R.string.nm_context_limit_reached),
                         iconKind = "compact",
                     )
                     // [T-android-group-pause-badge-restamp] A LIVE interruption just
@@ -8400,7 +8053,6 @@ class ChatViewModel(
             // log it at turn-end alongside the empty-turn warning.
             var turnFinishReason: String? = null
             var lastUsage: LLMUsage? = null
-            val maxTokens = dynamicMaxTokens(provider, lastContextTokens)
             val toolCalls = mutableListOf<Triple<String, String, JSONObject>>() // id, name, args
             // [T-android-gemini3-thoughtsig / #179] toolCallId -> Gemini 3.x
             // thoughtSignature for this turn's calls (null for other providers).
@@ -8499,10 +8151,40 @@ class ChatViewModel(
                     // [_compactSummary] is prepended as a `<context-summary>`
                     // user message. Falls through to the raw agentHistory when
                     // no compact has happened, so the common path stays zero-copy.
+                    // nanoMuse: pair reported usage with this request, before any later tool output (#719).
+                    // nanoMuse: a fallback provider must rebuild its own budgeted view.
+                    alignContextEstimate()
+                    if (preparedMessages == null) {
+                        prepareContext()
+                        // nanoMuse: fallback to a smaller model must pass the same guard.
+                        when (inLoopContextCheck(contextMaintenance, requestBudget,
+                            ::measureContextTokens, ::measureProbeTokens, { prepareContext() })) {
+                            ContextMaintenance.Action.PROCEED -> Unit
+                            ContextMaintenance.Action.COMPACTED -> {
+                                resumeAfterCompaction()
+                                continue@agentTurns
+                            }
+                            ContextMaintenance.Action.STOP -> throw LLMError.ProviderError(
+                                context.getString(R.string.nm_context_limit_reached))
+                        }
+                    }
+                    val requestMessages = checkNotNull(preparedMessages)
+                    val requestTools = agentTools
+                    var requestUsage: LLMUsage? = null
+                    val requestSnapshot = usageSnapshot(requestMessages)
+                    val requestEstimate = io.github.nanomuse.chat.ContextEstimate.request(
+                        requestMessages, systemPrompt, requestTools,
+                        imageTokens = BPETokenizer::countImageTokens,
+                    )
+                    alignContextEstimate()
+                    // nanoMuse: a calibration-only probe uses the raw input estimate so a
+                    // false high ratio cannot squeeze the answer to a single output token.
+                    lastContextTokens = if (contextMaintenance.calibrationProbeGranted) requestEstimate
+                        else usageMeter.estimate(requestSnapshot, requestEstimate, contextEstimate)
                     currentProvider.streamMessage(
-                        applyRequestImageBudget(effectiveAgentHistory()),
+                        requestMessages,
                         systemPrompt, dynamicMaxTokens(currentProvider, lastContextTokens),
-                        tools = agentTools,
+                        tools = requestTools,
                         thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
                     ).collect { chunk ->
                 // [T-STALL-DIAG] Mark first byte back from the provider and log
@@ -8818,22 +8500,17 @@ class ChatViewModel(
                     }
                     is LLMStreamChunk.Usage -> {
                         lastUsage = chunk.usage
+                        // nanoMuse: retain the last nonempty input count and observe it once.
+                        if (ContextEstimate.inputTokens(chunk.usage) > 0) requestUsage = chunk.usage
                         // Update context token count for next turn's dynamicMaxTokens()
                         // and publish to _lastTurnContextTokens so the ContextPolicy
                         // gate in [checkContextBeforeSend] can see the latest pressure
                         // without a DB round-trip.
-                        if (chunk.usage.latestContextTokens > 0) {
-                            lastContextTokens = chunk.usage.latestContextTokens
-                        } else if (chunk.usage.inputTokens > 0) {
-                            // Fallback when a provider omits latestContextTokens: inputTokens is
-                            // now fresh-only (cached portion subtracted in the parser), so add the
-                            // cache back to recover the true context size — otherwise a high
-                            // cache-hit turn would under-report context pressure and skip offload.
-                            lastContextTokens = chunk.usage.inputTokens +
-                                (chunk.usage.cacheReadInputTokens ?: 0) +
-                                (chunk.usage.cacheCreationInputTokens ?: 0)
-                        }
-                        if (lastContextTokens > 0) {
+                        // nanoMuse: calibrate only input actually reported by this chunk (#719).
+                        val actualContextTokens =
+                            io.github.nanomuse.chat.ContextEstimate.inputTokens(chunk.usage)
+                        if (actualContextTokens > 0) {
+                            lastContextTokens = actualContextTokens
                             _lastTurnContextTokens.value = lastContextTokens
                         }
                     }
@@ -8860,6 +8537,15 @@ class ChatViewModel(
                     }
                 }
                     }  // end collect
+                    // nanoMuse: persist one final input sample, never partial or failed requests.
+                    requestUsage?.let { usage ->
+                        usageMeter.observe(requestSnapshot, ContextEstimate.inputTokens(usage), requestEstimate)
+                        if (contextEstimate.observe(ContextEstimate.inputTokens(usage), requestEstimate)) {
+                            calibrationKey?.let { key ->
+                                nmCalibrationStore.save(key, currentProvider.model.id, contextEstimate)
+                            }
+                        }
+                    }
                     // T94 fix 2: flush any text that landed in the throttle
                     // window after the last UI tick. The retry-rollback /
                     // turn-finalize paths below assume _messages reflects all
@@ -8913,8 +8599,17 @@ class ChatViewModel(
                     val isTransient = actual is com.openminis.app.data.model.LLMError.NetworkError ||
                         actual is com.openminis.app.data.model.LLMError.TransientError ||
                         is5xx
-                    if (isTransient && retryAttempt < AUTO_RETRY_DELAYS_SEC.size) {
-                        val delaySec = AUTO_RETRY_DELAYS_SEC[retryAttempt]
+                    // nanoMuse: one server-overflow retry is allowed only after local work
+                    // measurably shrinks the same request. No blind resend of identical history.
+                    var recoveredContext = false
+                    if (!contextOverflowRetried && isContextTooLargeError(actual)) {
+                        contextOverflowRetried = true
+                        val before = measureRawTokens()
+                        prepareContext(force = true)
+                        recoveredContext = measureRawTokens() < before
+                    }
+                    if ((isTransient || recoveredContext) && retryAttempt < AUTO_RETRY_DELAYS_SEC.size) {
+                        val delaySec = if (recoveredContext) 0 else AUTO_RETRY_DELAYS_SEC[retryAttempt]
                         retryAttempt += 1
                         val errDesc = actual.message ?: actual.javaClass.simpleName
                         Log.w(TAG, "🔁 Transient error on ${currentProvider.model.displayName}, retry $retryAttempt/${AUTO_RETRY_DELAYS_SEC.size} in ${delaySec}s: $errDesc")
@@ -11979,8 +11674,19 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }?.content
         SessionActivityTracker.publishLastReply(sessionId, text)
     }
+    // nanoMuse: every stream path shares completion classification before publishing its badge.
+    private suspend fun finishTrackedReply(id: String) {
+        if (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isCancelled == true) {
+            SessionActivityTracker.markReplyIncomplete(id)
+        }
+        publishOverlayReplyExcerpt(id)
+        SessionActivityTracker.setInactive(id)
+    }
+
 
     fun cancelStream() {
+        // nanoMuse: Stop belongs to the remote call; no local shell was started.
+        if (nmRemoteBridge.cancel()) return
         AppLogger.info(TAG_STREAM, "cancelStream invoked _isStreaming=false (sid=$activeSessionId)")
         if (_isStreaming.value) io.github.nanomuse.ui.feedback.TurnFeedback.stopped(activeSessionId) // nanoMuse: the record hears the Stop; the chat asks why, once (relay 0.31)
         streamJob?.cancel()
@@ -12000,10 +11706,13 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // surface any reply we already streamed + tag outcome as
         // Cancelled so the overlay's glyph reflects the actual end
         // state (⊘) instead of carrying over the prior tool's outcome.
+        // nanoMuse: cancellation must be recorded before the immediate tracker teardown.
+        SessionActivityTracker.markReplyIncomplete(activeSessionId)
         publishOverlayReplyExcerpt(activeSessionId)
         SessionActivityTracker.clearToolRunning(com.openminis.app.service.ToolOutcome.Cancelled)
         SessionActivityTracker.setInactive(activeSessionId)
         if (isDraft && realSessionId.isNotEmpty() && activeSessionId != sessionId) {
+            SessionActivityTracker.markReplyIncomplete(sessionId)
             SessionActivityTracker.setInactive(sessionId)
         }
         // Stop whichever shell the agent loop is actually dispatching against.
@@ -12132,6 +11841,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         AppLogger.error(TAG_STREAM, "resumeQueueAfterCancel drain EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "Queued drain error (resumeQueueAfterCancel)", e)
                         setInlineError(e.message ?: "Unknown error")
+                        // nanoMuse: a failed resumed run is not a new unread answer.
+                        SessionActivityTracker.markReplyIncomplete(activeSessionId)
                     } finally {
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY enter")
                         // [T-android-overlay-reply-status-34599] Surface
@@ -12141,8 +11852,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY exit")
                     }
@@ -12419,6 +12129,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         AppLogger.error(TAG_STREAM, "resume runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "Agent loop error (resume)", e)
                         setInlineError(e.message ?: "Unknown error")
+                        // nanoMuse: a failed resumed run is not a new unread answer.
+                        SessionActivityTracker.markReplyIncomplete(activeSessionId)
                     } finally {
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY enter")
                         // [T-android-overlay-reply-status-34599] Surface
@@ -12428,8 +12140,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         // non-null excerpt. Reading _messages here is safe:
                         // we're in the finally block of the agent loop and
                         // the stream has already flushed its last delta.
-                        publishOverlayReplyExcerpt(activeSessionId)
-                        SessionActivityTracker.setInactive(activeSessionId)
+                        finishTrackedReply(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY exit")
                     }
@@ -12481,12 +12192,16 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
     fun cleanupIfEmptyOnExit() {
         val sid = realSessionId
         if (sid.isEmpty()) return
+        // nanoMuse: explicitly protected empty conversations are intentional saved rows.
+        if (io.github.nanomuse.guard.SessionAccess.isProtected(sid)) return
         if (_isStreaming.value) return
         if (_attachments.value.isNotEmpty()) return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val count = chatRepository.messageCount(sid)
                 if (count > 0) return@launch
+                // nanoMuse: protection may have been enabled while the message count was loading.
+                if (io.github.nanomuse.guard.SessionAccess.isProtected(sid)) return@launch
                 AppLogger.info(
                     TAG,
                     "cleanupIfEmptyOnExit: deleting empty session $sid (no persisted messages)",

@@ -162,6 +162,9 @@
             disabled: true
 
           # ── nanoMuse's own ────────────────────────────────────────────────
+          # The desktop capability manual is a native skill, loaded on demand.
+          - id: nanomuse-capability-skill
+            name: dsh-nanomuse/capability-skill
           # Hands: this computer's screen and mouse/keyboard, from the runtime's
           # `nanomuse mcp` (nanomuse/bridge/mcp_server.py) over stdio — the tools
           # arrive as mcp__nanomuse__computer_screen / computer_act, with the

@@ -2,7 +2,7 @@
 // title a goal gets before the agent names it.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { goalTitle, parseArray } from '../lib/rooms.js'
+import Rooms, { goalTitle, parseArray } from '../lib/rooms.js'
 
 test('parseArray takes the last fenced json block', () => {
   const text = 'Here is a draft:\n```json\n[{"title": "draft"}]\n```\nFinal:\n```json\n[{"title": "a"}, {"title": "b"}]\n```\n'
@@ -155,4 +155,33 @@ test('a new file takes the next free number instead of overwriting (#689)', asyn
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('memory dates follow fixed local calendar boundaries east and west of UTC', async () => {
+  const { execFileSync } = await import('node:child_process')
+  for (const [zone, at, expected] of [
+    ['Asia/Shanghai', '2026-01-01T16:30:00Z', '2026-01-02'],
+    ['America/Los_Angeles', '2026-01-01T00:30:00Z', '2025-12-31'],
+    ['UTC', '2026-01-01T00:30:00Z', '2026-01-01'],
+  ]) {
+    const script = `import { memoryDoc } from ${JSON.stringify(new URL('../lib/rooms.js', import.meta.url).href)};
+      console.log(memoryDoc([{ source: 'agent', at: Date.parse(${JSON.stringify(at)}), text: 'boundary memory' }], false));`
+    const doc = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...process.env, TZ: zone }, encoding: 'utf8',
+    })
+    assert.ok(doc.includes(`(${expected})`), `${zone}: ${doc}`)
+  }
+})
+
+
+test('cleared chat records are removed and cannot be read or recreated by late events', async () => {
+  let saved
+  const ctx = { nanomuseCloud: { isClearedSession: id => id === 'old' } }
+  const self = { ctx, store: { activity: [{ sessionId: 'old', request: 'old words' }, { sessionId: 'kept', request: 'kept words' }] }, save: async function () { saved = structuredClone(this.store) } }
+  assert.equal(Rooms.prototype.activityOf.call(self, 'old'), undefined)
+  assert.equal(Rooms.prototype.activityOf.call(self, 'kept').request, 'kept words')
+  await Rooms.prototype.clearActivity.call(self, ['old'])
+  Rooms.prototype.trackActivity.call(self, { id: 'old' }, { type: 'turn/start' })
+  assert.deepEqual(saved.activity.map(row => row.sessionId), ['kept'])
+  assert.deepEqual(self.store.activity.map(row => row.sessionId), ['kept'])
 })

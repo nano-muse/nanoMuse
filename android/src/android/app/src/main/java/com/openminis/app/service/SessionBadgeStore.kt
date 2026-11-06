@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * the same data path so adding it later is a one-line emit.
  */
 object SessionBadgeStore {
+    // nanoMuse: completions are local and ephemeral, independent of persisted pause badges.
+    private val _unread = MutableStateFlow<Set<String>>(emptySet())
+    val unread: StateFlow<Set<String>> = _unread.asStateFlow()
+    val replies = io.github.nanomuse.chat.UnreadReplies { _unread.value = it }
     private const val TAG = "SessionBadgeStore"
     private const val PREFS = "session_badge_store"
 
@@ -174,6 +178,8 @@ object SessionBadgeStore {
 
     /** Drop everything for [sessionId] (e.g. session deletion). */
     fun clear(sessionId: String) {
+        // nanoMuse: deleting a session also drops its ephemeral completion state.
+        replies.removed(sessionId)
         mutate { current ->
             if (!current.containsKey(sessionId)) return@mutate current
             if (sessionId in stamps) {

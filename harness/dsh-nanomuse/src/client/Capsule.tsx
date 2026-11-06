@@ -4,6 +4,7 @@
  * conversation (`MuseHeader`); this file keeps the frame-wide overlay entry
  * that shows the notices (`notify`, and each remote `call` that ran here).
  */
+import { relaunchHands } from './RelaunchButton.tsx'
 import { Button, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createElement as h, useEffect, useState, type ReactNode } from 'react'
 import type { Translate } from './api.ts'
@@ -89,7 +90,7 @@ function BlackScreenCard({ t }: { t: Translate }): ReactNode {
   const perms: BlackScreenPerms = {
     blackScreen: true,
     helper,
-    relaunch: () => void bridge()?.relaunch?.(),
+    relaunch: relaunchHands,
     clearBlackScreen: () => void call('hands/black-screen/clear', {}).catch(() => undefined),
   }
   return h('div', { style: { pointerEvents: 'auto' } }, h(BlackScreenNotice, { t, perms }))

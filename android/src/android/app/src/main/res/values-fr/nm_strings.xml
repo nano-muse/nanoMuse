@@ -1217,4 +1217,41 @@
     <string name="nm_stop_reason_done">C\'était déjà fait</string>
     <string name="nm_stop_reason_other">Autre chose</string>
     <string name="nm_feed_limit_notice">%1$d publication(s) générée(s) n’a/n’ont pas été ajoutée(s) en raison de la limite quotidienne de 12.</string>
+
+    <!-- Context maintenance -->
+    <string name="nm_context_compacting">Réduction du contexte en cours (estimation : %1$d / %2$d tokens).</string>
+    <string name="nm_context_compact_deferred">Le contexte n’a pas pu être réduit. Le traitement continue, car il tient encore dans la fenêtre du modèle.</string>
+    <string name="nm_context_limit_reached">Le contexte approche de la limite du modèle et n’a pas pu être réduit. Réessayez la réduction ou démarrez une nouvelle discussion.</string>
+    <string name="nm_context_compact_timeout">La réduction du contexte a dépassé le délai de %1$d secondes (%2$d appels au modèle).</string>
+    <string name="nm_context_compact_idle_timeout">La compression s’est arrêtée après %1$d secondes sans réponse (%2$d appels au modèle).</string>
+    <string name="nm_context_compact_no_gain">Le résumé n’a pas réduit le contexte. Le contenu original a été conservé.</string>
+    <string name="nm_context_compact_incomplete">Le modèle n’a pas renvoyé de résumé complet. Le contexte original a été conservé.</string>
+    <string name="nm_remote_ambiguous">Plusieurs appareils correspondent. Choisissez dans Compte → Appareils.</string>
+    <string name="nm_remote_attachments">Les mentions d’appareils envoient uniquement du texte. Retirez les pièces jointes avant l’envoi.</string>
+    <string name="nm_remote_no_answer">%1$s a terminé sans réponse.</string>
+    <string name="nm_remote_failed">%1$s n’a pas répondu : %2$s</string>
+    <string name="nm_remote_offline">%1$s est hors ligne.</string>
+    <string name="nm_remote_chat_busy">Attendez la fin de cette conversation avant d’envoyer une tâche à un appareil.</string>
+
+    <string name="nm_reply_unread">Réponse non lue</string>
+    <string name="nm_restore_recovered">La restauration interrompue a été récupérée. En cas d’échec, les données de récupération sont conservées pour un nouvel essai.</string>
+    <string name="nm_restore_recovery_failed">La récupération a échoué. Les données de récupération sont conservées. Redémarrez l’application pour réessayer.</string>
+    <string name="nm_backup_resume">Reprendre la sauvegarde</string>
+    <string name="nm_backup_discard">Abandonner la sauvegarde interrompue</string>
+    <string name="nm_backup_resume_hint">Une sauvegarde interrompue attend. Reprenez avec les options initiales et saisissez de nouveau le mot de passe si nécessaire, ou abandonnez pour recommencer.</string>
+<string name="nm_access_locked">nanoMuse est verrouillé</string>
+<string name="nm_access_hint">Confirmez avec le verrouillage de cet appareil.</string>
+<string name="nm_access_unlock">Déverrouiller</string>
+<string name="nm_access_settings">Verrouillage de l’application</string>
+<string name="nm_access_on_exit">Verrouiller en quittant</string>
+<string name="nm_access_never">Ne jamais verrouiller automatiquement</string>
+<string name="nm_access_seconds">%1$d secondes</string>
+<string name="nm_access_unavailable">Configurez d’abord un verrouillage sur cet appareil.</string>
+<string name="nm_session_protected">Conversation protégée</string>
+<string name="nm_session_protect">Protéger la conversation</string>
+<string name="nm_session_unprotect">Retirer la protection de la conversation</string>
+<string name="nm_session_settings">Délai de verrouillage des conversations</string>
+
+    <string name="nm_coding_installed">Installé</string>
+    <string name="nm_coding_not_installed">Non installé</string>
 </resources>

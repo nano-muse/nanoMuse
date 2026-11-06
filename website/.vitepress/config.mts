@@ -102,6 +102,7 @@ const runIt: DefaultTheme.SidebarItem[] = [
   { text: 'Run nanoMuse yourself', link: '/self-hosting' },
   { text: 'The runtime in Docker', link: '/deployment' },
   { text: 'Configuration', link: '/configuration' },
+  { text: 'Task budgets', link: '/runtime-budgets' },
   { text: 'nanoMuse Cloud, the relay', link: '/cloud' },
 ]
 
@@ -121,6 +122,7 @@ const understandIt: DefaultTheme.SidebarItem[] = [
 
 const contribute: DefaultTheme.SidebarItem[] = [
   { text: 'Contributing', link: `${REPO}/blob/main/CONTRIBUTING.md` },
+  { text: 'Goal evaluation tasks', link: '/goal-eval' },
   { text: 'AGENTS.md', link: `${REPO}/blob/main/AGENTS.md` },
   { text: 'README', link: `${REPO}/blob/main/README.md` },
   { text: 'Roadmap', link: '/roadmap' },
@@ -160,6 +162,7 @@ const zhRunIt: DefaultTheme.SidebarItem[] = [
   { text: '自己运行 nanoMuse', link: '/zh/self-hosting' },
   { text: 'Docker 里的运行时', link: '/zh/deployment' },
   { text: '配置', link: '/zh/configuration' },
+  { text: '任务预算', link: '/zh/runtime-budgets' },
   { text: 'nanoMuse Cloud：中继', link: '/zh/cloud' },
 ]
 
@@ -179,6 +182,7 @@ const zhUnderstandIt: DefaultTheme.SidebarItem[] = [
 
 const zhContribute: DefaultTheme.SidebarItem[] = [
   { text: '参与贡献（英文）', link: `${REPO}/blob/main/CONTRIBUTING.md` },
+  { text: '目标评测任务', link: '/zh/goal-eval' },
   { text: 'AGENTS.md（英文）', link: `${REPO}/blob/main/AGENTS.md` },
   { text: '中文 README', link: `${REPO}/blob/main/docs/readme/README_zh.md` },
   { text: '路线图', link: '/zh/roadmap' },

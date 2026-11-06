@@ -596,6 +596,25 @@ def test_detect_language_names_english_outright():
     assert detect_language("Abre WeChat y dime qué dijo Zhang Wei").startswith("English (or")
 
 
+async def test_operator_inherits_the_agent_budget(settings: Settings):
+    from nanomuse.config import TaskBudgetSettings
+    from nanomuse.llm import budget as budgets
+
+    link = PhoneLink(shots_dir=settings.agent.workspace / "screenshots")
+    phone = FakePhone(link, [PAY_SCREEN])
+    llm = MockLLM([labelled("Done", "terminate", status="success")])
+    operator, _ = make_operator(settings, link, llm, AutoApproveUI())
+    token = budgets.begin(TaskBudgetSettings(max_total_tokens=1))
+    parent = budgets.current()
+    try:
+        outcome = await operator.run("Look at the screen", language="en")
+        assert outcome.status == "failed" and outcome.budget["stopped"] == "token"
+        assert not llm.calls and not phone.acts
+        assert budgets.current() is parent
+    finally:
+        budgets.end(token)
+
+
 async def test_operator_runs_until_done_and_asks_before_paying(settings: Settings):
     link = PhoneLink(shots_dir=settings.agent.workspace / "screenshots")
     home = {

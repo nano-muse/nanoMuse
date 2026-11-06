@@ -13,6 +13,9 @@
 #   --bind ADDR        with --local: listen on another address; 0.0.0.0 for the whole LAN, and
 #                      the URLs then carry this machine's LAN address so phones can use them
 #   --port N           with --local: another port (default 8787)
+#   --with-runtime     also start the web app's runtime (the root docker-compose.yml) and join it
+#                      to the relay's docker network, so the two find each other at relay:8787
+#   --runtime-port N   with --with-runtime: the runtime's host port (default 8788)
 #   --no-start         write cloud/.env only
 #
 # Needs: docker with the compose plugin (or docker-compose), curl. docs/self-hosting.md
@@ -23,7 +26,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLOUD="$ROOT/cloud"
 ENV_FILE="$CLOUD/.env"
 
-LOCAL=0; BIND=127.0.0.1; PORT=8787; START=1
+LOCAL=0; BIND=127.0.0.1; PORT=8787; START=1; RUNTIME=0; RUNTIME_PORT=8788
+# The leading comment block is the help text: everything from the shebang down to the line
+# below. A range of line numbers used to say where it ended, and adding a sentence to it cut
+# the help short; the line that starts the script is the one thing that cannot move.
+usage() { sed -n '2,/^set -euo pipefail$/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --local) LOCAL=1 ;;
@@ -31,8 +38,12 @@ while [ $# -gt 0 ]; do
     --port)
       [ $# -ge 2 ] && [[ "$2" =~ ^[0-9]+$ ]] || { echo "--port needs a number (try --help)" >&2; exit 2; }
       PORT="$2"; shift ;;
+    --with-runtime) RUNTIME=1 ;;
+    --runtime-port)
+      [ $# -ge 2 ] && [[ "$2" =~ ^[0-9]+$ ]] || { echo "--runtime-port needs a number (try --help)" >&2; exit 2; }
+      RUNTIME=1; RUNTIME_PORT="$2"; shift ;;
     --no-start) START=0 ;;
-    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
   esac
   shift
@@ -40,6 +51,15 @@ done
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'self-host: %s\n' "$*" >&2; exit 1; }
+
+if [ "$RUNTIME" = 1 ]; then
+  [[ "$PORT" =~ ^[0-9]{1,5}$ ]] || die "--port must be between 1 and 65535"
+  PORT=$((10#$PORT))
+  [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "--port must be between 1 and 65535"
+  [[ "$RUNTIME_PORT" =~ ^[0-9]{1,5}$ ]] || die "--runtime-port must be between 1 and 65535"
+  RUNTIME_PORT=$((10#$RUNTIME_PORT))
+  [ "$RUNTIME_PORT" -ge 1 ] && [ "$RUNTIME_PORT" -le 65535 ] || die "--runtime-port must be between 1 and 65535"
+fi
 
 # --- tools --------------------------------------------------------------------------------
 if docker compose version >/dev/null 2>&1; then COMPOSE=(docker compose)
@@ -66,17 +86,18 @@ lan_address() { # the IPv4 address other machines on the network reach this one 
 }
 
 # --- the current .env, if any ---------------------------------------------------------------
-get() { # get KEY  → current value from .env, empty when absent
-  [ -f "$ENV_FILE" ] || return 0
-  sed -n "s/^$1=//p" "$ENV_FILE" | head -1
+get() { # get KEY [FILE]  → current value from .env, empty when absent
+  local f="${2:-$ENV_FILE}"
+  [ -f "$f" ] || return 0
+  sed -n "s/^$1=//p" "$f" | head -1
 }
-set_kv() { # set_kv KEY VALUE  → replace the line or append it; the value is taken verbatim
-  local tmp; tmp="$(mktemp)"
+set_kv() { # set_kv KEY VALUE [FILE]  → replace the line or append it; the value is taken verbatim
+  local f tmp; f="${3:-$ENV_FILE}"; tmp="$(mktemp)"
   V="$2" awk -v k="$1" 'BEGIN { v = ENVIRON["V"]; done = 0 }
     index($0, k "=") == 1 { if (!done) { print k "=" v; done = 1 }; next }
     { print }
-    END { if (!done) print k "=" v }' "$ENV_FILE" > "$tmp"
-  mv "$tmp" "$ENV_FILE"
+    END { if (!done) print k "=" v }' "$f" > "$tmp"
+  mv "$tmp" "$f"
 }
 ask() { # ask VAR "question" "default"  → reads a line; Enter keeps the default
   local var="$1" q="$2" def="$3" ans
@@ -220,7 +241,122 @@ say
 say "Wrote $ENV_FILE (mode 600). Back it up together with cloud/data/; see docs/self-hosting.md."
 [ "$START" = 1 ] || exit 0
 
+# --- the runtime, for --with-runtime ----------------------------------------------------------
+RUNTIME_ENV="$ROOT/.env"
+
+ensure_runtime_config() {
+  # config/config.toml is bind-mounted read-only, and docker answers a missing host file by
+  # creating a directory in its place: the container then cannot start at all ("not a
+  # directory: Are you trying to mount a directory onto a file"), and the directory it left
+  # behind belongs to root. Writing the file before the first `up` is what prevents that.
+  local cfg="$ROOT/config/config.toml"
+  if [ -d "$cfg" ]; then
+    die "$cfg is a directory. Check its contents; if it is empty, remove it with: sudo rmdir -- '$cfg'"
+  fi
+  if [ -f "$cfg" ]; then return 0; fi
+  cp "$ROOT/config/config.example.toml" "$cfg"
+  say "Wrote config/config.toml from the example; the runtime's own settings are in it."
+}
+
+write_runtime_env() {
+  if [ ! -f "$RUNTIME_ENV" ]; then
+    cp "$ROOT/.env.example" "$RUNTIME_ENV"
+    say "Writing a new $RUNTIME_ENV from .env.example (the runtime's settings)."
+  fi
+  # A fixed token keeps the web app's URL the same across restarts. It is generated once and
+  # never rotated, and it is the one the URL printed at the end carries.
+  if [ -z "$(get NANOMUSE_SERVER_TOKEN "$RUNTIME_ENV")" ]; then
+    set_kv NANOMUSE_SERVER_TOKEN "$(random_hex)" "$RUNTIME_ENV"
+  fi
+  # The relay is one more OpenAI-compatible provider to the runtime: signing in on the
+  # runtime's page is what gives it the account's key, so no model key belongs here. The
+  # address is the relay's name on the network the two stacks share, not 127.0.0.1 — inside
+  # its container the runtime is 127.0.0.1, and under TLS the relay publishes no port at all.
+  if [ -z "$(get NANOMUSE_CLOUD_BASE_URL "$RUNTIME_ENV")" ]; then
+    set_kv NANOMUSE_CLOUD_BASE_URL "http://relay:8787" "$RUNTIME_ENV"
+  fi
+  chmod 600 "$RUNTIME_ENV"
+}
+
+relay_network() { # the docker network the relay was started on; empty when it cannot be read
+  local id
+  # `|| true` everywhere a docker command feeds a pipe: set -o pipefail turns a failed `ps` or
+  # an early-closing `head` into a non-zero pipeline, and that would stop the script over a
+  # name it only wanted to read.
+  id="$("${COMPOSE[@]}" "${FILES[@]}" ps -q relay 2>/dev/null | awk 'NR==1' || true)"
+  if [ -z "$id" ]; then return 0; fi
+  docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' "$id" 2>/dev/null | awk 'NR==1' || true
+}
+
+up_runtime() {
+  local net id ok=0 tries probe_host
+  # read before the working directory changes: the relay's compose files are relative to cloud/
+  net="$(relay_network)"
+  if [ -z "$net" ]; then
+    say "Could not read the relay's Docker network. The relay is up; the runtime was not started."
+    return 1
+  fi
+  say
+  say "Starting the runtime on port $RUNTIME_PORT (the first build takes a few minutes)…"
+  cd "$ROOT" || return 1
+  # Created first, started afterwards, so it joins the relay's network before its first
+  # request; on a second run it is already joined and the connect is a no-op.
+  NANOMUSE_RUNTIME_BIND="$RUNTIME_BIND" NANOMUSE_RUNTIME_PORT="$RUNTIME_PORT" \
+    "${COMPOSE[@]}" -f docker-compose.yml up -d --build --no-start app || return 1
+  id="$("${COMPOSE[@]}" -f docker-compose.yml ps -a -q app 2>/dev/null | awk 'NR==1' || true)"
+  RUNTIME_JOINED=0
+  if [ -n "$net" ] && [ -n "$id" ]; then
+    if docker network connect "$net" "$id" 2>/dev/null; then
+      RUNTIME_JOINED=1
+    elif docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' "$id" 2>/dev/null | grep -Fxq -- "$net"; then
+      RUNTIME_JOINED=1 # already joined by an earlier run
+    fi
+  fi
+  if [ "$RUNTIME_JOINED" = 0 ]; then
+    say "Could not join the relay's Docker network. The relay is up; the runtime was not started."
+    return 1
+  fi
+  "${COMPOSE[@]}" -f docker-compose.yml start app || return 1
+  probe_host="$RUNTIME_BIND"
+  [ "$probe_host" != 0.0.0.0 ] || probe_host=127.0.0.1
+  health="http://$probe_host:$RUNTIME_PORT/api/health"
+  printf 'Waiting for %s ' "$health"
+  tries=0
+  while [ "$tries" -lt 90 ]; do
+    if curl -fsS --max-time 3 "$health" >/dev/null 2>&1; then ok=1; break; fi
+    printf '.'; tries=$((tries + 1)); sleep 2
+  done
+  say
+  if [ "$ok" = 0 ]; then
+    say "The runtime did not answer within three minutes. The relay is up without it; look at:"
+    say "  ${COMPOSE[*]} -f docker-compose.yml logs --tail=50 app    (from the repository root)"
+    return 1
+  fi
+  return 0
+}
+
 # --- start ------------------------------------------------------------------------------------
+# Everything the runtime needs that is cheap to get wrong: checked before the relay's three
+# minutes of building, not after them.
+if [ "$RUNTIME" = 1 ]; then
+  # Both stacks publish a host port, and --local puts the relay on 8787.
+  if [ "$LOCAL" = 1 ] && [ "$RUNTIME_PORT" = "$PORT" ]; then
+    die "the runtime would take the relay's port $PORT; pick another with --runtime-port N"
+  fi
+  if [ "$LOCAL" = 0 ] && { [ "$RUNTIME_PORT" = 80 ] || [ "$RUNTIME_PORT" = 443 ]; }; then
+    die "the runtime would take Caddy's port $RUNTIME_PORT; pick another with --runtime-port N"
+  fi
+  ensure_runtime_config
+  write_runtime_env
+  # A domain secures the relay through Caddy, not the runtime's HTTP port.
+  # Keep that port local unless --local --bind explicitly selected another address.
+  if [ "$LOCAL" = 1 ]; then RUNTIME_BIND="$BIND"; else RUNTIME_BIND=127.0.0.1; fi
+  RUNTIME_SHOWN="$RUNTIME_BIND"
+  if [ "$RUNTIME_SHOWN" = 0.0.0.0 ]; then
+    RUNTIME_SHOWN="$(lan_address)"
+    [ -n "$RUNTIME_SHOWN" ] || RUNTIME_SHOWN=127.0.0.1
+  fi
+fi
 cd "$CLOUD"
 FILES=(-f docker-compose.yml)
 if [ "$LOCAL" = 1 ]; then
@@ -254,6 +390,16 @@ if [ "$ok" = 0 ]; then
   exit 1
 fi
 
+# --- the runtime, when asked for ---------------------------------------------------------------
+if [ "$RUNTIME" = 1 ]; then
+  if ! up_runtime; then exit 1; fi
+  RUNTIME_URL="http://$RUNTIME_SHOWN:$RUNTIME_PORT/"
+  RUNTIME_TOKEN="$(get NANOMUSE_SERVER_TOKEN "$RUNTIME_ENV")"
+  if [ -n "$RUNTIME_TOKEN" ]; then
+    RUNTIME_URL="${RUNTIME_URL}#token=$RUNTIME_TOKEN"
+  fi
+fi
+
 say
 say "nanoMuse Cloud is up."
 say
@@ -264,11 +410,26 @@ if [ -n "$GENERATED_ADMIN" ]; then
 else
   say "            password: the CLOUD_ADMIN_TOKEN line in cloud/.env"
 fi
-[ "$SENDER" = log ] && say "  Codes     ${COMPOSE[*]} ${FILES[*]} logs relay    (sign-in codes are printed there)"
+[ "$SENDER" = log ] && say "  Codes     cd cloud && ${COMPOSE[*]} ${FILES[*]} logs relay    (sign-in codes are printed there)"
+if [ "$RUNTIME" = 1 ]; then
+  say
+  say "  Runtime   $RUNTIME_URL"
+  say "            the agent and the web app on this machine; the token is the"
+  say "            NANOMUSE_SERVER_TOKEN line in .env, so the link survives a restart"
+  say "  Logs      ${COMPOSE[*]} -f docker-compose.yml logs app    (from the repository root)"
+fi
 say
 say "Point each app at $BASE: on Android and iPhone, tap \"Use a different server\" on the"
 say "sign-in screen; on the desktop, set the plugin's baseURL in cordis.patch.yml; for the"
 say "terminal runtime, export NANOMUSE_CLOUD_BASE_URL=$BASE. The exact steps: docs/self-hosting.md."
+if [ "$RUNTIME" = 1 ] && [ "$(get NANOMUSE_CLOUD_BASE_URL "$RUNTIME_ENV")" = http://relay:8787 ]; then
+  say "The runtime started here already points at this relay (http://relay:8787, the relay's name"
+  say "on the network the two containers share): sign in on its page and chat goes through the"
+  say "relay's provider, within the account's allowance."
+fi
+if [ "$RUNTIME" = 1 ] && [ "$LOCAL" = 0 ]; then
+  say "The runtime's HTTP port is local to this server. Use an SSH tunnel or a TLS reverse proxy to reach it remotely."
+fi
 if [ "$LOCAL" = 1 ] && [ "$BIND" = 127.0.0.1 ]; then
   say "Only this machine can reach the relay. For the phones on the same network, run it again with --bind 0.0.0.0: the URLs then carry this machine's LAN address."
 fi

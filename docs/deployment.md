@@ -13,6 +13,14 @@ docker compose up -d app                  # the phone app on http://<host>:8787
 docker compose logs app                   # shows the URL with the access token
 ```
 
+If port 8787 is already occupied, choose another host port, for example when the local relay runs on the same machine:
+
+```bash
+NANOMUSE_RUNTIME_PORT=8788 docker compose up -d app
+```
+
+Open `http://<host>:8788` with the same access token. Set `NANOMUSE_RUNTIME_PORT=8788` in the root `.env` to keep that choice for later compose commands. Only the published host port changes; the container, its health check and the URL in its logs still use 8787. Without the variable, the host port is 8787 too.
+
 Other entry points:
 
 ```bash

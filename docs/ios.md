@@ -725,6 +725,14 @@ Ours, in `NanoMuse/`:
   sent was shown as it came. The Library's and the account page's segmented pickers and the •••
   menus of a goal, a routine and a feed post carry a VoiceOver label.
 
+## Reply voices
+
+With *System Voice (Auto)* selected for Voice Output, the chat's system read-aloud uses
+the Chinese or English voice chosen in *Background & notifications*, according to the reply's
+language. A concrete System voice explicitly selected for Voice Output takes priority over
+those language preferences. Only the active output entry chooses the voice: a later, inactive
+member of the default Voice Output group cannot replace Auto. Cloud voice selection is unchanged.
+
 ## Voice prompts from the Action Button
 
 *Voice Prompt* is a Shortcut the app registers (`NanoMuse/VoicePromptIntent.swift`): it opens

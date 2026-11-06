@@ -86,6 +86,9 @@ max_steps = 30
 extra_roots = []                # e.g. ["~/Documents/notes"]
 language = "auto"               # "auto" | "zh" | "en" | ...
 max_context_messages = 80
+# Optional input-token estimate (4 UTF-8 bytes per text token, plus pictures).
+# 0 keeps the existing message-count window; see docs/runtime-budgets.md.
+max_context_tokens = 0
 # Screenshots kept in the request: the newest N, older ones replaced by a note.
 # A long run of the hands sends the conversation again on every step; a dozen
 # full-size screenshots went past the relay's body limit (413). 0 keeps all.
@@ -95,6 +98,14 @@ show_thinking = false
 user_profile = ""
 # Extra standing instructions.
 instructions = ""
+
+[agent.budget]
+# One task, including nested phone/computer operators. Zero disables that limit.
+max_total_tokens = 0             # e.g. 200000, accumulated input + output across calls
+max_seconds = 0                  # e.g. 600, including model calls, tools and approval waits
+max_cost_usd = 0                 # needs the upper rates below; see docs/runtime-budgets.md
+input_usd_per_million = 0
+output_usd_per_million = 0
 
 # ------------------------------------------------------------------------------
 # Sentinel: the gatekeeper between the agent and the world.

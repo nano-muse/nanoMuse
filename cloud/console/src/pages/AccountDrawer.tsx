@@ -2,9 +2,10 @@
  *  sessions, devices, the statement and the timeline (paged and filtered), the people it
  *  invited (and the reclaim), its kept turns, its showcase record. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../App";
 import { ApiError, download, get, post, qs } from "../lib/api";
+import { LatestRequest } from "../lib/latest-request";
 import { clientLine } from "../lib/client";
 import { compact, dateOf, dur, fmt, money, ms, when } from "../lib/format";
 import { invalidate, useData, useNow } from "../lib/hooks";
@@ -350,26 +351,30 @@ function usePaged<R extends { id: number }>(path: string, kind: string, text: st
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // a page asked for under older filters (a "More" still in flight when they changed)
+  // must not land under the new ones, nor clear their loading flag
+  const requests = useRef(new LatestRequest());
   const load = useCallback(
-    async (before: number) => {
-      setLoading(true);
-      setError("");
-      try {
-        const r = await get<{ rows: R[]; total: number }>(`${path}${qs({ limit: 200, before, kind, q: text })}`);
-        setRows((xs) => (before ? [...xs, ...r.rows] : r.rows));
-        setTotal(r.total);
-        setDone(r.rows.length < 200);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    },
+    (before: number) => requests.current.run(
+      () => get<{ rows: R[]; total: number }>(`${path}${qs({ limit: 200, before, kind, q: text })}`),
+      {
+        start: () => { setLoading(true); setError(""); },
+        success: (r) => {
+          setRows((xs) => (before ? [...xs, ...r.rows] : r.rows));
+          setTotal(r.total);
+          setDone(r.rows.length < 200);
+        },
+        error: (e) => setError(e instanceof Error ? e.message : String(e)),
+        finish: () => setLoading(false),
+      },
+    ),
     [path, kind, text],
   );
   useEffect(() => {
+    const pending = requests.current;
     setRows([]);
     void load(0);
+    return () => pending.invalidate();
   }, [load]);
   const more = () => rows.length && void load(rows[rows.length - 1].id);
   return { rows, total, loading, error, done, more };
@@ -521,23 +526,31 @@ function SamplesTab({ id, total }: { id: string; total: number }) {
   const [rows, setRows] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  // a slow answer belongs to the account it was asked for: the drawer re-targets
+  // in place when another account's link is clicked, and the old account's
+  // samples must not land under the new one's title
+  const requests = useRef(new LatestRequest());
   const load = useCallback(
-    async (before?: Sample) => {
-      setLoading(true);
-      try {
-        const r = await get<{ samples: Sample[]; total: number }>(`/v1/admin/samples${qs({ account_id: id, limit: 30, before: before?.ts, before_id: before?.id })}`);
-        setRows((xs) => (before ? [...xs, ...r.samples] : r.samples));
-        setDone(r.samples.length < 30);
-      } catch (e) {
-        toast(e instanceof Error ? e.message : String(e), "bad");
-      } finally {
-        setLoading(false);
-      }
-    },
+    (before?: Sample) => requests.current.run(
+      () => get<{ samples: Sample[]; total: number }>(`/v1/admin/samples${qs({ account_id: id, limit: 30, before: before?.ts, before_id: before?.id })}`),
+      {
+        start: () => setLoading(true),
+        success: (r) => {
+          setRows((xs) => (before ? [...xs, ...r.samples] : r.samples));
+          setDone(r.samples.length < 30);
+        },
+        error: (e) => toast(e instanceof Error ? e.message : String(e), "bad"),
+        finish: () => setLoading(false),
+      },
+    ),
     [id, toast],
   );
   useEffect(() => {
+    const pending = requests.current;
+    setRows([]);
+    setDone(false);
     void load();
+    return () => pending.invalidate();
   }, [load]);
   const exportAll = () => download(`/v1/admin/samples/export?account_id=${encodeURIComponent(id)}`, `nanomuse-samples-${id.slice(0, 8)}.jsonl`).catch((e) => toast(String(e.message || e), "bad"));
   return (

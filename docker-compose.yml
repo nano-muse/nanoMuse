@@ -41,7 +41,9 @@ services:
     healthcheck:
       disable: false
     ports:
-      - "8787:8787"
+      # Publish elsewhere or on one address only, when 8787 is taken or a local relay holds it:
+      # NANOMUSE_RUNTIME_PORT=8788, NANOMUSE_RUNTIME_BIND=127.0.0.1
+      - "${NANOMUSE_RUNTIME_BIND:-0.0.0.0}:${NANOMUSE_RUNTIME_PORT:-8787}:8787"
     restart: unless-stopped
 
   daemon:

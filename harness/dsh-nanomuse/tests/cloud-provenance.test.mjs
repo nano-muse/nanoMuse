@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -37,6 +37,8 @@ async function relay() {
     })
   })
   await new Promise((resolve) => r.server.listen(0, '127.0.0.1', resolve))
+  // a test that never comes back (an init that waits for the loader, #701) is reported, not sat out
+  r.server.unref()
   r.origin = `http://127.0.0.1:${r.server.address().port}`
   r.close = () => new Promise((resolve) => r.server.close(resolve))
   return r
@@ -47,6 +49,17 @@ function fakeContext() {
   const settings = { [LLM_ROW]: { providers: {} } }
   const hooks = {}
   const listeners = { 'session/event': [] }
+  // The loader, as dsh has it: a settings write is applied only once the plugins are up, and
+  // the plugins are up only once every `Service.init` returned. `loader.ready()` is that moment.
+  const waiting = []
+  let loaderReady = false
+  const loader = {
+    ready() {
+      loaderReady = true
+      for (const go of waiting.splice(0)) go()
+    },
+    writes: 0,
+  }
   const ctx = {
     reflect: { provide() {} },
     logger: { info() {}, warn() {}, debug() {}, error() {} },
@@ -57,6 +70,8 @@ function fakeContext() {
     },
     settings: {
       async update(ns, patch) {
+        if (!loaderReady) await new Promise((resolve) => waiting.push(resolve))
+        loader.writes += 1
         const row = settings[ns] ?? (settings[ns] = {})
         for (const [k, v] of Object.entries(patch)) row[k] = k === 'providers' ? { ...row.providers, ...v } : v
       },
@@ -78,22 +93,41 @@ function fakeContext() {
   const emit = (sessionId, type, data) => {
     for (const fn of listeners['session/event']) fn({ id: sessionId }, { type, seq: 1, time: Date.now(), data })
   }
-  return { ctx, credentials, settings, hooks, emit }
+  return { ctx, credentials, settings, hooks, emit, loader }
 }
 
 const ACCOUNT_MODELS = [{ id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', kind: 'chat', for: ['chat'], recommended: true }]
 
-async function cloud(origin, { staleDoor = false } = {}) {
-  const home = await mkdtemp(join(tmpdir(), 'nm-cloud-prov-'))
+/** Init must come back on its own, before any settings write could be applied (#701). */
+async function initWithin(svc, ms = 5_000) {
+  let timer
+  const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Service.init did not return within ${ms} ms`)), ms) })
+  try {
+    await Promise.race([svc[Service.init](), late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * A service brought up the way dsh does it: init first, the loader ready after. `staleDoor`
+ * plants a row from an earlier start on another port; `again` is an earlier `cloud()` whose
+ * state file and rows this start inherits, as a restart of the host does.
+ */
+async function cloud(origin, { staleDoor = false, again } = {}) {
+  const home = again?.home ?? (await mkdtemp(join(tmpdir(), 'nm-cloud-prov-')))
   const statePath = join(home, 'cloud.json')
   const fake = fakeContext()
+  if (again) Object.assign(fake.settings, structuredClone(again.settings))
   await fake.ctx.credentials.set(TOKEN_REF, 'account-key')
   if (staleDoor) fake.settings[LLM_ROW].providers[PROVIDER_ID] = { displayName: 'nanoMuse Cloud', api: 'openai-completions', baseURL: 'http://127.0.0.1:1/v1', apiKeyEnv: 'x', models: [{ id: 'deepseek-v4.1-flash' }] }
-  await writeFile(statePath, JSON.stringify({ deviceId: 'pc-dsh-test01', account: { id: 'acct-1', channel: 'email', hint: 'a***@example.org', member: false, region: 'intl' }, models: ACCOUNT_MODELS, update: { checkedAt: Date.now() } }))
+  if (!again) await writeFile(statePath, JSON.stringify({ deviceId: 'pc-dsh-test01', account: { id: 'acct-1', channel: 'email', hint: 'a***@example.org', member: false, region: 'intl' }, models: ACCOUNT_MODELS, update: { checkedAt: Date.now() } }))
   const svc = new NanomuseCloud(fake.ctx, { baseURL: origin, deviceName: 'test-desktop', statePath })
   svc.hub.start = () => undefined
   svc.refresh = async () => svc.status()
-  await svc[Service.init]()
+  await initWithin(svc)
+  fake.loader.ready()
+  await svc.doorPointed
   const api = async (method, route, body) => {
     const req = Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))])
     req.method = method
@@ -103,7 +137,7 @@ async function cloud(origin, { staleDoor = false } = {}) {
     await svc.handle(req, res)
     return res
   }
-  return { svc, api, home, ...fake, done: async () => { await svc.relayDoor.close(); await rm(home, { recursive: true, force: true }) } }
+  return { svc, api, home, ...fake, done: async ({ keepHome = false } = {}) => { await svc.relayDoor.close(); if (!keepHome) await rm(home, { recursive: true, force: true }) } }
 }
 
 /** The hook as dsh runs it; `next` is the adapter: it sends the request to the provider row's base, as the adapter would. */
@@ -133,6 +167,7 @@ test('the provider row points at the door, a stale row is pointed at today\'s; a
     assert.equal(row.baseURL, out.svc.relayDoor.openaiBase, 'the stale port was replaced')
     assert.equal(row.displayName, 'nanoMuse Cloud', 'the rest of the row stayed')
     assert.match(row.baseURL, /^http:\/\/127\.0\.0\.1:\d+\/v1$/)
+    assert.equal(out.loader.writes, 1, 'one write, once the loader was ready')
 
     out.emit('s1', 'user/message', { source: { kind: 'schedule' }, content: [{ type: 'text', text: 'tidy up' }] })
     out.emit('s1', 'turn/start', { turn: 2 })
@@ -161,6 +196,62 @@ test('the provider row points at the door, a stale row is pointed at today\'s; a
     assert.equal(r.calls[1].headers['x-nanomuse-step'], undefined)
   } finally {
     await out.done()
+    await r.close()
+  }
+})
+
+test('#701: init returns while a stale row still waits for the loader; the row is rewritten once the loader is through', async () => {
+  const r = await relay()
+  const home = await mkdtemp(join(tmpdir(), 'nm-cloud-prov-'))
+  const fake = fakeContext()
+  await fake.ctx.credentials.set(TOKEN_REF, 'account-key')
+  // the row 1.0.7 wrote: the relay itself, no door
+  fake.settings[LLM_ROW].providers[PROVIDER_ID] = { displayName: 'nanoMuse Cloud', api: 'openai-completions', baseURL: `${r.origin}/v1`, apiKeyEnv: 'x', models: [{ id: 'deepseek-v4.1-flash' }] }
+  await writeFile(join(home, 'cloud.json'), JSON.stringify({ deviceId: 'pc-dsh-test01', account: { id: 'acct-1', channel: 'email', hint: 'a***@example.org', member: false, region: 'intl' }, models: ACCOUNT_MODELS, update: { checkedAt: Date.now() } }))
+  const svc = new NanomuseCloud(fake.ctx, { baseURL: r.origin, deviceName: 'test-desktop', statePath: join(home, 'cloud.json') })
+  svc.hub.start = () => undefined
+  svc.refresh = async () => svc.status()
+  try {
+    await initWithin(svc)
+    assert.equal(fake.loader.writes, 0, 'nothing was written yet: the loader is not through')
+    assert.equal(fake.settings[LLM_ROW].providers[PROVIDER_ID].baseURL, `${r.origin}/v1`, 'the old row stands until then')
+    fake.loader.ready()
+    await svc.doorPointed
+    assert.equal(fake.loader.writes, 1)
+    assert.equal(fake.settings[LLM_ROW].providers[PROVIDER_ID].baseURL, svc.relayDoor.openaiBase, 'then it points at the door')
+  } finally {
+    await svc.relayDoor.close()
+    await rm(home, { recursive: true, force: true })
+    await r.close()
+  }
+})
+
+test('the next start asks for the same door port, so the row is right as it is; a port that is taken gives way, and the row is rewritten', async () => {
+  const r = await relay()
+  const first = await cloud(r.origin, { staleDoor: true })
+  const port = first.svc.relayDoor.port
+  await first.done({ keepHome: true })
+  // the same profile, the port free: no write
+  const second = await cloud(r.origin, { again: first })
+  try {
+    assert.equal(second.svc.relayDoor.port, port, 'the door is on last start\'s port')
+    assert.equal(second.settings[LLM_ROW].providers[PROVIDER_ID].baseURL, `http://127.0.0.1:${port}/v1`)
+    assert.equal(second.loader.writes, 0, 'nothing to rewrite')
+  } finally {
+    await second.done({ keepHome: true })
+  }
+  // the port taken by something else: another port, and the row follows
+  const squatter = createServer()
+  await new Promise((resolve) => squatter.listen(port, '127.0.0.1', resolve))
+  const third = await cloud(r.origin, { again: second })
+  try {
+    assert.notEqual(third.svc.relayDoor.port, port)
+    assert.equal(third.settings[LLM_ROW].providers[PROVIDER_ID].baseURL, third.svc.relayDoor.openaiBase)
+    assert.equal(third.loader.writes, 1)
+    assert.equal(JSON.parse(await readFile(join(third.home, 'cloud.json'), 'utf8')).doorPort, third.svc.relayDoor.port, 'the new port is the one asked for next time')
+  } finally {
+    await third.done()
+    await new Promise((resolve) => squatter.close(resolve))
     await r.close()
   }
 })

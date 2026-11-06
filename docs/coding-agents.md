@@ -1,5 +1,7 @@
 # Coding agents
 
+On Android, the agent filters scroll horizontally and keep each name on one line. Each filter shows whether the agent is running, installed or not installed. Uninstalled agents remain selectable so their saved sessions can still be found.
+
 The Cursor, Codex, Claude Code and DeepSeek Harness sessions on your computer, seen and steered
 from any device of your account (the phone on the way home, the browser, another
 computer) and from the Muse itself.
@@ -10,7 +12,13 @@ leave on disk, starts their own command-line interface for a new message, and
 streams what comes back. Another device asks over the hub; the hub only carries
 the frames.
 
+On Windows, process discovery decodes command output using the console encoding when it is not UTF-8. Accented process names no longer interrupt the coding agent list.
+
+The desktop preserves Chinese text and other UTF-8 characters when a coding agent's output arrives across several pipe reads, including the last line without a newline.
+
 ## In the apps
+
+When a coding agent cannot resume a saved session, the retry starts a new session with clean output. A partially streamed line from the failed attempt is discarded along with its accumulated output.
 
 - **Phone**: the drawer's *Coding* row (or *Settings → Coding agents*, or the
   `nanomuse://coding` link). Pick a computer, an agent, a session; read the
@@ -32,6 +40,8 @@ the frames.
 Only computers that announce the `coding.*` actions on the hub appear: one
 running the runtime, or one with the desktop app, which announces them too; a
 phone never does.
+
+When the desktop follows a coding run on another computer, its tool count uses the same phase as the originating runner: completion for Codex, start for the other agents. Notes do not count as tools. The final result supplies the originating computer's count if any events were missed.
 
 ## What is read
 
@@ -93,6 +103,11 @@ The runner stops reading when the agent's terminal event arrives, not at pipe
 EOF: `cursor-agent` leaves a worker server running after it answers and would
 otherwise hold the run open forever. The process is then waited for and killed
 after a grace period.
+
+When the Python runtime lists sessions for a workspace, it checks each transcript's
+workspace before applying the result limit. Newer chats in other projects do not hide
+that workspace's history. The stored workspace takes priority over a directory name,
+since different paths can map to the same directory name in a coding agent's store.
 
 ## Where it runs
 

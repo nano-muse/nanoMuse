@@ -1,9 +1,20 @@
 # nanoMuse Cloud
 
+Daily analytics labels and tooltips use the site's configured timezone offset, including UTC, regardless of the operator's browser timezone.
+Unchanged settings polls preserve unsaved allowance, invite bonus and nudge-policy edits. A changed server value still refreshes the corresponding editor.
+Switching accounts in the admin drawer clears the samples list and ignores pending sample responses and errors from the previous account.
+Changing an Activity filter discards pending responses from the previous filter. Automatic refresh pauses while older event pages are being read, so it cannot discard a pending or already loaded More page.
+The admin console counts each demo visit once in its daily chart, including visits present in both the active and recent lists. Days follow the site's configured timezone offset.
+The admin console classifies legacy Python runtime sessions with an `AsyncOpenAI/Python` user agent as runtime sessions, matching the relay.
+
 The "start now" path: sign up with a phone number (mainland China; the code comes by SMS)
 or an e-mail address, get a free allowance, and use nanoMuse without an API key of your own.
 Bringing your own key still works exactly as before: this is one more
 provider, not a replacement.
+
+If a saved numeric admin-console preference is blank or is not a finite number, the console uses that setting’s default value.
+
+Admin-console refreshes keep the newest response for each URL. Responses from before sign-out cannot repopulate the cleared cache or replace a later account’s data.
 
 ## In the app
 
@@ -269,6 +280,9 @@ It is written after the answer has left, off the request's path, and is never
 the reason a chat fails. It does not depend on *Help improve* (that switch is
 about the training set) or on *Sync conversations* (that is the apps' own
 copy of a chat); `RECORD_TURNS=0` on a relay you run keeps none of it.
+The timestamp is captured when the reply finishes. Records from the same account
+are saved in that order, including replies with media, while other accounts can
+record independently. A failed write does not block that account's later turns.
 
 **Who reads it.** The account's devices: `GET /v1/turns` (newest first; paged
 with `before` and `before_id`; `conversation=` for one chat), `GET
@@ -281,6 +295,10 @@ this is the account's data, not the training set, which stays
 `/v1/admin/samples/export` without them), one file at
 `/v1/admin/blobs/{sha256}`, and `GET /v1/admin/record` for the figures:
 turns and files in all and per day, the store against its cap.
+
+In the admin console, changing a filter on Turns or an account's ledger and events
+starts a new list. An older page still loading cannot add its rows to that list
+or replace its error and loading state.
 
 History and sample pages use the existing timestamp indexes to skip newer seconds before applying the insertion-order tie-break. Exports and the analytics backfill use the same paging boundary; no database migration is needed.
 
@@ -496,7 +514,13 @@ travels: side chats stay on the device that made them, and a device pulls with
 (a second switch under *Data controls*, off by default, **per device**; the
 relay has no account-wide setting for it) turns that around for the device it is
 flipped on: its side chats go up, the other devices' side chats come down, and
-the first pull after the flip starts over from zero. The first pull of a fresh
+the first pull after the flip starts over from zero. Two kinds of chat never
+travel, switch or no switch: a chat the desktop runs for another device's task
+(*From Pixel 8*, that device's conversation) and a chat the desktop's rooms run
+for themselves, the feed's daily batch among them (*Feed · <date>*, archived
+when it is done) — those are the agent's workbench, not conversations of the
+person's, and through 1.0.9 the batches did reach the phones as side chats
+once a day ([#713](https://github.com/nano-muse/nanoMuse/issues/713)). The first pull of a fresh
 sign-in asks for the **tail**, the newest 300 messages with the conversations
 they belong to, so a long history opens at once instead of paging from the
 start; the older messages it skipped stay on the relay and are not pulled. While a
@@ -558,10 +582,17 @@ see the run move between its start and its end. Request bodies over
 `MAX_REQUEST_BYTES` (16 MiB by default since 0.20) are 413 `too_large` with
 *Request body is N MB; this relay accepts up to M MB*.
 
+A retry keeps the original `mid`, including when the relay accepted the message but
+its response was lost. The desktop derives new message IDs from the device, local
+session and local line ID; existing persisted message IDs remain recognized. The
+accepted ID format and other clients' UUIDs are unchanged. The desktop saves its
+conversation mapping before upload, so a lost response followed by a restart also
+keeps the same conversation ID.
+
 A conversation is `{cid, kind: main | side, title, device, device_name,
 created_at, updated_at, deleted, seq}` and a message `{mid, cid, seq, device,
 device_name, role: user | assistant, text, truncated, attachments[{name, mime,
-size}], created_at, deleted}`; `cid` and `mid` are UUIDs the device makes (4–64
+size}], created_at, deleted}`; `cid` and `mid` are opaque IDs the device makes (4–64
 characters of `a-z 0-9 . _ : -`, folded to lower case), times are Unix seconds.
 Every accepted change takes the account's next `seq`; a device keeps the
 highest `cursor` it has pulled and asks for `since=` that. A push is idempotent
@@ -584,6 +615,10 @@ or a deletion the hub tells the account's other devices with a `sync` frame
 so it can skip its own echo).
 
 ## Allowance
+
+The admin console's Usage dates, day picker and People sign-up chart follow the
+relay's `DAY_OFFSET_H` calendar. Viewing them from a different browser timezone
+does not shift a day's label or move its sign-ups into an adjacent day.
 
 nanoMuse is a community project and charges nothing. The public relay at
 `cloud.nanomuse.cn` is paid for by the developer, so each account has a pool
@@ -691,6 +726,10 @@ card changes; its title and buttons stay the app's. Apps built against relay
 0.22 and earlier ignore the two fields.
 
 ## Controls
+
+In the admin console, a People table or a Usage day's top accounts expanded with
+*More* keeps its visible rows when polling refreshes the data. If the list becomes
+shorter, the expansion shrinks with it.
 
 The operator can pause parts of the relay without a restart or a deploy
 (relay 0.22, *Controls* on the admin console; `nanomuse-cloud admin controls
@@ -817,6 +856,22 @@ DELETE /v1/devices/{id}     Bearer                            → 204; 409 devic
 and `PASSWORD_MIN_LEN`; the web console prints them in its sign-in and password
 forms, so a relay that sets other figures is described rightly, and an older
 relay without the two fields is read as ten minutes and eight characters.
+
+**Model capacities.** Each model may disclose `context_length` (combined input and output)
+and `max_output_tokens`, both positive integer token counts up to 2147483647. Operators
+can set these fields on each entry in `CLOUD_MODELS`. Unknown capacities are omitted,
+not guessed from a model's name or copied from its billing reference. The configured
+menu uses the same representation in sign-in replies, `/v1/me`, the model list and
+individual model lookups. Additional models discovered for eligible members retain
+these fields when the upstream provider supplies them.
+
+Android and the packaged desktop app use these values when a model's capacity field is blank. A manual
+model override wins; group context limits still apply. Refresh updates inherited values
+without another sign-in and preserves manual overrides. An older relay without these
+fields retains the client's existing fallback. Context capacity is not accumulated
+usage: cached input still occupies context. If an upstream stream omits `usage`, the
+relay estimates consumption for its ledger but does not label that estimate as measured
+usage in the stream, so conversation statistics may differ from the account ledger.
 
 Everything else is the OpenAI API: `GET /v1/models` (with `architecture`
 modalities so the picture model is recognisable, and a `nanomuse` block per

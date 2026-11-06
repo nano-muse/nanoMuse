@@ -21,6 +21,8 @@ pip install 'nanomuse[channels]'    # all three; Telegram needs nothing extra
 The Docker image carries all of them. Without an SDK the app shows the line to install
 and leaves the switch alone.
 
+If a Feishu or DingTalk message fails after reaching the runtime, the runtime log records the channel and the error. Check that log when a connected bot receives a message but does not answer.
+
 ## Where to find it
 
 * **App**: Settings → *Chat apps* (「聊天入口」). One card per app: the switch, the
@@ -106,6 +108,10 @@ robot** (智能机器人):
 The socket host (`openws.work.weixin.qq.com`) is added to `NO_PROXY` for the runtime
 process; a corporate HTTPS proxy usually cannot carry it. Replies stream over the same
 socket; proactive messages (delivery) are markdown.
+
+The runtime keeps reply frames for at most 1,000 WeCom chats. If a chat's frame has
+been evicted, its next pending reply is sent as one complete message instead of a stream.
+A new incoming message supplies a fresh frame.
 
 ### Telegram
 

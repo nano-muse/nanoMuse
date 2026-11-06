@@ -80,10 +80,14 @@ class BaseLLM(ABC):
         that want a JSON list (ideas, memory tidy-up) cannot use a fragment, so the
         second try gets ``roomier_max_tokens()``.
         """
-        response = await self.ask(messages, **kwargs)
+        # Imported here to keep the provider interface independent during module loading.
+        # Auxiliary model calls made inside tools inherit an active task's accounting too.
+        from nanomuse.llm.budget import ask
+
+        response = await ask(self, messages, **kwargs)
         if response.finish_reason == "length":
             kwargs["max_tokens"] = self.roomier_max_tokens()
-            response = await self.ask(messages, **kwargs)
+            response = await ask(self, messages, **kwargs)
         return response
 
     async def close(self) -> None:  # pragma: no cover - default no-op
