@@ -32,7 +32,8 @@ import { RelaunchButton } from './RelaunchButton.tsx'
 import { IconCheck, IconChevronLeft, IconHand, IconMessage, IconMonitor, IconSettings, IconUsers } from './icons.tsx'
 import { useLive } from './live.ts'
 import { setMainChatId } from './MuseChats.tsx'
-import { prefillComposer } from './composer.ts'
+import { prefillEmptyComposer } from './composer.ts'
+import { peekWin } from './win.ts'
 import { ModelChannelsStep, OwnKeyStep } from './OwnKey.tsx'
 import { nav, roomsCall, useRooms } from './rooms.ts'
 
@@ -200,7 +201,7 @@ export function makeOnboarding(t: Translate, _actions: OnboardingActions) {
           setMainChatId(result.sessionId)
           nav.openSession(result.sessionId)
           if (chosenPrompt) {
-            prefillComposer(chosenPrompt)
+            prefillEmptyComposer(chosenPrompt, () => peekWin().current === result.sessionId)
           }
         })
         .catch(() => roomsCall('firstrun/finish', {}).catch(() => undefined))

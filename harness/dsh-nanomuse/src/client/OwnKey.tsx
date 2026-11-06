@@ -63,9 +63,14 @@ export interface ModelOption { provider: string; providerLabel: string; id: stri
 
 const CAPS: Capability[] = ['chat', 'vision', 'image', 'video']
 
-/** The catalogue in the groups the rows are shown in: the host's `waysOn` (`src/catalogue.ts`), so both halves order them alike. */
+/** Keep API-key entries visible even when the same provider also offers subscription sign-in. */
 export function groupsOf(catalogue: ProviderEntry[], region: Region): WaysOn {
-  return waysOn(catalogue, region)
+  const groups = waysOn(catalogue, region)
+  return {
+    ...groups,
+    signIn: groups.signIn.filter((entry) => !entry.auth.includes('key')),
+    rest: [...groups.signIn.filter((entry) => entry.auth.includes('key')), ...groups.rest],
+  }
 }
 
 /** `GET /providers`, again whenever the host's live state says the rows or the sign-in moved. */
@@ -414,14 +419,14 @@ export function WaysOnRows({ t, view, groups = ALL_GROUPS, signInRow = true, hea
       out.push(h(AccountRow, { key: 'account', t, view }))
     }
     if (groups.includes('first') && g.first.length) {
-      const firstProviders = g.first.filter((p) => !chatgptEntry || p.id !== chatgptEntry.id)
+      const firstProviders = g.first
       if (firstProviders.length > 0) {
         out.push(heading(view.region === 'cn' ? t('ownKeyRegionCn') : t('ownKeyRegionGlobal')))
         for (const p of firstProviders) out.push(rowOf(p))
       }
     }
     if (groups.includes('rest') && g.rest.length) {
-      const restProviders = g.rest.filter((p) => !chatgptEntry || p.id !== chatgptEntry.id)
+      const restProviders = g.rest
       if (restProviders.length > 0) {
         out.push(heading(t('ownKeyRestGroup')))
         for (const p of restProviders) out.push(rowOf(p))
@@ -439,13 +444,19 @@ export function WaysOnRows({ t, view, groups = ALL_GROUPS, signInRow = true, hea
     }
   } else {
     // Capability filter active
-    const matches = view.catalogue.filter((p) => p.capabilities.includes(selectedCap) && p.id !== 'custom')
+    const visible = [
+      ...(groups.includes('first') ? g.first : []),
+      ...(groups.includes('rest') ? g.rest : []),
+      ...(groups.includes('local') ? g.local : []),
+      ...(groups.includes('signIn') ? g.signIn : []),
+    ]
+    const matches = visible.filter((p) => p.capabilities.includes(selectedCap))
     const capTitle = t(selectedCap === 'chat' ? 'ownKeyFilterChat' : selectedCap === 'vision' ? 'ownKeyFilterVision' : selectedCap === 'image' ? 'ownKeyFilterImage' : 'ownKeyFilterVideo')
     if ((selectedCap === 'chat' || selectedCap === 'vision') && chatgptEntry && groups.includes('signIn')) {
       out.push(heading(t('ownKeySignInGroup')))
       out.push(h(ChatGptRow, { key: 'chatgpt', t, view, onChanged }))
     }
-    const keyMatches = matches.filter((p) => !chatgptEntry || p.id !== chatgptEntry.id)
+    const keyMatches = matches
     if (keyMatches.length > 0) {
       out.push(heading(`${capTitle} (${keyMatches.length})`))
       for (const p of keyMatches) out.push(rowOf(p))
