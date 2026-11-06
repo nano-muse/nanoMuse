@@ -101,11 +101,10 @@ _DANGEROUS = [
 
 
 def _spliced(command: str) -> str:
-    # A backslash before a newline never reaches word splitting: the shell removes the
-    # pair, so `rm \<newline>-rf x` runs as `rm -rf x` and `su\<newline>do` as `sudo`.
-    # The guard reads the spliced text, never the raw one, or a split flag or a split
-    # word hides from every pattern above. Inside quotes a shell keeps the pair; dropping
-    # it there too can only add a warning, never remove one.
+    # POSIX shells remove an unquoted backslash-newline pair before splitting words,
+    # and also remove it inside double quotes. Thus `rm \<newline>-rf x` runs as
+    # `rm -rf x`, and `su\<newline>do` as `sudo`. This pattern scan is not a shell parser:
+    # it also joins pairs inside single quotes, so literal text can trigger a warning.
     return command.replace("\\\n", "")
 
 
