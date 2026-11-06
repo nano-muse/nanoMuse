@@ -7,6 +7,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Stopped scheduled relay backups before copying when free disk space was insufficient, and prevented overlapping backup runs. For #858.
+
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
 - **A visit that is both running and recent counts once in the demo per-day bars.** The bars concatenated the active and recent lists without the dedup the page's own table applies, so a running visit sat in both lists and its day counted it twice, and the bar total disagreed with the visits number printed beside it.
 
