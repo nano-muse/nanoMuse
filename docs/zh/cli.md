@@ -1,6 +1,8 @@
-# 命令行（CLI）
+# 命令行使用说明 {#命令行-cli}
 
-每条命令都接受 `--config PATH`（`-c`）。`--auto` 让哨兵（Sentinel）在这一次运行里切到 `auto` 模式；明确写下的拒绝规则仍然生效。
+CLI（命令行界面）是通过在终端输入命令来使用程序的方式。本页命令针对 Python 运行时，也就是执行智能体任务的程序。
+
+所有命令都支持 `--config PATH`，简写为 `-c`，用于指定配置文件。`--auto` 会将本次运行的哨兵（Sentinel，操作权限检查组件）切换为 `auto` 模式；你明确设置的拒绝规则仍会生效。
 
 ## 和智能体对话 {#talking-to-the-agent}
 
@@ -8,40 +10,42 @@
 nanomuse serve [--host 0.0.0.0] [--port 8787] [--no-qr] [--no-auth]
 ```
 
-一直在线的智能体，配合手机 App 使用。见 [app.md](app.md)。`--no-auth` 只用于本地开发。
+`serve` 启动持续运行的智能体服务，供手机 App 连接。详情见 [app.md](app.md)。`--no-auth` 会关闭身份验证，仅用于本地开发。
 
 ```bash
 nanomuse chat [--resume] [--show-thinking] [--auto]
 ```
 
-在终端里的交互式会话，审批直接在对话中进行。斜杠命令：
+`chat` 在终端中开启交互式对话，遇到需要审批的操作时会直接在终端询问。对话中可以使用以下斜杠命令：
 
 | 命令 | 作用 |
 |---|---|
 | `/help` | 列出命令 |
-| `/reset` | 清空对话和污染标记 |
+| `/reset` | 清空对话，并清除已读取私密数据的污染标记 |
 | `/memory`、`/goals` | 列出记忆 / 目标 |
-| `/audit [n]` | 最近的审计记录 |
+| `/audit [n]` | 显示最近的操作与权限判定记录，可指定条数 |
 | `/tools` | 智能体此刻能用的工具 |
 | `/tainted` | 这段对话有没有读过私密数据 |
-| `/permissions` | 你授予的长期权限（键和有效期） |
-| `/revoke <key>` | 收回一项，例如 `/revoke shell:git` |
+| `/permissions` | 显示已授予的长期权限，包括授权键和有效期 |
+| `/revoke <key>` | 撤销指定权限，例如 `/revoke shell:git` |
 | `/forget-approvals` | 清掉所有已授予的权限 |
 | `/exit` | 退出（`/quit`、`/q` 也可以） |
 
-`--resume` 接着最近一次会话继续（`<data_dir>/sessions/`）。
+加上 `--resume` 可继续最近一次会话。会话数据保存在 `<data_dir>/sessions/` 中，`data_dir` 是配置的数据目录。
 
 ```bash
 nanomuse run "Summarise the top three Hacker News stories into hn.md" [--auto]
 ```
 
-做一件事，然后退出。智能体失败时以非零码退出。
+`run` 执行指定任务后退出。如果智能体执行失败，命令返回非零退出码，便于脚本判断结果。
 
 ```bash
 nanomuse daemon [--interval 3600] [--once]
 ```
 
-把每一个进行中的目标各自放进一次性的会话里推进，休眠，再来一遍；每轮做了什么打印在这里。它跑在哨兵的 `auto` 模式下，所以要配上拒绝规则和收紧的 `egress_allowlist`。它是 App 里「后台工作」开关（在 `nanomuse serve` 内）的朴素版、无人值守版：那个开关每个周期挑一个目标，在聊天自己的上下文和哨兵之下运行，进展发到聊天里，重启后还记得欠下的那一轮（[app.md](app.md#background-work)）；daemon 没有聊天，也不记得上一轮，只是跑。
+`daemon` 会分别为每个进行中的目标创建临时会话，推进一轮并打印结果，等待指定时间后重复执行。它使用哨兵的 `auto` 模式，应配合拒绝规则和严格的 `egress_allowlist`（允许向外发送数据的主机列表）。
+
+App 的「后台工作」由 `nanomuse serve` 提供：每个周期只选一个目标，使用原聊天的上下文和哨兵，将进展发回聊天，并能在重启后恢复未完成的轮次，见 [app.md](app.md#background-work)。`daemon` 是独立的无人值守命令，没有关联聊天，也不保存各轮执行进度。
 
 ## 目标 {#goals}
 
@@ -64,7 +68,7 @@ nanomuse reminders add "Summarise unread email" --repeat "weekdays 07:30" --task
 nanomuse reminders cancel r_1a2b3c
 ```
 
-提醒是在你指定的时间说一句话；例程（`--task`）是智能体在那个时间用它的工具去做的事。两者都由运行中的 `nanomuse serve` 触发：在终端里设的落在主要聊天，在旁聊里设的留在那个旁聊。周期的写法和目标检查一样：`daily HH:MM`、`weekdays HH:MM`、`weekly <mon…sun> HH:MM`、`monthly <day> HH:MM`。
+提醒会在指定时间发送一条消息；例程（`--task`）则在指定时间调用工具执行任务。两者都需要 `nanomuse serve` 保持运行。从终端创建的任务归入主要聊天，从旁聊创建的任务留在该旁聊中。周期格式与目标检查一致：`daily HH:MM` 表示每天，`weekdays HH:MM` 表示工作日，`weekly <mon…sun> HH:MM` 表示每周指定日期，`monthly <day> HH:MM` 表示每月指定日期。
 
 ## 触发器 {#triggers}
 
@@ -77,7 +81,11 @@ nanomuse triggers add device "Say the phone is back"         --match "pixel"    
 nanomuse triggers cancel t_1a2b3c
 ```
 
-触发器在事情发生时触发，而不是到点触发：`mail` 需要邮件连接器（运行中的服务器每隔 `triggers.mail_poll_minutes` 查看一次收件箱，按 IMAP UID 记录，所以不会重放，也不会触发两次）；`event` 需要一个日历订阅；`hook` 是一个带密钥的 URL，任何程序都可以向它 `POST`；请求体成为智能体的上下文；`device` 需要这台电脑在 hub 上，账号下某台设备上线时触发（按名称或类型里的词匹配，本机不宣告自己，App 启动时就在线的设备不算一次上线）。每次触发都是在设置它的那个聊天里的一次后台运行，在动态里显示为 *New mail: …*、*Coming up: …*、*Webhook: …* 或 *Device online: …*。邮件或请求是作为数据交给模型的，并附带一句说明：只有你预先写下的那段话才决定做什么。
+触发器根据事件启动任务。`mail` 需要邮件连接器，服务器每隔 `triggers.mail_poll_minutes` 分钟检查收件箱，按 IMAP UID（邮件在该邮箱中的唯一编号）记录已处理项，避免重复执行。`event` 需要日历订阅。`hook` 提供带密钥的 URL，其他程序可以向它发送 `POST` 请求，请求体会作为任务上下文。
+
+`device` 要求这台电脑已加入 hub（账号下的设备通信服务）。当其他设备从离线变为在线时，它会按设备名称或类型中的词匹配触发条件。本机不会触发自身上线事件，App 启动时已经在线的设备也不算新上线。
+
+每次触发都会在创建它的聊天中执行一轮后台任务，动态中显示 *New mail: …*、*Coming up: …*、*Webhook: …* 或 *Device online: …*。邮件和外部请求只作为数据交给模型，模型会被明确要求只按你预设的任务说明行动。
 
 ## 日历 {#calendar}
 
@@ -90,7 +98,7 @@ nanomuse calendar feeds                                                         
 nanomuse calendar remove Family
 ```
 
-运行中的服务器每隔 `refresh_minutes` 重新读一次订阅；`agenda --refresh` 立刻抓取。智能体通过它的 `calendar` 工具看到同样的内容，另外还有 `draft`：它写出一个 `.ics` 文件，App 显示为「添加到日历」卡片；它从不直接写你的日历。
+服务器按 `refresh_minutes` 指定的间隔刷新日历订阅。使用 `agenda --refresh` 可立即刷新。智能体的 `calendar` 工具能读取相同日程，还能通过 `draft` 生成 `.ics` 日历交换文件。App 会将文件显示为「添加到日历」卡片，供你确认添加，不会直接修改你的日历。
 
 ## 联系人 {#contacts}
 
@@ -103,7 +111,7 @@ nanomuse contacts add-source Google ~/Downloads/contacts.vcf         # a .vcf fi
 nanomuse contacts remove-source Google
 ```
 
-智能体通过它的 `contacts` 工具看到同样的内容；`doctor` 会报告它认识多少人、来自哪里。
+智能体可通过 `contacts` 工具查询同一份联系人数据。`doctor` 会显示联系人总数及各通讯录来源。
 
 ## 技能 {#skills}
 
@@ -118,7 +126,7 @@ nanomuse skills enable inbox-triage
 nanomuse skills remove standup-notes                    # one of yours (built-in ones are disabled, not removed)
 ```
 
-技能是带 `SKILL.md` 的文件夹，格式按 [Agent Skills](https://agentskills.io)；你自己的放在 `<data_dir>/skills/`，和内置技能同名的会替换掉那一个内置技能。聊天里，消息开头写 `/name` 就运行对应的技能；`doctor` 列出已加载的技能和读不了的文件夹。
+技能是包含 `SKILL.md` 的文件夹，按 [Agent Skills](https://agentskills.io) 格式描述某类任务的执行方法。自定义技能放在 `<data_dir>/skills/` 下；名称与内置技能相同时，优先使用自定义版本。在聊天消息开头输入 `/name` 可调用对应技能。`doctor` 会列出已加载的技能，并报告无法读取的技能目录。
 
 ## 记忆 {#memory}
 
@@ -134,7 +142,7 @@ nanomuse memory changes                # the log, newest first
 nanomuse memory restore c_1a2b3c4d     # undo one change
 ```
 
-`memory recall` 显示智能体对一条消息会得到的排序：关键词命中，以及在配置了嵌入端点时（[配置 → 记忆](configuration.md#memory)）融合进来的按语义命中，每条带余弦相近度；用它看看「写邮件给房东」能不能找到「房东是 Bob Li」，再去依赖它。`doctor` 会说明按语义回忆有没有开、用的哪个模型、索引了多少条记忆。
+`memory recall` 会显示智能体面对指定消息时检索到的记忆及其排序。系统先匹配关键词；如果配置了嵌入端点，还会结合语义检索，即把文本转换为向量后比较含义，见[配置 → 记忆](configuration.md#memory)。每条结果附有余弦相似度，用于表示向量接近程度。可以用「写邮件给房东」检查能否找到「房东是 Bob Li」，再判断检索效果是否满足需求。`doctor` 会显示语义检索是否启用、所用模型和已建立索引的记忆条数。
 
 ## 保险库 {#vault}
 
@@ -144,7 +152,7 @@ nanomuse vault list                    # names only, never values
 nanomuse vault delete EMAIL_PASSWORD
 ```
 
-在配置里用 `{{vault:EMAIL_PASSWORD}}` 引用机密（只限连接器；命令永远拿不到机密）。见 [sentinel.md](sentinel.md#credential-vault)。
+保险库用于加密保存密钥等凭据。在配置中使用 `{{vault:EMAIL_PASSWORD}}` 引用相应条目。只有连接器会解析这些引用，shell 命令不能据此取得凭据。详情见 [sentinel.md](sentinel.md#credential-vault)。
 
 ## 聊天入口 {#chat-apps}
 
@@ -157,7 +165,7 @@ nanomuse channels login feishu [--lark]        # 扫码创建飞书机器人
 nanomuse channels test feishu [--chat <id>]    # 发一条测试消息（默认发到第一个已配对的会话）
 ```
 
-`nanomuse serve` 在运行时，这些命令走它的 API；否则直接改数据目录下的文件，服务器启动时读取。各个应用、配对和各自需要什么：[channels.md](channels.md)。
+如果 `nanomuse serve` 正在运行，这些命令会通过 API（程序调用接口）更新服务；否则会修改数据目录中的文件，供服务器下次启动时读取。各聊天应用的配置要求和配对步骤见 [channels.md](channels.md)。
 
 ## ChatGPT 登录 {#chatgpt-sign-in}
 
@@ -169,7 +177,7 @@ nanomuse chatgpt logout                        # 忘掉这次登录；上游不�
 nanomuse chatgpt proxy [--port 0] [--token …]  # 回环地址上的一个 OpenAI 兼容服务
 ```
 
-每个子命令都接受 `--json`（每行一个 JSON 对象）；需要访问 chatgpt.com 的子命令还接受 `--proxy`（默认取配置里的 `[llm] proxy`）。登录覆盖什么、令牌存在哪里：[own-key.md](own-key.md#sign-in-with-a-plan-you-already-pay-for)。
+所有子命令都支持 `--json`，按每行一个 JSON 对象输出，便于程序读取。需要访问 chatgpt.com 的子命令还支持 `--proxy`，默认沿用 `[llm] proxy` 配置。登录可使用哪些能力、授权令牌保存在哪里，见 [own-key.md](own-key.md#sign-in-with-a-plan-you-already-pay-for)。
 
 ## 手机 {#phone}
 
@@ -179,7 +187,7 @@ nanomuse phone trace pt-20260923-230710-5be7       # one task step by step: scre
 nanomuse phone trace pt-20260923-230710-5be7 -o trace.html   # a self-contained page with every screen and tap drawn on it
 ```
 
-每当智能体操作手机时都会写下轨迹（[gui.md](gui.md#traces)）；HTML 页面是单个文件，截图内嵌，就是为了附到 issue 上。
+每次手机操作都会记录轨迹，即按顺序保存截图、动作和结果，见 [gui.md](gui.md#traces)。导出的 HTML 是包含内嵌截图的独立文件，可附在 issue（问题报告）中。
 
 ## 审计和配置 {#audit-and-config}
 
@@ -193,6 +201,8 @@ nanomuse version                       # also: nanomuse --version / -V
 nanomuse mcp                           # this computer's screen and hands as an MCP server on stdio, for another host
 ```
 
-`nanomuse mcp` 是给不是我们运行时的宿主用的（[跑在 DeepSeek Harness 上的 nanoMuse](harness.md)），它以运行时自己的描述提供 `computer_screen` 和 `computer_act`；哨兵会停下来问的那一步（回车、提交、重的快捷键、点到敏感词）会被拒绝并给出原因，直到调用带上 `confirmed: true`，而模型只有在对话里得到人的同意后才可以设置它。
+`nanomuse mcp` 通过 MCP（让智能体接入外部工具的协议）向其他宿主提供 `computer_screen` 和 `computer_act`，工具描述与本运行时一致。用法见[在 DeepSeek Harness 中运行 nanoMuse](harness.md)。对于回车、提交、可能产生较大影响的快捷键，以及涉及敏感词的点击，哨兵会拒绝执行并说明原因，直到调用包含 `confirmed: true`。模型只有在对话中得到用户同意后，才能设置该字段。
 
-`nanomuse doctor` 是出问题时第一个该跑的命令，也是该贴进 bug 报告的内容：用的是哪个配置文件（以及里面有没有没人读的键）、数据放在哪、配置了哪个模型和端点、key 有没有设、按语义回忆有没有开、索引了多少条记忆、哪个网页搜索服务商在应答、它的 key 或 URL 有没有、命令是否跑在沙箱里（如果没有，为什么）、智能体有哪些工具、连接器状态（邮箱、日历订阅、通讯录），以及对模型的一次单行调用及其延迟（`--no-model` 跳过这一项）。有东西需要修时它以非零码退出，并说明是什么。
+排查问题时先运行 `nanomuse doctor`，提交错误报告时也可附上诊断结果。它会检查配置文件路径及未被程序使用的配置键、数据目录、模型与服务地址、密钥是否已设置、语义记忆检索与索引数量、网页搜索服务及其密钥或 URL、命令是否在沙箱中运行及未启用的原因、可用工具，以及邮箱、日历和通讯录的连接状态。沙箱是限制命令可访问资源的隔离环境。
+
+诊断还会向模型发送一次简短请求并显示耗时，可用 `--no-model` 跳过。发现需要修复的问题时，命令返回非零退出码并说明原因。

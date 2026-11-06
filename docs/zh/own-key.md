@@ -1,25 +1,25 @@
-# 换成自己的 key
+# 使用自己的 key {#换成自己的-key}
 
-nanoMuse 免费、非营利。它背后的模型要花钱，每个账号的起始额度由开发者出（应用里显示的是中继当前的数字）。额度用完以后，有两条路可以继续走，都不需要 nanoMuse 再提供什么：在某家模型服务商申请一把自己的 key，或者用你已经在付费的套餐（ChatGPT、Claude、Kimi）在应用里登录。
+nanoMuse 免费、非营利，但调用模型需要付费。开发者为每个账号承担一笔起始额度，具体金额以 App 显示的中继数据为准。中继是负责账号和设备间通信的服务器。额度用完后，可以直接使用模型服务商的 key（调用服务所需的密钥），或在 App 中登录已经付费的 ChatGPT、Claude、Kimi 等套餐，无需 nanoMuse 再提供额度。
 
-每个客户端读的都是同一份服务商清单，每家能做什么也写在里面：**对话**、**动手**（一个能看截图的模型）、**画图**（形象工作室）和**视频**（形象的短视频）。没有任何已配置的服务商能做的功能，就干脆不提供，只用一句话说明哪些服务商可以；什么都不会坏。
+所有客户端共用一份服务商目录，标明各家的能力：对话、屏幕操作（模型根据截图决定如何操作）、图片生成（用于形象工作室）、视频生成（用于形象短视频）。如果当前没有配置支持某功能的服务商，界面会暂不提供该功能，并说明哪些服务商支持它，其他功能照常使用。
 
-你的登录、邀请码和设备都不受影响：账号还是那个账号，换的只是模型服务商。用上自己的 key 或套餐之后，你说的话不再经过 nanoMuse Cloud。
+切换服务商不会影响登录、邀请码或设备连接，账号仍然保留。使用自己的 key 或套餐时，模型请求不再经过 nanoMuse Cloud。
 
-## 先看你在哪 {#where-you-are-decides-who-comes-first}
+## 按地区推荐服务商 {#where-you-are-decides-who-comes-first}
 
 | | 首选 | 一把 key 能做什么 |
 |---|---|---|
 | 中国大陆 | **阿里云百炼** | 对话、动手、画图、生成视频，四样都在一把 key 下 |
 | 海外 | **OpenRouter**，其次 **OpenAI** | 对话、动手、画图；生成视频目前只有百炼 |
 
-百炼只给中国大陆身份注册；海外用户一个 OpenRouter 账号就能用到几百个模型，按量付费。首选之外，下面的每一家都可以单独用，或者和另一家搭配，比如对话用 DeepSeek、画图用智谱。
+百炼注册要求中国大陆身份。其他地区可使用 OpenRouter，一个账号、一份 key 即可按量调用数百个模型。除推荐项外，下表的服务商也可单独使用或组合使用，例如用 DeepSeek 对话、用智谱生成图片。
 
-四件事、四个设置、一个页面：Android、iPhone 和桌面版都是 **设置 › 模型**，网页控制台是「连接」页。四行分别是「对话」「操作屏幕」「生成图片」「生成视频」；每行显示 `服务商 · 模型`，点开是一个只列能做这件事的模型的选择器（操作屏幕需要能看图的模型）。iPhone 上「操作屏幕」这一行是灰的（「不在 iPhone 上」）：手机不能操作自己的屏幕，电脑用它自己的设置。细节见下面的[哪个模型做哪件事](#which-model-does-what)。
+Android、iPhone 和桌面版都在 设置 → 模型 配置；网页控制台则在「连接」页配置。四项分别为「对话」「操作屏幕」「生成图片」「生成视频」，各自显示 `服务商 · 模型`。点开后只会列出具备该项能力的模型，例如屏幕操作必须选能看图的模型。iPhone 不能操作本机屏幕，因此该项不可选，并显示「不在 iPhone 上」；远程电脑使用电脑自身的设置。详见[哪个模型负责什么](#which-model-does-what)。
 
-## 各家服务商能做什么 {#what-each-provider-covers}
+## 各服务商支持的能力 {#what-each-provider-covers}
 
-对话 = 聊天；动手 = 看截图操作手机和电脑；画图 = 形象工作室的图片；视频 = 形象的短动画。
+下表的「对话」指聊天；「动手」指根据截图操作手机或电脑；「画图」指生成形象工作室图片；「视频」指生成形象短视频。
 
 | 服务商 | 对话 | 动手 | 画图 | 视频 | 地区 | 申请 key |
 |---|:-:|:-:|:-:|:-:|---|---|
@@ -46,46 +46,46 @@ nanoMuse 免费、非营利。它背后的模型要花钱，每个账号的起�
 | AtmoRouter | ● | | | | 海外 | [atmorouter.dev](https://atmorouter.dev/dashboard/keys) |
 | Ollama / LM Studio / vLLM（本机） | ● | | | | 都可以 | 不需要 key |
 
-「视频」一栏只有百炼，是因为 nanoMuse 的视频生成走的是百炼的接口；其他家的视频模型用的是各自的任务接口，这一轮还没有接。「画图」一栏里，OpenRouter 走的是它的 Image API，模型例如 `openai/gpt-image-2`；Gemini 用 `gemini-2.5-flash-image`。
+视频一栏只有百炼，是因为 nanoMuse 当前接入的是百炼视频 API（程序调用服务的接口）。其他厂商的视频模型使用各自的任务接口，本轮尚未接入。图片方面，OpenRouter 使用 Image API，例如 `openai/gpt-image-2`；Gemini 使用 `gemini-2.5-flash-image`。
 
-这张表来自仓库里的目录文件 [`nanomuse/llm/providers.json`](../../nanomuse/llm/providers.json)：每个客户端、中继都读它，地址、默认模型和「能做什么」都在里面；表里的事实在 2026 年 10 月对照各家文档核过。
+表格来自仓库目录 [`nanomuse/llm/providers.json`](../../nanomuse/llm/providers.json)。客户端和中继都读取它，其中包括接口地址、默认模型及支持能力，相关信息已在 2026 年 10 月对照厂商文档核验。
 
-## 怎么申请 key {#making-a-key}
+## 创建 key {#making-a-key}
 
-每家的步骤都是一样的三步：注册 → 控制台里创建 API key → 复制到 nanoMuse。**key 只给 nanoMuse 用，不要发给任何人、不要贴到聊天里。**
+基本流程都是：注册服务商账号，在控制台创建 API key，再填入 nanoMuse。**key 只应填在 nanoMuse 的配置中，不要发给他人，也不要粘贴进聊天**。
 
-- **阿里云百炼。** 用阿里云账号登录 [bailian.console.aliyun.com](https://bailian.console.aliyun.com/)（要实名认证），首次进入点「开通百炼服务」，再到 [API-KEY 页](https://bailian.console.aliyun.com/?apiKey=1) 创建；key 以 `sk-` 开头。新账号有一段时间的免费 token。建议在控制台设一个用量告警。
-- **DeepSeek。** [platform.deepseek.com](https://platform.deepseek.com/) 注册、充值、API Keys 里创建。地址 `https://api.deepseek.com/v1`。
-- **Kimi。** 国内版在 [platform.moonshot.cn](https://platform.moonshot.cn/console/api-keys)，地址 `https://api.moonshot.cn/v1`；国际版在 [platform.kimi.ai](https://platform.kimi.ai/console)，地址 `https://api.moonshot.ai/v1`。两个版本的账号和 key 不通用。
-- **智谱 GLM。** [open.bigmodel.cn](https://open.bigmodel.cn/usercenter/apikeys)，地址 `https://open.bigmodel.cn/api/paas/v4`。
-- **硅基流动。** [cloud.siliconflow.cn](https://cloud.siliconflow.cn/account/ak)，地址 `https://api.siliconflow.cn/v1`；模型 id 带厂商前缀，例如 `deepseek-ai/DeepSeek-V4-Flash`。
-- **火山方舟。** [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey)，先在方舟里开通要用的模型，再创建 key；地址 `https://ark.cn-beijing.volces.com/api/v3`。
-- **MiniMax。** 国内版 [platform.minimaxi.com](https://platform.minimaxi.com/user-center/basic-information/interface-key)，地址 `https://api.minimaxi.com/v1`；国际版地址 `https://api.minimax.io/v1`。
-- **OpenRouter。** [openrouter.ai](https://openrouter.ai/) 用 Google、GitHub 或邮箱登录，*Credits* 里充值，*Keys* 里创建；key 以 `sk-or-v1-` 开头。*Settings → Limits* 可以给 key 设每月上限。
-- **OpenAI。** [platform.openai.com](https://platform.openai.com/api-keys)，地址 `https://api.openai.com/v1`。
-- **Anthropic。** [platform.claude.com](https://platform.claude.com/settings/keys)。nanoMuse 直接用 Anthropic 的接口，不需要兼容层。
-- **Google Gemini。** [aistudio.google.com/apikey](https://aistudio.google.com/apikey)，地址 `https://generativelanguage.googleapis.com/v1beta/openai`。
-- **xAI、Groq、Mistral。** 各自的控制台创建 key；地址分别是 `https://api.x.ai/v1`、`https://api.groq.com/openai/v1`、`https://api.mistral.ai/v1`。
-- **OpenCode Zen。** 在 [opencode.ai/auth](https://opencode.ai/auth) 申请 key；按请求从余额里扣费，有几个模型免费。地址 `https://opencode.ai/zen/v1`。只有 OpenAI 格式的那些模型到得了，所以只有对话、没有动手：OpenCode 列出的视觉模型 `deepseek-v4-flash-vision-exp` 在 DeepSeek 自家平台上已经退役。OpenCode 没有套餐登录，只有 key，所以这里没有可以登录的东西。
-- **OpenCode Go。** 同一域名上的订阅：在 OpenCode 控制台订阅 Go（每月 10 美元）或 Go Plus（每月 40 美元），再到 [opencode.ai/auth](https://opencode.ai/auth) 申请 key。地址 `https://opencode.ai/zen/go/v1`。用量按模型计，分每月、每周和每 5 小时三档上限。OpenCode 把 Go 定位给编程智能体，要求客户端说明自己是谁，并在 `x-opencode-session` 里为每个对话带上一个固定的 id（[它的 Go 页面](https://opencode.ai/go)，「Can I use Go with other coding agents?」一条）。运行时（也就是网页控制台）每次请求 Go 都把 `nanoMuse/<版本>` 作为 user agent，并在这个请求头里带上对话的 id；不属于任何对话的调用（比如连接测试）带的是它自己的 id。桌面版把 Go 写成模型适配器自带的 OpenCode Go 路由，这条路由同样会带上这个请求头，并按每个模型自己的格式访问：桌面版提供这条路由的目录里列出的模型，走 Responses 和 Messages 格式的也在内；其他地方只走 OpenAI 格式。手机端也会发：对 OpenCode 域名的对话和 Responses 请求都带上这个请求头，id 是这个聊天的提示缓存键，由第一条消息算出，每一轮都一样（开头一字不差的两个聊天会共用一个）。和 Zen 一样只有对话。
-- **Standard Compute。** 在 [standardcompute.com/dashboard/api-keys](https://standardcompute.com/dashboard/api-keys) 申请 key；按月付固定费用，每月 19 美元起，每个套餐有每月的算力预算，用完后请求返回 402（没有超额费用）。地址 `https://api.stdcmpt.com/v1`。默认模型 `standardcompute` 是一个路由：每个请求从账号 Models 页面里启用的模型中挑一个；也可以改填 `https://api.stdcmpt.com/v1/models` 里的任意模型 id。只有对话：路由在这个列表里没有声明能看图，所以「动手」不列入。
-- **Cheaper Inference。** 在 [cheaperinference.com/signup](https://cheaperinference.com/signup) 申请 key；一把 key 用多个厂商的模型。地址 `https://api.cheaperinference.com/v1`。默认模型是 `gpt-5.4-mini`；也可以改填 `https://api.cheaperinference.com/v1/models` 里的任意模型 id。这里只有对话，走 OpenAI 格式。
-- **API Route。** 登录后打开 [API keys](https://www.api-route.com/api-keys)，并为账号充值。地址为 `https://global.api-route.com/v1`；默认模型 `gpt-6.1-sol` 已通过 `/v1/models` 列表和真实对话请求验证。其他模型 id 应从这把 key 可用的列表中选择。费用按所选模型的[当前价格](https://www.api-route.com/pricing)从 API Route 预充值余额中扣除，与 nanoMuse Cloud 分开计费。这里只提供对话，尚未验证图片输入、图片生成和视频功能。详见[服务商文档](https://www.api-route.com/docs/overview)。
-- **Opper。** 在 [platform.opper.ai](https://platform.opper.ai) 的 *API Keys* 里创建 key；一把 key 用 50 多家服务商的 700 多个模型，按服务商的价格计费，不加价，网关托管在欧盟。地址 `https://api.opper.ai/v3/compat`。默认模型是 `claude-sonnet-4-6`；也可以改填 `https://api.opper.ai/v3/compat/models` 里的任意模型 id，`anthropic/claude-sonnet-4-6` 这样带服务商前缀的 id 固定走一条线路。这里只有对话，走 OpenAI 格式。
-- **AtmoRouter。** 在 [atmorouter.dev/dashboard/keys](https://atmorouter.dev/dashboard/keys) 申请 key；按用量付费，一把 key 用多个厂商的模型。地址 `https://atmorouter.dev/v1`。模型 id 带线路前缀，以 `https://atmorouter.dev/v1/models` 列出的为准；默认模型是 `cc/claude-sonnet-4-6`，也可以改填这个列表里的任意模型 id。这里只有对话，走 OpenAI 格式。
+- **阿里云百炼**。 用已完成实名认证的阿里云账号登录 [bailian.console.aliyun.com](https://bailian.console.aliyun.com/)，首次进入先选择「开通百炼服务」，再到 [API-KEY 页](https://bailian.console.aliyun.com/?apiKey=1) 创建 key，其开头为 `sk-`。新账号会在一定期限内获得免费 token，token 是模型输入和输出的计量单位。可在控制台设置用量告警。
+- **DeepSeek**。 在 [platform.deepseek.com](https://platform.deepseek.com/) 注册、充值并创建 key，基础地址为 `https://api.deepseek.com/v1`。
+- **Kimi**。 中国大陆版在 [platform.moonshot.cn](https://platform.moonshot.cn/console/api-keys) 创建 key，地址为 `https://api.moonshot.cn/v1`；国际版在 [platform.kimi.ai](https://platform.kimi.ai/console)，地址为 `https://api.moonshot.ai/v1`。两版账号和 key 不通用。
+- **智谱 GLM**。 在 [open.bigmodel.cn](https://open.bigmodel.cn/usercenter/apikeys) 创建 key，地址为 `https://open.bigmodel.cn/api/paas/v4`。
+- **硅基流动**。 在 [cloud.siliconflow.cn](https://cloud.siliconflow.cn/account/ak) 创建 key，地址为 `https://api.siliconflow.cn/v1`。模型 id 含厂商前缀，例如 `deepseek-ai/DeepSeek-V4-Flash`。
+- **火山方舟**。 打开 [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey)，先开通所需模型，再创建 key。地址为 `https://ark.cn-beijing.volces.com/api/v3`。
+- **MiniMax**。 中国大陆版在 [platform.minimaxi.com](https://platform.minimaxi.com/user-center/basic-information/interface-key) 创建 key，地址为 `https://api.minimaxi.com/v1`；国际版地址为 `https://api.minimax.io/v1`。
+- **OpenRouter**。 用 Google、GitHub 或邮箱登录 [openrouter.ai](https://openrouter.ai/)，在「Credits」充值，再到「Keys」创建 key，其开头为 `sk-or-v1-`。「Settings → Limits」可以为 key 设置每月用量上限。
+- **OpenAI**。 在 [platform.openai.com](https://platform.openai.com/api-keys) 创建 key，地址为 `https://api.openai.com/v1`。
+- **Anthropic**。 在 [platform.claude.com](https://platform.claude.com/settings/keys) 创建 key。nanoMuse 直接调用 Anthropic 原生 API，无需兼容层。
+- **Google Gemini**。 在 [aistudio.google.com/apikey](https://aistudio.google.com/apikey) 创建 key，地址为 `https://generativelanguage.googleapis.com/v1beta/openai`。
+- **xAI、Groq、Mistral**。 在各自控制台创建 key，地址依次为 `https://api.x.ai/v1`、`https://api.groq.com/openai/v1`、`https://api.mistral.ai/v1`。
+- **OpenCode Zen**。 从 [opencode.ai/auth](https://opencode.ai/auth) 获取 key，按请求从余额扣费，部分模型免费。地址为 `https://opencode.ai/zen/v1`。此处只接入 OpenAI 格式的模型，只支持对话。OpenCode 列出的视觉模型 `deepseek-v4-flash-vision-exp` 已被 DeepSeek 在自家平台停用，因此不提供屏幕操作。OpenCode 只提供 key，没有可供这里使用的套餐登录方式。
+- **OpenCode Go**。 在 OpenCode 控制台订阅 Go（每月 10 美元）或 Go Plus（每月 40 美元），再从 [opencode.ai/auth](https://opencode.ai/auth) 获取 key。地址为 `https://opencode.ai/zen/go/v1`。用量按模型统计，分别受月、周、五小时上限约束。Go 面向编程助手，要求客户端提供名称，并在 `x-opencode-session` 请求头中为每段对话发送固定 id，见[其 Go 页面](https://opencode.ai/go)的「Can I use Go with other coding agents?」。运行时及网页控制台会发送 `nanoMuse/<version>` 作为 User-Agent，并在每次 Go 请求中发送对话 id；连接测试等不属于对话的调用使用独立 id。桌面版使用模型适配器自带的 OpenCode Go 路由，同样发送该请求头，并按每个模型的原生格式调用，因此可使用该路由目录中的模型，包括 Responses 和 Messages 格式；其他客户端只调用 OpenAI 格式。手机向 OpenCode 主机发出的聊天和 Responses 请求也带此请求头，其 id 是由聊天第一条消息哈希生成的提示缓存键，在各轮保持不变，两段首条消息完全相同的聊天会共用该 id。与 Zen 一样，此处只支持对话。
+- **Standard Compute**。 从 [standardcompute.com/dashboard/api-keys](https://standardcompute.com/dashboard/api-keys) 获取 key。套餐按月固定收费，19 美元起，含每月算力额度；用尽后请求返回 402，不产生超额费用。地址为 `https://api.stdcmpt.com/v1`。默认模型 `standardcompute` 实际是路由器，会为每次请求从账号「Models」页启用的模型中选择一个；也可指定 `https://api.stdcmpt.com/v1/models` 返回的任意 id。该列表未声明路由器支持图片输入，所以此处只提供对话，不声明屏幕操作能力。
+- **Cheaper Inference**。 从 [cheaperinference.com/signup](https://cheaperinference.com/signup) 获取 key，即可访问多家模型厂商。地址为 `https://api.cheaperinference.com/v1`，默认模型为 `gpt-5.4-mini`，也可选择 `https://api.cheaperinference.com/v1/models` 中的其他 id。此处只通过 OpenAI 格式提供对话。
+- **API Route**。 登录后打开 [API keys](https://www.api-route.com/api-keys) 创建 key，再充值。地址为 `https://global.api-route.com/v1`。默认模型 `gpt-6.1-sol` 已用 `/v1/models` 和真实对话请求核验，其他 id 须从该 key 可访问的模型列表选择。费用按所选模型的[当前价格](https://www.api-route.com/pricing)从 API Route 预付余额扣除，与 nanoMuse Cloud 分别计费。此处只提供对话，图片输入、图片生成和视频尚未核验，详见[服务商文档](https://www.api-route.com/docs/overview)。
+- **Opper**。 在 [platform.opper.ai](https://platform.opper.ai) 的「API Keys」创建 key，可按服务商原价访问 50 多家服务商的 700 多个模型，不加价，网关部署在欧盟。地址为 `https://api.opper.ai/v3/compat`。默认模型为 `claude-sonnet-4-6`，也可选择 `https://api.opper.ai/v3/compat/models` 中任意 id；使用 `anthropic/claude-sonnet-4-6` 这样的 `provider/model` id 可固定线路。此处只通过 OpenAI 格式提供对话。
+- **AtmoRouter**。 从 [atmorouter.dev/dashboard/keys](https://atmorouter.dev/dashboard/keys) 获取 key，按量访问多家模型厂商。地址为 `https://atmorouter.dev/v1`。模型 id 含线路前缀，以 `https://atmorouter.dev/v1/models` 为准，默认是 `cc/claude-sonnet-4-6`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
 
-**贴到 nanoMuse 里。**
+**将 key 填入 nanoMuse**。
 
-- 手机：额度用完时卡片上的「去设置」会打开预填好的服务商表单；或者 设置 → 服务商 → 添加，选服务商，贴 key，保存。
-- 桌面版：额度卡片上的「去设置」会打开 设置 → nanoMuse Cloud 并停在那家服务商的一行；或者直接在那里「可用的途径」下面那家服务商的一行里贴 key。地址已经填好。
-- 网页控制台：额度卡片上的「去设置」会打开「连接」页并选好服务商；或者 连接 → 对话模型，点服务商，贴 key，保存。
-- 自己跑的运行时：在 `config.toml` 里写 `[llm] provider = "bailian"`（表里任一服务商的 id）加 `api_key`，地址和默认模型会从目录文件里补上；画图、生成视频用另一家，就加 `[image]` / `[video]` 一段（[configuration.md](configuration.md#image-and-video)）。
+- 手机：额度卡片的「去设置」会打开预填好的服务商表单；也可到 设置 → 服务商 → 添加，选服务商，粘贴 key 并保存。
+- 桌面版：「去设置」会打开 设置 → nanoMuse Cloud 的对应服务商；也可在该页「可用的途径」下找到服务商，填入 key。地址已经预填。
+- 网页控制台：「去设置」会打开「连接」并选中对应服务商；也可到 连接 → 对话模型，选择服务商，填入 key 后保存。
+- 自行运行的运行时：在 `config.toml` 中设置 `[llm] provider = "bailian"`（可换成表内服务商 id）和 `api_key`，地址与默认模型会从目录补全。若图片或视频使用其他服务商，另加 `[image]` / `[video]` 配置，见 [configuration.md](configuration.md#image-and-video)。运行时是执行智能体及工具的后台程序。
 
-**用它来做什么。** key 保存好之后，会弹出一张卡片问这把 key 负责哪些事：这家服务商能做的每件事一个开关（对话、操作屏幕、生成图片、生成视频），默认全开。「就这样」把勾上的几行切到这家服务商，每件事用目录里的默认模型（目录里的默认模型不在它的列表里时，用列表里第一个能做这件事的）；「暂不」什么都不改，关掉的开关也什么都不改，其他模型选择保持原样。每一行以后都可以在 设置 › 模型 里改（网页控制台：「连接」页）。
+**选择 key 的用途**。 保存 key 后，「用它来做什么」卡片会为该服务商支持的每项任务显示开关，包括对话、操作屏幕、生成图片、生成视频，默认全部打开。点「就这样」后，勾选项会改用该服务商及该任务的目录默认模型；默认模型不在列表时，使用列表中第一个符合条件的模型。「暂不」不修改任何设置，关闭的项目也不修改，其他模型选择保持原样。之后可在 设置 → 模型 修改，网页版在「连接」中修改。
 
-## 哪个模型做哪件事 {#which-model-does-what}
+## 哪个模型负责什么 {#which-model-does-what}
 
-设置 › 模型（Android：设置顶部的那张卡；iPhone：设置的第一张卡；桌面版：紧跟「通用」；网页控制台：「连接」页上的「对话模型」「手的模型」「生成图片」「生成视频」几张卡）一件事一行：
+Android 从设置顶部卡片进入 设置 → 模型，iPhone 从设置第一张卡片进入，桌面版位于「通用」之后。网页控制台在「连接」页分别提供「对话模型」「手的模型」「生成图片」「生成视频」卡片，每项对应一种任务：
 
 | 行 | 做什么 | 列出谁 |
 |---|---|---|
@@ -94,70 +94,71 @@ nanoMuse 免费、非营利。它背后的模型要花钱，每个账号的起�
 | 生成图片 | 形象的肖像，以及你要的图片。 | 你有图像模型的服务商 |
 | 生成视频 | 形象的短视频。 | 你有视频模型的服务商（百炼） |
 
-每行显示 `服务商 · 模型`，点开是选择器。对话和操作屏幕两行在登录时先列 nanoMuse Cloud，并标出中继给这条通道的推荐模型；媒体两行只列你自己的服务商，因为项目托管 Cloud 不生成图片或视频。只有自己部署的中继由运营者明确开启并在菜单里声明媒体能力时，它才会出现在媒体行。然后是你的每家服务商一组，只列能做这件事的模型。没有这项能力的服务商在这一行里根本不出现。一行里什么都没有时，显示那句「谁能提供」的话和「添加服务商」。对话这一行选了，就是新对话的默认，主要聊天也跟着走（「对主要聊天和新对话生效；旁聊保留自己的模型。」）：主要聊天是聊天标签页始终显示的那一个对话，永远不算「新对话」，不这样的话就会一直停在它开始时的服务商上；已经打开的旁聊保留它的模型。还没写过字的对话也跟着走：刚登录后的主要聊天（账号一开始是一个空对话），或者你新开了又放着的对话。所以「对话」这一行写的是什么，你发出的下一条消息就由谁来回答，主要聊天和新对话都是，不管之前用的是哪个来源：你登录的套餐（ChatGPT、Claude、Kimi）、你自己的 key，还是 nanoMuse Cloud；登录永远不会抢在你的选择前面。手机和桌面版都是这样。在对话自己的选择器里（`•••` 菜单的一行，或它下面的一个模型）选了你自己的模型组，这个组就原样成为默认，不会被重新排序，主要聊天带着对话解析出的那个模型跟过去；只有以服务商命名、且只含这一家服务商的组，才会像在模型页里选择那样把选中的模型排到最前。手机上你的模型组可以带一个默认思考等级（iPhone 的「全部设置 › 模型组」，Android 从对话选择器进入的「模型组」），主要聊天跟着选择走的时候，这个等级一起带过去，和新对话、对话自己的选择器一样。
+每行显示 `provider · model`，点开可选模型。登录后，对话和屏幕操作首先显示 nanoMuse Cloud 组，并标出中继针对该任务的推荐模型。项目托管 Cloud 不生成图片或视频，所以媒体项只列出你自己的服务商。自己部署的中继只有在运营者明确启用并声明媒体能力后，才会出现在媒体项中。每个服务商组只列出符合任务要求的模型；不支持该能力的服务商不会显示。没有可用模型时，页面会说明哪些服务商支持，并提供「添加服务商」。
 
-**自动。** 操作屏幕、生成图片、生成视频三行打开时第一项是「自动」，写着它现在给的是什么。选它，这一行忘掉在这里做过的选择，按一个顺序走：对话模型所在的服务商是你自己的、而且能做这件事时用它（目录里的默认模型）；否则 nanoMuse Cloud 的实际菜单有这项能力、账号已登录且 Cloud 模型开着时用它；否则用你第一家能做这件事的服务商。项目托管 Cloud 的菜单只有对话和操作屏幕，因此生图和生视频会直接走你自己的服务商。你做过的选择永远优先；nanoMuse Cloud 不会排到你选的服务商前面。每台设备各自选，因为 key 不会离开录入它的那台设备。
+更改「对话」会同时更新主要聊天和新聊天的默认模型，已存在的旁聊继续用原模型，页面会提示「对主要聊天和新对话生效；旁聊保留自己的模型。」主要聊天是「聊天」标签页固定显示的对话，不能只靠新聊天默认值更新，否则会一直沿用最初的服务商。尚未发送消息的聊天也跟随选择，包括刚登录后账号的空主要聊天，以及新建但未使用的聊天。因此，无论之前使用套餐登录、自己的 key 还是 nanoMuse Cloud，主要聊天或新聊天的下一条消息都会用「对话」行显示的模型；登录不会覆盖你已选的模型。手机和桌面版规则相同。
 
-**Cloud 重试按钮需要你点击。** 某一轮失败后，已登录时的错误卡片会显示「这次改用 nanoMuse Cloud」。点击才会把这次对话或操作屏幕的请求放到账号模型上重跑，不改任何一行。这个按钮不控制模型组路由：如果手机上的组里包含 Cloud 模型，组路由仍可能自动选中它。图片或视频失败时没有 Cloud 重试；修好或换成你自己的媒体服务商后再试。
+在聊天自己的选择器中，从 `•••` 菜单或其下模型项选择自建模型组后，该组原顺序会成为默认，主要聊天也改用该聊天实际解析出的模型。只有以服务商命名、且只包含该服务商的组，才会像模型页选择一样将选中模型移到最前。手机自建模型组还可配置默认思考等级，iPhone 入口是「全部设置 → 模型组」，Android 从聊天选择器进入「模型组」。主要聊天跟随模型选择时会一并采用该等级，与新聊天及聊天自身选择器的行为一致。
 
-**模型组可以自动切换。** 这和 Cloud 重试按钮是两件事。Android 和 iPhone 上，绑定了模型组的
-聊天遇到错误后，可以尝试组内另一个可用成员。备选来自这个组，不是所有服务商列出的全部模型；
-遇到限流时，下一次请求可能直接发给另一个成员，不会先弹出确认。
+**自动选择**。 操作屏幕、生成图片、生成视频的第一项是「自动」，并显示当前解析结果，例如屏幕操作的「当前为 nanoMuse Cloud · Qwen/Qwen3.6-27B-FP8」。选择它会清除该项的显式设置，按以下顺序解析：先使用你自己的对话服务商所支持的对应能力及目录默认模型；否则，在账号已登录、Cloud 模型已开启且中继实际菜单提供该能力时使用中继；再否则，使用你配置的第一家具备该能力的服务商。项目托管 Cloud 只提供对话和屏幕操作，不提供媒体生成。你明确选择的模型始终优先，Cloud 不会覆盖。各设备分别保存选择，key 也只留在录入它的设备。
+
+**主动点击才会执行 Cloud 重试**。 某轮请求失败后，已登录用户的错误卡片会提供「这次改用 nanoMuse Cloud」。点击后只用账号模型重跑这一轮，不修改任何模型配置。这个按钮与模型组自动路由无关，如果手机的模型组包含 Cloud 模型，组路由仍可能自动选到它。图片、视频失败没有 Cloud 重试，需要修复或更换自己的媒体服务商后重试。
+
+**模型组可能自动切换模型**。 Android、iPhone 的聊天如果绑定模型组，出错后可尝试同组的其他可用成员，候选只来自该组，不来自全部服务商。限流可能直接触发下一次请求改用另一个成员，无需先确认。它与 Cloud 重试按钮是独立机制。
 
 | 聊天模型组设置 | Android | iPhone |
 | --- | --- | --- |
 | 默认 | 限流错误和被识别为 5xx 的服务商错误可以触发切换；可重试的网络和服务器错误会先在当前模型上重试。 | 限流、无效 key 和服务商拒绝可以立即触发切换；网络及暂时性的服务器错误在当前模型重试用尽后也可以切换。 |
 | 始终 | 其他错误也可以触发切换；如果错误适合在当前模型重试，会先重试。 | 其他错误也可以立即触发切换，跳过通常在当前模型上的重试。 |
 
-模型组目前没有单独的「关闭回退」选项。想让手机上的聊天只用一个模型，可以使用只含该模型的组；
-Android 上直接选中具体模型条目而不是组，也会移除组内回退链。其他模型仍可留在服务商目录里，供
-别的聊天使用。回退可能改变组在这段聊天中当前使用的模型，重新打开聊天时也可能继续使用它，
-因此应留意聊天显示的模型和服务商。
+模型组设置目前没有「关闭」选项。要固定使用一个模型，可以创建只含该模型的组；Android 也可直接选具体模型，而不选组，这会移除组内备用链。其他模型仍可保留供别的聊天使用。自动切换会改变该聊天的当前模型，重新打开后也可能继续沿用，使用时请核对聊天显示的模型和服务商。
 
-每个备选模型都会收到回答所需的请求上下文，并使用对应服务商及凭据。不同模型的价格和计费政策
-可能不同，重试和回退产生的每次请求也可能分别计费。使用多模型组前应检查成员；Cloud 重试按钮
-不会替这些组成员的请求增加一道确认。
+每个备用模型都会通过自己配置的服务商与凭据，收到回答所需的上下文。它们可能采用不同价格和计费规则，重试、备用请求也可能各自收费。使用多模型组前应检查成员，Cloud 重试按钮不会为组内请求额外提供确认。
 
-**思考深度（桌面版）。** 输入框的模型选择器会给你自己的模型提供思考深度，前提是服务商的文档写明了怎么控制，发送时用的也是服务商自己的字段：DeepSeek、Kimi（kimi-k3）、智谱（GLM-5.2 和 5.3）、硅基流动和火山引擎（它们的 DeepSeek-V4、GLM-5.2 以及豆包 Seed 2）、MiniMax（M3.1）、OpenRouter（按它模型列表里每个模型给出的档位）、OpenAI（o 系列、GPT-5 起）、Anthropic（Claude 4.6 起）、走 OpenAI 兼容层的 Gemini、xAI（Grok 4.5 起）、Groq、Mistral，以及 Ollama 或 vLLM 上的 gpt-oss。档位就是服务商自己的（比如 DeepSeek 是 `low`、`high`、`max`），「服务商默认」什么都不发，模型按服务商文档里的默认方式思考。没有「关闭」这一项：在这些服务商那里，关掉思考是另一个开关或另一个模型。没有文档写明档位的模型不显示这个控件，百炼（它的开关是 `enable_thinking`，没法不发）、LM Studio 和自定义端点也不显示。在这个版本之前保存的 key，下次启动时会拿到这个控件。
+**桌面版的思考深度**。 输入框的模型选择器只对文档明确支持深度控制的自有模型显示此选项，并使用厂商原生字段发送。目前包括 DeepSeek、Kimi（kimi-k3）、智谱（GLM-5.2 和 5.3）、硅基流动和火山引擎（各自的 DeepSeek-V4、GLM-5.2、豆包 Seed 2）、MiniMax（M3.1）、OpenRouter（模型目录给出的等级）、OpenAI（o 系列、GPT-5 起）、Anthropic（Claude 4.6 起）、OpenAI 兼容层的 Gemini、xAI（Grok 4.5 起）、Groq、Mistral，以及 Ollama 或 vLLM 的 gpt-oss。等级沿用厂商定义，例如 DeepSeek 的 `low`、`high`、`max`。「服务商默认」不发送深度参数，采用厂商默认设置。没有「关闭」项，因为这些服务商需要用另一开关或模型来关闭思考。未说明等级的模型不显示此控件；百炼的 `enable_thinking` 开关无法省略，所以也不显示，LM Studio 和自定义端点同样不显示。旧版保存的 key 会在下次启动时获得该控件。
 
-**关掉 nanoMuse Cloud。** 登录时，模型页上有一个开关「使用 nanoMuse Cloud 模型」。关掉之后，nanoMuse Cloud 从选择器和自动顺序里退出，任何附带的调用（对话标题、记忆、动手）都不会在它上面运行，唯一会消耗额度的是「这次改用 nanoMuse Cloud」这个按钮，而且只在你每次点它的时候。账号保持登录：同步、你的设备和账号页照常工作。nanoMuse Cloud 这家服务商不能像你自己添加的那样删除（删除它就等于退出登录）；退出登录在「设置 › nanoMuse Cloud」里。
+**关闭 nanoMuse Cloud 模型**。 登录后，模型页提供「使用 nanoMuse Cloud 模型」。关闭后，Cloud 从选择器和自动选择顺序中移除，对话标题、记忆、屏幕操作等辅助调用也不再使用它。只有你主动点击「这次改用 nanoMuse Cloud」时，才会消耗额度。账号仍保持登录，同步、设备互联和账号页照常使用。Cloud 服务商不能像自建服务商一样删除，因为删除等同于退出登录；退出入口在 设置 → nanoMuse Cloud。
 
-**不用账号。** 有自己的 key，应用在未登录时一样能用：对话、动手、生成图片和短视频都跑在你的服务商上，第一屏在登录旁边给了「改用自己的 API key」。只有 nanoMuse Cloud 的模型、对话同步和设备互通才需要登录。
+**不登录账号**。 只要有自己的 key，未登录时也能对话、操作屏幕、生成图片和短视频，均使用自己的服务商。欢迎页提供「改用自己的 API key」。只有 Cloud 模型、对话同步及设备互联需要登录。
 
-**已知的限制。** iPhone 上生成图片、生成视频两行只列你在 DashScope 主机上的服务商（阿里云百炼）；目录里说能画图的 key（OpenRouter、OpenAI、Gemini、自定义接口）会在选择页下方用一句「此处不提供：……」点名，并说明它在哪里能用，免得你以为手机把它弄丢了。桌面版的手只说 OpenAI 的接口形状，所以 Anthropic 和原生 Gemini 的 key 在操作屏幕那一行下面用一句话点出来、不列进去；手的改动在手的下一步生效，不用重启。用 Gemini 的 key 画图走的是 Google 的 OpenAI 兼容层：`images/generations` 接受 `gemini-2.5-flash-image`，但 Google 的页面没有写明那里有 `images/edits`，所以形象工作室里的姿势图用 Gemini 的 key 可能画不出来。
+**当前限制**。 iPhone 的图片和视频选项只列出使用 DashScope 主机的服务商，即阿里云百炼。OpenRouter、OpenAI、Gemini、自定义接口等目录中支持绘图的来源，会在选择页下方以「此处不提供：……」说明，并指出可使用的平台，避免误以为配置丢失。桌面版的「手」只支持 OpenAI 格式，Anthropic 和原生 Gemini key 会在屏幕操作项下说明原因，不列入候选。更改手的模型在下一步生效，无需重启。Gemini 绘图通过 Google 的 OpenAI 兼容层，`images/generations` 支持 `gemini-2.5-flash-image`，但其文档未声明 `images/edits`，因此形象工作室的姿势图可能无法生成。
 
-## 用你已经在付费的套餐登录 {#sign-in-with-a-plan-you-already-pay-for}
+## 登录已付费的套餐 {#sign-in-with-a-plan-you-already-pay-for}
 
-有些套餐可以直接登录使用，不用申请 key：
+以下套餐可直接登录，不需要创建 key：
 
 | 套餐 | 能做什么 | 哪里可以登录 |
 |---|---|---|
 | **ChatGPT**（Plus / Pro / Team） | 对话、动手 | Android、iPhone、桌面版、网页版 |
 | **Claude**（Pro / Max） | 对话、动手 | Android、iPhone |
 | **Kimi** | 对话、动手 | Android、iPhone（设备码登录） |
-| **OpenRouter** | 对话、动手、画图 | Android、iPhone（一键登录，key 自动回到 App） |
+| **OpenRouter** | 对话、动手、画图 | Android、iPhone（点按登录，key 自动返回 App） |
 
-ChatGPT 登录走的是 OpenAI 自家 Codex 的授权流程（网页控制台：连接 → 「或者用 ChatGPT 套餐登录」；桌面版：设置 → nanoMuse Cloud 里的 ChatGPT 一行；手机：设置 → 服务商 → OpenAI → 登录）。登录后只有对话和动手：Codex 这条通道没有图像和视频接口，画图和生成视频仍要配一把 key。
+ChatGPT 使用 OpenAI 自家 Codex 的授权流程。网页入口为 连接 →「或者用 ChatGPT 套餐登录」；桌面版为 设置 → nanoMuse Cloud 中的 ChatGPT 行；手机为 设置 → 服务商 → OpenAI →「登录」。登录后支持对话和屏幕操作，Codex 通道没有图像或视频接口，媒体生成仍需配置 key。
 
-在终端里也可以：`nanomuse chatgpt login` 打开登录页并等浏览器回来，`nanomuse chatgpt status` 看登录的是谁、什么时候过期，`nanomuse chatgpt logout` 忘掉它；然后在 `config.toml` 里写 `[llm] provider = "chatgpt"`（不用 `base_url`、`api_key`，`model` 留空就是 `gpt-5.6-sol`）。浏览器要能访问运行时所在机器的 1455 端口；运行时在别的机器上时，把浏览器最后停在的那个地址整条复制下来，贴给命令行的提示，或者 `POST /api/chatgpt/callback {"url": …}`（[configuration.md](configuration.md#a-chatgpt-plan-instead-of-a-key)）。
+终端也可完成同一流程：`nanomuse chatgpt login` 打开登录页并等待浏览器回调；`nanomuse chatgpt status` 查看当前账号及有效期；`nanomuse chatgpt logout` 删除登录状态。随后在 `config.toml` 设置 `[llm] provider = "chatgpt"`，无需 `base_url` 或 `api_key`，`model` 留空时默认 `gpt-5.6-sol`。浏览器需要能访问运行时所在机器的 1455 端口。运行时位于其他机器时，将浏览器最终停留的完整地址复制到命令行提示处，或提交给 `POST /api/chatgpt/callback {"url": …}`，详见 [configuration.md](configuration.md#a-chatgpt-plan-instead-of-a-key)。
 
-**手机上的代理或 VPN 可能吞掉回调。** Android 上，登录页会把浏览器送回 `http://localhost:1455/auth/callback`，这个地址只有同一部手机上的 App 会应答。把所有地址都送进隧道、或者替 `localhost` 答 DNS 的代理或 VPN 应用（比如 Clash）会把这个地址也接走：浏览器显示连接错误，App 一直等。两条路：把 `localhost` 和 `127.0.0.1` 加进代理应用的直连（绕过）列表再登录一次；或者把那个错误页的地址复制下来，贴进「登录」按钮下方大约十秒后出现的输入框（手机的代理设置会接走这个地址时立刻出现），点「继续」，登录码会不经代理直接交给正在等待的登录流程。Anthropic、xAI 和 OpenRouter 的登录用同一种回跳，也有这个输入框；Kimi 的登录用设备码，不需要它。
+**手机代理或 VPN 可能拦截登录回调**。 Android 登录页会返回 `http://localhost:1455/auth/callback`，此地址应由同一手机上的 App 接收。Clash 等代理或 VPN 如果接管全部地址，或代为解析 `localhost`，可能把回调送入隧道，造成浏览器连接错误、App 一直等待。可把 `localhost` 和 `127.0.0.1` 加入代理直连列表后重新登录；也可复制错误页地址，粘贴到「登录」按钮下方的输入框，点「继续」，直接将授权码交给等待中的流程，绕过代理。输入框通常约十秒后出现，检测到手机代理可能接管回调时立即出现。Anthropic、xAI、OpenRouter 使用同类跳转，也有此输入框；Kimi 使用设备码登录，不需要回调框。
 
-**一句老实话。** OpenAI 的条款只允许在它自家的 Codex 里使用 ChatGPT 套餐；其他应用曾被切断过这条路（OpenCode，2026 年 1 月）。哪天它不能用了，API key 仍然可以。
+**套餐授权的限制**。 OpenAI 条款规定 ChatGPT 套餐用于其自家 Codex。其他 App 曾被停止这类访问，例如 2026 年 1 月的 OpenCode。若套餐登录无法继续使用，可改用 API key。
 
-## 服务商连不上的时候 {#when-the-provider-cannot-be-reached}
+## 无法连接服务商时 {#when-the-provider-cannot-be-reached}
 
-有些网络到不了 `chatgpt.com`（DNS 不解析、连接超时、TLS 失败、返回的是一张 HTML 拦截页），有些地区 OpenAI 直接拒绝（HTTP 403 `unsupported_country_region_territory`）。这时手机上的对话不再显示 socket 原文，而是一张卡片：发生了什么（「这个网络连不上 chatgpt.com」或「OpenAI 不向这个地区提供服务」）、能帮上忙的（这台手机上的 VPN；应用自己的代理，设置 → 网络；换一个服务商、用自己的 key）、一个「重试」按钮，原始错误收在「详情」里供提 issue 用。登录失效（401）显示「ChatGPT 登录已失效」和「重新登录」；套餐这几个小时的余量用完（429 且写明 usage limit）显示「ChatGPT 套餐暂时没有余量了」、OpenAI 自己的那句话和多久后恢复；其他 429 是「同时发出的请求太多」。自己的 key 遇到同样的网络问题，卡片一样出现，只是主机名换成那家服务商的。
+部分网络无法访问 `chatgpt.com`，可能表现为 DNS 无法解析、连接超时、TLS 加密连接失败，或本应收到 JSON 却返回 HTML 拦截页。部分地区会被 OpenAI 直接拒绝，返回 HTTP 403 `unsupported_country_region_territory`。手机聊天会用卡片说明「这个网络连不上 chatgpt.com」或「OpenAI 不向这个地区提供服务」，并列出可尝试的方法：手机 VPN、设置 → 网络 中的 App 代理，或换用其他服务商的 key。卡片提供「重试」，原始连接错误保留在「详情」供报告问题。
 
-**设置 → 网络 → 自有服务商的 HTTP 代理**（Android 和 iPhone 都有）：主机、端口、可选的用户名和密码，默认关闭，只存在这台手机上。只有发往你用自己 key 添加的服务商和 ChatGPT 套餐的请求走它；nanoMuse Cloud、你的电脑和局域网从不经过它。页面上有一行「测试」，通过这个代理抓一次 `https://chatgpt.com/`，告诉你通没通、多少毫秒。同一个设置在每个应用里都放在存 key 的地方：手机在服务商表单里；桌面版在**设置 → nanoMuse Cloud → 网络**，一个地址（`http://host:port` 或 `socks5://host:port`），应用在下次启动时写进它的 Host 进程（这一行下面有「立即重启」），于是每把自己的 key、ChatGPT 登录、手的运行时和这个应用对外发出的其他请求都走它，nanoMuse Cloud 永远不走（[desktop.md](desktop.md)）；网页版在自有 key 表单里有「代理」一栏；运行时是 `config.toml` 里的 `[llm] proxy`（[configuration.md](configuration.md#llm)）。
+登录过期的 401 会提示「ChatGPT 登录已失效」并提供「重新登录」。套餐当前时间段额度用尽时，如果 429 明确表示 usage limit，会显示「ChatGPT 套餐暂时没有余量了」、OpenAI 原始说明和恢复时间。其他 429 则提示「同时发出的请求太多」。自有 key 遇到相同网络问题时也显示这类卡片，主机名替换为对应服务商。
+
+**设置 → 网络 → 自有服务商的 HTTP 代理**。 Android 和 iPhone 可填主机、端口，以及可选用户名、密码，默认关闭，只保存在本机。它只代理自有服务商和 ChatGPT 套餐请求，不代理 nanoMuse Cloud、你的电脑或局域网。「测试」会按当前代理访问一次 `https://chatgpt.com/`，报告是否成功及毫秒耗时。
+
+其他客户端也在保存 key 的位置提供代理设置：手机的服务商表单；桌面版的 设置 → nanoMuse Cloud → 网络，填写 `http://host:port` 或 `socks5://host:port`。桌面代理在下次启动时应用到 Host 进程，下方提供「立即重启」，自有 key、ChatGPT 登录、手的运行时及 App 其他外部请求都会走此代理，Cloud 始终直连，见 [desktop.md](desktop.md)。网页自有 key 表单提供「代理」，运行时在 `config.toml` 中设置 `[llm] proxy`，见 [configuration.md](configuration.md#llm)。
 
 ## 本机模型 {#local-models}
 
-Ollama、LM Studio、vLLM 跑在自己电脑上的模型也能用：选对应的预设（网页控制台：「连接」；桌面版：设置 → nanoMuse Cloud；手机：设置 → 服务商），地址默认是本机端口（`http://127.0.0.1:11434/v1`、`:1234`、`:8000`），不需要 key。它们算「对话」；手的模型要能看图，本机跑一个多模态模型（例如 Ollama 的 `qwen3-vl`）再在「操作屏幕」里选它（网页控制台：「对话模型」下面的「动手模型」一行列出这个端点提供的模型，在那里选它）。画图和视频需要上面表里的一家。
+电脑上运行的 Ollama、LM Studio、vLLM 也能接入。网页从「连接」、桌面版从 设置 → nanoMuse Cloud、手机从 设置 → 服务商 选择对应预设。默认使用本机地址 `http://127.0.0.1:11434/v1`、`:1234`、`:8000`，不需要 key。这些预设提供对话；若要操作屏幕，需要运行能看图的多模态模型，例如 Ollama 的 `qwen3-vl`，再在「操作屏幕」中选它。网页版在「对话模型」下的「动手模型」中选择该端点提供的模型。图片、视频生成仍需上表中的服务商。
 
-## 其他 OpenAI 兼容服务 {#any-other-openai-compatible-endpoint}
+## 其他兼容 OpenAI 的接口 {#any-other-openai-compatible-endpoint}
 
-任何 OpenAI 兼容接口都能填，选「自定义」：
+其他支持 OpenAI API 的服务也可接入，选择「自定义」并填写：
 
 | 字段 | 填什么 |
 |---|---|
@@ -165,6 +166,6 @@ Ollama、LM Studio、vLLM 跑在自己电脑上的模型也能用：选对应的
 | API key | 服务商控制台里创建的 key（本机服务可以留空） |
 | 模型 | 保存后从列表里选；接口列不出模型时，表单会请你填模型 id（逗号分开），再按这些保存 |
 
-自定义接口能做什么由你来说：nanoMuse 会把它当作对话；手的模型、图片模型、视频模型各自填了 id 才算有。
+自定义端点的能力需要你配置。默认视为可对话；填写手、图片或视频模型的 id 后，才视为具备对应能力。
 
-**几个同时用。** 在桌面版和网页控制台里，自定义接口是一个列表，不是一个槽位（#294）：每个加进来的接口都有自己的 key 和自己的模型，再加一个绝不会替换掉前一个。桌面版的 设置 → 账号 → 任何 OpenAI 兼容接口 下，每个接口一行（名字在上、主机名在下，带「换 key」「改名」「移除」），下面是「添加接口」一行；设置 → 模型 里的选择器把每个接口列成单独一组。网页控制台的 连接 → 对话模型 里，「本地或你自己的端点」下每个接口一块卡片，最后是「添加接口」；双手、图片和短片的选择器也列出这些接口（[web.md](web.md#where-it-shows)）。列表出现之前设好的自定义接口，下次启动时成为列表的第一项，key 一并带过去。手机上每家服务商还是一个槽位。
+**同时保存多个端点**。 桌面版、网页控制台使用端点列表，每个端点分别保存 key 和模型，添加第二个不会替换第一个，见 #294。桌面版的 设置 → 账号 → 任何 OpenAI 兼容接口 下，每个端点各占一行，显示名称、主机名，并提供「换 key」「改名」「移除」，下方可「添加接口」。设置 → 模型 中，各端点各自成为一组。网页的 连接 → 对话模型 在「本地或你自己的端点」下为每个端点显示卡片，最后为「添加接口」；动手、图片、视频选择器也会列出这些端点，见 [web.md](web.md#where-it-shows)。旧版配置的自定义接口会在下次启动时连同 key 迁移为列表首项。手机仍为每个服务商保留一个位置。

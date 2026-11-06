@@ -1,59 +1,61 @@
-# 国内服务：智能体不用屏幕也能够到的
+# 国内服务：不操作屏幕也能使用哪些功能 {#国内服务-智能体不用屏幕也能够到的}
 
-[阶梯](gui.md#the-ladder)把手机屏幕排在最后一级。要让这个排序有意义，第一级得是真的：撑起国内一天生活的那些服务，得有智能体真能调用的 CLI 或 MCP 服务器。这一页就是那张清单（哪些跑过、哪些还没有、哪些我们不会推荐），以及让它保持诚实的一条规则：
+[工具选择顺序](gui.md#the-ladder)将操作手机屏幕放在最后。要让智能体优先使用其他方式，日常使用的国内服务就需要提供可调用的 CLI（命令行工具）或 MCP 服务器（通过统一协议向智能体提供工具的服务）。本文列出已经验证、仍待验证和不推荐的接入方式，并遵守以下标准：
 
-> **没有在手机的根文件系统里跑过、留下记录之前，什么都不进[展示站](showcase.md)。** 装得上的包不等于能用的服务。「跑过」的意思是工具被调用了、也回答了；记录在这一页的底部。
+> 服务工具必须在手机使用的根文件系统中实际调用、得到响应并留下记录，才能进入[展示站](showcase.md)。安装成功只能证明软件包可安装，不能证明服务能用。本文底部附有调用记录。
 
-今天手机上的根文件系统，是 Android 应用在 proot 下解开的那份 Alpine Linux 3.21 minirootfs（[android.md](android.md)；构建时由 `android/scripts/prepare_android_sandbox.sh` 下载）。它是光秃秃的：任务第一次需要时，智能体才用 `apk add` 在里面装 Node 和 Python。这一页底部的记录是 2026-09-24 在 Python 线的镜像里录的，那份镜像用同一个 Alpine 底座，预装了 Node 22 和 Python 3.12（[local-runtime.md](local-runtime.md) 是那条线的记录），跑在 arm64 模拟器（构建机上的 QEMU 用户态）上；当前应用的 rootfs 在这里还没有自己的一次记录。PRoot 本身和手机的网络是模拟器碰不到的两样东西，检查清单里给它们各留了一行。下面点到的技能是 Python 运行时自带的那些，在 `nanomuse/skills/builtin/` 下。
+当前 Android App 使用 Alpine Linux 3.21 minirootfs 作为根文件系统，即 Linux 程序运行所需的基础目录和文件。它由 `android/scripts/prepare_android_sandbox.sh` 在构建时下载，App 再通过 proot 运行，见 [android.md](android.md)。初始系统不带 Node 和 Python，首次有任务需要时，智能体才用 `apk add` 安装。本文底部的记录来自 2026-09-24，测试使用旧版 Python 实现的镜像，与当前系统采用相同的 Alpine 基础，但预装了 Node 22 和 Python 3.12。旧方案说明见 [local-runtime.md](local-runtime.md)。当时是在构建机上通过 QEMU 用户态模拟 arm64 执行；本文尚未收录当前 App 根文件系统的独立运行记录。该模拟没有验证 PRoot 本身和手机网络，检查清单为这两项保留了验证项。下文提到的技能都是 Python 运行时内置技能，位于 `nanomuse/skills/builtin/`。
 
-## 一档：已验证 {#tier-1-verified}
+## 第一档：已有验证记录 {#tier-1-verified}
 
-在 rootfs 里跑过、答了、进了展示站。
+这些工具已在根文件系统中运行、返回响应，并被用于展示站。各项验证覆盖的范围见表格。
 
-| 服务 | 通过什么 | 验证情况 | 需要用户提供什么 | 技能 |
+| 服务 | 接入方式 | 验证情况 | 用户需要准备什么 | 技能 |
 |---|---|---|---|---|
-| **12306**（火车票） | [12306-mcp](https://github.com/Joooook/12306-mcp)，社区 MCP 服务器，基于 12306 的公开时刻表：`npx -y 12306-mcp`，stdio | 已装进 rootfs；一次实时查询第二天早上的 北京 → 上海，1.0 秒返回车次、座位和票价。只能查询：服务器不能订票 | 不需要：没有 key，不用登录 | `train-tickets`（在这里查；只在被要求时才去手机上订） |
-| **飞书 / Lark** | [lark-cli](https://github.com/larksuite/cli)，官方 CLI：`npm i -g @larksuite/cli` | 已装进 rootfs 并能运行（1.0.96）；在构建机上，配置好的安装对 `lark-cli auth status` 会回答它的身份。登录是机主的事：先 `lark-cli config init --new` 一次，再 `lark-cli auth login`，两步都通过浏览器里的链接完成 | 一个飞书账号；那两步登录，做一次 | `feishu` |
-| **高德地图**（地图、天气） | [高德 MCP Server](https://lbs.amap.com/api/mcp-server/summary)，官方：托管在 `https://mcp.amap.com/mcp?key=…`，或 `npx -y @amap/amap-maps-mcp-server` | 包能在 rootfs 里跑并列出它的十二个工具；实时调用走带 key 的托管地址。构建机上没有 key，所以实时的地理编码和路线调用是检查清单里留给机主的那一行 | 一个 console.amap.com 的免费 Web 服务 key，放在保险库里叫 `AMAP_KEY` | `amap` |
-| **腾讯会议** | [tmeet](https://github.com/TencentCloud/tencentmeeting-cli)，腾讯官方 CLI（Go 二进制，`npm i -g @tencentcloud/tmeet`） | 已装进 rootfs 并能运行（v1.0.18）；`tmeet auth status` 和 `tmeet meeting create --help` 都有回答。登录是 OAuth 设备流程，机主点一次（`tmeet auth login --no-browser` 在手机上打印链接） | 一个腾讯会议账号；登录一次 | `tencent-meeting` |
+| **12306**（火车票） | [12306-mcp](https://github.com/Joooook/12306-mcp)，基于 12306 公开时刻表的社区 MCP 服务器：`npx -y 12306-mcp`，使用 stdio 标准输入输出通信 | 已在根文件系统中安装；实时查询第二天早上北京 → 上海的车票，1.0 s 返回车次、余票和价格。仅支持查询，不能订票 | 无需 key 或登录 | `train-tickets`，用此服务查询，只有用户要求时才在手机上订票 |
+| **飞书 / Lark** | [lark-cli](https://github.com/larksuite/cli)，官方 CLI：`npm i -g @larksuite/cli` | 1.0.96 已在根文件系统中安装并运行；构建机上的已配置实例调用 `lark-cli auth status` 能返回身份信息。用户需先执行一次 `lark-cli config init --new`，再执行 `lark-cli auth login`，两步都通过浏览器链接完成 | 飞书账号，以及首次配置和登录 | `feishu` |
+| **高德地图**（地图、天气） | [高德 MCP Server](https://lbs.amap.com/api/mcp-server/summary)，官方服务，托管地址 `https://mcp.amap.com/mcp?key=…`，也可运行 `npx -y @amap/amap-maps-mcp-server` | 软件包可在根文件系统中运行并列出十二个工具；实际业务调用需带 key 访问托管地址。构建机没有 key，地理编码和路线查询仍需由用户完成验证 | 在 console.amap.com 申请免费 Web 服务 key，并以 `AMAP_KEY` 存入保险库 | `amap` |
+| **腾讯会议** | [tmeet](https://github.com/TencentCloud/tencentmeeting-cli)，腾讯官方 CLI，以 Go 二进制提供：`npm i -g @tencentcloud/tmeet` | v1.0.18 已在根文件系统中安装并运行；`tmeet auth status` 和 `tmeet meeting create --help` 均返回结果。登录使用 OAuth 设备授权流程，即用户在浏览器中确认授权一次；`tmeet auth login --no-browser` 会在手机上打印链接 | 腾讯会议账号，首次使用时登录一次 | `tencent-meeting` |
 
-`device` MCP 服务器（手机自己的剪贴板、日历、通讯录、闹钟、位置、通知、照片；[device.md](device.md)）不是第三方服务，不列在这里；它是用 Android 应用验证的。
+`device` MCP 服务器提供手机自身的剪贴板、日历、联系人、闹钟、位置、通知和照片功能，见 [device.md](device.md)。它不属于第三方服务，因此不列入上表；其验证通过 Android App 完成。
 
-## 二档：待逐个跑 {#tier-2-to-be-run-one-by-one}
+## 第二档：仍需逐项验证 {#tier-2-to-be-run-one-by-one}
 
-服务器是有的；但还没有带着真实的 key 在 rootfs 里跑过，或者还没有技能。按我们打算尝试的顺序排。
+这些服务已有接入工具，但尚未在根文件系统中使用真实 key 完成调用，或者还没有对应技能。以下按计划尝试的顺序排列。
 
-| 服务 | 通过什么 | 状态 | 为什么还没有 |
+| 服务 | 接入方式 | 当前状态 | 尚未完成的原因 |
 |---|---|---|---|
-| **快递100**（快递） | [快递100 MCP Server](https://github.com/kuaidi100-api/kuaidi100-MCP)，官方：托管（`https://api.kuaidi100.com/mcp/streamable?key=…`）或 `npx -y @kuaidi100-mcp/kuaidi100-mcp-server` | 包能在 rootfs 里跑并列出它的四个工具（`query_trace`、`estimate_time`、`estimate_time_with_logistic`、`estimate_price`）；`kuaidi100` 技能是照着它们写的。实时查询需要账号：按单号付费，注册有免费试用 | 构建机上没有 key。有一条留了记录的 `query_trace` 就升到一档 |
-| **百度地图** | [@baidumap/mcp-server-baidu-map](https://lbsyun.baidu.com/faq/api?title=mcpserver/base)，官方（npm 上 1.0.5） | 没跑过。和高德同一类；第二家地图只在其中一家出错时才有意义 | 需要 key；展示站有高德就够了 |
-| **腾讯位置服务** | [官方 MCP Server](https://lbs.qq.com/service/MCPServer/MCPServerGuide/overview)，托管（`https://mcp.map.qq.com/sse?key=…`，也支持 Streamable HTTP）：地理编码、地点搜索、路线、IP 定位、天气 | 没跑过 | 需要开通了 WebServiceAPI 的 key；原因同百度 |
-| **和风天气** | 基于和风天气 API 的社区服务器（PyPI 上的 `hefeng-weather-mcp` 等）；没找到官方服务器 | 没跑过。高德的 `maps_weather` 给展示站提供天气预报；和风是给想要逐小时或空气质量数据的人 | 需要一个项目、一个 key id 和一把 Ed25519 私钥，比其他家都重的设置 |
-| **钉钉** | `dingtalk-mcp-server`（社区，消息 / 待办 / 日历）；钉钉自己的智能体平台不是 MCP 服务器 | 没跑过 | 需要企业账号和应用注册；没有展示案例用到它 |
-| **语雀** | `yuque-mcp-server`（社区），基于语雀开放 API | 没跑过 | 个人 token；照 `feishu` 技能的样子写，一个下午就能接上 |
-| **百度网盘** | 宣布过支持 MCP；没找到能确认的包或接口 | 没跑过 | 还没有可以跑的东西 |
-| **携程 / 飞猪 / 饿了么** | [阿里云百炼 MCP 市场](https://bailian.console.aliyun.com)里的服务器，托管在百炼账号后面 | 没跑过。展示站的酒店预算案例改用应用内浏览器浏览携程（阶梯的第三级），因为没有百炼账号的人也能这样用 | 需要百炼账号和市场的按次计费；给托管的演示值得，给个人构建不值 |
+| **快递100**（物流查询） | [快递100 MCP Server](https://github.com/kuaidi100-api/kuaidi100-MCP)，官方服务，可用托管地址 `https://api.kuaidi100.com/mcp/streamable?key=…`，或运行 `npx -y @kuaidi100-mcp/kuaidi100-mcp-server` | 软件包能在根文件系统中运行，并列出四个工具：`query_trace`、`estimate_time`、`estimate_time_with_logistic`、`estimate_price`。`kuaidi100` 技能已按这些工具编写。真实查询需账号，按单号收费，注册后有免费试用 | 构建机没有 key；完成一次 `query_trace` 并保留记录后可移入第一档 |
+| **百度地图** | [@baidumap/mcp-server-baidu-map](https://lbsyun.baidu.com/faq/api?title=mcpserver/base)，官方软件包，npm 版本 1.0.5 | 尚未运行，功能与高德类似；其中一家结果有误时，另一家才有补充价值 | 需要 key；展示站已有高德接入 |
+| **腾讯位置服务** | [官方 MCP Server](https://lbs.qq.com/service/MCPServer/MCPServerGuide/overview)，托管地址 `https://mcp.map.qq.com/sse?key=…`，也支持 Streamable HTTP；提供地理编码、地点搜索、路线、IP 定位和天气 | 尚未运行 | 需要启用 WebServiceAPI 的 key；其他原因与百度地图相同 |
+| **和风天气** | 基于 QWeather API 的社区服务器，例如 PyPI 上的 `hefeng-weather-mcp`；未找到官方服务器 | 尚未运行。展示站用高德 `maps_weather` 获取预报；需要逐小时天气或空气质量数据时可考虑和风 | 需要创建项目、准备 key id 和 Ed25519 私钥，配置步骤比其他服务多 |
+| **钉钉** | 社区 `dingtalk-mcp-server`，提供消息、待办和日历；钉钉自己的智能体平台并非 MCP 服务器 | 尚未运行 | 需要企业账号并注册应用；现有展示案例没有使用需求 |
+| **语雀** | 社区 `yuque-mcp-server`，通过语雀开放 API 接入 | 尚未运行 | 需要个人 token（访问凭据）；可参照 `feishu` 技能编写，预计约一个下午 |
+| **百度网盘** | 已宣布支持 MCP，但尚未确认可用软件包或接口地址 | 尚未运行 | 暂无已确认可运行的接入方式 |
+| **携程 / 飞猪 / 饿了么** | [阿里云百炼 MCP 市场](https://bailian.console.aliyun.com)中的托管服务，需要百炼账号 | 尚未运行。展示站的酒店预算案例改用 App 内浏览器访问携程，即工具选择顺序中的第三级，没有百炼账号的人也可以使用 | 需要百炼账号，并按市场调用次数付费；适合托管演示，个人版本没有必要依赖它 |
 
-## 三档：不推荐 {#tier-3-not-recommended}
+## 第三档：不推荐 {#tier-3-not-recommended}
 
-列出来，免得有人问。
+以下接入方式不推荐使用，原因列在表中。
 
-| 服务 | 为什么 |
+| 服务 | 原因 |
 |---|---|
-| **微信**：对它的任何自动化，包括社区的「wechat MCP」服务器 | 违反使用条款；账号会被限制。智能体只在用户明确要求时，才在手机屏幕上读和回微信，而且这些都不会出现在公开材料里 |
-| **小红书 MCP 服务器** | 社区服务器抓的是已登录的会话；小红书会封账号。被要求时，屏幕能做同样的事 |
-| **支付宝 / 微信支付** MCP 服务器 | 它们是给商户的（收款、退款），不是给个人自己的账号。付款是用户自己的事；智能体在那之前停下 |
-| 任何需要把用户**密码**写进配置文件的东西 | 保险库里放的是 key 和 token；一个工具自己不能用设备流程或二维码完成的登录，就不是智能体该持有的登录 |
+| **微信**自动化，包括社区「wechat MCP」服务器 | 违反使用条款，账号可能被限制。只有用户明确要求读或回微信时，智能体才通过手机屏幕操作，这些内容不用于公开材料 |
+| **小红书 MCP 服务器** | 社区服务器抓取已登录会话，存在封号风险。用户要求时，可以通过屏幕完成同类任务 |
+| **支付宝 / 微信支付** MCP 服务器 | 面向商户收款、退款，不用于个人账号。付款由用户完成，智能体会在付款前停止 |
+| 任何要求将用户**密码**写入配置文件的工具 | 保险库用于保存 key 和 token。工具若不能通过设备授权流程或二维码让用户登录，智能体就不应替用户保管这类登录 |
 
-## 添加一个 {#adding-one}
+## 添加服务 {#adding-one}
 
-MCP 服务器：在 `config.toml` 里写一个 `[[mcp.servers]]` 块（或者在应用里 连接 → MCP 服务器），key 放在保险库里写成 `{{vault:NAME}}`，`risk` 和 `egress` 如实填写，参数里带用户数据（快递单号、手机号）时 `reads_private_data = true`。CLI：装进 rootfs，或者在电脑上共享给沙箱（程序用 `sandbox.share_read_only`，它的登录用 `share`），然后写一个技能，说明要跑哪些命令、写操作前要问什么。`config/config.example.toml` 里有高德、12306 和快递100 的块；[configuration.md](configuration.md#mcp-servers) 解释各字段。
+接入 MCP 服务器时，在 `config.toml` 中添加 `[[mcp.servers]]` 配置块，也可以在 App 中进入连接 → MCP 服务器。key 存入保险库，并使用 `{{vault:NAME}}` 引用。`risk` 应如实表示风险级别，`egress` 表示是否向外发送数据；参数含快递单号、手机号等用户信息时，设置 `reads_private_data = true`。
 
-它在 rootfs 里跑过、回答过一次之后，把记录加到下面，再把它往上挪一档。
+接入 CLI 时，将它安装到根文件系统，或在电脑上共享给沙箱。程序使用 `sandbox.share_read_only` 只读共享，登录状态使用 `share` 共享。然后编写技能，说明具体命令，以及修改数据前需要询问用户的事项。`config/config.example.toml` 提供了高德、12306 和快递100 的配置示例，字段说明见 [configuration.md](configuration.md#mcp-servers)。
+
+工具在根文件系统中成功调用一次后，把记录补充到下方，并将它移到上一档。
 
 ## 验证记录 {#verification-log}
 
-在 Python 线的镜像 `nanomuse-rootfs:aarch64`（Alpine 3.21.8、Node 22.23.2、npm 10.9.1、Python 3.12.14、nanomuse 0.1.0）里，x86_64 上的 QEMU 用户态，2026-09-24。软件源当时用那份镜像里的 `nanomuse-mirror cn` 切换；今天的应用在第一次启动时自己测速选软件源。探针是一个 60 行的 Python 脚本，用的是智能体自己用的那个 `mcp` 客户端：连接、`tools/list`、几次 `tools/call`。
+以下记录生成于 2026-09-24，环境是旧版 Python 镜像 `nanomuse-rootfs:aarch64`，包含 Alpine 3.21.8、Node 22.23.2、npm 10.9.1、Python 3.12.14 和 nanomuse 0.1.0，在 x86_64 构建机上由 QEMU 用户态运行。当时使用镜像自带的 `nanomuse-mirror cn` 切换软件源；当前 App 会在首次启动时自行测速选择镜像。测试脚本约 60 行 Python，使用智能体本身采用的 `mcp` 客户端，依次建立连接、调用 `tools/list` 和若干 `tools/call`。
 
 ```
 $ npm i -g 12306-mcp @larksuite/cli @tencentcloud/tmeet @amap/amap-maps-mcp-server @kuaidi100-mcp/kuaidi100-mcp-server
@@ -92,4 +94,4 @@ connected in 4.1s · 4 tools: query_trace, estimate_time, estimate_time_with_log
   (the server prints one non-JSON line, "MCP server is running…", on stdout first; the client logs it and carries on)
 ```
 
-在构建机本身（x86_64、Node 20）上，同一条 12306 查询算上 `npx` 启动用了 3.5 秒；配置好的那份安装上，`lark-cli auth status` 报告机器人身份就绪、用户身份需要刷新，这正是 `feishu` 技能在以用户名义做任何事之前要检查的。
+在构建机本机环境，即 x86_64、Node 20 中，同一条 12306 查询包含 `npx` 启动在内共用时 3.5 s。已配置的 `lark-cli` 实例运行 `auth status` 后，报告机器人身份可用、用户身份需要刷新。`feishu` 技能会在以用户身份执行操作前检查这一状态。

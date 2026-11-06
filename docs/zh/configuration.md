@@ -1,49 +1,51 @@
 # 配置
 
-nanoMuse 只读一个 TOML 文件。`nanomuse config init` 把带注释的 [`config/config.example.toml`](../../config/config.example.toml) 抄一份写到 `config/config.toml`；`nanomuse config show` 打印实际生效的设置，机密值打码。
+nanoMuse 从一个 TOML 配置文件读取设置。TOML 是一种用键和值、分组标题表示设置的文本格式。运行 `nanomuse config init`，会把带注释的示例 [`config/config.example.toml`](../../config/config.example.toml) 复制到 `config/config.toml`。`nanomuse config show` 可查看最终生效的设置，其中的密钥等敏感内容会隐藏。
 
-查找顺序：
+配置文件按以下顺序查找：
 
 1. `--config PATH` / `NANOMUSE_CONFIG`
 2. `./config/config.toml`
 3. `~/.nanomuse/config.toml`
 
-任何字符串值都可以写 `${VAR}` 或 `${VAR:-default}`，加载文件时会替换成环境变量，所以 API key 不必落在文件里。`api_key`、`address` 和 `password` 还可以写成 `{{vault:NAME}}`：值在构建客户端时才从加密的保险库里读出，从不给模型看。
+任何字符串值都可以包含 `${VAR}` 或 `${VAR:-default}`。加载文件时，程序会将其替换为相应环境变量的值，因此无需把 API key（调用服务所需的密钥）直接写入文件。`api_key`、`address`、`password` 还支持 `{{vault:NAME}}`，程序创建客户端时才从加密保险库读取真实值，不会提供给模型。
 
-三层设置，后面的覆盖前面的：先是这个文件，然后是环境变量覆盖，最后是 App 里「连接」屏幕改过的东西（`<data_dir>/app-settings.json`：模型、邮件服务器、浏览器开关、从手机上添加的 MCP 服务器）。最后这个文件里提到机密，一律只写 `{{vault:NAME}}`。
+设置分三层，后者覆盖前者：配置文件、环境变量、应用「连接」页保存的设置。应用设置保存在 `<data_dir>/app-settings.json`，包括模型、邮件服务器、浏览器开关和从手机添加的 MCP 服务器。MCP 是让智能体以统一方式连接外部工具的协议。这份应用设置文件只使用 `{{vault:NAME}}` 引用敏感信息。
 
-运行时没有对应设置的键（拼错的 `modle`、来自另一个版本的键）会被忽略，取默认值；加载时会在日志里带着键的路径（`llm.modle`）说明，`nanomuse doctor` 把这类键列为问题。自由格式的表（`[llm.extra_headers]`、MCP 服务器的 `env`）和 [channels.md](channels.md) 里的 `[channels.<name>]` 表接受任何键。
+无法识别的键会被忽略，对应设置使用默认值。例如拼错的 `modle` 或其他版本的配置键，加载器会在日志中指出完整路径，如 `llm.modle`，`nanomuse doctor` 也会将它列为问题。允许任意内容的配置段不受此限制，包括 `[llm.extra_headers]`、MCP 服务器的 `env`，以及 [channels.md](channels.md) 中的 `[channels.<name>]`。
 
-日期和标题相同的日历草稿会使用带序号的文件名，如 `calendar/<date>-<title>-2.ics`，已有草稿会保留。
+日期和标题相同的日历草稿会用序号区分，例如 `calendar/<date>-<title>-2.ics`，不会覆盖已有草稿。
 
 ## 环境变量覆盖 {#environment-overrides}
 
-这些优先于文件。它们覆盖了人们最常改的设置，以及 Docker 需要的东西。
+以下环境变量优先于配置文件，涵盖常用设置和 Docker 所需设置。运行时指执行 nanoMuse 任务的程序，容器则是打包并隔离该程序运行环境的方式。
 
-| 变量 | 设置 |
+| 变量 | 对应设置 |
 |---|---|
-| `NANOMUSE_LLM_PROVIDER`、`NANOMUSE_LLM_MODEL`、`NANOMUSE_LLM_BASE_URL`、`NANOMUSE_LLM_API_KEY`、`NANOMUSE_LLM_TOOL_MODE`、`NANOMUSE_LLM_VISION`、`NANOMUSE_LLM_IMAGE_MODEL`、`NANOMUSE_LLM_VIDEO_MODEL`、`NANOMUSE_LLM_VIDEO_BASE_URL` | `[llm]`（`video_base_url`：异步视频 API 在聊天模型以外的另一台主机上；转发用的主机，比如展示站的网关，会在这里报上自己的名字） |
-| `DEEPSEEK_API_KEY`、`OPENAI_API_KEY` | `llm.api_key` 为空时顶上：`base_url` 是 `*.deepseek.com` 用 DeepSeek 的，其他所有主机（OpenAI 自己、OpenRouter、网关、vLLM）用 OpenAI 的 |
-| `NANOMUSE_DATA_DIR` | `data_dir`（默认 `~/.nanomuse`） |
-| `NANOMUSE_WORKSPACE` | `agent.workspace`（默认：当前目录下有 `./workspace` 就用它，否则 `<data_dir>/workspace`） |
+| `NANOMUSE_LLM_PROVIDER`、`NANOMUSE_LLM_MODEL`、`NANOMUSE_LLM_BASE_URL`、`NANOMUSE_LLM_API_KEY`、`NANOMUSE_LLM_TOOL_MODE`、`NANOMUSE_LLM_VISION`、`NANOMUSE_LLM_IMAGE_MODEL`、`NANOMUSE_LLM_VIDEO_MODEL`、`NANOMUSE_LLM_VIDEO_BASE_URL` | `[llm]`。其中 `video_base_url` 指位于其他服务地址的异步视频 API；展示站网关等转发服务会在这里设置自己的地址。异步 API 在创建任务后另行查询生成结果 |
+| `DEEPSEEK_API_KEY`、`OPENAI_API_KEY` | 当 `llm.api_key` 为空时使用。`base_url` 属于 `*.deepseek.com` 时用 DeepSeek key，其他服务地址，包括 OpenAI、OpenRouter、网关、vLLM，使用 OpenAI key |
+| `NANOMUSE_DATA_DIR` | `data_dir`，默认 `~/.nanomuse` |
+| `NANOMUSE_WORKSPACE` | `agent.workspace`。当前目录中有 `./workspace` 时默认使用它，否则使用 `<data_dir>/workspace` |
 | `NANOMUSE_SENTINEL_MODE` | `sentinel.mode` |
 | `NANOMUSE_SEARCH_PROVIDER`、`NANOMUSE_SEARCH_API_KEY`、`NANOMUSE_SEARCH_BASE_URL` | `[connectors.search]` |
 | `NANOMUSE_SERVER_HOST`、`NANOMUSE_SERVER_PORT`、`NANOMUSE_SERVER_TOKEN` | `[server]` |
-| `NANOMUSE_BROWSER_ENABLED=1` | `browser.enabled = true`（只能打开，不能关；浏览器版 Docker 镜像会设它；手机通过 `NANOMUSE_DEVICE` 设它） |
-| `NANOMUSE_BROWSER_BACKEND` | `browser.backend`：`auto`、`playwright` 或 `device` |
-| `NANOMUSE_GUI_ENABLED=1`、`NANOMUSE_GUI_PROVIDER`、`NANOMUSE_GUI_MODEL`、`NANOMUSE_GUI_BASE_URL`、`NANOMUSE_GUI_API_KEY` | `[gui]`：操作手机，以及干这件事的模型 |
-| `NANOMUSE_IMAGE_PROVIDER`、`NANOMUSE_IMAGE_MODEL`、`NANOMUSE_IMAGE_BASE_URL`、`NANOMUSE_IMAGE_API_KEY`；把 `IMAGE` 换成 `VIDEO` 也一样 | [`[image]` 和 `[video]` 槽位](#image-and-video)：图片和短视频从哪里来 |
-| `NANOMUSE_VAULT_KEY` | 保险库的 Fernet 密钥（默认：`<data_dir>/vault.key`） |
-| `NANOMUSE_CLOUD_BASE_URL`、`NANOMUSE_CLOUD_REQUIRED`、`NANOMUSE_CLOUD_SYNC` | `[cloud]`：托管运行时登录的那个中继、是否必须有 nanoMuse Cloud 账号，以及「在我的设备之间同步对话」的默认值（`sync`，除非设为 `0` 否则是开的；「设置 → 数据控制」里的开关只要动过一次，就以它为准；[every-device.md](every-device.md#the-same-conversations-everywhere)）（[cloud.md](cloud.md)；中继自己的变量在 [cloud/README.md](../../cloud/README.md)） |
-| `NANOMUSE_HUB_NAME` | `hub.name`，这台设备在其他设备上叫什么 |
-| `NANOMUSE_CLOUD_KEY`、`NANOMUSE_CLOUD_HINT`、`NANOMUSE_CLOUD_CHANNEL`、`NANOMUSE_ONBOARDED` | 托管的运行时（nanoMuse Web）一启动就是登录状态：创建容器的网关交来账号 key（和手动输入的一样进保险库）、账号页要显示的打码标识和渠道，以及首次运行是否已经完成；保险库里已经有 key 时什么都不做 |
-| `NANOMUSE_IN_CONTAINER=1` | 说明运行时在容器里（镜像会设置它；`/.dockerenv` 也会被读取），于是 `sandbox.mode = auto` 把容器当作箱子，而不是报告缺少 bubblewrap |
-| `NANOMUSE_CODING_HOME` | 到哪里找编程 CLI 各自的家目录（`~/.codex`、`~/.claude`……），默认是用户的家目录（[coding-agents.md](coding-agents.md)） |
+| `NANOMUSE_BROWSER_ENABLED=1` | 设置 `browser.enabled = true`，只能启用，不能关闭。浏览器 Docker 镜像会设置此项，手机通过 `NANOMUSE_DEVICE` 设置 |
+| `NANOMUSE_BROWSER_BACKEND` | `browser.backend`，可用值为 `auto`、`playwright`、`device` |
+| `NANOMUSE_GUI_ENABLED=1`、`NANOMUSE_GUI_PROVIDER`、`NANOMUSE_GUI_MODEL`、`NANOMUSE_GUI_BASE_URL`、`NANOMUSE_GUI_API_KEY` | `[gui]`，控制手机操作及使用的模型 |
+| `NANOMUSE_IMAGE_PROVIDER`、`NANOMUSE_IMAGE_MODEL`、`NANOMUSE_IMAGE_BASE_URL`、`NANOMUSE_IMAGE_API_KEY`；将 `IMAGE` 换为 `VIDEO` 同样适用 | [`[image]` 和 `[video]` 配置](#image-and-video)，指定图片和视频的生成服务 |
+| `NANOMUSE_VAULT_KEY` | 保险库使用的 Fernet 加密密钥，默认保存在 `<data_dir>/vault.key` |
+| `NANOMUSE_CLOUD_BASE_URL`、`NANOMUSE_CLOUD_REQUIRED`、`NANOMUSE_CLOUD_SYNC` | `[cloud]`，分别指定托管运行时登录的中继、是否必须登录 nanoMuse Cloud，以及「在我的设备之间同步对话」的默认状态。中继是负责账号和设备消息转发的服务。`sync` 未设为 `0` 时默认开启，但用户在设置 → 数据控制中选择后，以用户选择为准，见 [every-device.md](every-device.md#the-same-conversations-everywhere)。另见 [cloud.md](cloud.md)，中继自身的变量见 [cloud/README.md](../../cloud/README.md) |
+| `NANOMUSE_HUB_NAME` | `hub.name`，其他设备看到的本机名称 |
+| `NANOMUSE_CLOUD_KEY`、`NANOMUSE_CLOUD_HINT`、`NANOMUSE_CLOUD_CHANNEL`、`NANOMUSE_ONBOARDED` | 让托管运行时 nanoMuse Web 启动即登录。创建容器的网关传入账号 key、脱敏账号标识、账号渠道及首次引导完成状态。key 与手动输入时一样存入保险库；保险库已有 key 时不再处理 |
+| `NANOMUSE_IN_CONTAINER=1` | 表示运行时位于容器内。镜像会设置，程序也会检查 `/.dockerenv`。此时 `sandbox.mode = auto` 将容器本身视为隔离环境，不再因缺少 bubblewrap 报告问题 |
+| `NANOMUSE_CODING_HOME` | 查找编程 CLI（命令行程序）数据目录的位置，例如 `~/.codex`、`~/.claude`，默认从用户主目录查找，见 [coding-agents.md](coding-agents.md) |
 | `NANOMUSE_LOG_LEVEL` | `log_level` |
 
-仓库根目录的 Docker compose 文件使用 `NANOMUSE_RUNTIME_PORT` 选择网页版在宿主机上发布的端口，默认 8787。它是 compose 变量，不是运行时设置，也不代替 `NANOMUSE_SERVER_PORT`；详见[部署](deployment.md#docker)。
+仓库根目录的 Docker compose 文件通过 `NANOMUSE_RUNTIME_PORT` 设置网页版映射到宿主机的端口，默认 8787。这是 compose 变量，不属于运行时设置，也不能代替 `NANOMUSE_SERVER_PORT`，见[部署](deployment.md#docker)。
 
 ## `[llm]` {#llm}
+
+`[llm]` 配置对话模型。`max_tokens` 中的 token 是模型计算输入输出长度的文本单位，并不等同于字数。
 
 ```toml
 [llm]
@@ -68,29 +70,31 @@ video_model   = ""                 # the same for clips
 video_base_url = ""                # the asynchronous video API when it is not on this host (a relaying gateway)
 ```
 
-`proxy` 让这个槽位的请求（`chatgpt` 槽位还包括登录的令牌刷新）走那个代理，并对它们忽略环境里的 `HTTPS_PROXY`；留空则由环境决定。它从不作用于 nanoMuse Cloud 和 hub。（手机上同样的开关在「设置 → 网络」；[own-key.md](own-key.md#when-the-provider-cannot-be-reached)。）
+`proxy` 只让本组模型请求使用指定代理，`chatgpt` 组还包括登录 token 的刷新。设定后，这些请求不再使用环境中的 `HTTPS_PROXY`；留空时由环境决定。它不影响 nanoMuse Cloud 或 hub（设备互联）连接。手机上的对应设置位于设置 → 网络，见 [own-key.md](own-key.md#when-the-provider-cannot-be-reached)。
 
-各服务商的写法：
+各服务商的配置示例：
 
 | 服务商 | `model` | `base_url` | 说明 |
 |---|---|---|---|
-| DeepSeek | `deepseek-flash` | `https://api.deepseek.com` | 默认 |
-| Kimi（月之暗面） | `kimi-k2.6` | `https://api.moonshot.cn/v1` | |
-| 阿里云百炼 | `deepseek-v4.1-flash` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 中国大陆；手的模型 `qwen3.8-27b` 在同一个端点上 |
+| DeepSeek | `deepseek-flash` | `https://api.deepseek.com` | 默认配置 |
+| Kimi（Moonshot） | `kimi-k2.6` | `https://api.moonshot.cn/v1` | |
+| 阿里云百炼（Alibaba Cloud Bailian） | `deepseek-v4.1-flash` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 中国大陆服务；操作屏幕的模型 `qwen3.8-27b` 使用同一接口 |
 | GLM（智谱） | `glm-5.3` | `https://open.bigmodel.cn/api/paas/v4` | |
-| 豆包（火山方舟） | 你的接入点 id | `https://ark.cn-beijing.volces.com/api/v3` | 模型是带版本的部署；App 会列出你的 |
+| 豆包（火山方舟） | 你的接入点 id | `https://ark.cn-beijing.volces.com/api/v3` | 模型以版本化部署提供，应用会列出你的部署 |
 | MiniMax | `MiniMax-M3` | `https://api.minimaxi.com/v1` | |
-| OpenAI | `gpt-5.4-mini` | `https://api.openai.com/v1` | `provider = "openai_responses"` 也可以 |
-| OpenRouter | `deepseek/deepseek-v4.1-flash` | `https://openrouter.ai/api/v1` | 中国大陆以外；手的模型 `qwen/qwen3.8-27b` 在同一个端点上 |
-| Ollama | `qwen3:8b` | `http://localhost:11434/v1` | `api_key = "ollama"`；见[本地模型](#local-models) |
-| vLLM / LM Studio | 你起的服务名 | `http://localhost:8000/v1` | 服务器不理会 `tools` 的话，设 `tool_mode = "prompt"` |
-| 公司网关 | 按要求 | 按要求 | 用 `extra_headers` / `extra_body`；按网关说的 API 形状来选 provider |
+| OpenAI | `gpt-5.4-mini` | `https://api.openai.com/v1` | 也支持 `provider = "openai_responses"` |
+| OpenRouter | `deepseek/deepseek-v4.1-flash` | `https://openrouter.ai/api/v1` | 中国大陆以外的服务；操作屏幕的模型 `qwen/qwen3.8-27b` 使用同一接口 |
+| Ollama | `qwen3:8b` | `http://localhost:11434/v1` | 使用 `api_key = "ollama"`，见[本地模型](#local-models) |
+| vLLM / LM Studio | 你部署的模型名称 | `http://localhost:8000/v1` | 如果服务器忽略 `tools`，设置 `tool_mode = "prompt"` |
+| 公司网关 | 按网关要求 | 按网关要求 | 可用 `extra_headers` / `extra_body`，按网关支持的 API 协议选择 provider |
 
-网页控制台提供同一组预设（「连接 → 对话模型」，以及第一次打开时），每个都带一个链接，指向它的 key 从哪里领；确切的主机名在 `nanomuse/server/connections.py` 的 `PROVIDERS` 里。从 App 保存的 `base_url` 如果没有路径，会补上 `/v1`（`http://host:8000` → `http://host:8000/v1`）；预设自带的主机原样保留。Ollama 和自定义端点可以没有 key。从网页控制台添加的自定义接口是一个列表（`app-settings.json` 里的 `endpoints`，每项是 `{id, label, base_url, api_key, models}`，key 以 `ENDPOINT_<ID>_API_KEY` 存在保险库里）；设在其中一个接口上的槽位带着它的地址和那个保险库引用，所以这个文件不需要知道列表的存在（[web.md](web.md#where-it-shows)）。在这里设在目录外主机上的 `[llm]` 对话模型保持原样；只有从 App 里设的那个会搬进列表。
+网页控制台的连接 → 对话模型和首次引导也提供这些预设，并附上申请 key 的链接。准确的服务地址保存在 `nanomuse/server/connections.py` 的 `PROVIDERS` 中。从应用保存的 `base_url` 如果不含路径，会自动补上 `/v1`，例如 `http://host:8000` 变为 `http://host:8000/v1`；预设自带的地址则保持原样。Ollama 和自定义接口可以不填 key。
 
-`provider` 也可以是服务商目录 [`nanomuse/llm/providers.json`](../../nanomuse/llm/providers.json) 里的一个 id（`bailian`、`deepseek`、`moonshot`、`zhipu`、`openrouter`、`openai`、`gemini`……），这时 `base_url` 以及（为空时的）`model` 从目录里填上，只有 `api_key` 是你自己的。目录还写明每家服务商的 key 覆盖什么（聊天、手、图片、短视频）；服务器上的 `GET /api/providers` 报告每个槽位用的是哪家服务商、还剩哪些没被覆盖，App 对一项没人覆盖的功能只显示一句话（[own-key.md](own-key.md)）。
+网页版添加的自定义接口保存在 `app-settings.json` 的 `endpoints` 列表中，每项为 `{id, label, base_url, api_key, models}`，key 存入保险库，名称为 `ENDPOINT_<ID>_API_KEY`。某项模型配置使用该接口时，会保存服务地址和保险库引用，因此无需在本文件重复配置接口列表，见 [web.md](web.md#where-it-shows)。如果你在本文件的 `[llm]` 中配置了未收录的服务地址，程序会保留原配置；只有从应用设置的接口才会加入列表。
 
-### 用 ChatGPT 套餐代替 key {#a-chatgpt-plan-instead-of-a-key}
+`provider` 也可以填写[服务商目录 `nanomuse/llm/providers.json`](../../nanomuse/llm/providers.json)中的 id，如 `bailian`、`deepseek`、`moonshot`、`zhipu`、`openrouter`、`openai`、`gemini`。此时程序从目录补全 `base_url`，并在 `model` 为空时填入默认模型，你只需提供自己的 `api_key`。目录还记录各家 key 能用于对话、操作屏幕、图片或视频中的哪些功能。服务器的 `GET /api/providers` 会报告每项配置使用的服务商及尚未覆盖的功能，应用也会为不可用功能显示一句说明，见 [own-key.md](own-key.md)。
+
+### 使用 ChatGPT 套餐 {#a-chatgpt-plan-instead-of-a-key}
 
 ```toml
 [llm]
@@ -98,52 +102,64 @@ provider = "chatgpt"     # the sign-in from `nanomuse chatgpt login`; no base_ur
 model    = ""            # empty → gpt-5.6-sol (also gpt-6.1-sol, gpt-6-sol, gpt-6-luna, gpt-6-astra, gpt-5.4, gpt-5.4-mini)
 ```
 
-有 ChatGPT 套餐（Plus、Pro、Team）的人可以让 nanoMuse 用它来聊天和动手，方式和 OpenAI 自己的 Codex CLI 一样：`nanomuse chatgpt login` 在浏览器里打开 OpenAI 的登录页（PKCE，和 Codex 相同的 client id、scope 和重定向地址），在运行时所在机器的 1455 端口等回调，然后把令牌存进 `<data_dir>/chatgpt.json`（权限 0600），到期前自动刷新。`nanomuse chatgpt status` 说明是谁登录的、有效到什么时候（从不显示令牌）；`nanomuse chatgpt logout` 删掉存储。同样的三步也在网页控制台的「连接」屏幕上（「或者用 ChatGPT 套餐登录」），它调用运行时的 `POST /api/chatgpt/login`、`GET /api/chatgpt/status` 和 `POST /api/chatgpt/logout`（[web.md](web.md)）。登录之后什么都不会自己切换：在这里设 `provider = "chatgpt"`，在网页上选「让它来回答对话」，或者 `PUT /api/connections/llm {"provider": "chatgpt"}`。`[gui] provider = "chatgpt"` 对手同样适用。
+已有 ChatGPT Plus、Pro 或 Team 套餐时，可以像 OpenAI 的 Codex CLI 一样，登录后供 nanoMuse 对话和操作屏幕使用。运行 `nanomuse chatgpt login` 会在浏览器打开 OpenAI 登录页，采用 PKCE（防止授权码被截取后冒用的校验方式），client id、权限范围和重定向地址与 Codex 相同。运行时在本机 1455 端口等待登录回调，将 token（证明登录身份的访问令牌）保存在 `<data_dir>/chatgpt.json`，文件权限为 0600，并在到期前刷新。
 
-它覆盖什么：聊天和视觉（手要读截图）。Codex 后端没有图片和视频端点，所以图片和短视频仍然需要一把 key：下面的 `[image]` 或 `[video]` 槽位，或者一家主机会画图的聊天服务商。`chatgpt` 槽位里的 `base_url` 和 `api_key` 会被忽略，并在日志里留一条警告。
+`nanomuse chatgpt status` 显示登录账号和有效期，不显示 token；`nanomuse chatgpt logout` 删除凭据。网页控制台连接页的「或者用 ChatGPT 套餐登录」也提供同样流程，分别调用 `POST /api/chatgpt/login`、`GET /api/chatgpt/status`、`POST /api/chatgpt/logout`，见 [web.md](web.md)。登录完成不会自动切换模型。你还需在本文件设置 `provider = "chatgpt"`，在网页选择用于对话，或调用 `PUT /api/connections/llm {"provider": "chatgpt"}`。为手设置 `[gui] provider = "chatgpt"` 的方式相同。
 
-**实话一句**，每次登录都会打印：*OpenAI 的条款只允许在 OpenAI 自己的 Codex 里使用 ChatGPT 套餐；别的应用曾被切断过这种访问（OpenCode，2026 年 1 月）。哪天它不能用了，API key 还能用。*
+ChatGPT 套餐可用于对话和图片理解，后者供手读取截图。Codex 后端没有图片或视频生成接口，因此这些功能仍需要自己的 key，可配置下面的 `[image]`、`[video]`，或使用支持媒体生成的对话服务商。`chatgpt` 配置中的 `base_url`、`api_key` 会被忽略，日志会给出警告。
 
-**回调必须到得了运行时。** OpenAI 把浏览器送回 `http://localhost:1455/auth/callback`，所以浏览器必须和运行时在同一台机器上（或者把这个端口转发过去）。不在同一台时（运行时在服务器上、控制台开在笔记本上），登录页照样能用，只是浏览器最后落在一个没人应答的地址上。把地址栏里那整个地址（`http://localhost:1455/auth/callback?code=…&state=…`）复制出来交给运行时：端口被占或者迟迟没有回调时，CLI 会问你要；带 `--json` 时它从 stdin 读一行；网页控制台的卡片上有一个输入框；从 `/api/chatgpt/login` 发起的登录还在等待期间，服务器接受 `POST /api/chatgpt/callback {"url": "<the address>"}`。`state` 和正在等待的那次登录对不上会被拒绝（400 `state_mismatch`），什么都不会交换。`nanomuse chatgpt proxy` 把这个登录以回环地址上一个 OpenAI 兼容端点的形式提供出来（`GET /v1/models`、`POST /v1/chat/completions`、`GET /v1/usage`，一个本地 bearer 令牌），给同一台机器上的其他程序用；`--proxy`（或 `[llm] proxy`）让它的上游调用走代理。
+**每次登录都会显示的说明**：OpenAI 的条款涵盖在其自家 Codex 中使用 ChatGPT 套餐。其他应用曾被停止此类访问，例如 2026 年 1 月的 OpenCode。如果这种登录方式失效，可以改用 API key。
 
-桌面版完成浏览器授权后会保存登录凭据；本地代理启动后，ChatGPT 模型才会出现。`nanomuse chatgpt proxy --json` 发出的 `ready` 事件包含模型列表，桌面版用它注册服务商。能从 OpenAI 获取列表时使用该列表，否则使用内置列表。
+**登录回调必须送达运行时**。OpenAI 最后会将浏览器跳转至 `http://localhost:1455/auth/callback`。因此，浏览器应与运行时位于同一台电脑，或把该端口转发到运行时。若运行时在服务器、浏览器在笔记本，登录页面仍可完成操作，但最后会跳转到没有服务响应的本机地址。
 
-**套餐还剩多少。** OpenAI 按两个窗口（几小时和一周）统计套餐用量，并在每次 Codex 调用的响应头里（`x-codex-primary-used-percent`、`…-window-minutes`、`…-reset-after-seconds`，`secondary` 也有同样一组）和 `GET https://chatgpt.com/backend-api/wham/usage`（Codex CLI 的 `/status` 读的就是这个端点）上写明。`nanomuse chatgpt usage` 打印两个窗口（`--json` 给原始的 `{label, plan, limits}`），运行时在 `GET /api/chatgpt/usage` 提供给控制台，回环代理在 `GET /v1/usage` 提供；运行时还保留最近一次调用的响应头（`CodexClient.limits`）。没有什么会缓存超过一分钟。
+此时，复制地址栏中的完整地址 `http://localhost:1455/auth/callback?code=…&state=…`，交给运行时。端口被占用或等待超时时，CLI 会提示你输入；带 `--json` 时从标准输入读取一行；网页控制台卡片也有输入框。由 `/api/chatgpt/login` 发起的登录仍在等待时，服务器接受 `POST /api/chatgpt/callback {"url": "<the address>"}`。如果 `state` 与待完成登录不符，会返回 400 `state_mismatch`，不交换任何凭据。
 
-**失败的时候。** 一次过不去的 Codex 调用会归结为少数几句话之一，从不原样照抄 socket 的报错：*这个网络连不上 chatgpt.com*（DNS、连接、TLS、超时，或者该返回 JSON 的地方给了一个 HTML 页面：拦截页）、*OpenAI 不向这个地区提供服务*（HTTP 403 `unsupported_country_region_territory`）、*ChatGPT 登录已失效。请重新登录*（401）、*ChatGPT 套餐暂时没有余量了*（指明用量上限的 429，后面附上 OpenAI 的原话和 `Retry-After`）以及*同时发出的请求太多*（其他任何 429）。回环代理返回这些句子时在 `error.code` 里带一个机器码（`unreachable`、`region_blocked`、`not_signed_in`、`quota`、`rate_limited`、`upstream`），客户端可以据此处理；手机上把同样的句子显示成一张卡片（[own-key.md](own-key.md#when-the-provider-cannot-be-reached)）。
+`nanomuse chatgpt proxy` 会把登录后的服务提供为本机 OpenAI 兼容接口，供同一台电脑的其他程序调用，包括 `GET /v1/models`、`POST /v1/chat/completions`、`GET /v1/usage`，通过本地 Bearer token 验证访问。使用 `--proxy` 或 `[llm] proxy`，可让这个服务向上游发出的请求经过代理。
+
+桌面版在浏览器授权完成后保存登录信息，本地代理启动后才会显示 ChatGPT 模型。`nanomuse chatgpt proxy --json` 的 `ready` 事件包含模型列表，桌面版据此注册服务商。能够向 OpenAI 获取列表时使用其返回值，否则使用内置列表。
+
+**查看套餐余量**。OpenAI 按几小时和一周两个用量周期统计使用情况。每次 Codex 响应头都有 `x-codex-primary-used-percent`、`…-window-minutes`、`…-reset-after-seconds`，以及对应的 `secondary` 字段。`GET https://chatgpt.com/backend-api/wham/usage` 也提供用量，Codex CLI 的 `/status` 就读取此接口。`nanomuse chatgpt usage` 显示两个周期，`--json` 返回原始 `{label, plan, limits}`。运行时通过 `GET /api/chatgpt/usage` 提供给控制台，本机代理通过 `GET /v1/usage` 提供。运行时还保留最近一次响应头中的 `CodexClient.limits`，所有缓存都不超过一分钟。
+
+**连接失败时的提示**。Codex 请求失败会被转换为具体说明，不会直接显示底层 socket 错误：网络无法访问 chatgpt.com，可能是 DNS、连接、TLS、超时或收到 HTML 拦截页而非 JSON；OpenAI 不向当前地区提供服务，对应 HTTP 403 `unsupported_country_region_territory`；ChatGPT 登录失效需重新登录，对应 401；套餐暂时用尽，对应说明用量限制的 429，并附 OpenAI 信息和 `Retry-After`；其他 429 则说明同时请求过多。本机代理还会在 `error.code` 中提供 `unreachable`、`region_blocked`、`not_signed_in`、`quota`、`rate_limited`、`upstream`，方便客户端按类别处理。手机会将相同说明显示为卡片，见 [own-key.md](own-key.md#when-the-provider-cannot-be-reached)。
 
 ### 工具调用模式 {#tool-calling-modes}
 
-| `tool_mode` | 发生什么 |
+| `tool_mode` | 行为 |
 |---|---|
-| `auto`（默认） | 用 API 的函数调用。如果端点*拒绝* `tools` 字段（Ollama 跑一个没有工具模板的模型（"does not support tools"）、vLLM 启动时没带工具解析器），nanoMuse 记一条警告，这次运行余下的时间改在提示词里描述工具。 |
-| `native` | 始终用函数调用 API；被拒绝就是错误。 |
-| `prompt` | 工具写在系统提示词里，调用从 `<tool_call>` 块里解析。对那些默默*无视* `tools` 的端点（不报错，模型就是从不调用任何东西）来说，这是唯一能用的模式；有些「agent 应用」网关就是这样。 |
+| `auto`（默认） | 使用 API 原生函数调用。如果接口拒绝 `tools` 字段，例如 Ollama 模型没有工具模板并返回 "does not support tools"，或 vLLM 未启用工具解析器，nanoMuse 会记录一次警告，本次运行后续改为在提示词中描述工具 |
+| `native` | 始终使用原生函数调用 API，被拒绝时直接报错 |
+| `prompt` | 在系统提示词中描述工具，再从 `<tool_call>` 块解析调用。对于忽略 `tools` 却不报错、模型从不调用工具的接口，这是唯一可用方式；部分智能体应用网关采用这种行为 |
 
 ### 图片 {#pictures}
 
-用户在聊天里附的图片会作为图片内容发给模型（Chat Completions 的 `image_url` 部分，Responses 的 `input_image`），先把长边缩到 1568 px。`vision = "auto"`（默认）会发送图片；端点拒绝带图的请求时（DeepSeek，或 Ollama 跑一个没有视觉的模型："model does not support multimodal requests"），就只带文字再发一次同样的请求，这次运行余下的时间不再发图片，App 提醒用户一次；之后模型收到的消息会说明哪些图片它看不到，免得它去描述自己从没见过的东西。`on` 始终发送，被拒绝就是错误。`off` 从不发送：模型只拿到文件名；文本文件、PDF 和表格无论如何它都是用 `files` 读的。在这里能用的视觉模型：GPT-4o 及之后的版本、经 OpenAI 兼容网关的 Claude、Gemini、Qwen-VL、`qwen3.8-*`，以及 Ollama 上的 `gemma3` 和 `llava`。有些 id 事先就知道，不用白费一次请求：DeepSeek 的模型只认文字，除非 id 里含 `v4.1`、`vision` 或 `ocr`；`qwen*-vl` 和 `qwen3.8-*` 看得见。
+聊天附件中的图片会先将长边缩至 1568 px，再作为图片内容发送给模型：Chat Completions 使用 `image_url`，Responses 使用 `input_image`。
+
+默认 `vision = "auto"` 会先尝试发送图片。如果接口拒绝带图请求，例如 DeepSeek 或不支持视觉的 Ollama 模型返回 "model does not support multimodal requests"，程序会只保留文字重新请求，本次运行后续也不再发送图片，并向用户提示一次。模型收到的消息会注明哪些图片不可见，避免它描述未看到的内容。`on` 始终发送图片，拒绝则报错；`off` 从不发送图片，模型只能看到文件名。无论视觉设置如何，文本文件、PDF 和表格都由 `files` 工具读取。
+
+支持的视觉模型包括 GPT-4o 及之后的版本、经 OpenAI 兼容网关调用的 Claude、Gemini、Qwen-VL、`qwen3.8-*`，以及 Ollama 的 `gemma3` 和 `llava`。部分模型可通过 id 预先判断，无需试错：DeepSeek 默认只支持文字，除非 id 包含 `v4.1`、`vision` 或 `ocr`；`qwen*-vl` 和 `qwen3.8-*` 支持图片。
 
 ### 本地模型 {#local-models}
 
-Ollama 在 `http://localhost:11434/v1` 提供 OpenAI 兼容的 API；带工具模板的模型（Qwen 3、Llama 3.1 及以上、Mistral、DeepSeek-R1 蒸馏版）原生调用工具，其余的通过 `auto` 的提示词回退方式工作。[`scripts/provider_check.py`](../../scripts/provider_check.py) 对任意模型跑五个日常任务（聊天、通过 `python_execute` 做一次计算、写一个文件、记住一个偏好、一个多步任务）；在 RTX 4070（12 GB）、Ollama 0.34 上的结果：
+Ollama 在 `http://localhost:11434/v1` 提供 OpenAI 兼容 API。带工具模板的模型，例如 Qwen 3、Llama 3.1+、Mistral 和 DeepSeek-R1 蒸馏模型，可以原生调用工具；其余模型使用 `auto` 的提示词备用方式。[`scripts/provider_check.py`](../../scripts/provider_check.py) 可用任意模型测试五种日常任务：对话、用 `python_execute` 计算、写文件、记住偏好及多步骤任务。以下是在 RTX 4070（12 GB）、Ollama 0.34 上的结果：
 
 | 模型 | 工具调用 | provider_check | 说明 |
 |---|---|---|---|
-| `qwen3:8b` | 原生（`tool_mode = "prompt"` 也是 5/5） | 5/5 | 默认预设；每个任务 7–20 秒 |
-| `llama3.2:3b` | 原生 | 5/5 | 经常把调用写成正文里一个光秃秃的 JSON 对象，并把文件内容里的换行双重转义；两种情况都会修复（见下） |
-| `gemma3:4b` | 提示词，经 `auto` 回退 | 5/5 | Ollama 对它拒绝 `tools`；它输出 ```` ```tool_call ```` 围栏，提示词解析器接受 |
-| DeepSeek V4.1 Flash（在线） | 原生 | 5/5 | 每个任务 1–4 秒 |
+| `qwen3:8b` | 原生，`tool_mode = "prompt"` 也通过 5/5 | 5/5 | 默认预设，每项任务 7–20 秒 |
+| `llama3.2:3b` | 原生 | 5/5 | 常将调用写成正文中的普通 JSON 对象，或对文件换行重复转义，程序会修正这两种情况，见下文 |
+| `gemma3:4b` | `auto` 失败后使用提示词方式 | 5/5 | Ollama 拒绝它的 `tools`，它输出的 ```` ```tool_call ```` 代码块可由提示词解析器读取 |
+| DeepSeek V4.1 Flash（托管） | 原生 | 5/5 | 每项任务 1–4 秒 |
 
-小模型会以可预料的方式扭曲协议，nanoMuse 选择迁就它们而不是让任务失败：回复如果是一个光秃秃的或围栏里的 JSON 对象、点名了某个工具（并带一个 arguments 对象），在任何模式下都算作工具调用；JSON 字符串里可以有真正的换行；`files.write` 遇到只有一行、却含两个及以上拼出来的 `\n` 的文本时会把它拆成多行（代码本来就有真正的换行，从不动它）。带其他键的加引号 JSON 对象仍当文字。
+小模型有时不能严格遵循工具协议，nanoMuse 会处理已知情况：若回复是普通或代码块中的 JSON 对象，指定了现有工具并包含 arguments 对象，所有模式都将其视为工具调用；JSON 字符串也允许实际换行。`files.write` 遇到单行文本且包含至少两个字面量 `\n` 时，会将其转换为多行；本身已有实际换行的代码不会改动。带有其他键、以引用形式出现的 JSON 对象仍视为文字。
 
-把 `max_tokens` 设成模型一轮能产出的量（对这些模型 4096 就够），`agent.max_context_messages` 别太大：一个 8k 上下文窗口的本地 8B 模型，工具结果一开始回传，很快就满了。
+`max_tokens` 应设置为模型单轮能生成的上限，上述模型使用 4096 即可。`agent.max_context_messages` 不宜过大，本地 8B 模型若只有 8k 上下文窗口，加入工具返回值后很快就会填满。上下文窗口指模型一次请求能够处理的全部历史和内容。
 
-在内容里输出 `<think>…</think>` 的模型也有处理：推理部分被单独分出来，只在 `agent.show_thinking = true` 时显示。开着这个开关时，服务商流式送来的推理（Chat Completions 分块里的 `reasoning_content`，Responses API 的推理增量）会在模型思考的当下就显示出来：控制台里是一行暗色的 `⌗`，网页控制台里在气泡中；回答一开始，它就收进「显示思考」的折叠里，随回复保存的只有完整的推理。
+如果模型在正文中输出 `<think>…</think>`，程序会分离其中的推理，只在 `agent.show_thinking = true` 时显示。开启后，服务商逐段发送的推理也会实时显示，包括 Chat Completions 中的 `reasoning_content` 和 Responses API 的推理增量。终端会在暗色 `⌗` 行下显示，网页则在聊天气泡中显示。开始回答后，推理折叠到「显示思考」，最终只保存完整推理。
 
 ## `[image]` 和 `[video]` {#image-and-video}
 
-形象工作室的图片和形象的短视频不在聊天模型的主机上生成时，从哪里来。两个槽位都空（默认）时按一个顺序来（模型约定，0.1.41）：聊天服务商自己的媒体模型（目录里带 `image` / `video` 的服务商，用对应的默认模型；`[llm] image_model` / `video_model` 仍可指定别的），然后是菜单明确提供这项媒体能力的已登录中继，最后是你第一家能做这件事的服务商。公共 nanoMuse Cloud 的菜单不再提供生图或生视频，因此它的用户必须接入自己的服务商和 API key；自己部署中继的运营者仍可明确开启旧媒体代理。设一个槽位，就能换到别处生成，或者在聊天模型是 DeepSeek、ChatGPT 套餐或本地模型时给媒体功能一个来源：
+这两组配置用于为形象工作室的图片和视频指定独立服务。默认均为空时，遵循 0.1.41 的模型约定，按以下顺序寻找：先使用对话服务商自己的媒体模型，前提是目录标有 `image` 或 `video` 能力，并使用其相应默认模型，旧的 `[llm] image_model` / `video_model` 仍可指定其他模型；再检查已登录中继的实时模型菜单，只有明确提供该媒体类型时才使用；最后使用你添加的第一家支持相应功能的服务商。
+
+公开的 nanoMuse Cloud 菜单不提供图片或视频生成模型，因此用户需要自己的服务商及 API key。自己部署的中继可由运营者明确启用旧媒体代理。填写相应配置，可以改用其他生成服务，也可以为 DeepSeek、ChatGPT 套餐或本地对话模型补充媒体生成功能：
 
 ```toml
 [image]
@@ -159,9 +175,13 @@ model    = ""                         # empty → the catalogue's default (wan2.
 api_key  = "{{vault:VIDEO_API_KEY}}"
 ```
 
-目录里没有的主机可以不写 `provider`，改写 `base_url`；`api_key` 发给那台主机（`[video]` 自己的主机用 `[video]` 的 key，不用图片主机的）。一项没有任何配置覆盖的功能就是不可用，并用一句话说明谁可以（大陆是*图片需要一家有图像模型的服务商：阿里云百炼、智谱 GLM、SiliconFlow 或火山方舟（怎么做：docs/own-key.md）*，其他地方是 OpenRouter、OpenAI、Google Gemini 或 xAI Grok，按 `[agent] language` 用英文或中文），出现在形象工作室、「连接」里的「生成图片」和「生成视频」下，以及 `GET /api/providers` 里。这些句子和能力都来自目录，目录变它们就变。
+目录未收录的服务，可以不填 `provider`，直接指定 `base_url`。`api_key` 会发给这个服务地址。如果视频使用独立服务，则使用 `[video]` 的 key，不会使用图像服务的 key。
 
-应用层设置的是同样的槽位：`PUT /api/connections/image` 和 `PUT /api/connections/video` 接受 `provider`（目录 id，或 `openai` / `openai_responses` 加 `base_url`）、`model`（空：目录的默认值）、`base_url` 和 `api_key`（进保险库，名为 `IMAGE_API_KEY` / `VIDEO_API_KEY`，或原样保留的 `{{vault:NAME}}` 引用；`""` 删掉它），写 `app-settings.json` 的 `image` / `video` 对象，键和这里一样是四个，像其他设置一样叠在这个文件之上，并回答槽位的设置加上它解析成什么（`effective_provider`、`effective_model`、`effective_source`：`app`、`config`、`chat` 或 `cloud`）；`GET /api/connections/image` 和 `/video` 回答同样的内容，`GET /api/connections` 两者都带。四项都空就清掉槽位。目录里列出但没有这项能力的服务商被拒绝，400 加那一句话（`DeepSeek has no image models; Pictures need …`），ChatGPT 登录也一样；本地服务器或目录不认识的主机放行，因为它有的是你装的东西。网页控制台的「生成图片」和「生成视频」两行用的就是这些路由（[web.md](web.md)）。
+没有任何配置能提供某项能力时，该功能不可用，并会说明需要什么服务商。例如在中国大陆，图片功能会提示需要阿里云百炼、智谱 GLM、SiliconFlow 或火山方舟等图像服务商，并指向 `docs/own-key.md`；其他地区列出 OpenRouter、OpenAI、Google Gemini 或 xAI Grok。语言遵循 `[agent] language`。这些说明出现在形象工作室、连接页的「生成图片」「生成视频」下方及 `GET /api/providers` 中，内容和能力都来自目录，会随目录更新。
+
+应用通过 `PUT /api/connections/image`、`PUT /api/connections/video` 设置同样的配置。它们接受四个字段：`provider` 可以是目录 id，或配合 `base_url` 的 `openai` / `openai_responses`；`model` 留空时使用目录默认值；`base_url` 指定服务地址；`api_key` 存入保险库的 `IMAGE_API_KEY` / `VIDEO_API_KEY`，已有 `{{vault:NAME}}` 引用会原样保留，`""` 会删除密钥。四个字段写入 `app-settings.json` 的 `image` / `video` 对象，并覆盖本文件。
+
+响应既包含填写的设置，也包含解析后的 `effective_provider`、`effective_model` 和 `effective_source`，来源可为 `app`、`config`、`chat` 或 `cloud`。`GET /api/connections/image`、`/video` 返回相同结构，`GET /api/connections` 同时返回两组。四项都留空会清除该配置。如果目录明确记录该服务商没有此能力，或选择了 ChatGPT 登录，会返回 400 并说明原因，例如 `DeepSeek has no image models; Pictures need …`。本地服务器及目录未知的地址不作这项限制，因为实际能力取决于你部署的服务。网页控制台的「生成图片」「生成视频」使用的就是这些接口，见 [web.md](web.md)。
 
 ## `[agent]` {#agent}
 
@@ -179,15 +199,13 @@ user_profile         = ""              # free text injected into the system prom
 instructions         = ""              # extra rules appended to the system prompt
 ```
 
-在 Windows 上，运行时的 `files` 工具和 hub 文件操作会拒绝保留设备名（包括 `NUL.txt`），
-也会拒绝以点或空格结尾的路径分量。请换一个名称，不要依赖 Windows 自动改名。其他平台
-仍使用各自的文件命名规则。
+在 Windows 上，运行时的 `files` 工具和 hub 文件动作会拒绝系统保留设备名，包括 `NUL.txt`，也会拒绝以点或空格结尾的路径部分。遇到这种情况请改名，不要依赖 Windows 自动处理。其他平台遵循各自的文件命名规则。
 
-`language = "auto"` 时，系统提示词会点明回复语言并告诉模型用它回答：客户端随消息送来了界面语言（网页控制台会送，即 `POST /api/threads/{id}/send` 的 `language`；hub 上的 `task` 也可以带）就用界面语言，否则按最近一条用户消息的文字书写系统判断。笼统的一句「用用户的语言回复」在某些模型上不可靠；点名就管用。固定的 `language` 优先于两者。
+`language = "auto"` 时，系统提示词会明确告诉模型应使用哪种语言。有客户端随消息传来的界面语言时优先使用它：网页控制台会在 `POST /api/threads/{id}/send` 的 `language` 中传入，hub 的 `task` 也可携带。否则根据最新用户消息的文字判断。部分模型无法可靠执行笼统的「用用户的语言回答」，明确写出语言后才可靠。固定设置的 `language` 优先于上述两种判断。
 
-`max_context_images` 是给手用的。在屏幕上跑一次任务，每一步都会追加一张截图，而整段对话每一步都要重新上传，所以十几张全尺寸图片曾经超过中继的请求体上限（413 `too_large`，0.1.37）。现在只带最新的四张，每张缩到最多两百万像素；更早的换成一行说明，模型仍然知道那里有过一张截图。桌面版的 harness 按字节而不是按张数算（它的适配器只认字节）：一次请求里图片的 base64 合计不超过 2 MiB，大约是最新的四到八张截图，更早的同样换成一行说明。
+`max_context_images` 主要限制屏幕操作时的截图数量。每一步都会新增截图，而下一步会重新上传整段对话。0.1.37 时，十几张原尺寸截图曾超出中继请求体限制，返回 413 `too_large`。现在默认只上传最新四张，每张最多两百万像素，旧图替换为一行说明，让模型仍知道该处曾有截图。桌面版 harness 的适配器只接受字节限制，因此将单次请求图片的 base64 总量限制为 2 MiB，约相当于最新四至八张截图，旧图同样以文字说明替代。
 
-`max_context_messages` 尽量从用户消息的边界开始保留近期历史。如果单轮对话就填满了窗口，运行时会保留最新消息，并补全截断位置的整组工具调用与结果，因此消息数可能略高于配置值。已保存的对话历史不受影响。
+`max_context_messages` 尽量在用户消息边界裁去旧历史。如果单轮任务就填满上下文，运行时会保留最新消息，并在截断位置保留完整的一组工具调用和结果。因此，实际条数可能略高于设置，以免拆散这组消息。已保存的聊天历史不会改变。
 
 ## `[sync]` {#sync}
 
@@ -196,7 +214,7 @@ instructions         = ""              # extra rules appended to the system prom
 side_chats = false   # off: only the main conversation travels between devices
 ```
 
-整个账号的同步开关在 App 里（「数据控制 → 同步」）；这里是「同时同步旁聊」在这台设备上的默认值。关着时只推送、拉取主要聊天；旁聊留在创建它的设备上，别的设备的也不会过来。开着时这台设备的旁聊进入账号，其他设备的也到这里来。你在 App 里的选择保存在 `sync.json`，优先于这个文件。全貌见 [every-device.md](every-device.md#the-same-conversations-everywhere)。
+整个账号的同步开关位于应用的数据控制 → 同步。这里设置的是本机「同时同步旁聊」的默认值。关闭时，只上传和拉取主要聊天，旁聊留在创建它的设备，也不会接收其他设备的旁聊。开启后，本机旁聊会同步到账号，也会接收其他设备的旁聊。用户在应用中的选择保存在 `sync.json`，优先于本文件，详见 [every-device.md](every-device.md#the-same-conversations-everywhere)。
 
 ## `[cloud]` 与 `[hub]` {#cloud-and-hub}
 
@@ -213,11 +231,15 @@ remote_control = true
 name = ""            # 空：用主机名
 ```
 
-`[cloud]` 是这个运行时登录的中继（[cloud.md](cloud.md)）：`base_url` 是它的公网地址（按 [self-hosting.md](self-hosting.md) 自己架一台后填这里）；`required = false` 允许首次运行不登录账号就完成，适合完全不用中继的运行时；`sync` 是整个账号「数据控制 → 同步」开关的默认值，人一旦选过，以选择为准；`models = false`（控制台里的「使用 nanoMuse Cloud 模型」开关，存在 app-settings 里）会把该中继实时声明的全部模型从自动顺序和服务商列表里拿掉，登录保持不变，于是除了明确点下的「这次改用 nanoMuse Cloud」，没有什么会消耗额度。nanoMuse 公共 Cloud 目前只提供对话和界面操作模型；生成图片和短视频需要用户添加自己的服务商。自建中继可以声明不同能力。账号密钥本身是保险库里的 `NANOMUSE_CLOUD_KEY`。
+`[cloud]` 指定运行时登录的中继，见 [cloud.md](cloud.md)。`base_url` 填写中继的公网地址，自己部署后可按 [self-hosting.md](self-hosting.md) 修改。`required = false` 允许不登录账号就完成首次引导，适合完全不使用中继的运行时。`sync` 是账号级「数据控制 → 同步」的默认值，用户选择过后以用户设置为准。
 
-`[hub]` 是把这台电脑当作账号的一台设备（[hub.md](hub.md)）：`enabled` 表示账号登录后就加入 hub；`remote_control = false` 时，其他设备只能从这台拿到 `info`，别的什么都做不了；`name` 是其他设备对它的称呼（空：用主机名）。`device_id` 按安装生成，由 App 写入。
+`models = false` 对应控制台的「使用 nanoMuse Cloud 模型」开关，应用中的值保存在 app-settings。关闭后，中继声明的所有模型都会退出自动选择顺序和服务商列表，但账号保持登录。除非主动选择「这次改用 nanoMuse Cloud」，否则不会消耗账号额度。公开的 nanoMuse Cloud 目前只提供对话和界面操作模型，生成图片和视频需要自己的服务商；自建中继可声明其他能力。账号密钥保存在保险库的 `NANOMUSE_CLOUD_KEY`。
+
+`[hub]` 将本机作为账号设备加入设备互联，见 [hub.md](hub.md)。`enabled` 开启后，账号一登录就连接 hub；`remote_control = false` 时，对其他设备只应答 `info`，不允许其他动作；`name` 是其他设备看到的名称，留空使用主机名。`device_id` 每次安装各自生成，由应用写入。
 
 ## `[sentinel]` {#sentinel}
+
+哨兵（Sentinel）在操作执行前检查风险，按配置决定允许、询问审批或拒绝。
 
 ```toml
 [sentinel]
@@ -237,16 +259,20 @@ action = "deny"                      # allow | ask | deny
 reason = "recursive deletes are not allowed"
 ```
 
-这些部分怎么组合起来，见 [sentinel.md](sentinel.md)。
+各项规则如何配合，见 [sentinel.md](sentinel.md)。
 
 ## `[sandbox]` {#sandbox}
+
+沙箱用于限制命令可以访问的文件和网络。
 
 ```toml
 [sandbox]
 mode = "auto"                        # auto | bwrap | off
 ```
 
-在装了 [bubblewrap](https://github.com/containers/bubblewrap) 的 Linux 上（`apt install bubblewrap`、`dnf install bubblewrap`），每次 `shell` 和 `python_execute` 调用都在自己的命名空间里跑：工作区和 `agent.extra_roots` 是仅有的可写位置，你的家目录不在里面，`/tmp` 是私有的，而且除非这次调用被评估为需要网络，否则没有网络。`auto` 在这里能用就用，不能用时在日志里说明；`bwrap` 则坚持要用（否则 `nanomuse doctor` 失败）；`off` 不装箱直接跑命令，只有清理过的环境变量。`share_read_only` 列出箱子可以读的目录（你想让智能体用的某个 CLI：`["~/.nvm"]` 给 node 和 lark-cli），`share` 列出工具还必须写的目录（它的登录态：`["~/.lark-cli", "~/.local/share/lark-cli"]`）；你家目录下的共享目录在箱子的家目录下同一位置也看得到，所以到 `$HOME` 里找东西的工具能找到。细节和哨兵（Sentinel）在沙箱里有什么变化，见 [sentinel.md → 沙箱](sentinel.md#the-sandbox)。
+Linux 安装 [bubblewrap](https://github.com/containers/bubblewrap) 后，例如 `apt install bubblewrap` 或 `dnf install bubblewrap`，每次 `shell`、`python_execute` 都在独立的命名空间中运行。这种隔离下，只有工作区和 `agent.extra_roots` 可写，用户主目录不可见，`/tmp` 为私有目录；只有经评估需要网络的调用才能联网。
+
+`auto` 会在可用时启用沙箱，不可用时在日志中说明；`bwrap` 要求沙箱必须可用，否则 `nanomuse doctor` 报告失败；`off` 则只清理环境变量，直接执行命令，不进行沙箱隔离。`share_read_only` 列出允许读取的目录，例如 `["~/.nvm"]` 可提供 node 和 lark-cli 的安装目录；`share` 列出工具需要写入的目录，例如登录信息所在的 `["~/.lark-cli", "~/.local/share/lark-cli"]`。共享的主目录下路径在沙箱主目录中保持相同相对位置，所以工具仍能通过 `$HOME` 找到它们。更多细节及沙箱中哨兵的行为见 [sentinel.md → 沙箱](sentinel.md#the-sandbox)。
 
 ## `[memory]` {#memory}
 
@@ -260,9 +286,13 @@ embedding_base_url = ""        # empty → the model's endpoint and key (llm.bas
 embedding_api_key  = ""        # a key of its own, "{{vault:EMBEDDINGS_API_KEY}}" from the app
 ```
 
-回忆按关键词进行（生僻词权重更高，中文按字的两两组合匹配），有了嵌入端点，还能按含义回忆：每条记忆只嵌入一次（向量和文本的哈希一起存在 `memory.db` 里，所以改过的行会重新嵌入，换回某个模型不花代价），每轮把消息嵌入一次，含义最接近的记忆和关键词排名融合在一起，于是「写邮件给房东」能唤起「房东是 Bob Li」，虽然两句话没有一个词相同。任何 OpenAI 兼容的 `/embeddings` 都行：OpenAI（`text-embedding-3-small` 是那里和多数网关的默认值）、拉取了嵌入模型的 [Ollama](https://ollama.com)（`ollama pull qwen3-embedding:0.6b`，`:11434` 上的默认值，很小，中英文都读）、OpenRouter（`openai/text-embedding-3-small`）。DeepSeek 没有嵌入模型，所以用它时把 `embedding_base_url` 指到一个有的地方（DeepSeek 旁边放一个 Ollama 是常见搭配），或者就只按关键词回忆。
+记忆默认按关键词检索，少见词权重更高，中文按相邻两个字匹配。如果配置了 embedding 接口，还能按含义查找。Embedding（文本向量化）把文字转换为可比较语义接近程度的数字表示。每条记忆只转换一次，向量和文本哈希保存在 `memory.db`；内容改变后才重新生成，切回曾使用的模型可以复用已有结果。每轮再为当前消息生成向量，将语义接近度与关键词排名合并。例如，即使文字没有相同单词，「写邮件给房东」也能找到「the landlord is Bob Li」。
 
-`auto` 每次启动试一次端点，调用失败就退回关键词回忆，在日志里说明原因：失败一次，不是每轮一次；连不上的端点五分钟后再试。`on` 则坚持要用：回忆照样退回，但失败算警告，`nanomuse doctor` 会因此失败。`off` 从不嵌入。`embedding_api_key` 为空表示在模型自己的端点上用模型自己的 key；从 App 里设置时它是一个 `{{vault:EMBEDDINGS_API_KEY}}` 引用。`llm.extra_headers` 里的网关请求头只发给模型的端点，不发给这里指定的另一个端点。App 里的「连接 → 按含义召回」设置并测试这一切；`nanomuse memory recall "…"` 显示会回忆起什么，带每条记忆的接近程度。
+任何 OpenAI 兼容的 `/embeddings` 接口都可使用，包括 OpenAI，默认 `text-embedding-3-small`，多数网关也采用该默认值；[Ollama](https://ollama.com)，需先运行 `ollama pull qwen3-embedding:0.6b`，该小模型支持中英文，也是 `:11434` 的默认值；OpenRouter 则使用 `openai/text-embedding-3-small`。DeepSeek 不提供向量模型，可将 `embedding_base_url` 指向其他服务，常见做法是搭配本地 Ollama，也可以只用关键词检索。
+
+`auto` 在每次启动时尝试一次接口，失败后改用关键词检索并记录原因，不会每轮重复失败；无法连接的接口会在五分钟后重试。`on` 同样允许检索退回关键词，但会将失败记为警告，并使 `nanomuse doctor` 检查失败。`off` 不生成向量。
+
+`embedding_api_key` 为空时，在模型自身接口使用模型的 key；从应用设置时会保存为 `{{vault:EMBEDDINGS_API_KEY}}`。`llm.extra_headers` 只发往对话模型的服务地址，不会发给这里配置的其他地址。应用的连接 → 按含义召回可配置并测试这些选项；`nanomuse memory recall "…"` 会显示能找到哪些记忆及其接近程度。
 
 ## `[skills]` {#skills}
 
@@ -273,7 +303,13 @@ dir      = ""                        # your skills; empty → <data_dir>/skills
 disabled = ["inbox-triage"]          # built-in ones to leave out of the model's list
 ```
 
-一个技能就是一个带 `SKILL.md` 的文件夹（YAML front matter 里有 `name` 和 `description`，后面是 Markdown 写的步骤），采用 [Agent Skills](https://agentskills.io) 格式，所以给其他智能体写的技能在这里也能用。nanoMuse 多读一个键 `channel`：技能在[阶梯](gui.md#the-ladder)的哪一级上工作：`api`（MCP 服务器或连接器）、`cli`、`web`（一次抓取）、`browser`、`gui`（手机屏幕；也接受 `app-only`）或 `mixed`。`gui` 技能在智能体的索引里标为*在手机屏幕上*，这样它开始之前就知道这活需要手机；必须严格遵守共享格式的技能可以改用 `metadata.channel`。内置十二个（`skill-creator`、`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`；`phone-messages` 用于手机屏幕；五个面向不需要屏幕的中国服务：`feishu` 经 lark-cli、`tencent-meeting` 经 tmeet、`amap` 经高德 MCP 服务器、`kuaidi100` 经快递100 服务器，以及 `train-tickets`，它通过 12306 服务器查询，只在被明确要求时才在手机上订票；哪些在哪里跑过，见 [services.md](services.md)）；`dir` 里一个和内置同名的文件夹会替换掉内置的那个。模型在系统提示词里拿到索引（每个启用技能的名字和描述），请求合适时用 `skills` 工具读取技能的步骤；聊天消息开头的 `/name` 直接运行一个。从聊天里保存或删除技能是敏感调用：无论哨兵是什么模式，都先问。在 App 里关掉的技能记在 `app-settings.json`；这里的列表和那份会合并。在[沙箱](sentinel.md#the-sandbox)里，技能的文件夹（它的脚本和参考文件）以只读方式可见。见 [App → 技能](app.md#skills)和 [CLI](cli.md#skills) 里的 `nanomuse skills`。
+技能是包含 `SKILL.md` 的目录，采用 [Agent Skills](https://agentskills.io) 格式。文件开头的 YAML 元数据包含 `name`、`description`，后面用 Markdown 写操作步骤，因此为其他智能体编写的技能也能使用。
+
+nanoMuse 还会读取 `channel`，说明技能使用哪类操作方式，见[工具选择顺序](gui.md#the-ladder)：`api` 表示 MCP 服务器或连接器，`cli` 表示命令行，`web` 表示网页抓取，`browser` 表示浏览器，`gui` 表示手机屏幕，也接受 `app-only`，`mixed` 表示混合使用。`gui` 技能在索引中标注「在手机屏幕上」，让智能体执行前就知道需要手机。要严格保持通用格式的技能可写 `metadata.channel`。
+
+内置十二个技能：`skill-creator`、`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`；操作手机屏幕的 `phone-messages`；以及五个可不使用屏幕的中国服务技能：通过 lark-cli 的 `feishu`、通过 tmeet 的 `tencent-meeting`、通过高德 MCP 的 `amap`、通过快递100 的 `kuaidi100`，以及通过 12306 服务器查询、只有明确要求才在手机订票的 `train-tickets`。实际验证过的服务和环境见 [services.md](services.md)。`dir` 中与内置技能同名的目录会替换内置版本。
+
+模型在系统提示中收到所有启用技能的名称和描述。遇到适用请求时，会用 `skills` 工具读取详细步骤；聊天消息以 `/name` 开头则直接调用该技能。从聊天中保存或删除技能属于敏感操作，无论哨兵模式如何，都必须先征求允许。应用中停用的技能保存在 `app-settings.json`，会与此处的停用列表合并。技能目录中的脚本和参考文件在[沙箱](sentinel.md#the-sandbox)内以只读方式提供。另见[应用 → 技能](app.md#skills)和 [CLI](cli.md#skills) 中的 `nanomuse skills`。
 
 ## 连接器 {#connectors}
 
@@ -292,13 +328,13 @@ password      = "{{vault:EMAIL_PASSWORD}}"
 scrub_secrets = true   # remove one-time codes and reset links before the model reads a mail
 ```
 
-用 `nanomuse vault set EMAIL_ADDRESS` 和 `nanomuse vault set EMAIL_PASSWORD` 存值。`read_emails` 会把这段对话标记为已污染；`send_email` 默认在 `always_ask_tools` 里。
+用 `nanomuse vault set EMAIL_ADDRESS`、`nanomuse vault set EMAIL_PASSWORD` 保存邮箱地址和密码。调用 `read_emails` 后，对话会标为「已污染」，表示其中已包含私密数据，后续外发操作需要相应检查。`send_email` 默认列在 `always_ask_tools`，每次发送都需要审批。
 
 ### 日历 {#calendar}
 
-任何提供私密 iCalendar 链接的日历都行（Google（「设置 → 整合日历 → iCal 格式的私密地址」）、Outlook（「共享日历 → 发布」）、iCloud（「共享日历 → 公共日历」）、Fastmail、Nextcloud），或者磁盘上的一个 `.ics` 文件。`webcal://` 链接通过 HTTPS 抓取。订阅源的文本缓存在 `<data_dir>/calendar-cache.json`（权限 0600），这样启动时和两次刷新之间都有日程可看。
+可以使用提供 iCalendar 私密订阅链接的日历，也可读取磁盘上的 `.ics` 文件。支持的来源包括 Google 的设置 → 整合日历 → iCal 格式的私密地址，Outlook 的共享日历 → 发布，iCloud 的共享日历 → 公共日历，以及 Fastmail、Nextcloud。`webcal://` 链接使用 HTTPS 获取。订阅内容缓存在 `<data_dir>/calendar-cache.json`，权限 0600，启动时及刷新间隔内也能查看日程。
 
-日程会显示通过 `RDATE` 为重复事件补充的日期，包括全天事件。重复日期只显示一次，`EXDATE` 仍可取消其中某次日程。暂不支持带独立时长的 `RDATE` 条目（`VALUE=PERIOD`），这类条目会被跳过。
+日程会包含通过 `RDATE` 额外加入重复事件的日期，也支持全天日期。同一天重复列出时只显示一次，`EXDATE` 仍可排除某一次。带独立持续时间的 `RDATE`，即 `VALUE=PERIOD`，暂不支持，会被跳过。
 
 ```toml
 [connectors.calendar]
@@ -316,11 +352,13 @@ name = "Family"
 url  = "~/family.ics"
 ```
 
-`calendar` 工具负责读（日程、搜索、空闲时间）和*起草*：它提议的日程写成工作区里的 `calendar/<date>-<title>.ics`，App 把它显示成一张带「加入日历」按钮的卡片。它自己从不写你的日历。今天和明天的日程在系统提示词里；动态在「今天」下面显示它们。`nanomuse calendar add NAME URL` 和「连接」屏幕做的是同一件事。
+`calendar` 可以读取日程、搜索、查找空闲时间，也能起草事件。草稿写入工作区的 `calendar/<date>-<title>.ics`，应用显示带「加入日历」按钮的卡片，工具本身不会直接修改日历。今天和明天的日程会加入系统提示，也显示在动态的「今天」下。`nanomuse calendar add NAME URL` 与连接页添加订阅的效果相同。
 
 ### 联系人 {#contacts}
 
-谁是谁。智能体写信给人之前会先查这个人，从不猜地址；邮件的审批卡片用通讯录里的名字标出收件人，不认识时会提醒。来源是 `.vcf` 文件（Google 通讯录（「导出 → vCard」）、iCloud、Outlook（「人员 → 管理 → 导出」）、Nextcloud、iPhone（「通讯录 → 全选 → 共享」）和 Android 都能导出），可以是一个路径、从手机上传（存在 `<data_dir>/contacts/` 下），或者一个链接（存在保险库里）。vCard 2.1、3.0 和 4.0 都能读，包括 Apple 的 `item1.` 标签分组和老手机导出的 quoted-printable 编码的名字。链接的文本缓存在 `<data_dir>/contacts-cache.json`（权限 0600）。
+智能体联系某个人前会先查通讯录，不猜邮箱地址。邮件审批卡片会显示通讯录中的收件人姓名，查不到时提示你。来源为 `.vcf` 文件，可以指定文件路径、从手机上传到 `<data_dir>/contacts/`，或提供保存在保险库中的链接。Google 通讯录的导出 → vCard、iCloud、Outlook 的人员 → 管理 → 导出、Nextcloud、iPhone 的通讯录 → 全选 → 共享，以及 Android 都能导出此类文件。
+
+程序支持 vCard 2.1、3.0、4.0，包括 Apple 的 `item1.` 标签分组，以及旧手机用 quoted-printable 编码保存的姓名。链接返回的内容缓存在 `<data_dir>/contacts-cache.json`，权限 0600。
 
 ```toml
 [connectors.contacts]
@@ -335,11 +373,15 @@ name = "Nextcloud"
 url  = "{{vault:CONTACTS_NEXTCLOUD}}"   # a link, kept in the vault: nanomuse vault set CONTACTS_NEXTCLOUD
 ```
 
-除了这些来源，始终还有一本「我的联系人」，`<data_dir>/contacts.vcf`：在聊天里告诉过智能体的人（「房东是 Bob Li，bob@example.com」），通过 `contacts` 的 action=add 加进去；这是它唯一会写的一本，也是唯一能从里面删人的一本。`contacts` 工具按姓名、昵称、公司、邮箱或电话搜索（每个词都要匹配上，前缀算数，中文名里的一个字也算数）；一次查询属于私密数据，会污染这段对话。命令行用 `nanomuse contacts search | list | add | sources | add-source | remove-source`。
+除这些来源外，程序始终保留「我的联系人」，文件为 `<data_dir>/contacts.vcf`。聊天中告诉智能体的人，例如「房东是 Bob Li，bob@example.com」，会通过 `contacts` 的 action=add 加入这里。这是智能体唯一可以写入和删除联系人的通讯录。
+
+`contacts` 可按姓名、昵称、公司、邮箱或电话搜索，要求每个搜索词都匹配，支持前缀，中文姓名中的单个字也可匹配。查询联系人会读取私密数据，因此将对话标为已污染。CLI 对应命令为 `nanomuse contacts search | list | add | sources | add-source | remove-source`。
 
 ### 网页搜索 {#web-search}
 
-谁来回答 `web_search`。DuckDuckGo 什么都不需要，是默认值，但它是抓网页而不是正规接口：会限流，时不时出问题。想要每次都能搜到，指定一家带 API 的服务商：带 key 的 [Brave Search](https://brave.com/search/api/)、[Tavily](https://app.tavily.com/) 或 [Serply](https://serply.io/)（Google 搜索结果），有没有 key 都行的 [You.com](https://you.com/platform/api-keys)、[Parallel](https://docs.parallel.ai/integrations/mcp/search-mcp) 和 [Keenable](https://docs.keenable.ai/api-reference)，或者你自己跑的一个 [SearXNG](https://docs.searxng.org/) 实例（`search.formats` 里要有 `json`）。手机上同样的选项在「连接 → 网页搜索」，key 以 `SEARCH_API_KEY` 存进保险库，「测试」跑一次搜索。
+此处设置 `web_search` 使用的服务商。默认 DuckDuckGo 无需配置，但通过抓取网页获取结果，可能限流或偶尔失效。需要 API 服务时，可选带 key 的 [Brave Search](https://brave.com/search/api/)、[Tavily](https://app.tavily.com/)、[Serply](https://serply.io/)，后者提供 Google 结果；也可选支持无 key 使用的 [You.com](https://you.com/platform/api-keys)、[Parallel](https://docs.parallel.ai/integrations/mcp/search-mcp)、[Keenable](https://docs.keenable.ai/api-reference)，或自己部署 [SearXNG](https://docs.searxng.org/)，并在 `search.formats` 中启用 `json`。
+
+手机的连接 → 网页搜索提供相同选择，key 以 `SEARCH_API_KEY` 存入保险库，点击「测试」会实际搜索一次。
 
 ```toml
 [connectors.search]
@@ -349,17 +391,19 @@ base_url = ""                    # searxng: your instance, e.g. "http://127.0.0.
 fallback = true                  # false：搜索失败就失败，不再转去 DuckDuckGo
 ```
 
-You.com 不带 key 时走 `api.you.com`，每个地址每天 100 次，不用注册；超出后搜索会说明原因，由 DuckDuckGo 补答一次。带 key 时走 `ydc-index.io`，也就是额度更高的付费 Search API；哨兵显示的是这次搜索真正去的主机。发往 You.com 的请求带 `youdotcom-integration/nano-muse-nanomuse` 这个 User-Agent，是应对方要求加的，方便他们认出来自 nanoMuse 的流量；除此之外不多发任何东西，其他服务商也不会收到它。
+You.com 不带 key 时访问 `api.you.com`，每个地址每天可免费搜索 100 次，无需账号。超限时会说明原因，再由 DuckDuckGo 补查一次。带 key 时访问额度更高的 `ydc-index.io` Search API，哨兵会显示实际访问的地址。按厂商要求，请求的 User-Agent 为 `youdotcom-integration/nano-muse-nanomuse`，用来识别 nanoMuse 流量，不额外发送其他信息，其他服务商也不会收到这个标识。
 
-Parallel 走的是它的 [Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp)（`search.parallel.ai`）里的 `web_search` 工具，每次搜索调用一次，查询词同时作为搜索目标和唯一的一条关键词。不带 key 时免费，用的是 Parallel 的 Fast 模式，限额较低，不用注册；运行时会带一个随机的会话 id，重启之前每次搜索都用同一个，Parallel 靠它统计免费用量。在 [platform.parallel.ai](https://platform.parallel.ai/) 拿到的 key 以 Bearer token 发送，限额更高。每条结果的摘要是它的几段摘录拼成的一行。Parallel 回了错误（工具报错、被限流、key 被拒、回复里没有结果）时，说明或失败信息里写的就是这个错误。
+Parallel 每次搜索调用一次 [Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) 的 `web_search`，地址为 `search.parallel.ai`。同一查询同时用作搜索目标和唯一关键词。不带 key 时使用免费 Fast 模式，限流较严格，无需账号；运行时会使用随机会话 id，直到重启都保持相同，供 Parallel 统计免费用量。[platform.parallel.ai](https://platform.parallel.ai/) 提供的 key 以 Bearer token 发送，可提高限额。结果摘要由多段摘录合并为一行。工具错误、限流、key 被拒绝或没有结果时，失败或备用搜索说明会保留相应错误信息。
 
-Keenable 不带 key 时走 `api.keenable.ai/v1/search/public`，每个地址每小时 1000 次，不用注册；超出后搜索会说明原因，由 DuckDuckGo 补答一次。在 [keenable.ai/console](https://keenable.ai/console) 拿到的 key 以 `X-API-Key` 发到同一台主机上的 `/v1/search`，去掉每小时的上限，所以有没有 key，哨兵显示的都是 `api.keenable.ai`。每个请求都带 `X-Keenable-Title: nanoMuse` 这个请求头，不带 key 的接口靠它知道是哪个应用在调用；除了它，发出去的只有查询词和要几条结果。每条结果的摘要是它页面正文的开头，拼成一行。
+Keenable 不带 key 时访问 `api.keenable.ai/v1/search/public`，每个地址每小时可搜索 1,000 次，无需账号。超限后会说明原因，由 DuckDuckGo 补查一次。[keenable.ai/console](https://keenable.ai/console) 提供的 key 以 `X-API-Key` 发送到同一主机的 `/v1/search`，解除每小时限制，所以哨兵始终显示 `api.keenable.ai`。每个请求都包含无 key 接口要求的 `X-Keenable-Title: nanoMuse`，用于标识调用应用；除此之外只发送查询和结果数量。摘要取页面正文开头，并整理为一行。
 
-不管选的是谁，一次失败的搜索（key 过期、被限流、实例挂了）都改由 DuckDuckGo 回答，只补这一次，并在结果顶上加一条说明，任务就能继续（这时查询词除了到你选的服务商，也会到 DuckDuckGo 的主机；不希望这样，就在 `[connectors.search]` 下设 `fallback = false`）；`nanomuse doctor` 会报告缺了必要配置的服务商。工具的 `region` 参数（`cn-zh`、`us-en`）按每家服务商自己的写法传给支持它的服务商；Tavily、Parallel 和 Keenable 不接收这个参数。服务商的主机是你选定的目的地，所以读过私密数据之后再搜索，不像去一个陌生主机那样需要审批（见[污点追踪](sentinel.md#taint-tracking)）；对搜索结果做 `web_fetch` 仍然需要。
+无论选择哪家，搜索因 key 过期、限流或服务不可用而失败时，默认会由 DuckDuckGo 再查一次，并在结果顶部注明，方便任务继续。这意味着查询会同时到达所选服务商和 DuckDuckGo；不希望这样时，在 `[connectors.search]` 中设置 `fallback = false`。`nanomuse doctor` 会指出服务商缺少的必要配置。
+
+工具的 `region` 参数，例如 `cn-zh`、`us-en`，会转换为各家支持的格式，Tavily、Parallel、Keenable 不接受地区参数。搜索服务地址是你主动选定的，因此读取私密数据后，搜索不必像访问未知主机那样再次审批，见[污染追踪](sentinel.md#taint-tracking)。但用 `web_fetch` 访问搜索结果页面时，仍需检查。
 
 ## `[triggers]` {#triggers}
 
-触发器是常设的指令，某件事发生时就开工：来了一封邮件、一个日程快开始了、某个程序调用了 webhook（见 [App](app.md#triggers)）。它们在聊天里或「日程」下设置，不在配置文件里；这一节只调它们被监视的方式。
+触发器是事件发生时自动启动任务的长期指令，例如收到邮件、日程即将开始，或其他程序调用 webhook（向指定接口发送事件通知）。触发器在聊天或「日程」中设置，不在本配置文件中创建，见[应用](app.md#triggers)。本节只调整检查方式。
 
 ```toml
 [triggers]
@@ -367,7 +411,7 @@ mail_poll_minutes = 5    # how often the inbox is looked at while a mail trigger
 hook_min_seconds  = 10   # deliveries to one webhook closer together than this get HTTP 429
 ```
 
-邮件触发器需要[邮件连接器](#email)；日程触发器需要[日历](#calendar)。触发器存在 `<data_dir>/triggers.db`。
+邮件触发器需要[邮件连接器](#email)，日程触发器需要[日历](#calendar)，触发器记录保存在 `<data_dir>/triggers.db`。
 
 ### 浏览器 {#browser}
 
@@ -380,9 +424,9 @@ headless   = true      # Playwright only
 timeout_ms = 30000
 ```
 
-在 Chromium 里完成的登录保存在 `<workspace>/browser-profile/`，重启后还在；在手机上则保存在 App 的 WebView 里。两种后端、接管、带登录态的 `fetch`，以及什么东西在 WebView 里登录不了：[browser.md](browser.md)。
+Chromium 的登录状态保存在 `<workspace>/browser-profile/`，重启后保留。手机则保存在应用 WebView（嵌入应用的浏览器组件）中。两种后端、用户接管、带登录状态的 `fetch`，以及 WebView 不支持的登录方式，见 [browser.md](browser.md)。
 
-### 操作这台电脑（`[hands]`） {#hands-on-this-computer-hands}
+### 操作本机（`[hands]`） {#hands-on-this-computer-hands}
 
 ```toml
 [hands]
@@ -394,13 +438,13 @@ max_image_width = 1600
 settle_s        = 0.6
 ```
 
-模型看到的那张图就是度量单位：`computer_screen` 在第一行和结尾的 *Coordinates:* 一行里说明它的尺寸，`computer_act` 接受这张图里的 `x`、`y`（或一个 `box`）；运行时把它们一次性换算成手自己的像素，不管显示器是什么缩放比例。这张图是屏幕先按 `max_image_width` 封顶，再对齐到 Qwen 缩放时用的 28 像素网格，所以模型看到的正是它所指的东西（[gui.md](gui.md#hands-on-the-computer-the-picture-is-the-unit)）。
+操作坐标以模型实际看到的图片为准。`computer_screen` 会在第一行及末尾的 *Coordinates:* 行说明图片尺寸；`computer_act` 接受图中的 `x`、`y` 或 `box`。运行时再一次性换算为操作器使用的实际坐标，适配显示缩放。截图先受 `max_image_width` 限制，再对齐 Qwen 缩放使用的 28 像素网格，因此模型指出的位置与图片内容一致，见 [gui.md](gui.md#hands-on-the-computer-the-picture-is-the-unit)。
 
-模型、步数上限和敏感词都用 `[gui]` 的。窗口模式、按 App 逐个询问（*允许 <Muse> 使用 <App>？*，一条 `computer_app:<id>` 授权）和 macOS 权限：[every-device.md](every-device.md#hands-on-this-computer)。
+模型、步数上限和敏感词沿用 `[gui]`。窗口模式、按应用授权的「允许 <Muse> 使用 <App>？」及 `computer_app:<id>` 授权记录，以及 macOS 权限，见 [every-device.md](every-device.md#hands-on-this-computer)。
 
 ### 手机（`[gui]`） {#the-phone-gui}
 
-打开它，智能体就能看连着的手机的屏幕，在上面的 App 里点、输入、滑动：这是够到 12306、微信或支付宝的办法，它们没有 API。默认关闭；「连接」屏幕上的「手机」卡片是同一个开关。它怎么工作、哨兵拿它怎么办：[gui.md](gui.md)。
+开启后，智能体可以查看已连接手机的屏幕，在应用中点击、输入和滑动。这让它能使用没有 API 的 12306、微信、支付宝等应用。默认关闭，连接页的「手机」卡片控制同一开关。操作流程和哨兵检查见 [gui.md](gui.md)。
 
 ```toml
 [gui]
@@ -415,13 +459,15 @@ reconnect_grace_s = 30.0             # 手机掉线后，进行中的任务等�
 sensitive_words  = ["确认支付", "立即付款", "转账", "提交订单", "发送", "删除", "pay now", "place order", "send", "delete"]  # a tap on these asks first; 这里是节选，默认列表有 22 个词
 ```
 
-`base_url` 和 `api_key` 为空时回退到 `[llm]`。空的 `model` 按一个顺序来（模型约定，0.1.41）：以中继为聊天模型时，是 `/v1/models` 推荐给 `gui` 的模型（公共 Cloud 目前让同一个多模态 `Qwen/Qwen3.6-27B-FP8` 同时负责聊天和操作屏幕）；聊天服务商是目录里带 `vision` 的自有服务商时，是它自己的手的模型（`defaults.hands`，百炼是 `qwen3.8-27b`，智谱是 `glm-4.6v`），用聊天的 key；聊天服务商看不了图（按目录 id 或主机识别出的本地服务器）而账号已登录时，是中继的手的模型，用账号的 key，聊天模型留在原处；其余情况是聊天模型，目录里没有的主机也是。明确写了 `model` 总是优先。只有操作器的 `base_url` 是另一个服务时才需要 key。每次手机任务的轨迹都进 `<data_dir>/phone-traces/`（保留最近 200 条；`nanomuse phone traces`）。
+`base_url`、`api_key` 为空时沿用 `[llm]`。`model` 为空时遵循 0.1.41 模型约定：对话使用中继时，选择 `/v1/models` 为 `gui` 推荐的模型，公开 Cloud 目前推荐与对话相同的多模态 `Qwen/Qwen3.6-27B-FP8`；对话使用自有服务商且目录标有 `vision` 时，使用该服务商的 `defaults.hands`，百炼为 `qwen3.8-27b`，智谱为 `glm-4.6v`，沿用对话 key；对话服务商不能识图，例如按目录 id 或主机判断为本地服务器，而账号已登录，则用账号 key 调用中继的屏幕操作模型，对话模型保持原处；其他情况沿用对话模型，未收录服务地址也如此。
 
-应用层通过 `PUT /api/connections/gui` 设置这个槽位，它接受的 `provider` 和 `PUT /api/connections/llm` 一样：协议（`openai`、`openai_responses`）、`chatgpt`，或者 `bailian` 这样的目录 id，后者自带接口地址（`base_url` 可以留空）；目录里没有的 id，或运行时不会说其协议的 id，回 400 并列出可选项。回答（以及 `GET /api/connections` → `gui`）带 `provider` 原样、`provider_id`（协议加 URL 对应的目录条目）、`effective_model` 和 `effective_source`（`gui`、`chat` 或 `cloud`）。
+明确填写 `model` 时始终优先。只有操作器的 `base_url` 指向另一项服务时才需单独 key。每次手机任务的轨迹保存在 `<data_dir>/phone-traces/`，保留最近 200 条，可用 `nanomuse phone traces` 查看。
+
+应用通过 `PUT /api/connections/gui` 保存此配置，`provider` 规则与 `PUT /api/connections/llm` 相同：可以填 `openai`、`openai_responses` 协议，`chatgpt`，或 `bailian` 等目录 id。目录 id 自带接口地址，`base_url` 可以留空。不在目录中或运行时不支持其协议的 id 会返回 400，并列出可选项。响应及 `GET /api/connections` 的 `gui` 中，包含原始 `provider`、由协议与 URL 对应到的目录 `provider_id`、`effective_model`，以及 `effective_source`，来源为 `gui`、`chat` 或 `cloud`。
 
 ### MCP 服务器 {#mcp-servers}
 
-任何会说 [Model Context Protocol](https://modelcontextprotocol.io) 的东西都变成一组名为 `<server>__<tool>` 的工具，每个都带着你指定的风险级别经过哨兵。
+支持 [Model Context Protocol](https://modelcontextprotocol.io) 的服务可以接入为 `<server>__<tool>` 工具。每次调用都按你指定的风险等级经过哨兵检查。
 
 ```toml
 [[mcp.servers]]
@@ -447,15 +493,15 @@ risk               = "sensitive"
 reads_private_data = false
 ```
 
-`egress` 不写时由地址决定：`url` 指向别的主机，每次调用的参数都会发过去，就按向那台主机外发算（污点追踪会在读过私密数据之后、调用它之前先问一句，除非主机在 `egress_allowlist` 里）；`command` 或回环地址不算。想说得不一样就显式写 `egress`。审批卡片和审计日志只记工具名和参数的形状（字符串的长度、列表的长度、对象的键），从不记参数的值。
+不填 `egress` 时，程序根据地址判断是否向外发送数据：`url` 指向其他主机时，每次调用的参数都会发过去，因此算作向该主机外发；如果对话已读取私密数据，污染追踪会要求先审批，除非该主机在 `egress_allowlist` 中。通过 `command` 启动的本地程序或回环地址默认不算外发。你也可以显式设置 `egress` 覆盖判断。审批卡片和审计日志只记录工具名与参数结构，例如字符串长度、列表长度、对象键，不记录参数值。
 
-`tools` 是可选的，按工具名（不带 `<server>__` 前缀）逐个写；没写的都回退到服务器的值。手机自带的工具就是这样拿到默认值的：在手机上，App 的能力不用任何配置就以 `device` 这个服务器的身份出现（[device.md](device.md)），逐工具的表来自 `nanomuse/runtime.py`。
+可选的 `tools` 配置按工具名填写，不含 `<server>__` 前缀，未指定的项沿用服务器默认值。手机内置工具也用这个机制：应用能力无需配置即以 `device` 服务器出现，见 [device.md](device.md)，各工具的默认值来自 `nanomuse/runtime.py`。
 
-需要 key 的命令通过 `env` 拿到它，而 key 本身放在保险库里：写 `env = { AMAP_MAPS_API_KEY = "{{vault:AMAP_KEY}}" }`，引用在服务器启动时才解析，不会写进磁盘，也不会显示在 App 里。从 App（连接页）添加的服务器也是同样的做法，不需要你额外操作：你输入的每个 `env` 值都存进保险库，名字是 `MCP_<SERVER>_<KEY>`（全部大写，`amap` 配 `AMAP_MAPS_API_KEY` 就是 `MCP_AMAP_AMAP_MAPS_API_KEY`），`app-settings.json` 里只保留 `{{vault:...}}`；移除服务器时这些条目一并删除。本来就写成引用的值原样保留。`config.toml` 里的明文值仍然可用，连接页会给这个服务器打上标记，提醒你把它挪进保险库。
+需要 key 的命令通过 `env` 获取，真实 key 存入保险库。例如 `env = { AMAP_MAPS_API_KEY = "{{vault:AMAP_KEY}}" }` 仅在启动服务器时解析，不会将真实值写入磁盘或显示在应用中。连接页添加服务器也会自动这样处理：每个输入的 `env` 值存到保险库的 `MCP_<SERVER>_<KEY>`，名称全部大写，例如 `amap` 与 `AMAP_MAPS_API_KEY` 组成 `MCP_AMAP_AMAP_MAPS_API_KEY`，`app-settings.json` 只保留 `{{vault:...}}`。移除服务器也会删除对应保险库条目。已经是引用的输入保持原样。`config.toml` 中的明文值仍可使用，但连接页会标出该服务器，提醒你移入保险库。
 
-连不上的服务器会记一条日志然后跳过，智能体照常启动，只是没有它的工具；日志那一行写明服务器名和传输层的错误，URL 查询参数的值一律打码（`?key=***`），保险库里的机密也会被替换，所以被拒绝的 key 不会落进 `logs/`。
+无法响应的服务器会记录日志并跳过，智能体仍会启动，只是没有该服务的工具。日志会标明服务器名称及传输错误，将所有 URL 查询参数值隐藏为 `?key=***`，并移除保险库敏感值，避免被拒绝的 key 写进 `logs/`。
 
-内置技能认识的三个中国服务以 MCP 服务器的形式提供，`config/config.example.toml` 里每个都有一段：高德地图（托管，`AMAP_KEY` 放保险库）、12306（`npx -y 12306-mcp`，不要 key；火车票，只能查询）和快递100（托管，`KUAIDI100_KEY`；快递，按单号付费）。其中哪些真的在手机的根文件系统里跑过，外面还有些什么：[services.md](services.md)。
+内置技能使用的三个中国服务通过 MCP 提供，`config/config.example.toml` 含有相应配置：高德地图是托管服务，`AMAP_KEY` 放保险库；12306 使用 `npx -y 12306-mcp`，无需 key，只能查票；快递100 是托管服务，使用 `KUAIDI100_KEY`，按快递单号付费。哪些服务已在手机根文件系统中实际运行，以及其他可选服务，见 [services.md](services.md)。
 
 ## `[server]` {#server}
 
@@ -472,27 +518,22 @@ update_check     = true          # Settings → About says when a newer release 
 start_grace      = 4             # seconds the services may take before the app answers anyway
 ```
 
-`update_check` 每天一次（点「现在检查」时提前；查询失败时，比如运行时比网络先起来，一小时后再试）先问下载镜像的索引（`nanomuse.cn/dl/index.json`），
-它不答再问 `api.github.com` 最新版本，并在「设置 → 关于」下显示版本号和指向发布页的链接；什么都不下载，
-除了请求 `User-Agent` 里的运行时版本号，也不发送任何关于这次安装的信息。
-`NANOMUSE_NO_UPDATE_CHECK=1` 同样能关掉它；托管的网页会话（用 `NANOMUSE_CLOUD_KEY`
-启动的运行时）从不检查；由它的运营者来更新。
+`update_check` 每天检查一次最新版本，优先访问下载镜像索引 `nanomuse.cn/dl/index.json`，没有响应时再访问 `api.github.com`。点击「现在检查」可以提前检查；失败时，例如运行时先于网络启动，会在一小时后重试。结果显示在设置 → 关于，包含版本号和发布页链接。检查不会下载安装文件，也不会发送安装信息，请求的 `User-Agent` 只携带运行时版本号。设置 `NANOMUSE_NO_UPDATE_CHECK=1` 也能关闭。通过 `NANOMUSE_CLOUD_KEY` 启动的托管网页会话从不检查，由运营者负责更新。
 
-这些设置只适用于 Python 运行时。Windows 桌面壳在启动后和每六小时独立检查，自动下载
-开关默认开启并保存，计费或未知网络等待主动下载，详见[桌面版](desktop.md#updating-on-windows)。
+这些设置仅适用于 Python 运行时。Windows 桌面外壳会在启动后及每六小时独立检查。它默认开启自动下载并保存开关状态，但计费或未知网络需要用户主动下载，见[桌面版](desktop.md#updating-on-windows)。
 
-## 东西都在哪 {#where-things-live}
+## 数据保存在哪里 {#where-things-live}
 
 | 路径 | 内容 |
 |---|---|
-| `~/.nanomuse/`（`data_dir`） | 下面所有的东西 |
-| `memory.db`、`goals.db` | SQLite |
-| `vault.enc`、`vault.key` | 加密存放的机密和它的密钥（或 `NANOMUSE_VAULT_KEY`） |
-| `audit.jsonl` | 只追加的审计日志 |
-| `approvals.json` | 你授予 24 小时或永久的权限（工具 + 目标、范围、过期时间） |
-| `app-settings.json` | App「连接」屏幕里改过的东西，叠在 `config.toml` 之上（没有密钥，只有 `{{vault:NAME}}` 引用） |
-| `chatgpt.json` | ChatGPT 登录的令牌（权限 0600；`nanomuse chatgpt logout` 删掉它） |
-| `sessions/` | CLI 的对话历史 |
-| `skills/<name>/SKILL.md` | 你的技能（Agent Skills 格式）；和内置同名的会替换掉内置的 |
-| `threads/`、`profile.json`、`ideas.json`、`server_token`、`logs/` | App 状态 |
-| `./workspace`（`agent.workspace`） | 智能体读写的文件；`screenshots/` 存着手机最近发来的 400 张屏幕（手机轨迹指向它们） |
+| `~/.nanomuse/`（`data_dir`） | 以下数据的根目录 |
+| `memory.db`、`goals.db` | SQLite 数据库 |
+| `vault.enc`、`vault.key` | 加密的敏感信息和加密密钥，也可使用 `NANOMUSE_VAULT_KEY` |
+| `audit.jsonl` | 只追加、不覆盖的审计日志 |
+| `approvals.json` | 已授予 24 小时或永久的权限，包含工具、目标、范围、到期时间 |
+| `app-settings.json` | 应用连接页的设置，覆盖 `config.toml`，只有 `{{vault:NAME}}` 引用，没有真实密钥 |
+| `chatgpt.json` | ChatGPT 登录 token，权限 0600，`nanomuse chatgpt logout` 可删除 |
+| `sessions/` | CLI 对话历史 |
+| `skills/<name>/SKILL.md` | Agent Skills 格式的自定义技能，同名时替换内置技能 |
+| `threads/`、`profile.json`、`ideas.json`、`server_token`、`logs/` | 应用状态 |
+| `./workspace`（`agent.workspace`） | 智能体读写的文件；`screenshots/` 保留手机最近发送的 400 张截图，手机轨迹会引用这些文件 |
