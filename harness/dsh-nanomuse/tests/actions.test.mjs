@@ -31,20 +31,24 @@ test('expand: ~, env vars and relative paths land under home', () => {
   delete process.env.NANOMUSE_TEST_DIR
 })
 
-test('shell: exit code, output, cwd and a timeout that kills the command', { skip: !posix }, async () => {
-  const ok = await shell({ command: 'echo hello; echo oops >&2; exit 3' })
+test('shell: exit code, output, cwd and a timeout that kills the command', async () => {
+  // POSIX shells chain with ';' and end lines bare; cmd chains with '&', ends every line with '\r', and its echo keeps the word cleanest with '&' tight against it
+  const ok = await shell({ command: posix ? 'echo hello; echo oops >&2; exit 3' : 'echo hello&echo oops>&2&exit 3' })
   assert.equal(ok.exit_code, 3)
-  assert.equal(ok.stdout, 'hello\n')
-  assert.equal(ok.stderr, 'oops\n')
+  assert.equal(ok.stdout, posix ? 'hello\n' : 'hello\r\n')
+  assert.equal(ok.stderr, posix ? 'oops\n' : 'oops\r\n')
   assert.equal(ok.timed_out, false)
   assert.ok(typeof ok.duration_ms === 'number')
 
   await scratch(async (dir) => {
-    const here = await shell({ command: 'pwd', cwd: dir })
-    assert.equal(here.stdout.trim(), dir)
+    const here = await shell({ command: posix ? 'pwd' : 'cd', cwd: dir })
+    const printed = here.stdout.trim()
+    // Windows paths are case-insensitive, and cmd prints the drive the way it was given
+    if (posix) assert.equal(printed, dir)
+    else assert.equal(printed.toLowerCase(), dir.toLowerCase())
   })
 
-  const slow = await shell({ command: 'sleep 5; echo late', timeout: 1 })
+  const slow = await shell({ command: posix ? 'sleep 5; echo late' : 'ping -n 6 127.0.0.1 >nul&echo late', timeout: 1 })
   assert.equal(slow.timed_out, true)
   assert.equal(slow.exit_code, 124)
   assert.ok(slow.duration_ms < 4000, `took ${slow.duration_ms}ms`)
@@ -52,23 +56,52 @@ test('shell: exit code, output, cwd and a timeout that kills the command', { ski
   await assert.rejects(shell({ command: '   ' }), (e) => e.code === 'usage')
 })
 
-test('shell bounds tens of megabytes while receiving them and keeps both ends', { skip: !posix }, async () => {
-  const command = `${JSON.stringify(process.execPath)} -e "process.stdout.write('HEAD'+ 'x'.repeat(30*1024*1024) +'TAIL'); process.stderr.write('ERRHEAD'+ 'y'.repeat(24*1024*1024) +'ERRTAIL')"`
-  const result = await shell({ command, timeout: 20 })
-  assert.equal(result.exit_code, 0)
-  assert.ok(result.stdout.startsWith('HEAD'))
-  assert.ok(result.stdout.endsWith('TAIL'))
-  assert.ok(result.stderr.startsWith('ERRHEAD'))
-  assert.ok(result.stderr.endsWith('ERRTAIL'))
-  assert.match(result.stdout, /bytes not shown/)
-  assert.ok(result.stdout.length < 220_000)
-  assert.ok(result.stderr.length < 220_000)
+test('shell bounds tens of megabytes while receiving them and keeps both ends', async () => {
+  // POSIX takes the payload inline; on Windows the command crosses cmd.exe, whose handling of a quoted inline script does not survive the spawn, so the same payload is written to a file beside the run and started bare from the cwd
+  await scratch(async (dir) => {
+    if (!posix) {
+      await writeFile(join(dir, 'payload.js'), "process.stdout.write('HEAD'+ 'x'.repeat(30*1024*1024) +'TAIL'); process.stderr.write('ERRHEAD'+ 'y'.repeat(24*1024*1024) +'ERRTAIL')")
+    }
+    const command = posix
+      ? `${JSON.stringify(process.execPath)} -e "process.stdout.write('HEAD'+ 'x'.repeat(30*1024*1024) +'TAIL'); process.stderr.write('ERRHEAD'+ 'y'.repeat(24*1024*1024) +'ERRTAIL')"`
+      : 'node payload.js'
+    const result = await shell({ command, timeout: 20, cwd: posix ? undefined : dir })
+    assert.equal(result.exit_code, 0)
+    assert.ok(result.stdout.startsWith('HEAD'))
+    assert.ok(result.stdout.endsWith('TAIL'))
+    assert.ok(result.stderr.startsWith('ERRHEAD'))
+    assert.ok(result.stderr.endsWith('ERRTAIL'))
+    assert.match(result.stdout, /bytes not shown/)
+    assert.ok(result.stdout.length < 220_000)
+    assert.ok(result.stderr.length < 220_000)
+  })
 })
 
-test('shell timeout kills the descendant process tree', { skip: !posix }, async () => {
+test('shell: a command with quotes in it survives the Windows shell', { skip: posix }, async () => {
+  // the interpreter's own path is the everyday quoted-with-spaces command: "C:\Program Files\...\node.exe"
+  const command = `${JSON.stringify(process.execPath)} -e "console.log('quoted ok')"`
+  const ok = await shell({ command, timeout: 30 })
+  assert.equal(ok.exit_code, 0)
+  assert.equal(ok.stdout.trim(), 'quoted ok')
+
+  // an argument in quotes next to it, the shape every spaced path arrives in
+  const withArg = `${JSON.stringify(process.execPath)} -e "console.log(process.argv[1])" "${JSON.stringify('a value with spaces').slice(1, -1)}"`
+  const passed = await shell({ command: withArg, timeout: 30 })
+  assert.equal(passed.exit_code, 0)
+  assert.equal(passed.stdout.trim(), 'a value with spaces')
+})
+
+test('shell timeout kills the descendant process tree', async () => {
   await scratch(async (dir) => {
     const marker = join(dir, 'leaked')
-    const result = await shell({ command: `(sleep 3; printf leaked > ${JSON.stringify(marker)}) & wait`, timeout: 1 })
+    // POSIX backgrounds a subshell that writes the marker after three seconds; Windows starts a bare node grandchild (start /b) on the same errand - either way the shell dies at the timeout and the marker must never land
+    let result
+    if (posix) {
+      result = await shell({ command: `(sleep 3; printf leaked > ${JSON.stringify(marker)}) & wait`, timeout: 1 })
+    } else {
+      await writeFile(join(dir, 'grandchild.js'), "setTimeout(() => { require('node:fs').writeFileSync('leaked', 'x'); process.exit(0) }, 3000)")
+      result = await shell({ command: 'start /b node grandchild.js&ping -n 6 127.0.0.1 >nul', timeout: 1, cwd: dir })
+    }
     assert.equal(result.timed_out, true)
     await new Promise((resolve) => setTimeout(resolve, 2500))
     await assert.rejects(access(marker))

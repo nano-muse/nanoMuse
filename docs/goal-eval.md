@@ -39,3 +39,22 @@ cannot be represented without losing precision remain unknown rather than passin
 
 The expected outcomes in `tasks_v1.json` describe the currently committed responses. After
 refreshing them, review each changed outcome manually before updating the expectations.
+
+## Criterion cases
+
+`criteria_cases_v1.json` measures the evaluator itself. Each case builds a final state and an
+answer, runs one criterion to its verdict and compares the result with the expected one. Cases
+from `spec` were written by a different model from the rules alone, in an empty directory;
+cases from `code` were written against the evaluator to find inputs it judges wrongly. Every
+criterion has at least one case that should pass and one that should fail.
+
+`expected` follows the criterion as defined. `current` pins a result the evaluator still gets
+wrong, a known miss. `truth` records the user's goal where a criterion, applied correctly,
+still misses it: a calendar event can be right while the answer reports the wrong time. Closing
+such a gap needs a new criterion, so it waits for the next version of the tasks. A change that
+alters a case's result updates the case in the same commit.
+
+A criterion that reads the answer does not guess at negation. When 不, 未, 没 or 无 sits in the
+same clause as a reported result or a ticket exclusion, outside every status or exclusion word,
+the criterion records unknown. The cases also record what this costs: an honest explanation such
+as 因无权限被拒 goes to review.
