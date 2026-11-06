@@ -46,3 +46,14 @@ export function focusComposer(tries = 8): void {
   }
   if (tries > 0) window.setTimeout(() => focusComposer(tries - 1), 150)
 }
+
+/** A first-run task waits for its chat and never replaces an existing draft. */
+export function prefillEmptyComposer(text: string, isTarget: () => boolean, tries = 30): void {
+  const editable = isTarget() ? composerEditable() : null
+  if (!editable) {
+    if (tries > 0) window.setTimeout(() => prefillEmptyComposer(text, isTarget, tries - 1), 150)
+    return
+  }
+  if (editable.textContent?.trim()) return
+  prefillComposer(text, 0)
+}

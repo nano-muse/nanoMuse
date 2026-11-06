@@ -61,6 +61,8 @@ fun MuseBottomBar(
     // inverted in light. Follows the chat background, not the system setting,
     // since the app has its own theme override.
     val nmDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val chatBackground by io.github.nanomuse.ui.chat.rememberChatBackground()
+    val chatCanvas = chatBackground.color(com.openminis.app.ui.theme.ChatColors)
     val nmSelectedBg = if (nmDark) Color.White else Color.Black
     val nmSelectedFg = if (nmDark) Color.Black else Color.White
     val window = LocalConfiguration.current
@@ -84,8 +86,9 @@ fun MuseBottomBar(
                 .fillMaxWidth()
                 // Keep the chat surround outside the glass and its blur source.
                 .then(
-                    if (nmDark && selected == HomeTab.CHAT) {
-                        Modifier.amoledNavPillSurround(
+                    if (selected == HomeTab.CHAT && (nmDark || chatBackground != io.github.nanomuse.ui.chat.ChatBackground.DEFAULT)) {
+                        Modifier.chatNavPillSurround(
+                            color = chatCanvas,
                             extent = surroundExtent,
                             topGap = NM_CHAT_COMPOSER_BOTTOM_GAP,
                         )

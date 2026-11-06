@@ -102,6 +102,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
 
+- Changed desktop first run to choose an example task, connect a model and start a conversation.
+- Fixed the ChatGPT sign-in on the desktop showing the end of the terms notice as its error when the sign-in stopped early; it now says the sign-in closed before it finished.
+
 - **Added the model-neutral `skill-creator` guide to the desktop and Python runtime.** Android loaded the same packaged instructions, including on existing installs. For [#757](https://github.com/nano-muse/nanoMuse/issues/757) and [#758](https://github.com/nano-muse/nanoMuse/issues/758).
 - Kept separate screenshots when reporting more than one problem within the same second.
 
@@ -134,6 +137,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Android
 
 - Routed DashScope Paraformer transcription, CosyVoice speech and Qwen3 TTS through their native APIs, added Qwen3 TTS to voice choices, and rejected unsupported realtime voice models before sending a request.
+- Added optional chat background colors under Appearance, with light and dark variants, matching edge fades and a Default option to reset. For #861.
+
 - Allowed API-key Gemini providers to generate and edit avatar images through their native image models, recognised Nano Banana model names, and excluded Imagen from that route. For #834.
 
 - Closed native provider-import and permission dialogs when app access expired, cancelling pending permission choices.

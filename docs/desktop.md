@@ -118,6 +118,8 @@ right-click an editable field to cut, copy, paste or select all. The Edit menu a
 usual keyboard shortcuts also work. Page scripts cannot read the clipboard; pasting
 through the native menu or a keyboard shortcut is your explicit editing action.
 
+On first start, choose an example task, connect a model or skip that step, and start the conversation. The selected task is placed in the main chat composer when it is empty; an existing draft is kept. You can sign in to nanoMuse Cloud, sign in with ChatGPT, or add a provider key on the model page. A new Cloud account is offered a password, and macOS asks for the permissions the hands need.
+
 A dsh Host started by the shell as a child process, showing the harness's web app in a
 window of ours: the rail (Chats, Search, Feed, Ideas, Goals, Library, Devices, the
 hamburger), the chats column with the main chat and the side chats, the face and name

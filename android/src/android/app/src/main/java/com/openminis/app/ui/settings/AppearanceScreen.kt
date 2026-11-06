@@ -368,6 +368,9 @@ fun AppearanceScreen(
             }
         }
 
+        // nanoMuse: reversible chat-only colors, with light and dark variants.
+        io.github.nanomuse.ui.chat.ChatBackgroundSettings()
+
         // -- Theme --
         // Each row carries its own leading icon + tile colour, mirroring the
         // Provider / Permissions screens. Earlier only the first row had an

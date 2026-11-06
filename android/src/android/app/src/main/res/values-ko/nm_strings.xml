@@ -1249,4 +1249,13 @@
 
     <string name="nm_coding_installed">설치됨</string>
     <string name="nm_coding_not_installed">설치되지 않음</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">채팅 배경</string>
+    <string name="nm_chat_background_footer">이 기기의 모든 채팅에 적용됩니다. 라이트 모드와 다크 모드에 따라 색상이 바뀝니다. 기본값을 선택하면 초기화됩니다.</string>
+    <string name="nm_chat_background_default">기본값</string>
+    <string name="nm_chat_background_warm">따뜻한 색</string>
+    <string name="nm_chat_background_blue">파란색</string>
+    <string name="nm_chat_background_green">초록색</string>
+    <string name="nm_chat_background_purple">보라색</string>
 </resources>

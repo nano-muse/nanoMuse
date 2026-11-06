@@ -101,6 +101,7 @@ export function failureText(t: Translate, err: unknown): string {
   if (code === 'bad_provider') return t('errSignInRow')
   if (code === 'domain_limited') return t('errDomainLimited')
   if (code === 'channel_unsupported') return t('errChannelUnsupported')
+  if (code === 'no_image_model') return t('errNoImageModel')
   return t('failed', { message: text || code || '?' })
 }
 
