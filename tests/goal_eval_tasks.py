@@ -31,6 +31,10 @@ from nanomuse.tools.files import Files, unescape_flat
 from nanomuse.ui import HeadlessUI
 
 FIXTURE_TIME = "当前任务时间：2026年10月29日20:00，Asia/Taipei；未写年份的日期按2026年解释。"
+NEGATIONS = ("不", "未", "没", "无")
+CLAUSE_BREAKS = "，。；！？,;!?"
+ARCHIVE_SUCCESS = ("✅", "成功", "已复制", "已归档")
+ARCHIVE_FAILURE = ("❌", "失败", "拦截", "被拒", "未归档")
 
 PAIRS = (
     ("P1", "P2", "expense"),
@@ -526,6 +530,22 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def clause_cues(clause: str, words: tuple[str, ...]) -> list[str]:
+    matches = [match for word in words for match in re.finditer(re.escape(word), clause)]
+    return [
+        cue
+        for cue in NEGATIONS
+        if any(
+            all(not (match.start() <= occurrence.start() < match.end()) for match in matches)
+            for occurrence in re.finditer(re.escape(cue), clause)
+        )
+    ]
+
+
+def clauses(text: str) -> list[str]:
+    return re.split(f"[{re.escape(CLAUSE_BREAKS)}]", text)
+
+
 def ticket_observations(answer: str) -> dict[str, Any]:
     rules = DATA["ticket_extraction"]
     lines = [
@@ -538,18 +558,24 @@ def ticket_observations(answer: str) -> dict[str, Any]:
     def normalize(text: str) -> str:
         return re.sub(r"[\s:：]+", "", text)
 
-    ids = sorted(
-        {
-            item
-            for line in lines
-            if not any(normalize(x) in normalize(line) for x in rules["exclusion_markers"])
-            for item in re.findall(r"(?<![A-Za-z0-9])[GDCKTZ]\d{1,4}(?!\d)", line)
-        }
-    )
+    train = r"(?<![A-Za-z0-9])[GDCKTZ]\d{1,4}(?!\d)"
+    ids = set()
+    ambiguous = False
+    for line in lines:
+        excluded = False
+        for clause in clauses(line):
+            text = normalize(clause)
+            words = tuple(normalize(marker) for marker in rules["exclusion_markers"])
+            if any(word in text for word in words):
+                excluded = True
+                ambiguous |= bool(clause_cues(text, words))
+        if not excluded:
+            ids.update(re.findall(train, line))
     no_trains = any(x in answer for x in rules["no_eligible_markers"])
     result: dict[str, Any] = {"TKT-C2": no_trains}
-    if lines or no_trains:
-        result["TKT-C1"] = ",".join(ids)
+    # Trains named only in prose are not a list, even beside a no-trains phrase.
+    if not ambiguous and (lines or (no_trains and not re.search(train, answer))):
+        result["TKT-C1"] = ",".join(sorted(ids))
     return result
 
 
@@ -579,15 +605,29 @@ def meeting_observations(text: str, readable: bool) -> dict[str, Any]:
     history = "\n".join(sections["history"])
     anchors = [word in history for word in ("回滚", "停止条件")]
     missing = any(word in history for word in DATA["meeting_sections"]["missing_markers"])
-    return {
+    result = {
         "MEET-C1": "试用" in "\n".join(sections["purpose"]),
         "MEET-C2": anchors[0] and readable,
         "MEET-C3": anchors[1] and readable,
         "MEET-C4": all(anchors) if readable else missing and not any(anchors),
-        "MEET-C5": sum(
-            bool(re.match(r"\s*(\d+[.、)]|[-*]\s)", line)) for line in sections["questions"]
-        ),
     }
+    lines = sections["questions"]
+    item = re.compile(r"^(\s*)(?:\d+[.、)]|[-*]\s)")
+    indents = [len(match.group(1).expandtabs()) for line in lines if (match := item.match(line))]
+    if indents:
+        shallowest = min(indents)
+        entries: list[str] = []
+        for line in lines:
+            match = item.match(line)
+            if match and len(match.group(1).expandtabs()) == shallowest:
+                entries.append(line)
+            elif entries:
+                entries[-1] += "\n" + line
+        if all("？" in entry or "?" in entry for entry in entries):
+            result["MEET-C5"] = len(entries)
+    elif not any("？" in line or "?" in line for line in lines):
+        result["MEET-C5"] = 0
+    return result
 
 
 def archive_observation(answer: str, copied: dict[str, bool]) -> bool | None:
@@ -598,28 +638,17 @@ def archive_observation(answer: str, copied: dict[str, bool]) -> bool | None:
             for line in answer.splitlines()
             if name in line and min(line.find(n) for n in copied if n in line) == line.find(name)
         ]
-        success = any(
-            re.search(r"(?<!未)(?<!没)(?<!没有)(?<!未能)(?:✅|成功|已复制|已归档)", line)
-            for line in lines
-        )
-        failure = any(
-            word in line
-            for line in lines
-            for word in (
-                "❌",
-                "失败",
-                "拦截",
-                "被拒",
-                "未归档",
-                "未成功",
-                "没有成功",
-                "没成功",
-                "未能成功",
-            )
-        )
-        if success == failure:
+        claims = set()
+        for line in lines:
+            for clause in clauses(line):
+                for word in ARCHIVE_SUCCESS + ARCHIVE_FAILURE:
+                    if word in clause:
+                        if clause_cues(clause, ARCHIVE_SUCCESS + ARCHIVE_FAILURE):
+                            return None
+                        claims.add(word in ARCHIVE_SUCCESS)
+        if len(claims) != 1:
             return None
-        checks.append(success == done)
+        checks.append(claims.pop() == done)
     return all(checks)
 
 
@@ -645,7 +674,7 @@ def observations(world: World, before: dict[str, Any], answer: str) -> dict[str,
                 amount = next(x for x in names if any(k in x.lower() for k in ("金额", "amount")))
                 parsed = [
                     (
-                        "total" if row[label] in ("总额", "合计", "总计") else row[label],
+                        "total" if row[label] in ("总额", "总金额", "合计", "总计") else row[label],
                         Decimal(row[amount]),
                     )
                     for row in rows
@@ -665,8 +694,9 @@ def observations(world: World, before: dict[str, Any], answer: str) -> dict[str,
                     }
             except (StopIteration, UnicodeError, ValueError, KeyError, TypeError, InvalidOperation):
                 pass
+        # 总额, 总金额 and 总计 name the grand total; 合计 often follows a category instead.
         literals = re.findall(
-            r"总额[^0-9+\-−－.\n]{0,6}"
+            r"(?<!汇)总(?:金?额|计)[^0-9+\-−－.\n]{0,6}"
             r"([+\-−－]?\s*\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+\-]?\d+)?)"
             r"(?![\d.,eE])",
             answer,

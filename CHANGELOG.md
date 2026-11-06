@@ -175,6 +175,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
 
 - **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. Expense checks kept signs and fractions instead of accepting an incorrect total's integer prefix. [Goal evaluation](docs/goal-eval.md).
+- **The goal evaluator's own mistakes were counted.** 162 cases written apart from the evaluator run each criterion from the final state to its verdict. They caught answers the evaluator passed wrongly, such as "不成功" read as success, and the rules were fixed: a reported result or a ticket exclusion with a negation in the same clause is now recorded as unknown instead of guessed. The cases also list what the evaluator still gets wrong. [Goal evaluation](docs/goal-eval.md#criterion-cases).
 
 - **GUI regression gained 20 fixed simulated tasks and independent state checks.** Reference mode ran offline in CI, an opt-in runner used a configured model, and a standalone recorder reported model calls, latency and available token usage. The cases also corrected loop detection for identical click coordinates on different pages. [GUI regression](docs/gui-regression.md).
 
