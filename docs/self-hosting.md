@@ -118,6 +118,16 @@ The command above backs up the database. Keep copies of `CLOUD_SECRET` and the f
 
 Caddy's certificates live in the `caddy_data` volume and are fetched again if lost.
 
+The scheduled backup in `cloud/deploy/nanomuse-hk/backup.sh` requires Python 3 and
+`flock` on the host. Before copying, it checks the space available to an ordinary
+user on both the database and backup filesystems. Each needs at least twice the
+combined database and WAL size, plus 5 GiB for the running service. Concurrent
+runs are refused. A failed capacity check stops the job before copying or
+retention cleanup and reports the required and available bytes in the journal.
+Provide more space or review recovery points before trying again; the check does
+not remove backups and cannot reserve space against other writers. The manual
+command above does not run this preflight check.
+
 ### What your relay stores
 
 The relay keeps hashed and encrypted identifiers, per-request counts and prices, and the devices on the hub. By default, `RECORD_TURNS=1` also keeps full model requests and replies, including turns uploaded by signed-in apps using their own model keys; pictures, audio and clips are stored under `MEDIA_DIR`. Set `RECORD_TURNS=0` to disable that account record. The conversation-sync switch controls the separate cross-device chat copy, and the training switch controls what joins training data. The full list, and what each switch does, is [privacy.md](privacy.md); as the operator you are the one it now describes.
