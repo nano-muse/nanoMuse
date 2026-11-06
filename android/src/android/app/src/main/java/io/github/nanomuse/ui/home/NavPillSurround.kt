@@ -13,11 +13,11 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.Dp
 
 /**
- * Paints black outside the pill, including the gap below the chat composer.
+ * Paints the selected chat canvas outside the pill, including the gap below the chat composer.
  * Attached before the pill's clip/Haze modifiers, this uses its actual outline
  * without covering the glass or becoming part of Haze's scrolling source.
  */
-internal fun Modifier.amoledNavPillSurround(extent: Dp, topGap: Dp): Modifier = drawWithCache {
+internal fun Modifier.chatNavPillSurround(color: Color, extent: Dp, topGap: Dp): Modifier = drawWithCache {
     val outline = CircleShape.createOutline(size, layoutDirection, this)
     val opening = Path().apply {
         when (outline) {
@@ -34,7 +34,7 @@ internal fun Modifier.amoledNavPillSurround(extent: Dp, topGap: Dp): Modifier = 
     onDrawWithContent {
         clipPath(opening, clipOp = ClipOp.Difference) {
             drawRect(
-                color = Color.Black,
+                color = color,
                 topLeft = Offset(-extentPx, -topGapPx),
                 size = Size(size.width + extentPx * 2f, size.height + extentPx + topGapPx),
             )

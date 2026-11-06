@@ -1249,4 +1249,13 @@
 
     <string name="nm_coding_installed">ติดตั้งแล้ว</string>
     <string name="nm_coding_not_installed">ยังไม่ได้ติดตั้ง</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">พื้นหลังแชต</string>
+    <string name="nm_chat_background_footer">ใช้กับทุกแชตในอุปกรณ์นี้ สีจะปรับตามโหมดสว่างหรือมืด เลือกค่าเริ่มต้นเพื่อคืนค่าเดิม</string>
+    <string name="nm_chat_background_default">ค่าเริ่มต้น</string>
+    <string name="nm_chat_background_warm">โทนอุ่น</string>
+    <string name="nm_chat_background_blue">สีน้ำเงิน</string>
+    <string name="nm_chat_background_green">สีเขียว</string>
+    <string name="nm_chat_background_purple">สีม่วง</string>
 </resources>

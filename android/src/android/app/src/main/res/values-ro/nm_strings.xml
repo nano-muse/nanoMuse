@@ -1257,4 +1257,13 @@
 
     <string name="nm_coding_installed">Instalat</string>
     <string name="nm_coding_not_installed">Neinstalat</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Fundalul conversației</string>
+    <string name="nm_chat_background_footer">Pentru toate conversațiile de pe acest dispozitiv. Culorile se adaptează la modul luminos sau întunecat. Alege Implicit pentru a reveni la fundalul inițial.</string>
+    <string name="nm_chat_background_default">Implicit</string>
+    <string name="nm_chat_background_warm">Cald</string>
+    <string name="nm_chat_background_blue">Albastru</string>
+    <string name="nm_chat_background_green">Verde</string>
+    <string name="nm_chat_background_purple">Violet</string>
 </resources>

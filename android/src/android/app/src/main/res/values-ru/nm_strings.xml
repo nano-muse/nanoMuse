@@ -1261,4 +1261,13 @@
 
     <string name="nm_coding_installed">Установлен</string>
     <string name="nm_coding_not_installed">Не установлен</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Фон чата</string>
+    <string name="nm_chat_background_footer">Для всех чатов на этом устройстве. Цвета адаптируются к светлому или тёмному режиму. Выберите «По умолчанию» для сброса.</string>
+    <string name="nm_chat_background_default">По умолчанию</string>
+    <string name="nm_chat_background_warm">Тёплый</string>
+    <string name="nm_chat_background_blue">Синий</string>
+    <string name="nm_chat_background_green">Зелёный</string>
+    <string name="nm_chat_background_purple">Фиолетовый</string>
 </resources>

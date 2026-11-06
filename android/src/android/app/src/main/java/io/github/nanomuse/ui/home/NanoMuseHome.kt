@@ -111,6 +111,7 @@ fun NanoMuseHome(
     mcpRepository: MCPRepository?,
 ) {
     val context = LocalContext.current
+    val chatBackground = io.github.nanomuse.ui.chat.rememberChatBackgroundColor()
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -362,7 +363,7 @@ fun NanoMuseHome(
         },
     ) {
         Scaffold(
-            containerColor = ChatColors.background,
+            containerColor = if (tab == HomeTab.CHAT) chatBackground else ChatColors.background,
             contentWindowInsets = WindowInsets(0),
             bottomBar = {
                 MuseBottomBar(selected = tab, hazeState = hazeState, onSelect = { picked ->
