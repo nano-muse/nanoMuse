@@ -1253,4 +1253,13 @@
 
     <string name="nm_coding_installed">Installiert</string>
     <string name="nm_coding_not_installed">Nicht installiert</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Chat-Hintergrund</string>
+    <string name="nm_chat_background_footer">Gilt für alle Chats auf diesem Gerät. Die Farben passen sich dem hellen oder dunklen Modus an. Standard setzt die Auswahl zurück.</string>
+    <string name="nm_chat_background_default">Standard</string>
+    <string name="nm_chat_background_warm">Warm</string>
+    <string name="nm_chat_background_blue">Blau</string>
+    <string name="nm_chat_background_green">Grün</string>
+    <string name="nm_chat_background_purple">Lila</string>
 </resources>
