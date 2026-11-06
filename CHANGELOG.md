@@ -124,6 +124,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Added optional chat background colors under Appearance, with light and dark variants, matching edge fades and a Default option to reset. For #861.
+
 - Allowed API-key Gemini providers to generate and edit avatar images through their native image models, recognised Nano Banana model names, and excluded Imagen from that route. For #834.
 
 - Closed native provider-import and permission dialogs when app access expired, cancelling pending permission choices.

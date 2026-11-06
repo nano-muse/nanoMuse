@@ -1253,4 +1253,13 @@
 
     <string name="nm_coding_installed">Naka-install</string>
     <string name="nm_coding_not_installed">Hindi naka-install</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Background ng chat</string>
+    <string name="nm_chat_background_footer">Para sa lahat ng chat sa device na ito. Umaayon ang mga kulay sa light o dark mode. Piliin ang Default para ibalik sa dati.</string>
+    <string name="nm_chat_background_default">Default</string>
+    <string name="nm_chat_background_warm">Mainit na kulay</string>
+    <string name="nm_chat_background_blue">Asul</string>
+    <string name="nm_chat_background_green">Berde</string>
+    <string name="nm_chat_background_purple">Lila</string>
 </resources>
