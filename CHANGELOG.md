@@ -31,6 +31,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Enabled Windows test coverage for the remote shell: exit codes, stdout and stderr, the working directory, the output bound, and the timeout's tree kill through the taskkill path Windows devices actually take.
 - Enabled Windows test coverage for the harness coding suite: the reader and service tests that need no CLI now run there, and the six that start a fake `#!/bin/sh` CLI skip with the reason named instead of a whole-file POSIX gate.
 - Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
 - Ran the hub suite's own shell commands on Windows too: the stop tests' `sleep 20` spells became the suite interpreter's `-c` payload, which `cmd.exe` runs unchanged (the posix spell died instantly, so the run answered before the stop landed), and the shell contract test lost its win32 skip to the same payload.
