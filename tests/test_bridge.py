@@ -279,10 +279,12 @@ class FakeClipboard(BaseTool):
 def _bridge_command(*args: str) -> str:
     """Run the program from this interpreter (the venv's bin may not be on PATH here)."""
     code = f"from nanomuse.bridge.cli import device_main; raise SystemExit(device_main({list(args)!r}))"
+    if sys.platform == "win32":
+        # the shell tool hands the string to cmd.exe, which does not read POSIX quotes
+        return subprocess.list2cmdline([sys.executable, "-c", code])
     return f"{shlex.quote(sys.executable)} -c {shlex.quote(code)}"
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the shell tool assumes a POSIX shell")
 def test_a_command_reaches_the_phone_through_the_bridge(settings: Settings):
     """The whole way round, on a real loopback port: the model runs a shell command, the
     command runs `nanomuse-device clipboard read`, the request comes back in as a tool call

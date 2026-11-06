@@ -30,9 +30,10 @@ agent ◄── redact(result)   ◄── taint bookkeeping ◄─────�
 
 `shell` 和 `python_execute` 启动子进程前，会移除可能含凭据的环境变量。包括名称匹配 `*KEY*`、`*TOKEN*`、`*SECRET*`、`*PASSW*`、`*CREDENTIAL*`、`*AUTH*`、`*COOKIE*`、`*SESSION*` 的变量；所有以 `NANOMUSE_`、`AWS_`、`AZURE_`、`GOOGLE_`、`GH_`、`GITHUB_`、`NPM_` 开头的变量；以及 `SSH_AUTH_SOCK`。因此，模型生成的代码无法从 `os.environ` 读取模型自己的 API key 或保险库密钥。API 是程序调用接口，key 是访问服务的密钥。这两个工具也不接受 `{{vault:NAME}}` 占位符，命令带占位符时会被拒绝并说明原因。保险库的真实值只交给已配置使用它们的连接器。编程 CLI，即 `coding_tool` 中的 Codex、Claude Code、Cursor，使用同样清理后的环境，但会补入各自账号变量：`OPENAI_*` / `CODEX_*`、`ANTHROPIC_*` / `CLAUDE_*`、`CURSOR_*`；当 `CLAUDE_CODE_USE_BEDROCK` / `_VERTEX` 指定使用云服务时，也会补入所需云凭据。其他运行时环境变量不会传入。
 
-递归强制删除检查既识别 `rm -rf`，也识别 `rm -r -f` 和 `rm --recursive --force`。后续另一条命令的参数、其他长选项，以及 `--` 后的文件名，不会被误拼成这一组合。这些检查识别的是常见命令模式，不能覆盖所有 shell 程序。
+递归强制删除警告既识别 `rm -rf` 这样的组合参数，也识别 `rm -r -f`、`rm --recursive --force` 这样的分开参数。后续命令的参数、其他长选项或 `--` 后的文件名不会被拼成这一组合。检查危险模式前，会先拼接反斜杠紧接换行的续行，包括被拆开的命令名或参数。审批卡片和实际执行仍使用原始命令。这些检查用于识别常见命令模式，不能覆盖所有 shell 程序；引号中的字面文本也可能触发警告。
 
 `Path(...).rmdir()` 与 `Path(...).unlink()`、`os.rmdir()` 一样会触发删除警告。即使沙箱正常工作，这类 Python 调用也会升为 `sensitive`；已有的长期授权不能跳过警告。
+
 
 ## 沙箱 {#the-sandbox}
 
