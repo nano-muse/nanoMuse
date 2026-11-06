@@ -333,9 +333,12 @@ test('ChatGPT sign-in: the runtime’s error ends the login with its code; no ru
   await tick()
   spawned[1].child.say({ event: 'url', url: 'https://auth' })
   await p2
+  spawned[1].child.stderr.emit('data', Buffer.from('OpenAI’s terms cover using a ChatGPT plan inside OpenAI’s own Codex;\nother apps have had this access cut off before. If it stops\nworking, an API key does.\n'))
   spawned[1].child.emit('exit', 1)
   await tick()
   assert.equal(d.login.status, 'error')
+  // what the runtime prints for a person is not the failure: the notice on stderr never becomes the error
+  assert.equal(d.login.error, 'exited')
   // cancel from a waiting state
   const p3 = d.beginLogin()
   await tick()

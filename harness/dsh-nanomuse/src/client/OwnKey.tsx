@@ -23,7 +23,7 @@ import { baseUrlFor, isLocal, keyUrlFor, ownKeyStepDone, providersWith, unavaila
 import { call, errorCode, errorStyle, muted, row, type Translate, failureText } from './api.ts'
 import { openLink } from './bridge.ts'
 import { settingsBus } from './bus.ts'
-import { IconCheck, IconGlobe, IconKey } from './icons.tsx'
+import { IconCheck, IconExternal, IconGlobe, IconHand, IconImage, IconKey, IconMessage, IconUser, IconVideo } from './icons.tsx'
 import { useLive } from './live.ts'
 
 export type { Capability, ProviderEntry, Region }
@@ -63,9 +63,14 @@ export interface ModelOption { provider: string; providerLabel: string; id: stri
 
 const CAPS: Capability[] = ['chat', 'vision', 'image', 'video']
 
-/** The catalogue in the groups the rows are shown in: the host's `waysOn` (`src/catalogue.ts`), so both halves order them alike. */
+/** Keep API-key entries visible even when the same provider also offers subscription sign-in. */
 export function groupsOf(catalogue: ProviderEntry[], region: Region): WaysOn {
-  return waysOn(catalogue, region)
+  const groups = waysOn(catalogue, region)
+  return {
+    ...groups,
+    signIn: groups.signIn.filter((entry) => !entry.auth.includes('key')),
+    rest: [...groups.signIn.filter((entry) => entry.auth.includes('key')), ...groups.rest],
+  }
 }
 
 /** `GET /providers`, again whenever the host's live state says the rows or the sign-in moved. */
@@ -203,30 +208,34 @@ export function ChatGptRow({ t, view, onChanged }: { t: Translate; view: Provide
   const login = cg.login
   let state: ReactNode
   if (cg.signedIn) {
-    state = h('div', { className: 'nm-way-sub' }, h(IconCheck, { size: 13 }), ' ', cg.proxy ? t('ownKeyChatGptDone', { label: cg.label || 'ChatGPT' }) : t('ownKeyChatGptProxyDown', { label: cg.label || 'ChatGPT' }))
+    state = h('div', { className: 'nm-way-sub', style: { color: 'var(--nm-green, #10b981)' } }, h(IconCheck, { size: 13 }), ' ', cg.proxy ? t('ownKeyChatGptDone', { label: cg.label || 'ChatGPT' }) : t('ownKeyChatGptProxyDown', { label: cg.label || 'ChatGPT' }))
   } else if (login.status === 'waiting') {
     state = h('div', { className: 'nm-way-sub nm-wrap' }, t('ownKeyChatGptWaiting'))
   } else if (login.status === 'error') {
-    state = h('div', { style: errorStyle }, t('ownKeyChatGptFailed', { error: login.error === 'no_runtime' ? t('ownKeyNoRuntime') : login.error }))
+    state = h('div', { style: errorStyle }, chatGptLoginError(t, login.error))
   } else if (!view.chatgpt.runtime) {
     state = h('div', { className: 'nm-way-sub nm-wrap' }, t('ownKeyNoRuntime'))
   }
-  return h('div', { className: 'nm-way' },
-    h('span', { className: 'nm-way-icon' }, h(IconKey, { size: 15 })),
-    h('div', { className: 'nm-way-main' },
-      h('div', { className: 'nm-way-title' }, t('ownKeyChatGptRow'), h('span', { style: { ...muted, marginLeft: 8 } }, coverage(t, ['chat', 'vision']))),
+  return h('div', { className: `nm-way nm-way-card${cg.signedIn ? ' nm-way-ready' : ''}${error || login.status === 'error' ? ' nm-way-error' : ''}` },
+    h('span', { className: 'nm-way-icon', style: cg.signedIn ? { color: 'var(--nm-green, #10b981)', background: 'color-mix(in srgb, #10b981 12%, transparent)' } : undefined }, cg.signedIn ? h(IconCheck, { size: 15 }) : h(IconUser, { size: 15 })),
+    h('div', { className: 'nm-way-main', style: { flex: 1, minWidth: 0 } },
+      h('div', { className: 'nm-way-title', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px' } },
+        h('span', { style: { fontWeight: 600 } }, t('ownKeyChatGptRow')),
+        h('span', { style: { ...muted, fontSize: 12 } }, coverage(t, ['chat', 'vision'])),
+        cg.signedIn ? h('span', { style: { fontSize: 11, padding: '1px 6px', borderRadius: 4, background: 'color-mix(in srgb, #10b981 15%, transparent)', color: 'var(--nm-green, #10b981)' } }, t('ownKeyConfigured')) : null
+      ),
       h('div', { className: 'nm-way-sub nm-wrap' }, t('ownKeyChatGptSub')),
-      h('div', { className: 'nm-way-sub nm-wrap', style: muted }, t('ownKeyChatGptHonesty')),
+      h('div', { className: 'nm-way-sub nm-wrap', style: { ...muted, fontSize: 12 } }, t('ownKeyChatGptHonesty')),
       state,
-      error ? h('div', { style: errorStyle }, error) : null,
-      h('div', { style: row },
-        cg.signedIn
-          ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy, onClick: signOut }, t('ownKeySignOut'))
-          : login.status === 'waiting'
-            ? h(Fragment, null,
-                login.url ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => openLink(login.url) }, t('ownKeyChatGptOpen')) : null,
-                h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: cancel }, t('ownKeyChatGptCancel')))
-            : h('button', { type: 'button', className: 'nm-pill nm-pill-sm', disabled: busy || !view.chatgpt.runtime, onClick: signIn }, t('ownKeySignIn')))))
+      error ? h('div', { style: errorStyle }, error) : null),
+    h('div', { className: 'nm-way-actions' },
+      cg.signedIn
+        ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy, onClick: signOut }, t('ownKeySignOut'))
+        : login.status === 'waiting'
+          ? h(Fragment, null,
+              login.url ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => openLink(login.url) }, t('ownKeyChatGptOpen')) : null,
+              h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: cancel }, t('ownKeyChatGptCancel')))
+          : h('button', { type: 'button', className: 'nm-pill nm-pill-sm', disabled: busy || !view.chatgpt.runtime, onClick: signIn }, t('ownKeySignIn'))))
 }
 
 // ---- the "Use it for" card ------------------------------------------------------------------------
@@ -309,13 +318,16 @@ export function ProviderRow({ t, entry, view, own, onChanged }: { t: Translate; 
       .then((r) => { setRenaming(false); setLabel(r.label); onChanged() })
       .catch((err: unknown) => setError(failureText(t, err))).finally(() => setBusy(false))
   }
-  return h('div', { className: 'nm-way', 'data-testid': several && configured ? `nm-way-${rowId}` : undefined },
-    h('span', { className: 'nm-way-icon' }, configured ? h(IconCheck, { size: 15 }) : h(IconKey, { size: 15 })),
-    h('div', { className: 'nm-way-main' },
-      h('div', { className: 'nm-way-title' }, title, h('span', { style: { ...muted, marginLeft: 8 } }, coverage(t, configured?.capabilities ?? entry.capabilities))),
+  return h('div', { className: `nm-way nm-way-card${configured ? ' nm-way-ready' : ''}${error ? ' nm-way-error' : ''}`, 'data-testid': several && configured ? `nm-way-${rowId}` : undefined },
+    h('span', { className: 'nm-way-icon', style: configured ? { color: 'var(--nm-green, #10b981)', background: 'color-mix(in srgb, #10b981 12%, transparent)' } : undefined }, configured ? h(IconCheck, { size: 15 }) : h(IconKey, { size: 15 })),
+    h('div', { className: 'nm-way-main', style: { flex: 1, minWidth: 0 } },
+      h('div', { className: 'nm-way-title', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px' } },
+        h('span', { style: { fontWeight: 600 } }, title),
+        h('span', { style: { ...muted, fontSize: 12 } }, coverage(t, configured?.capabilities ?? entry.capabilities)),
+        configured ? h('span', { style: { fontSize: 11, padding: '1px 6px', borderRadius: 4, background: 'color-mix(in srgb, #10b981 15%, transparent)', color: 'var(--nm-green, #10b981)' } }, `${t('ownKeyConfigured')}${configured.models.length ? ` · ${configured.models.length}` : ''}`) : null
+      ),
       several && configured ? h('div', { className: 'nm-way-sub nm-wrap', style: muted }, hostOf(configured.baseURL)) : null,
       open ? h('div', { className: 'nm-way-sub nm-wrap', style: muted }, noteOf(t, entry), entry.verified ? ` · ${t('ownKeyVerified', { month: entry.verified })}` : '') : null,
-      configured ? h('div', { className: 'nm-way-sub' }, `${t('ownKeyConfigured')} · ${configured.models.length ? t('ownKeySaved', { n: configured.models.length }) : t('ownKeySavedNone')}`) : null,
       said ? h('div', { className: 'nm-way-sub' }, said) : null,
       offer
         ? h(UseItCard, { t, id: offer.id, label: offer.label || nameOf(t, entry), offer: offer.offer, signedIn: view.cloud.signedIn, onDone: (text) => { setOffer(undefined); if (text) setSaid(text); onChanged(text) } })
@@ -328,11 +340,14 @@ export function ProviderRow({ t, entry, view, own, onChanged }: { t: Translate; 
             h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy, onClick: () => { setRenaming(false); setLabel(configured?.label ?? '') } }, t('cancel')))
         : open
         ? h(KeyForm, { t, entry, region: view.region, configured, onSaved: (text, got) => { setOpen(false); setSaid(text); setOffer(Object.keys(got.offer).length ? got : undefined); onChanged(text) }, onCancel: () => setOpen(false) })
-        : h('div', { style: row },
-            h('button', { type: 'button', className: `nm-pill nm-pill-sm${configured ? ' nm-pill-ghost' : ''}`, disabled: busy, onClick: () => setOpen(true) }, configured ? t('ownKeyChange') : several ? t('ownKeyAddEndpoint') : needsKey ? t('ownKeyAdd') : t('ownKeyConnect')),
-            keyUrl && needsKey ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => openLink(keyUrl) }, t('ownKeyGetKey')) : null,
-            several && configured ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy, onClick: () => setRenaming(true) }, t('ownKeyRename')) : null,
-            configured ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy, onClick: remove }, t('ownKeyRemove')) : null)))
+        : null),
+    !open && !renaming
+      ? h('div', { className: 'nm-way-actions' },
+          h('button', { type: 'button', className: `nm-pill nm-pill-sm${configured ? ' nm-pill-ghost' : ''}`, disabled: busy, onClick: () => setOpen(true) }, configured ? t('ownKeyChange') : several ? t('ownKeyAddEndpoint') : needsKey ? t('ownKeyAdd') : t('ownKeyConnect')),
+          keyUrl && needsKey ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm nm-pill-icon', title: t('ownKeyGetKey'), 'aria-label': t('ownKeyGetKey'), onClick: () => openLink(keyUrl) }, h(IconExternal, { size: 14 })) : null,
+          several && configured ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy, onClick: () => setRenaming(true) }, t('ownKeyRename')) : null,
+          configured ? h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy, onClick: remove }, t('ownKeyRemove')) : null)
+      : null)
 }
 
 function hostOf(url: string): string {
@@ -345,15 +360,19 @@ function hostOf(url: string): string {
 
 // ---- the groups ----------------------------------------------------------------------------------
 
-export type Group = 'account' | 'first' | 'signIn' | 'rest' | 'local' | 'custom'
-export const ALL_GROUPS: Group[] = ['account', 'first', 'signIn', 'rest', 'local', 'custom']
+export type Group = 'signIn' | 'account' | 'first' | 'rest' | 'local' | 'custom'
+export const ALL_GROUPS: Group[] = ['signIn', 'account', 'first', 'rest', 'local', 'custom']
 
 /** The account's row, first while signed in: what nanoMuse Cloud covers right now (the relay's model list). */
 function AccountRow({ t, view }: { t: Translate; view: ProvidersView }): ReactNode {
-  return h('div', { className: 'nm-way', 'data-testid': 'nm-way-account' },
-    h('span', { className: 'nm-way-icon' }, h(IconGlobe, { size: 15 })),
-    h('div', { className: 'nm-way-main' },
-      h('div', { className: 'nm-way-title' }, 'nanoMuse Cloud', h('span', { style: { ...muted, marginLeft: 8 } }, coverage(t, view.cloud.capabilities))),
+  return h('div', { className: 'nm-way nm-way-card nm-way-ready', 'data-testid': 'nm-way-account' },
+    h('span', { className: 'nm-way-icon', style: { color: 'var(--nm-green, #10b981)', background: 'color-mix(in srgb, #10b981 12%, transparent)' } }, h(IconGlobe, { size: 15 })),
+    h('div', { className: 'nm-way-main', style: { flex: 1, minWidth: 0 } },
+      h('div', { className: 'nm-way-title', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px' } },
+        h('span', { style: { fontWeight: 600 } }, 'nanoMuse Cloud'),
+        h('span', { style: { ...muted, fontSize: 12 } }, coverage(t, view.cloud.capabilities)),
+        h('span', { style: { fontSize: 11, padding: '1px 6px', borderRadius: 4, background: 'color-mix(in srgb, #10b981 15%, transparent)', color: 'var(--nm-green, #10b981)' } }, t('ownKeyConfigured'))
+      ),
       h('div', { className: 'nm-way-sub nm-wrap' }, t('ownKeyAccountSub'))))
 }
 
@@ -363,43 +382,87 @@ function AccountRow({ t, view }: { t: Translate; view: ProvidersView }): ReactNo
  * sign-in row, the rest behind *More ways*.
  */
 export function WaysOnRows({ t, view, groups = ALL_GROUPS, signInRow = true, headings = true, onChanged }: { t: Translate; view: ProvidersView; groups?: Group[]; /** false leaves the ChatGPT sign-in row out (the allowance card draws it under its own heading) */ signInRow?: boolean; headings?: boolean; onChanged(said?: string): void }): ReactNode {
+  const [selectedCap, setSelectedCap] = useState<Capability | 'all'>('all')
   const g = useMemo(() => groupsOf(view.catalogue, view.region), [view.catalogue, view.region])
   const rowOf = (entry: ProviderEntry) => h(ProviderRow, { key: entry.id, t, entry, view, onChanged })
-  const heading = (text: string) => (headings ? h('div', { className: 'nm-ways-lead', style: { marginTop: 6 } }, text) : null)
-  // the ChatGPT sign-in sits with OpenAI: under it when OpenAI is in the first group, else in the sign-in group
+  const heading = (text: string) => (headings ? h('div', { className: 'nm-ways-lead', style: { marginTop: 10, marginBottom: 4 } }, text) : null)
+
+  const filterPills = h('div', { className: 'nm-seg', style: { marginBottom: 12, flexWrap: 'wrap' } },
+    h('button', {
+      type: 'button',
+      className: `nm-seg-btn${selectedCap === 'all' ? ' nm-active' : ''}`,
+      onClick: () => setSelectedCap('all')
+    }, t('ownKeyFilterAll')),
+    (['chat', 'vision', 'image', 'video'] as const).map((cap) => {
+      const icon = cap === 'chat' ? h(IconMessage, { size: 14 }) : cap === 'vision' ? h(IconHand, { size: 14 }) : cap === 'image' ? h(IconImage, { size: 14 }) : h(IconVideo, { size: 14 })
+      const labelKey = cap === 'chat' ? 'ownKeyFilterChat' : cap === 'vision' ? 'ownKeyFilterVision' : cap === 'image' ? 'ownKeyFilterImage' : 'ownKeyFilterVideo'
+      return h('button', {
+        key: cap,
+        type: 'button',
+        className: `nm-seg-btn${selectedCap === cap ? ' nm-active' : ''}`,
+        onClick: () => setSelectedCap(cap)
+      }, h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6 } }, icon, t(labelKey)))
+    })
+  )
+
   const chatgptEntry = signInRow ? view.catalogue.find((p) => p.auth.includes('oauth-chatgpt')) : undefined
-  const chatgptInFirst = Boolean(chatgptEntry && g.first.some((p) => p.id === chatgptEntry.id))
-  const out: ReactNode[] = []
-  if (groups.includes('account') && view.cloud.signedIn) {
-    out.push(heading(t('ownKeyAccountGroup')))
-    out.push(h(AccountRow, { key: 'account', t, view }))
-  }
-  if (groups.includes('first') && g.first.length) {
-    out.push(heading(view.region === 'cn' ? t('ownKeyRegionCn') : t('ownKeyRegionGlobal')))
-    for (const p of g.first) {
-      out.push(rowOf(p))
-      if (chatgptEntry && p.id === chatgptEntry.id) out.push(h(ChatGptRow, { key: 'chatgpt', t, view, onChanged }))
+  const out: ReactNode[] = [filterPills]
+
+  if (selectedCap === 'all') {
+    if (groups.includes('signIn') && (g.signIn.length || chatgptEntry)) {
+      out.push(heading(t('ownKeySignInGroup')))
+      if (chatgptEntry) out.push(h(ChatGptRow, { key: 'chatgpt', t, view, onChanged }))
+      for (const p of g.signIn) if (!chatgptEntry || p.id !== chatgptEntry.id) out.push(rowOf(p))
     }
-  }
-  if (groups.includes('signIn') && (g.signIn.length || (chatgptEntry && !chatgptInFirst))) {
-    out.push(heading(t('ownKeySignInGroup')))
-    if (chatgptEntry && !chatgptInFirst) out.push(h(ChatGptRow, { key: 'chatgpt', t, view, onChanged }))
-    for (const p of g.signIn) if (!chatgptEntry || p.id !== chatgptEntry.id) out.push(rowOf(p))
-  }
-  if (groups.includes('rest') && g.rest.length) {
-    out.push(heading(t('ownKeyRestGroup')))
-    for (const p of g.rest) out.push(rowOf(p))
-  }
-  if (groups.includes('local') && g.local.length) {
-    out.push(heading(t('ownKeyLocalGroup')))
-    for (const p of g.local) out.push(rowOf(p))
-  }
-  if (groups.includes('custom') && g.custom) {
-    // one row per saved endpoint, then the row that adds another (#294)
-    const custom = g.custom
-    out.push(heading(t('ownKeyCustomGroup')))
-    for (const own of view.configured.filter((p) => p.provider === custom.id)) out.push(h(ProviderRow, { key: `custom:${own.id}`, t, entry: custom, view, own, onChanged }))
-    out.push(h(ProviderRow, { key: 'custom:add', t, entry: custom, view, own: null, onChanged }))
+    if (groups.includes('account') && view.cloud.signedIn) {
+      out.push(heading(t('ownKeyAccountGroup')))
+      out.push(h(AccountRow, { key: 'account', t, view }))
+    }
+    if (groups.includes('first') && g.first.length) {
+      const firstProviders = g.first
+      if (firstProviders.length > 0) {
+        out.push(heading(view.region === 'cn' ? t('ownKeyRegionCn') : t('ownKeyRegionGlobal')))
+        for (const p of firstProviders) out.push(rowOf(p))
+      }
+    }
+    if (groups.includes('rest') && g.rest.length) {
+      const restProviders = g.rest
+      if (restProviders.length > 0) {
+        out.push(heading(t('ownKeyRestGroup')))
+        for (const p of restProviders) out.push(rowOf(p))
+      }
+    }
+    if (groups.includes('local') && g.local.length) {
+      out.push(heading(t('ownKeyLocalGroup')))
+      for (const p of g.local) out.push(rowOf(p))
+    }
+    if (groups.includes('custom') && g.custom) {
+      const custom = g.custom
+      out.push(heading(t('ownKeyCustomGroup')))
+      for (const own of view.configured.filter((p) => p.provider === custom.id)) out.push(h(ProviderRow, { key: `custom:${own.id}`, t, entry: custom, view, own, onChanged }))
+      out.push(h(ProviderRow, { key: 'custom:add', t, entry: custom, view, own: null, onChanged }))
+    }
+  } else {
+    // Capability filter active
+    const visible = [
+      ...(groups.includes('first') ? g.first : []),
+      ...(groups.includes('rest') ? g.rest : []),
+      ...(groups.includes('local') ? g.local : []),
+      ...(groups.includes('signIn') ? g.signIn : []),
+    ]
+    const matches = visible.filter((p) => p.capabilities.includes(selectedCap))
+    const capTitle = t(selectedCap === 'chat' ? 'ownKeyFilterChat' : selectedCap === 'vision' ? 'ownKeyFilterVision' : selectedCap === 'image' ? 'ownKeyFilterImage' : 'ownKeyFilterVideo')
+    if ((selectedCap === 'chat' || selectedCap === 'vision') && chatgptEntry && groups.includes('signIn')) {
+      out.push(heading(t('ownKeySignInGroup')))
+      out.push(h(ChatGptRow, { key: 'chatgpt', t, view, onChanged }))
+    }
+    const keyMatches = matches
+    if (keyMatches.length > 0) {
+      out.push(heading(`${capTitle} (${keyMatches.length})`))
+      for (const p of keyMatches) out.push(rowOf(p))
+    } else if (!((selectedCap === 'chat' || selectedCap === 'vision') && chatgptEntry && groups.includes('signIn'))) {
+      out.push(h('div', { key: 'none', style: { ...muted, padding: '12px 0' } }, t('ownKeyNone')))
+    }
   }
   return h('div', { className: 'nm-ways' }, out)
 }
@@ -458,8 +521,131 @@ export function OwnKeyStep({ t, onDone }: { t: Translate; onDone(done: boolean):
   useEffect(() => { onDone(done) }, [done, onDone])
   if (error) return h('div', { style: errorStyle }, error)
   if (!view) return h('div', { style: muted }, t('loading'))
-  const groups: Group[] = more ? ['first', 'signIn', 'rest', 'local', 'custom'] : ['first', 'signIn']
+  const groups: Group[] = more ? ['signIn', 'first', 'rest', 'local', 'custom'] : ['signIn', 'first']
   return h('div', { className: 'nm-ob-card nm-ownkey-step', 'data-testid': 'nm-ownkey-step', style: { textAlign: 'left', width: '100%', padding: '4px 14px 12px' } },
     h(WaysOnRows, { t, view, groups, onChanged: reload }),
     more ? null : h('div', { style: { marginTop: 10 } }, h('button', { type: 'button', className: 'nm-ob-link nm-inline', onClick: () => setMore(true) }, t('ownKeyMoreWays'))))
+}
+
+/** The ChatGPT sign-in's failure in the person's words: the runtime's codes are worded here, its own messages kept. */
+export function chatGptLoginError(t: Translate, error: string): string {
+  if (error === 'no_result' || error === 'exited') return t('ownKeyChatGptIncomplete')
+  return t('ownKeyChatGptFailed', { error: error === 'no_runtime' ? t('ownKeyNoRuntime') : error })
+}
+
+/** Cloud sign-in state is supplied by the account, never by a local selection. */
+export function CloudChannelCard({ t, signedIn, onSignIn, onChoose }: { t: Translate; signedIn: boolean; onSignIn(): void; onChoose(): void }): ReactNode {
+  return h('div', { className: `nm-model-channel-card${signedIn ? ' nm-channel-ready' : ''}` },
+      h('span', { className: 'nm-model-channel-icon' }, h(IconGlobe, { size: 22 })),
+      h('div', { className: 'nm-model-channel-main' },
+        h('div', { className: 'nm-model-channel-title-row' },
+          h('span', { className: 'nm-model-channel-title' }, 'nanoMuse Cloud'),
+          h('span', { className: 'nm-model-channel-tag nm-model-channel-tag-blue' }, t('frChannelCloudTag'))),
+        h('span', { className: 'nm-model-channel-sub' }, t('frChannelCloudDesc'))),
+      h('div', { className: 'nm-model-channel-side' },
+        signedIn ? h('span', { className: 'nm-model-channel-ready-badge' }, h(IconCheck, { size: 13 }), ' ', t('frChannelConnected')) : null,
+        h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: signedIn ? onChoose : onSignIn }, signedIn ? t('frChannelCloudSelect') : t('ownKeySignIn'))))
+}
+
+/**
+ * Clean 3-tier model channel picker for onboarding Step 2.
+ * Offers ChatGPT (subscription direct login), nanoMuse Cloud (official relay),
+ * and third-party API Keys (expandable).
+ */
+export function ModelChannelsStep({
+  t,
+  onDone, statusReady, cloudSignedIn, onCloudSignIn, onCloudChoose,
+}: {
+  t: Translate
+  onDone(done: boolean): void
+  statusReady: boolean
+  cloudSignedIn: boolean
+  onCloudSignIn(): void
+  onCloudChoose(): void
+}): ReactNode {
+  const live = useLive()
+  const { view, error, reload } = useProviders(t)
+  const [expandedKeys, setExpandedKeys] = useState(false)
+  const [cgBusy, setCgBusy] = useState(false)
+  const [cgError, setCgError] = useState<string | undefined>()
+
+  const cg = live.ownKeys?.chatgpt ?? view?.chatgpt
+  const cgSignedIn = Boolean(cg?.signedIn)
+  const cloudActive = Boolean(cloudSignedIn || live.cloud.signedIn)
+  const configuredCount = view?.configured.length ?? 0
+  const hasKeys = configuredCount > 0
+
+  const hasAny = statusReady || cgSignedIn || cloudActive || hasKeys
+  useEffect(() => {
+    onDone(hasAny)
+  }, [hasAny, onDone])
+
+  if (error) return h('div', { style: errorStyle }, error)
+  if (!view) return h('div', { style: muted }, t('loading'))
+
+  const signInChatGpt = () => {
+    setCgBusy(true)
+    setCgError(undefined)
+    call<{ url: string }>('chatgpt/login', {})
+      .then((r) => { if (r.url) openLink(r.url) })
+      .catch((err: unknown) => { if ((err as Error).message !== 'no_runtime') setCgError(failureText(t, err)) })
+      .finally(() => setCgBusy(false))
+  }
+  const signOutChatGpt = () => {
+    setCgBusy(true)
+    call('chatgpt/logout', {}).then(() => reload()).catch((err: unknown) => setCgError(failureText(t, err))).finally(() => setCgBusy(false))
+  }
+  const cancelChatGpt = () => { void call('chatgpt/cancel', {}).catch(() => undefined) }
+
+  return h('div', { className: 'nm-model-channels', style: { width: '100%' } },
+    statusReady && !cgSignedIn && !cloudActive && !hasKeys
+      ? h('div', { className: 'nm-model-channel-ready-badge' }, t('frModelReady')) : null,
+    // 1. ChatGPT
+    h('div', { className: `nm-model-channel-card${cgSignedIn ? ' nm-channel-ready' : ''}` },
+      h('span', { className: 'nm-model-channel-icon' }, h(IconUser, { size: 22 })),
+      h('div', { className: 'nm-model-channel-main' },
+        h('div', { className: 'nm-model-channel-title-row' },
+          h('span', { className: 'nm-model-channel-title' }, 'ChatGPT'),
+          h('span', { className: 'nm-model-channel-tag nm-model-channel-tag-blue' }, t('frChannelChatGptTag')),
+          h('span', { className: 'nm-model-channel-tag nm-model-channel-tag-gray' }, t('frChannelChatGptCaps'))),
+        h('span', { className: 'nm-model-channel-sub' }, t('frChannelChatGptDesc')),
+        h('span', { className: 'nm-model-channel-sub' }, t('ownKeyChatGptHonesty')),
+        cg?.login.status === 'waiting'
+          ? h('div', { className: 'nm-way-sub nm-wrap', style: { marginTop: 4, color: 'var(--nm-blue)' } }, t('ownKeyChatGptWaiting'))
+          : null,
+        cgError || cg?.login.status === 'error'
+          ? h('div', { style: { ...errorStyle, marginTop: 4 } }, cgError || chatGptLoginError(t, cg?.login.error ?? ''))
+          : null),
+      h('div', { className: 'nm-model-channel-side' },
+        cgSignedIn
+          ? h(Fragment, null,
+              h('span', { className: 'nm-model-channel-ready-badge' }, h(IconCheck, { size: 13 }), ' ', t('frChannelConnected')),
+              h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: cgBusy, onClick: signOutChatGpt }, t('ownKeySignOut')))
+          : cg?.login.status === 'waiting'
+            ? h(Fragment, null,
+                cg.login.url ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => openLink(cg.login.url) }, t('ownKeyChatGptOpen')) : null,
+                h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: cancelChatGpt }, t('ownKeyChatGptCancel')))
+            : h('button', { type: 'button', className: 'nm-pill nm-pill-sm', disabled: cgBusy || !view.chatgpt.runtime, onClick: signInChatGpt }, t('ownKeySignIn')))),
+
+    h(CloudChannelCard, { t, signedIn: cloudActive, onSignIn: onCloudSignIn, onChoose: onCloudChoose }),
+
+    // 3. Third-party provider API keys
+    h('div', { className: `nm-model-channel-card${hasKeys ? ' nm-channel-ready' : ''}` },
+      h('span', { className: 'nm-model-channel-icon' }, h(IconKey, { size: 22 })),
+      h('div', { className: 'nm-model-channel-main' },
+        h('div', { className: 'nm-model-channel-title-row' },
+          h('span', { className: 'nm-model-channel-title' }, t('frChannelKey'))),
+        h('span', { className: 'nm-model-channel-sub' }, t('frChannelKeyDesc'))),
+      h('div', { className: 'nm-model-channel-side' },
+        hasKeys
+          ? h('span', { className: 'nm-model-channel-ready-badge' }, h(IconCheck, { size: 13 }), ' ', `${t('frChannelConnected')} (${configuredCount})`)
+          : null,
+        h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: () => setExpandedKeys(!expandedKeys) },
+          expandedKeys ? t('frChannelKeyCollapse') : t('frChannelKeyConfig')))),
+
+    // Expanded keys list
+    expandedKeys
+      ? h('div', { className: 'nm-model-expanded-keys' },
+          h(WaysOnRows, { t, view, groups: ['first', 'rest', 'local', 'custom'], onChanged: reload }))
+      : null)
 }
