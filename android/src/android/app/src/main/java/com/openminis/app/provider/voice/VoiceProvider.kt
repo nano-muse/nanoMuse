@@ -115,6 +115,9 @@ open class VoiceProvider(
     open fun defaultVoiceOutputModel(): String = "tts-1"
     open fun defaultVoiceOutputVoice(): String = "alloy"
 
+    // nanoMuse: fixed-format speech APIs can tell the playback callers what to request.
+    open fun preferredOutputFormat(model: String?): VoiceOutputFormat = VoiceOutputFormat.MP3
+
     // -- Request construction (override to customize format) -----------------
 
     /** Build the ASR request. Default: OpenAI multipart/form-data. */

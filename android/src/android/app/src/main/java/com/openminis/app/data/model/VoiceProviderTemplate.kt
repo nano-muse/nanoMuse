@@ -170,10 +170,13 @@ data class VoiceProviderTemplate(
                 baseURL = "https://dashscope.aliyuncs.com/compatible-mode",
                 appendV1 = true,
                 capability = Capability.BOTH,
-                baseURLMarkers = listOf("dashscope"),
+                // nanoMuse: native speech adapters also accept workspace-specific endpoints.
+                baseURLMarkers = listOf("dashscope", ".maas.aliyuncs.com"),
                 mockModels = listOf(
                     asr("paraformer-realtime-v2", "Paraformer Realtime v2", "alibaba"),
                     tts("cosyvoice-v2", "CosyVoice v2", "alibaba"),
+                    // nanoMuse: Qwen's non-realtime TTS has a separate native HTTP adapter.
+                    tts("qwen3-tts-flash", "Qwen3 TTS Flash", "alibaba"),
                 ),
             ),
             VoiceProviderTemplate(

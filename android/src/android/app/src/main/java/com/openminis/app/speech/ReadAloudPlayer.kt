@@ -419,6 +419,8 @@ class ReadAloudPlayer(context: Context) {
                         input = text,
                         model = modelEntry.model.id,
                         voice = modelEntry.model.id,
+                        // nanoMuse: Qwen TTS returns WAV; request the provider's actual format.
+                        responseFormat = voice.preferredOutputFormat(modelEntry.model.id),
                     ),
                 )
             }
