@@ -32,7 +32,7 @@
 
 **桌面版显示「nanoMuse 没能启动」或「nanoMuse 的后台停止了」**。 桌面外壳会启动 dsh Host（承载桌面插件的后台进程），并把自身及 Host 的日志写入 `~/.nanomuse/desktop/desktop.log`。可通过 `NANOMUSE_DESKTOP_HOME` 更改目录。弹窗会显示具体错误；「复制详情」会把版本、日志末尾和 Host 最近的输出复制到剪贴板，供你提交问题；「打开日志文件夹」可以打开日志位置。如果 Host 在运行中退出，外壳会自动重启一次，之后再退出时，弹窗会提供「重新启动」。Windows 更新后常见的原因是配置中的插件链接仍指向旧安装目录，报错为 `EEXIST: file already exists, symlink …`。0.1.40 已改为重建链接；如果重建失败，提示会指出需要手动删除的路径。
 
-第一次启动耗时几分钟，尤其是在 Windows 上，未必表示失败。Host 需要加载约 20 000 个文件，实时安全扫描会逐个检查。0.1.41 及之前，外壳会在 120 秒后放弃等待，尽管 Host 仍在加载。现在只要进程仍在运行就会继续等待；两分钟后显示「还在启动」及 Host 最近的输出，十分钟后询问是否继续等待。Windows x64 版支持在 App 内下载和安装更新，流程见[桌面版更新说明](desktop.md#updating-on-windows)。其他平台及未提供此更新功能的版本，通过托盘菜单中的「下载页（检查新版本）」打开发布页。详见 [desktop.md](desktop.md#config-and-data)。0.1.29 及之前的桌面版采用另一套程序，即 Electron 外壳中的 Python 运行时，日志位于 `~/.nanomuse/desktop-app.log`。下面两条问题发生在那一时期。
+第一次启动耗时几分钟，尤其是在 Windows 上，未必表示失败。Host 需要加载约 20 000 个文件，实时安全扫描会逐个检查。0.1.41 及之前，外壳会在 120 秒后放弃等待，尽管 Host 仍在加载。现在只要进程仍在运行就会继续等待；两分钟后显示「还在启动」及 Host 最近的输出，十分钟后询问是否继续等待。Windows x64 版支持在 App 内下载和安装更新，流程见[桌面版更新说明](desktop.md#updating-on-windows)。其他平台及未提供此更新功能的版本，通过应用菜单中的「帮助 → 下载页（检查新版本）」打开发布页。详见 [desktop.md](desktop.md#config-and-data)。0.1.29 及之前的桌面版采用另一套程序，即 Electron 外壳中的 Python 运行时，日志位于 `~/.nanomuse/desktop-app.log`。下面两条问题发生在那一时期。
 
 **安装后立即提示「The data folder … is not writable」或「cannot write to the data directory」（Windows，0.1.20–0.1.21）**。 当时运行时会相对于启动器的当前目录创建 `workspace` 文件夹。安装器直接打开 App 时，该目录是 `C:\Windows\System32`，因此创建失败，程序随即退出。从 0.1.22 起，默认工作区改为 `<data dir>\workspace`，外壳也会在数据目录中启动运行时。升级即可；如果必须使用旧版，可以设置 `NANOMUSE_WORKSPACE`。
 
