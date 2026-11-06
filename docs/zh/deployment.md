@@ -1,8 +1,8 @@
 # 部署
 
-一个会跑 shell 命令的智能体，应当待在一个属于它自己的盒子里。在服务器上，这个盒子就是一个容器：智能体只看得到它的数据目录和工作区。
+能够执行 shell 命令（操作系统命令）的智能体，应当在隔离环境中运行。在服务器上可以用容器隔离，让智能体只能访问自己的数据目录和工作区。
 
-这一页讲的是 Python 运行时（网页版背后的智能体）怎么在 Docker 里跑。自己运行中继（你自己的登录、hub 和同步）并把各个 App 指向它，见[自己部署](self-hosting.md)，那一页也把自己运行 nanoMuse 的三条路按顺序排好了。
+本文介绍如何在 Docker 中部署 Python 运行时，也就是为网页版执行任务的程序。如果你要自己提供登录、hub（设备互联）和同步服务，并让各个 App 连接它，请参阅[自己部署](self-hosting.md)。那一页也介绍了自行运行 nanoMuse 的三种方式。
 
 ## Docker {#docker}
 
@@ -13,15 +13,15 @@ docker compose up -d app                  # the phone app on http://<host>:8787
 docker compose logs app                   # shows the URL with the access token
 ```
 
-如果 8787 端口已被占用，比如同一台机器上还运行着本地中继，可以换一个宿主机端口：
+如果 8787 端口已被占用，例如同一台机器上还运行着本地中继，可以改用其他宿主机端口：
 
 ```bash
 NANOMUSE_RUNTIME_PORT=8788 docker compose up -d app
 ```
 
-用同一个访问令牌打开 `http://<host>:8788`。在仓库根目录的 `.env` 中加入 `NANOMUSE_RUNTIME_PORT=8788`，后续 compose 命令就会沿用这个端口。改变的只有宿主机发布的端口，容器、健康检查和容器日志里的 URL 仍使用 8787。不设置这个变量时，宿主机端口也是 8787。
+使用原来的访问令牌打开 `http://<host>:8788`。访问令牌是控制网页访问权限的凭据。若要让后续 compose 命令继续使用这个端口，在仓库根目录的 `.env` 中加入 `NANOMUSE_RUNTIME_PORT=8788`。这个变量只改变宿主机对外发布的端口；容器内部、健康检查以及日志中的 URL 仍使用 8787。不设置时，宿主机也使用 8787。
 
-其他入口：
+还可以通过以下方式运行：
 
 ```bash
 docker compose run --rm muse                      # terminal chat
@@ -29,9 +29,9 @@ docker compose run --rm muse run "plan my week"   # one task
 docker compose up -d daemon                       # advance goals on a timer, no UI
 ```
 
-镜像以非 root 用户运行，所有 capability 都已丢弃，并带有健康检查：容器每 30 秒访问一次自己的 `/api/health`，`docker ps` 会在它旁边显示 *healthy* 或 *unhealthy*。`muse` 和 `daemon` 两个服务不运行服务器，所以 compose 文件为它们关掉了这项检查；直接用 `docker run` 跑 `chat` 或 `daemon` 时加 `--no-healthcheck`。状态放在两个卷里：`nanomuse-data`（记忆、目标、保险库、审计日志、对话线程）和 `./workspace`（智能体的文件）。`config/config.toml` 以只读方式挂载。在 `.env` 里设好 `NANOMUSE_SERVER_TOKEN`，令牌就不会每次重启都变；然后在手机上用主机的地址打开打印出来的那个 URL。
+镜像以非 root 用户运行，并移除了全部 Linux capabilities（进程可获得的额外系统权限）。容器每 30 秒请求一次自身的 `/api/health` 做健康检查，`docker ps` 会显示 *healthy* 或 *unhealthy*。`muse` 和 `daemon` 不启动服务器，因此 compose 配置为它们禁用了这项检查。直接通过 `docker run` 运行 `chat` 或 `daemon` 时，需要加 `--no-healthcheck`。状态数据保存在两处：`nanomuse-data` 卷存放记忆、目标、保险库、审计日志和对话线程；`./workspace` 存放智能体处理的文件。`config/config.toml` 以只读方式挂载。请在 `.env` 中设置 `NANOMUSE_SERVER_TOKEN`，让访问令牌在重启后保持不变，然后在手机上用宿主机地址打开日志打印的 URL。
 
-不克隆仓库，直接用发布的镜像（linux/amd64 和 linux/arm64，所以树莓派或 Apple 芯片的 Mac 也行）：
+如果不想克隆仓库，可以直接运行发布镜像。镜像支持 linux/amd64 和 linux/arm64，因此也适用于树莓派和 Apple 芯片的 Mac：
 
 ```bash
 docker run -d --name muse -p 8787:8787 --env-file .env \
@@ -40,11 +40,11 @@ docker run -d --name muse -p 8787:8787 --env-file .env \
 docker logs muse                          # the URL with the access token
 ```
 
-`:latest` 和 `:X.Y.Z` 跟随正式版本；`:edge` 跟随 `main`。没有挂载 `config.toml` 时，镜像从 `config.example.toml` 起步，所以模型要在 `.env` 里（`NANOMUSE_LLM_*`）或 App 的「连接」屏幕里设。
+`:latest` 和 `:X.Y.Z` 对应正式发布版本，`:edge` 随 `main` 分支更新。没有挂载 `config.toml` 时，镜像会使用 `config.example.toml` 作为初始配置。此时可以在 `.env` 中通过 `NANOMUSE_LLM_*` 设置模型，也可以在 App 的「连接」页面设置。
 
-**带浏览器。** `-browser` 标签（`:latest-browser`、`:X.Y.Z-browser`、`:edge-browser`；linux/amd64）打包了 Chromium 和 Playwright，启动时浏览器工具就是开着的，智能体可以使用网站，你可以在手机上旁观和接管（见 [App → 浏览器视图](app.md#what-is-on-the-screen)）。它大约大 400 MB。在那个镜像里打开这个工具的是 `NANOMUSE_BROWSER_ENABLED=1`；只要装了 Playwright 和 Chromium，这个变量在哪里都管用。
+**附带浏览器的镜像**。`-browser` 标签包括 `:latest-browser`、`:X.Y.Z-browser`、`:edge-browser`，支持 linux/amd64。它们打包了 Chromium 浏览器和 Playwright 浏览器控制库，并在启动时启用浏览器工具。智能体可以操作网站，你也可以在手机上查看操作过程或接管，见 [App → 浏览器视图](app.md#what-is-on-the-screen)。这类镜像约大 400 MB。镜像通过 `NANOMUSE_BROWSER_ENABLED=1` 开启工具；在其他环境中，只要已安装 Playwright 和 Chromium，这个变量同样有效。
 
-自己构建：
+手动构建镜像：
 
 ```bash
 docker build -t nanomuse .
@@ -54,9 +54,9 @@ docker run -d --name muse -p 8787:8787 --env-file .env \
   -v "$PWD/config/config.toml:/app/config/config.toml:ro" nanomuse
 ```
 
-## 不用 Docker 也让它一直跑着 {#keeping-it-running-without-docker}
+## 不使用 Docker 时如何持续运行 {#keeping-it-running-without-docker}
 
-一个用户级的 systemd 单元就够了：
+可以用用户级 systemd 服务管理进程：
 
 ```ini
 # ~/.config/systemd/user/nanomuse.service
@@ -80,14 +80,14 @@ loginctl enable-linger $USER          # keep it running after logout
 journalctl --user -u nanomuse -f
 ```
 
-## 从你的网络外面访问它 {#reaching-it-from-outside-your-network}
+## 从外部网络访问 {#reaching-it-from-outside-your-network}
 
-不要把 8787 端口直接暴露到互联网。几个能保住令牌机制的选项：
+不要将 8787 端口直接开放到互联网。以下方式都能保留原有的令牌验证：
 
-- **Tailscale / WireGuard**：绑定到 `0.0.0.0`，在手机上打开 tailnet 地址。
-- **带 TLS 的反向代理**（Caddy、nginx）：把 `/` 和 `/ws`（WebSocket 升级）代理到 `127.0.0.1:8787`。令牌照样有效。
+- **Tailscale / WireGuard**：将服务绑定到 `0.0.0.0`，在手机上通过 tailnet 地址，也就是 Tailscale 私有网络中的地址访问。
+- **TLS 反向代理**，例如 Caddy 或 nginx：将 `/` 和 `/ws` 转发至 `127.0.0.1:8787`，并为 `/ws` 启用 WebSocket 协议升级。WebSocket 是客户端与服务器保持连接、双向传消息的协议。代理后仍需通过令牌验证。
 
-TLS 也是手机上推送通知的开关：浏览器只在安全上下文（`https://` 或 `localhost`）里允许 service worker 和 Web Push。一个配了 [`tailscale serve`](https://tailscale.com/kb/1312/serve) 的 Tailscale 地址，或者像下面这样一段 Caddy 配置，就够了：
+TLS 为连接提供加密，也是手机浏览器接收推送通知的前提。浏览器只允许在安全环境中使用 service worker（网页的后台脚本）和 Web Push（网页推送），这里的安全环境指 `https://` 或 `localhost`。可以为 Tailscale 地址配置 [`tailscale serve`](https://tailscale.com/kb/1312/serve)，也可以使用下面的 Caddy 配置：
 
 ```
 muse.example.com {
@@ -103,4 +103,4 @@ docker compose build && docker compose up -d app       # Docker，本机构建
 docker pull ghcr.io/nano-muse/nanomuse:latest          # Docker，发布的镜像；拉完重新启动
 ```
 
-数据格式（SQLite、JSONL、JSON）在同一个次版本号内保持向后兼容。
+同一个次版本内，SQLite、JSONL、JSON 数据格式保持向后兼容。

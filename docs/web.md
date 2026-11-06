@@ -10,8 +10,9 @@ The chat `/` menu keeps its loaded skills if a refresh fails and ignores older a
 
 Daily, the setup checklist and the avatar studio ignore older refresh responses and errors from a page you have left. Refreshing the studio preserves your description and current choice; a different drawing session clears the candidate selection so it must be confirmed again.
 
-> The web console is the app `nanomuse serve` serves at `/`: the front door of
-> the desktop app and of a self-hosted runtime ([app.md](app.md)). This page is
+> The web console is the app `nanomuse serve` serves at `/`, used to operate a
+> self-hosted runtime ([app.md](app.md)). Earlier desktop versions also used it;
+> the current [desktop app](desktop.md) uses DeepSeek Harness instead. This page is
 > about one part of it: how it picks the model that answers, and what it offers
 > when the model lacks something. The guide for making a key is
 > [own-key.md](own-key.md).

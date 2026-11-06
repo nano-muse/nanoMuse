@@ -4,6 +4,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Documentation
+
+- Rewrote all Simplified Chinese documentation in plain language, added inline term explanations and a bilingual glossary, and clarified navigation labels, privacy and backup wording, and desktop update guidance.
 
 ### Cloud
 

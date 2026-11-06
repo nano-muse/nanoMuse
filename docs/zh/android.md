@@ -1,242 +1,109 @@
 # Android App
 
-设置 → 技能中的内置技能可以查看、导出和停用。名称、内容和文件由 App 管理，因此不提供编辑、更新和删除。需要自定义时，可以导出后换一个名称再导入。内置 `skill-creator` 指南使用与模型服务商无关的说明。
+在 设置 → 技能 中，可以阅读、导出或停用内置技能。它们的名称、内容和文件由 App 维护，因此不能编辑、更新或删除。要自行修改，请先导出，再改名后导入为副本。内置 `skill-creator` 指南不依赖特定模型服务商。
 
-`android/` 是手机上的 nanoMuse：[OpenMinis](https://github.com/OpenMinis/OpenMinis)
-1.13（GPL-3.0）：一个原生 App，智能体**在手机上**运行，Linux shell、浏览器、MCP 服务器、
-技能和定时任务都装在 APK 里，再加上 nanoMuse 自己的身份、设计和功能。属于 nanoMuse 的一切
-都在 `io.github.nanomuse.*` 下；OpenMinis 文件里的改动用 `// nanoMuse:` 标出。应用 id 是
-`io.github.nanomuse.app`，系统认得这个 App 的 URL scheme 是 `nanomuse://`，这样同一部手机上也装了
-OpenMinis 时，不会有两个 App 抢同一个 scheme；App 内部的链接仍是 `minis://…`（上游的词汇，沙箱、
-系统提示词和模型都用它），从系统进来的 `nanomuse://` 链接按它的 `minis://` 形式读，App 自己打开
-自己的链接时一律按名字指向 `MainActivity`，不交给系统去解析
-（`io.github.nanomuse.deeplink.OwnScheme`）。沙箱的 offload 套接字（proot 和 App 之间通信的
-抽象套接字）也是 App 自己的：叫 `io.github.nanomuse.app.native-offload`，不用上游的
-`native-offload`，因为抽象套接字在整台设备上只有一个命名空间，两个 App 用同一个名字，后启动的那个
-会在启动时直接死掉；如果连这个名字都还被我们自己上一个进程占着，服务端就改绑一个带进程号的名字，
-并把它告诉 proot（`io.github.nanomuse.sandbox.OffloadSocketName`）。这个选择的来龙去脉
-在 [roadmap.md](roadmap.md)；它之前的方案（包着一个 Python 服务器的 WebView，两个 APK 变体）
-作为设计记录保留在 [archive/android-python-line.md](../archive/android-python-line.md)，不是你今天
-下载到的东西。
+`android/` 是 nanoMuse 的 Android 原生 App，基于 [OpenMinis](https://github.com/OpenMinis/OpenMinis) 1.13，使用 GPL-3.0 许可证。智能体直接在手机上运行，APK（Android 安装包）内包含 Linux shell（运行终端命令的环境）、浏览器、MCP 服务器（通过通用协议提供工具的服务）、技能和定时任务，再加入 nanoMuse 的身份、设计和功能。nanoMuse 自有代码位于 `io.github.nanomuse.*`，对 OpenMinis 文件的改动均标有 `// nanoMuse:`。
 
-一个 APK，一种架构：`nanoMuse-<version>-arm64.apk`（arm64-v8a，Android 8.0 / API 26 及以上，
-`targetSdk` 35）。每个版本都用同一把签名密钥，所以新 APK 直接覆盖旧的，数据保留。没有上架
-Play 商店：「设置 → 版本」把已安装的构建和最新版本并排显示（先查 `nanomuse.cn/dl/index.json`，
-再查这个仓库的 GitHub Releases：「最新 0.1.x，你用的就是它」/「0.1.x 已发布，点此更新」），
-并提供下载。
+应用 id 为 `io.github.nanomuse.app`，系统用 `nanomuse://` 这一 URL scheme（唤起 App 的链接前缀）识别它，避免与同机安装的 OpenMinis 争用前缀。App 内仍使用上游的 `minis://…`，以兼容沙箱、系统提示词和模型。系统传入的 `nanomuse://` 会按 `minis://` 处理；App 打开自身链接时，直接指定 `MainActivity`，不交给系统选择处理程序，实现见 `io.github.nanomuse.deeplink.OwnScheme`。
+
+沙箱的 offload 抽象套接字用于 proot 与 App 通信，也采用专用名称 `io.github.nanomuse.app.native-offload`，而非上游的 `native-offload`。抽象套接字名称在整台设备共享，同名会让后启动的 App 失败。如果专用名称仍被 nanoMuse 的旧进程占用，服务端会改用带进程标识的名称，并通知 proot，见 `io.github.nanomuse.sandbox.OffloadSocketName`。相关选择见 [roadmap.md](roadmap.md)。早期 WebView 包装 Python 服务、提供两种 APK 的方案只作为历史记录保存在 [archive/android-python-line.md](../archive/android-python-line.md)，当前下载版本不再采用。
+
+每个版本只提供 `nanoMuse-<version>-arm64.apk`，适用于 arm64-v8a、Android 8.0 / API 26 及以上，`targetSdk` 为 35。各版本使用同一签名密钥，新 APK 可覆盖安装并保留数据。App 未上架 Play 商店。设置 → 版本 会对照已安装版本和最新版，先查询 `nanomuse.cn/dl/index.json`，再查询仓库 GitHub Releases，显示「最新 0.1.x，你用的就是它」或「0.1.x 已发布，点此更新」，并提供下载。
 
 ## 安装 {#install}
 
-1. 从[最新版本](https://github.com/nano-muse/nanoMuse/releases/latest)下载
-   `nanoMuse-<version>-arm64.apk`。想核对的话，运行
-   `sha256sum -c nanoMuse-<version>-arm64.apk.sha256`。
-2. 打开它。Android 会问一次，是否允许从你的浏览器或文件管理器安装。
-3. **登录。** 第一屏就是账号：手机号或邮箱，一个验证码，设过密码之后也可以用密码。账号让
-   你的设备能连成一体（[hub.md](hub.md)），也带来一个起步用的模型（[cloud.md](cloud.md)：每个
-   账号一份免费额度（写这页时是 ¥10），每邀请一位朋友，等对方发出第一次请求后，你和对方都再得一些；App 会显示中继
-   当前的数字；之后可以[换自己的 key](own-key.md)）。然后选哪个模型来回答：账号自带的，或者
-   你自己的 key（任何 OpenAI 兼容端点，或 App 内置的那几种 OAuth 登录）。设的是四个模型，
-   不是一个，都在同一页「**设置 → 模型**」里（设置顶部那张卡片打开它）：**对话**，和你说话
-   的模型；**操作屏幕**，看屏幕的那个；**生成图片**和**生成视频**。项目托管账号给前两项都推荐
-   同一个多模态 `Qwen/Qwen3.6-27B-FP8`，不提供生图或生视频。每一行显示「服务商 · 模型」，
-   打开一个选择页：登录后只在中继实际菜单覆盖的行里先列 nanoMuse Cloud，然后是你自己每个
-   服务商一组，只列能做这件事的模型。每组先只显示 8 个模型，点
-   「还有 N 个」才全部展开（目录里这一行的默认模型排最前，然后是正在用的那个，其余按服务商
-   列出的顺序）；所有组加起来超过 8 个时，分组上方多一个「搜索模型」输入框，按模型 id 或名称
-   实时过滤每一组，都不匹配时显示「没有匹配的模型」；搜索词和已展开的分组在旋转屏幕、
-   去「添加服务商」再回来之后都还在。在这里或在对话的 `•••` 菜单里
-   选的对话模型，就是新对话的默认，主要聊天也跟着换（「对主要聊天和新对话生效；旁聊保留自己的模型。」）；已经打开的旁聊保留它的模型。另外三个
-   选择页第一项是「自动」（操作屏幕例如「当前为 nanoMuse Cloud · Qwen/Qwen3.6-27B-FP8」），选它会忘掉在这里做过的
-   选择，让这一行重新按下面的顺序走。登录后这一页最上面有一个开关「使用 nanoMuse Cloud
-   模型」：关掉后，账号从所有选择页和自动顺序里退出，附带调用（标题、记忆、操作屏幕）都不再
-   走它，只有被拒绝那一轮上的「这次改用 nanoMuse Cloud」按钮例外；登录本身保留，同步和你的
-   设备照常。如果关掉那一刻对话模型还是账号的，「对话」那一行会换到你自己的第一个对话模型
-   （目录里该服务商的默认），每个客户端都这么做，页面上写着「对主要聊天和新对话生效」。对话
-   模型还是账号的、而你又没有自己的对话模型时，关闭会被拒绝并给出一句话：开关保持打开，下面
-   出现「先添加一个自己的服务商；关掉 nanoMuse Cloud 后没有别的模型能回答。」，因为没有别的
-   东西能回答。Cloud 这个服务商自己的页面（「设置 → 管理服务商」）遵守同一条规则；在那里关掉
-   一个正在回答对话的自己的服务商，对话会交给下一个来源，一个都不剩时发送会提示「现在没有
-   能回答的模型。请在『设置 › 模型』里选一个。」。有自己 key 的手机不登录也能用：欢迎页提供
-   「改用自己的 API key」。
-   完全不要账号、一切自己跑，是运行时的 `cloud.required = false`。
-4. 可选：让智能体能使用你手机上其他 App 的那两个权限（可跳过、可撤销）。「设置 → Hands」
-   仍保留屏幕模型那一行，点开是同一个选择页；「模型」页底部的「更多图片和视频选项」就是原来的
-   「图像与视频模型」页（手动输入模型名、缺了哪个模型会停下什么、重新检查一把 key 能用哪些
-   视频模型），也在 `minis://settings/media`。
+1. 从[最新版本](https://github.com/nano-muse/nanoMuse/releases/latest)下载 `nanoMuse-<version>-arm64.apk`。如需校验文件完整性，执行 `sha256sum -c nanoMuse-<version>-arm64.apk.sha256`。
+2. 打开 APK，按 Android 提示允许浏览器或文件管理器安装应用，只需授权一次。
+3. **登录并选择模型**。 首屏可用手机号或邮箱接收验证码，设置过密码后也可用密码。账号用于设备互联，见 [hub.md](hub.md)，并提供起始模型及免费额度。写本文时每账号为 ¥10，邀请朋友注册并完成首次请求后，双方还会获得额度；具体数字以 App 显示的中继数据为准。详见 [cloud.md](cloud.md)，之后也可[使用自己的 key](own-key.md)。key 是调用模型服务的密钥。回答模型可使用账号模型、自有 key 对应的 OpenAI 兼容端点，或 App 内置的 OAuth 登录。端点是接收请求的服务地址，OAuth 是不用向 App 提供密码的授权登录流程。
 
-**用它来做什么。** 保存一个你自己的服务商之后（新建的，或给原本没有 key 的补上 key），会有一张
-卡片问这把 key 负责哪些事：目录里该厂商每有一项能力就有一个开关（对话、操作屏幕、生成图片、
-生成视频），默认全开。「就这样」把勾选的几行切到这个服务商，模型用目录里该项的默认
-（`providers.json` 的 `defaults.chat` 等），默认不在它的列表里时用列表里第一个能做这件事的；
-「暂不」什么都不改，没勾的开关也一样，其他模型选择保持原样。以后在「模型」页改。
+   设置 → 模型 从设置顶部卡片进入，集中配置四种任务：「对话」「操作屏幕」「生成图片」「生成视频」。对话模型与你聊天，屏幕模型读取截图并决定动作。项目托管账号为前两项推荐同一个多模态模型 `Qwen/Qwen3.6-27B-FP8`，不生成图片或视频。每行显示「服务商 · 模型」，选择器只列出适合该任务的模型。已登录时，只有中继实际提供该能力的行才首先显示 nanoMuse Cloud，之后各自有服务商分别成组。
 
-**你没选的时候。** 对话：登录了就是中继推荐的模型，否则是你自己的第一个服务商。屏幕、图片、
-视频跟着对话的服务商走，只要它是你自己的、且有这项能力（用目录里的默认）；否则登录了就用中继
-实际菜单明确为这项工作提供的模型；再否则是你自己第一个能做这件事的服务商。项目托管 Cloud
-只有对话和操作屏幕，不提供媒体生成。选过的永远优先，nanoMuse Cloud 不会插到你选
-的服务商前面。你自己的模型失败时不会自动兜底：错误卡片多一个「这次改用 nanoMuse Cloud」
-（仅登录后显示），只把这次对话或操作屏幕请求放到中继的对话模型上跑，不改任何一行。图片或
-视频失败时没有 Cloud 重试，修好或更换你自己的媒体服务商后再试。
+   每组先显示 8 个模型，顺序为该任务的目录默认模型、当前模型、服务商列表中的其他模型，点「还有 N 个」展开。总数超过 8 个时，可在「搜索模型」按 id 或名称实时筛选所有组，没有结果会显示「没有匹配的模型」。旋转屏幕，或前往「添加服务商」再返回，搜索和展开状态都保留。在此页或聊天 `•••` 菜单更换对话模型，会更新主要聊天及新对话默认值，已有旁聊沿用原模型，提示为「对主要聊天和新对话生效；旁聊保留自己的模型。」其他三项首先提供「自动」，例如屏幕项显示「当前为 nanoMuse Cloud · Qwen/Qwen3.6-27B-FP8」，选中会清除该项显式选择，重新按后文顺序解析。
 
-**自己的中继。** 登录屏默认连 nanoMuse Cloud，除非你另有指定：登录表单下方的「使用其他服务器」
-接受你自己运行的中继地址（[cloud.md](cloud.md)，`cloud/docker-compose.yml`），「检查」会请求它的
-`/healthz` 并显示它回答的版本，「使用这个服务器」把地址记住，下次启动仍然有效。自己网络之外的
-地址必须是 `https://`；自己网络内的地址可以用明文 `http://`，判断规则与模型服务器地址相同
-（见下文：按解析后的地址判断私有网段，`localhost`、不带点的名字，以及 `.local`、`.lan`、`.home`、
-`.internal`、`.home.arpa`、`.localdomain`、`.ts.net` 后缀）。「设置 → 账号」显示「服务器：`<host>`」和「更改」，更改会先把
-手机退出登录：它持有的 key 属于签发它的那台服务器。App 对账号做的一切（登录、hub、同步、
-用量、模型菜单）都发往这个地址。
+   已登录时，模型页顶部提供「使用 nanoMuse Cloud 模型」。关闭后，Cloud 会从全部选择器与自动顺序移除，标题、记忆、屏幕操作等辅助请求也不再使用它。只有错误卡片上的「这次改用 nanoMuse Cloud」能对单轮使用它，账号仍保持登录，同步和设备互联照常工作。如果当前对话用的是账号模型，会改用第一个自有对话服务商的目录默认模型，并提示「对主要聊天和新对话生效」。没有任何自有对话模型时不能关闭，开关保持开启，下方说明「先添加一个自己的服务商；关掉 nanoMuse Cloud 后没有别的模型能回答。」
+
+   设置 → 管理服务商 中 Cloud 页面采用相同规则。如果关闭当前负责对话的自有服务商，则转交下一个来源；没有来源时，发送会提示「现在没有能回答的模型。请在『设置 › 模型』里选一个。」有自己的 key 时，可在欢迎页选「改用自己的 API key」，不登录也能使用。完全自行运行、无需账号的配置为运行时的 `cloud.required = false`。
+4. **按需授权屏幕操作**。 智能体操作其他 App 需要两项权限，均可跳过，也可撤销。设置 →「手」仍提供屏幕模型行，打开同一个选择器。模型页底部「更多图片和视频选项」进入原「图像与视频模型」页，可手填模型名、查看缺少模型会影响什么、重新检查 key 可用的视频模型，也可通过 `minis://settings/media` 打开。
+
+**选择自有 key 的用途**。 新建自有服务商，或为原本没有 key 的服务商补上 key 后，会显示「用它来做什么」卡片。目录中的每种能力各有一个开关，包括对话、操作屏幕、生成图片、生成视频，默认全开。「就这样」将勾选项改为该服务商，使用 `providers.json` 中的 `defaults.chat` 等对应默认模型；默认模型不在列表时，选第一个符合该任务的模型。「暂不」以及关闭的开关都不修改配置，其他模型选择保留。以后可在模型页调整。
+
+**未明确选择时的顺序**。 对话在登录后使用中继推荐模型，未登录则使用第一个自有服务商。屏幕、图片、视频先使用自有对话服务商支持的对应能力及目录默认模型；否则使用登录后中继实际菜单提供的对应模型；再否则选第一个支持该能力的自有服务商。项目托管 Cloud 只支持对话和屏幕操作。显式选择始终优先，Cloud 不会覆盖。自有模型失败时不会自行切换，已登录用户的错误卡片会提供「这次改用 nanoMuse Cloud」，点击后只用中继对话模型重跑当前对话或屏幕请求，不修改设置。图片和视频失败没有 Cloud 重试，须修复或更换自己的媒体服务商。
+
+**使用自己部署的中继**。 默认登录 nanoMuse Cloud，也可在登录表单下选「使用其他服务器」，填写自建中继地址，见 [cloud.md](cloud.md) 和 `cloud/docker-compose.yml`。「检查」会请求 `/healthz` 并显示版本，「使用这个服务器」保存地址，重启后仍有效。自有网络之外必须使用 `https://`；局域网可用明文 `http://`，判断规则与模型地址相同：先解析私有地址，或识别 `localhost`、无点主机名，以及 `.local`、`.lan`、`.home`、`.internal`、`.home.arpa`、`.localdomain`、`.ts.net` 后缀。设置 → 账号 会显示「服务器：`<host>`」和「更改」。更改前会退出登录，因为当前 key 只属于签发它的服务器。登录、hub、同步、用量、模型菜单等账号请求都会发往选定地址。
 
 ## 手机能做什么 {#what-the-phone-does}
 
-Shell 的进度更新会保留较短覆盖后未被改写的文字。终端的颜色和标题控制码会先移除，避免覆盖后在输出中留下转义序列的残片。
+Shell 进度更新若把较长内容改为较短文字，会保留未被覆盖的部分。更新前会去掉终端颜色、标题控制码，避免显示残缺的转义序列。
 
-手机按当前模型的上下文窗口计算每次请求的预算，模型组设置了更小的窗口时，以那个限制为准。`ContextBudget` 为回复预留的空间，取请求输出上限与 `max(4096, 窗口的 15%)` 中较小的值，且不超过窗口本身；再扣掉系统提示和工具定义，剩下的才是对话历史可用的空间。历史占到这部分空间的 75% 时，可以把旧工具内容移到文件；到 90% 时尝试生成摘要，整理后的目标是 50%。每条检查线都另外计入固定提示词的成本。这些预留用于判断何时整理上下文，实际回复长度仍根据请求发出时剩余的空间计算，不再给所有模型套用 32k 压缩线。
+系统提示词将安全、工具和手机操作规则放在稳定前缀中。技能与 MCP 元数据、模型和设备状态、对话专属要求、记忆、`USER.md` 等会变化的内容，按固定顺序追加在后；日期、语言、可用模型数放在最后的运行上下文中。因此，更新记忆或跨日不会改变稳定前缀，支持前缀缓存的服务商仍可复用它。
 
-上下文检查覆盖实际要发送的普通正文、结构化内容、摘要、回传给服务商的思考内容、系统提示、工具定义和图片。中文等非 ASCII 文字单独估算；成功请求返回的输入用量会逐步向上或向下修正估算，异常样本不参与校准。校准记录按服务商配置和模型分别保存，点击「继续」或重启 App 后仍可使用。同次运行中，已有请求的完整前缀没有变化时，以最近一次服务商报出的输入用量为基础，只为新增消息补上估算；更换服务商、提示词、工具定义或旧消息内容后，这个用量锚点即失效。新增或改写内容的计数仍是估算，不等于模型自己的分词结果。原生音频以服务商报出的用量为准，不把传输用的 base64 当普通文字计算。工具内容移到文件后、历史生成摘要后，都会重新测量请求。
+手机会按当前模型的上下文窗口，即单次能接收和生成的内容容量，计算每次请求预算；模型组限制更小时以组限制为准。`ContextBudget` 预留输出空间，取请求输出上限与 `max(4096, 窗口的 15%)` 中较小者，且不超过窗口本身，再扣除系统指令和工具定义，得到历史容量。历史占该容量 75% 时可将旧工具内容移入文件，90% 时开始摘要，整理目标为 50%。各阈值会再加回固定提示词用量。这些比例只决定何时整理，实际输出上限另按待发送请求剩余容量计算，不存在统一的 32k 压缩上限。
 
-生成摘要前，手机可以先从待发送内容中去掉较早的思考文本，把旧工具结果和较大的工具参数写到模型可读取的文件。最新用户请求受到保护；通常保留最近三个工具步骤，空间更紧张时至少保留最近一个。最新一个已完成步骤的结果本身过大时，也可把完整结果移到文件，同时保留调用、思考内容和结果引用。工具调用和结果始终配对，文件写入失败时保留原内容。摘要仍无法腾出足够空间时，还可以把符合条件的旧工具步骤归档，并留下文件引用。保存的聊天记录保留原文。去掉思考文本、用摘要替代较早历史都可能损失细节，模型不再在每次调用中收到全部原文。
+容量检查包括普通文本、结构化内容、摘要、回传服务商的推理文本、系统指令、工具定义和图片。非 ASCII 文字单独估算。成功响应的输入用量会逐步上下校准估算，按服务商配置和模型分别保存，点「继续」或重启后仍有效。请求前缀未变时，优先使用最近一次服务商报告的输入用量，再估算新增消息。更换服务商、指令、工具定义或旧内容会使该基准失效，异常样本不参与校准。新增、改写内容仍使用启发式估算，并非模型分词器的精确计数。原生音频采用服务商报告的用量，不把 base64 传输内容当文字计算。移出工具内容或生成摘要后，程序会重新测量请求。
 
-提前生成摘要超时或没有缩短请求时，只要仍低于容量保护线，就继续处理，本次运行不会每收到一个工具结果都再次尝试。每次运行最多尝试三次自动摘要。如果只有校准倍率使估算超过保护线，而未校准的估算仍能放下，本次运行允许向服务商发送一次请求来检验估算；其他无法缩短到足够大小的请求会停止。摘要流连续 120 秒没有任何数据块时超时，包含分段和重试的整次摘要操作最多 900 秒。停止当前轮也会取消摘要请求。
+生成摘要前，可先从待发送请求删除旧推理文本，将旧工具结果及较大参数保存到模型可读文件。最新用户要求受保护，通常也保留最近三个完整工具迭代；空间紧张时至少保留最近一个。最近完成的迭代中，单个结果过大也可存文件，但调用、推理和文件引用仍保持配对。写文件失败则保留原文。摘要后仍放不下时，可把符合条件的旧工具步骤归档并留下文件引用。磁盘上的原聊天历史不变。但去掉推理和用摘要替代旧历史都会丢失细节，模型不再每次收到全部原文。
 
-摘要区分历史背景、已完成的工作和当前请求，单独记录当前任务尚未完成的步骤及下一步；没有正在进行的任务时会明确写出，不会把旧问题重新当作任务。摘要完成后，先为固定提示词、摘要和受保护的当前轮留出空间，再决定能带回多少较早轮次的原文。这份回填预算随模型和请求变化，不再固定为 8k。单个任务特别长时，已被摘要覆盖的旧步骤由摘要接替，完整用户要求和最近的工具步骤继续保留。最新问题及其保留的工具调用、结果始终成组留下；如果这些受保护的内容本身太大，由上下文检查决定能否发送。后续消息带有结构化正文或附件时，摘要也会一起发送。相关提示跟随 App 语言。Android 使用这套原生流程，与 Python 运行时的任务预算各自独立。
+提前摘要失败或未缩短请求时，只要内容尚未超过容量预留界限，本轮就继续，也不会每收到工具结果都再次摘要。每次智能体运行最多自动尝试三次。若只有校准倍率使请求超限，未校准估算仍能容纳，则允许向服务商发一次请求检验估算；其他无法缩小到合适容量的请求会停止。摘要流连续 120 秒没有数据块即超时，包含分段、重试的整个摘要操作限时 900 秒。停止本轮也会取消摘要。
 
-`PromptDiet` 缩短 `browser_use` 的 schema 说明，但保留每个动作和参数，同时精简 Android 工具一节中 `minis-*` 的介绍。各个 CLI 的 `--help` 提供完整用法。
+摘要分别记录背景、已完成工作、当前要求、未完成步骤和下一步。没有活动任务时会明确说明，不重新激活旧要求。摘要后，仅在固定提示词、摘要和受保护当前轮之外的剩余空间内，补回可选的旧轮次原文。此预算随模型和请求变化，不固定为 8k。长任务用检查点替换已覆盖的旧步骤，保留完整用户要求与最近的完整工具迭代。最新问题、保留的工具调用和结果仍保持完整；即使它们已过大，也不截断，由容量检查决定能否发送。结构化追问和附件同样带上摘要，提示使用 App 当前语言。这套 Android 原生循环不依赖 Python 运行时的任务预算。
 
-使用默认思考规则时，Qwen3.8-Max 的摘要请求会明确发送 `enable_thinking: false`。只在 App 内选择关闭、却省略这个参数，服务商仍会按默认行为处理。参数用法见[阿里云思考模式文档](https://help.aliyun.com/zh/model-studio/deep-thinking)。超时本身仍不能说明延迟来自网络还是服务商。
+`PromptDiet` 会精简 `browser_use` 的 schema（参数结构）描述，保留全部动作、参数，同时压缩 Android 工具部分的 `minis-*` 说明。完整用法仍可通过各 CLI 的 `--help` 查看。
 
-一轮还没等到第一个字的时候，输入中的点点下面有一行小字（`NmWaitLine`）：前十秒什么都不显示，然后是「模型接口比较忙，已等待 15 秒」和「取消」；nanoMuse Cloud 说请求正在等它的模型名额时（中继 0.31 每 5 秒发一段没有 `choices`、带 `nanomuse: {phase, ahead}` 字段的 chunk，[cloud.md](cloud.md#protocol)），一知道就改为「前面还有 3 个」或「下一个就到你」（`NmStreamStatus`，`OpenAIProvider` 里标记的一行）。用到工具的一轮里，每一步各自计时。
+默认思考规则下，Qwen3.8-Max 摘要请求会显式发送 `enable_thinking: false`。如果省略该字段，即使 App 已请求关闭思考，服务商仍会采用自身默认值。详见[阿里云思考模式文档](https://help.aliyun.com/zh/model-studio/deep-thinking)。单凭超时无法判断延迟发生在网络还是服务商。
+
+尚未收到首个 token（模型处理文字的计量单位）时，输入状态圆点下方由 `NmWaitLine` 显示等待信息。前十秒不显示，随后显示如「模型接口比较忙，已等待 15 秒」和「取消」。如果 Cloud 告知请求正在排队，则立即改为「前面还有 3 个」或「下一个就到你」。中继 0.31 每 5 秒发送不含 `choices`、带 `nanomuse: {phase, ahead}` 的数据块，协议见 [cloud.md](cloud.md#protocol)，由 `NmStreamStatus` 及 `OpenAIProvider` 的标记行处理。多工具步骤中，每一步独立计时。
 
 | | |
 | --- | --- |
-| **智能体，在手机上** | 一个沙箱里的 Alpine Linux、一个真正的 shell、文件、浏览器、MCP 服务器、Agent Skills 格式的技能、记忆、定时任务；删除、发送、付款之前先审批。模型是账号的或你自己的；用自己的 key 时，对话本身从手机直接发给那家服务商，不经过项目的中继；1.0.7 起，答完的那一轮会事后补进你账号的记录（模型的 id 和这一轮，从不包括 key），让你的其他设备也有它（[cloud.md](cloud.md#the-record)）。 |
-| **手（Hands）**（`hands/`） | 打开「Hands」并启用无障碍服务之后，智能体会看手机的屏幕，在各个 App 里点、输入、滑动：这是 API、抓取和浏览器之后的最后一级。盖在 App 上的舞台显示它即将点哪里，一个胶囊显示当前步骤和**停止**；屏幕边缘有一圈呼吸的光（干活时蓝色，等你时琥珀色；亮 2.4 s、暗 2.4 s，第 9 轮起每个客户端上每一处「在干活」的灯都是这个节奏：没有东西绕着边缘跑，也没有东西从屏幕上扫下来，胶囊的环和竖条按同样的节奏呼吸；系统设了「减弱动态效果」时全部静止）；当一次点击会发送、发布或删除时，胶囊自己就会问（**允许** / **拒绝**，和聊天卡片、通知显示的是同一个请求），所以你不用被拉回 nanoMuse（付款在聊天卡片里用锁屏确认；对这一种，胶囊提供「打开」）；胶囊只回答它自己的请求，不会替另一段对话的命令行或浏览器卡片作答，卡片等待期间按**停止**会直接拒绝它并立刻结束这次运行。密码和验证码永远由你自己输。屏幕没有变化而同一个动作做到第三次，历史里会记一笔，好让模型换个法子；做到第六次，这一轮就以「做不到」结束并写明是哪个动作（`HandsLoopWatch`，运行时也有同样的底线），而不是每一步都调用一次模型，直到三十分钟上限。每一步的截图写在会话的 `attachments/hands/<run>/` 下、与这次运行的轨迹放在一起；最新的十次运行保留全部截图，更早的运行只保留轨迹和最后一张屏幕（聊天里显示的那张），超过 200 次之后最早的一次整个删除（`HandsTraces`）。[gui.md](gui.md) 是设计记录；App 自己的手在 `io.github.nanomuse.hands`。 |
-| **Reach**（`reach/`） | 从手机使用你的电脑：「手机上说一句，电脑上执行」，一条 shell 命令、一个文件、电脑的屏幕，或者把整个任务交给那边运行的 nanoMuse。入口是 hub（下一行）：在电脑上装 nanoMuse 桌面版，用同一个账号登录，几秒钟内它就出现在「账号 → 设备」下，不限网络；从 0.1.24 起这是唯一的方式（局域网的 host 脚本已经去掉）。「设置 → 电脑」列出账号下的电脑，并说明手机用的是哪个账号，因为电脑不见了，几乎总是因为它登的是另一个账号。审批在手机上决定之后，才会发出任何东西。[every-device.md](every-device.md)。 |
-| **hub**（`hub/`） | 账号下每台登录的设备都在中继的 hub 上相遇：手机看得到你的电脑，能拜托它们做事，把它们的审批当作卡片收到，也能被它们拜托。一个前台服务让它在后台也保持可达（Android 13 及以上为此会请求通知权限）。[hub.md](hub.md)。 |
-| **编程助手**（`ui/coding/`） | 你电脑上的 Cursor、Codex 和 Claude Code 会话，在手机上看、在手机上指挥。[coding-agents.md](coding-agents.md)。 |
-| **账号**（`ui/cloud/`） | 谁登录了、密码、每台持有 key 的设备、按类别和按模型的用量、退出的方式。免费额度用完或超过 80 % 时，账号页和被拒绝的那一轮都会显示接下来的路：自己的 key，也就是目录里的服务商，所在地区的排前面（中国大陆的人看到阿里云百炼：判断依据是界面语言为简体中文、用手机号登录，或者中继这么说；其他地方是 OpenRouter 和 OpenAI），每一家都写明它覆盖什么；你已经在付费的套餐（ChatGPT、Claude、Kimi、OpenRouter 用登录代替 key）；还有邀请。见下面的[自己的 key](#your-own-key)。手机只显示、只同步当前登录账号的对话：从 0.1.40 起每个聊天都有一个归属者，同步与否都是；退出登录时会问「在这台设备上保留这个账号的聊天」（默认关：这个账号的聊天、记忆、动态、目标、例程和形象都离开手机；开：先收起来，等它回来）；删除账号会把这些全部删除；中继拒绝的 key（`401 bad_key`）会像「保留」那样把账号的数据收起来，登录页会一直说明，直到下次登录；只有 `401 account_deleted` 会删除；退出登录状态下，只显示退出后产生的聊天（[sync.md](sync.md)）。 |
-| **交到你手里的浏览器**（`browser/`） | 需要你亲自处理的页面（登录、验证码、付款、人机验证）会直接交到你手里，而不是用文字描述：`browser_use` 的 `hand_over` 动作把智能体自己的标签页（同一个 WebView、同一个会话）在浏览器面板里打开，智能体松手；输入框上方的**轮到你了**卡片说明页面要你做什么，带「打开页面」和「完成，继续」，面板上是同一句话和同一个按钮，工具调用会等到「完成」（最多十五分钟），然后智能体从页面当前的样子接着往下做。`io.github.nanomuse.browser.BrowserHandOver`。 |
-| **连接器**（`connectors/`、`ui/connectors/`） | 智能体可以被放进去的那些服务：桌面版那份 75 个远程 MCP 服务器的目录（Notion、Linear、GitHub、GitLab、Slack、Stripe、Miro……），以 `assets/nanomuse/connectors.json` 随 App 发布。设置里管这一切的只有一行：「连接器」；上游的 MCP 编辑器（按地址、按命令、导入 JSON）是页面末尾的「你自己的服务器」。开放的服务点一下就加上；要 key 的服务填 key；OAuth 服务走 MCP 授权流程（发现、动态客户端注册、在 Custom Tab 里做 PKCE），令牌进入该条目的 `Authorization` 头，供沙箱内的 MCP 客户端使用，App 启动时刷新；授权服务器不接受注册客户端的服务（`clientIdRequired`：GitHub、Slack、Discord、HubSpot、Render、Bitrise、PagerDuty、Box）会要你在厂商的开发者页面用 App 的回调地址创建一对 OAuth client id 和 secret，面板会显示并复制这个回调地址。连接好的服务就是同一个 id 下的一个 MCP 服务器条目；「你自己的服务器」也能管它。连接了什么，会通过中继的 profile 分享给账号的其他设备，只有条目（id、名称、地址、认证方式、哪台设备、何时），从不包含令牌，所以页面还会列出「在你的其他设备上」：在桌面上连接的服务显示为「已在 <device> 上连接，在这里登录即可在这台手机上使用」，点一下进入同一个面板。 |
-| **聊天，不花哨** | 智能体工作时，形象下面那一行写的是正在进行的步骤（「nanoMuse 正在用 Shell」「正在写回复」「在做了：订餐桌」），从不写心情。工具小标签、「电脑」面板和浮动的步骤条从 0.1.37 起**默认打开**；「设置 → 外观 → 显示智能体的步骤」可以关掉它们。打开时，完成的步骤显示为「nanoMuse 用过 Shell · 完成」，它的面板点 ×、滑动或返回键都能关。 |
+| **本机智能体** | 在隔离的 Alpine Linux 中使用 shell、文件、浏览器、MCP 服务器、Agent Skills 格式技能、记忆和定时任务。删除、发送、付款前先审批（请求你确认操作）。模型可用账号或自有来源。自有 key 的请求直接从手机发往服务商，不经过项目中继；1.0.7 起，完成后会将模型 id 和整轮内容补到账号记录，不上传 key，供其他设备读取，见 [cloud.md](cloud.md#the-record)。 |
+| **手（Hands）**（`hands/`） | 开启「手」及无障碍服务后，可根据手机截图在 App 中点击、输入、滑动。技能或 API、网页抓取、浏览器无法完成时，才使用这一步。覆盖在 App 上的「舞台」是显示下一点击位置的提示层，「胶囊」是显示步骤和「停止」的浮动控制条。屏幕边缘光晕以 2.4 s 变亮、2.4 s 变暗，工作蓝色、等待琥珀色。第 9 轮起各客户端工作指示采用相同节奏，光不绕边缘移动或扫过屏幕，胶囊环与条也同步呼吸；系统减少动态效果时全部静止。发送、发布、删除时，胶囊直接显示「允许」「拒绝」，与聊天、通知是同一个请求，不用返回 App。付款须在聊天卡片验证锁屏，胶囊提供「打开」。胶囊只能回应自身请求，不能替其他聊天的 shell 或浏览器审批作答。等待卡片时点「停止」会拒绝并立即结束。密码和验证码由你输入。若屏幕不变、同一动作重复第三次，历史会提醒模型换方法；第六次以「做不到」结束并注明动作，避免持续调用直到三十分钟上限。此规则由 `HandsLoopWatch` 实现，运行时相同。截图与轨迹保存在会话 `attachments/hands/<run>/`，最新十次保留全部截图，更早仅留轨迹和最后一张聊天展示图，超过 200 次删除最早运行，见 `HandsTraces`。设计见 [gui.md](gui.md)，实现位于 `io.github.nanomuse.hands`。 |
+| **Reach**（`reach/`） | 从手机调用电脑的 shell、文件、屏幕，或将完整任务交给电脑的 nanoMuse。电脑安装桌面版并登录同一账号后，数秒内出现在 账号 → 设备，跨网络也可连接。0.1.24 起仅通过 hub 连接，原局域网 host 脚本已移除。设置 → 电脑 显示账号下电脑及手机当前账号，找不到电脑时通常是两端账号不同。请求发出前先在手机完成审批，见 [every-device.md](every-device.md)。 |
+| **hub（设备互联）**（`hub/`） | 同一账号所有已登录设备经中继连接。手机可查看电脑、发送任务、接收审批卡片，也可接受电脑请求。Android 前台服务使 App 进入后台后仍可连接，Android 13 及以上会为此请求通知权限，见 [hub.md](hub.md)。 |
+| **编程助手**（`ui/coding/`） | 在手机上查看、引导电脑中的 Cursor、Codex、Claude Code 会话，见 [coding-agents.md](coding-agents.md)。 |
+| **账号**（`ui/cloud/`） | 查看当前账号、密码、持有登录 key 的设备，以及按类型、模型分类的用量，并管理退出。额度耗尽或已用超过 80 % 时，账号页和失败轮次会列出自有 key、已付费套餐、邀请三类方式。服务商按地区排列：中国大陆优先百炼，依据简体中文界面、手机号登录或中继地区信息判断，其他地区优先 OpenRouter、OpenAI，各有能力说明。套餐包括 ChatGPT、Claude、Kimi、OpenRouter，详见[自己的 key](#your-own-key)。手机只显示和同步当前账号聊天。0.1.40 起，无论是否同步，每个聊天都有归属。退出时「在这台设备上保留这个账号的聊天」默认关，关闭会移除账号聊天、记忆、动态、目标、例程和形象，开启则单独保存，等待重新登录。删除账号会全部删除；`401 bad_key` 按保留处理，并在登录页持续提示；只有 `401 account_deleted` 直接删除。未登录时只显示未登录期间创建的聊天，见 [sync.md](sync.md)。 |
+| **接手浏览器**（`browser/`） | 登录、验证码、付款、人机验证等必须你亲自完成时，`browser_use` 的 `hand_over` 会在浏览器面板打开智能体原标签页，保留同一 WebView 和会话，智能体暂停。输入框上方「轮到你了」卡片说明所需操作，提供「打开页面」「完成，继续」，浏览器面板显示相同提示、按钮。工具等待「完成」，最长十五分钟，随后从页面现状继续。实现为 `io.github.nanomuse.browser.BrowserHandOver`。 |
+| **连接器**（`connectors/`、`ui/connectors/`） | 用于接入 Notion、Linear、GitHub、GitLab、Slack、Stripe、Miro 等服务。复用桌面版 75 个远程 MCP 服务器目录，打包为 `assets/nanomuse/connectors.json`。设置统一入口为「连接器」，页面末尾「你自己的服务器」进入上游 MCP 编辑器，可按地址、命令或导入 JSON 管理。公开服务点选即可加入，需要 key 则填写，OAuth 服务执行发现、动态客户端注册、Custom Tab 内 PKCE 验证。令牌写入条目 `Authorization` 头供沙箱 MCP 客户端使用，启动时刷新。GitHub、Slack、Discord、HubSpot、Render、Bitrise、PagerDuty、Box 等不支持动态注册的服务标记 `clientIdRequired`，需要你在厂商开发页创建 OAuth client id、secret，面板会显示并允许复制 App 回调地址。连接结果是相同 id 的 MCP 条目，也可在自有服务器编辑器管理。连接清单经中继 profile 共享给其他设备，只含 id、名称、地址、认证方式、来源设备、时间，不含令牌。页面「在你的其他设备上」显示如「已在 <device> 上连接，在这里登录即可在这台手机上使用」，点开同一配置面板。 |
+| **聊天中的进度** | 智能体工作时，形象下方说明当前步骤，例如「nanoMuse 正在用 Shell」「正在写回复」「在做了：订餐桌」，不写情绪。0.1.37 起，工具标签、电脑面板、浮动步骤条默认开启，可在 设置 → 外观 →「显示智能体的步骤」关闭。完成后标签显示如「nanoMuse 用过 Shell · 完成」，点 ×、滑动或返回均可关闭面板。 |
 
-默认情况下，聊天和胶囊栏、菜单、抽屉在同一块底色上：深色主题是纯黑，浅色主题是纯白。你的消息是白色胶囊、黑色文字（浅色主题下反过来，黑色胶囊、白色文字），
-智能体的回复放在比底色略浅一级的胶囊里（`#1C1C1E` / `#F2F2F7`），发送按钮和「回到最新」圆盘是白底黑箭头（浅色主题下反过来）；
-除了链接，对话里没有蓝色。顶栏不是一条横条，而是一层渐隐：对话从它下面滚过去，渐渐融进底色；往回翻旧消息时，顶边还会多出一层渐隐。
-调色板在上游的 `com/openminis/app/ui/theme/ChatColors.kt`，由 `scripts/rebrand.py` 写入。
+默认情况下，聊天、胶囊导航栏、菜单、抽屉使用统一底色，深色为纯黑，浅色为纯白。用户消息在深色模式为白底黑字，浅色模式为黑底白字。智能体消息使用稍有区分的底色 `#1C1C1E` / `#F2F2F7`。发送和「回到最新」按钮在深色模式为白底黑箭头，浅色反向。除链接外，聊天不使用蓝色。顶栏采用渐隐层，内容滚过时融入背景，翻看旧消息时顶部再加一层渐隐。配色由 `scripts/rebrand.py` 写入上游 `com/openminis/app/ui/theme/ChatColors.kt`。
 
-消息输入框始终位于浮动导航胶囊上方，胶囊栏和输入框一样宽（同样的 16 dp 边距；最宽 420 dp，更宽的屏幕上居中），两枚胶囊的边缘对齐。智能体使用工具时，步骤条在输入框上方；
-最新消息和工具小标签都可以完整滚动到它们上方。对话仍会滚过导航胶囊背后，
-保留磨砂模糊效果。输入框展开、工具预览或审批卡片出现时，间距跟着底部区域的实际高度调整。
-审批卡片本身最多占屏幕的三分之二：超过六行的命令折叠在「全部显示」后面，说明和预览在中间滚动，「允许」和「拒绝」始终留在底部可见。
-查看较早的消息时，稍淡的渐隐效果沿着输入框的圆角轮廓展开。
-只有当前浏览器操作的步骤条、浏览器面板或「轮到你了」操作卡片显示时，这层渐隐才会隐藏；历史工具小标签和其他工具不会关闭它。
-深色模式下，主要聊天和旁聊的导航胶囊周围跟随所选聊天背景，输入框下方的间隙也使用相同底色，默认为纯黑色。
-胶囊的玻璃区域仍透出滚动内容，保留实时磨砂模糊效果。其他页面的导航外观保持原样。
-键盘弹出时，输入框贴在键盘上，胶囊栏在键盘后面。
-动态、点子、目标和资源库四个页面的列表也在胶囊栏上方结束，最后一行不会被它挡住。
+输入框位于浮动导航胶囊上方，二者边缘对齐，左右边距同为 16 dp，最大宽度 420 dp，宽屏居中。使用工具时，步骤条位于输入框上方，最新消息和工具标签能完整滚到两者上面。对话仍可从胶囊背后滚过，形成实时磨砂效果。输入框展开、工具预览或审批卡片出现时，内容间距按底部实际高度调整。审批卡片最多占屏幕三分之二，超过六行的命令折叠在「全部显示」下，说明、预览在中间滚动，底部「允许」「拒绝」始终可见。阅读旧消息时，输入框圆角周围有较浅渐隐；实时浏览器控制会隐藏它，历史工具标签和其他工具不会。深色主要聊天及旁聊的导航胶囊周围、输入框下方间隙跟随所选聊天背景，默认为纯黑，胶囊玻璃仍透出滚动内容，其余标签页导航不变。键盘打开时输入框贴在键盘上方，导航栏位于键盘后。动态、点子、目标、资源库列表也在导航栏上方结束，最后一行不会被遮挡。
 
-同一个账号的网页控制台在中继上（`/app`），桌面版见 [desktop.md](desktop.md)；手机、桌面和网页共用
-[brand.md](brand.md) 里描述的设计语言。
+同账号网页控制台位于中继的 `/app`，桌面版见 [desktop.md](desktop.md)。手机、桌面、网页采用 [brand.md](brand.md) 所述的统一设计规范。
 
 「设置 → 外观 → 聊天背景」提供默认、暖色、蓝色、绿色和紫色。
 选择后立即应用于本机所有聊天，重启 App 后仍会保留。每种颜色都会随 App 的浅色或深色模式调整，
 顶栏和底部的渐隐效果、导航胶囊周围的区域也使用相同背景。选择「默认」即可恢复原样。
 消息气泡、文字、强调色和其他页面保持原有配色。目前不包含背景图片、渐变背景或主题导入。
 
-在「设置 → 外观」中，「聊天输入」「消息文本」和「应用基础」的字号标签会跟随应用语言。
+设置 → 外观 中，「聊天输入」「消息文本」「应用基础」的字号名称按 App 当前语言显示。
+
 
 ## 自己的 key {#your-own-key}
 
-App 认识的厂商在一个文件里，`assets/nanomuse/providers.json`，运行时的
-`nanomuse/llm/providers.json` 的一份拷贝，由 `node scripts/providers-json.mjs` 写出，每个客户端读的
-都是这同一份目录（[own-key.md](own-key.md)）。每个条目写明端点在哪、在哪里创建 key、有哪些登录方式、
-在哪里接受注册（`cn`、`global`），以及它的模型能做什么：`chat`、`vision`（手看屏幕）、`image`（图片）、
-`video`（短视频）。
+服务商信息保存在 `assets/nanomuse/providers.json`，它由 `node scripts/providers-json.mjs` 从运行时的 `nanomuse/llm/providers.json` 生成，各客户端共用同一目录，见 [own-key.md](own-key.md)。每项包括端点、key 创建页、登录方式、可注册地区 `cn` / `global`，以及模型能力 `chat`、`vision`（看屏幕）、`image`（图片）、`video`（短视频）。
 
-**卡片。** 额度用完或快用完时，「使用自己的模型 key」列出目录，所在地区的厂商在前：大陆是
-阿里云百炼（一把 key 覆盖全部四项；它只接受中国大陆的账号注册），其他地方是 OpenRouter 和
-OpenAI；然后是其余的，每次三家，收在「更多服务商」后面。每一行都写明这家覆盖什么
-（「聊天 · 屏幕 · 图片 · 短视频」）；「添加」打开服务商表单，预填好它的名字、端点和 `/v1` 设置
-（`minis://settings/providers/add?preset=<id>`），「获取 key」打开厂商的 key 页面。不推荐任何一家。
-「你已经在付费的套餐」列出用套餐登录、不用 key 的厂商：ChatGPT（OpenAI 的 Codex OAuth）、
-Claude、Kimi（设备码）和 OpenRouter；「登录」打开同一个表单并停在登录按钮上（`?preset=<id>:oauth`），
-走的是 OpenMinis 自己的 `OpenAIOAuthManager`、`ClaudeOAuthManager`、`KimiOAuthManager` 或
-`OpenRouterOAuthManager`。ChatGPT 那一行附一句话：OpenAI 的条款只允许 ChatGPT 套餐在 OpenAI
-自己的 Codex 里使用，别的 App 曾被切断过这种访问（OpenCode，2026 年 1 月），如果停了，API key
-照样能用。Anthropic 和 Gemini 打开的是 OpenMinis 为它们准备的服务商类型；其他都走 OpenAI
-兼容表单。Claude 登录需要 Anthropic 要求放在每个请求开头的一段标识；它在构建时从
-`app/provider-customization.properties` 读入，这个文件不在仓库里，所以发布的 APK 没有它。没有这段
-标识的构建不会列出 Claude 登录（这张卡片上没有，「添加服务商」里没有，`?preset=anthropic:oauth`
-打开的是 API key 表单）；早先版本保存下来的 Claude 登录，每次发送都会得到一句「这个版本不能用
-Claude 账号登录。请改用 API key 添加 Anthropic。」，而不是让 App 退出（`io.github.nanomuse.cloud.ClaudeSignIn`）。
+**额度提示卡片**。 额度接近用尽或已用尽时，「使用自己的模型 key」按地区排列目录：中国大陆先列阿里云百炼，它只接受大陆身份注册，一个 key 支持四种任务；其他地区先列 OpenRouter 和 OpenAI。其余服务商在「更多服务商」后每次展开三家。各行说明「聊天 · 屏幕 · 图片 · 短视频」等能力；「添加」打开预填名称、端点和 `/v1` 设置的表单，路径为 `minis://settings/providers/add?preset=<id>`；「获取 key」打开厂商页面。卡片不单独背书某一家。
 
-**列表从哪来。** 中继的 `/v1/me` 带着 `spend.guidance`（中继 0.21，[cloud.md](cloud.md)）：这个人所在
-地区的服务商，按中继的顺序，每家覆盖什么、可以登录的套餐以及它们面向哪些客户端、本地服务器、
-文档链接，还有关于 ChatGPT 登录的那句实话。`cloud/Guidance.kt` 解析它，`Ways.resolve` 优先用它，
-卡片和「设置 → nanoMuse Cloud」只在中继没发（旧中继）时才读内置目录，所以中继上新加的厂商
-不用等 App 更新就能出现，中继不再列出的服务商当天就消失。`429 allowance_exhausted` 在数字旁边
-带着同一块内容。
+「你已经在付费的套餐」列出 ChatGPT、Claude、Kimi、OpenRouter。ChatGPT 使用 Codex OAuth，Kimi 使用设备码。「登录」通过 `?preset=<id>:oauth` 打开对应表单，调用 OpenMinis 的 `OpenAIOAuthManager`、`ClaudeOAuthManager`、`KimiOAuthManager`、`OpenRouterOAuthManager`。ChatGPT 行说明：OpenAI 条款只允许套餐用于自家 Codex，其他 App 曾被停止访问，例如 2026 年 1 月 OpenCode，失效后仍可改用 API key。Anthropic、Gemini 使用各自原生服务商类型，其余采用 OpenAI 兼容表单。
 
-**各家覆盖什么。** 能力决定 App 提供什么（`cloud/Capabilities.kt`）：图片（「设置 → 模型 → 生成图片」、
-形象工作室、`nanomuse-media image`）只在厂商有 `image` 的服务商里挑；短视频只在有 `video` 且 App
-能驱动的里面挑（百炼的视频 API）；屏幕模型和它的选择页只列出有 `vision` 的厂商的模型。通过
-Codex 登录的 ChatGPT 套餐只有聊天和视觉（Codex 后端没有图片或视频端点），所以从不会被拿来
-画图。目录不认识的厂商（一个网关、你自己的中继、nanoMuse Cloud）按它模型自己的说法算，和以前
-一样。没有任何已配置的服务商具备某项能力时，页面用一句话说明（「画图需要有图像模型的
-服务商：百炼、OpenAI、Gemini 或 OpenRouter。」），而不是报错。
+Claude 登录要求每次请求开头包含 Anthropic 规定的标识，该值在构建时读取 `app/provider-customization.properties`。此文件不在仓库，发布 APK 也不包含该标识。缺少它的构建不会在额度卡片或「添加服务商」显示 Claude 登录，`?preset=anthropic:oauth` 会打开 key 表单。旧构建保存的 Claude 登录在发送时会提示「这个版本不能用 Claude 账号登录。请改用 API key 添加 Anthropic。」，不会使 App 退出，代码见 `io.github.nanomuse.cloud.ClaudeSignIn`。
 
-**一把 key 有哪些视频模型。** 百炼的 `/models` 列表里没有视频模型，所以 App 拿一个不计费的空任务
-逐个去问这个版本认识的那几个模型（`VideoGen.KNOWN_DASHSCOPE_MODELS`，万相 2.2 Flash 排第一），
-答案记一天。「视频」选择页列出这份答案，再加上你自己在该服务商下列出的每一个视频模型——名字
-带 `t2v`、`i2v` 等字样的条目，或者详情里输出模态标了 `video` 的条目（名字叫什么都行）——原样
-列出，不管探测有没有确认过。要问的模型一变（你加了条目，或新版本认识了新模型），记下的答案
-立刻重新去问，不用等满一天。「图像与视频模型」页仍保留手动输入模型 ID 的输入框。
-（[#508](https://github.com/nano-muse/nanoMuse/issues/508)）
+**选项列表的来源**。 中继 0.21 起，`/v1/me` 通过 `spend.guidance` 返回地区服务商顺序、各能力、可登录套餐及适用客户端、本地服务、文档链接和 ChatGPT 条款说明，见 [cloud.md](cloud.md)。`cloud/Guidance.kt` 解析，`Ways.resolve` 优先采用。卡片和 设置 → nanoMuse Cloud 只在旧中继没有返回时使用打包目录，因此中继新增服务商无需等待 App 更新，移除也会当天生效。`429 allowance_exhausted` 会在用量数据旁返回同一结构。
 
-在形象工作室重新生成候选图时，新一组会替换旧一组。旧请求随后返回的图片或失败结果，不会改动新一组的候选格或文件。点击重新生成即可开始新请求，无需等待旧图片保存完毕。
+**按能力提供功能**。 `cloud/Capabilities.kt` 决定候选来源：设置 → 模型 → 生成图片、形象工作室及 `nanomuse-media image` 只选支持 `image` 的厂商；视频只选支持 `video` 且 App 已接入其 API 的厂商，目前为百炼；屏幕选择器只列支持 `vision` 的模型。Codex 登录的 ChatGPT 仅支持对话和视觉，不提供图片、视频接口，不列入绘图来源。目录未识别的网关、自建中继、nanoMuse Cloud 继续按模型自己声明的能力判断。没有配置对应能力时，页面说明「画图需要有图像模型的服务商：百炼、OpenAI、Gemini 或 OpenRouter。」，不直接报错。
 
-**连不上服务商的时候**（`net/ProviderReach.kt`、`ui/chat/ProviderReachCard.kt`）。失败的一轮，如果
-错误来自传输层（OkHttp 的「failed to connect to chatgpt.com/…（port 443）」「Unable to resolve host」、
-一条 TLS 或超时信息），或者是 OpenAI 的「region not supported」，就显示为一张卡片而不是红色横幅：
-发生了什么、什么有用（这台手机上的 VPN、「设置 → 网络」下的代理、另一家用你自己 key 的服务商）、
-「重试」，以及收在「详情」后面的原始信息。上游的 `mapHttpError` 会丢掉 401/403/429 的响应体，
-`ReachSignal`（`OpenAIProvider` 里一处 `// nanoMuse:` 改动）把它们留几秒钟，以规范的 `nm_reach:` 行
-写进消息，所以过期的 ChatGPT 登录显示「重新登录」，用完的套餐窗口显示「ChatGPT 套餐暂时没有
-剩余了」，附 OpenAI 自己的那句话和重置时间；key 服务商上普通的「Invalid API key」则保持上游的
-样子。中继的 `daily_cap` 429 现在和 `allowance_exhausted` 一样读取，卡片会说今天的份额用完了，
-隔天回来。额度卡片还列出你自己的模型（你自己电脑上的 Ollama、LM Studio、vLLM），以及对登录
-账号而言，你的电脑：聊天里打「@」加它的名字，这一轮就在那边跑。
+**检查 key 可用的视频模型**。 百炼 `/models` 不列视频模型，App 会用不计费的空任务逐个探测 `VideoGen.KNOWN_DASHSCOPE_MODELS` 中本版本已知模型，先探测万相 2.2 Flash，结果缓存一天。「视频」选择器除探测结果外，也保留你手动列入该服务商的模型：名称含 `t2v`、`i2v` 等视频标识，或详情输出模态包含 `video`，都按原样列出，不以探测成功为前提。手动新增模型或升级后已知模型列表变化，会立即重新探测，无需等满一天。「图像与视频模型」仍允许手填任意模型 ID，见 [#508](https://github.com/nano-muse/nanoMuse/issues/508)。
 
-**中继拒绝一轮的时候**（`cloud/RelayRefusal.kt`、`ui/chat/RelayRefusalCard.kt`）。nanoMuse Cloud 发来的
-每一种拒绝都是手机语言的一句大白话，加上一个合适的按钮，从不显示状态码、中继的 JSON 或上游的
-「Rate limited」。回复在响应体还完整时读取（`AllowanceSignal.noteHttpError`，经由 `OpenAIProvider` 里
-同一处 `// nanoMuse:` 改动），以规范的 `nm_relay:` 行存进消息，由卡片绘制：`413 too_large`（也包括
-中继主机上的代理返回的普通 413）→「这条消息对模型来说太大了。缩短一点、去掉一些附件，或者开
-一个新聊天。」加「新聊天」；`400 content_rejected`（服务商的内容审核没有放行这些内容；用自己的
-key 时服务商自己的 `DataInspectionFailed` 也算）→「模型服务商的内容审核没有放行这次请求。换个说法
-试试；如果反复出现，就新开一个对话，被拦下的可能是对话里更早的内容。」加「新聊天」和「重试」，
-压缩的对半重试（`ChatViewModel.shouldSplitOnError`）不碰它，因为请求再小，同样的内容回来还是被拒；
-`401 bad_key` / `account_deleted` →「登录」；`403 not_invited` /
-`account_disabled` / `signup_closed` →「打开设置」；`429 too_many_in_flight` / `locked` /
-`rate_limited` 和 `provider_busy`（附 `retry_after` 的等待时间）→「重试」；`404
-model_not_offered` →「打开设置」；`503 service_paused`、`sync_paused`、`hub_paused` 以及任何 5xx
-或空响应 →「重试」。`429 allowance_exhausted` 和 `daily_cap` 保留额度卡片；带 `paused: true`
-（中继 0.22）时，卡片开头说额度「在这个中继上暂停了，不是用完了」，剩下的保持不变。这些句子
-来自 `NanoMuseCloud.describe`，和登录页、账号页用的是同一批，17 种语言都有（`nm_cloud_err_*`）。
-单元测试：`RelayRefusalTest`、`GuidanceTest`。
+形象工作室开始新一轮候选图生成时，会替换上一组。旧请求稍后完成或失败，都不会再改动新组的图片格和文件。「重新生成」立即发起新请求，不必等待旧图保存完成。
 
-**设置 → 网络**（`net/OwnProviderProxy.kt`、`ui/net/NetworkScreen.kt`、`minis://settings/network`）。
-给自己的服务商用的 HTTP 代理：主机、端口、可选的用户名和密码，默认关闭，只存在这台手机上：设置项在
-`SharedPreferences` 里，密码单独放在一个 `EncryptedSharedPreferences` 文件里（`nanomuse_proxy_secrets`，
-和服务商 key 一样的存法；1.0.3 的手机存在普通文件里的密码会在第一次读取时搬过去）。它在
-`MinisApp.onCreate` 中被装为进程默认的 `ProxySelector`，所以每个 OkHttp
-客户端每次请求都会问它；对目录里的主机、`chatgpt.com`、`auth.openai.com` 和服务商实例的自定义
-base URL（从不包括中继的，从不包括局域网地址）它回答代理，对其他所有主机回答系统的设置：hub、
-中继、沙箱镜像都不受影响。服务商客户端带着 `OwnProviderProxy.authenticator`，应付要密码的代理。
-「测试」按填写的代理抓取 `https://chatgpt.com/`，报告状态码和毫秒数。单元测试：`ProviderReachTest`、
-`OwnProviderProxyTest`。
+**无法连接服务商**。 `net/ProviderReach.kt`、`ui/chat/ProviderReachCard.kt` 会把连接失败显示为说明卡片，而非红色错误横幅。可识别 OkHttp 的 `failed to connect to chatgpt.com/… (port 443)`、`Unable to resolve host`、TLS 或超时错误，以及 OpenAI 的地区不支持。卡片说明情况，建议使用本机 VPN、设置 → 网络 的代理或其他自有 key 服务商，并提供「重试」，原错误放在「详情」。上游 `mapHttpError` 会丢弃 401/403/429 响应体，`ReachSignal` 通过 `OpenAIProvider` 的一处 `// nanoMuse:` 改动短暂保留，再以 `nm_reach:` 标准行写入消息，因此登录过期能显示「重新登录」，套餐时间段额度用尽能显示「ChatGPT 套餐暂时没有剩余了」、OpenAI 原因及恢复时间。普通 key 的「Invalid API key」保持上游处理。中继 `daily_cap` 429 与 `allowance_exhausted` 一样进入额度卡片，说明今日份额已用完，次日恢复。卡片也列出本机模型方案，包括电脑上的 Ollama、LM Studio、vLLM；已登录时还列出你的电脑，聊天输入 `@` 加设备名即可交给它执行。
 
-离开登录页或「网络」页，会取消该页尚未完成的请求，服务器已开始回复但还未传完时也一样。
+**中继拒绝请求**。 `cloud/RelayRefusal.kt` 和 `ui/chat/RelayRefusalCard.kt` 用手机当前语言显示具体说明及适当按钮，不只展示状态码、JSON 或「Rate limited」。`AllowanceSignal.noteHttpError` 在响应体完整时经 `OpenAIProvider` 同一处 `// nanoMuse:` 接入读取，以 `nm_relay:` 标准行存入消息。`413 too_large`，包括中继代理的普通 413，会说明消息太大，可缩短、移除附件或新建聊天，并提供「新聊天」。`400 content_rejected`，包括自有 key 返回 `DataInspectionFailed`，会说明服务商内容审核拒绝请求，建议改写，反复出现时新建聊天，因为触发内容也可能在旧消息中；提供「新聊天」「重试」。`ChatViewModel.shouldSplitOnError` 不对这种错误拆分重试，因为缩小请求仍包含相同内容。`401 bad_key` / `account_deleted` 提供「登录」；`403 not_invited` / `account_disabled` / `signup_closed` 提供「打开设置」；`429 too_many_in_flight` / `locked` / `rate_limited` / `provider_busy` 提供「重试」，并使用 `retry_after` 等待时间；`404 model_not_offered` 提供「打开设置」；`503 service_paused`、`sync_paused`、`hub_paused`、其他 5xx 或空响应提供「重试」。`429 allowance_exhausted`、`daily_cap` 继续显示额度卡片，中继 0.22 返回 `paused: true` 时，说明额度暂停发放而非耗尽，剩余额度保留。提示由 `NanoMuseCloud.describe` 提供，与登录、账号页一致，覆盖 17 种语言的 `nm_cloud_err_*`。测试为 `RelayRefusalTest`、`GuidanceTest`。
+
+**设置 → 网络**。 `net/OwnProviderProxy.kt`、`ui/net/NetworkScreen.kt`、`minis://settings/network` 提供自有服务商 HTTP 代理，可填主机、端口及可选用户名、密码，默认关闭，仅保存在此手机。普通设置存在 `SharedPreferences`，密码单独加密存入 `nanomuse_proxy_secrets` 的 `EncryptedSharedPreferences`，与服务商 key 的方式相同。1.0.3 保存在普通文件的密码会在首次读取时迁移。`MinisApp.onCreate` 将它设为进程默认 `ProxySelector`，每个 OkHttp 客户端每次请求都查询：目录主机、`chatgpt.com`、`auth.openai.com`、已配置服务商自定义 Base URL 使用代理；中继和局域网地址不使用，其他主机沿用系统设置。因此 hub、中继、沙箱镜像不受影响。服务商客户端使用 `OwnProviderProxy.authenticator` 处理代理密码。「测试」通过当前代理请求 `https://chatgpt.com/`，报告状态及毫秒耗时，测试为 `ProviderReachTest`、`OwnProviderProxyTest`。
+
+退出登录页面或网络设置页面后，会取消该页未完成的请求，即使服务器已经开始返回、但响应尚未传输完毕。
 
 ## 语音输入 {#voice-input}
 
@@ -255,54 +122,32 @@ Qwen TTS 只提供 WAV 音频，App 按该格式请求并播放，不会将它�
 [CosyVoice 文档](https://help.aliyun.com/en/model-studio/cosyvoice-websocket-api) 和
 [Qwen TTS HTTP 接口](https://help.aliyun.com/en/model-studio/qwen-tts-api)。
 
-Android 13 及以上的系统连续听写在识别器切换到下一段时会继续传入音频。上一段已关闭管道的写入失败，不会再清除新一段的音频流。
+Android 13 及以上，系统连续听写切换到新语音段时会继续传送音频。即使旧段已关闭的管道发生写入错误，也不会关闭新段音频流。
 
-使用服务商语音模型时，静默录音达到时限，或极短语音等待补充超时后，面板会回到空闲状态。已经开始的转写仍会等待结果，不会被空结果提前结束。
 
-系统语音输入可以优先使用设备端识别。手机没有可用的设备端识别服务时，会改用默认识别服务；默认服务返回的语言错误会显示在语音面板中。已经启动的设备端识别器缺少语言包时，仍会尝试一次默认服务。
+用服务商模型输入语音时，静默达到录音时限，或太短的语音未能在等待期内补足可转写内容，界面会恢复待命。若已经开始转写，则等结果返回后才结束本次会话。
 
-录音无法启动，或在开始采集前被取消时，语音检测器也会释放已经创建的录音器，避免重试语音输入时留下未释放的录音器。
+系统语音可优先选择本机识别。没有可用本机服务时，自动转到系统默认识别服务；默认服务的语言错误会显示在语音面板。已启动的本机识别器若缺少语言包，也会尝试一次默认服务。
 
-一段话在静音后结束时会送去转写并关掉麦克风，而这个关掉过去是在语音检测器自己的回调里、同一个线程上，把它正在运行的原生对象直接释放掉：说满两秒以上再停下来，App 就会原生崩溃（1.0.8 修好了；上游 OpenMinis 1.14 有同一处改动）。现在回调里发起的停止，要等检测器把这一帧处理完交回来才生效。
+无法开始录音，或尚未开始采集就被取消时，语音检测器会释放已分配的录音器，避免重试时仍占用旧录音资源。
+
+语音段遇到静音后会提交转写并停止麦克风。旧实现会在检测器自身的回调线程中直接释放仍在运行的原生对象，导致说话两秒以上、停下来时 App 崩溃。1.0.8 已修复，上游 OpenMinis 1.14 也包含同一修复。现在回调内部提出停止时，会等当前音频帧处理返回后再生效。
 
 ## 隐私与权限 {#privacy-and-permissions}
 
-中继保存账号 id、一个打码的标识、用量计数，以及智能体的名字和外观（让你的设备保持一致）；
-你的对话有三份：记录（和中继模型的每一轮完整保存，1.0.7 起用自己 key 的轮次也补进来，你的设备和运行中继的人能读，
-在*数据控制*里一键删除）、对话同步（登录后默认开启，在*数据控制*里关掉），以及只在「帮助改进」开着时才进入的训练集
-（[privacy.md](privacy.md)、[cloud.md](cloud.md#the-record)、[sync.md](sync.md)）；第一次对话的第四句话会这么说。
-*数据控制*会显示记录里有这个账号的多少轮（其中多少轮用自己的 key、多少张图片），以及这个中继保留多久。在手机上，API key 和账号 key 放在
-`EncryptedSharedPreferences` 里，*设置 → 网络* 的代理密码也是（1.0.4 起；只在这台手机上）；从 0.1.40 起 App 完全不参与设备备份（`allowBackup="false"`：
-聊天、记忆和 key 从不上传到 Google，重装后从空白开始，账号的聊天通过同步回来；`res/xml/` 下的
-两个规则文件留着，等哪天开关再打开时用）。手需要无障碍服务和悬浮窗权限，两者都可选、都能在
-同一屏撤销（首次运行的「手」那一页在 App 标志下面请求这两项，和登录页一样）；会发送东西的步骤（点「发送」，或在聊天软件的消息框里按回车）一次一次地审批，
-「本次对话」的答复也只对当初授权的那个 App 或地址有效。账号下的另一台设备想在手机上运行、读取
-或写入什么（hub 的 `shell`、`files`、`open`、`screen`……），要先经拿着手机的人批准：「一次」或
-「对这台设备总是允许」，可在「权限」里撤销。另一台设备或智能体说出的路径（hub 的 `files`、
-`nanomuse-media`、`nanomuse-pc put`）只在沙箱内解析（`io.github.nanomuse.sandbox.SandboxPaths`）：
-`..` 和指向 rootfs 之外的符号链接都无处可去，App 自己的私有文件始终够不着。App 只对你自己网络内的地址（私有网段 `10/8`、`172.16/12`、
-`192.168/16`、Tailscale 分配的 `100.64/10`、链路本地地址、IPv6 ULA、`localhost`、不带点的名字，
-以及 `.local`、`.lan`、`.home`、`.internal`、`.home.arpa`、`.localdomain`、`.ts.net` 后缀），也就是一台模型
-服务器或你自己的电脑，允许明文 `http://`，其他地址在服务商 URL 字段里一律拒绝
-（`io.github.nanomuse.net.LanOnly`）。地址先解析再判断，所以 `10.foo.example.com` 这样的公网名字
-不会被当成私有地址。自己的中继能否用 `http://` 也按同一条规则判断；nanoMuse Cloud 以及到它的
-hub 只走 TLS。App 内的
-web view 不对其他 App 导出。用服务商语音模型做语音输入时，麦克风只在录音期间打开：停止或取消录音都会立刻关掉录音器，取消的那段音频直接丢弃，不会发给服务商。
+中继保存账号 id、打码标识、用量，以及用于各设备保持一致的智能体名字和形象。对话相关数据分三类：完整请求记录，包含中继模型每轮及 1.0.7 起上传的自有 key 轮次，你的设备和中继运营者可读，可在「数据控制」删除；默认开启、可关闭的对话同步；仅在「帮助改进」开启时收录的训练集。详见 [privacy.md](privacy.md)、[cloud.md](cloud.md#the-record)、[sync.md](sync.md)，首次对话第四句话也会说明。「数据控制」显示记录总轮数、自有 key 轮数、图片数和中继保留期限。
 
-**除了这一轮本身，记录还会听到什么**（中继 0.31）。发给 nanoMuse Cloud 的聊天请求，除了设备和对话的 id，还会带上这次调用在对话里的位置：
-这一轮是谁发起的（`X-NanoMuse-Run`：你本人、定时任务、动态的例行程序、目标的检查、另一台设备通过 hub 托付的任务）、
-按聊天自己的计数这是第几轮、这次调用是这一轮里的第几次、手在操作屏幕时所属的那次运行及其步数，以及 `X-NanoMuse-Platform: android`；
-用自己 key 跑的轮次上传时带同样的字段（[cloud.md](cloud.md#provenance)；`io.github.nanomuse.cloud.Provenance` 从聊天的协程里读出这些，
-所以手打的消息、重试、例行程序的提示、hub 任务和手的每一步说的都是同一套）。登录状态下，手机还会把一轮前后发生的事以短记录发上去
-（`POST /v1/events`，`io.github.nanomuse.cloud.ClientEvents`）：风险闸门对每条 shell 命令、浏览器点击、屏幕步骤的判定和那张卡片是怎么答的，
-手的每一步和这次运行是怎么收尾的，一轮是被手动停下还是出错结束，以及最新回复下面的两个拇指和停止之后的那一个问题
-（「为什么停下来？」，五个一词的答案加「跳过」；例行程序或另一台设备的那一轮不会问）。只有代码和数字——工具的种类、风险档、谁答的、等了多久——
-从不包含命令、页面、屏幕或对话里的任何一个字（[cloud.md](cloud.md#client-events)）；*数据控制*里的删除会把它们和轮次一起删掉。
+API key、账号 key 和设置 → 网络 的代理密码都使用 `EncryptedSharedPreferences` 加密保存；代理密码从 1.0.4 起采用此方式，仅留本机。0.1.40 起，App 不参与系统设备备份，`allowBackup="false"`，聊天、记忆、key 不上传 Google。重装从空白开始，账号聊天通过同步恢复；`res/xml/` 的两个备份规则文件仍保留，供未来重新开启时使用。
+
+「手」需要无障碍服务和悬浮窗权限，均可选，可在同一页面撤销。首次引导的手页面与登录页一样，在 App 标志下请求权限。发送步骤，例如点「发送」或在聊天框按回车，要逐次审批；「本次对话」授权也仅限原先指定 App 或地址。其他设备通过 hub 的 `shell`、`files`、`open`、`screen` 等操作手机前，须由持机者允许一次或对该设备总是允许，授权可在「权限」撤销。
+
+远端设备及智能体提供的文件路径，包括 hub `files`、`nanomuse-media`、`nanomuse-pc put`，均由 `io.github.nanomuse.sandbox.SandboxPaths` 限定在沙箱内解析。`..` 或指向 rootfs 外的符号链接无法越界访问 App 私有文件。只有自有网络地址可用明文 `http://`：私有网段 `10/8`、`172.16/12`、`192.168/16`、Tailscale 的 `100.64/10`、链路本地地址、IPv6 ULA、`localhost`、无点名称，以及 `.local`、`.lan`、`.home`、`.internal`、`.home.arpa`、`.localdomain`、`.ts.net` 后缀。其他地址在服务商 URL 字段会被 `io.github.nanomuse.net.LanOnly` 拒绝。先解析再判断，因此 `10.foo.example.com` 不会被误判为私网地址。自建中继也用同一规则；nanoMuse Cloud 和到它的 hub 连接只使用 TLS 加密。App 内 WebView 不向其他 App 导出。服务商语音输入只在录音时开启麦克风，停止或取消会立即关闭录音器，取消的音频直接丢弃，不发送给服务商。
+
+**请求记录还包括哪些来源信息**。 中继 0.31 起，Cloud 请求除设备和对话 id 外，还通过 `X-NanoMuse-Run` 标明发起者：用户、定时任务、动态例程、目标检查或其他设备的 hub 任务；注明对话轮次序号、轮内模型调用序号、屏幕任务运行与步骤，以及 `X-NanoMuse-Platform: android`。自有 key 轮次上传时也包含相同字段，见 [cloud.md](cloud.md#provenance)。`io.github.nanomuse.cloud.Provenance` 从聊天协程读取，保证输入、重试、例程、hub 任务、手操作采用统一来源格式。登录时还通过 `POST /v1/events` 和 `io.github.nanomuse.cloud.ClientEvents` 上报每轮附近的事件：shell、浏览器点击、屏幕步骤的风险判定和审批结果，手的各步骤及结束情况，手动停止或错误，以及最新回复下的赞踩。用户点停止后会问「为什么停下来？」，提供五个单词选项和「跳过」，例程与其他设备发起的轮次不问。报告仅含工具种类、风险级别、回答者、等待时间等代码与数字，不含命令、网页、屏幕或对话文字，见 [cloud.md](cloud.md#client-events)。「数据控制」删除轮次时会一并删除这些事件。
 
 ## 自己构建 {#building-it-yourself}
 
-JDK 21（CI 用的也是它）和 Android SDK（Android Studio 会把两个都装上）；`scripts/android/env.sh` 在一台空机器上
-设好环境。工程在 `android/src/android` 下：
+构建需要 JDK 21，与 CI 一致，以及 Android SDK，Android Studio 可安装这两项。空白机器可通过 `scripts/android/env.sh` 设置环境。工程目录为 `android/src/android`：
 
 ```bash
 bash scripts/android/build-natives.sh   # 只需一次：proot、Alpine rootfs 和 rclone.aar（NDK r27c，Go 1.25+）
@@ -313,40 +158,30 @@ cd android/src/android
 ./gradlew :app:lintDebug            # Android lint；报告在 app/build/reports/lint-results-debug.html
 ```
 
-Lint 用的是比 AGP 8.7.3 自带版本更新的 lint（`gradle.properties` 里的
-`android.experimental.lint.version`）：Compose 和 lifecycle 库自带的检查，自带的那个加载不了。上游树里有
-它自己的 lint 发现；看报告时找 `io.github.nanomuse` 的部分。
+Lint 静态检查使用比 AGP 8.7.3 自带版本更新的版本，由 `gradle.properties` 的 `android.experimental.lint.version` 指定，因为旧版无法加载 Compose、lifecycle 库附带的检查。上游代码也有自己的 lint 问题，查看报告时关注 `io.github.nanomuse` 部分。
 
-`rclone.aar` 用 Go 构建，模块走 Go 自己的默认代理（`https://proxy.golang.org,direct`）；在中国大陆网络下先
-`export GOPROXY=https://goproxy.cn,direct`，`env.sh` 会沿用你导出的值。
+`rclone.aar` 通过 Go 构建，模块默认经 `https://proxy.golang.org,direct` 下载。中国大陆网络可先执行 `export GOPROXY=https://goproxy.cn,direct`，`env.sh` 会保留你已导出的设置。
 
-`scripts/rebrand.py` 带着版本号（`VERSION_NAME`、`VERSION_CODE`），把 nanoMuse 的命名套到
-OpenMinis 树上；`android/BUILDING.md` 讲原生部分。没有签名密钥时，release 构建用 debug 密钥签名，
-能安装，但不能升级一个正式签名的构建。要签名，先创建一次密钥，放在仓库之外：
+`scripts/rebrand.py` 定义 `VERSION_NAME`、`VERSION_CODE` 并将 nanoMuse 名称应用到 OpenMinis 代码树；原生组件构建见 `android/BUILDING.md`。未配置发布签名时，release 也会用 debug 密钥签名，可以安装，但无法更新正式签名的 App。要发布自己的签名版本，先创建密钥并保存在仓库外：
 
 ```bash
 keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
         -keyalg RSA -keysize 4096 -validity 10950
 ```
 
-然后把它的四个值填进 `android/keystore.properties`（已 git-ignore：`storeFile`、
-`storePassword`、`keyAlias`、`keyPassword`）。
+将四项签名配置写入已被 Git 忽略的 `android/keystore.properties`：`storeFile`、`storePassword`、`keyAlias`、`keyPassword`。
 
-仅用于聊天测试的模拟器构建（`-Pnm.abi=x86_64`）会排除缓存中的 arm64 proot 和 Alpine 根文件系统资源。切回默认的 arm64 构建后会重新包含这些资源，无需删除缓存。
+使用 `-Pnm.abi=x86_64` 构建模拟器聊天测试版本时，会排除缓存里的 arm64 proot 和 Alpine 根文件系统资源。切回默认 arm64 构建会自动重新包含它们，不需要删除缓存。
 
 ### 在 Windows 上使用 WSL {#windows-wsl}
 
-在 x64 Windows 上，使用 WSL 2 中的 x86_64 Ubuntu 完成整个构建。原生构建脚本支持
-Linux 和 macOS 主机，不支持 Windows shell。尚未安装时，先按
-[WSL 安装说明](https://learn.microsoft.com/zh-cn/windows/wsl/install)操作，再打开 Ubuntu。
-只有下面第一条命令在管理员 PowerShell 中运行：
+x64 Windows 需要在 WSL 2 的 x86_64 Ubuntu 中完成整个构建。WSL 是 Windows 提供的 Linux 环境；原生构建脚本支持 Linux、macOS 主机，不支持 Windows shell。若尚未安装，请先按 [WSL 安装说明](https://learn.microsoft.com/zh-cn/windows/wsl/install)设置并打开 Ubuntu。以下只有第一条命令在管理员 PowerShell 执行：
 
 ```powershell
 wsl --install -d Ubuntu
 ```
 
-后续命令都在 Ubuntu 中运行。把代码、SDK 和缓存放在 Linux 文件系统中，而不是
-`/mnt/c` 下；shell 脚本保持 LF 换行：
+以下其余命令全部在 Ubuntu 中执行。源码、SDK、缓存应放在 Linux 文件系统内，避免放在 `/mnt/c`。shell 脚本使用 LF 换行格式：
 
 ```bash
 sudo apt update
@@ -357,13 +192,7 @@ cd ~/src/nanoMuse
 git submodule update --init android/deps/proot
 ```
 
-安装 [Linux 版 Go](https://go.dev/doc/install)，把它的 `go` 命令加入 Ubuntu 的 `PATH`；
-[Android 工作流](https://github.com/nano-muse/nanoMuse/blob/main/.github/workflows/android.yml)
-使用 Go 1.26。下载 **Linux 版** Android SDK Command-Line Tools，按
-[sdkmanager 安装说明](https://developer.android.com/tools/sdkmanager)设置，以
-`$HOME/Android/Sdk` 为 SDK 目录。可执行文件应位于
-`$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager`。Windows 版 Android Studio
-安装的 SDK 不包含这次构建所需的 Linux NDK 可执行文件。
+安装 [Linux 版 Go](https://go.dev/doc/install)，将 `go` 加入 Ubuntu 的 `PATH`。[Android 工作流](https://github.com/nano-muse/nanoMuse/blob/main/.github/workflows/android.yml)使用 Go 1.26。另下载 Linux 版 Android SDK Command-Line Tools，按 [sdkmanager 安装说明](https://developer.android.com/tools/sdkmanager)设置，SDK 路径用 `$HOME/Android/Sdk`，确保命令位于 `$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager`。Windows Android Studio 安装的 SDK 不包含本次构建需要的 Linux NDK 工具。
 
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
@@ -386,17 +215,11 @@ cd android/src/android
 ./gradlew :app:assembleDebug --console=plain --no-daemon
 ```
 
-APK 位于 Gradle 工程目录下的 `app/build/outputs/apk/debug/app-debug.apk`。
-需要时把生成的 APK 复制到 Windows，构建目录仍保留在 Linux 中。
+生成的 APK 位于 Gradle 目录下的 `app/build/outputs/apk/debug/app-debug.apk`。需要时可以把 APK 复制到 Windows，但构建代码树继续留在 Linux。
 
-Gradle 在 Ubuntu 内的 `$HOME/.android/debug.keystore` 创建 debug 签名密钥。
-如果后续 debug 构建需要覆盖安装这个 APK，保留这把位于代码目录之外的密钥。
-它可能与 Windows 用户目录里的密钥不同。debug APK 不能覆盖另一把密钥签名的官方 APK；
-使用自己的 release 密钥时，按上面的 release 签名说明操作。
+Gradle 会在 Ubuntu 的 `$HOME/.android/debug.keystore` 创建 debug 签名密钥。如果后续 debug APK 需要覆盖安装，请保留这把仓库外的密钥，它不一定与 Windows 用户目录下的密钥相同。debug APK 不能覆盖用另一密钥签名的官方 APK。要用自己的 release 密钥，请按前文签名步骤配置。
 
-如果 Kotlin 报 Java 堆内存不足，先用 `free -h` 查看 WSL 可用内存。
-机器能同时满足 Windows 和 WSL 的内存需求时，可以只为这次构建提高 Gradle 与 Kotlin
-daemon 的上限，不修改仓库配置。例如在同一 Gradle 工程目录中运行：
+若 Kotlin 提示 Java 堆内存不足，先用 `free -h` 查看 WSL 可用内存。机器内存足够同时供 Windows、WSL 使用时，可以仅为当前构建提高 Gradle 和 Kotlin 后台进程的内存上限，无需改仓库配置。例如在同一 Gradle 目录运行：
 
 ```bash
 ./gradlew :app:assembleDebug --console=plain --no-daemon \
@@ -404,105 +227,98 @@ daemon 的上限，不修改仓库配置。例如在同一 Gradle 工程目录�
   '-Pkotlin.daemon.jvmargs=-Xmx6g'
 ```
 
-这些是可选的堆内存上限，不是最低要求。按 WSL 实际可用内存选择，并为其他进程留出空间。
+示例数值是可选的堆内存上限，不是最低需求。应按 WSL 实际可用内存调整，并为其他进程预留空间。
 
 
 ## 发布 {#releases}
 
-`.github/workflows/android.yml` 在 `android/` 下每有改动就构建 debug APK（「debug APK · arm64-v8a」
-这项检查）。版本由 `scripts/release-apk.sh <version>` 从一个标签做出来：它核对版本号与 `rebrand.py`
-和 Gradle 是否一致，用 release 密钥构建 `:app:assembleRelease`，写出
-`dist/nanoMuse-<version>-arm64.apk` 和它的 `.sha256`，加 `--publish` 时打上 `v<version>` 标签，
-并把两者连同 `docs/releases/v<version>.md` 里的说明一起附到 GitHub release 上。工作区有未提交的改动，
-或者提交不在 `main` 上，发布会被拒绝。debug 签名的 APK
-永远不进 release，因为正式签名的版本无法覆盖它。`versionName` 必须和标签一致，就像 Python 包的
-版本号那样。
+修改 `android/` 后，`.github/workflows/android.yml` 会构建 debug APK，对应「debug APK · arm64-v8a」检查。发布使用 `scripts/release-apk.sh <version>`：核对 `rebrand.py`、Gradle 版本，用 release 密钥构建 `:app:assembleRelease`，输出 `dist/nanoMuse-<version>-arm64.apk` 及 `.sha256`。带 `--publish` 时创建 `v<version>` 标签，并将两文件与 `docs/releases/v<version>.md` 说明发布到 GitHub release。工作区未提交干净或当前提交不在 `main` 时拒绝发布。release 不上传 debug 签名 APK，因为正式签名版本无法覆盖它。`versionName` 必须与标签及 Python 包版本一样保持一致。
 
-## 东西都在哪 {#where-things-are}
+## 代码位置 {#where-things-are}
 
 | 路径（`android/src/android/app/src/main/java/io/github/nanomuse/`） | 作用 |
 | --- | --- |
-| `cloud/NanoMuseCloud.kt` | 账号：用验证码或密码登录、加密存储里的 key、`/v1/me`、用量、会话、本地化的错误句子；中继的菜单和它的两个默认值（`for: chat` / `for: gui`） |
-| `cloud/Region.kt`、`cloud/ProviderCatalogue.kt`、`cloud/Capabilities.kt`、`cloud/OwnKeyPresets.kt`、`cloud/ProfileSync.kt` | 哪个地区的厂商排前面（大陆 → 百炼，否则 OpenRouter 和 OpenAI）；从 `assets/nanomuse/providers.json` 读出的自带 key 目录，以及某个已配置的服务商对应哪家厂商；一个服务商覆盖什么和那些一句话的「不可用」提示；预填的服务商表单（`?preset=<id>[:oauth]`）；拉取和推送的中继 profile（名字、外观、连接器） |
-| `sync/` | 对话同步（契约 C7–C10）：`SyncEngine`（什么上传、什么下载；每个映射带 `owner`，只有本账号的）、`ConversationSync`（何时同步；`hidden`：另一个账号的聊天，从 `ChatRepository.observeSessions()` 里排除）、`LocalChats`、Room 存储 `nanomuse_sync.db`（含 C12 的 `session_owners` 表） |
-| `account/` | 契约 C12（0.1.40，[sync.md](sync.md)）：`AccountScope`（规则：一个会话是谁的聊天、账号的 key、列表排除什么、被拒绝的 key 保留什么（`keepOnRefusedKey`：全部保留，除非中继说 `account_deleted`）；有单元测试）、`AccountData`（执行规则：每个聊天一行归属记录，`leave` 把账号的聊天、记忆、动态、目标、例程、形象和偏好收起来或删掉，`enter` 把一个账号的东西带回来）。「库」标签遵循同一条规则：只列出聊天列表会显示的那些会话的工作区，共用一台手机时另一个账号的文件不会出现（`library/LibraryIndex.shows`，有单元测试） |
-| `hub/` | `Hub`（状态、设备身份、设置）、`HubClient`（带退避的 socket；key 被拒绝时每分钟重试一次并如实显示，连接被替换时等 30 秒，运营者暂停 hub 时等两分钟并如实显示）、`HubService`（前台服务）、`HubActions`（其他设备可以让这台手机做什么；`stop {call | conversation}` 结束发起设备在这里启动的任务，由 `HubTasks` 记账，有单元测试）、`HubErrors`（用文字描述的失败） |
-| `reach/` | `Computers`（账号的设备，按 hub 列出的样子，以及对它们的调用；0.1.24 起不再有配对，也没有自己的令牌）、把工作转交给电脑的处理器 |
-| `models/` | 「设置 → 模型」背后的逻辑：`ModelSlots`（四个槽位、各自设成了什么、存在哪里、选择页列出的分组、对话默认的 `followPick`、「用它来做什么」卡片的 `applyProvider`），`SlotOrder`（解析顺序和目录默认，纯 Kotlin，有单元测试），`PickerList`（选择页每组 8 行的折叠、排序和搜索过滤，纯 Kotlin，有单元测试） |
-| `ui/models/` | 「模型」页、每一行背后的选择页、「用它来做什么」卡片（`minis://settings/models`） |
-| `chat/CloudRetry.kt` | 「这次改用 nanoMuse Cloud」：卡片何时提供它，以及 `ChatViewModel.retryLast` 这一轮用的服务商 |
-| `chat/RoutineWakes.kt`、`ui/chat/NmRoutineWakeRow.kt` | 定时任务的一轮是例程的，不是本人的：`ScheduledAgentRunner` 在提示词发出前先登记一次唤醒，`ChatViewModel` 把它绑到落库的那一行，聊天里这一行只画成一行安静的小字「例程 · 〈名称〉 · 08:00」，而不是一条以本人口吻发出的气泡；模型收到一条只管这一轮的 `SessionAddenda`，说明情况，于是它直接从结果说起，不感谢谁的提问。到 1.0.4 为止，提示词就像本人打的字一样立在聊天里 |
-| `feed/` | 动态：`FeedFlow` 维护每日定时任务和它写作所在的会话，这个会话是智能体的工作间，不进抽屉、聊天列表和主聊天的回退（`FeedFlow.hidden`，由 `ChatRepository.observeSessions()`、`MainChat` 和「移到会话」面板读取）；`FeedStore` 存帖子，最新的一天在前，一天之内最新的一批在前、每批保持模型给出的顺序（同一批共享 `created` 时间；`FeedStore.DAY_ORDER`，有单元测试）。智能体在 `/var/minis/feed/YYYY-MM-DD/NN.md` 读帖子，你点过赞的带 `liked: true`：这是一份只读副本（`FeedSandboxScope`，每条 shell 命令前和每次点赞后刷新），不是 App 自己的目录，因为 PRoot 不能把文件夹只读地绑进去，而点赞是本人的，不该由智能体改；没有 `liked` 的帖子只是还没反应，提示词里说明了这不是不喜欢。任务在 App 退到后台时写出了帖子，就发一条点出帖子标题的通知，点开进动态页（`minis://feed`），取代 1.0.4 之前那条带着模型原文、点开进会话的通用「任务完成」通知 |
-| `chat/TurnReply` | 判断刚结束的这一轮到底产出了哪条助手消息：只有排在最后一条用户消息之后、且没有挂着错误的最后一条助手消息才算。动态、目标和首次对话都通过它读回复，所以模型调用在产出回复前就失败的一轮，交给它们的是空，而不是上一轮的回复（#637） |
-| `net/ModelBlip` | 沙箱里 `model_use` 调用外面的重试：网络错误、瞬时错误或 5xx 隔一秒、两秒再试，和聊天、iOS 的桥一致；其他错误直接抛出。网关自己上游没有应答的 `HTTP 0` 也按瞬时错误处理（#640） |
-| `hands/` | 作为手的无障碍服务、舞台和胶囊、屏幕读取器；`Hands.screenModel` 选屏幕模型（已选的 → 对话服务商自己的默认，当它能看图 → Cloud 给 `gui` 推荐的模型 → 自有 key 的回退模型 → 一个能看图的聊天模型 → Vision Group） |
-| `ui/coding/` | 你电脑上的编程助手 |
-| `backup/` | nanoMuse 在上游备份（*设置 → 备份与恢复*，`minis://settings/backup`）之上加的东西：「对话」下面的「对话里的文件」（默认开）可以关掉，对话就只带消息，每个会话的文件在包里只列为墓碑，其他类别不变，1.5 GB 的包因此只剩几 MB，拒收大文件的服务器也收得下（[#561](https://github.com/nano-muse/nanoMuse/issues/561)）；目的地返回 `413` 时说明是服务器的上传上限（`BackupHints`）；沙箱里的 `nanomuse-backup run` 用页面上保存的选项和所有已启用的目的地做一次备份，记入页面的历史（`BackupRun`；`status`、`history`、`choices` 读它），定时任务因此能让手机定期备份。加密开着时它会拒绝，因为口令在页面上输入、从不进入命令行；没有启用的目的地时也拒绝（[#560](https://github.com/nano-muse/nanoMuse/issues/560)） |
-| `connectors/`、`ui/connectors/` | 连接器目录（`ConnectorsCatalogue` 读取资源文件）、MCP 授权发现与注册（`McpAuthDiscovery`）、连接和令牌刷新（`Connectors`）、这台手机连接了什么并发布到 profile、其他设备连接了什么（`SharedConnectors`）、「设置 → 连接器」页面 |
-| `ui/cloud/` | 登录、账号屏、设备部分 |
-| `res/values*/nm_strings.xml` | nanoMuse 的全部字符串，App 支持的十七种语言各一份（英语、简体中文、繁體中文、德语、西班牙语、菲律宾语、法语、印尼语、日语、韩语、马来语、波兰语、巴西葡萄牙语、罗马尼亚语、俄语、泰语、土耳其语）；每个文件的键相同，只有英语文件里标了 `translatable="false"` 的两条（中继地址示例和产品名 `nanoMuse Cloud`）例外，缺的回落到英语 |
+| `cloud/NanoMuseCloud.kt` | 处理验证码、密码登录，加密存储 key，读取 `/v1/me`、用量、会话及本地化错误；读取中继模型菜单和 `for: chat` / `for: gui` 两类默认模型。 |
+| `cloud/Region.kt`、`cloud/ProviderCatalogue.kt`、`cloud/Capabilities.kt`、`cloud/OwnKeyPresets.kt`、`cloud/ProfileSync.kt` | 按地区排列服务商，大陆先百炼，其他地区先 OpenRouter、OpenAI。从 `assets/nanomuse/providers.json` 读取自有 key 目录，识别已配置服务商及其能力，生成不可用提示。用 `?preset=<id>[:oauth]` 预填表单，同步中继 profile 中的名字、形象、连接器。 |
+| `sync/` | 实现约定 C7–C10。`SyncEngine` 决定上传、下载，每个映射保存 `owner`，只同步当前账号；`ConversationSync` 决定时机，其 `hidden` 使 `ChatRepository.observeSessions()` 隐藏其他账号聊天。另有 `LocalChats` 和基于 Room 的 `nanomuse_sync.db`，其中 `session_owners` 属于 C12。 |
+| `account/` | 实现 C12（0.1.40），见 [sync.md](sync.md)。`AccountScope` 定义聊天归属、账号标识、列表过滤、key 被拒后的保留规则：`keepOnRefusedKey` 保留全部，除非中继返回 `account_deleted`，均有单元测试。`AccountData` 为各聊天写归属记录；`leave` 删除或单独保存聊天、记忆、动态、目标、例程、形象、偏好，`enter` 恢复账号数据。「资源库」同样只列出聊天列表可见会话的工作区，避免共用手机时暴露其他账号文件，检查位于有单元测试的 `library/LibraryIndex.shows`。 |
+| `hub/` | `Hub` 维护连接状态、设备身份、设置。`HubClient` 保持 socket 并按退避策略重连：key 被拒每分钟一次，连接被替换等 30 秒，运营者暂停 hub 等两分钟，均显示原因。`HubService` 是前台服务。`HubActions` 执行允许的远程动作，`stop {call \| conversation}` 可结束发起设备在此启动的任务，`HubTasks` 记录归属并有单元测试。`HubErrors` 将失败转成文字。 |
+| `reach/` | `Computers` 读取 hub 的账号设备列表并调用设备。0.1.24 起不再单独配对、保存令牌。此处也包含向电脑转交任务的处理器。 |
+| `models/` | 实现 设置 → 模型。`ModelSlots` 保存四种用途的配置及存储位置、选择器分组，用 `followPick` 更新对话默认模型，用 `applyProvider` 应用「用它来做什么」卡片。`SlotOrder` 定义解析顺序和目录默认值，`PickerList` 处理每组八行、排序和搜索；后二者为纯 Kotlin，均有单元测试。 |
+| `ui/models/` | 提供模型页、各用途选择器和「用它来做什么」卡片，入口 `minis://settings/models`。 |
+| `chat/CloudRetry.kt` | 判断何时显示「这次改用 nanoMuse Cloud」，并决定 `ChatViewModel.retryLast` 在该轮使用哪个服务商。 |
+| `chat/RoutineWakes.kt`、`ui/chat/NmRoutineWakeRow.kt` | 将定时任务轮次标为例程发起，而非用户发起。`ScheduledAgentRunner` 发出提示前登记唤醒，`ChatViewModel` 关联到持久消息，`NmRoutineWakeRow` 只显示「例程 · 〈名称〉 · 08:00」，不用用户消息气泡。仅该轮附加的 `SessionAddenda` 会让模型直接报告结果，而非感谢用户提问。1.0.4 及之前，提示显示得像用户亲自输入。 |
+| `feed/` | `FeedFlow` 维护每日定时任务及写作会话，后者仅供智能体工作，不进入抽屉、聊天列表、主要聊天候选；`FeedFlow.hidden` 由 `ChatRepository.observeSessions()`、`MainChat` 和移动面板使用。`FeedStore` 按最新日期、同日最新批次排序，批内保持模型顺序，以相同 `created` 标识同批次，`FeedStore.DAY_ORDER` 有测试。智能体在 `/var/minis/feed/YYYY-MM-DD/NN.md` 读取只读副本，已点赞内容含 `liked: true`。`FeedSandboxScope` 在 shell 命令前及点赞后刷新副本，避免 PRoot 不能只读挂载、智能体可能修改点赞的问题。没有 `liked` 表示未评价，提示词明确说明并非不喜欢。后台写出动态后，通知会列出标题并打开动态页 `minis://feed`，替代 1.0.4 及之前显示模型正文、打开工作会话的通用任务完成通知。 |
+| `chat/TurnReply` | 识别本轮有效回复：只接受最后用户消息之后、未附错误的最后一条助手消息。动态、目标、首次对话通过它读取，因此尚未产出回复就失败的轮次返回空，不会误取上一轮回答，见 #637。 |
+| `net/ModelBlip` | 为沙箱 `model_use` 加重试：网络错误、临时错误、5xx 分别等待一秒、两秒后再试，与聊天及 iOS 桥接一致；其他错误立即抛出。网关上游无响应的 `HTTP 0` 也视为临时错误，见 #640。 |
+| `hands/` | 包含无障碍执行服务、屏幕提示层、浮动胶囊和屏幕读取器。`Hands.screenModel` 按顺序选择：显式选择；具备视觉能力的自有对话服务商默认模型；Cloud 的 `gui` 推荐；自有 key 备用；能看图的聊天模型；Vision Group。 |
+| `ui/coding/` | 提供电脑编程助手的手机界面。 |
+| `backup/` | 在上游 设置 → 备份与恢复（`minis://settings/backup`）扩展备份。「对话里的文件」默认开启，关闭后只导出消息，文件以墓碑记录即仅有条目、无实际内容的方式列入，各其他类别不变，可将 1.5 GB 包缩成几 MB，适配限制上传大小的服务器，见 [#561](https://github.com/nano-muse/nanoMuse/issues/561)。`BackupHints` 将目标 `413` 解释为服务器上传上限。沙箱 `nanomuse-backup run` 使用页面保存的选项和全部启用目标执行一次备份，`BackupRun` 写入历史，`status`、`history`、`choices` 可读取，便于定时任务备份。加密开启时拒绝命令行备份，因为口令只在页面输入、不进入 shell；未启用目标时也拒绝，见 [#560](https://github.com/nano-muse/nanoMuse/issues/560)。 |
+| `connectors/`、`ui/connectors/` | `ConnectorsCatalogue` 读取连接器资源目录；`McpAuthDiscovery` 发现授权及注册；`Connectors` 连接、刷新令牌；`SharedConnectors` 发布本机连接清单到 profile 并读取其他设备清单。另提供 设置 → 连接器 页面。 |
+| `ui/cloud/` | 提供登录页、账号页和设备设置。 |
+| `res/values*/nm_strings.xml` | 保存 nanoMuse 全部界面文字，共十七种语言：英语、简体中文、繁體中文、德语、西班牙语、菲律宾语、法语、印尼语、日语、韩语、马来语、波兰语、巴西葡萄牙语、罗马尼亚语、俄语、泰语、土耳其语。各文件键保持一致，英语中标记 `translatable="false"` 的中继地址示例、`nanoMuse Cloud` 产品名除外。缺少翻译时使用英语。 |
 
 ## 继续中断的备份 {#export-resume}
 
-备份与还原页面可继续或丢弃中断的导出。继续时必须使用原来的类别、文件大小上限、对话文件和凭据选项，并保留原标识及时间截止点，复用已验证的完成类别。加密备份需要重新输入密码，不能改为明文继续；日志从不保存密码。加密和打包使用可丢弃的副本，需要为该副本预留临时空间。失败的任务会保留私有暂存数据，直到继续或丢弃。计划任务会报告需要用户选择，而不会替换中断任务。成品仍使用可互操作的 .minisbak 格式。
+「备份与恢复」可对中断的导出选择「继续」或「丢弃」。继续时必须沿用原类别、文件大小限制、对话文件和凭据选项，保留原导出标识与时间截止点，并复用已校验完成的类别。加密导出需要重新输入密码，不能改成明文继续，日志不记录密码。加密与打包会使用一次性副本，需要额外临时磁盘空间。失败后的私有暂存数据会一直保留，直到继续或丢弃。定时备份遇到待恢复导出时，会报告需要选择，不覆盖它。完成的文件仍采用可互操作的 .minisbak 格式。
 
-恢复导出时还会校验已保存的文件索引，以及暂存数据和内容文件；即使索引长度未变，目标路径或元数据被改动也会拒绝继续。
+继续导出时，不仅校验暂存数据和内容文件，也校验已提交的文件索引。即使索引长度相同，只要目标路径或元数据变化，也会拒绝继续。
 
 ## 中断还原的恢复 {#restore-recovery}
 
-Android 在还原共享文件、技能、记忆、MCP 配置、服务商或环境变量前保存恢复快照。类别还原失败时会回滚；若进程中断，下次启动会在打开数据仓库前恢复该类别。恢复失败会保留快照并阻止正常启动，以便重试。对话仍按原有规则合并，此功能不提供完整的对话历史回滚。恢复元数据不包含在导出内容中。
+Android 在恢复共享文件、技能、记忆、MCP 配置、服务商或环境变量前，会保存恢复快照。某类别恢复失败则撤销该类别修改；过程中断时，下次启动会在打开数据仓库前核对并恢复该类别。恢复仍失败时保留快照、阻止正常启动，以便再次尝试。聊天继续沿用既有合并规则，不支持把整段聊天历史回退。恢复元数据不放入导出包。
 
-环境变量恢复也会刷新当前进程中的列表；原来没有元数据文件时，部分导入留下的条目会被清除。
+环境变量元数据恢复后，也会更新正在运行的 App，即使原先不存在该元数据文件。
 
 ## 直接向另一台设备发送任务 {#direct-tasks-to-another-device}
 
-以 `@设备名称` 开头发送文字，任务会直接通过 Hub 到达该设备，本机模型不再先用一轮对话决定如何委派。远端设备使用自己的模型、工具和配置。这仍是单次任务，不会把后续消息的执行位置固定到该设备。
+消息以 `@设备名称` 开头时，文字直接经 hub 发往目标设备，本机模型不再额外用一轮判断如何委派。目标设备用自己的模型、工具、配置执行。此指定只适用于当前任务，不会改变后续消息的默认执行设备。
 
-聊天会实时显示设备名称、工具步骤和回复文字。分段文字会替换当前段落，不会重复添加消息。不支持流式回复的设备仍可返回最终答案。审批沿用模型委派任务使用的本机卡片和限定范围的授权；「停止」会取消远端的本次调用，并撤回它尚未回答的卡片。
+远端执行时，聊天实时显示设备名、工具步骤和回复。未完成的流式文字替换当前片段，不重复插入消息；不提供流式输出的设备则返回最终回答。审批与模型委派任务一样，使用本机卡片和限定范围的授权。点「停止」会取消目标设备的本次调用，并撤回尚未回答的审批卡片。
 
-设备离线或名称有歧义时，消息留在输入框。设备任务只接收文字，请先移除附件和粘贴的文件内容。当前一轮结束后才能发送下一条设备任务；普通本机消息仍沿用现有队列。调用失败前可能已有部分步骤执行，因此会明确显示失败或没有回复。最终文字和设备来源只保存一次；重新打开聊天时不会重建实时工具卡片。
+目标离线或名称不明确时，消息保留在输入框。跨设备任务只接收文字，发送前需移除附件和粘贴文件的内容。须等活动轮次结束才能再发设备任务，普通本机消息仍可进入原有队列。调用报错前可能已执行部分步骤，因此界面会明确显示失败或缺少回答。最终文字及设备来源只保存一次，重新打开聊天不会重建实时远端工具胶囊。
 
-Android 跨设备任务最多等待十五分钟，与中继的任务时限一致。调用方超时或取消时，会尝试按原调用编号停止目标任务，清理最多等待十五秒。已经结束的调用编号不会停止同一对话中的后续任务。
+Android 等待设备任务的上限为十五分钟，与中继期限相同。发起端超时或取消后，会尽力向目标发送针对该调用 id 的停止请求，最多等待十五秒完成清理。过期调用 id 无法停止同一对话后来启动的任务。
 
-远端任务也沿用本地回复的前台服务跟踪。离开对话后成功完成并保存的回复会显示未读标记；取消、失败或未能保存的回复不会标为未读。
+远端任务与本地回答使用相同的前台服务跟踪。你离开该聊天后，成功完成并保存的回复会标为未读；取消、失败、未保存的回复不标记。
 
 ## 未读回复 {#unread-replies}
 
-对话不可见时成功完成的回复，会在 Muse 抽屉和经典对话列表中标记为未读。折叠的经典分组也会显示未读提示。打开对话即可清除标记。失败、取消或重复的完成事件不会产生未读标记。该状态仅在本机当前进程内保存，与运行和暂停标记独立。此功能覆盖 #531 的未读回复部分，不代表完成其中所有运行状态和审批提议。
+回复成功完成时，如果聊天不可见，Muse 抽屉和经典会话列表会显示未读，经典布局折叠分组也保留提示。打开聊天即清除。失败、取消、重复完成事件不产生标记。未读状态只保存在本机当前进程中，与运行、暂停徽标分开。此功能只实现 #531 的未读回复部分，未覆盖其中全部工作状态、审批建议。
 
-两种布局都以当前处于前台且可见的对话为准，草稿发送首条消息后也会继续跟踪其实际标识。切换到其他标签页、打开覆盖对话的页面或将应用置于后台后，后续完成的回复会标记为未读。
+两种布局都按当前已恢复到前台的聊天判断可见性，新草稿发出首条消息后也适用。切换标签、被其他页面遮住或 App 进入后台后，完成的回复会标为未读。
 
 ## 用 @ 选择设备 {#picking-a-device-with}
 
-在消息开头输入 `@`，可接收任务的在线设备会列在文件之前。按名称筛选后点击，也可用现有的方向键和回车选择。设备行显示名称、手机或电脑图标、操作系统、在线状态和设备 ID。
+在消息起始位置键入 `@`，会在常规文件结果前列出在线、可接收任务的设备。可按名字筛选后点选，或沿用方向键和回车选择。每行显示名称、手机或电脑图标、系统、在线状态、设备 ID。
 
-选择后会插入完整名称。同名设备用 `@名称 [设备ID]` 区分；有歧义的简称或未限定的同名不会默认选第一台。委派指令使用稳定的设备 ID。消息中间的提及仍只列出文件。
+选择设备会插入完整名称。同名设备使用 `@名称 [设备ID]` 区分，不明确的简称或无 id 的同名不会自动匹配第一项。委派实际使用稳定设备 ID。消息中间输入 `@` 仍只建议文件。
 
 ## 来自其他设备的 Emoji 形象 {#emoji-avatars-from-another-device}
 
-在桌面或网页选择的 emoji 形象也会显示在 Android 上，并保留背景色。emoji 与生成的形象存放在同一目录，重启后仍保留，也沿用现有的账号隔离。emoji 为空时显示 ✨，颜色无效时使用蓝色（`#0064d4`）。
+桌面版或网页版选定的 emoji 形象及背景色会同步显示到 Android。手机会将 emoji 与自绘形象一并保留，重启后仍有效，也遵循账号隔离。空 emoji 使用 ✨，无效颜色使用蓝色 `#0064d4`。
 
-生成的形象和个人短片仍按原有优先级显示。修改智能体名字或连接器不会覆盖未改变的远端形象；明确重置形象才会恢复小龙。本次不增加 Android 上的 emoji 选择器。
+自绘形象和个人视频继续按既有优先级显示。改名、修改连接器不会动未变化的远端外观。明确重置形象才恢复小龙。此项不包含 Android 本机选择 emoji 的功能。
 
 ## 应用锁 {#app-lock}
 
-Android 可在显示应用内容前要求使用本机锁屏方式验证。在设置中启用应用锁并选择重新锁定的时间，保存更改需要验证。解锁状态仅在当前进程内有效。两种布局、传入分享和安全模式诊断使用同一入口保护。应用重新锁定时，原生诊断窗口会关闭；从导出文件选择器返回后，写入诊断数据前仍需通过访问验证。这是应用内访问保护，不是存储加密。后台任务继续运行。
+Android 可要求先验证设备锁屏，再显示 App 内容。在设置启用应用锁、选择重新锁定时间，保存前需要验证。解锁只在当前进程有效。两种布局、外部分享入口、安全模式诊断都受同一访问检查保护。重新锁定会关闭原生诊断窗口，从导出文件选择器返回后，也必须重新获得访问权限才写诊断数据。这是 App 内访问控制，不加密存储，后台任务仍继续。
 
-等待中的诊断导出，只有在所属页面回到前台且应用同时处于解锁状态时才会继续。在其他窗口解锁，不会让后台的导出页面开始写入。
+待执行的诊断导出，必须同时满足导出页面已回到前台、App 已解锁，才会开始。在其他窗口解锁，不会放行尚在后台的导出。
 
-应用重新锁定时，服务商导入和权限修复的原生对话框也会关闭，等待中的权限选择按取消处理。
+访问权限到期时，原生服务商导入、权限修复弹窗也会关闭，尚未确认的权限选择会取消。
 
 ## 受保护的对话 {#session-lock}
 
-对话菜单可使用本机锁屏方式保护单个对话。启用或移除保护、导出或复制已锁定的对话，以及根据消息内容重新生成标题，都需要验证。副本继承保护，但需要单独解锁。保护新对话时会先将其保存；取消验证则保留原来的草稿。设置中可选择重新锁定的间隔，也可选择离开对话时立即锁定。两种布局以及通知、深层链接入口均受保护。受保护对话的消息预览和正文搜索匹配不会显示。
+可在聊天菜单用设备锁屏保护单个对话。开启、解除保护，导出、复制已锁聊天，或根据正文重新生成标题，都需验证。复制品继承保护，但必须单独解锁。保护新对话时先保存聊天；若取消验证，草稿保持原样。设置可指定重新锁定间隔，也可选离开即锁。两种布局、通知、深链接入口都使用此检查，受保护聊天不显示预览，也隐藏正文搜索命中。
 
-手动备份包含已锁定的对话时会请求验证。此次授权只用于备份，不会同时解锁所有对话。计划备份、同步和后台任务保持原有行为。保护元数据在本地持久保存，解锁状态不会跨进程保存；两者均不通过对话同步或备份传输。此功能不加密对话存储。
+手动备份若包含锁定聊天，会先请求确认，授权只针对该次备份，不会解锁所有聊天。定时备份、同步、后台工作照常进行。保护信息在本机跨重启保存，解锁状态不保存；二者均不通过聊天同步或备份传输，也不加密聊天存储。
 
-设置为「退出时」后，切换到其他 Muse 标签页也会重新锁定对话，即使聊天页面仍保留在后台。
+使用「退出时」重新锁定选项时，切换到其他 Muse 标签也算离开对话，即使聊天仍在后台保留。
 
 
 ## 继续操作屏幕 {#hands-continuity}
 
-同一对话再次明确请求「手」操作同一个已识别应用时，Android 会提供上次运行的简短记录，包括任务、结果、结束状态和最后八步。记录只保存在内存中，最多保留三十分钟、三十二组对话与应用。它只是历史观察，不代表允许重复操作或继续已停止的任务；当前请求和最新截图优先。没有对话或无法识别应用时不复用记录，运行中明确切换到其他应用时不保存共享记录。清空、编辑或删除对话、同步替换历史、退出账号或重启后，相应记录会被清除。
+同一聊天再次明确要求「手」操作同一已识别应用时，Android 会附上上次执行的任务、结束状态、结果和最后八步，作为简短历史记录。记录只存内存，最多三十分钟，最多三十二组聊天与应用组合。它不代表允许重复操作或恢复已停止任务，当前要求和新截图优先。没有聊天或未识别应用的运行不复用记录；明确切换到别的应用的运行不保存共用记录。清空、编辑、删除聊天，替换同步历史，退出账号或重启，都会丢弃对应记录。
 
-屏幕模型可在 `scroll` 动作中增加 `"distance":"large"`，将纵向滑动距离增至约屏幕高度的 65%。省略时保留原来约 45% 的纵向距离，横向手势不变。主智能体会收到提示，保留 `nanomuse-hands run` 的完整 JSON，包括结束状态和最终回答，不用 `head` 或 `tail` 截断。
+屏幕模型可为 `scroll` 加上 `"distance":"large"`，执行约屏幕高度 65% 的纵向滑动。不传时维持约 45%，横向手势不变。主智能体会收到要求，保留 `nanomuse-hands run` 的完整 JSON，尤其是结束状态和最终回答，不以 `head`、`tail` 截掉内容。

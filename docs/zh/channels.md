@@ -1,8 +1,8 @@
 # 聊天入口
 
-把你的 nanoMuse 放进你已经在用的聊天软件：飞书 / Lark、钉钉、企业微信和 Telegram。在手机上给机器人发消息，回答的就是同一个 Muse：每个聊天对应一个对话，回复边生成边发回来，工具在跑时显示一行状态，审批用一个词或一个按钮回答。标了「推送到这里」的聊天还会收到 Muse 自己主动做的事：问候、提醒、后台任务的结果、它需要你回答的问题。
+你可以在平时使用的聊天软件中与 nanoMuse 对话，目前支持飞书 / Lark、钉钉、企业微信和 Telegram。用手机给机器人发消息，就能使用同一个 nanoMuse：每个聊天各自对应一段对话，回复会随生成进度显示，执行工具时会显示状态，需要审批时可以回复文字或点击按钮。开启「推送到这里」的聊天还会收到主动消息，包括问候、提醒、后台任务结果，以及需要你回答的问题。
 
-不需要公网地址。每家都提供一种由机器人从你的网络内部主动发起的长连接（Telegram 是长轮询），所以运行时放在路由器后面或一台笔记本上就够了。socket 的活由各家自己的 SDK 来干；它们是可选的额外依赖：
+这些入口都不需要公网地址。机器人会从你的网络内部主动建立长连接，让双方持续收发消息；Telegram 使用长轮询，也就是发送请求并等待新消息后再继续请求。因此，在路由器后面的电脑或笔记本上运行 nanoMuse 就可以使用。连接由各厂商的 SDK（软件开发工具包）处理，这些 SDK 是按需安装的可选依赖：
 
 ```sh
 pip install 'nanomuse[feishu]'      # lark-oapi
@@ -11,16 +11,16 @@ pip install 'nanomuse[wecom]'       # wecom-aibot-sdk-python
 pip install 'nanomuse[channels]'    # all three; Telegram needs nothing extra
 ```
 
-Docker 镜像带全了这些。没装 SDK 时，应用会显示要安装的那行命令，开关保持不动。
+Docker 镜像已包含全部 SDK。未安装对应 SDK 时，应用会显示安装命令，并保持该入口的开关不变。
 
-飞书或钉钉消息交给运行时后处理失败时，运行时日志会记录入口名称和错误。机器人已连接、收到消息却没有回复时，可查看这份日志。
+飞书或钉钉消息到达运行时（负责执行智能体任务的本地程序）后，如果处理失败，运行时日志会记录入口名称和错误。机器人显示已连接、却收到消息不回答时，可以先检查这份日志。
 
-## 在哪里找到它 {#where-to-find-it}
+## 设置入口 {#where-to-find-it}
 
-* **应用**：设置 → 「聊天入口」。每个聊天软件一张卡片：开关、凭据、谁可以和它说话、已配对的聊天和各自的「推送到这里」开关、一个「发一条测试消息」按钮，还有设置步骤和指向厂商控制台的链接。
-* **终端**：`nanomuse channels status | pending | approve <code> | deny <code> | login feishu [--lark] | test <name>`。`nanomuse serve` 在跑时，这些命令走它的 API；否则它们直接改 `<data_dir>/channels/` 下的文件，服务器启动时（或按「重新加载」时）读入。
-* **API**：`GET /api/channels`、`PUT /api/channels/<name>`、`POST /api/channels/pairing/<code>/approve|deny`、`PUT|DELETE /api/channels/<name>/chats/<sender>`、`POST /api/channels/<name>/test`、`POST /api/channels/deliver {text}`、`POST /api/channels/reload`，飞书还有 `POST /api/channels/feishu/login` + `GET /api/channels/feishu/login/<device_code>`。
-* **config.toml**：手工搭的服务器也可以写一张 `[channels.<name>]` 表：
+* **应用**：进入设置 → 聊天入口。每种聊天软件各有一张卡片，包含开关、连接凭据、允许联系机器人的用户、已配对的聊天、每个聊天的「推送到这里」开关，以及「发一条测试消息」按钮。卡片还提供设置步骤和厂商控制台链接。
+* **终端**：使用 `nanomuse channels status | pending | approve <code> | deny <code> | login feishu [--lark] | test <name>`。如果 `nanomuse serve` 正在运行，命令会调用它的 API（供程序访问功能的接口）；否则直接修改 `<data_dir>/channels/` 中的文件，由服务在启动或点击「重新加载」时读取。
+* **API**：提供 `GET /api/channels`、`PUT /api/channels/<name>`、`POST /api/channels/pairing/<code>/approve|deny`、`PUT|DELETE /api/channels/<name>/chats/<sender>`、`POST /api/channels/<name>/test`、`POST /api/channels/deliver {text}`、`POST /api/channels/reload`。飞书另有 `POST /api/channels/feishu/login` 和 `GET /api/channels/feishu/login/<device_code>`。
+* **config.toml**：手动配置服务器时，也可以添加 `[channels.<name>]` 配置段：
 
   ```toml
   [channels.telegram]
@@ -30,110 +30,109 @@ Docker 镜像带全了这些。没装 SDK 时，应用会显示要安装的那�
   group_policy = "mention"        # or "open"
   ```
 
-  应用里保存的值按字段优先。在应用里填的密钥进保险库（文件里留的是 `{{vault:CHANNEL_TELEGRAM_BOT_TOKEN}}`），之后不再显示；密钥字段只告诉你有没有填过。
+  每个字段都以应用中保存的值为优先。在应用中输入的密钥会存入保险库（专门保存敏感凭据的位置），文件中只留下 `{{vault:CHANNEL_TELEGRAM_BOT_TOKEN}}` 这样的占位符。保存后不会再次显示密钥，字段只提示是否已设置。
 
-## 逐个设置 {#setting-up-each-app}
+## 配置各聊天软件 {#setting-up-each-app}
 
-下面的控制台名称是 2026 年时的叫法；厂商会挪地方。
+下面使用的是 2026 年各厂商控制台的名称，厂商之后可能调整位置或名称。
 
 ### 飞书 / Lark {#feishu-lark}
 
-简便的办法：在应用里按「扫码创建机器人」（或运行 `nanomuse channels login feishu`，国际版加 `--lark`），用飞书扫码，确认，完成；App ID 和 Secret 已经保存，这个入口随即打开。这是飞书自己为个人智能体提供的扫码建应用流程；它创建出来的应用已经带上机器人能力和长连接事件。
+你可以在应用中点击「扫码创建机器人」，用飞书扫描并确认。也可以运行 `nanomuse channels login feishu`，国际版 Lark 加上 `--lark`。完成后，App ID 和 Secret 会自动保存，聊天入口随即启用。这是飞书为个人智能体提供的扫码创建应用流程，创建的应用已经配置好机器人能力和长连接事件。
 
-手动的话，到 <https://open.feishu.cn/app>（Lark：<https://open.larksuite.com/app>）：
+如果手动配置，打开 <https://open.feishu.cn/app>，Lark 则打开 <https://open.larksuite.com/app>：
 
-1. 「创建企业自建应用」→「添加应用能力」→ **机器人**。
-2. 「权限管理」：`im:message`、`im:message.p2p_msg:readonly`、`im:message.group_at_msg:readonly`、`im:resource`（图片和文件）。
-3. 「事件与回调」：订阅方式选 **长连接**，添加 `im.message.receive_v1`；回调方式选 **长连接**，添加 `card.action.trigger`（审批按钮）。
-4. 「凭证与基础信息」：把 **App ID** 和 **App Secret** 复制到应用里；选 *feishu* 或 *lark*。「Encrypt Key」和「Verification Token」留空，除非你在控制台里设了。
-5. 「版本管理与发布」→ 创建版本 → 发布。
+1. 选择「创建企业自建应用」→「添加应用能力」→「机器人」。
+2. 在「权限管理」中添加 `im:message`、`im:message.p2p_msg:readonly`、`im:message.group_at_msg:readonly` 和 `im:resource`，最后一项用于图片和文件。
+3. 在「事件与回调」中，将事件订阅方式设为「长连接」，添加 `im.message.receive_v1`；将回调方式也设为「长连接」，添加 `card.action.trigger`，用于处理审批按钮。
+4. 在「凭证与基础信息」中，将「App ID」和「App Secret」复制到 nanoMuse，选择 *feishu* 或 *lark*。如果没有在厂商控制台设置「Encrypt Key」和「Verification Token」，这两项留空。
+5. 进入「版本管理与发布」，创建版本并发布。
 
-回复是带 markdown 正文的可交互卡片；回复流式生成时，卡片原地更新（大约每秒一次）。你的消息上出现一个 👍，表示 Muse 正在处理。群里 @ 它才回答。
+回复以交互卡片发送，正文支持 Markdown 排版。文字生成过程中，应用会约每秒更新一次原卡片。你的消息上出现 👍，表示 nanoMuse 正在处理。在群聊中，只有 @ 机器人时才会收到回答。
 
 ### 钉钉 {#dingtalk}
 
-到 <https://open-dev.dingtalk.com/>：
+打开 <https://open-dev.dingtalk.com/>：
 
-1. 「创建应用」（企业内部应用）→「添加应用能力」→ **机器人**。
-2. 消息接收模式：**Stream 模式**。不需要回调地址。
-3. 「凭证与基础信息」：复制 **Client ID**（AppKey）和 **Client Secret**（AppSecret）。
-4. 「权限管理」：机器人发消息的权限（`qyapi_robot_sendmsg`），这样「推送到这里」的聊天在没有消息可回复时也能写入。
-5. 发布版本；把机器人加进群，或在通讯录里找到它。
+1. 创建「企业内部应用」，进入「添加应用能力」，添加「机器人」。
+2. 将消息接收模式设为「Stream 模式」，不需要回调 URL（接收厂商推送请求的公网地址）。
+3. 在「凭证与基础信息」中复制「Client ID」（AppKey）和「Client Secret」（AppSecret）。
+4. 在「权限管理」中添加机器人发送消息的权限 `qyapi_robot_sendmsg`。这样，开启「推送到这里」的聊天即使没有等待回复的消息，也能接收主动推送。
+5. 发布版本，再将机器人加入群聊，或在通讯录中找到它。
 
-钉钉消息不能编辑，所以回复在写完后一次发出。钉钉群里的机器人只听得到 @ 它的消息。
+钉钉不支持编辑已发出的消息，因此回复会在生成完毕后整条发送。群聊中的机器人只能收到 @ 它的消息。
 
 ### 企业微信 {#wecom}
 
-在企业微信管理后台 →「安全与管理」→ **智能机器人**：
+进入企业微信管理后台 → 安全与管理 → 智能机器人：
 
-1. 「创建机器人」→ **API 模式**，连接方式选 **长连接**。
-2. 把 **Bot ID** 和 **Secret** 复制到应用里。
-3. 把机器人加进它该听的聊天，或者让大家在通讯录里找到它。
+1. 点击「创建机器人」，选择「API 模式」，连接方式选择「长连接」。
+2. 将「Bot ID」和「Secret」复制到 nanoMuse。
+3. 将机器人加入需要接收消息的聊天，或让用户在通讯录中找到它。
 
-socket 主机（`openws.work.weixin.qq.com`）已加进运行时进程的 `NO_PROXY`；公司的 HTTPS 代理通常带不动它。回复经同一个 socket 流式返回；主动消息（推送）是 markdown。
+运行时会将长连接使用的主机 `openws.work.weixin.qq.com` 加入 `NO_PROXY`（不经过代理的地址列表），因为企业 HTTPS 代理通常无法转发这种连接。回复会通过同一条 socket 连接逐段发送，主动推送的消息采用 Markdown 格式。
 
-运行时最多保留 1,000 个企业微信聊天的回复帧。如果某个聊天的帧已被移除，它接下来
-等待发送的回复会作为一条完整消息发出，不再流式更新。收到新消息后会保留新的回复帧。
+运行时最多保留 1,000 个企业微信聊天的回复帧，即用于向该聊天继续发送回复的数据。如果某个聊天的回复帧已被清理，下一条等待发送的回复会一次完整发出，不再逐段更新。该聊天收到新消息后，会重新获得回复帧。
 
 ### Telegram {#telegram}
 
-1. 在 Telegram 里找 **@BotFather**，发 `/newbot`，把 token 复制到应用里。
-2. 私聊立刻可用。群聊要先把机器人拉进群；BotFather 的「Group Privacy」开着（默认）时，它只听得到 @ 它的消息和对它自己消息的回复，正好对应 *mention* 策略。
-3. 这台电脑连不上 `api.telegram.org` 的话，填 **代理**（`socks5://…` 或 `http://…`）。
+1. 在 Telegram 中找到「@BotFather」，发送 `/newbot`，将得到的 token（机器人访问令牌）复制到 nanoMuse。
+2. 私聊可以直接使用。群聊需要先添加机器人。BotFather 的「Group Privacy」默认开启，此时机器人只会收到 @ 它的消息和对它自己消息的回复，与 *mention* 策略一致。
+3. 如果运行 nanoMuse 的电脑无法访问 `api.telegram.org`，设置「代理」，格式为 `socks5://…` 或 `http://…`。
 
-回复先发出，再在流式生成时原地编辑（超过 Telegram 的 4096 字符上限会拆成几条）。审批是两个内联按钮。
+回复先发送，再随文字生成不断编辑原消息。超过 Telegram 的 4096 字符限制时会拆分为多条。审批消息包含两个可直接点击的按钮。
 
-## 配对：谁可以和机器人说话 {#pairing-who-may-talk-to-the-bot}
+## 配对：决定谁能与机器人对话 {#pairing-who-may-talk-to-the-bot}
 
-找到机器人的人都能给它发消息；Muse 只回答你放进来的人。
+任何找到机器人的人都能给它发消息，但只有你允许的人才能让 nanoMuse 处理消息。
 
-* 陌生人的第一条私聊只会得到一个**配对码**（六位字母和数字，不含 0/O/1/I，十分钟有效），别的什么都没有；这条消息不会到 Muse。在 设置 → 聊天入口 里通过这个码，或者运行 `nanomuse channels approve <code>`。对方会收到通知，此后的消息就通了。
-* **免配对的 ID**（`allow_from`）：不需要配对码的厂商用户 id。单独一个 `*` 放行所有人，只适合别人都找不到的机器人。
-* **群**：群里的陌生人被静静忽略（群里不发配对码）。已配对的人在群里的消息，机器人被 @ 时才回答（`group_policy = "mention"`），或者每条都回（`"open"`）。群本身是一个独立的对话；每一行都带着发送者的名字。
-* 在应用里**移除**一个已配对的聊天（或从 `pairing.json` 里删掉）；对方的下一条消息会收到新的配对码。
+* 陌生人第一次私聊时，只会收到一个**配对码**，原消息不会交给 nanoMuse。配对码由六位字母和数字组成，不含容易混淆的 0/O/1/I，十分钟内有效。你可以在设置 → 聊天入口中批准，或运行 `nanomuse channels approve <code>`。对方会收到通知，此后发送的消息才会交给智能体。
+* **免配对的 ID**（`allow_from`）：填入聊天平台的用户 id，这些用户无需配对码。单独填 `*` 会允许所有人，仅适合其他人无法访问的机器人。
+* **群聊**：未获准的用户会被忽略，群内不会发送配对码。获准用户的消息在 `group_policy = "mention"` 时需要 @ 机器人，设为 `"open"` 则每条消息都会回答。每个群拥有独立对话，每条消息都附带发送者姓名。
+* 在应用中「移除」已配对聊天，或从 `pairing.json` 删除该配对后，对方下次发消息时需要重新获取配对码。
 
-配对关系和配对码存在 `<data_dir>/channels/pairing.json`（在数据目录，不在工作区），所以智能体自己的文件工具改不了谁可以和它说话。
+配对关系和配对码保存在 `<data_dir>/channels/pairing.json`。这是数据目录，不是工作区，因此智能体自己的文件工具无法修改哪些人可以与它对话。
 
-## 聊天怎么对应到 Muse {#how-a-chat-maps-to-the-muse}
+## 聊天如何对应到 nanoMuse 对话 {#how-a-chat-maps-to-the-muse}
 
-每个聊天是智能体的一个对话，id 是 `channel-<app>-<chat id>`，在应用抽屉里的标题是「飞书 · Ann」/「Telegram · Team」。来自聊天的消息和在应用里打的字走同一个入口，所以其他一切，记忆、目标、哨兵（Sentinel）、技能，都是同一个 Muse。附件（照片、文件、语音）保存在工作区的 `attachments/` 下，并附在消息上。
+每个聊天对应智能体的一段独立对话，id 为 `channel-<app>-<chat id>`，在应用抽屉中的标题类似「飞书 · Ann」或「Telegram · Team」。聊天软件收到的消息与 nanoMuse 应用中输入的消息使用同一个处理入口，因此记忆、目标、哨兵（Sentinel，检查操作风险和权限的组件）及技能等能力相同。照片、文件、语音等附件会保存在工作区的 `attachments/` 目录，并附在消息上。
 
-运行进行时：
+任务执行时：
 
-* 文字随着模型的输出流进回复（厂商允许编辑的地方）；
-* 正在运行的工具在同一条消息里显示为一行斜体短句（「正在搜索网页」「正在运行命令」），直到被文字替换；
-* 哨兵要求的**审批**会到聊天里：飞书和 Telegram 是带「允许」/「拒绝」按钮的卡片，钉钉和企业微信是一条要你回一个词的消息。`allow`、`yes`、`ok`、`允许`、`同意` 是允许一次；`deny`、`no`、`拒绝`、`不行` 是拒绝。这个决定和在应用里按卡片是一样的；
-* 运行产生的文件（构件事件）在运行结束时发出；
-* Muse 提出的**问题**会送到聊天里，你的下一行就是回答。
+* 平台允许编辑消息时，回复会随模型输出逐段显示。
+* 工具执行期间，同一条消息中会显示简短的斜体状态，例如「正在搜索网页」或「正在运行命令」，随后被回复文字替换。
+* 哨兵要求你确认的**审批**会发送到聊天中。飞书和 Telegram 使用带「允许」「拒绝」按钮的卡片；钉钉和企业微信发送文字，让你回复关键词。`allow`、`yes`、`ok`、`允许`、`同意` 表示允许一次；`deny`、`no`、`拒绝`、`不行` 表示拒绝。效果与在 nanoMuse 应用中点击审批卡片相同。
+* 任务生成的文件会在运行结束后发送，对应内部的构件事件。
+* nanoMuse 提出的**问题**也会发送到聊天中，你的下一条消息会作为回答。
 
-语言跟随 `agent.language`：`zh` 时这些短句是中文，`en` 是英文，`auto` 两种都有。
+状态文字的语言由 `agent.language` 决定：`zh` 使用中文，`en` 使用英文，`auto` 同时提供两种语言。
 
 ## 推送到这里 {#deliver-here}
 
-给一个已配对的聊天打开「推送到这里」，它还会收到 Muse 没被要求也会做的事，也就是手机 App 变成通知的那些事件：后台运行的最后一句话（安静的除外）、等待中的审批（可以直接在聊天里回答）、需要你的问题。一个 Muse 可以推送到好几个聊天；每个聊天自己决定。`POST /api/channels/deliver {"text": …}` 给它们全部发一行字，脚本或提醒里用得上。
+为已配对聊天开启「推送到这里」后，它还会接收主动消息，也就是手机应用会显示为通知的那些事件：后台任务的最终回复，设置为安静的任务除外；等待你决定的审批，可直接在聊天中回答；以及需要你回答的问题。同一个 nanoMuse 可以推送到多个聊天，每个聊天独立设置。`POST /api/channels/deliver {"text": …}` 会给所有启用推送的聊天发送文字，适合从脚本或提醒任务中调用。
 
 ## 安全 {#security}
 
-* 密钥进保险库，从不经 API 回传；设置文件里只有占位符。日志里是厂商的错误原文，不含凭据。
-* 只有已配对或在放行名单里的人能到达 Muse；陌生人得到一个配对码，在群里则是沉默。审批卡片上的按钮，只有已配对的人按才算数。
-* 来自聊天的审批是一次性的决定，理由是「来自飞书」（等等）；聊天里不会记住任何东西。
-* 聊天入口的数据放在数据目录，智能体够不着。
-* 连接都是向外发起的；不开端口，不涉及公网地址。
+* 密钥存入保险库，API 不会返回原文，配置文件只保存占位符。日志包含厂商错误信息，不包含连接凭据。
+* 只有已配对或在允许名单中的用户能让 nanoMuse 处理消息。陌生人私聊只会收到配对码，在群聊中则不会得到回应。审批卡片也只接受已配对用户的按钮操作。
+* 从聊天入口作出的审批仅限本次，记录的理由会注明「来自飞书」等来源，不会保存为长期授权。
+* 聊天入口的数据保存在智能体无法访问的数据目录中。
+* 所有连接都由运行时主动向外建立，不需要开放接收端口，也不需要公网 URL。
 
-## 排错 {#troubleshooting}
+## 排查问题 {#troubleshooting}
 
-| 你看到的 | 意思 |
+| 你看到的情况 | 原因及处理方法 |
 |---|---|
-| **未安装** | 运行 nanoMuse 的机器上缺 SDK：运行显示的那行（`pip install 'nanomuse[feishu]'`），再把这个入口重新打开 |
-| **还缺设置** | 有必填项是空的；卡片会写明是哪一项 |
-| **出错**，后面是厂商的原话 | 凭据被拒，或连不上厂商；改好后关掉再开，或再按一次「保存」 |
-| 机器人在群里不回答 | 群策略是 *mention* 而机器人没被 @；或者发送者没有配对（群里从不显示配对码） |
-| 飞书有回复，但没有表情回应 / 卡片没有按钮 | 缺 `im:message.group_at_msg:readonly` / `im:resource`，或者 `card.action.trigger` 没有放在长连接上 |
-| 飞书：「app secret invalid」 | App Secret 在控制台里被重新生成了；贴新的 |
-| 钉钉连上了但收不到东西 | 机器人的接收模式不是 *Stream*，或者版本没有发布 |
-| 企业微信：代理后面连接出错 | socket 绕开了 `HTTPS_PROXY`；主机必须能直连 |
-| Telegram：`Conflict: terminated by other getUpdates request` | 同一个 token 在两处轮询（另一个运行时，或一个 webhook）；只留一个 |
-| 配对码一直来 | 十分钟内通过一个；`nanomuse channels pending` 列出全部 |
-| `nanomuse channels …` 说服务器拒绝了 token | config.toml 里的 `server.token` 和正在跑的服务器的不一致；或者用同一个 `--config` 运行它 |
+| 「未安装」 | 运行 nanoMuse 的电脑缺少 SDK。运行页面显示的命令，例如 `pip install 'nanomuse[feishu]'`，再开启聊天入口 |
+| 「还缺设置」 | 某个必填字段为空，卡片会指出具体字段 |
+| 「出错」，并显示厂商错误信息 | 凭据未通过验证，或无法连接厂商。修正后关闭再开启入口，或再次点击「保存」 |
+| 群里的机器人不回答 | 群策略为 *mention*，但消息没有 @ 机器人；或者发送者尚未配对，群内不会显示配对码 |
+| 飞书有回复，但没有表情回应或审批按钮 | 缺少 `im:message.group_at_msg:readonly`、`im:resource`，或没有为长连接配置 `card.action.trigger` |
+| 飞书提示「app secret invalid」 | 控制台重新生成过 App Secret，需要填入新的值 |
+| 钉钉连接成功但收不到消息 | 接收模式未设为 *Stream*，或版本尚未发布 |
+| 企业微信在代理环境中连接失败 | socket 连接不经过 `HTTPS_PROXY`，对应主机必须能够直连 |
+| Telegram 提示 `Conflict: terminated by other getUpdates request` | 两处正在使用同一个 token 接收消息，例如另一个运行时或 webhook（接收消息的回调接口）。只保留一处 |
+| 反复收到配对码 | 需要在十分钟内批准一个配对码，可用 `nanomuse channels pending` 查看待处理列表 |
+| `nanomuse channels …` 提示服务器拒绝 token | config.toml 中的 `server.token` 与正在运行的服务器不一致，或命令需要使用与服务器相同的 `--config` |
 
-`nanomuse channels status --json` 输出的和应用看到的是同一份。
+`nanomuse channels status --json` 输出的数据与应用页面读取的相同。
