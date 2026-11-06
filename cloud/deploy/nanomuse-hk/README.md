@@ -130,6 +130,16 @@ the *Free allowance* switch says it better to the apps.
 
 ## Restoring
 
+The scheduled backup requires Python 3 and `flock` on the host. It takes an
+exclusive lock and checks free space before starting SQLite's copy. Both the
+database and backup filesystems must have ordinary-user available space of at
+least twice the combined database and WAL size, plus 5 GiB for the running
+service. Root-reserved blocks do not count. Insufficient space or an unreadable
+capacity check fails the service before copying or deleting expired backups;
+`journalctl -u nanomuse-relay-backup.service` shows the byte counts. Add capacity
+or review recovery points before retrying. This check cannot reserve space
+against other writers and does not automatically remove backups to make room.
+
 ```bash
 ssh nanomuse-hk 'cd /opt/nanomuse/relay && docker compose stop \
   && gunzip -c /opt/nanomuse/backups/cloud-YYYYMMDD-HHMMSS.db.gz \

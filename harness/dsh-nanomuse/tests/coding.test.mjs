@@ -16,6 +16,13 @@ import { CODING_ACTIONS, CodingService, codingBrief, GATED_CODING_ACTIONS } from
 
 const posix = process.platform !== 'win32'
 
+/**
+ * The fake CLIs are `#!/bin/sh` wrappers. On Windows the shim would be a `.cmd`, which the
+ * runner's bare `spawn`/`execFile` refuses outright (EINVAL), so the tests that start a fake
+ * CLI stay off it; the readers and the spawn-free service paths need no CLI and run as they are.
+ */
+const needsShCli = posix ? false : 'the fake CLI is a #!/bin/sh wrapper, and a Windows .cmd shim cannot be started by the runner’s bare spawn'
+
 /** The agents' slug of a workspace on this OS: `/` as `-` on Unix; Cursor's `C-Users-…` on Windows. */
 function slugOf(ws) {
   return posix ? ws.slice(1).replace(/\//g, '-') : ws.replace(/^([A-Za-z]):\\/, '$1-').replace(/\\/g, '-')
@@ -106,7 +113,7 @@ async function fixtureHome(home) {
 
 const SESSION_KEYS = ['agent', 'id', 'title', 'workspace', 'path', 'created_at', 'updated_at', 'messages', 'status', 'last_user', 'last_assistant', 'source', 'resumable']
 
-test('readers: a fixture home gives one session per agent, in the runtime shape', { skip: !posix }, async () => {
+test('readers: a fixture home gives one session per agent, in the runtime shape', async () => {
   await scratch(async (home) => {
     const { ws } = await fixtureHome(home)
     const env = { ...process.env, NANOMUSE_CODING_HOME: home }
@@ -167,7 +174,7 @@ test('readers: a fixture home gives one session per agent, in the runtime shape'
   })
 })
 
-test('readers: one session comes with its transcript; a bad id is nothing', { skip: !posix }, async () => {
+test('readers: one session comes with its transcript; a bad id is nothing', async () => {
   await scratch(async (home) => {
     await fixtureHome(home)
     const env = { ...process.env, NANOMUSE_CODING_HOME: home }
@@ -210,7 +217,7 @@ test('readers: a missing home is every agent with no sessions', async () => {
   })
 })
 
-test('readers: detect sees a store without a CLI, and a CLI on PATH', { skip: !posix }, async () => {
+test('readers: detect sees a store without a CLI, and a CLI on PATH', { skip: needsShCli }, async () => {
   await scratch(async (home) => {
     await fixtureHome(home)
     const bin = join(home, 'bin')
@@ -513,7 +520,7 @@ test('runner: stopping a run ends the whole tree on Windows', { skip: posix, tim
   })
 })
 
-test('runner: a run against a fake CLI streams events and ends at the terminal event', { skip: !posix }, async () => {
+test('runner: a run against a fake CLI streams events and ends at the terminal event', { skip: needsShCli }, async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir, { linger: '200' })
     const events = []
@@ -529,7 +536,7 @@ test('runner: a run against a fake CLI streams events and ends at the terminal e
   })
 })
 
-test('runner: a failed resume of an unknown session goes out again as a new chat', { skip: !posix }, async () => {
+test('runner: a failed resume of an unknown session goes out again as a new chat', { skip: needsShCli }, async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir)
     const events = []
@@ -571,7 +578,7 @@ out({ type: 'result', result: 'Fresh start: ' + text, session_id: 'fresh-1', dur
   return cli
 }
 
-test('runner: the retry after an unknown session does not splice in the dead chat\'s half line', { skip: !posix }, async () => {
+test('runner: the retry after an unknown session does not splice in the dead chat\'s half line', { skip: needsShCli }, async () => {
   await scratch(async (dir) => {
     const cli = await fakeCursorDeadDelta(dir)
     const events = []
@@ -583,7 +590,7 @@ test('runner: the retry after an unknown session does not splice in the dead cha
   })
 })
 
-test('runner: an error result and a missing CLI are failed runs', { skip: !posix }, async () => {
+test('runner: an error result and a missing CLI are failed runs', { skip: needsShCli }, async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir, { fail: true })
     const run = await startRun({ agent: 'claude', text: 'x', which: () => cli, timeoutMs: 20_000, readerEnv: { NANOMUSE_CODING_HOME: join(dir, 'nohome') } })
@@ -627,7 +634,7 @@ test('service: the action names and the gate match the runtime', () => {
   assert.equal(codingBrief('coding.agents', {}), '')
 })
 
-test('service: coding.agents / sessions / session / runs answer in the runtime shapes', { skip: !posix }, async () => {
+test('service: coding.agents / sessions / session / runs answer in the runtime shapes', async () => {
   await scratch(async (home) => {
     const { ws } = await fixtureHome(home)
     const env = { ...process.env, NANOMUSE_CODING_HOME: home, PATH: join(home, 'emptybin') }
@@ -652,7 +659,7 @@ test('service: coding.agents / sessions / session / runs answer in the runtime s
   })
 })
 
-test('service: coding.send with wait streams event frames with the run id and answers with the run; the record survives', { skip: !posix }, async () => {
+test('service: coding.send with wait streams event frames with the run id and answers with the run; the record survives', { skip: needsShCli }, async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir)
     const store = join(dir, 'state', 'coding', 'runs.json')

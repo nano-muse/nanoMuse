@@ -106,9 +106,13 @@ class BoundedOutput {
   }
 }
 
-function shellCommand(command: string, platform: NodeJS.Platform, env: NodeJS.ProcessEnv): { file: string; args: string[] } {
-  if (platform === 'win32') return { file: env.COMSPEC || 'cmd.exe', args: ['/d', '/s', '/c', command] }
-  return { file: env.SHELL || '/bin/sh', args: ['-c', command] }
+function shellCommand(command: string, platform: NodeJS.Platform, env: NodeJS.ProcessEnv): { file: string; args: string[]; verbatim: boolean } {
+  // cmd.exe with /s strips one outer pair of quotes from a verbatim tail, so the command rides
+  // inside a pair and every quote the caller wrote (a spaced path, a quoted argument) survives;
+  // the default escaping instead turns each inner quote into backslash-quote, which cmd reads
+  // as part of the program name
+  if (platform === 'win32') return { file: env.COMSPEC || 'cmd.exe', args: ['/d', '/s', '/c', `"${command}"`], verbatim: true }
+  return { file: env.SHELL || '/bin/sh', args: ['-c', command], verbatim: false }
 }
 
 /** `shell {command, cwd?, timeout?}` → `{exit_code, stdout, stderr, timed_out, duration_ms}`. */
@@ -119,11 +123,11 @@ export async function shell(args: Args, platform: NodeJS.Platform = process.plat
   const timeoutS = Math.max(1, Math.min(Number.isFinite(requested) && requested > 0 ? requested : 120, SHELL_TIMEOUT_MAX_S))
   const cwd = typeof args.cwd === 'string' && args.cwd.trim() ? expand(args.cwd) : undefined
   const started = Date.now()
-  const { file, args: argv } = shellCommand(command, platform, env)
+  const { file, args: argv, verbatim } = shellCommand(command, platform, env)
   return new Promise<Result>((done) => {
     let child
     try {
-      child = spawn(file, argv, { cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: platform !== 'win32', env, windowsHide: true })
+      child = spawn(file, argv, { cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: platform !== 'win32', env, windowsHide: true, windowsVerbatimArguments: verbatim })
     } catch (error: unknown) {
       done({ exit_code: 127, stdout: '', stderr: message(error), timed_out: false, duration_ms: 0 })
       return
