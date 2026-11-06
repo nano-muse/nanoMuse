@@ -235,6 +235,19 @@ base URL（从不包括中继的，从不包括局域网地址）它回答代理
 
 ## 语音输入 {#voice-input}
 
+语音输入、语音输出和聊天模型可以分别选择，也可以来自不同服务商。通过语音模型组或语音选择器设置即可。
+阿里云百炼的 `paraformer-realtime-v2` 使用 DashScope 原生 WebSocket 接口转写录好的语音；
+朗读支持通过该接口调用 `cosyvoice-v2`，以及通过原生 HTTP 接口调用 `qwen3-tts-flash`。
+请求会保留服务商配置中的地域和工作空间。API Key、模型和音色须在对应地域可用；
+CosyVoice 默认音色为 `longxiaochun_v2`，Qwen 默认音色为 `Cherry`。
+
+这些适配用于录音结束后的转写和回复朗读，尚不提供全双工实时语音对话。
+现有语音控件不支持 Qwen ASR Realtime、Qwen TTS Realtime 和 Omni Realtime 的会话协议；
+这些模型会在发起服务商请求前被拒绝；服务商朗读失败后，仍会按现有机制尝试设备的语音引擎。
+协议说明参见阿里云的 [Paraformer 文档](https://help.aliyun.com/en/model-studio/websocket-for-paraformer-real-time-service)、
+[CosyVoice 文档](https://help.aliyun.com/en/model-studio/cosyvoice-websocket-api) 和
+[Qwen TTS HTTP 接口](https://help.aliyun.com/en/model-studio/qwen-tts-api)。
+
 Android 13 及以上的系统连续听写在识别器切换到下一段时会继续传入音频。上一段已关闭管道的写入失败，不会再清除新一段的音频流。
 
 使用服务商语音模型时，静默录音达到时限，或极短语音等待补充超时后，面板会回到空闲状态。已经开始的转写仍会等待结果，不会被空结果提前结束。
