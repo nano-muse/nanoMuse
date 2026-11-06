@@ -33,6 +33,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
 - Flagged recursive forced deletion when `rm` flags are separate arguments, without borrowing flags from another command or treating filenames after `--` as options.
+- **A line-spliced `rm` still reads as what it runs.** A backslash before a newline is removed before the shell splits words, so `rm \` plus a newline plus `-rf x` ran as a recursive force delete while the guard scanned the raw text and saw neither flag, and a word split in the middle (`su` plus `do`) hid from the other patterns the same way. The guard reads the spliced command now.
 - Flagged Python directory removal through `Path(...).rmdir()` for approval, including inside the sandbox.
 
 - **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
