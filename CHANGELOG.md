@@ -32,7 +32,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
+- Ran the hub suite's own shell commands on Windows too: the stop tests' `sleep 20` spells became the suite interpreter's `-c` payload, which `cmd.exe` runs unchanged (the posix spell died instantly, so the run answered before the stop landed), and the shell contract test lost its win32 skip to the same payload.
 - Flagged recursive forced deletion when `rm` flags are separate arguments, without borrowing flags from another command or treating filenames after `--` as options.
+- **A line-spliced `rm` still reads as what it runs.** A backslash before a newline is removed before the shell splits words, so `rm \` plus a newline plus `-rf x` ran as a recursive force delete while the guard scanned the raw text and saw neither flag, and a word split in the middle (`su` plus `do`) hid from the other patterns the same way. The guard reads the spliced command now.
 - Flagged Python directory removal through `Path(...).rmdir()` for approval, including inside the sandbox.
 
 - **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
@@ -173,6 +175,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
 
 - **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. Expense checks kept signs and fractions instead of accepting an incorrect total's integer prefix. [Goal evaluation](docs/goal-eval.md).
+- **The goal evaluator's own mistakes were counted.** 162 cases written apart from the evaluator run each criterion from the final state to its verdict. They caught answers the evaluator passed wrongly, such as "不成功" read as success, and the rules were fixed: a reported result or a ticket exclusion with a negation in the same clause is now recorded as unknown instead of guessed. The cases also list what the evaluator still gets wrong. [Goal evaluation](docs/goal-eval.md#criterion-cases).
 
 - **GUI regression gained 20 fixed simulated tasks and independent state checks.** Reference mode ran offline in CI, an opt-in runner used a configured model, and a standalone recorder reported model calls, latency and available token usage. The cases also corrected loop detection for identical click coordinates on different pages. [GUI regression](docs/gui-regression.md).
 
