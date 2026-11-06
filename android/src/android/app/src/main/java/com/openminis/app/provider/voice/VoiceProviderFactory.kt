@@ -47,7 +47,8 @@ object VoiceProviderFactory {
                 when {
                     normalizedBase.contains("groq.com") ->
                         GroqVoiceProvider(instance.id, custom ?: "https://api.groq.com/openai", apiKey)
-                    normalizedBase.contains("dashscope") ->
+                    // nanoMuse: also recognize Alibaba's workspace-specific endpoints.
+                    normalizedBase.contains("dashscope") || normalizedBase.contains(".maas.aliyuncs.com") ->
                         AlibabaVoiceProvider(instance.id, custom ?: "https://dashscope.aliyuncs.com/compatible-mode", apiKey)
                     normalizedBase.contains("minimax") ->
                         MiniMaxVoiceProvider(instance.id, custom ?: "https://api.minimax.io", apiKey)

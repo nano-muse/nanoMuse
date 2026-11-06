@@ -360,6 +360,26 @@ started to answer but has not finished sending the response.
 
 ## Voice input
 
+You can choose voice input and voice output separately from the chat model, including
+models from different providers, using the voice groups and the voice picker.
+For Alibaba Model Studio, `paraformer-realtime-v2` transcribes recorded speech through
+the native DashScope WebSocket API. Read-aloud supports `cosyvoice-v2` through that API
+and `qwen3-tts-flash` through the native HTTP API. The provider's selected region and
+workspace are retained. The API key, model and voice must be available in that region;
+the default CosyVoice voice is `longxiaochun_v2`, and Qwen uses `Cherry`.
+Qwen TTS supplies WAV audio; the app requests that format and plays the returned file
+without relabelling it as MP3. An explicit old CosyVoice `longxiaochun` voice selection
+is normalized to `longxiaochun_v2`.
+
+These adapters transcribe a completed recording or generate a reply's audio. They do
+not provide a full-duplex voice conversation. Qwen ASR Realtime, Qwen TTS Realtime and
+Omni Realtime session protocols are not supported by these voice controls. These
+models are rejected before a provider request; read-aloud keeps its existing fallback
+to the device's speech engine when provider synthesis fails.
+See Alibaba's [Paraformer protocol](https://help.aliyun.com/en/model-studio/websocket-for-paraformer-real-time-service),
+[CosyVoice protocol](https://help.aliyun.com/en/model-studio/cosyvoice-websocket-api) and
+[Qwen TTS HTTP API](https://help.aliyun.com/en/model-studio/qwen-tts-api).
+
 On Android 13 and later, continuous system dictation keeps feeding audio when the recognizer
 starts its next segment. A write that fails on the previous segment's closed pipe cannot
 disable the new segment's audio stream.
