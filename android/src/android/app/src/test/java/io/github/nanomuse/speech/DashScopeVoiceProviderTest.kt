@@ -6,6 +6,7 @@ import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.model.VoiceProviderTemplate
 import com.openminis.app.provider.voice.VoiceInputRequest
+import com.openminis.app.provider.voice.VoiceOutputFormat
 import com.openminis.app.provider.voice.VoiceOutputRequest
 import com.openminis.app.provider.voice.VoiceProvider
 import com.openminis.app.provider.voice.VoiceProviderException
@@ -121,13 +122,34 @@ class DashScopeVoiceProviderTest {
         assertEquals("finish-task", action(commands.poll(1, TimeUnit.SECONDS)!!))
     }
 
+    @Test fun `CosyVoice upgrades the legacy default voice name`() = runBlocking {
+        websocket { socket, command ->
+            if (action(command) == "finish-task") {
+                socket.send(byteArrayOf(1).toByteString())
+                event(socket, "task-finished")
+            }
+        }
+        provider().synthesize(VoiceOutputRequest("Hello", "cosyvoice-v2", "longxiaochun"))
+        val run = commands.poll(1, TimeUnit.SECONDS)!!.getJSONObject("payload")
+        assertEquals("longxiaochun_v2", run.getJSONObject("parameters").getString("voice"))
+    }
+
+    @Test fun `fixed format Qwen selects WAV and refuses an incompatible request`() = runBlocking {
+        val provider = provider()
+        assertEquals(VoiceOutputFormat.WAV, provider.preferredOutputFormat("qwen3-tts-flash"))
+        assertEquals(VoiceOutputFormat.MP3, provider.preferredOutputFormat("cosyvoice-v2"))
+        assertTrue(runCatching { provider.synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash")) }
+            .exceptionOrNull() is VoiceProviderException.Unsupported)
+        assertEquals(0, server.requestCount)
+    }
+
     @Test fun `Qwen TTS uses native HTTP and downloads without provider authorization`() = runBlocking {
         val url = server.url("/audio.wav").toString()
         server.enqueue(MockResponse().setBody(JSONObject().put("output", JSONObject()
             .put("audio", JSONObject().put("url", url))).toString()))
         server.enqueue(MockResponse().setBody(okio.Buffer().write(byteArrayOf(7, 8, 9))))
         assertArrayEquals(byteArrayOf(7, 8, 9), provider().synthesize(
-            VoiceOutputRequest("Hello", "qwen3-tts-flash", "qwen3-tts-flash")))
+            VoiceOutputRequest("Hello", "qwen3-tts-flash", "qwen3-tts-flash", responseFormat = VoiceOutputFormat.WAV)))
         val generate = server.takeRequest(1, TimeUnit.SECONDS)!!
         assertEquals("/api/v1/services/aigc/multimodal-generation/generation", generate.path)
         assertEquals("Bearer test-key", generate.getHeader("Authorization"))
@@ -193,14 +215,14 @@ class DashScopeVoiceProviderTest {
 
     @Test fun `HTTP authentication failure is surfaced without downloading`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(401))
-        assertTrue(runCatching { provider().synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash")) }
+        assertTrue(runCatching { provider().synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash", responseFormat = VoiceOutputFormat.WAV)) }
             .exceptionOrNull() is VoiceProviderException.Auth)
         assertEquals(1, server.requestCount)
     }
 
     @Test fun `Qwen missing audio URL is not treated as audio`() = runBlocking {
         server.enqueue(MockResponse().setBody("{\"output\":{\"audio\":{}}}"))
-        assertTrue(runCatching { provider().synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash")) }
+        assertTrue(runCatching { provider().synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash", responseFormat = VoiceOutputFormat.WAV)) }
             .exceptionOrNull() is VoiceProviderException.NoAudioData)
     }
 
@@ -212,7 +234,7 @@ class DashScopeVoiceProviderTest {
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
         val provider = DashScopeVoiceProvider("test", server.url("/api/v1").toString(), null, client)
         val task = async(start = CoroutineStart.UNDISPATCHED) {
-            provider.synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash"))
+            provider.synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash", responseFormat = VoiceOutputFormat.WAV))
         }
         assertNotNull(server.takeRequest(1, TimeUnit.SECONDS))
         task.cancel()
@@ -223,7 +245,7 @@ class DashScopeVoiceProviderTest {
     @Test fun `native URLs preserve an explicitly configured proxy prefix`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(401))
         val provider = DashScopeVoiceProvider("test", server.url("/gateway/compatible-mode").toString(), null)
-        runCatching { provider.synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash")) }
+        runCatching { provider.synthesize(VoiceOutputRequest("Hello", "qwen3-tts-flash", responseFormat = VoiceOutputFormat.WAV)) }
         assertEquals("/gateway/api/v1/services/aigc/multimodal-generation/generation",
             server.takeRequest(1, TimeUnit.SECONDS)!!.path)
     }

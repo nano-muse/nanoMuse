@@ -360,6 +360,9 @@ the native DashScope WebSocket API. Read-aloud supports `cosyvoice-v2` through t
 and `qwen3-tts-flash` through the native HTTP API. The provider's selected region and
 workspace are retained. The API key, model and voice must be available in that region;
 the default CosyVoice voice is `longxiaochun_v2`, and Qwen uses `Cherry`.
+Qwen TTS supplies WAV audio; the app requests that format and plays the returned file
+without relabelling it as MP3. An explicit old CosyVoice `longxiaochun` voice selection
+is normalized to `longxiaochun_v2`.
 
 These adapters transcribe a completed recording or generate a reply's audio. They do
 not provide a full-duplex voice conversation. Qwen ASR Realtime, Qwen TTS Realtime and

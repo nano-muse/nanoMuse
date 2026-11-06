@@ -240,6 +240,8 @@ base URL（从不包括中继的，从不包括局域网地址）它回答代理
 朗读支持通过该接口调用 `cosyvoice-v2`，以及通过原生 HTTP 接口调用 `qwen3-tts-flash`。
 请求会保留服务商配置中的地域和工作空间。API Key、模型和音色须在对应地域可用；
 CosyVoice 默认音色为 `longxiaochun_v2`，Qwen 默认音色为 `Cherry`。
+Qwen TTS 只提供 WAV 音频，App 按该格式请求并播放，不会将它当作 MP3。
+显式指定的旧 CosyVoice 音色 `longxiaochun` 会自动换用 `longxiaochun_v2`。
 
 这些适配用于录音结束后的转写和回复朗读，尚不提供全双工实时语音对话。
 现有语音控件不支持 Qwen ASR Realtime、Qwen TTS Realtime 和 Omni Realtime 的会话协议；

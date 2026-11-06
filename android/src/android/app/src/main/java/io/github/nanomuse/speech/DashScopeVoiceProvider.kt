@@ -41,6 +41,9 @@ open class DashScopeVoiceProvider(
     override fun defaultVoiceOutputModel() = "cosyvoice-v2"
     override fun defaultVoiceOutputVoice() = "longxiaochun_v2"
 
+    override fun preferredOutputFormat(model: String?) =
+        if (model == "qwen3-tts-flash") VoiceOutputFormat.WAV else VoiceOutputFormat.MP3
+
     // Keep the selected region/workspace and any proxy prefix. Strip only known API suffixes.
     private fun endpoint(path: String): String {
         val url = baseURL.trimEnd('/').toHttpUrl()
@@ -87,7 +90,9 @@ open class DashScopeVoiceProvider(
         if (model == "qwen3-tts-flash") return qwenSpeech(request, model)
         if (model != "cosyvoice-v2") throw VoiceProviderException.Unsupported(model)
         if (request.responseFormat == VoiceOutputFormat.AAC) throw VoiceProviderException.Unsupported("aac")
-        val voice = request.voice?.takeUnless { it.isBlank() || it == model } ?: defaultVoiceOutputVoice()
+        val voice = request.voice?.takeUnless {
+            it.isBlank() || it == model || it == "longxiaochun"
+        } ?: defaultVoiceOutputVoice()
         val parameters = JSONObject().put("text_type", "PlainText").put("voice", voice)
             .put("format", request.responseFormat.wireValue).put("sample_rate", 22050)
         request.speed?.let { parameters.put("rate", it.coerceIn(0.5f, 2.0f).toDouble()) }
@@ -103,6 +108,10 @@ open class DashScopeVoiceProvider(
     }
 
     private suspend fun qwenSpeech(request: VoiceOutputRequest, model: String): ByteArray = withTimeout(timeoutMillis) {
+        // This HTTP API provides a WAV file and has no format-conversion request parameter.
+        if (request.responseFormat != VoiceOutputFormat.WAV) {
+            throw VoiceProviderException.Unsupported(request.responseFormat.wireValue)
+        }
         val voice = request.voice?.takeUnless { it.isBlank() || it == model } ?: "Cherry"
         val body = JSONObject().put("model", model).put("input", JSONObject()
             .put("text", request.input).put("voice", voice).put("language_type", "Auto"))
