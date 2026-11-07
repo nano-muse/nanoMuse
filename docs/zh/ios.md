@@ -206,6 +206,12 @@ gh secret set IOS_DIST_P12_PASSWORD -R nano-muse/nanoMuse < dist.p12.pass
 
 默认执行器为 `macos-26`。若 GitHub 套餐不提供此标签，可改为 `macos-15`、`xcode-version: latest-stable`，但将缺少项目要求的 iOS 26 SDK。
 
+## 连接器 OAuth 登录 {#connector-oauth}
+
+交换和刷新令牌时会明确请求 JSON 响应。即使服务商返回 HTTP 200，只要响应包含 OAuth 错误，就会视为登录失败。错误提示只显示固定错误码，不展示服务商响应原文或凭据。刷新响应无效时，已保存的令牌不会被替换。
+
+出现 `incorrect_client_credentials` 或 `invalid_client` 时，请核对 OAuth 应用的 client ID；如果服务商要求 client secret，也要核对该值。出现 `redirect_uri_mismatch` 时，请核对服务商登记的回调地址与 App 显示的地址是否一致。出现 `bad_verification_code` 或 `invalid_grant` 时，请重新发起登录。并非所有连接器都需要 client secret。GitHub 的官方文档说明了 [JSON 响应协商](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)和[令牌错误码](https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors)。
+
 ## 接下来 {#what-follows}
 
 Android 是 nanoMuse 界面与交互的参照。0.1.34 起，iPhone 在 OpenMinis 上实现了同样的智能体页、聊天换形象、目标、动态、例程和首次引导，并在文字中明确 iOS 后台限制。对应关系如下：
