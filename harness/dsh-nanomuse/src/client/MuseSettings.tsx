@@ -26,6 +26,7 @@ import type { RenderSlot } from './MuseSidebar.tsx'
 import { DATA_SECTION, REPO_URL } from './panels.ts'
 import { AppBehaviorRows, ConversationRows, DeveloperRows, HotkeyField } from './Sections.tsx'
 import { clearMarks, filterPages, hitLabel, markMatches, queryWords } from './settings-search.ts'
+import { SKILLS_SECTION } from './Skills.tsx'
 
 /** The pages that make up the everyday group, in Muse's order; the rest are Advanced. */
 export const COMPUTER_SECTION = 'nanomuse-computer'
@@ -40,7 +41,7 @@ export const HARNESS_SECTION = 'nanomuse-harness'
 const MEDIA_SECTION = 'nanomuse-media'
 /** Settings → Models (0.1.41): the four slots, right after General. */
 const MODELS_SECTION = 'nanomuse-models'
-const PRIMARY: readonly string[] = ['general', MODELS_SECTION, 'nanomuse-connectors', COMPUTER_SECTION, MEDIA_SECTION, 'nanomuse-files', 'nanomuse-dictation', WALLET_SECTION, STORAGE_SECTION, 'nanomuse-permissions', CHANNELS_SECTION, 'nanomuse-devices', DATA_SECTION, HELP_SECTION, LEGAL_SECTION]
+const PRIMARY: readonly string[] = ['general', MODELS_SECTION, 'nanomuse-connectors', SKILLS_SECTION, COMPUTER_SECTION, MEDIA_SECTION, 'nanomuse-files', 'nanomuse-dictation', WALLET_SECTION, STORAGE_SECTION, 'nanomuse-permissions', CHANNELS_SECTION, 'nanomuse-devices', DATA_SECTION, HELP_SECTION, LEGAL_SECTION]
 
 export interface SectionRow {
   id: string
@@ -79,6 +80,7 @@ function navIcon(id: string): ReactNode {
     case COMPUTER_SECTION: return h(IconHand, { size: 16 })
     case MEDIA_SECTION: return h(IconVideo, { size: 16 })
     case 'nanomuse-connectors': return h(IconLink, { size: 16 })
+    case SKILLS_SECTION: return h(IconPuzzle, { size: 16 })
     case 'nanomuse-files': return h(IconFolder, { size: 16 })
     case 'nanomuse-dictation': return h(IconMic, { size: 16 })
     case 'nanomuse-permissions': return h(IconShield, { size: 16 })

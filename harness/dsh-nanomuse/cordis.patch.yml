@@ -5,6 +5,11 @@
 # can be overridden by the person running it. A patch replaces a row's whole
 # `config`, so the rows restated below carry every key they need.
 
+# Replace the stock registry with the managed registry below. Patch names are
+# assertions about existing rows, so changing `name` here cannot replace a plugin.
+- id: skill
+  disabled: true
+
 # The agent is nanoMuse, not "an AI agent powered by …". The row id is the one
 # dsh-base and dsh-web-app use, so this replaces their persona text; the stock
 # identity line is switched off and the persona names the base it runs on.
@@ -56,6 +61,11 @@
   disabled: true
 
 - insert:
+    # Apply local preferences at the shared registry boundary. Like the stock
+    # row, this uses the SDK defaults; consumers wait for the `skills` service.
+    - id: nanomuse-skills
+      name: dsh-nanomuse/skills
+
     - id: nanomuse-windows-pwsh-sandbox
       name: dsh-nanomuse/windows-pwsh-sandbox
       disabled: !!js process.platform !== 'win32'

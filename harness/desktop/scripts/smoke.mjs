@@ -159,6 +159,41 @@ const blocked = await createSession("smoke-cleared");
 const admissionPassed = created.result?.ok === true && created.result?.value?.sessionId === "smoke-live"
   && blocked.result?.ok === false && blocked.result?.error?.code === "session/not-found";
 console.log(`session admission: ordinary ${created.result?.ok === true ? "created" : JSON.stringify(created.result)}, cleared ${blocked.result?.error?.code ?? JSON.stringify(blocked.result)}`);
+// Exercise the real registry replacement through both the management route and
+// the Harness's native skill catalog, without a model call or shared-file edits.
+let skillsPassed = false;
+let skillsStage = "management catalog";
+try {
+  const headers = { cookie, origin, "x-nanomuse": "1", "sec-fetch-site": "same-origin", "content-type": "application/json" };
+  const catalogResponse = await fetch(origin + "/nanomuse/skills/catalog", { headers });
+  skillsStage = `management catalog: HTTP ${catalogResponse.status}, JSON ${catalogResponse.headers.get("content-type")?.includes("application/json") === true}`;
+  const catalog = await catalogResponse.json();
+  const skillName = "nanomuse-desktop";
+  skillsStage = `management catalog: managed ${catalog.managed === true}, bundled skill ${catalog.skills?.some((skill) => skill.name === skillName) === true}`;
+  const visible = async () => {
+    const http = await fetch(origin + "/api/skills/list", {
+      method: "POST", headers,
+      body: JSON.stringify({ type: "client-request", rpcId: "smoke-skills", method: "skills/list", payload: { args: { request: { sessionId: "smoke-live" } } } }),
+    });
+    const response = await http.json();
+    skillsStage = `native catalog: HTTP ${http.status}, RPC success ${response.result?.ok === true}, skill list ${Array.isArray(response.result?.value?.skills)}`;
+    if (response.result?.ok !== true || !Array.isArray(response.result.value?.skills)) throw new Error("skill catalog unavailable");
+    return response.result.value.skills.some((skill) => skill.name === skillName);
+  };
+  if (catalog.managed === true && catalog.skills?.some((skill) => skill.name === skillName) && await visible()) {
+    skillsPassed = true;
+    for (const disabled of [true, false]) {
+      const saved = await fetch(origin + "/nanomuse/skills/toggle", {
+        method: "POST", headers, body: JSON.stringify({ name: skillName, scope: "global", disabled }),
+      });
+      if (!saved.ok) { skillsStage = `save preference: HTTP ${saved.status}`; skillsPassed = false; break; }
+      if (await visible() === disabled) { skillsStage = `native visibility unchanged after disabled=${disabled}`; skillsPassed = false; break; }
+    }
+  }
+} catch {
+  skillsPassed = false;
+}
+console.log(`skill preferences: ${skillsPassed ? "native discovery follows disable and enable" : `failed (${skillsStage})`}`);
 const warnings = (out.match(/did not activate/g) ?? []).length;
 if (process.platform === "win32" && child.pid) spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
 else child.kill("SIGTERM");
@@ -167,6 +202,11 @@ cleanup();
 if (noToken !== 401 || withToken >= 400) throw new Error("the Host did not answer as dsh's web app does");
 if (Object.values(ours).some((status) => status !== 200)) throw new Error("the nanoMuse routes did not answer: the cloud or rooms row did not come up");
 if (!admissionPassed) throw new Error("the staged session access policy did not admit a new chat and reject a cleared ID");
+if (!skillsPassed) {
+  console.error(redact(out.slice(-3000)));
+  console.error(redact(err.slice(-3000)));
+  throw new Error("the staged skill registry did not enforce nanoMuse preferences");
+}
 if (warnings > 0) {
   console.error(redact(out));
   throw new Error("some entries did not activate");
