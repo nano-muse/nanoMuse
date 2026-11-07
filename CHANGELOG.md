@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Documentation
 
+- Documented supported migration paths for memories, reference files and connectors, and the limits of importing another assistant's archive. For #870.
+
 - Rewrote all Simplified Chinese documentation in plain language, added inline term explanations and a bilingual glossary, and clarified navigation labels, privacy and backup wording, and desktop update guidance.
 
 ### Cloud
@@ -89,6 +91,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A slower search answer no longer lands under a newer query.** The contacts search and the coding screen's recent-workspaces list both fired a request per query (or per picked agent) and took whatever answer arrived last: type past a slow request, or switch agents while one was still loading, and the earlier answer's results replaced the newer one's on screen. Both effects now drop answers that were superseded before they landed.
 
 ### Desktop
+
+- Rejected memory imports that exceeded line, length or capacity limits before changing any entries, preserved existing memories, and reported disk-write failures so the import could be retried. For #870.
 
 - Kept in-flight conversation sync isolated across account changes and sign-out. Interrupted account changes kept sync paused across restarts until sign-in succeeded.
 - Remembered conversation-clear notifications across restarts and blocked cleared chats from task records, history, search, duplication and resume. Automatic subagent histories followed their parent; saved copies and ordinary archives stayed available. Local JSONL logs remained on disk. For #832.

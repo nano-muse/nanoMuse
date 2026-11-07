@@ -163,7 +163,8 @@ then what you allowed or rejected on the approval cards, with when; kept on this
 computer), **Daily** (the routines; *Manage routines* opens the harness's schedules
 panel), **Soul & memory** (what the agent remembers about you, one line each): a
 field to add one, × to forget one, *Import memory* (a sheet: paste what another
-assistant knew, one line per memory), and the agent's description when the account has
+assistant knew, one line per memory; see the [migration guide](migration.md) for limits
+and the paths for documents and connectors), and the agent's description when the account has
 one. The agent writes memory itself with the `remember` tool when you tell it something
 you will expect it to know next time, and every chat's prompt carries the list back
 (`rooms.json`, this computer only). *Change look* has the dragon, an emoji on a colour,

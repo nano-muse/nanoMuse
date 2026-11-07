@@ -1007,16 +1007,30 @@ export default class NanomuseRooms extends Service {
     if (this.store.memory.length !== before) await this.save()
   }
 
-  /** Muse's "import memory": a text pasted from another assistant — one line or paragraph per memory. */
+  /** Validate a whole import before changing memory; an import never evicts existing lines. */
   async importMemory(text: string): Promise<number> {
-    const lines = text.split(/\n+/).map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter((l) => l.length > 1)
-    let added = 0
-    for (const line of lines.slice(0, 200)) {
-      const before = this.store.memory.length
-      await this.remember(line, 'import')
-      if (this.store.memory.length > before) added++
+    const lines = text.split(/\r\n?|\n/).map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+    if (lines.length > 200) throw new RelayError(400, 'memory_import_lines', 'Import at most 200 lines at a time. Nothing was imported.')
+    if (lines.some((line) => line.length > MEMORY_LINE)) throw new RelayError(400, 'memory_import_length', 'Each memory must fit within 400 characters. Nothing was imported.')
+    const known = new Set(this.store.memory.map((item) => titleKey(item.text)))
+    const incoming: MemoryItem[] = []
+    for (const line of lines) {
+      const key = titleKey(line)
+      if (known.has(key)) continue
+      known.add(key)
+      incoming.push({ id: newId('mem'), at: Date.now(), text: line, source: 'import' })
     }
-    return added
+    if (this.store.memory.length + incoming.length > MEMORY_MAX) throw new RelayError(409, 'memory_import_capacity', 'Memory holds 400 entries. Remove unneeded entries or import fewer new lines. Nothing was imported.')
+    if (lines.length) {
+      this.store.memory.push(...incoming)
+      try {
+        // A retry must persist even when all its lines are already present in memory.
+        await this.save(true)
+      } catch {
+        throw new RelayError(503, 'memory_import_save', 'Imported memories could not be saved. They are only in memory; check disk space and access, then retry before closing the app.')
+      }
+    }
+    return incoming.length
   }
 
   /** Snapshot the catalogue through an agent's view; the registry shows nothing from the root. */
@@ -1941,17 +1955,18 @@ export default class NanomuseRooms extends Service {
   }
 
   /** Serialised atomic writes; every save reaches the browser. */
-  private save(): Promise<void> {
+  private save(propagateErrors = false): Promise<void> {
     const snapshot = JSON.stringify(this.store, null, 2) + '\n'
-    this.writing = this.writing.then(async () => {
+    const writing = this.writing.then(async () => {
       const path = this.path
       await mkdir(join(dshHome(), 'nanomuse'), { recursive: true })
       const tmp = `${path}.${process.pid}.tmp`
       await writeFile(tmp, snapshot, { mode: 0o600 })
       await rename(tmp, path)
-    }).catch((error: unknown) => this.warn('save', error))
+    })
+    this.writing = writing.catch((error: unknown) => this.warn('save', error))
     this.broadcast()
-    return this.writing
+    return propagateErrors ? writing : this.writing
   }
 
   private warn(what: string, error: unknown): void {
@@ -1985,8 +2000,8 @@ export default class NanomuseRooms extends Service {
       if (req.method === 'GET' && route === '/files') return send(res, 200, { home: homeDir(), library: this.libraryFolder(), downloads: await downloadsDir(), state: join(dshHome(), 'nanomuse') })
       if (req.method === 'GET' && route === '/library/file') return this.serveFile(res, url.searchParams.get('id') ?? '', url.searchParams.get('raw') === '1')
       if (req.method !== 'POST') return send(res, 404, { error: { code: 'not_found', message: `No ${req.method ?? ''} ${route}` } })
-      // an imported file travels as text in the body: room for the editor's 2 MiB plus the JSON around it
-      const body = await json(req, route === '/library/import' ? IMPORT_MAX_BYTES * 2 + 4096 : undefined)
+      // Imports need room for UTF-8 and JSON escaping, including a full batch of memory lines.
+      const body = await json(req, route === '/library/import' ? IMPORT_MAX_BYTES * 2 + 4096 : route === '/memory/import' ? 512 * 1024 : undefined)
       switch (route) {
         case '/lang': {
           const lang = String(body.lang ?? '').trim().slice(0, 20)
