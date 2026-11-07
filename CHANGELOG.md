@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Documentation
 
+- Documented supported migration paths for memories, reference files and connectors, and the limits of importing another assistant's archive. For #870.
+
 - Rewrote all Simplified Chinese documentation in plain language, added inline term explanations and a bilingual glossary, and clarified navigation labels, privacy and backup wording, and desktop update guidance.
 
 ### Cloud
@@ -91,6 +93,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Desktop
 
 - Added a Skills settings page with descriptions, source details and availability controls for all workspaces or the current workspace. Global disabling took precedence, disabled skills were blocked from discovery and loading, and shared skill files stayed unchanged. For #772.
+- Rejected memory imports that exceeded line, length or capacity limits before changing any entries, preserved existing memories, and reported disk-write failures so the import could be retried. For #870.
 
 - Kept in-flight conversation sync isolated across account changes and sign-out. Interrupted account changes kept sync paused across restarts until sign-in succeeded.
 - Remembered conversation-clear notifications across restarts and blocked cleared chats from task records, history, search, duplication and resume. Automatic subagent histories followed their parent; saved copies and ordinary archives stayed available. Local JSONL logs remained on disk. For #832.
@@ -141,6 +144,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Requested JSON for connector OAuth sign-in, handled token errors returned with HTTP 200, and kept provider response text out of failure messages. Applied the same validation to token refresh. For #869.
+
 - Routed DashScope Paraformer transcription, CosyVoice speech and Qwen3 TTS through their native APIs, added Qwen3 TTS to voice choices, and rejected unsupported realtime voice models before sending a request.
 - Added optional chat background colors under Appearance, with light and dark variants, matching edge fades and a Default option to reset. For #861.
 
@@ -179,6 +184,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Made Android summaries preserve the current task separately from completed work.** Summaries without an active task no longer describe historical requests as work to resume. Summary streams now stop after 120 seconds without activity, within a 900-second overall deadline; stopping the turn cancels the request. Qwen3.8-Max summary requests explicitly disable thinking under the default rules, and context notices follow the app language. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 
 ### iOS
+
+- Requested JSON for connector OAuth sign-in and refresh, rejected malformed tokens and HTTP 200 OAuth errors, and showed safe error codes instead of provider response text. For #869.
 
 - **A task sent with `@<device>` no longer answers 「完成」 when nothing came back.** An `@Mac …` line whose task did not run showed *Done*, as if the work had happened; it now says the device finished without an answer, and the steps above it say what did happen. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
 - **Kept System Auto reply speech on the chosen language-specific voice.** An inactive concrete voice later in the Voice Output group no longer overrides Auto. A concrete System voice explicitly selected for Voice Output still takes priority. For [#722](https://github.com/nano-muse/nanoMuse/issues/722).

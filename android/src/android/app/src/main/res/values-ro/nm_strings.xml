@@ -1266,4 +1266,5 @@
     <string name="nm_chat_background_blue">Albastru</string>
     <string name="nm_chat_background_green">Verde</string>
     <string name="nm_chat_background_purple">Violet</string>
+    <string name="nm_mcp_oauth_token_failed">Autentificarea la conector a eșuat (%1$s). Verifică conexiunea și setările OAuth, apoi încearcă din nou.</string>
 </resources>

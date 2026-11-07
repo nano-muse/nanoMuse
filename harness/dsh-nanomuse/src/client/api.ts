@@ -72,6 +72,10 @@ export function errorCode(err: unknown): string {
 export function failureText(t: Translate, err: unknown): string {
   const code = errorCode(err)
   if (code === 'conversation_cleared') return t('chCleared')
+  if (code === 'memory_import_lines') return t('memImportTooMany')
+  if (code === 'memory_import_length') return t('memImportTooLong')
+  if (code === 'memory_import_capacity') return t('memImportFull')
+  if (code === 'memory_import_save') return t('memImportSaveFailed')
   const text = typeof err === 'object' && err !== null && 'message' in err ? String((err as { message: unknown }).message ?? '') : String(err ?? '')
   const status = Number(/^(?:http_)?(\d{3})$/.exec(code)?.[1] ?? 0)
   // `fetch` itself failed: the host on loopback is gone (no status, no code)
