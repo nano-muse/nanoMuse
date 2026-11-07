@@ -5,13 +5,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { Readable } from 'node:stream'
+import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import { NanoMuseSkills, catalogForSession, skillsHandler } from '../lib/skills.js'
 import { SkillPreferences, skillWorkspace } from '../lib/skills-policy.js'
 
 const require = createRequire(import.meta.url)
-const { createScope } = await import(require.resolve('@deepseek-ai/dsh-scope', { paths: [require.resolve('@deepseek-ai/dsh-skill')] }))
+const { createScope } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-scope', { paths: [require.resolve('@deepseek-ai/dsh-skill')] })).href)
 
 async function fixture(t, writer) {
   const directory = await mkdtemp(join(tmpdir(), 'nanomuse-skills-'))
