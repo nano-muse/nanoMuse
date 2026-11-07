@@ -1263,4 +1263,5 @@
     <string name="nm_chat_background_green">Verde</string>
     <string name="nm_chat_background_purple">Morado</string>
     <string name="nm_chat_in_progress">Tarea en curso</string>
+    <string name="nm_mcp_oauth_token_failed">No se pudo iniciar sesión en el conector (%1$s). Revisa la conexión y la configuración de OAuth e inténtalo de nuevo.</string>
 </resources>

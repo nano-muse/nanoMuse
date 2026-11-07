@@ -1271,4 +1271,5 @@
     <string name="nm_chat_background_green">Zielone</string>
     <string name="nm_chat_background_purple">Fioletowe</string>
     <string name="nm_chat_in_progress">Zadanie w toku</string>
+    <string name="nm_mcp_oauth_token_failed">Logowanie do łącznika nie powiodło się (%1$s). Sprawdź połączenie i ustawienia OAuth, a następnie spróbuj ponownie.</string>
 </resources>

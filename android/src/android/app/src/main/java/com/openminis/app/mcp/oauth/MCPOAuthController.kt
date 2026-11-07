@@ -5,14 +5,13 @@ import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import com.openminis.app.auth.OAuthCallbackServer
 import com.openminis.app.logging.AppLogger
+// nanoMuse: Safe JSON token negotiation and localized exchange failures.
+import com.openminis.app.R
+import io.github.nanomuse.connectors.McpOAuthTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.net.URI
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
@@ -133,42 +132,35 @@ class MCPOAuthController(private val context: Context) {
             clientSecret = MCPOAuthStore.clientSecret(context, server),
             resource = resource,
         )
-        val request = Request.Builder()
-            .url(oauth.tokenEndpoint)
-            .post(body.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
-            .build()
-
         return try {
+            // nanoMuse: Negotiate JSON and include invalid endpoint errors in safe failure handling.
+            val request = McpOAuthTokens.request(oauth.tokenEndpoint, body)
             http.newCall(request).execute().use { resp ->
-                val text = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) {
-                    AppLogger.error(TAG, "[Authorize] '$server' token exchange HTTP ${resp.code}")
-                    return Result.Failed("Token exchange failed (${resp.code}): ${text.take(200)}")
-                }
-                val json = JSONObject(text)
-                val access = json.optString("access_token", "")
-                if (access.isEmpty()) {
-                    return Result.Failed("Token endpoint returned no access_token.")
-                }
-                val expiresIn = json.optLong("expires_in", 0L)
+                // nanoMuse: Reject OAuth errors even on HTTP 200; never expose response text.
+                val tokens = McpOAuthTokens.parse(resp.code, resp.body?.string().orEmpty())
+                val expiresIn = tokens.expiresIn
                 val expiresAt = if (expiresIn > 0) System.currentTimeMillis() + expiresIn * 1000 else 0L
                 MCPOAuthStore.setTokens(
                     context, server,
                     MCPOAuthStore.StoredTokens(
-                        accessToken = access,
-                        refreshToken = json.optString("refresh_token", "").ifBlank { null },
+                        // nanoMuse: Persist only validated token fields.
+                        accessToken = tokens.accessToken,
+                        refreshToken = tokens.refreshToken,
                         expiresAtMs = expiresAt,
                     ),
                 )
                 AppLogger.info(
                     TAG,
-                    "[Authorize] '$server' OK (hasRefresh=${json.has("refresh_token")}, expiresIn=${expiresIn}s)",
+                    // nanoMuse: Log token metadata only.
+                    "[Authorize] '$server' OK (hasRefresh=${tokens.refreshToken != null}, expiresIn=${expiresIn}s)",
                 )
                 Result.Success
             }
-        } catch (t: Throwable) {
-            AppLogger.error(TAG, "[Authorize] '$server' token exchange failed: ${t.message}")
-            Result.Failed("Token exchange failed: ${t.message}")
+        } catch (e: Exception) {
+            // nanoMuse: Provider bodies and exception messages may contain credentials.
+            val code = (e as? McpOAuthTokens.Failure)?.code ?: "connection_failed"
+            AppLogger.error(TAG, "[Authorize] token exchange failed: $code")
+            Result.Failed(context.getString(R.string.nm_mcp_oauth_token_failed, code))
         }
     }
 

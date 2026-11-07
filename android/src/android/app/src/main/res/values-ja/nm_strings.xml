@@ -1259,4 +1259,5 @@
     <string name="nm_chat_background_green">緑</string>
     <string name="nm_chat_background_purple">紫</string>
     <string name="nm_chat_in_progress">タスク進行中</string>
+    <string name="nm_mcp_oauth_token_failed">コネクターへのログインに失敗しました（%1$s）。接続と OAuth 設定を確認して、もう一度お試しください。</string>
 </resources>

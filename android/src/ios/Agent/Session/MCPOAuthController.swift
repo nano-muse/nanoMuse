@@ -369,25 +369,26 @@ final class MCPOAuthController: NSObject, ObservableObject {
         if let resource {
             form["resource"] = resource
         }
-        var req = URLRequest(url: URL(string: oauth.tokenEndpoint)!)
-        req.httpMethod = "POST"
-        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        req.httpBody = form.map { "\($0.key)=\(Self.formEncode($0.value))" }
-            .joined(separator: "&").data(using: .utf8)
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            logger.error("[Authorize] '\(server)' token exchange HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)")
-            throw OAuthError.exchangeFailed(AppLocalized("Token exchange failed: \(String(body))"))
+        // nanoMuse: Request JSON and keep provider bodies out of user-visible errors.
+        let encodedForm = Data(form.map { "\($0.key)=\(Self.formEncode($0.value))" }
+            .joined(separator: "&").utf8)
+        let req = NanoMuseMcpOAuthTokens.request(endpoint: URL(string: oauth.tokenEndpoint)!, form: encodedForm)
+        let tokens: NanoMuseMcpOAuthTokens.Tokens
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            tokens = try NanoMuseMcpOAuthTokens.parse(
+                status: (resp as? HTTPURLResponse)?.statusCode ?? 0, data: data)
+        } catch {
+            let code = (error as? NanoMuseMcpOAuthTokens.Failure)?.code ?? "connection_failed"
+            logger.error("[Authorize] token exchange failed: \(code)")
+            throw OAuthError.exchangeFailed(String(format: AppLocalized(
+                "Connector sign-in failed (%@). Check the connection and OAuth settings, then try again."), code))
         }
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let access = obj["access_token"] as? String else {
-            throw OAuthError.exchangeFailed(AppLocalized("Token endpoint returned no access_token."))
-        }
-        let expiresIn = (obj["expires_in"] as? NSNumber)?.doubleValue ?? 0
+        let expiresIn = tokens.expiresIn
         let stored = StoredTokens(
-            accessToken: access,
-            refreshToken: obj["refresh_token"] as? String,
+            // nanoMuse: Persist only validated token fields.
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             expiresAt: expiresIn > 0 ? Date().timeIntervalSince1970 + expiresIn : 0
         )
         Self.keychainSet(try JSONEncoder().encode(stored), account: "\(server)#tokens")

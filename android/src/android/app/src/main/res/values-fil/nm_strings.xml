@@ -1263,4 +1263,5 @@
     <string name="nm_chat_background_green">Berde</string>
     <string name="nm_chat_background_purple">Lila</string>
     <string name="nm_chat_in_progress">Kasalukuyang ginagawa ang gawain</string>
+    <string name="nm_mcp_oauth_token_failed">Hindi makapag-sign in sa connector (%1$s). Suriin ang koneksyon at mga setting ng OAuth, at subukang muli.</string>
 </resources>

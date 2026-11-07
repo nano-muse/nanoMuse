@@ -1243,4 +1243,5 @@
     <string name="nm_chat_background_green">Green</string>
     <string name="nm_chat_background_purple">Purple</string>
     <string name="nm_chat_in_progress">Task in progress</string>
+    <string name="nm_mcp_oauth_token_failed">Connector sign-in failed (%1$s). Check the connection and OAuth settings, then try again.</string>
 </resources>

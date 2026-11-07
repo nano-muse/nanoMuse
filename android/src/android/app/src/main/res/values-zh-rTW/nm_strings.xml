@@ -1229,4 +1229,5 @@
     <string name="nm_chat_background_green">綠色</string>
     <string name="nm_chat_background_purple">紫色</string>
     <string name="nm_chat_in_progress">工作進行中</string>
+    <string name="nm_mcp_oauth_token_failed">連接器登入失敗（%1$s）。請檢查網路連線及 OAuth 設定後重試。</string>
 </resources>
