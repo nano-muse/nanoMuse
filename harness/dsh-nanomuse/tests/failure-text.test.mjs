@@ -50,6 +50,17 @@ after(async () => {
 /** A failed `call`: the Error the client throws, with the relay-style code on it. */
 const failed = (code, message = 'raw text from the wire') => Object.assign(new Error(message), { code })
 
+test('memory import limits explain that nothing was imported in both languages', () => {
+  for (const words of [en, zh]) {
+    for (const [code, key] of [
+      ['memory_import_lines', 'memImportTooMany'],
+      ['memory_import_length', 'memImportTooLong'],
+      ['memory_import_capacity', 'memImportFull'],
+      ['memory_import_save', 'memImportSaveFailed'],
+    ]) assert.equal(failureText(translator(words), failed(code)), words[key])
+  }
+})
+
 test('the wire: the relay out of reach or past its deadline, in both languages', () => {
   const t = translator(en)
   assert.equal(failureText(t, failed('unreachable', 'fetch failed')), en.errUnreachable)

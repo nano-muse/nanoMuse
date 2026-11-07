@@ -65,12 +65,13 @@ export function ImportMemorySheet({ t, onClose }: { t: Translate; onClose(): voi
       done === undefined ? h('button', { type: 'submit', form: 'nm-mem-import', className: 'nm-pill nm-pill-sm', disabled: busy || !text.trim() }, busy ? t('memImporting') : t('memImportDo')) : null) },
     h('form', { id: 'nm-mem-import', className: 'nm-sheet-form', onSubmit: submit },
       h('p', { className: 'nm-sheet-lead' }, t('memImportLead')),
+      h('p', { className: 'nm-sheet-lead' }, t('memImportLimits')),
       h('ol', { className: 'nm-sheet-steps' },
         h('li', null, t('memImportStep1')),
         h('li', null, t('memImportStep2')),
         h('li', null, t('memImportStep3'))),
       done === undefined
-        ? h('textarea', { className: 'nm-textarea', rows: 8, value: text, placeholder: t('memImportPlaceholder'), maxLength: 60000, onChange: (e: FormEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value), 'data-modal-autofocus': true })
+        ? h('textarea', { className: 'nm-textarea', rows: 8, value: text, placeholder: t('memImportPlaceholder'), onChange: (e: FormEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value), 'data-modal-autofocus': true })
         : h('p', { className: 'nm-sheet-lead' }, t('memImported', { n: done })),
       error ? h('div', { className: 'nm-room-error' }, error) : null))
 }
