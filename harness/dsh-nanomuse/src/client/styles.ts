@@ -598,6 +598,35 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-pf-top { padding-t
 .nm-pf-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: 0 0 0 1px rgba(0,0,0,0.12); }
 .nm-pf-swatch.nm-active { border-color: var(--dsw-alias-label-primary); }
 
+/* Skills availability uses the current chat's catalog and an explicit preference scope. */
+.nm-skills { display: flex; flex-direction: column; gap: 16px; padding-top: 12px; color: var(--dsw-alias-label-primary); }
+.nm-skills-head { display: flex; align-items: flex-start; gap: 12px; }
+.nm-skills-head > div { flex: 1; min-width: 0; }
+.nm-skills-head h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+.nm-skills-head p, .nm-skill-description { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
+.nm-card.nm-skills-scope { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.nm-skills-scope-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+.nm-skills-scope-picker .nm-select { max-width: 60%; }
+.nm-skills input, .nm-skills select { border: 1px solid var(--nm-field-border); border-radius: 10px; background: var(--nm-field); color: var(--dsw-alias-label-primary); padding: 9px 11px; font: inherit; font-size: 13px; }
+.nm-skills input::placeholder { color: var(--dsw-alias-label-tertiary); }
+.nm-skills input:focus-visible, .nm-skills select:focus-visible { outline: 2px solid var(--nm-blue); outline-offset: 2px; }
+.nm-skills .nm-switch[aria-checked="false"] { background: color-mix(in srgb, var(--dsw-alias-label-primary) 18%, var(--nm-card)); }
+.nm-card.nm-skills-list { padding: 0; }
+.nm-skills-hint, .nm-skills-context { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
+.nm-skills-context code { font-size: 11.5px; }
+.nm-skills-search { display: flex; align-items: center; gap: 8px; color: var(--dsw-alias-label-tertiary); }
+.nm-skills-search input { flex: 1; min-width: 0; }
+.nm-skills-list:empty { display: none; }
+.nm-skill { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.nm-skill + .nm-skill { border-top: 1px solid var(--nm-divider); }
+.nm-skill-head { display: flex; align-items: center; gap: 16px; }
+.nm-skill-head h3 { margin: 0; overflow-wrap: anywhere; }
+.nm-skill-details { color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.nm-skill-details summary { cursor: pointer; }
+.nm-skill-details dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px 14px; margin: 10px 0 0; }
+.nm-skill-details dt, .nm-skill-details dd { margin: 0; overflow-wrap: anywhere; }
+.nm-skill-details code { font-size: 11px; }
+
 /* ---- the devices page ------------------------------------------------- */
 .nm-page { height: 100%; min-height: 0; overflow: auto; box-sizing: border-box; padding: 28px 32px 40px; color: var(--dsw-alias-label-primary); }
 .nm-page-inner { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }

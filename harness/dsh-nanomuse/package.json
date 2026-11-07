@@ -47,6 +47,10 @@
       "types": "./lib/types/capability-skill.d.ts",
       "default": "./lib/capability-skill.js"
     },
+    "./skills": {
+      "types": "./lib/types/skills.d.ts",
+      "default": "./lib/skills.js"
+    },
     "./hands-tools": {
       "types": "./lib/types/hands-tools.d.ts",
       "default": "./lib/hands-tools.js"

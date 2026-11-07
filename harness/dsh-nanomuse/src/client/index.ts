@@ -48,6 +48,7 @@ import { en, zh } from './locales.ts'
 import type { ChatActions } from './MuseChats.tsx'
 import { MuseHeader, type UseSessionStatus } from './MuseHeader.tsx'
 import { CONNECTORS_SECTION, makeConnectorsSection } from './Connectors.tsx'
+import { SKILLS_SECTION, makeSkillsSection } from './Skills.tsx'
 import { DICTATION_SECTION, FILES_SECTION, makeDictationSection, makeFilesSection, makePermissionsSection, PERMISSIONS_SECTION } from './Pages.tsx'
 import { makeTurnError } from './RefusalCard.tsx'
 import { CHANNELS_SECTION, COMPUTER_SECTION, createShellStore, DATA_SECTION, HARNESS_SECTION, HELP_SECTION, LEGAL_SECTION, makeGeneralSection, makeHarnessSection, MuseSettings, STORAGE_SECTION, WALLET_SECTION, type MuseSettingsProps, type OnboardingStep, type SectionRow } from './MuseSettings.tsx'
@@ -608,6 +609,9 @@ export function apply(ctx: ClientContext): void {
   const ConnectorsSection = makeConnectorsSection(t)
   slots.inject('settings.section', () =>
     slots.register({ name: 'settings.section', id: CONNECTORS_SECTION, order: 21, label: () => t('navConnectors'), locale: 'nanomuse' }, ConnectorsSection))
+  const SkillsSection = makeSkillsSection(t)
+  slots.inject('settings.section', () =>
+    slots.register({ name: 'settings.section', id: SKILLS_SECTION, order: 21.5, label: () => t('navSkills'), locale: 'nanomuse' }, SkillsSection))
   const FilesSection = makeFilesSection(t)
   slots.inject('settings.section', () =>
     slots.register({ name: 'settings.section', id: FILES_SECTION, order: 23, label: () => t('navFiles'), locale: 'nanomuse' }, FilesSection))
