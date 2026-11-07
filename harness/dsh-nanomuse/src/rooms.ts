@@ -1012,10 +1012,12 @@ export default class NanomuseRooms extends Service {
     const lines = text.split(/\r\n?|\n/).map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])(?:\s+|$)/, '').replace(/\s+/g, ' ').trim()).filter(Boolean)
     if (lines.length > 200) throw new RelayError(400, 'memory_import_lines', 'Import at most 200 lines at a time. Nothing was imported.')
     if (lines.some((line) => line.length > MEMORY_LINE)) throw new RelayError(400, 'memory_import_length', 'Each memory must fit within 400 characters. Nothing was imported.')
-    const known = new Set(this.store.memory.map((item) => titleKey(item.text)))
+    // Punctuation can carry meaning, such as a minus sign or decimal point.
+    const keyOf = (line: string) => line.replace(/\s+/g, ' ').trim().toLowerCase()
+    const known = new Set(this.store.memory.map((item) => keyOf(item.text)))
     const incoming: MemoryItem[] = []
     for (const line of lines) {
-      const key = titleKey(line)
+      const key = keyOf(line)
       if (known.has(key)) continue
       known.add(key)
       incoming.push({ id: newId('mem'), at: Date.now(), text: line, source: 'import' })

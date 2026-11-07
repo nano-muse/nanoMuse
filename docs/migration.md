@@ -29,8 +29,9 @@ different export paths may include different material.
 
 An import accepts at most **200 nonempty lines**, each at most **400 characters** after
 whitespace and leading list markers are normalized. Desktop memory holds **400 entries
-in total**, including existing memories. Lines differing only in letter case, spacing
-or punctuation count as duplicates and are not added again.
+in total**, including existing memories. Lines differing only in letter case or extra
+whitespace count as duplicates and are not added again. Punctuation is preserved when
+comparing lines, so negative numbers and decimals remain distinct.
 
 If any limit is exceeded, the current implementation rejects the **whole batch** and
 keeps the existing memory unchanged. It does not shorten imported lines or remove old
