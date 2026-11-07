@@ -127936,6 +127936,65 @@
         }
       }
     },
+    "Connector sign-in failed (%@). Check the connection and OAuth settings, then try again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anmeldung beim Konnektor fehlgeschlagen (%@). Prüfe die Verbindung und die OAuth-Einstellungen und versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connector sign-in failed (%@). Check the connection and OAuth settings, then try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo iniciar sesión en el conector (%@). Revisa la conexión y la configuración de OAuth e inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La connexion au connecteur a échoué (%@). Vérifiez la connexion et les paramètres OAuth, puis réessayez."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コネクターへのログインに失敗しました（%@）。接続と OAuth 設定を確認して、もう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "커넥터 로그인에 실패했습니다(%@). 연결 및 OAuth 설정을 확인한 후 다시 시도하세요."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось войти в коннектор (%@). Проверьте подключение и настройки OAuth и повторите попытку."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接器登录失败（%@）。请检查网络连接和 OAuth 配置后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連接器登入失敗（%@）。請檢查網路連線及 OAuth 設定後重試。"
+          }
+        }
+      }
+    },
     "Connectors" : {
       "extractionState" : "manual",
       "localizations" : {

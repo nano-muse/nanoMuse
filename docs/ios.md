@@ -930,6 +930,12 @@ Info.plist, so builds do not wait for the export-compliance question.
 The runner is `macos-26`; if the label is not available on your GitHub plan, `macos-15` with
 `xcode-version: latest-stable` is the fallback, at the cost of the iOS 26 SDK the project asks for.
 
+## Connector OAuth sign-in {#connector-oauth}
+
+Token exchange and refresh request JSON responses. An OAuth error is treated as a failed sign-in even when the server returns HTTP 200. Failure messages show a fixed error code, without the provider response body or credentials. Invalid refresh responses leave the saved tokens unchanged.
+
+For `incorrect_client_credentials` or `invalid_client`, check the OAuth app client ID and, if the provider requires one, its client secret. For `redirect_uri_mismatch`, compare the provider registration with the callback address shown in the app. For `bad_verification_code` or `invalid_grant`, start sign-in again. A client secret is not required for every connector. GitHub documents its [JSON response negotiation](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) and [token error codes](https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors).
+
 ## What follows
 
 The Android app is where nanoMuse's shape lives; since 0.1.34 the iPhone carries the same shape

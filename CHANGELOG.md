@@ -139,6 +139,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Requested JSON for connector OAuth sign-in, handled token errors returned with HTTP 200, and kept provider response text out of failure messages. Applied the same validation to token refresh. For #869.
+
 - Routed DashScope Paraformer transcription, CosyVoice speech and Qwen3 TTS through their native APIs, added Qwen3 TTS to voice choices, and rejected unsupported realtime voice models before sending a request.
 - Added optional chat background colors under Appearance, with light and dark variants, matching edge fades and a Default option to reset. For #861.
 
@@ -177,6 +179,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Made Android summaries preserve the current task separately from completed work.** Summaries without an active task no longer describe historical requests as work to resume. Summary streams now stop after 120 seconds without activity, within a 900-second overall deadline; stopping the turn cancels the request. Qwen3.8-Max summary requests explicitly disable thinking under the default rules, and context notices follow the app language. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 
 ### iOS
+
+- Requested JSON for connector OAuth sign-in and refresh, rejected malformed tokens and HTTP 200 OAuth errors, and showed safe error codes instead of provider response text. For #869.
 
 - **A task sent with `@<device>` no longer answers 「完成」 when nothing came back.** An `@Mac …` line whose task did not run showed *Done*, as if the work had happened; it now says the device finished without an answer, and the steps above it say what did happen. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
 - **Kept System Auto reply speech on the chosen language-specific voice.** An inactive concrete voice later in the Voice Output group no longer overrides Auto. A concrete System voice explicitly selected for Voice Output still takes priority. For [#722](https://github.com/nano-muse/nanoMuse/issues/722).

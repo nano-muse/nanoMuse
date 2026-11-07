@@ -1258,4 +1258,5 @@
     <string name="nm_chat_background_blue">Biru</string>
     <string name="nm_chat_background_green">Hijau</string>
     <string name="nm_chat_background_purple">Ungu</string>
+    <string name="nm_mcp_oauth_token_failed">Gagal masuk ke konektor (%1$s). Periksa koneksi dan pengaturan OAuth, lalu coba lagi.</string>
 </resources>

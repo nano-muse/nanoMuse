@@ -12,11 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
@@ -169,26 +165,16 @@ object Connectors {
             MCPOAuthStore.clientSecret(context, server.id)?.let { form["client_secret"] = it }
             McpPkce.canonicalResourceUri(server.url)?.let { form["resource"] = it }
             val body = form.entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
-            val req = Request.Builder().url(oauth.tokenEndpoint)
-                .post(body.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
-                .header("accept", "application/json")
-                .build()
             try {
+                val req = McpOAuthTokens.request(oauth.tokenEndpoint, body)
                 http.newCall(req).execute().use { resp ->
-                    val text = resp.body?.string().orEmpty()
-                    if (!resp.isSuccessful) {
-                        AppLogger.warning(TAG, "refresh '${server.id}' answered ${resp.code}")
-                        return@use
-                    }
-                    val json = JSONObject(text)
-                    val access = json.optString("access_token", "")
-                    if (access.isEmpty()) return@use
-                    val expiresIn = json.optLong("expires_in", 0L)
+                    val updated = McpOAuthTokens.parse(resp.code, resp.body?.string().orEmpty())
+                    val expiresIn = updated.expiresIn
                     MCPOAuthStore.setTokens(
                         context, server.id,
                         MCPOAuthStore.StoredTokens(
-                            accessToken = access,
-                            refreshToken = json.optString("refresh_token", "").ifBlank { null } ?: refresh,
+                            accessToken = updated.accessToken,
+                            refreshToken = updated.refreshToken ?: refresh,
                             expiresAtMs = if (expiresIn > 0) System.currentTimeMillis() + expiresIn * 1000 else 0L,
                         ),
                     )
@@ -196,7 +182,8 @@ object Connectors {
                     AppLogger.info(TAG, "refreshed '${server.id}'")
                 }
             } catch (e: Exception) {
-                AppLogger.warning(TAG, "refresh '${server.id}' failed: ${e.message}")
+                val code = (e as? McpOAuthTokens.Failure)?.code ?: "connection_failed"
+                AppLogger.warning(TAG, "token refresh failed: $code")
             }
         }
     }

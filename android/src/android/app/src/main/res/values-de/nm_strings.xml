@@ -1262,4 +1262,5 @@
     <string name="nm_chat_background_blue">Blau</string>
     <string name="nm_chat_background_green">Grün</string>
     <string name="nm_chat_background_purple">Lila</string>
+    <string name="nm_mcp_oauth_token_failed">Anmeldung beim Konnektor fehlgeschlagen (%1$s). Prüfe die Verbindung und die OAuth-Einstellungen und versuche es erneut.</string>
 </resources>
