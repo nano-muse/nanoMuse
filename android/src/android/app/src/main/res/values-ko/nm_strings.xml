@@ -1258,4 +1258,5 @@
     <string name="nm_chat_background_blue">파란색</string>
     <string name="nm_chat_background_green">초록색</string>
     <string name="nm_chat_background_purple">보라색</string>
+    <string name="nm_chat_in_progress">작업 진행 중</string>
 </resources>

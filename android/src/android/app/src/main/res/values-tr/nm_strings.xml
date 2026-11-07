@@ -1262,4 +1262,5 @@
     <string name="nm_chat_background_blue">Mavi</string>
     <string name="nm_chat_background_green">Yeşil</string>
     <string name="nm_chat_background_purple">Mor</string>
+    <string name="nm_chat_in_progress">Görev devam ediyor</string>
 </resources>

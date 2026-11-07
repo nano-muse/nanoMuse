@@ -1262,4 +1262,5 @@
     <string name="nm_chat_background_blue">Blau</string>
     <string name="nm_chat_background_green">Grün</string>
     <string name="nm_chat_background_purple">Lila</string>
+    <string name="nm_chat_in_progress">Aufgabe läuft</string>
 </resources>

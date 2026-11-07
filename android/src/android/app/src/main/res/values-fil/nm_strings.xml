@@ -1262,4 +1262,5 @@
     <string name="nm_chat_background_blue">Asul</string>
     <string name="nm_chat_background_green">Berde</string>
     <string name="nm_chat_background_purple">Lila</string>
+    <string name="nm_chat_in_progress">Kasalukuyang ginagawa ang gawain</string>
 </resources>

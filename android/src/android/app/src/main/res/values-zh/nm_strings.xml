@@ -1235,4 +1235,5 @@
     <string name="nm_chat_background_blue">蓝色</string>
     <string name="nm_chat_background_green">绿色</string>
     <string name="nm_chat_background_purple">紫色</string>
+    <string name="nm_chat_in_progress">任务进行中</string>
 </resources>

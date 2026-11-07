@@ -1263,4 +1263,5 @@
     <string name="nm_chat_background_blue">Azul</string>
     <string name="nm_chat_background_green">Verde</string>
     <string name="nm_chat_background_purple">Roxo</string>
+    <string name="nm_chat_in_progress">Tarefa em andamento</string>
 </resources>

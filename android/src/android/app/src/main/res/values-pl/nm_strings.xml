@@ -1270,4 +1270,5 @@
     <string name="nm_chat_background_blue">Niebieskie</string>
     <string name="nm_chat_background_green">Zielone</string>
     <string name="nm_chat_background_purple">Fioletowe</string>
+    <string name="nm_chat_in_progress">Zadanie w toku</string>
 </resources>

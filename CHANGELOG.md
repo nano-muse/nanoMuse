@@ -139,6 +139,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Added progress rings to active main and side chats in the Muse drawer, using this phone's existing task tracking while preserving unread reply markers. Approval and per-chat step indicators remain separate work. For #531.
+
 - Routed DashScope Paraformer transcription, CosyVoice speech and Qwen3 TTS through their native APIs, added Qwen3 TTS to voice choices, and rejected unsupported realtime voice models before sending a request.
 - Added optional chat background colors under Appearance, with light and dark variants, matching edge fades and a Default option to reset. For #861.
 

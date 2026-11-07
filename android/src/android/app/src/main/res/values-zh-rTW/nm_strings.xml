@@ -1228,4 +1228,5 @@
     <string name="nm_chat_background_blue">藍色</string>
     <string name="nm_chat_background_green">綠色</string>
     <string name="nm_chat_background_purple">紫色</string>
+    <string name="nm_chat_in_progress">工作進行中</string>
 </resources>

@@ -1258,4 +1258,5 @@
     <string name="nm_chat_background_blue">Biru</string>
     <string name="nm_chat_background_green">Hijau</string>
     <string name="nm_chat_background_purple">Ungu</string>
+    <string name="nm_chat_in_progress">Tugas sedang dijalankan</string>
 </resources>

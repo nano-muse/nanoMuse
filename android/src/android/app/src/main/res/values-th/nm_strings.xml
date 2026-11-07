@@ -1258,4 +1258,5 @@
     <string name="nm_chat_background_blue">สีน้ำเงิน</string>
     <string name="nm_chat_background_green">สีเขียว</string>
     <string name="nm_chat_background_purple">สีม่วง</string>
+    <string name="nm_chat_in_progress">กำลังดำเนินงาน</string>
 </resources>

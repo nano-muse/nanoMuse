@@ -1266,4 +1266,5 @@
     <string name="nm_chat_background_blue">Albastru</string>
     <string name="nm_chat_background_green">Verde</string>
     <string name="nm_chat_background_purple">Violet</string>
+    <string name="nm_chat_in_progress">Sarcină în desfășurare</string>
 </resources>
