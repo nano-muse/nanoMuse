@@ -1262,5 +1262,6 @@
     <string name="nm_chat_background_blue">Mavi</string>
     <string name="nm_chat_background_green">Yeşil</string>
     <string name="nm_chat_background_purple">Mor</string>
+    <string name="nm_chat_in_progress">Görev devam ediyor</string>
     <string name="nm_mcp_oauth_token_failed">Bağlayıcı oturumu açılamadı (%1$s). Bağlantıyı ve OAuth ayarlarını kontrol edip tekrar deneyin.</string>
 </resources>

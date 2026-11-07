@@ -6,6 +6,38 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UnreadTrackerIntegrationTest {
+    @Test fun parallelRunsKeepTheirActivityAndUnreadStateSeparate() {
+        val first = "drawer-first"
+        val second = "drawer-second"
+        try {
+            SessionActivityTracker.setActive(first)
+            SessionActivityTracker.setActive(second)
+            assertTrue(SessionActivityTracker.activeSessions.value.containsAll(listOf(first, second)))
+
+            SessionActivityTracker.setInactive(first)
+            assertFalse(first in SessionActivityTracker.activeSessions.value)
+            assertTrue(second in SessionActivityTracker.activeSessions.value)
+            assertTrue(first in SessionBadgeStore.unread.value)
+            assertFalse(second in SessionBadgeStore.unread.value)
+
+            SessionActivityTracker.setPresent(first)
+            assertFalse(first in SessionBadgeStore.unread.value)
+            assertTrue(second in SessionActivityTracker.activeSessions.value)
+
+            SessionActivityTracker.markReplyIncomplete(second)
+            SessionActivityTracker.setInactive(second)
+            assertFalse(second in SessionActivityTracker.activeSessions.value)
+            assertFalse(second in SessionBadgeStore.unread.value)
+        } finally {
+            SessionActivityTracker.setAbsent(first)
+            for (id in listOf(first, second)) {
+                SessionActivityTracker.markReplyIncomplete(id)
+                SessionActivityTracker.setInactive(id)
+                SessionBadgeStore.clear(id)
+            }
+        }
+    }
+
     @Test fun backgroundCompletionIsPublishedOnceAndOpeningClearsIt() {
         val id = "unread-tracker-complete"
         SessionActivityTracker.setActive(id)

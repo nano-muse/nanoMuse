@@ -147,9 +147,14 @@ fun SideChatDrawer(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = nmInk,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            // nanoMuse: main and side chats share the same unread store.
-            io.github.nanomuse.ui.chat.UnreadReplyDot(mainSessionId)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                io.github.nanomuse.ui.chat.ChatRunningIndicator(mainSessionId, nmMuted)
+                io.github.nanomuse.ui.chat.UnreadReplyDot(mainSessionId)
+            }
         }
 
         // nanoMuse: Devices — the account's other Muses, one tap away like a chat (docs/every-device.md)
@@ -385,7 +390,10 @@ private fun SideChatRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            io.github.nanomuse.ui.chat.UnreadReplyDot(session.id)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                io.github.nanomuse.ui.chat.ChatRunningIndicator(session.id, muted)
+                io.github.nanomuse.ui.chat.UnreadReplyDot(session.id)
+            }
             Spacer(Modifier.size(10.dp))
             Text(
                 text = relativeDay(androidx.compose.ui.platform.LocalContext.current, session.updatedAt),

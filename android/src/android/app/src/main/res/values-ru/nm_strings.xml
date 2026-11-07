@@ -1270,5 +1270,6 @@
     <string name="nm_chat_background_blue">Синий</string>
     <string name="nm_chat_background_green">Зелёный</string>
     <string name="nm_chat_background_purple">Фиолетовый</string>
+    <string name="nm_chat_in_progress">Задача выполняется</string>
     <string name="nm_mcp_oauth_token_failed">Не удалось войти в коннектор (%1$s). Проверьте подключение и настройки OAuth и повторите попытку.</string>
 </resources>

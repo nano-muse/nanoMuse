@@ -1263,5 +1263,6 @@
     <string name="nm_chat_background_blue">Bleu</string>
     <string name="nm_chat_background_green">Vert</string>
     <string name="nm_chat_background_purple">Violet</string>
+    <string name="nm_chat_in_progress">Tâche en cours</string>
     <string name="nm_mcp_oauth_token_failed">La connexion au connecteur a échoué (%1$s). Vérifiez la connexion et les paramètres OAuth, puis réessayez.</string>
 </resources>
