@@ -1009,7 +1009,7 @@ export default class NanomuseRooms extends Service {
 
   /** Validate a whole import before changing memory; an import never evicts existing lines. */
   async importMemory(text: string): Promise<number> {
-    const lines = text.split(/\r\n?|\n/).map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+    const lines = text.split(/\r\n?|\n/).map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])(?:\s+|$)/, '').replace(/\s+/g, ' ').trim()).filter(Boolean)
     if (lines.length > 200) throw new RelayError(400, 'memory_import_lines', 'Import at most 200 lines at a time. Nothing was imported.')
     if (lines.some((line) => line.length > MEMORY_LINE)) throw new RelayError(400, 'memory_import_length', 'Each memory must fit within 400 characters. Nothing was imported.')
     const known = new Set(this.store.memory.map((item) => titleKey(item.text)))

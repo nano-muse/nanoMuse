@@ -203,6 +203,12 @@ test('memory import accepts a full batch at the documented limits and one-charac
   assert.deepEqual(self.store.memory.slice(-2).map((item) => item.text), ['甲', '乙'])
 })
 
+test('memory import distinguishes list markers from negative numbers and decimal facts', async () => {
+  const { self, run } = memoryImportFixture()
+  assert.equal(await run('-40 degrees\n1.23 units\n- Listed fact\n1. Another fact'), 4)
+  assert.deepEqual(self.store.memory.map((item) => item.text), ['-40 degrees', '1.23 units', 'Listed fact', 'Another fact'])
+})
+
 test('memory import HTTP route accepts a full UTF-8 batch and refuses oversized bodies unchanged', async () => {
   const { Readable } = await import('node:stream')
   const rooms = new Rooms({ reflect: { provide() {} }, logger: { warn() {} } })
