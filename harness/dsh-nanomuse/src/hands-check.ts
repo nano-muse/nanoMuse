@@ -12,6 +12,7 @@
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
 import { access, constants } from 'node:fs/promises'
 import { delimiter, extname, isAbsolute, join } from 'node:path'
+import { cliSpawnCommand } from './coding-readers.ts'
 
 const SIZE_PART = /^(\d{2,5})[×x](\d{2,5})$/
 
@@ -147,7 +148,10 @@ export async function withMcp<T>(options: McpOptions, body: (call: (tool: string
   const timeoutMs = options.timeoutMs ?? 60_000
   let child: ChildProcess
   try {
-    child = spawnImpl(options.command, options.args ?? ['mcp'], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...options.env } })
+    // the runtime this starts may be a `.cmd` shim (runtimeInfo looks for one on win32), which
+    // node's bare spawn refuses; the coding CLIs' shim resolution starts it the same way
+    const [command, args] = cliSpawnCommand(process.platform, options.command, options.args ?? ['mcp'])
+    child = spawnImpl(command, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...options.env } })
   } catch (error: unknown) {
     throw new HandsCheckError(`could not start the runtime: ${error instanceof Error ? error.message : String(error)}`)
   }
