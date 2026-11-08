@@ -9,7 +9,7 @@
  * tells the settings page what the person needs to do next: a black capture means Screen
  * Recording for nanoMuse Desktop (and a relaunch), a refused move means Accessibility.
  */
-import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
+import { spawn as nodeSpawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { access, constants } from 'node:fs/promises'
 import { delimiter, extname, isAbsolute, join } from 'node:path'
 
@@ -141,13 +141,40 @@ export class HandsCheckError extends Error {
   }
 }
 
-/** One MCP session: initialize, the calls, exit. The child is killed on timeout. */
+/**
+ * End the runtime and everything it started. A plain `kill()` ends the runtime alone: the
+ * helpers it started (the screenshot helper, say) keep running orphaned with their stdio
+ * pipes gone, so every timeout here takes the tree - `taskkill /T` walks the parentage on
+ * Windows, and the runtime's own process group answers a negative pid on posix (the coding
+ * runner's stop does the same). Falls back to `kill()` when the tree walk cannot run.
+ */
+function killTree(child: ChildProcess): void {
+  try {
+    if (process.platform !== 'win32') {
+      if (child.pid) process.kill(-child.pid, 'SIGTERM')
+      else child.kill()
+    } else {
+      // taskkill /T walks the tree by parentage; /F because the runtime is being given up on
+      const killed = child.pid
+        ? spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, timeout: 10_000 })
+        : null
+      if (!killed || killed.error || killed.status !== 0) child.kill()
+    }
+  } catch {
+    child.kill()
+  }
+}
+
+/**
+ * One MCP session: initialize, the calls, exit. The child runs in a process group of its
+ * own (posix) so that giving up on it can end the whole tree, not the runtime alone.
+ */
 export async function withMcp<T>(options: McpOptions, body: (call: (tool: string, args: Record<string, unknown>) => Promise<ToolReply>) => Promise<T>): Promise<T> {
   const spawnImpl = options.spawn ?? nodeSpawn
   const timeoutMs = options.timeoutMs ?? 60_000
   let child: ChildProcess
   try {
-    child = spawnImpl(options.command, options.args ?? ['mcp'], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...options.env } })
+    child = spawnImpl(options.command, options.args ?? ['mcp'], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...options.env }, detached: process.platform !== 'win32' })
   } catch (error: unknown) {
     throw new HandsCheckError(`could not start the runtime: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -199,7 +226,7 @@ export async function withMcp<T>(options: McpOptions, body: (call: (tool: string
   child.stdin?.on('error', () => undefined)
   const timer = setTimeout(() => {
     failAll(new HandsCheckError('the runtime did not answer in time', stderr))
-    child.kill()
+    killTree(child)
   }, timeoutMs)
   const request = (method: string, params: Record<string, unknown>): Promise<unknown> =>
     new Promise((resolve, reject) => {
@@ -226,7 +253,7 @@ export async function withMcp<T>(options: McpOptions, body: (call: (tool: string
     } catch {
       // already closed
     }
-    const grace = setTimeout(() => child.kill(), 2000)
+    const grace = setTimeout(() => killTree(child), 2000)
     await exited
     clearTimeout(grace)
   }
