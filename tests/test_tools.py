@@ -280,18 +280,31 @@ async def test_shell_output_is_capped_in_memory(tmp_path: Path, monkeypatch):
     assert r.ok and "cut" not in r.output
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="process groups are POSIX")
 async def test_shell_timeout_stops_the_whole_tree(tmp_path: Path):
     """A timed-out command used to lose only the shell: `sleep` in a pipeline, a server put
-    in the background, lived on. The command runs in its own session now and the group goes."""
+    in the background, lived on. The command runs in its own session now and the group goes;
+    on Windows the group is the process tree taskkill /T walks."""
     import os
     import subprocess
     import time
 
     marker = tmp_path / "pid"
     shell = Shell(workspace=tmp_path)
-    # two seconds, so a loaded runner has forked the grandchild before the timeout fires
-    r = await shell.execute(command=f"sh -c 'echo $$ > {marker}; sleep 30' | cat", timeout=2)
+    if sys.platform == "win32":
+        # a grandchild of the shell, the shape taskkill /T walks: python reports its pid
+        # and sleeps. Names stay relative because the command's cwd is the workspace, so
+        # nothing needs quoting on the way through cmd; `start /b` keeps the grandchild
+        # in the shell's tree while `ping` holds the shell itself open for the timeout.
+        (tmp_path / "grandchild.py").write_text(
+            "import os, time\nopen('pid', 'w').write(str(os.getpid()))\ntime.sleep(30)\n",
+            encoding="ascii",
+        )
+        r = await shell.execute(
+            command="start /b python grandchild.py&ping -n 31 127.0.0.1 >nul", timeout=2
+        )
+    else:
+        # two seconds, so a loaded runner has forked the grandchild before the timeout fires
+        r = await shell.execute(command=f"sh -c 'echo $$ > {marker}; sleep 30' | cat", timeout=2)
     assert r.error and "timed out" in r.error
     for _ in range(50):
         if marker.is_file() and marker.read_text().strip():
@@ -300,8 +313,24 @@ async def test_shell_timeout_stops_the_whole_tree(tmp_path: Path):
     pid = int(marker.read_text().strip())
 
     def alive() -> bool:
-        """Running, as opposed to gone or a zombie waiting for init to reap it (as good as gone;
-        init is not always prompt): Linux reads /proc, macOS asks ps."""
+        """Running, as opposed to gone. Windows asks the process for its exit code
+        (os.kill(pid, 0) means something else there); Linux reads /proc for a zombie
+        waiting for init to reap it (as good as gone; init is not always prompt),
+        macOS asks ps."""
+        if sys.platform == "win32":
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                return False  # no such process (or closed and released): gone
+            try:
+                code = ctypes.c_ulong()
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                    return False
+                return code.value == 259  # STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
