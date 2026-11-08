@@ -1,5 +1,19 @@
 # The hub: every device is a Muse
 
+## Persistent device conversations
+
+The local prototype for #815 opens independent conversations in **Devices** on Android and desktop. Select an online destination that advertises `task.status`, then start or reopen a conversation. Each entry remembers the device ID and its own conversation UUID. The destination uses its own model and tools. The initiator keeps the transcript locally, independently of side-chat sync.
+
+A message beginning with a device mention uses a separate conversation for that turn. The entry shows the one-off destination. Use `@Device Name [device-id] message` when names are ambiguous. The next ordinary message still goes to the bound device.
+
+The first turn sends `task {text, conversation, turn_id, new_conversation: true, stream: true}`. Follow-ups use the same conversation and a fresh turn UUID with `new_conversation: false`. A missing remembered session reports `context_lost`; only a first turn can create a binding. Calls without `turn_id` retain legacy task behavior.
+
+The target saves the session binding and turn before executing and emits `event {stage: "accepted", turn_id}` after committing them. The authenticated account and caller device scope the binding. The initiator saves its turn before dispatch. A repeated turn returns its stored state without executing again. A distinct concurrent turn in the same conversation returns `busy`.
+
+After a disconnect, send `task.status {conversation, turn_id}` as a new Hub call. Its `state` is `accepted`, `completed`, `failed`, `cancelled`, `interrupted` or `unknown`. Completed results carry `text`; failures carry `error` and may carry `message`. An accepted result can include an `events` snapshot of recent progress and pending approvals with their remaining timeout. The initiator replaces its snapshot and reconciles the final answer by turn ID.
+
+A missing record means delivery is uncertain. An accepted turn without a terminal record after executor restart is interrupted and may already have had effects. Recovery never resends the turn. `stop {conversation, turn_id}` requests cancellation of the exact live turn. Its `stopped` field acknowledges the request, and the terminal state confirms the outcome. Approval scopes follow the existing task rules. The relay forwards calls without storing the transcript or results.
+
 Sign in to the same nanoMuse Cloud account on a phone, a computer and a browser,
 and they see each other. Each device runs its own Muse with its own hands (the
 phone's apps and sandbox, the computer's shell and screen), and any of them can

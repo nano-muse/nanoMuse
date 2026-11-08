@@ -324,7 +324,7 @@ class HubClient(
         try {
             return callWithId(id, to, action, args, timeoutMs, onEvent)
         } catch (error: Exception) {
-            if (action == "task" && (error is InterruptedException ||
+            if (action == "task" && !args.has("turn_id") && (error is InterruptedException ||
                     error is HubException && error.code == "timeout")) {
                 // The caller owns this id. A late cleanup must never stop a different task.
                 val interrupted = Thread.interrupted() || error is InterruptedException

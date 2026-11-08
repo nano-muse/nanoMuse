@@ -1237,4 +1237,8 @@
     <string name="nm_chat_background_purple">紫色</string>
     <string name="nm_chat_in_progress">任务进行中</string>
     <string name="nm_mcp_oauth_token_failed">连接器登录失败（%1$s）。请检查网络连接和 OAuth 配置后重试。</string>
+    <string name="nm_device_chats">设备对话</string>
+    <string name="nm_device_chat_start">在此设备上聊天</string>
+    <string name="nm_device_chat_uncertain">送达状态未知，正在查询设备上的结果。</string>
+    <string name="nm_device_chat_interrupted">任务已中断，设备可能已经执行了部分操作。</string>
 </resources>

@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
+
 ### Documentation
 
 - Documented supported migration paths for memories, reference files and connectors, and the limits of importing another assistant's archive. For #870.

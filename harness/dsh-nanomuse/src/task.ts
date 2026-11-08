@@ -168,15 +168,16 @@ export class TaskRunner {
   }
 
   /** `task {text, from?, conversation?, stream?}` → `{text, conversation, thread, device}`. */
-  async task(args: Record<string, unknown>, call: IncomingCall): Promise<Record<string, unknown>> {
+  async task(args: Record<string, unknown>, call: IncomingCall, boundSession?: SessionId): Promise<Record<string, unknown>> {
     if (this.options.closed?.()) throw new HubError('busy', 'this computer is ending its work; ask again in a moment')
     const text = String(args.text ?? '').trim()
     if (!text) throw new HubError('usage', 'text is required')
     const from = call.from
     const conversation = String(args.conversation ?? '').trim() || from.id || 'device'
-    const sessionId = await this.sessionFor(from, conversation)
+    const sessionId = boundSession ?? await this.sessionFor(from, conversation)
     const resolved = await this.ctx.sessionController.resolveAgent(sessionId)
-    if ('error' in resolved) throw new HubError('failed', `the session could not be opened: ${String(resolved.error)}`)
+    if ('error' in resolved) throw new HubError(boundSession ? 'context_lost' : 'failed', `the session could not be opened: ${String(resolved.error)}`)
+    if (boundSession) await this.restore(boundSession)
     const agent = resolved.agent
     if (agent.status !== 'idle' || this.bySession.has(sessionId)) throw new HubError('busy', 'this conversation is already busy')
 
@@ -256,11 +257,16 @@ export class TaskRunner {
         return known
       }
     }
+    const session = await this.createTaskSession(from)
+    this.conversations.set(k, session)
+    this.options.remember?.(k, session)
+    return session
+  }
+
+  async createTaskSession(from: Caller): Promise<SessionId> {
     const created = await this.ctx.sessionController.create((await this.options.home?.()) ?? { agentPreset: 'nanomuse' })
     const title = `From ${from.name || from.id}`
     await this.ctx.sessionController.rename({ sessionId: created.sessionId, title }).catch(() => undefined)
-    this.conversations.set(k, created.sessionId)
-    this.options.remember?.(k, created.sessionId)
     return created.sessionId
   }
 

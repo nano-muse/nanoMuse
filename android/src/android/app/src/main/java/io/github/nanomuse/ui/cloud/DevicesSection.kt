@@ -162,6 +162,7 @@ fun DevicesSection(
         }
     }
     MuseCaption(stringResource(R.string.nm_devices_how))
+    DeviceConversationPanel(others)
     if (onAsk != null && others.any { it.online }) MuseCaption(stringResource(R.string.nm_devices_ask_hint))
     MuseGap()
     MuseCard {
