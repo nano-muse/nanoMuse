@@ -12,12 +12,19 @@ function escapeHtml(text: string): string {
 }
 
 function inlineHtml(text: string): string {
+  // an inline comment's words ride as a numbered placeholder, so no markup rule can swallow
+  // or escape them (a comment inside **bold** keeps its own span), and come back at the end
+  const notes: string[] = []
+  const plain = text.replace(/\u0000span:([^\u0000]*)\u0000/g, (_m, body: string) => {
+    notes.push(`<span class="nm-doc-note">${escapeHtml(body)}</span>`)
+    return `\u0001${notes.length - 1}\u0001`
+  })
   let out = ''
   const re = /(\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*([^*\n]+)\*|_([^_\n]+)_|<?(https?:\/\/[^\s<>)]+)>?)/g
   let last = 0
   let match: RegExpExecArray | null
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > last) out += escapeHtml(text.slice(last, match.index))
+  while ((match = re.exec(plain)) !== null) {
+    if (match.index > last) out += escapeHtml(plain.slice(last, match.index))
     if (match[2] !== undefined || match[3] !== undefined) out += `<strong>${escapeHtml(match[2] ?? match[3] ?? '')}</strong>`
     else if (match[4] !== undefined) out += `<code>${escapeHtml(match[4])}</code>`
     else if (match[5] !== undefined && match[6] !== undefined) out += `<a href="${escapeHtml(match[6])}">${escapeHtml(match[5])}</a>`
@@ -25,15 +32,24 @@ function inlineHtml(text: string): string {
     else if (match[9] !== undefined) out += `<a href="${escapeHtml(match[9])}">${escapeHtml(match[9])}</a>`
     last = match.index + match[0].length
   }
-  if (last < text.length) out += escapeHtml(text.slice(last))
-  return out
+  if (last < plain.length) out += escapeHtml(plain.slice(last))
+  return out.replace(/\u0001(\d+)\u0001/g, (_m, i: string) => notes[Number(i)] ?? '')
 }
 
 /** Markdown → HTML for the editable. */
 export function mdToHtml(text: string): string {
   const src = text.replace(/\r\n?/g, '\n')
-  // the file's note about itself: comments become prefaces
-  const lines = src.replace(/<!--([\s\S]*?)-->/g, (_m, body: string) => `\u0000note:${body.trim().replace(/\n/g, ' ')}\u0000`).split('\n')
+  // the file's note about itself: comments become prefaces; a comment in the middle of a
+  // line is not a note paragraph, and its sentinel must never reach the editable (the
+  // autosave would write it into the file), so on any other line it becomes the span form
+  const lines = src
+    .replace(/<!--([\s\S]*?)-->/g, (_m, body: string) => `\u0000note:${body.trim().replace(/\n/g, ' ')}\u0000`)
+    .split('\n')
+    .map((line) =>
+      /^\u0000note:[^\u0000]*\u0000\s*$/.test(line)
+        ? line
+        : line.replace(/\u0000note:([^\u0000]*)\u0000/g, (_m, body: string) => `\u0000span:${body}\u0000`),
+    )
   const out: string[] = []
   const paragraph: string[] = []
   const flush = () => {
@@ -60,7 +76,9 @@ export function mdToHtml(text: string): string {
       const code: string[] = []
       const lang = line.slice(3).trim()
       i++
-      while (i < lines.length && !/^```/.test(lines[i] ?? '')) code.push(lines[i++] ?? '')
+      // inside a fence a comment is source text, not markup: the sentinel goes back to the
+      // comment it stood for (a multi-line one returns as the single line it collapsed to)
+      while (i < lines.length && !/^```/.test(lines[i] ?? '')) code.push((lines[i++] ?? '').replace(/\u0000(?:note|span):([^\u0000]*)\u0000/g, (_m, body: string) => `<!-- ${body} -->`))
       i++
       out.push(`<pre${lang ? ` data-lang="${escapeHtml(lang)}"` : ''}><code>${escapeHtml(code.join('\n'))}</code></pre>`)
       continue
@@ -145,6 +163,10 @@ function inlineMd(node: Node): string {
     case 'br':
       return '\n'
     case 'span':
+      // an inline comment's span goes back to the comment it rendered, so the autosave's
+      // round trip leaves the file as it found it
+      if (el.classList.contains('nm-doc-note')) return `<!-- ${inner().replace(/\s+/g, ' ').trim()} -->`
+      return inner()
     case 'u':
     case 's':
     case 'font':
