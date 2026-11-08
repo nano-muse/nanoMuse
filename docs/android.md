@@ -158,6 +158,9 @@ reserve while its uncalibrated estimate still fits, the run permits one provider
 check that estimate. Otherwise a request that cannot be reduced enough stops. A summary
 stream times out after 120 seconds without a chunk; its complete operation, including segments
 and retries, has a 900-second deadline. Stopping the turn cancels the summary request.
+Summary requests reserve their output space before sending the transcript. If it would leave
+too little room for the summary, the phone first splits the transcript into smaller segments
+within the same retry budget. A single message that still cannot fit remains unchanged.
 
 A summary separates background and completed work from the current request, its unfinished
 steps and the next action. When no task is active, those task sections say so instead of
