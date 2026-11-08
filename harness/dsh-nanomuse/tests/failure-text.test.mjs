@@ -70,6 +70,17 @@ test('the wire: the relay out of reach or past its deadline, in both languages',
   assert.doesNotMatch(failureText(t, failed('unreachable', 'fetch failed')), /fetch failed/)
 })
 
+test("a body the wire refuses as too large reads in the person's language, not as a raw 413", () => {
+  const t = translator(en)
+  const z = translator(zh)
+  assert.equal(failureText(t, failed('too_large', 'Request body too large')), en.errTooLarge)
+  assert.equal(failureText(z, failed('too_large', 'Request body too large')), zh.errTooLarge)
+  assert.doesNotMatch(failureText(t, failed('too_large', 'Request body too large')), /Request body too large/)
+  // the same refusal spelled as a bare status lands on the same sentence
+  assert.equal(failureText(t, failed('413', 'Request body too large')), en.errTooLarge)
+  assert.ok(en.errTooLarge && zh.errTooLarge, 'errTooLarge in both languages')
+})
+
 test('the relay: too many requests, a sign-in no longer valid, a 5xx', () => {
   const t = translator(en)
   assert.equal(failureText(t, failed('rate_limited')), en.errBusy)
