@@ -132,6 +132,78 @@ def test_thread_ids_are_file_safe():
     assert thread_id_for("wecom", "") == "channel-wecom-chat"
 
 
+def test_thread_ids_fold_case_only_for_an_id_the_channel_documents_insensitive():
+    # Windows resolves two names that differ only by case to one file, and a WeCom user's
+    # id is documented case-insensitive, so one person arrives in two spellings: the 1:1
+    # chat named by that user id folds, when the caller says the id is that kind
+    assert thread_id_for("wecom", "ZhangSan", fold_user_id=True) == "channel-wecom-zhangsan"
+    assert thread_id_for("wecom", "ZhangSan", fold_user_id=True) == thread_id_for(
+        "wecom", "zhangsan", fold_user_id=True
+    )
+    # a WeCom group is named by its chatid, an id for which no document promises
+    # case-insensitivity: two spellings are two chats, and the case is kept
+    assert thread_id_for("wecom", "RoomKey") == "channel-wecom-RoomKey"
+    assert thread_id_for("wecom", "RoomKey") != thread_id_for("wecom", "roomkey")
+    # other channels' ids keep the case they arrive in
+    assert thread_id_for("feishu", "Ou_CaseSensitive") == "channel-feishu-Ou_CaseSensitive"
+    assert thread_id_for("dingtalk", "AbC123") == "channel-dingtalk-AbC123"
+
+
+def test_a_wecom_group_keeps_its_case_and_adopts_nothing_a_direct_chat_still_folds(chan):
+    client, service, llm, manager, fake = chan
+    # two spellings of a group chatid are two conversations, neither adopting the other
+    upper = manager._thread_for(
+        InboundMessage(channel="wecom", chat_id="RoomKey", sender_id="u1", text="", is_group=True)
+    )
+    lower = manager._thread_for(
+        InboundMessage(channel="wecom", chat_id="roomkey", sender_id="u1", text="", is_group=True)
+    )
+    assert upper == "channel-wecom-RoomKey"
+    assert lower == "channel-wecom-roomkey"
+    service.timeline(upper).add({"kind": "user", "text": "the upper room's history"})
+    assert not service.threads[lower].timeline.events
+    # a 1:1 chat named by the member user id still folds and adopts the history an
+    # earlier spelling wrote
+    service.timeline("channel-wecom-ZhangSan").add({"kind": "user", "text": "earlier spelling"})
+    dm = manager._thread_for(
+        InboundMessage(
+            channel="wecom", chat_id="ZhangSan", sender_id="ZhangSan", text="", is_group=False
+        )
+    )
+    assert dm == "channel-wecom-zhangsan"
+    assert "channel-wecom-ZhangSan" not in service.threads
+    assert [e["text"] for e in service.threads[dm].timeline.events] == ["earlier spelling"]
+
+
+def test_a_folded_wecom_id_adopts_the_history_an_earlier_spelling_wrote(chan):
+    client, service, llm, manager, fake = chan
+    folded = thread_id_for("wecom", "zhangsan", fold_user_id=True)
+    # the spelling the pre-fold runtime would have registered for the same chat
+    old = "channel-wecom-ZhangSan"
+    assert folded == "channel-wecom-zhangsan" != old
+    service.timeline(old).add({"kind": "user", "text": "earlier spelling"})
+    service.rename_thread(old, "WeCom · ZhangSan")
+
+    service.adopt_thread_id(folded)
+
+    assert folded in service.threads and old not in service.threads
+    moved = service.threads[folded]
+    assert moved.title == "WeCom · ZhangSan"
+    assert [e["text"] for e in moved.timeline.events] == ["earlier spelling"]
+    assert moved.timeline.path.name == folded + ".json"
+    assert moved.timeline.path.exists()
+    # the folder holds the folded spelling only (an exists() probe would say yes to
+    # both spellings on a case-insensitive filesystem)
+    names = [p.name for p in service.threads_dir.glob("channel-wecom-*")]
+    assert folded + ".json" in names
+    assert old + ".json" not in names
+    # nothing to adopt: an id already registered, or one with no earlier spelling
+    service.adopt_thread_id(folded)
+    service.adopt_thread_id("channel-wecom-nobody")
+    assert folded in service.threads
+    assert "channel-wecom-nobody" not in service.threads
+
+
 def test_first_message_gets_a_pairing_code_and_approval_pairs(chan):
     client, service, llm, manager, fake = chan
     view = client.get("/api/channels").json()
