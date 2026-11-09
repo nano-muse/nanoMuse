@@ -16,7 +16,8 @@
      (Linux: hidden for the capture). Nothing runs round or sweeps across it; the only motion is
      the breathing — 2.4 s in, 2.4 s out — and it is still under prefers-reduced-motion. */
   :root { --accent: #0a66e4; --violet: #7c5cff; --cyan: #06b6d4; --ink: rgba(17,18,24,0.82); --hair: rgba(255,255,255,0.1); }
-  html, body { margin: 0; background: transparent; overflow: hidden; }
+  /* nothing here is text to select: a Cmd+A that reaches the window would keep every later word highlighted */
+  html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-select: none; user-select: none; }
   body { font: 13px/1.4 -apple-system, "Segoe UI", system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; color: #fff; }
   #root { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 8px 10px; }
   .pill, .card { box-sizing: border-box; width: 100%; max-width: 420px; background: var(--ink); backdrop-filter: blur(14px); box-shadow: inset 0 0 0 1px var(--hair), 0 10px 30px rgba(0,0,0,0.35); -webkit-app-region: drag; animation: slide 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
