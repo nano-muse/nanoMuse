@@ -136,6 +136,41 @@ test('a comment inside a code fence stays source text, sentinel-free', () => {
   assert.equal(back, '```\nsee <!-- todo --> here\n```\n')
 })
 
+test('comments in inline code stay source text with their delimiters', () => {
+  for (const source of ['`<!--todo-->`', '`<!-- todo -->`']) {
+    const html = io.mdToHtml(source)
+    assert.doesNotMatch(html, /nm-doc-note|[\u0000\u0001]/)
+    assert.equal(withDocument(() => io.htmlToMd(html)), source + '\n')
+  }
+})
+
+test('quoted code and table comments do not leak parsing markers', () => {
+  assert.equal(io.mdToHtml('> ```\n> <!-- one\n> two -->\n> ```'),
+    '<blockquote><pre><code>&lt;!-- one\ntwo --&gt;</code></pre></blockquote>')
+  assert.equal(io.mdToHtml('| note |\n| --- |\n| <!-- one|two --> |'),
+    '<table><thead><tr><th>note</th></tr></thead><tbody><tr><td><span class="nm-doc-note">one|two</span></td></tr></tbody></table>')
+})
+
+test('fenced code preserves multiline comments and comments across a fence boundary', () => {
+  for (const source of [
+    '```\n<!--one\n  two-->\n```',
+    '```\n<!-- open\n```\n\ntext -->',
+    '```\n<!-- unclosed',
+  ]) {
+    const html = io.mdToHtml(source)
+    assert.doesNotMatch(html, /nm-doc-note|[\u0000\u0001]/)
+    const expected = source.endsWith('```') || source.includes('```\n\n') ? source + '\n' : source + '\n```\n'
+    assert.equal(withDocument(() => io.htmlToMd(html)), expected)
+  }
+})
+
+test('a comment beside a URL stays outside the link destination', () => {
+  assert.equal(io.mdToHtml('https://example.test/<!-- todo -->'),
+    '<p><a href="https://example.test/">https://example.test/</a><span class="nm-doc-note">todo</span></p>')
+  assert.equal(io.mdToHtml('[label <!-- note -->](https://example.test/)'),
+    '<p><a href="https://example.test/">label <span class="nm-doc-note">note</span></a></p>')
+})
+
 test('plain text and its marks keep round-tripping unchanged', () => {
   for (const source of ['plain words', 'two\n\nparagraphs', 'a < b & "c"']) {
     const html = io.mdToHtml(source)

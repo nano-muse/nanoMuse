@@ -53,6 +53,8 @@ Windows x64 应用在启动后及每六小时检查一次较新的正式稳定�
 
 首次启动时，先选一个示例任务，再连接模型或跳过，最后开始对话。选中的任务会填入主要聊天的空输入框；已有草稿会保留。模型页可以登录 nanoMuse Cloud、登录 ChatGPT，或添加服务商 key。新建的 Cloud 账号可以设置密码，macOS 还会询问手需要的权限。
 
+Windows 上，ChatGPT 登录及登录状态检查支持通过可识别的 Node `.cmd` 脚本启动运行时，包括受支持的 npm 格式。其他批处理程序会被拒绝；请使用运行时的可执行文件，或受支持的 Node 启动脚本。
+
 「复制」按钮可将文字写入剪贴板。选中文字后右键可复制，在可编辑字段右键可剪切、复制、粘贴或全选，也可使用「编辑」菜单和常用快捷键。网页脚本不能读取剪贴板，通过原生菜单或快捷键粘贴由你主动完成。
 
 Electron 外壳将 dsh Host 作为子进程启动，再把 harness 的网页应用显示在 nanoMuse 窗口中。Host 是管理插件、模型和会话的后台进程。窗口包含聊天、搜索、动态、点子、目标、资源库、设备和底部菜单组成的侧栏；主要聊天与旁聊列表；固定在对话顶部的形象、名字、实时状态和「停止」；以及基于 harness 审批显示的权限卡片。
@@ -64,6 +66,7 @@ Electron 外壳将 dsh Host 作为子进程启动，再把 harness 的网页应�
 - **账号**。使用手机号或邮箱加验证码登录 [nanoMuse Cloud](cloud.md)，也支持密码和朋友的邀请码。key 保存在 dsh 凭据库中，账号模型通过 harness 原有的 OpenAI 兼容适配器，以 *nanoMuse Cloud* 服务商提供，不加入独立的 nanoMuse 模型适配器。设置 → 账号与手机功能一致，包括以人民币显示的额度池、额度不足时的使用方式、邀请码、按类型和模型统计的用量、密码、持有 key 的设备、账号时间线和注销。数据经 Host 透传接口读取：`/nanomuse/cloud/me`、`/sessions`、`/account-events`、`/password`、`/sign-out-all`、`/delete-account`、`/config`。
 - **自选视频形象**。智能体页的铅笔菜单和形象工作室中的「你自己的视频…」可以选择 MP4 或 MOV，最长 15 秒、最大 30 MB，支持 H.264；本机能解码时也支持 HEVC。Windows 和 macOS 有解码器，多数 Linux 构建没有，无法在预览播放的视频会被拒绝。视频先在圆形形象框中预览，再在所有状态下静音循环。它只保存在本机的 `$DSH_HOME/nanomuse/avatar/own-clip.mp4`，不会上传 nanoMuse Cloud。「默认形象」可移除，显示规则见 [avatar.md](avatar.md)。
 - **本机的手**。内置运行时通过 `nanomuse mcp` 的 stdio（标准输入输出）提供 `computer_screen`、`computer_act` 及审批。因此安装后即可询问「我屏幕上是什么？」或要求「打开设置把音量调小」。MCP 是连接外部工具的统一协议。实际鼠标、键盘、截图由应用的 `src/operator.ts` 实现，它基于 `@computer-use/nut-js` 移植 UI-TARS-desktop 操作器。运行时通过本机回环 HTTP 服务访问它，每次启动使用新 token（验证调用身份的令牌），环境变量为 `NANOMUSE_OPERATOR_URL` / `NANOMUSE_OPERATOR_TOKEN`，接口为 `GET /info`、`POST /screenshot`、`POST /execute`。各平台只有一套截图和指针坐标路径，无需 `xdotool`、`pyautogui`，坐标以模型看到的图片像素为准，见 [gui.md](gui.md#hands-on-the-computer-the-picture-is-the-unit)。运行时不是由本应用启动时，仍可使用自己的备用后端。`config.toml` 中启用的邮箱、日历、通讯录连接器也通过同一服务器提供，设置 → 连接器中有各自说明。
+  电脑操作检查超时，或检查完成两秒后运行时仍未退出时，应用会请求系统停止该运行时及其子进程。
 - **功能页面与记忆**。这里所说的「房间」是聊天以外的动态、点子、目标、资源库页面，与手机版一致。Host 将数据保存在 `nanomuse/rooms.json`，智能体在隐藏会话中生成动态和点子，在各自会话中处理目标，目标自动执行使用 harness 日程插件。资源库作品保存在 `~/nanoMuse/Library`。插件创建的所有聊天，包括用户聊天、后台批处理和其他设备交来的任务，都以 `~/nanoMuse` 为工作区，不直接使用用户主目录。在 Windows 上，若整个用户目录作为工作区，沙箱临时根目录落在其中，会导致 `workspace-write` 命令无法执行，见 [#705](https://github.com/nano-muse/nanoMuse/issues/705)。关于你的记忆也会读入每段聊天，见 [desktop-muse.md](desktop-muse.md#rail-rooms)。
 - **Reach**。本机通过 [hub](hub.md) 出现在账号设备列表。`devices`、`device_screen`、`device_shell`、`device_files`、`device_open`、`device_notify`、`delegate` 可访问手机和其他电脑。手机发来的 `delegate` 在本机创建「来自 <device>」dsh 会话，审批传回手机；请求方启用 `stream` 时，回复会随模型生成逐段返回。如果该会话此前被归档，新任务会像用户重新打开并输入一样恢复会话。`shell`、`files`、`open`、`screen` 等远程控制受开关管理。
 - **编程助手**。设置 → 编程助手先列出本机 Cursor、Codex、Claude Code、DeepSeek Harness 的聊天，再列出账号下其他电脑。记录从磁盘读取，发送消息会启动助手自己的 CLI（命令行程序），实时显示文字及工具调用，点击「停止」结束。跨设备通过本机也声明支持的 `coding.*` hub 动作完成。设备卡片的「编程助手」标签可打开那台电脑的页面，见 [coding-agents.md](coding-agents.md)。
@@ -138,6 +141,8 @@ Windows 的桌面环境准备脚本支持带空格的源码和临时目录路径
 
 Windows 停止编程任务时，还会请求系统终止其子进程，包括已分离的辅助进程。
 
+Windows 上的编程助手 `.cmd` 启动脚本需要采用受支持的 npm 格式或直接调用 Node 的格式。应用会直接启动其中指定的脚本，保留任务文字中的特殊字符。其他批处理程序会被拒绝，避免把其中提到的脚本误当成入口。遇到此提示时，可以改用助手的可执行文件，或重新安装它的 npm 启动脚本。
+
 设备完成一轮时只清除自己的工作指示。较早的停止通知不能清除同一设备后来开始的工作状态。
 
 账号状态按顺序排队保存，先写私有临时文件，再替换 `cloud.json`。替换前中断，原有完整数据仍在。
@@ -146,6 +151,10 @@ Windows 停止编程任务时，还会请求系统终止其子进程，包括已
 
 `MEMORY.md` 中记忆旁的日期按本机本地日历计算。
 
+记忆去重会忽略大小写和重复空白，但保留标点。因此，`-40` 与 `40`、`1.23` 与 `123` 会分别保留。助手记住事实、导入记忆和编辑 `MEMORY.md` 时都使用这一规则。
+
+文档编辑器将 HTML 注释显示为备注，编辑后保存时仍写为注释。行内代码和代码块中的注释保持为源码文本，代码块中的多行注释也保留原有换行。
+
 桌面开发冒烟测试在 Windows 等平台通过文件 URL 导入 Electron，源码路径支持空格、Unicode、`#` 和 `%`。
 
 页面加载期间关窗口，不再误报启动失败或退出应用。如果窗口仍开着而页面加载失败，仍会报告错误。
@@ -153,6 +162,8 @@ Windows 停止编程任务时，还会请求系统终止其子进程，包括已
 应用的 dsh 数据主目录为 `~/.nanomuse/desktop`，可用 `NANOMUSE_DESKTOP_HOME` 改位置。这里包含 `profiles/nanomuse` 下的 profile、插件列表和用户的 `cordis.patch.yml`，设置和登录流程会在其中写入 *nanoMuse Cloud* 服务商；还有保存账号 key 的 dsh 凭据库、会话、外壳及 Host 的 `desktop.log`，以及记录上次回环端口的 `port`。下次启动先尝试该端口，再尝试 38421，最后选择任意空闲端口，使窗口 origin 及浏览器按该来源保存的数据尽量保持不变。0.1.28 至 0.1.29 的 nanoMuse Harness 主目录 `~/.nanomuse/harness` 会迁入一次。`NANOMUSE_CLOUD_URL` 可更换账号中继，`NANOMUSE_PY` 可更换手的运行时。CLI 自身的 `~/.dsh` 不受影响。
 
 主目录下权限为 0600 的 `nanomuse/hands.json` 保存设置 → 模型解析出的手的服务商、模型、base URL 和 key，与插件交给运行时的 `NANOMUSE_GUI_*` 环境变量相同。从 0.1.41 起，手的 MCP 客户端由 `dsh-nanomuse/hands-tools` 插件挂载，取代固定预设配置。修改「操作屏幕」后，会先等正在执行的调用完成，再释放客户端，用新环境重启 `nanomuse mcp`，无需重启应用。未配置时删除该文件。`nanomuse/rooms.json` 保存动态、目标及其步骤和进度、尝试过的点子、资源库索引及记忆。
+
+Windows 上，设置 → 电脑操作中的检查支持通过可识别的 Node `.cmd` 脚本启动运行时，包括受支持的 npm 格式。任意批处理程序，包括直接调用 Python 的包装脚本，都会被拒绝；请使用运行时的可执行文件，或受支持的 Node 启动脚本。
 
 `desktop.json` 先写相邻临时文件再替换，上一版保存为 `desktop.json.bak`。磁盘满或崩溃导致保存失败时，仍保留最后一次有效设置，文件损坏后下次启动会从备份恢复。因为代理地址可能含密码，两份文件都仅本人可读。「下载你的智能体数据」逐个文件写入 zip，跳过链接和超过 64 MB 的文件，并删除打包副本 `desktop.json` 中代理地址的密码。
 

@@ -23,10 +23,10 @@
  * `NANOMUSE_CODING_HOME` names another directory.
  */
 import { execFile } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { open, readdir, readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, delimiter, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 
 export type AgentId = 'cursor' | 'codex' | 'claude' | 'dsh'
@@ -166,11 +166,82 @@ export function cliFor(agent: AgentId, env: NodeJS.ProcessEnv = process.env, arg
   return which(agent, env) ?? (agent === 'dsh' ? ownDshEntry(argv) : undefined)
 }
 
+/**
+ * A `.cmd` or `.bat` cannot be started by node's bare `spawn`/`execFile` on Windows: since
+ * the batch-file injection fixes (node 18.20, 20.12 and 21.7) it throws `EINVAL` before any
+ * process exists, and npm's bins are exactly that shape. Routing through `cmd /c` starts it
+ * but is no way to carry an argument: cmd re-reads everything after `/c` as shell syntax, so
+ * a quote, a percent sign, a metacharacter or a newline in the argument is parsed as cmd's
+ * own grammar (an `&` in a prompt can start another command, `%PATH%` expands on the way),
+ * and the argument that arrives is not the one that was written. The shim is therefore read
+ * for the node script it launches, npm's `"<node>" "<…>.js" %*` line, and that script is
+ * started directly: node passes arguments verbatim, so every character survives and nothing
+ * in the text can run. A batch file whose launcher cannot be read is refused outright with
+ * an error naming it, because starting it through cmd would quietly return to the
+ * interpretation bug. Anything that is not a batch file is passed through untouched.
+ */
+export function cliSpawnCommand(platform: NodeJS.Platform, file: string, args: readonly string[]): [string, string[]] {
+  if (platform !== 'win32' || !/\.(cmd|bat)$/i.test(file)) return [file, [...args]]
+  const target = batchShimTarget(file)
+  if (!target) {
+    throw new Error(`"${file}" is a batch file whose node launcher cannot be read; refusing to start it, because cmd would reinterpret its arguments`)
+  }
+  return [process.execPath, [target, ...args]]
+}
+
+// npm's cmd-shim prelude only chooses node.exe beside the shim or node on PATH.
+// Other batch programs can set variables, branch or execute more than one program;
+// starting a quoted script from one of those would not preserve its meaning.
+const NPM_SHIM_PRELUDE = [
+  'echo off', 'goto start', ':find_dp0', 'set dp0=%~dp0', 'exit /b', ':start',
+  'setlocal', 'call :find_dp0', 'if exist "%dp0%\\node.exe" (',
+  'set "_prog=%dp0%\\node.exe"', ') else (', 'set "_prog=node"',
+  'set pathext=%pathext:;.js;=;%', ')',
+].join('\n')
+
+/** Read only a plain Node launcher or npm's known shim, never a quoted path in arbitrary batch code. */
+function batchShimTarget(file: string): string | undefined {
+  try {
+    if (statSync(file).size > 128 * 1024) return undefined
+    const text = readFileSync(file, 'utf8')
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/)
+      .map((line) => line.trim().replace(/^@\s*/, ''))
+      .filter((line) => line && !/^(rem(?:\s|$)|::)/i.test(line))
+    const last = lines.pop()
+    if (!last) return undefined
+    const npmPrefix = /^endlocal\s*&\s*goto\s+#_undefined_#\s*(?:&\s*goto\s+#_undefined_#|2>nul\s*\|\|\s*title\s+%comspec%)\s*&\s*/i
+    const npm = npmPrefix.test(last)
+    const invocation = last.replace(npmPrefix, '')
+    const match = /^(?:"([^"\r\n]+)"|(node(?:\.exe)?))\s+"([^"\r\n]+\.(?:mjs|cjs|js))"\s+%\*$/i.exec(invocation)
+    if (!match) return undefined
+    const launcher = match[1] ?? match[2] ?? ''
+    if (npm) {
+      const prelude = lines.map((line) => line.replace(/\s+/g, ' ').toLowerCase()).join('\n')
+      if (launcher.toLowerCase() !== '%_prog%' || prelude !== NPM_SHIM_PRELUDE) return undefined
+    } else {
+      if (lines.some((line) => !/^echo\s+off$/i.test(line))) return undefined
+      if (!/(?:^|[\\/])node(?:\.exe)?$/i.test(launcher)) return undefined
+      if (launcher.includes('%') && !/^%~dp0[\\/]node\.exe$/i.test(launcher)) return undefined
+    }
+    const script = match[3] as string
+    const relative = /^(?:%dp0%|%~dp0)[\\/](.+)$/i.exec(script)
+    if (!npm && /^%dp0%/i.test(script)) return undefined
+    if (!relative && !isAbsolute(script)) return undefined
+    const rest = relative?.[1] ?? script
+    if (rest.includes('%')) return undefined
+    const target = relative ? join(dirname(file), ...rest.split(/[\\/]/)) : resolve(script)
+    return statSync(target).isFile() ? target : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** The first line of `<cli> --version`, at most 60 characters; empty when it cannot be run. */
 export function versionOf(cli: string, timeoutMs = 8000): Promise<string> {
   return new Promise((done) => {
     try {
-      execFile(cli, ['--version'], { timeout: timeoutMs, windowsHide: true, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
+      const [file, args] = cliSpawnCommand(process.platform, cli, ['--version'])
+      execFile(file, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
         const text = String(stdout || stderr || '').trim().split(/\r?\n/)[0] ?? ''
         done(error && !text ? '' : text.slice(0, 60))
       })

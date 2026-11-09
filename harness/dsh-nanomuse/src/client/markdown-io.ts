@@ -11,16 +11,16 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function inlineHtml(text: string): string {
+function inlineHtml(text: string, comments: string[]): string {
   // an inline comment's words ride as a numbered placeholder, so no markup rule can swallow
   // or escape them (a comment inside **bold** keeps its own span), and come back at the end
   const notes: string[] = []
-  const plain = text.replace(/\u0000span:([^\u0000]*)\u0000/g, (_m, body: string) => {
-    notes.push(`<span class="nm-doc-note">${escapeHtml(body)}</span>`)
+  const plain = text.replace(/\u0000span:(\d+)\u0000/g, (_m, id: string) => {
+    notes.push(`<span class="nm-doc-note">${escapeHtml(comments[Number(id)] ?? '')}</span>`)
     return `\u0001${notes.length - 1}\u0001`
   })
   let out = ''
-  const re = /(\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*([^*\n]+)\*|_([^_\n]+)_|<?(https?:\/\/[^\s<>)]+)>?)/g
+  const re = /(\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^\s)\u0001]+)\)|\*([^*\n]+)\*|_([^_\n]+)_|<?(https?:\/\/[^\s<>)\u0001]+)>?)/g
   let last = 0
   let match: RegExpExecArray | null
   while ((match = re.exec(plain)) !== null) {
@@ -36,14 +36,42 @@ function inlineHtml(text: string): string {
   return out.replace(/\u0001(\d+)\u0001/g, (_m, i: string) => notes[Number(i)] ?? '')
 }
 
+/** Convert comments outside code; code retains its original bytes and line breaks. */
+function commentNotes(source: string, comments: string[]): string {
+  const tokens = /^```[^\n]*(?:\n|$)|^>[^\n]*(?:\n|$)|`[^`\n]+`|<!--([\s\S]*?)-->/gm
+  let out = ''
+  let last = 0
+  let match: RegExpExecArray | null
+  while ((match = tokens.exec(source)) !== null) {
+    out += source.slice(last, match.index)
+    if (match[0].startsWith('```')) {
+      const closing = /^```[^\n]*/gm
+      closing.lastIndex = tokens.lastIndex
+      const end = closing.exec(source)
+      tokens.lastIndex = end ? end.index + end[0].length : source.length
+      out += source.slice(match.index, tokens.lastIndex)
+    } else if (match[1] !== undefined) {
+      comments.push(match[1].trim().replace(/\n/g, ' '))
+      out += `\u0000note:${comments.length - 1}\u0000`
+    } else {
+      out += match[0]
+    }
+    last = tokens.lastIndex
+  }
+  return out + source.slice(last)
+}
+
 /** Markdown → HTML for the editable. */
 export function mdToHtml(text: string): string {
+  return renderMarkdown(text, [])
+}
+
+function renderMarkdown(text: string, comments: string[]): string {
   const src = text.replace(/\r\n?/g, '\n')
   // the file's note about itself: comments become prefaces; a comment in the middle of a
   // line is not a note paragraph, and its sentinel must never reach the editable (the
   // autosave would write it into the file), so on any other line it becomes the span form
-  const lines = src
-    .replace(/<!--([\s\S]*?)-->/g, (_m, body: string) => `\u0000note:${body.trim().replace(/\n/g, ' ')}\u0000`)
+  const lines = commentNotes(src, comments)
     .split('\n')
     .map((line) =>
       /^\u0000note:[^\u0000]*\u0000\s*$/.test(line)
@@ -53,7 +81,7 @@ export function mdToHtml(text: string): string {
   const out: string[] = []
   const paragraph: string[] = []
   const flush = () => {
-    if (paragraph.length) out.push(`<p>${inlineHtml(paragraph.join(' '))}</p>`)
+    if (paragraph.length) out.push(`<p>${inlineHtml(paragraph.join(' '), comments)}</p>`)
     paragraph.length = 0
   }
   let i = 0
@@ -62,7 +90,7 @@ export function mdToHtml(text: string): string {
     const note = /^\u0000note:([\s\S]*)\u0000\s*$/.exec(line)
     if (note) {
       flush()
-      out.push(`<p class="nm-doc-note"><em>${escapeHtml(note[1] ?? '')}</em></p>`)
+      out.push(`<p class="nm-doc-note"><em>${escapeHtml(comments[Number(note[1])] ?? '')}</em></p>`)
       i++
       continue
     }
@@ -76,9 +104,7 @@ export function mdToHtml(text: string): string {
       const code: string[] = []
       const lang = line.slice(3).trim()
       i++
-      // inside a fence a comment is source text, not markup: the sentinel goes back to the
-      // comment it stood for (a multi-line one returns as the single line it collapsed to)
-      while (i < lines.length && !/^```/.test(lines[i] ?? '')) code.push((lines[i++] ?? '').replace(/\u0000(?:note|span):([^\u0000]*)\u0000/g, (_m, body: string) => `<!-- ${body} -->`))
+      while (i < lines.length && !/^```/.test(lines[i] ?? '')) code.push(lines[i++] ?? '')
       i++
       out.push(`<pre${lang ? ` data-lang="${escapeHtml(lang)}"` : ''}><code>${escapeHtml(code.join('\n'))}</code></pre>`)
       continue
@@ -86,7 +112,7 @@ export function mdToHtml(text: string): string {
     const heading = /^(#{1,6})\s+(.*)$/.exec(line)
     if (heading) {
       flush()
-      out.push(`<h${heading[1]!.length}>${inlineHtml(heading[2] ?? '')}</h${heading[1]!.length}>`)
+      out.push(`<h${heading[1]!.length}>${inlineHtml(heading[2] ?? '', comments)}</h${heading[1]!.length}>`)
       i++
       continue
     }
@@ -100,7 +126,7 @@ export function mdToHtml(text: string): string {
       flush()
       const quote: string[] = []
       while (i < lines.length && /^>\s?/.test(lines[i] ?? '')) quote.push((lines[i++] ?? '').replace(/^>\s?/, ''))
-      out.push(`<blockquote>${mdToHtml(quote.join('\n'))}</blockquote>`)
+      out.push(`<blockquote>${renderMarkdown(quote.join('\n'), comments)}</blockquote>`)
       continue
     }
     if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
@@ -112,7 +138,7 @@ export function mdToHtml(text: string): string {
         while (i < lines.length && /^\s{2,}\S/.test(lines[i] ?? '') && !/^\s*([-*+]|\d+[.)])\s+/.test(lines[i] ?? '')) item += ' ' + (lines[i++] ?? '').trim()
         const task = /^\[([ xX])\]\s+/.exec(item)
         if (task) item = item.slice(task[0].length)
-        items.push(`<li${task ? ` data-task="${task[1] === ' ' ? 'todo' : 'done'}"` : ''}>${inlineHtml(item)}</li>`)
+        items.push(`<li${task ? ` data-task="${task[1] === ' ' ? 'todo' : 'done'}"` : ''}>${inlineHtml(item, comments)}</li>`)
       }
       out.push(`<${ordered ? 'ol' : 'ul'}>${items.join('')}</${ordered ? 'ol' : 'ul'}>`)
       continue
@@ -124,7 +150,7 @@ export function mdToHtml(text: string): string {
       i += 2
       const rows: string[][] = []
       while (i < lines.length && /^\|.*\|\s*$/.test(lines[i] ?? '')) rows.push(cells(lines[i++] ?? ''))
-      out.push(`<table><thead><tr>${head.map((c) => `<th>${inlineHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inlineHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`)
+      out.push(`<table><thead><tr>${head.map((c) => `<th>${inlineHtml(c, comments)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inlineHtml(c, comments)}</td>`).join('')}</tr>`).join('')}</tbody></table>`)
       continue
     }
     paragraph.push(line.trim())
