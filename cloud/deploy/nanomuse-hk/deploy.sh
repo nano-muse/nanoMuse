@@ -38,7 +38,7 @@ rsync -az --delete \
 	--exclude '.pytest_cache/' --exclude '.ruff_cache/' --exclude 'deploy/' \
 	--exclude '.venv/' --exclude 'console/node_modules/' --exclude 'console/dist/' \
 	"$cloud/" "$host:$remote/src/"
-rsync -az "$here/docker-compose.yml" "$here/backup.sh" "$here/selfcheck.sh" "$host:$remote/"
+rsync -az "$here/docker-compose.yml" "$here/backup.sh" "$here/backup_preflight.py" "$here/selfcheck.sh" "$host:$remote/"
 units="nanomuse-relay-backup.service nanomuse-relay-backup.timer nanomuse-relay-selfcheck.service nanomuse-relay-selfcheck.timer"
 (cd "$here" && rsync -az $units "$host:/tmp/")
 ssh "$host" "cd /tmp && sudo install -m 644 $units /etc/systemd/system/ && rm -f $units \

@@ -34,11 +34,19 @@ relay=${RELAY_DIR:-/opt/nanomuse/relay}
 out=${BACKUP_DIR:-/opt/nanomuse/backups}
 keep=${KEEP_DAYS:-30}
 owner=${BACKUP_OWNER:-$(stat -c '%u:%g' "$relay")}
-stamp=$(date -u +%Y%m%d-%H%M%S)
+here=$(cd "$(dirname "$0")" && pwd)
 
 umask 077
+# A manual run and the timer must not both pass the same free-space check.
+exec 9>>"$relay/.backup.lock"
+if ! flock -n 9; then
+	echo "backup: another backup is running" >&2
+	exit 1
+fi
 mkdir -p "$out"
+python3 "$here/backup_preflight.py" "$relay/data/cloud.db" "$out"
 chown "$owner" "$out"
+stamp=$(date -u +%Y%m%d-%H%M%S)
 
 # sqlite3 inside the relay image (python:3.12-slim has the module, not the CLI):
 # python's sqlite3 backup API writes a consistent snapshot to a new file.

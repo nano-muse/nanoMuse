@@ -16,6 +16,10 @@ On Windows, process discovery decodes command output using the console encoding 
 
 The desktop preserves Chinese text and other UTF-8 characters when a coding agent's output arrives across several pipe reads, including the last line without a newline.
 
+When you switch computers or agents on desktop, lists and suggested folders show only
+the current selection. Previous results disappear while the new selection loads. A
+chat composer waits for that chat to load before using its saved workspace.
+
 ## In the apps
 
 When a coding agent cannot resume a saved session, the retry starts a new session with clean output. A partially streamed line from the failed attempt is discarded along with its accumulated output.
@@ -215,6 +219,8 @@ then `session_index.jsonl`, then the first actual user message. Injected
 `AGENTS.md` instructions are excluded from messages and fallback titles.
 
 The Python runtime and desktop plugin answer the same additional hub actions.
+The structured timeline, file-change grouping and writer-conflict prompt draw on
+the interface open-source Remodex shows for controlling coding agents remotely.
 No Remodex relay, pairing code, SDK or daemon is needed. These are coding subprotocol
 2 additions, not a new hub envelope version. Existing plain `transcript` clients
 remain supported; an older computer still supplies plain text to the iOS screen.

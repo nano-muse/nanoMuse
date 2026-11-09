@@ -1254,4 +1254,15 @@
 
     <string name="nm_coding_installed">Installé</string>
     <string name="nm_coding_not_installed">Non installé</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Fond de la conversation</string>
+    <string name="nm_chat_background_footer">Pour toutes les conversations sur cet appareil. Les couleurs suivent le mode clair ou sombre. Choisissez Par défaut pour rétablir le fond initial.</string>
+    <string name="nm_chat_background_default">Par défaut</string>
+    <string name="nm_chat_background_warm">Chaud</string>
+    <string name="nm_chat_background_blue">Bleu</string>
+    <string name="nm_chat_background_green">Vert</string>
+    <string name="nm_chat_background_purple">Violet</string>
+    <string name="nm_chat_in_progress">Tâche en cours</string>
+    <string name="nm_mcp_oauth_token_failed">La connexion au connecteur a échoué (%1$s). Vérifiez la connexion et les paramètres OAuth, puis réessayez.</string>
 </resources>

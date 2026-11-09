@@ -210,9 +210,11 @@ export function makeCodingPanel(t: Translate) {
       codingNav.device = undefined
       return picked
     })
-    const [agents, setAgents] = useState<CodingAgent[] | undefined>()
-    const [runs, setRuns] = useState<CodingRun[]>([])
-    const [sessions, setSessions] = useState<CodingSession[] | undefined>()
+    const [loaded, setLoaded] = useState<{ device: string; agents: CodingAgent[]; runs: CodingRun[]; sessions: CodingSession[] }>()
+    const current = loaded?.device === device ? loaded : undefined
+    const agents = current?.agents
+    const runs = current?.runs ?? []
+    const sessions = current?.sessions
     const [filter, setFilter] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | undefined>()
@@ -228,24 +230,28 @@ export function makeCodingPanel(t: Translate) {
       if (device && !picked && hub.connected) setDevice('')
     }, [device, picked, hub.connected])
 
+    // only the newest load's answers land: the finished-run refresh and a device switch can
+    // both start one, and a slower earlier answer must not speak for the device shown now
+    const loadSeq = useRef(0)
     const load = useCallback(async () => {
+      const mine = ++loadSeq.current
       setLoading(true)
       setError(undefined)
       try {
         const [a, s] = await Promise.all([api.agents(device), api.sessions(device, '', 40)])
-        setAgents(a.agents)
-        setRuns(a.runs ?? [])
-        setSessions(s.sessions)
+        if (mine !== loadSeq.current) return
+        setLoaded({ device, agents: a.agents, runs: a.runs ?? [], sessions: s.sessions })
       } catch (err: unknown) {
+        if (mine !== loadSeq.current) return
         setError(failureText(t, err))
-        setAgents([])
-        setSessions([])
+        setLoaded({ device, agents: [], runs: [], sessions: [] })
       } finally {
-        setLoading(false)
+        if (mine === loadSeq.current) setLoading(false)
       }
     }, [device])
     useEffect(() => {
       void load()
+      return () => { loadSeq.current++ }
     }, [load])
 
     // a finished run means a transcript on disk changed: refresh quietly
@@ -271,6 +277,7 @@ export function makeCodingPanel(t: Translate) {
 
     if (open) {
       return h(SessionView, {
+        key: JSON.stringify([device, open.agent, open.id]),
         t,
         device,
         deviceLabel: deviceName,
@@ -357,6 +364,7 @@ export function makeCodingPanel(t: Translate) {
           h(Button, { variant: 'outline', size: 'sm', disabled: loading, onClick: () => void load() }, h(IconRefresh, { size: 14 }), ' ', t('refresh')))),
       fresh
         ? h(NewChatSheet, {
+            key: device,
             t,
             agent: fresh,
             agents: withCli,
@@ -397,23 +405,33 @@ function LiveRunRow({ t, live, agentLabel, onOpen }: { t: Translate; live: Codin
 
 function SessionView({ t, device, deviceLabel, agent, id, agentLabel, onBack }: { t: Translate; device: string; deviceLabel: string; agent: string; id: string; agentLabel: string; onBack(): void }): ReactNode {
   const liveRuns = useCodingLive()
-  const [session, setSession] = useState<CodingSession | undefined>()
+  const selection = JSON.stringify([device, agent, id])
+  const [loaded, setLoaded] = useState<{ selection: string; session: CodingSession }>()
+  const session = loaded?.selection === selection ? loaded.session : undefined
   const [error, setError] = useState<string | undefined>()
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const listRef = useRef<HTMLDivElement | null>(null)
 
+  // only the chat being shown gets its answer: switching chats starts a new load, and the
+  // chat switched away from may answer slower
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
     if (!id) return
+    const mine = ++loadSeq.current
     try {
-      setSession(await api.session(device, agent, id))
+      const fresh = await api.session(device, agent, id)
+      if (mine !== loadSeq.current) return
+      setLoaded({ selection, session: fresh })
       setError(undefined)
     } catch (err: unknown) {
+      if (mine !== loadSeq.current) return
       setError(failureText(t, err))
     }
-  }, [device, agent, id])
+  }, [device, agent, id, selection])
   useEffect(() => {
     void load()
+    return () => { loadSeq.current++ }
   }, [load])
 
   // runs on this chat, live (a new chat: the run whose session the agent has not named yet)
@@ -529,11 +547,16 @@ function NewChatSheet({ t, agent: initial, agents, device, deviceLabel, onClose,
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
-  const [recent, setRecent] = useState<string[]>([])
+  const [loaded, setLoaded] = useState<{ device: string; agent: string; folders: string[] }>()
+  const recent = loaded?.device === device && loaded.agent === agent ? loaded.folders : []
+  // only the selected agent's answer lands: the previous agent's slower answer must not
+  // overwrite it and offer the other agent's folders to the agent being sent to
   useEffect(() => {
+    let current = true
     api.sessions(device, agent, 30)
-      .then((r) => setRecent([...new Set(r.sessions.map((s) => s.workspace).filter(Boolean))].slice(0, 6)))
-      .catch(() => setRecent([]))
+      .then((r) => { if (current) setLoaded({ device, agent, folders: [...new Set(r.sessions.map((s) => s.workspace).filter(Boolean))].slice(0, 6) }) })
+      .catch(() => { if (current) setLoaded({ device, agent, folders: [] }) })
+    return () => { current = false }
   }, [agent, device])
   const label = agents.find((a) => a.id === agent)?.name ?? agent
 

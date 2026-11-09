@@ -4,8 +4,15 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Documentation
+
+- Documented supported migration paths for memories, reference files and connectors, and the limits of importing another assistant's archive. For #870.
+
+- Rewrote all Simplified Chinese documentation in plain language, added inline term explanations and a bilingual glossary, and clarified navigation labels, privacy and backup wording, and desktop update guidance.
 
 ### Cloud
+
+- Stopped scheduled relay backups before copying when free disk space was insufficient, and prevented overlapping backup runs. For #858.
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
 - **A visit that is both running and recent counts once in the demo per-day bars.** The bars concatenated the active and recent lists without the dedup the page's own table applies, so a running visit sat in both lists and its day counted it twice, and the bar total disagreed with the visits number printed beside it.
@@ -31,9 +38,22 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Restricted Windows coding-agent batch launchers to supported Node shim forms, so quoted script paths in other batch commands could not select a different program. For #854.
+
+- Enabled Windows test coverage for the remote shell: exit codes, stdout and stderr, the working directory, the output bound, and the timeout's tree kill through the taskkill path Windows devices actually take.
+- Enabled Windows test coverage for the harness coding suite: the reader and service tests that need no CLI now run there, and the six that start a fake `#!/bin/sh` CLI skip with the reason named instead of a whole-file POSIX gate.
+- **A quoted command survives the Windows remote shell.** The hub's shell action handed the command to `cmd.exe` through node's default argument escaping, which turns every inner quote into backslash-quote; `cmd` read the backslashes literally, so the interpreter's own `"C:\Program Files\…\node.exe"` arrived as a program name with backslashes in it, and every command carrying a spaced path or a quoted argument answered "is not recognized as an internal or external command". The command line now rides inside one outer pair of quotes with verbatim arguments, which `cmd`'s own `/s` rule strips on arrival, and every quote the caller wrote survives the trip.
+- **A `.cmd` CLI starts on Windows like any other, with its arguments intact.** npm's global bins are `.cmd` shims, and node's bare `spawn` and `execFile` have refused to start a batch file since its injection fixes (they throw `EINVAL` before any process exists), so a coding run sent to a Windows-installed `claude` or `codex` failed on the spot and the version read came back empty. The shim is now read for the node script it launches, npm's `"<node>" "<…>.js" %*` line (comment lines do not count), and that script is started directly, so an argument arrives exactly as it was written, quotes, percent signs, metacharacters and newlines among them, and no part of it can run as a command; a batch file whose launcher cannot be read is refused with an error naming it rather than started through cmd, which would quietly reinterpret the argument. Every other executable is untouched.
+- **The ChatGPT desk starts a runtime that is a `.cmd`.** The status, login, logout and proxy children the desk spawns run the runtime's own executable, and the runtime lookup on Windows explicitly accepts the `nanomuse.cmd` an npm install leaves in the path, the same shape a bare spawn refuses outright (`EINVAL`, before any process exists): the status read crashed and the sign-in could not start behind an npm-installed runtime. The desk's default spawn resolves a batch-file executable the way the coding runners do, reading the shim for the node script it starts, and refusing one whose shim cannot be read; every other executable is untouched.
+- **The hands check starts a `.cmd` runtime too.** The check behind Settings, Computer use looks for `nanomuse.exe`, `nanomuse.cmd` or `nanomuse` on `PATH` and hands what it finds to node's bare `spawn`, which refuses a batch file before any process exists: on a Windows runtime installed as an `nanomuse.cmd` shim, the lookup found it, called it runnable, and the test screenshot and the mouse move then failed on the spot with `spawn EINVAL`. The MCP session now starts the way the coding CLIs do, reading the shim for the node script it launches, and every other executable is untouched.
+- Enabled Windows test coverage for the six coding tests that start a fake CLI: the fakes now ship a one-line `.cmd` wrapper around the same node script on Windows - the shape npm's own shims have, started through the batch-file path - so the run, resume, retry and service streams run there too, and the named-reason skips are gone.
 - Enabled Windows test coverage for Hub tasks, approvals and cancellation, with only the POSIX shell case skipped. Corrected the Windows coding-transcript fixture path.
+- Ran the hub suite's own shell commands on Windows too: the stop tests' `sleep 20` spells became the suite interpreter's `-c` payload, which `cmd.exe` runs unchanged (the posix spell died instantly, so the run answered before the stop landed), and the shell contract test lost its win32 skip to the same payload.
+- Enabled Windows test coverage for the coding agent bridge: the transcript fixture slugs workspaces the way the CLIs do on Windows, and the fake `cursor-agent` runs as node behind a batch wrapper, so the reading, spawning, restart and cancellation tests run there too. The one POSIX-only assertion, the full quoted exchange in a continuation argument, stays on posix: a batch wrapper ends an argument at the first newline, which the real command-line executables do not.
 - Flagged recursive forced deletion when `rm` flags are separate arguments, without borrowing flags from another command or treating filenames after `--` as options.
+- **A line-spliced `rm` still reads as what it runs.** A backslash before a newline is removed before the shell splits words, so `rm \` plus a newline plus `-rf x` ran as a recursive force delete while the guard scanned the raw text and saw neither flag, and a word split in the middle (`su` plus `do`) hid from the other patterns the same way. The guard reads the spliced command now.
 - Flagged Python directory removal through `Path(...).rmdir()` for approval, including inside the sandbox.
+- **The end-to-end bridge test runs on Windows too.** The helper built the `nanomuse-device` command with POSIX quoting, which `cmd.exe` keeps as literal quote characters, so the round trip from a shell tool call, through the CLI bridge, back in as a tool call, never started on Windows. The helper now quotes for the shell the tool actually hands the command to on each platform.
 
 - **An appointment a feed dated only with `RDATE` no longer disappears from the agenda.** The reader took DTSTART, unrolled RRULE and dropped EXDATE dates, and had nowhere to put a date named on its own `RDATE` line, which Outlook and iCloud feeds use for one-off additions to a series. Those dates are occurrences now, an all-day one is a whole day, and an EXDATE on one still cancels it. A PERIOD value is skipped rather than given the event's own length.
 
@@ -65,6 +85,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A workspace's own coding sessions stay findable however many newer chats other repos hold.** The per-workspace list took the newest twenty to thirty transcripts of them all and only then kept the workspace's, so a day of work elsewhere made an older repo look like it had no history. The Claude Code, Codex and harness readers now check each transcript's workspace before counting it toward the requested limit, so ambiguous directory names cannot hide a matching session.
 - **A Windows device name or a trailing dot in a file's name is refused, not silently mapped elsewhere.** Writing to `NUL` or `com7` opened the device itself — the tool reported success and no file appeared — and `report.` landed as `report`, a name nobody asked for, which then reads as missing on a platform that keeps the name. Both are now refused with a sentence naming where the file would have landed; reserved device basenames are refused with extensions too (`NUL.txt`), and every directory component is checked before normalization. The hub's file actions — a phone's browse, fetch and upload — refuse the same names at `expand()`, where a device path used to answer "already exists; force replaces it" and invite the worse follow-up.
 - **A CJK character is estimated at one and a half tokens, not the byte rule's three quarters of one.** The context and budget estimates count text at four UTF-8 bytes a token, but a Chinese character is three bytes and one to two tokens from real tokenizers, so a Chinese conversation could pack `max_context_tokens` to twice what the model's window takes and be refused, shortened, and refused again on the same estimate. The estimate now gives a character in the CJK range one and a half tokens, in the direction of the relay's own fallback count, and the two budget guides say so. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
+- **Preserved signs and decimal points when comparing memories.** Agent writes, imports and `MEMORY.md` edits now share the same comparison rule, so `-40` is distinct from `40` and `1.23` from `123`.
+- Requested cleanup of the runtime process tree when a Computer use check timed out or its runtime did not exit within the two-second grace period.
+- **Translated oversized-request errors.** Memory imports and other requests that exceed the transport size limit now ask for a smaller amount in the selected interface language.
+- **Preserved HTML comments when saving document edits.** Inline comments return to comment markup, comments in inline and fenced code remain source text, and multiline fenced comments retain their line breaks. Notes beside URLs and inside tables no longer corrupt link destinations or leak parsing markers.
+- **Kept coding-agent results with the selected computer, agent and chat.** Switching selections hides previous folder suggestions, sessions and transcripts while loading, and ignores delayed replies from the previous selection.
+- Enabled native Windows regression coverage for the runtime shell timeout and its process-tree cleanup, with process-query validation.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 - Added structured coding history, paged tool output and recorded patches over the existing hub, with send deduplication and per-agent capabilities.
 - Read Codex's saved session names instead of injected instructions and retained diffs from JSON-wrapped patch calls.
@@ -81,6 +107,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Added a Skills settings page with descriptions, source details and availability controls for all workspaces or the current workspace. Global disabling took precedence, disabled skills were blocked from discovery and loading, and shared skill files stayed unchanged. For #772.
+- Rejected memory imports that exceeded line, length or capacity limits before changing any entries, preserved existing memories, and reported disk-write failures so the import could be retried. For #870.
+
 - Kept in-flight conversation sync isolated across account changes and sign-out. Interrupted account changes kept sync paused across restarts until sign-in succeeded.
 - Remembered conversation-clear notifications across restarts and blocked cleared chats from task records, history, search, duplication and resume. Automatic subagent histories followed their parent; saved copies and ordinary archives stayed available. Local JSONL logs remained on disk. For #832.
 - Opened archived chats inside the chat column, with search and restore controls, instead of opening general settings. For #833.
@@ -95,6 +124,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Kept plugin choices across desktop restarts.** Startup preserved the saved bundle list and its order instead of replacing it with defaults, keeping enabled agent teams and automatic authorization review enabled and disabled automations disabled. For [#731](https://github.com/nano-muse/nanoMuse/issues/731).
 
 - Counted remote coding tools once using the originating agent's counting phase, excluded notes, and reconciled the count with the final result.
+
+- Changed desktop first run to choose an example task, connect a model and start a conversation.
+- Fixed the ChatGPT sign-in on the desktop showing the end of the terms notice as its error when the sign-in stopped early; it now says the sign-in closed before it finished.
 
 - **Added the model-neutral `skill-creator` guide to the desktop and Python runtime.** Android loaded the same packaged instructions, including on existing installs. For [#757](https://github.com/nano-muse/nanoMuse/issues/757) and [#758](https://github.com/nano-muse/nanoMuse/issues/758).
 - Kept separate screenshots when reporting more than one problem within the same second.
@@ -131,6 +163,13 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Prevented the Host from exiting when a sync notification or hub reconnection arrived during a conversation pull that then timed out or lost its connection. Failed follow-up pulls remained handled, and later pulls continued from the saved cursor.
 
 ### Android
+
+- Reserved output space before summarizing long conversations, so nearly full inputs were split instead of leaving the summary only a few output tokens. For #719.
+- Added progress rings to active main and side chats in the Muse drawer, using this phone's existing task tracking while preserving unread reply markers. Approval and per-chat step indicators remain separate work. For #531.
+- Requested JSON for connector OAuth sign-in, handled token errors returned with HTTP 200, and kept provider response text out of failure messages. Applied the same validation to token refresh. For #869.
+
+- Routed DashScope Paraformer transcription, CosyVoice speech and Qwen3 TTS through their native APIs, added Qwen3 TTS to voice choices, and rejected unsupported realtime voice models before sending a request.
+- Added optional chat background colors under Appearance, with light and dark variants, matching edge fades and a Default option to reset. For #861.
 
 - Allowed API-key Gemini providers to generate and edit avatar images through their native image models, recognised Nano Banana model names, and excluded Imagen from that route. For #834.
 
@@ -173,6 +212,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Recognized Codex's `already has an active writer` resume error so iOS offered a new conversation instead of showing only the CLI failure.
 - Added local coding-session diagnostics on iOS and desktop to trace resume failures, conflict prompts and live-to-history matching without logging conversation text.
 - Asked before starting a new conversation when Codex reported a session writer conflict, opened the new chat immediately after confirmation, and matched its full continuation prompt when replacing live replies with history.
+- Requested JSON for connector OAuth sign-in and refresh, rejected malformed tokens and HTTP 200 OAuth errors, and showed safe error codes instead of provider response text. For #869.
 
 - **A task sent with `@<device>` no longer answers 「完成」 when nothing came back.** An `@Mac …` line whose task did not run showed *Done*, as if the work had happened; it now says the device finished without an answer, and the steps above it say what did happen. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
 - **Kept System Auto reply speech on the chosen language-specific voice.** An inactive concrete voice later in the Voice Output group no longer overrides Auto. A concrete System voice explicitly selected for Voice Output still takes priority. For [#722](https://github.com/nano-muse/nanoMuse/issues/722).
@@ -190,6 +230,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Documented building the Android app on Windows through Ubuntu in WSL, including Linux toolchains, debug signing and optional memory tuning.
 
 - **Added ten goal evaluation tasks.** CI replayed recorded model answers offline, and contributors could run the tasks with their configured model. Expense checks kept signs and fractions instead of accepting an incorrect total's integer prefix. [Goal evaluation](docs/goal-eval.md).
+- **The goal evaluator's own mistakes were counted.** 162 cases written apart from the evaluator run each criterion from the final state to its verdict. They caught answers the evaluator passed wrongly, such as "不成功" read as success, and the rules were fixed: a reported result or a ticket exclusion with a negation in the same clause is now recorded as unknown instead of guessed. The cases also list what the evaluator still gets wrong. [Goal evaluation](docs/goal-eval.md#criterion-cases).
 
 - **GUI regression gained 20 fixed simulated tasks and independent state checks.** Reference mode ran offline in CI, an opt-in runner used a configured model, and a standalone recorder reported model calls, latency and available token usage. The cases also corrected loop detection for identical click coordinates on different pages. [GUI regression](docs/gui-regression.md).
 

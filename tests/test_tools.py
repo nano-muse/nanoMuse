@@ -280,18 +280,31 @@ async def test_shell_output_is_capped_in_memory(tmp_path: Path, monkeypatch):
     assert r.ok and "cut" not in r.output
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="process groups are POSIX")
 async def test_shell_timeout_stops_the_whole_tree(tmp_path: Path):
     """A timed-out command used to lose only the shell: `sleep` in a pipeline, a server put
-    in the background, lived on. The command runs in its own session now and the group goes."""
+    in the background, lived on. The command runs in its own session now and the group goes;
+    on Windows the group is the process tree taskkill /T walks."""
     import os
     import subprocess
     import time
 
     marker = tmp_path / "pid"
     shell = Shell(workspace=tmp_path)
-    # two seconds, so a loaded runner has forked the grandchild before the timeout fires
-    r = await shell.execute(command=f"sh -c 'echo $$ > {marker}; sleep 30' | cat", timeout=2)
+    if sys.platform == "win32":
+        # a grandchild of the shell, the shape taskkill /T walks: python reports its pid
+        # and sleeps. Names stay relative because the command's cwd is the workspace, so
+        # nothing needs quoting on the way through cmd; `start /b` keeps the grandchild
+        # in the shell's tree while `ping` holds the shell itself open for the timeout.
+        (tmp_path / "grandchild.py").write_text(
+            "import os, time\nopen('pid', 'w').write(str(os.getpid()))\ntime.sleep(30)\n",
+            encoding="ascii",
+        )
+        r = await shell.execute(
+            command="start /b python grandchild.py&ping -n 31 127.0.0.1 >nul", timeout=2
+        )
+    else:
+        # two seconds, so a loaded runner has forked the grandchild before the timeout fires
+        r = await shell.execute(command=f"sh -c 'echo $$ > {marker}; sleep 30' | cat", timeout=2)
     assert r.error and "timed out" in r.error
     for _ in range(50):
         if marker.is_file() and marker.read_text().strip():
@@ -299,28 +312,58 @@ async def test_shell_timeout_stops_the_whole_tree(tmp_path: Path):
         time.sleep(0.02)
     pid = int(marker.read_text().strip())
 
-    def alive() -> bool:
-        """Running, as opposed to gone or a zombie waiting for init to reap it (as good as gone;
-        init is not always prompt): Linux reads /proc, macOS asks ps."""
+    def alive(process_id: int) -> bool:
+        """Running, as opposed to gone. Windows asks the process for its exit code
+        (os.kill(pid, 0) means something else there); Linux reads /proc for a zombie
+        waiting for init to reap it (as good as gone; init is not always prompt),
+        macOS asks ps."""
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+            kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            handle = kernel32.OpenProcess(0x1000, False, process_id)
+            if not handle:
+                error = ctypes.get_last_error()
+                if error == 87:  # ERROR_INVALID_PARAMETER: this nonzero pid no longer exists
+                    return False
+                raise ctypes.WinError(error)
+            try:
+                code = wintypes.DWORD()
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                return code.value == 259  # STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
         try:
-            os.kill(pid, 0)
+            os.kill(process_id, 0)
         except ProcessLookupError:
             return False
-        stat = Path(f"/proc/{pid}/stat")
+        stat = Path(f"/proc/{process_id}/stat")
         if stat.is_file():
             try:
                 return stat.read_text().rsplit(")", 1)[-1].split()[0] != "Z"
             except (FileNotFoundError, ProcessLookupError):
                 return False  # reaped between the two calls
-        ps = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True)
+        ps = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(process_id)], capture_output=True, text=True
+        )
         state = ps.stdout.strip()
         return bool(state) and not state.startswith("Z")
 
+    # A broken query must not turn every pid into a successful "already gone" result.
+    assert alive(os.getpid()), "the process query did not recognize this running test"
     for _ in range(100):  # the kill is delivered at once; the reap takes a moment
-        if not alive():
+        if not alive(pid):
             break
         time.sleep(0.02)
-    assert not alive(), "the grandchild outlived the timeout"
+    assert not alive(pid), "the grandchild outlived the timeout"
 
 
 def test_subprocess_env_is_scrubbed_of_credentials():
@@ -390,6 +433,9 @@ async def test_python_and_shell_children_cannot_read_secrets(tmp_path: Path, mon
         ("rm -r x | echo -f", False),
         ("rm -r x && echo -f", False),
         ("rm -r\n-f", False),
+        ("rm \\\n-rf x", True),
+        ("rm -r\\\nf x", True),
+        ("rm -r \\\nx", False),
     ],
 )
 def test_recursive_force_warning_respects_option_and_command_boundaries(
@@ -397,6 +443,11 @@ def test_recursive_force_warning_respects_option_and_command_boundaries(
 ) -> None:
     assessment = Shell(workspace=tmp_path).assess({"command": command})
     assert ("command looks dangerous: recursive force delete" in assessment.warnings) is warns
+
+
+def test_a_line_splice_cannot_hide_the_guard_words_either(tmp_path: Path) -> None:
+    assessment = Shell(workspace=tmp_path).assess({"command": "su\\\ndo id"})
+    assert "command looks dangerous: privilege escalation (sudo)" in assessment.warnings
 
 
 def test_python_reach_decides_the_risk(tmp_path: Path):

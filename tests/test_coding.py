@@ -23,8 +23,6 @@ from nanomuse.llm import MockLLM
 from nanomuse.server import create_app
 from nanomuse.server.service import MuseService
 
-pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="posix shell in the tests")
-
 
 def _jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,7 +50,14 @@ def coding_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home = tmp_path / "home"
     ws = tmp_path / "proj" / "app"
     ws.mkdir(parents=True)
-    slug = str(ws).strip("/").replace("/", "-")
+    if sys.platform == "win32":
+        # the stores slug the workspace the way the CLIs do on Windows: Cursor and dsh
+        # drop the drive's colon, Claude Code turns it into a dash (see _slug_to_path)
+        slug = str(ws).replace("\\", "-").replace(":", "")
+        claude_slug = str(ws).replace("\\", "-").replace(":", "-")
+    else:
+        slug = str(ws).strip("/").replace("/", "-")
+        claude_slug = "-" + slug
     # Cursor: an IDE chat (wrapped user text) and a CLI chat with meta
     _jsonl(
         home / ".cursor" / "projects" / slug / "agent-transcripts" / "c1" / "c1.jsonl",
@@ -163,7 +168,7 @@ def coding_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     # Claude Code
     _jsonl(
-        home / ".claude" / "projects" / ("-" + slug) / "s9.jsonl",
+        home / ".claude" / "projects" / claude_slug / "s9.jsonl",
         [
             {
                 "type": "user",
@@ -538,24 +543,93 @@ def test_command_for_dsh(monkeypatch: pytest.MonkeyPatch) -> None:
     ]
 
 
+# The same fake as node, for Windows: a batch file is the only thing CreateProcess will
+# start for a script, and cmd.exe ends an argument at the first newline, so the wrapper
+# stays a one-liner and the behaviour lives in the .mjs it points at.
+_FAKE_JS = {
+    "base": """import fs from "node:fs";
+
+const args = process.argv.slice(2);
+fs.appendFileSync(@ARGS_LOG@, args.join(" ") + "\\n");
+if (args.join(" ").includes("--resume nope")) {
+  fs.writeSync(2, "Error: chat not found\\n");
+  process.exit(1);
+}
+for (const line of [
+  '{"type":"system","subtype":"init","session_id":"S-new","model":"m"}',
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"work"}]},"timestamp_ms":1}',
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"working on it"}]}}',
+  '{"type":"tool_call","subtype":"started","tool_call":{"shellToolCall":{"args":{"command":"ls"}}}}',
+  '{"type":"result","subtype":"success","result":"working on it","session_id":"S-new","duration_ms":3}',
+]) {
+  fs.writeSync(1, line + "\\n");
+}
+process.exit(0);
+""",
+    "helper": """import fs from "node:fs";
+import { spawn } from "node:child_process";
+
+for (const line of [
+  '{"type":"system","subtype":"init","session_id":"S-new","model":"m"}',
+  '{"type":"result","subtype":"success","result":"ok","session_id":"S-new","duration_ms":3}',
+]) {
+  fs.writeSync(1, line + "\\n");
+}
+// keeps our stdout open long after the CLI itself has exited
+spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"],
+  { stdio: ["ignore", process.stdout, process.stderr] }).unref();
+process.exit(0);
+""",
+    "cancel": """import fs from "node:fs";
+
+fs.writeFileSync(@PID_FILE@, process.pid + "\\n");
+fs.writeSync(1, '{"type":"system","subtype":"init","session_id":"S-new","model":"m"}\\n');
+setInterval(() => {}, 60000); // an agent still at work
+""",
+}
+
+
+def _write_fake(script: Path, sh_body: str, js_body: str) -> None:
+    """Rewrite the fake CLI for the next test: the sh script on posix, the same behaviour
+    as node on Windows (the .cmd wrapper never changes, only the .mjs it points at)."""
+    script.write_text(
+        js_body if sys.platform == "win32" else sh_body, encoding="utf-8", newline="\n"
+    )
+
+
 @pytest.fixture()
 def fake_cursor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A stand-in `cursor-agent`: prints a stream-json run; `--resume nope` fails like the
-    real one does for an unknown chat; the arguments are written down for the assertions."""
-    script = tmp_path / "cursor-agent"
-    script.write_text(
-        "#!/bin/sh\n"
-        f'echo "$@" >> "{tmp_path}/args.log"\n'
-        'case "$*" in *"--resume nope"*) echo "Error: chat not found" >&2; exit 1;; esac\n'
-        'echo \'{"type":"system","subtype":"init","session_id":"S-new","model":"m"}\'\n'
-        'echo \'{"type":"assistant","message":{"content":[{"type":"text","text":"work"}]},"timestamp_ms":1}\'\n'
-        'echo \'{"type":"assistant","message":{"content":[{"type":"text","text":"working on it"}]}}\'\n'
-        'echo \'{"type":"tool_call","subtype":"started","tool_call":{"shellToolCall":{"args":{"command":"ls"}}}}\'\n'
-        'echo \'{"type":"result","subtype":"success","result":"working on it","session_id":"S-new","duration_ms":3}\'\n'
-    )
-    script.chmod(script.stat().st_mode | stat.S_IEXEC)
-    monkeypatch.setattr(runner, "which", lambda agent: str(script) if agent == "cursor" else None)
-    monkeypatch.setattr(agents, "which", lambda agent: str(script) if agent == "cursor" else None)
+    real one does for an unknown chat; the arguments are written down for the assertions.
+
+    On Windows the same behaviour is node behind a `cursor-agent.cmd` wrapper, and the
+    fixture returns the .mjs so the variant tests rewrite the behaviour, not the wrapper."""
+    if sys.platform == "win32":
+        exe = tmp_path / "cursor-agent.cmd"
+        exe.write_bytes(b'@node "%~dp0cursor-agent.mjs" %*\r\n')
+        logic = tmp_path / "cursor-agent.mjs"
+        logic.write_text(
+            _FAKE_JS["base"].replace("@ARGS_LOG@", json.dumps(str(tmp_path / "args.log"))),
+            encoding="utf-8",
+            newline="\n",
+        )
+        script = logic
+    else:
+        script = tmp_path / "cursor-agent"
+        script.write_text(
+            "#!/bin/sh\n"
+            f'echo "$@" >> "{tmp_path}/args.log"\n'
+            'case "$*" in *"--resume nope"*) echo "Error: chat not found" >&2; exit 1;; esac\n'
+            'echo \'{"type":"system","subtype":"init","session_id":"S-new","model":"m"}\'\n'
+            'echo \'{"type":"assistant","message":{"content":[{"type":"text","text":"work"}]},"timestamp_ms":1}\'\n'
+            'echo \'{"type":"assistant","message":{"content":[{"type":"text","text":"working on it"}]}}\'\n'
+            'echo \'{"type":"tool_call","subtype":"started","tool_call":{"shellToolCall":{"args":{"command":"ls"}}}}\'\n'
+            'echo \'{"type":"result","subtype":"success","result":"working on it","session_id":"S-new","duration_ms":3}\'\n'
+        )
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        exe = script
+    monkeypatch.setattr(runner, "which", lambda agent: str(exe) if agent == "cursor" else None)
+    monkeypatch.setattr(agents, "which", lambda agent: str(exe) if agent == "cursor" else None)
     return script
 
 
@@ -589,8 +663,13 @@ def test_start_run_streams_and_falls_back_to_a_new_chat(
     assert seen[0]["kind"] == "tool" and "made in the IDE" in seen[0]["text"]
     args = (tmp_path / "args.log").read_text()
     assert "--resume" not in args and args.count("--workspace") == 1  # one call, no failed try
-    assert "Fix the login bug" in args and "token check was inverted" in args
-    assert args.strip().endswith("carry on")
+    assert "Fix the login bug" in args
+    if sys.platform != "win32":
+        assert "token check was inverted" in args
+        assert args.strip().endswith("carry on")
+    # on Windows the batch wrapper that stands in for the CLI ends an argument at the
+    # first newline, so the quoted exchange's tail and the new message do not reach the
+    # fake's argv; the flags, the workspace and the title's first line do
 
     # an unknown chat: the CLI refuses, the runner starts a new chat with the last exchange quoted
     (tmp_path / "args.log").unlink()
@@ -658,12 +737,14 @@ def test_a_helper_left_behind_does_not_keep_the_run_open(
     """The real `cursor-agent` leaves a worker running after it answers, and under some
     event loops (uvloop) that worker inherits our pipes, so EOF never comes. The run has to
     finish on the agent's final message, not on EOF."""
-    fake_cursor.write_text(
+    _write_fake(
+        fake_cursor,
         "#!/bin/sh\n"
         'echo \'{"type":"system","subtype":"init","session_id":"S-new","model":"m"}\'\n'
         'echo \'{"type":"result","subtype":"success","result":"ok","session_id":"S-new","duration_ms":3}\'\n'
         "sleep 30 &\n"  # keeps our stdout open long after the CLI itself has exited
-        "exit 0\n"
+        "exit 0\n",
+        _FAKE_JS["helper"],
     )
     t0 = time.monotonic()
     run = asyncio.run(start_run("cursor", "hi", timeout_s=20))
@@ -693,11 +774,13 @@ def test_a_cancelled_run_takes_its_agent_down_with_it(
 ) -> None:
     """The chat that waited for the run was stopped: the agent's process group is ended,
     nothing of ours keeps reading its pipes, and the run says it was stopped."""
-    fake_cursor.write_text(
+    _write_fake(
+        fake_cursor,
         "#!/bin/sh\n"
         f'echo $$ > "{tmp_path}/pid"\n'
         'echo \'{"type":"system","subtype":"init","session_id":"S-new","model":"m"}\'\n'
-        "sleep 60\n"  # an agent still at work
+        "sleep 60\n",  # an agent still at work
+        _FAKE_JS["cancel"].replace("@PID_FILE@", json.dumps(str(tmp_path / "pid"))),
     )
 
     async def scenario() -> Run:
@@ -738,7 +821,9 @@ def test_api_lists_sessions_sends_and_follows(
     client, service = server
     status = client.get("/api/coding").json()
     agents_by = {a["id"]: a for a in status["agents"]}
-    assert agents_by["cursor"]["installed"] and agents_by["cursor"]["cli"].endswith("cursor-agent")
+    assert (
+        agents_by["cursor"]["installed"] and Path(agents_by["cursor"]["cli"]).stem == "cursor-agent"
+    )
     assert status["runs"] == []
 
     rows = client.get("/api/coding/sessions?agent=cursor").json()["sessions"]

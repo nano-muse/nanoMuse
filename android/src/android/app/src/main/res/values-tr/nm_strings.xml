@@ -1253,4 +1253,15 @@
 
     <string name="nm_coding_installed">Yüklü</string>
     <string name="nm_coding_not_installed">Yüklü değil</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Sohbet arka planı</string>
+    <string name="nm_chat_background_footer">Bu cihazdaki tüm sohbetler için geçerlidir. Renkler açık veya koyu moda uyum sağlar. Sıfırlamak için Varsayılan seçeneğini seçin.</string>
+    <string name="nm_chat_background_default">Varsayılan</string>
+    <string name="nm_chat_background_warm">Sıcak</string>
+    <string name="nm_chat_background_blue">Mavi</string>
+    <string name="nm_chat_background_green">Yeşil</string>
+    <string name="nm_chat_background_purple">Mor</string>
+    <string name="nm_chat_in_progress">Görev devam ediyor</string>
+    <string name="nm_mcp_oauth_token_failed">Bağlayıcı oturumu açılamadı (%1$s). Bağlantıyı ve OAuth ayarlarını kontrol edip tekrar deneyin.</string>
 </resources>

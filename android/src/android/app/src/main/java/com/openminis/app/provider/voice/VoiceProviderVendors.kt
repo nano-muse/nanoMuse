@@ -40,14 +40,9 @@ class GroqVoiceProvider(providerId: String, baseURL: String, apiKey: String?) :
     override fun defaultVoiceInputModel() = "whisper-large-v3-turbo"
 }
 
-// -- Alibaba Bailian (OpenAI-compatible, only default models differ) ----------
-
+// nanoMuse: DashScope speech uses native WebSocket/HTTP protocols, not OpenAI audio routes.
 class AlibabaVoiceProvider(providerId: String, baseURL: String, apiKey: String?) :
-    VoiceProvider(providerId, baseURL, apiKey) {
-    override fun defaultVoiceInputModel() = "paraformer-realtime-v2"
-    override fun defaultVoiceOutputModel() = "cosyvoice-v2"
-    override fun defaultVoiceOutputVoice() = "longxiaochun"
-}
+    io.github.nanomuse.speech.DashScopeVoiceProvider(providerId, baseURL, apiKey)
 
 // -- xAI (ASR endpoint path differs: /v1/stt) ---------------------------------
 

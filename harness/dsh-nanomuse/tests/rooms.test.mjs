@@ -157,6 +157,170 @@ test('a new file takes the next free number instead of overwriting (#689)', asyn
   }
 })
 
+function memoryImportFixture(count = 0) {
+  const self = {
+    store: { memory: Array.from({ length: count }, (_, i) => ({ id: `old-${i}`, at: 1, text: `Existing fact ${i}`, source: 'person' })) },
+    saved: [],
+    async save() { this.saved.push(structuredClone(this.store.memory)) },
+  }
+  return { self, run: (text) => Rooms.prototype.importMemory.call(self, text) }
+}
+
+test('memory import rejects every over-limit batch without changing existing entries', async () => {
+  for (const [count, text, code] of [
+    [1, `Valid first line\n${'x'.repeat(401)}`, 'memory_import_length'],
+    [1, Array.from({ length: 201 }, (_, i) => `New fact ${i}`).join('\n'), 'memory_import_lines'],
+    [399, 'New fact one\nNew fact two', 'memory_import_capacity'],
+    [400, 'Existing fact 0\nA new fact', 'memory_import_capacity'],
+  ]) {
+    const { self, run } = memoryImportFixture(count)
+    const before = structuredClone(self.store.memory)
+    await assert.rejects(run(text), { code })
+    assert.deepEqual(self.store.memory, before)
+    assert.deepEqual(self.saved, [])
+  }
+})
+
+test('memory import counts only unique additions and preserves duplicates at capacity', async () => {
+  const { self, run } = memoryImportFixture(399)
+  const before = structuredClone(self.store.memory)
+  assert.equal(await run('- Existing fact 0\r\n* New fact\n2. New   fact\n'), 1)
+  assert.deepEqual(self.store.memory.slice(0, 399), before)
+  assert.equal(self.store.memory[399].text, 'New fact')
+  assert.equal(self.store.memory[399].source, 'import')
+  assert.equal(self.saved.length, 1)
+  assert.equal(self.saved[0].length, 400)
+  assert.equal(await run('New fact\nExisting fact 0'), 0)
+  assert.equal(self.saved.length, 2)
+})
+
+test('memory import accepts a full batch at the documented limits and one-character facts', async () => {
+  const { self, run } = memoryImportFixture()
+  const lines = Array.from({ length: 200 }, (_, i) => `${i}: ${'字'.repeat(400)}`.slice(0, 400))
+  assert.equal(await run(lines.join('\n')), 200)
+  assert.deepEqual(self.store.memory.map((item) => item.text), lines)
+  assert.equal(await run('甲\r乙\n\n'), 2)
+  assert.deepEqual(self.store.memory.slice(-2).map((item) => item.text), ['甲', '乙'])
+})
+
+test('memory import distinguishes list markers from negative numbers and decimal facts', async () => {
+  const { self, run } = memoryImportFixture()
+  assert.equal(await run('-40 degrees\n40 degrees\n1.23 units\n123 units\n- Listed fact\n1. Another fact'), 6)
+  assert.deepEqual(self.store.memory.map((item) => item.text), ['-40 degrees', '40 degrees', '1.23 units', '123 units', 'Listed fact', 'Another fact'])
+  assert.equal(await run('-40 degrees\n1.23 units'), 0)
+})
+
+function memoryRememberFixture(lines = []) {
+  const self = {
+    store: { memory: lines.map((text, i) => ({ id: `old-${i}`, at: 1, text, source: 'person' })) },
+    saved: [],
+    async save() { this.saved.push(structuredClone(this.store.memory)) },
+  }
+  return { self, run: (text) => Rooms.prototype.remember.call(self, text) }
+}
+
+test('a remembered correction keeps its sign and its decimal point', async () => {
+  const { self, run } = memoryRememberFixture(['Winter lows reach 40 degrees'])
+  // the agent learned a correction: the minus sign is the whole point of the new line
+  const added = await run('Winter lows reach -40 degrees')
+  assert.equal(added?.text, 'Winter lows reach -40 degrees')
+  assert.equal(self.store.memory.length, 2)
+  assert.deepEqual(self.store.memory.map((m) => m.text), ['Winter lows reach 40 degrees', 'Winter lows reach -40 degrees'])
+  await run('1.23 units')
+  await run('123 units')
+  assert.equal(self.store.memory.length, 4)
+  // the refresh still folds case and spacing: one person, two spellings, one line
+  const { self: again, run: recall } = memoryRememberFixture(['Coffee: 2'])
+  await recall('coffee:   2')
+  assert.equal(again.store.memory.length, 1)
+  assert.ok(again.store.memory[0].at > 1, 'the existing line was refreshed, not doubled')
+})
+
+test('the conversation path and the import path compare memory lines the same way', async () => {
+  const { self, run } = memoryImportFixture()
+  await run('Coffee: 2')
+  await Rooms.prototype.remember.call(self, 'coffee 2')
+  assert.equal(self.store.memory.length, 2, 'punctuation is meaning: colon or not are two lines')
+  await Rooms.prototype.remember.call(self, 'COFFEE: 2')
+  assert.equal(self.store.memory.length, 2, 'case and spacing aside, the same line refreshes')
+})
+
+test('MEMORY.md edits keep both a number and its correction', async () => {
+  const self = {
+    store: { memory: [{ id: 'old-0', at: 1, text: 'Winter lows reach 40 degrees', source: 'person' }] },
+    saved: [],
+    async save() { this.saved.push(true) },
+  }
+  await Rooms.prototype.applyMemoryDoc.call(self, '- Winter lows reach 40 degrees\n- Winter lows reach -40 degrees')
+  assert.deepEqual(
+    self.store.memory.map((m) => m.text),
+    ['Winter lows reach 40 degrees', 'Winter lows reach -40 degrees'],
+  )
+})
+
+test('memory import HTTP route accepts a full UTF-8 batch and refuses oversized bodies unchanged', async () => {
+  const { Readable } = await import('node:stream')
+  const rooms = new Rooms({ reflect: { provide() {} }, logger: { warn() {} } })
+  let saved = 0
+  rooms.save = async () => { saved++ }
+  const post = async (text) => {
+    const req = Readable.from([Buffer.from(JSON.stringify({ text }))])
+    req.method = 'POST'
+    req.url = '/nanomuse/rooms/memory/import'
+    req.headers = {}
+    const res = { status: 0, body: undefined, writeHead(status) { this.status = status; return this }, end(body) { this.body = JSON.parse(body); return this } }
+    await rooms.handle(req, res)
+    return res
+  }
+  const text = Array.from({ length: 200 }, (_, i) => `${i}: ${'字'.repeat(400)}`.slice(0, 400)).join('\n')
+  const accepted = await post(text)
+  assert.equal(accepted.status, 200)
+  assert.deepEqual(accepted.body, { added: 200 })
+  const before = structuredClone(rooms.memory)
+  for (const [text, code, status] of [
+    ['Valid new line\n' + 'x'.repeat(401), 'memory_import_length', 400],
+    ['x'.repeat(512 * 1024), 'too_large', 413],
+  ]) {
+    const rejected = await post(text)
+    assert.equal(rejected.status, status)
+    assert.equal(rejected.body.error.code, code)
+    assert.deepEqual(rooms.memory, before)
+  }
+  assert.equal(saved, 1)
+})
+
+test('failed disk writes are reported and the same import can be retried without losing concurrent memories', async () => {
+  const { execFileSync } = await import('node:child_process')
+  const { mkdtemp, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const home = await mkdtemp(join(tmpdir(), 'nm-memory-write-'))
+  try {
+    const script = `
+      import Rooms from ${JSON.stringify(new URL('../lib/rooms.js', import.meta.url).href)};
+      import { mkdir, readFile, rm } from 'node:fs/promises';
+      import { join } from 'node:path';
+      const rooms = new Rooms({ reflect: { provide() {} }, logger: { warn() {} } });
+      rooms.broadcast = () => {};
+      const path = join(process.env.DSH_HOME, 'nanomuse', 'rooms.json');
+      await mkdir(path, { recursive: true });
+      const failed = rooms.importMemory('Imported fact').then(() => 'unexpected_success', error => error.code);
+      await rooms.remember('Concurrent fact', 'person');
+      const code = await failed;
+      await rm(path, { recursive: true });
+      const added = await rooms.importMemory('Imported fact');
+      const saved = JSON.parse(await readFile(path, 'utf8')).memory.map(item => item.text);
+      console.log(JSON.stringify({ code, added, saved }));
+    `
+    const result = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...process.env, DSH_HOME: home }, encoding: 'utf8',
+    }))
+    assert.deepEqual(result, { code: 'memory_import_save', added: 0, saved: ['Imported fact', 'Concurrent fact'] })
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
 test('memory dates follow fixed local calendar boundaries east and west of UTC', async () => {
   const { execFileSync } = await import('node:child_process')
   for (const [zone, at, expected] of [

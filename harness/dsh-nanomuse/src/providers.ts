@@ -23,6 +23,7 @@
  */
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
+import { cliSpawnCommand } from './coding-readers.ts'
 import { CAPABILITIES, reasoningFor, REASONING_WIRES, THINKING_LEVELS, type Auth, type Capability, type ModelReasoning, type Protocol, type ProviderEntry, type ReasoningHint, type ReasoningRule, type ReasoningWire, type Region, type ThinkingLevel } from './catalogue.ts'
 
 // The shapes and the pure rules (the groups, the region, the gate) live in `catalogue.ts`, which the browser half imports too.
@@ -550,7 +551,11 @@ export class ChatGptDesk {
   }
 
   private spawn(): SpawnLike {
-    return this.options.spawn ?? ((command, args, options) => nodeSpawn(command, args, options))
+    // an npm-installed runtime is a `.cmd` on Windows, which a bare spawn cannot start at all
+    return this.options.spawn ?? ((command, args, options) => {
+      const [file, argv] = cliSpawnCommand(process.platform, command, args)
+      return nodeSpawn(file, argv, options)
+    })
   }
 
   /**
@@ -619,7 +624,12 @@ export class ChatGptDesk {
       child.on('exit', (code) => {
         if (this.loginChild !== child) return
         this.loginChild = undefined
-        if (this.view.status === 'waiting') fail(code === 0 ? 'no_result' : (stderr.join('').trim().split('\n').pop() ?? `exit ${code}`).slice(0, 200))
+        if (this.view.status !== 'waiting') return
+        // stderr is what the runtime prints for a person (the terms notice first), not the failure:
+        // it goes to the log, and the row gets a code the client words itself
+        const tail = stderr.join('').trim().split('\n').slice(-3).join(' ').slice(0, 300)
+        if (tail) this.log('warn', `nanomuse chatgpt: the sign-in exited (${code ?? 'signal'}): ${tail}`)
+        fail(code === 0 ? 'no_result' : 'exited')
       })
     })
   }

@@ -204,24 +204,32 @@ class HTTPTransport:
         if tokens.get("resource"):
             form["resource"] = tokens["resource"]
         try:
-            resp = httpx.post(token_endpoint, data=form, timeout=30)
+            # nanoMuse: OAuth providers may default to form responses without Accept.
+            resp = httpx.post(token_endpoint, data=form,
+                              headers={"Accept": "application/json"}, timeout=30)
         except httpx.HTTPError:
             return None
-        if resp.status_code >= 400:
+        # nanoMuse: Only a successful JSON object without an OAuth error can replace tokens.
+        if not 200 <= resp.status_code < 300:
             return None
         try:
             payload = resp.json()
         except ValueError:
             return None
+        # nanoMuse: Error responses can use HTTP 200; never persist malformed token fields.
+        if not isinstance(payload, dict) or "error" in payload:
+            return None
         access = payload.get("access_token")
-        if not access:
+        if not isinstance(access, str) or not access.strip():
             return None
         import time as _time
         new_tokens = dict(tokens)
         new_tokens["access_token"] = access
         # Some providers rotate the refresh token on every grant.
-        if payload.get("refresh_token"):
-            new_tokens["refresh_token"] = payload["refresh_token"]
+        # nanoMuse: Preserve the current refresh token unless a valid replacement is provided.
+        refreshed = payload.get("refresh_token")
+        if isinstance(refreshed, str) and refreshed.strip():
+            new_tokens["refresh_token"] = refreshed
         if payload.get("expires_in"):
             try:
                 new_tokens["expires_at"] = int(_time.time()) + int(payload["expires_in"])

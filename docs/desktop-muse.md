@@ -163,7 +163,8 @@ then what you allowed or rejected on the approval cards, with when; kept on this
 computer), **Daily** (the routines; *Manage routines* opens the harness's schedules
 panel), **Soul & memory** (what the agent remembers about you, one line each): a
 field to add one, × to forget one, *Import memory* (a sheet: paste what another
-assistant knew, one line per memory), and the agent's description when the account has
+assistant knew, one line per memory; see the [migration guide](migration.md) for limits
+and the paths for documents and connectors), and the agent's description when the account has
 one. The agent writes memory itself with the `remember` tool when you tell it something
 you will expect it to know next time, and every chat's prompt carries the list back
 (`rooms.json`, this computer only). *Change look* has the dragon, an emoji on a colour,
@@ -361,6 +362,14 @@ state's `trajectory: {rev, sessions}` says when to read again. When the agent lo
 *phone* through Reach (`device_screen`), the run is a *device* run with the phone's name:
 that is what the phone app shows while its own Hands work ([gui.md](gui.md)), seen from
 here.
+
+## Skill availability {#skill-availability}
+
+Settings → Skills lists the skills for the selected chat, including disabled skills. You can search their names and descriptions and inspect their source, provider and instruction-file path as plain text. The page does not edit or delete skill files, so tools that share `~/.agents/skills` keep their own configuration.
+
+Choose **This workspace** to change only the workspace displayed on the page, or **All workspaces** to apply a setting throughout nanoMuse. Skills are enabled by default. Global disabling takes precedence: enable the skill under All workspaces before changing its workspace setting. A global enable does not remove an existing workspace disable. Without a selected workspace, only global settings are available; the global list may omit skills supplied by individual chats, even though its settings apply by name throughout nanoMuse. Workspace paths are resolved through symbolic links and use the nearest Git project root, matching filesystem skill discovery; subdirectories of the same project share a setting.
+
+Settings apply to the effective skill name, including same-named copies from different sources. Disabled skills remain visible in this manager, but are excluded from the agent's skill catalog and blocked by its skill loader. These controls affect subsequent skill discovery and loading. They do not delete shared files or revoke tool permissions; use Settings → Permissions for authorization rules. Instructions already loaded into a conversation remain in its history. Workspace controls require a live agent context using the managed skill registry. A chat that has not run, or a custom preset with an unsupported skill service, is shown read-only; opening the chat alone does not establish support. You can still select All workspaces to manage global preferences. Workspace changes are checked against the selected session and its canonical path on the server. If settings cannot be read, the page disables changes and explains the limitation. An incomplete catalog is marked so missing entries are not mistaken for disabled skills.
 
 ## Settings
 

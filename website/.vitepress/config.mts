@@ -74,6 +74,7 @@ function placeholderOrHtml(raw: string): string {
 }
 
 const getStarted: DefaultTheme.SidebarItem[] = [
+  { text: 'Glossary', link: '/glossary' },
   { text: 'Android', link: '/android' },
   { text: 'iPhone and iPad', link: '/ios' },
   { text: 'The desktop app', link: '/desktop' },
@@ -88,6 +89,7 @@ const useIt: DefaultTheme.SidebarItem[] = [
   { text: 'The screen as a hand', link: '/gui' },
   { text: 'Computer use, on the desktop', link: '/desktop-muse#computer-use' },
   { text: 'Feed, Ideas, Goals, Library', link: '/desktop-muse#rail-rooms' },
+  { text: 'Migrating from another assistant', link: '/migration' },
   { text: 'Memory and goals from the terminal', link: '/cli' },
   { text: 'Connectors', link: '/configuration#connectors' },
   { text: 'Chat apps: Feishu, DingTalk, WeCom, Telegram', link: '/channels' },
@@ -134,33 +136,35 @@ const contribute: DefaultTheme.SidebarItem[] = [
 // The same pages in Chinese, under /zh/. The group and item names follow what the apps'
 // Chinese screens call things (CONTRIBUTING.md, "Translating the docs", has the glossary).
 const zhGetStarted: DefaultTheme.SidebarItem[] = [
+  { text: '术语表', link: '/zh/glossary' },
   { text: 'Android', link: '/zh/android' },
   { text: 'iPhone 和 iPad', link: '/zh/ios' },
   { text: '桌面版', link: '/zh/desktop' },
   { text: '网页控制台', link: '/zh/web' },
-  { text: '一个账号，所有设备', link: '/zh/trial' },
-  { text: '自己的模型 key', link: '/zh/own-key' },
+  { text: '用一个账号连接设备', link: '/zh/trial' },
+  { text: '使用自己的模型密钥', link: '/zh/own-key' },
   { text: '故障排查', link: '/zh/troubleshooting' },
 ]
 
 const zhUseIt: DefaultTheme.SidebarItem[] = [
-  { text: '每一台设备', link: '/zh/every-device' },
-  { text: '「手」：把屏幕当手用', link: '/zh/gui' },
+  { text: '跨设备使用', link: '/zh/every-device' },
+  { text: '手机屏幕操作', link: '/zh/gui' },
   { text: '桌面版的电脑操作', link: '/zh/desktop-muse#computer-use' },
   { text: '动态、点子、目标、资源库', link: '/zh/desktop-muse#rail-rooms' },
-  { text: '终端里的记忆和目标', link: '/zh/cli' },
+  { text: '从其他助手迁移', link: '/zh/migration' },
+  { text: '命令行使用说明', link: '/zh/cli' },
   { text: '连接器', link: '/zh/configuration#connectors' },
   { text: '聊天入口：飞书、钉钉、企业微信、Telegram', link: '/zh/channels' },
   { text: '编程助手', link: '/zh/coding-agents' },
   { text: '形象工作室', link: '/zh/avatar' },
   { text: '浏览器', link: '/zh/browser' },
-  { text: '不走屏幕的中文服务', link: '/zh/services' },
+  { text: '通过接口使用国内服务', link: '/zh/services' },
   { text: '展示站', link: '/zh/showcase' },
 ]
 
 const zhRunIt: DefaultTheme.SidebarItem[] = [
   { text: '自己运行 nanoMuse', link: '/zh/self-hosting' },
-  { text: 'Docker 里的运行时', link: '/zh/deployment' },
+  { text: '用 Docker 部署运行时', link: '/zh/deployment' },
   { text: '配置', link: '/zh/configuration' },
   { text: '任务预算', link: '/zh/runtime-budgets' },
   { text: 'nanoMuse Cloud：中继', link: '/zh/cloud' },
@@ -170,10 +174,10 @@ const zhUnderstandIt: DefaultTheme.SidebarItem[] = [
   { text: '架构', link: '/zh/architecture' },
   { text: '哨兵（Sentinel）', link: '/zh/sentinel' },
   { text: '隐私', link: '/zh/privacy' },
-  { text: '什么留在手机上，归谁', link: '/zh/sync' },
+  { text: '手机数据的保存与账号归属', link: '/zh/sync' },
   { text: 'hub：设备互联', link: '/zh/hub' },
-  { text: '设计：长什么样，为什么', link: '/zh/design' },
-  { text: 'DeepSeek Harness 上的 nanoMuse', link: '/zh/harness' },
+  { text: '界面设计与设计理由', link: '/zh/design' },
+  { text: '在 DeepSeek Harness 中运行', link: '/zh/harness' },
   { text: '手机自身的能力', link: '/zh/device' },
   { text: '手机 App 的设计', link: '/zh/app' },
   { text: '手机上的本地运行时', link: '/zh/local-runtime' },
@@ -252,7 +256,7 @@ export default defineConfig({
           { text: '上手', items: zhGetStarted },
           { text: '使用', items: zhUseIt },
           { text: '自己部署', items: zhRunIt },
-          { text: '理解它', collapsed: true, items: zhUnderstandIt },
+          { text: '原理与设计', collapsed: true, items: zhUnderstandIt },
           { text: '参与', collapsed: true, items: zhContribute },
         ],
         outline: { level: [2, 3], label: '本页目录' },

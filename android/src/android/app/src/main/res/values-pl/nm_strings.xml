@@ -1261,4 +1261,15 @@
 
     <string name="nm_coding_installed">Zainstalowany</string>
     <string name="nm_coding_not_installed">Niezainstalowany</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Tło czatu</string>
+    <string name="nm_chat_background_footer">Dla wszystkich czatów na tym urządzeniu. Kolory dostosowują się do jasnego lub ciemnego trybu. Wybierz Domyślne, aby przywrócić ustawienia.</string>
+    <string name="nm_chat_background_default">Domyślne</string>
+    <string name="nm_chat_background_warm">Ciepłe</string>
+    <string name="nm_chat_background_blue">Niebieskie</string>
+    <string name="nm_chat_background_green">Zielone</string>
+    <string name="nm_chat_background_purple">Fioletowe</string>
+    <string name="nm_chat_in_progress">Zadanie w toku</string>
+    <string name="nm_mcp_oauth_token_failed">Logowanie do łącznika nie powiodło się (%1$s). Sprawdź połączenie i ustawienia OAuth, a następnie spróbuj ponownie.</string>
 </resources>

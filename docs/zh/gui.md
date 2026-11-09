@@ -1,55 +1,51 @@
-# 操作手机
+# 操作手机屏幕 {#操作手机}
 
-> **Python 线路的设计记录。** 当前 Android 应用的手（`io.github.nanomuse.hands`，0.1.12 起）
-> 沿用的就是这套设计（阶梯、带「停止」的胶囊、审批），只是智能体直接跑在手机上
-> （[android.md](android.md)）。本页写「小熊猫」的地方，胶囊里显示的是智能体自己的脸
-> （默认是那只小龙）。
+> **旧版 Python 实现的设计记录**。当前 Android App 的「手」位于 `io.github.nanomuse.hands`，从 0.1.12 起沿用本文的工具选择顺序、带「停止」按钮的胶囊和审批机制，但智能体直接在手机上执行，见 [android.md](android.md)。下文旧方案提到的小熊猫，在当前胶囊中已替换为智能体自己的形象，默认为龙。
 
+Muse 在西方主要通过 API（供程序调用的接口）接入服务。中国用户常用的 12306、微信、支付宝、美团等 App，大多没有可供个人智能体调用的接口。因此 nanoMuse 还提供屏幕操作工具，称为「手」：打开「手机」开关后，智能体可以查看屏幕，在 App 中点击、输入和滑动。这些仍由同一个智能体发起，也经过同一个哨兵（Sentinel）检查；每步 GUI（图形界面）操作都作为工具调用处理。
 
-Muse 在西方的能力来自带 API 的服务。而中国人在手机上做的大多数事（12306、微信、支付宝、美团）都没有一个个人智能体可以调用的 API。所以 nanoMuse 多了第二双手：打开「手机」开关后，智能体可以看手机的屏幕，在各个 App 里点、输入、滑动，像人一样操作。它还是同一个智能体，前面挡着的还是同一个哨兵（Sentinel）；屏幕上的每一步只是多出来的工具调用。
+设计遵循以下原则：
 
-这部分怎么做，由三件事决定：
+- **在指定设备运行**。智能体运行在你选择的机器上，Android 版则运行在手机本身。屏幕只发送给你配置的模型，不交给其他服务。
+- **优先适配中国使用场景**。nanoMuse Cloud 账号使用中继为 `gui` 推荐的模型，目前为 `Qwen/Qwen3.6-27B-FP8`。中继是负责账号和请求转发的服务器。使用自己的 key 时，按服务商目录选择同一接口上的操作模型，中国大陆为阿里云百炼 `qwen3.8-27b`，其他地区为 OpenRouter `qwen/qwen3.8-27b`，具体见下文模型选择说明。示例任务使用 12306 和微信，敏感词以中文为主。
+- **不依赖逐个 App 接入**。操作器通过图片理解屏幕，再按坐标点击，不要求无障碍树、带标签按钮或专用集成。同一操作循环既可订车票，也可读聊天。无障碍树是系统提供的界面元素结构；Android 能提供时，会作为辅助输入，帮助辨认小字和密码框，但流程不依赖它。
+- **最后才使用屏幕**。优先选择能准确完成任务的技能、CLI（命令行工具）或 MCP 服务器（通过统一协议提供工具的服务），其次携带登录状态获取网页，再用 App 内浏览器，最后操作手机屏幕。每个屏幕步骤都要调用模型并发送图片，因此只有前面的方式无法完成时才升级，开始前会说明。
 
-- **本地。** 大脑跑在你让它跑的地方（你的机器，或者在 Android 版里就是手机本身），屏幕只发给你配置的那个模型，不给别人。
-- **中国优先。** 有 nanoMuse Cloud 账号时，手用中继给 `gui` 推荐的模型（目前是 `Qwen/Qwen3.6-27B-FP8`）；用自己的 key 时，用目录里该端点上的手的模型（中国大陆是阿里云百炼 `qwen3.8-27b`，其他地方是 OpenRouter `qwen/qwen3.8-27b`；规则见下文「动手指的那个模型」）。示例任务是 12306 和微信；敏感词表以中文为先。
-- **任何 App。** 操作器把屏幕当一张图来看，按位置点。它不需要无障碍树、带标签的按钮或者针对某个 App 的接入，所以多一个 App 不花任何成本：订火车票的那套循环同样能读一段聊天。设备*有*树的时候（Android 应用），树会作为第二路输入一并送上（小字变得可读，密码框能被认出来），但没有任何环节依赖它。
-- **最后手段。** 屏幕是阶梯的第四级（见下）：先是能把事情做准确的技能、命令行工具或 MCP 服务器，然后是用你的登录态抓取页面，再然后是内置浏览器。屏幕上每一步都是一次模型调用加一张图；只有下一级做不到时智能体才往上爬，而且开始之前会先说一声。
+手机屏幕操作默认关闭。开启之前，模型不会收到这部分手机内容。
 
-默认关闭。你打开之前，手机上的任何东西都到不了模型那里。
+## 工具选择顺序 {#the-ladder}
 
-## 阶梯 {#the-ladder}
+访问服务时，依次尝试以下四种方式：
 
-够到一个服务有四条路，从最低的一级开始试：
-
-| 级 | 怎么做 | 什么时候 |
+| 级别 | 方式 | 适用情况 |
 |---|---|---|
-| 1 | **技能**、**CLI** 或 **MCP 服务器**：`feishu` 走 lark-cli，`amap` 走它的 MCP 服务器，还有邮件、日历、文件 | 只要有就用：准确、即时、不碰屏幕 |
-| 2 | **带你登录态的抓取**：`browser` action=fetch、`web_fetch` | 登录之后就能直接看到答案的页面 |
-| 3 | **内置浏览器**，一页一页来 | 需要一路点下去、但终究是个网站的东西 |
-| 4 | **手机屏幕**：`phone_task` | 只住在 App 里、别处没有的东西：一段微信聊天、12306 的真实余票、美团里的一笔订单、一次付款 |
+| 1 | **技能**、**CLI** 或 **MCP 服务器**，例如 `feishu` 调用 lark-cli，`amap` 调用 MCP，以及邮件、日历和文件工具 | 有可用接口时优先选择，直接准确获取结果，无需查看屏幕 |
+| 2 | **携带用户登录状态获取页面**，例如 `browser` 的 action=fetch、`web_fetch` | 登录后直接请求页面就能得到答案 |
+| 3 | **App 内浏览器**逐页操作 | 网站需要点击或填写后才能完成 |
+| 4 | **手机屏幕**，工具为 `phone_task` | 仅在 App 中提供的功能，例如微信聊天、12306 实时余票、美团订单或付款 |
 
-技能在 front matter 里用 `channel:` 说明自己在哪一级工作：`api`、`cli`、`web`、`browser`、`gui` 或 `mixed`（`app-only` 和 `phone` 也接受，等同于 `gui`）。`gui` 技能在智能体的技能索引里显示为 *[on the phone's screen]*，这样智能体一看就知道这是第四级的活；`train-tickets` 和 `phone-messages` 是内置的例子。在屏幕上走第一步之前，智能体会用一句话说明它要在手机上做什么；如果不是你自己要求用手机（它是因为下面几级失败才往上爬的），它会先问你。「活动」视图会统计一次会话里有多少步是在屏幕上做的，你能看到阶梯有没有被守住。
+技能在 front matter（文件开头的元数据区）中用 `channel:` 声明接入方式：`api`、`cli`、`web`、`browser`、`gui`、`mixed`，其中 `app-only`、`phone` 也作为 `gui` 接受。`gui` 技能在索引中标为 *[on the phone's screen]*，让智能体知道需要屏幕操作。内置示例为 `train-tickets` 和 `phone-messages`。首次操作屏幕前，智能体会用一句话说明要做什么；如果你没有主动要求使用手机，而是其他方式失败后需要升级，它会先征求同意。「活动」视图统计会话中的屏幕操作步数，供你检查是否遵循这个顺序。
 
-## 看起来是什么样 {#what-it-looks-like}
+## 实际使用过程 {#what-it-looks-like}
 
-问一句「帮我看看明天北京到上海最早的高铁」，智能体就在手机上打开 12306，设好车站和日期，按「查询车票」，筛选「只看高铁」，再把列表读给你。让它在微信上回复某个人，它会打开那段聊天，输入文字，然后**停在发送按钮前，等你批准**。要是一件事横跨两个世界（网上查资料、12306 里订票、日历里建日程），它会一边做一边在原生工具和屏幕之间来回切换。
+你说「帮我看看明天北京到上海最早的高铁」，智能体会打开手机 12306，设置车站与日期，点击「查询车票」，筛选「只看高铁」，再汇报列表。让它回复微信时，它会进入聊天、输入文字，在发送前停下等待审批。如果任务同时涉及网页研究、12306 订票和日历日程，它会按需要交替使用直接工具和屏幕。
 
-聊天里每个屏幕步骤都显示为一行，比如 `phone_act: tap "发送" at (318,742) in 微信 (wechat)`，你能看到它做了什么；手机上有一圈涟漪标出手指的落点，还有一行字幕说明 Muse 正在做什么（见[显示手指](#showing-the-finger)）。事后 `nanomuse phone traces` 列出每个任务，`nanomuse phone trace <id> -o trace.html` 把其中一个渲染成网页，每一屏和每一次点击都画在上面。
+每个屏幕步骤会出现在聊天中，例如 `phone_act: tap "发送" at (318,742) in 微信 (wechat)`。手机上会显示点击圆环和当前操作文字，见[显示操作位置](#showing-the-finger)。任务结束后，`nanomuse phone traces` 可列出任务，`nanomuse phone trace <id> -o trace.html` 可生成包含每张屏幕和点击标记的查看页面。
 
-## 打开 {#turning-it-on}
+## 启用操作工具 {#turning-it-on}
 
-在应用里：「连接 → 手机」，拨开开关。在 `config.toml` 里：
+在 App 中进入连接 → 手机，打开开关；也可以在 `config.toml` 设置：
 
 ```toml
 [gui]
 enabled = true
 ```
 
-或者 `NANOMUSE_GUI_ENABLED=1`。开关打开后，智能体多出三个工具（见下文），系统提示词里多出一段关于已连接手机的话。关掉时，这些工具不存在。
+或使用环境变量 `NANOMUSE_GUI_ENABLED=1`。启用后，智能体会获得下文三个工具，系统提示词也会加入已连接手机信息。关闭时，这些工具不会注册。
 
-### 动手指的那个模型 {#the-model-that-moves-the-finger}
+### 选择屏幕操作模型 {#the-model-that-moves-the-finger}
 
-每一步都读一次屏幕，意味着很多次带图的小调用，所以操作器可以用自己的模型，和主模型分开：
+操作器每步都需要读取截图，会产生多次带图请求，因此可以使用与聊天模型不同的独立模型：
 
 ```toml
 [gui]
@@ -60,85 +56,87 @@ base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 api_key  = "{{vault:GUI_API_KEY}}"
 ```
 
-聊天模型和手的模型是两个设置：手机和桌面版是 设置 → 模型 里的「操作屏幕」一行，网页控制台是「连接」页的「手的模型」下拉，这里是 `[gui] model`。留空（也就是那一行的「自动」）时，手按一个顺序走：
+手机和桌面版通过设置 → 模型的「操作屏幕」设置，网页控制台通过「连接」中的「手的模型」下拉框设置，配置文件则使用 `[gui] model`。聊天和操作屏幕是独立设置。留空或选择「自动」时，按下列顺序决定：
 
-- 对话模型所在的服务商，只要它是你自己的 key、而且目录里给它在同一个端点上指定了手的模型（阿里云百炼 `qwen3.8-27b`，OpenRouter `qwen/qwen3.8-27b`）；已知看不见图的模型（不含 `v4.1`、`vision` 或 `ocr` 的 DeepSeek id）从不会被列为手的模型；
-- 否则，有 nanoMuse Cloud 账号时用中继给 `gui` 推荐的模型（`/v1/models` 会说明哪些模型 `for` 和 `recommended_for` `chat`、`gui` 或两者皆可）；项目托管 Cloud 目前用同一个多模态 `Qwen/Qwen3.6-27B-FP8` 负责对话和操作屏幕，不过两项选择仍可分别配置；
-- 否则就用聊天模型本身，前提是它能看图（手机和桌面版在这之前还会先试你第一把带能看图模型的 key）。
+- 如果对话使用自己的 key，且服务商目录为同一接口指定了操作模型，则用该模型，例如百炼 `qwen3.8-27b`、OpenRouter `qwen/qwen3.8-27b`。已知不支持图片的模型不会列为操作模型，例如 ID 不含 `v4.1`、`vision`、`ocr` 的 DeepSeek 模型。
+- 否则，已登录 nanoMuse Cloud 时，使用中继为 `gui` 推荐的模型。`/v1/models` 通过 `for` 和 `recommended_for` 标明模型适用于 `chat`、`gui` 或两者。托管服务目前用同一个多模态 `Qwen/Qwen3.6-27B-FP8` 处理聊天和屏幕，但两项仍可分别配置。
+- 否则使用聊天模型本身，前提是支持看图。手机和桌面版在这之前还会尝试第一个支持视觉模型的自备 key。
 
-你在那一行做过的选择永远优先，那一行也写着「自动」现在给的是什么。你自己的手的模型失败时什么都不会自动切换；卡片上给「这次改用 nanoMuse Cloud」，只管这一轮（[own-key.md](own-key.md#which-model-does-what)）。
+手动选择始终优先，「自动」项会显示当前实际选择。自己的操作模型失败时不会自动切换，卡片会提供「这次改用 nanoMuse Cloud」，只应用于当前一轮，见 [own-key.md](own-key.md#which-model-does-what)。
 
-key 和其他 key 一样放进保险库（`nanomuse vault set GUI_API_KEY`，或者直接在「手机」卡片里输入）。操作器的模型**必须接受图片**：一张截图就是全部的观察。操作器以温度 0 调用它：定位要的是模型的第一选择，不是采样。
+key 与其他凭据一样放入保险库，可运行 `nanomuse vault set GUI_API_KEY`，或在「手机」卡片中填写。操作模型必须支持图像输入，因为主要观察来自截图。调用时温度设为 0，即减少采样随机性，让模型按首选判断定位。
 
-环境变量覆盖：`NANOMUSE_GUI_ENABLED`、`NANOMUSE_GUI_PROVIDER`、`NANOMUSE_GUI_MODEL`、`NANOMUSE_GUI_BASE_URL`、`NANOMUSE_GUI_API_KEY`。
+可用环境变量覆盖：`NANOMUSE_GUI_ENABLED`、`NANOMUSE_GUI_PROVIDER`、`NANOMUSE_GUI_MODEL`、`NANOMUSE_GUI_BASE_URL`、`NANOMUSE_GUI_API_KEY`。
 
-其他设置：`max_steps`（默认 0 = 不设上限；设一个数可以限制单次 `phone_task` 的步数）、`device_timeout_s`（默认 20，等手机回应一次请求的时长）、`sensitive_words`（下面那张词表）。
+其他设置包括 `max_steps`，默认 0 表示不限制单次 `phone_task` 步数；`device_timeout_s`，默认 20，表示每次设备请求等待秒数；以及下文的 `sensitive_words`。
 
 ## 连接手机 {#connecting-a-phone}
 
-智能体不一定要跑在手机上。一台*设备*通过应用用的同一条 WebSocket 连到 nanoMuse 服务器，报上自己，然后回应屏幕请求和动作请求。目前有两种设备：
+智能体不必与手机运行在同一设备。手机可以通过 App 使用的 WebSocket 连接 nanoMuse 服务器。WebSocket 是保持连接、双向收发消息的协议；设备先声明自身信息，再响应截图和操作请求。目前有以下两种实现：
 
-- **MobileGym**：[mobilegym.dev](https://mobilegym.dev/) 上的模拟手机，里面的中国 App（微信、支付宝、铁路12306、地图、小红书……）是浏览器里的 React 应用。它的 nanoMuse 模块（`demo/mobilegym/`）在设置页上有「允许 nanoMuse 操作这台手机」开关。这是展示站用的环境：不会碰到任何真实的东西。
-- **Android**：nanoMuse 应用，通过它自己的无障碍服务：`takeScreenshot()` 取图，`dispatchGesture()` 动手指，无障碍树给元素列表，`performGlobalAction` 做返回 / 主屏 / 最近任务，`open_app` 用应用自己维护的可启动 App 列表。同一套协议，真实的 App。需要 **Android 11 或更新**（从这个版本起无障碍服务才能截图），并且把服务打开：
+- **MobileGym**。位于 [mobilegym.dev](https://mobilegym.dev/) 的模拟手机，将微信、支付宝、铁路12306、地图、小红书等模拟为浏览器中的 React App。`demo/mobilegym/` 模块的设置页提供「允许 nanoMuse 操作这台手机」。展示站使用这个环境，不操作真实账号或服务。
+- **Android**。nanoMuse App 通过自己的无障碍服务执行真实操作。`takeScreenshot()` 截图，`dispatchGesture()` 发送手势，无障碍树提供元素列表，`performGlobalAction` 执行返回、主屏和最近任务，`open_app` 使用 App 可启动列表。协议与模拟器相同。需要 Android 11 或更新版本，因为无障碍服务从该版本起支持截图，并需要启用服务：
 
-  1. 「连接 → 手机 → 这台手机 → 打开无障碍设置」，在「已下载的应用」下找到 **nanoMuse** 并打开。Android 会说明这个服务能做什么（查看屏幕、执行手势），并要你确认。
-  2. Android 13 及更新版本上，从下载（而不是应用商店）安装的应用，开关会变灰并显示「受限设置」。打开应用在设置里的页面（同一张卡片上的「应用设置」），点 ⋮ → **允许受限设置**，再回到第 1 步。
-  3. Android 时不时会自己把无障碍服务关掉：更新之后、激进的电池清理之后、有些手机重启之后。「手机」卡片实时显示「就绪」/「还没有」；手机不回应时先看这里。服务一开一关，应用立刻把变化报告给服务器，所以「连接 → 手机」不会过时。
+  1. 进入连接 → 手机 → 这台手机 → 打开无障碍设置，在「已下载的应用」中找到「nanoMuse」并开启。Android 会说明查看屏幕、执行手势等能力，并要求确认。
+  2. Android 13 及更新版本中，从应用商店以外安装的 App 可能显示灰色「受限设置」。点击同卡片的「应用设置」，打开系统 App 页面，选择 ⋮ →「允许受限设置」，再执行第 1 步。
+  3. 更新、厂商电池清理或某些手机重启后，Android 可能自动关闭无障碍服务。「手机」卡片实时显示「就绪」或「还没有」，手机无响应时先检查这里。服务启停会立即通知服务器，因此连接 → 手机能及时反映状态。
 
-  这个服务自己不做任何事：只在 `phone_*` 工具要屏幕时才取一次屏幕，而且每个任务都会在屏幕顶部显示一个胶囊：小熊猫、正在进行的步骤和一个**停止**按钮（见下文）。
+  服务不会自行操作，只在 `phone_*` 请求时截图。任务执行期间，顶部胶囊显示形象、当前步骤和「停止」，见下文。
 
-「连接 → 手机」显示连着哪台设备、它列出了多少个 App。`GET /api/phone` 返回同样的内容，外加最后一次读到的屏幕。
+连接 → 手机显示已连接设备及其 App 数量。`GET /api/phone` 返回同样信息和最近一次屏幕读取。
 
 ## 工具 {#the-tools}
 
-| 工具 | 风险 | 做什么 |
+| 工具 | 风险 | 功能 |
 |---|---|---|
-| `phone_screen` | SAFE，读取隐私数据 | 当前屏幕：一张给模型看的截图，带一行说明：`铁路12306 (railway12306) · /station-select · 360×800 · keyboard hidden` |
-| `phone_act` | MODERATE，或 SENSITIVE（见下文） | 按位置做一个动作：`tap`、`long_press`、`double_tap` 带 `x`/`y` 和 `label`；`swipe` 到 `x2`/`y2` 或按 `direction`；`type`、`enter`、`back`、`home`、`recents`、`open_app`、`wait`。返回动作之后的屏幕 |
-| `phone_task` | 取决于它的各步 | 把一个目标交给*手机操作器*：一个用自己模型的循环，看、做、再看，直到目标达成、需要你，或者放弃。它的每一步都是一次 `phone_act`，和其他调用一样经过哨兵 |
+| `phone_screen` | SAFE，读取私密数据 | 获取当前截图供模型查看，并附说明，例如 `铁路12306 (railway12306) · /station-select · 360×800 · keyboard hidden` |
+| `phone_act` | MODERATE，特定情况升为 SENSITIVE，见下文 | 执行单个动作：带 `x` / `y`、`label` 的 `tap`、`long_press`、`double_tap`；指定 `x2` / `y2` 或 `direction` 的 `swipe`；以及 `type`、`enter`、`back`、`home`、`recents`、`open_app`、`wait`。返回操作后的屏幕 |
+| `phone_task` | 按每步分别判断 | 将目标交给手机操作器。它用独立模型循环查看和操作，直到完成、需要用户或无法继续。每步转换为 `phone_act`，并经过哨兵 |
 
-**屏幕是最后一级。** 搜索、网页、邮件、日历、文件、连接器：只要其中一个能即时、准确地给出答案，智能体就用它；手机留给只有你自己的 App 和账号才能做的事：12306 的真实余票和价格、一段微信聊天、美团里的一笔订单、需要你账号的一次付款。手机比工具慢，每一步都是一次模型调用，所以智能体不会为了知道北京离上海多远而打开 12306（见[阶梯](#the-ladder)）。
+SAFE、MODERATE、SENSITIVE 分别是安全、中等和敏感风险。屏幕仍是最后选择：搜索、网页、邮件、日历、文件或连接器能直接准确完成时，优先使用。只有用户自己的 App 和账号才能完成的操作，例如实时余票、微信聊天、美团订单或账号付款，才需要手机。屏幕操作较慢，且每步都要调用模型，因此不会为了查北京到上海的距离而打开 12306，见[工具选择顺序](#the-ladder)。
 
-主智能体把超过一两步的事交给 `phone_task`（「打开 12306，找明天北京到上海最早的车，报前三趟」），想自己看一眼或做一件事时用 `phone_screen` / `phone_act`。两种用法都可以；操作器让主模型的上下文保持小巧。
+超过一两步的工作通常交给 `phone_task`，例如打开 12306、找明天北京到上海最早车次并报告前三趟。主智能体只需查看或执行单项动作时，则用 `phone_screen` / `phone_act`。操作器将详细过程留在内部，可减少主模型上下文，也就是每次需要读取的历史内容。
 
 ## 操作器 {#the-operator}
 
-`phone_task(goal, app?, max_steps?)` 跑一个内层循环，移植自 [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench)（MIT）里的 `mobile_use` 操作器：
+`phone_task(goal, app?, max_steps?)` 启动内部循环，实现移植自 MIT 许可的 [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench) `mobile_use` 操作器：
 
-1. **看。** 取屏幕。操作器的模型拿到一张图（当前屏幕），加上目标和它到目前为止做过的事，早先的每一步是一句话（`Step 3: 点击「查询车站」按钮。; Result: …`）。设备送了元素列表时，列表里最多 60 行跟在后面，输入框排在前面，每行有它的文字、类型、标志和中心点，中心点用的是模型作答时同一套 999 网格（`- "密码" · EditText [editable, password] @ 500,375`）：这是读小字和瞄准用的第二路输入，从来不是第一路。
-2. **决定。** 模型按固定格式回答：一行 `Thought:`，一句用你的语言写的 `Action:`，以及一个调用 `mobile_use` 的 `<tool_call>`，动作是 `click`、`long_press`、`swipe`、`type`、`open`、`system_button`（Back、Home、Menu、Enter）、`wait`、`answer`、`ask_user` 或 `terminate`。坐标按 999×999 的网格返回，再换算成手机的像素。格式不对的回答会连同一句提醒退回去一次，最多三次。
-3. **做。** 这一步变成一次 `phone_act`，把 Action 那句话当作 `label`：哨兵读的是这句话，审批卡片显示的是这句话，轨迹里留下的也是这句话。然后回到第 1 步。
+1. **查看**。获取当前截图，将目标及历史步骤一并交给操作模型。每个历史步骤缩成一句话，例如 `Step 3: 点击「查询车站」按钮。; Result: …`。设备提供元素列表时，附最多 60 行，输入框优先，每行包括文字、类型、标记和中心坐标，使用与模型输出一致的 999 网格，例如 `- "密码" · EditText [editable, password] @ 500,375`。这些信息辅助读小字和定位，截图仍是主要输入。
+2. **决定**。模型必须返回一行 `Thought:`、一条使用用户语言的 `Action:`，以及调用 `mobile_use` 的 `<tool_call>`。动作支持 `click`、`long_press`、`swipe`、`type`、`open`、`system_button`，后者包括 Back、Home、Menu、Enter，以及 `wait`、`answer`、`ask_user`、`terminate`。坐标使用 999×999 网格，再换算为手机像素。格式错误时会附提醒交回模型修正，最多三次。
+3. **执行**。将决定转换为 `phone_act`，用 Action 句子作为 `label`，供哨兵判断、审批卡片展示和轨迹记录，然后回到第 1 步。
 
-它以 `done` 结束，附带模型的 `answer`（从屏幕上读到的文字放在这里）；模型调用 `ask_user` 或哨兵需要一个决定时以 `ask` 结束（主智能体问你，再拿你的回答继续）；两次被拒之后是 `blocked`；你在手机上按下**停止**是 `stopped`；`terminate(failure)`、超过 `max_steps` 或手机不再回应时是 `failed`。同一个动作连续三次会在历史里记一笔，好让模型换个法子。不设上限时步数不限，但连续六步都没有在屏幕上动到任何东西（未知函数、手机拒绝的动作、又一次同样的动作）会以 `failed` 结束：这样的每一步都是一次什么也没做的模型调用，没人盯着的任务不该一直花到按下停止为止。
+完成时返回 `done` 和模型 `answer`，从屏幕读出的文字放在答案中。模型调用 `ask_user` 或哨兵需要决定时返回 `ask`，由主智能体询问用户后继续；两次拒绝后返回 `blocked`；用户点「停止」后返回 `stopped`。调用 `terminate(failure)`、达到 `max_steps` 或手机不再响应时以 `failed` 结束。相同动作连续三次会在历史中加提示，要求模型调整做法。没有设置上限时不限制总步数，但连续六步未改变屏幕，例如未知函数、设备拒绝或重复无效动作，会以 `failed` 结束，避免无人值守时不断消耗无效调用。
 
-在带胶囊的设备上，操作器还会告诉手机任务什么时候**开始**（胶囊带着目标出现）、什么时候**结束**（胶囊消失）、什么时候**需要你**：一次 `ask` 或 `blocked` 会在手机上变成一张卡片，上面是问题和一个进入聊天的「打开」按钮，因为你那一刻看着的是微信，不是 nanoMuse。
+支持胶囊的设备还会收到任务开始、结束和需要用户的通知。开始时显示目标，结束时收起；`ask`、`blocked` 会变成带问题和「打开」按钮的卡片，方便你正在查看微信等 App 时直接返回 nanoMuse。
 
-操作器自己的规则写在它的提示词里：绝不输入密码、PIN、卡号或验证码（先 `ask_user`）；绝不确认一笔没有被明确要求的付款或转账；只做查询要求的事，查询是「查一下」的时候，读完就 `answer`，不再多按。
+操作器提示词规定：不输入密码、PIN、卡号或验证码，先调用 `ask_user`；不确认未经明确要求的付款或转账；只执行任务要求。请求只是查询时，读完就调用 `answer`，不继续点击。
 
-## 哨兵怎么处理它 {#what-sentinel-does-with-it}
+## 哨兵如何检查屏幕操作 {#what-sentinel-does-with-it}
 
-从屏幕上读到的一切都是隐私数据：第一次 `phone_screen` 之后这段对话就带上了隐私标记（tainted），之后把数据发到别处的步骤按更严的规则处理（见 [sentinel.md](sentinel.md)）。
+屏幕内容按私密数据处理。首次 `phone_screen` 后，当前对话会标为 tainted，即已污染，表示后续内容可能包含隐私。此后向外发送数据的操作要遵守更严格规则，见 [sentinel.md](sentinel.md)。
 
-一次 `phone_act` 是 MODERATE（默认模式下可以自行执行），除非它看起来像是在做出某种承诺，这时它是带警告的 SENSITIVE，而警告永远意味着**问一次**：
+普通 `phone_act` 为 MODERATE，默认模式可直接执行；可能提交、发送或确认操作时，会升为带警告的 SENSITIVE。带警告意味着必须询问，并且只批准当前一次：
 
-- `tap`、`long_press`、`double_tap` 或 `enter` 的 `label` 里含有 `sensitive_words` 中的一个：确认支付、立即付款、转账、提交订单、立即购买、发送、删除、注销、pay now、place order、send、delete……（App 的名字除外：点支付宝的图标不算付款步骤）
-- 带 `submit` 的 `type`，输入和提交合在一步，操作器从不这么做：它先输入，下一步再点发送按钮，这样那一步可以连同输入框里的文字一起被检查
+- `tap`、`long_press`、`double_tap`、`enter` 的 `label` 含 `sensitive_words`，例如确认支付、立即付款、转账、提交订单、立即购买、发送、删除、注销、pay now、place order、send、delete。App 名称不触发这条规则，因此点击支付宝图标不等于付款。
+- `type` 同时带 `submit`，把输入与提交合为一步。操作器不会这样做，而是先输入，再在下一步点击发送，让审批能检查输入框中的内容。
 
-一个带坐标的动作**必须**带 `label`：手指下面的字，按屏幕上显示的原样；操作器填的是它的 Action 句子。没有 label 的点击照样执行，但带一条警告（「没有任何信息说明手指下面是什么」）；屏幕之外的点在到达手机之前就被拒绝。最新屏幕里有带边界的元素包住这个点时（Android 的无障碍树会报），哨兵把那个元素的文字和 label 放在一起看，两者中更严的那个说了算；没有元素的屏幕一切照旧。
+带坐标的动作必须提供 `label`，说明屏幕上将要点击什么；操作器使用 Action 句子。缺少 label 的点击仍会执行检查，但附「没有任何信息说明手指下面是什么」警告；越出屏幕的坐标在发送到手机前直接拒绝。如果最近屏幕数据中有覆盖该坐标的元素边界，哨兵还会读取元素文字，与 label 分别判断并采用较严格结果。没有元素列表时，仍按 label 检查。
 
-默认词表是中英文；其他 App 或语言请编辑 `[gui] sensitive_words`。这里批准的审批只算*一次*：发一条消息永远不会变成不问就发下一条。
+默认敏感词包含中文和英文，其他 App 或语言可修改 `[gui] sensitive_words`。这类审批仅对一次操作有效，批准一条消息不会自动批准下一条。
 
-在电脑上还多一道询问，按应用计：一次对话里在某个应用中的第一次 `computer_act` 会问「让 <Muse> 使用 <App>？」，可选一次 / 本次对话 / 总是，记为一条 `computer_app:<id>` 授权（设置 → 权限）。上面按动作的规则在应用内部照样适用。macOS 上手可以只在那个应用的窗口里工作：[every-device.md](every-device.md#window-mode-macos)。
+电脑还会按 App 请求授权：每段对话中首次对某 App 调用 `computer_act`，会显示「让 <Muse> 使用 <App>？」。你可选「允许一次」「本次对话都允许」「总是允许」，保存为 `computer_app:<id>`，可在设置 → 权限查看。App 内每个动作仍遵守上述规则。macOS 还支持只在该 App 的窗口中工作，见 [every-device.md](every-device.md#window-mode-macos)。
 
-### 把屏幕交给你 {#handing-the-screen-over}
+### 将屏幕交给用户 {#handing-the-screen-over}
 
-密码、验证码、人机验证和付款确认由人来输入。操作器的 `hand_over` 动作（以及 `computer_act` / `phone_act` / `browser` → `hand_over`，带一个 `reason`）会在聊天里（桌面版上是在这次运行的轨迹卡片上）和胶囊上放一张「轮到你了：<reason>」卡片，带一个**完成**按钮，最多等十分钟。等待（hold）期间，那个线程里这个工具的每个动作都等着；人做完自己的部分，按**完成**；操作器重新截一张图，并被告知「用户接管了一会儿；再看一眼」。焦点落在密码框上时，`type` 会自动变成一次交接。人也可以先接管：「手」卡片或浏览器卡片上的「接管」，或者 `POST /api/holds {"thread","tool","reason"}`；`POST /api/holds/{id}/done` 结束它，`GET /api/state` 列出还没结束的等待。
+密码、验证码、人机验证和付款确认由用户处理。操作器的 `hand_over`，或 `computer_act` / `phone_act` / `browser` 的 `hand_over` 加 `reason`，会在聊天及胶囊显示「轮到你了：<reason>」和「完成」。桌面版显示在任务轨迹卡片中，最多等十分钟。
 
-因为观察是一张图，哨兵依据的是 *label*（模型自己对它将要按什么的描述），加上设备报了的话、点下面那个元素的文字；它不依赖那棵树一定存在。这对操作器所知道的东西是诚实的；也正因为如此，label 是必填的，付款步骤还另外有操作器自己停下来问的规则，授权也只算一次。
+这段等待称为 hold。期间同一线程中该工具的所有动作暂停。你处理后点击「完成」，操作器重新截图，并收到用户曾接管、需要重新观察的提示。焦点位于密码框时，`type` 会自动转为交接。你也可以主动点击「手」或浏览器卡片的「接管」，或调用 `POST /api/holds {"thread","tool","reason"}`。`POST /api/holds/{id}/done` 结束等待，`GET /api/state` 列出尚未完成的 hold。
 
-## 轨迹 {#traces}
+哨兵根据模型提供的 label 和设备可提供的目标元素文字判断，不要求一定存在无障碍树。这也限定了它能知道的内容。因此 label 必填，付款另有操作器主动停止并询问的规则，授权也仅限一次。
 
-每次 `phone_task` 在 `<data_dir>/phone-traces/pt-<timestamp>-<id>.jsonl` 下写一份 JSONL 轨迹：一条 `task` 记录（目标、App、上下文），每次迭代一条 `step` 记录（屏幕上的 App 和路由、截图路径、模型的想法和 Action 句子、工具调用、实际发给设备的动作、延迟、错误如果有的话），以及一条 `end` 记录（状态、消息、步数、秒数）。保留最近 200 份轨迹和最近 400 张截图。
+## 任务轨迹 {#traces}
+
+每次 `phone_task` 都会写入 `<data_dir>/phone-traces/pt-<timestamp>-<id>.jsonl`。JSONL 是每行一条 JSON 的记录格式。开头 `task` 记录目标、App、上下文；每次循环的 `step` 记录 App、路由、截图路径、模型想法和 Action、工具调用、实际设备动作、耗时及错误；最后 `end` 记录状态、说明、步数和秒数。最多保留最近 200 份轨迹、400 张截图。
 
 ```
 nanomuse phone traces                    # newest first: id, when, status, steps, goal
@@ -146,13 +144,13 @@ nanomuse phone trace pt-20260923-230710-5be7
 nanomuse phone trace pt-20260923-230710-5be7 -o trace.html
 ```
 
-这个 HTML 页面是自包含的（每张截图都内嵌，点击画成一个圆环、滑动画成一条线，就画在模型当时看到的那一屏上），所以一次运行可以当作一个文件传来传去，或者附在 issue 里。
+生成的 HTML 会内嵌全部截图，在模型当时看到的图片上用圆环标点击、用线标滑动，因此可以作为单个文件分享或附到 issue。
 
-## 设备协议 {#the-device-protocol}
+## 设备通信协议 {#the-device-protocol}
 
-写给想另写一个执行器的人。消息走应用的 WebSocket（`/ws`，token 放在第一帧）。
+这一节供实现其他执行器的人参考。执行器是接收请求、实际操作设备的程序。消息通过 App 的 `/ws` WebSocket 传输，首帧携带令牌。
 
-设备报到一次：
+设备先声明自身信息：
 
 ```json
 {"kind": "device", "name": "MobileGym", "platform": "mobilegym", "gui": true, "capsule": true,
@@ -160,16 +158,16 @@ nanomuse phone trace pt-20260923-230710-5be7 -o trace.html
  "screen": {"width": 720, "height": 1600}}
 ```
 
-然后收到 `{"kind": "device_ack", "phone": {…}}`。有变化时设备可以在同一条连接上再报一次（Android 应用在无障碍服务开关变化时会这么做；`gui` 随之翻转）；服务器保留这条连接的到达时间，更新其余部分。`"capsule": true` 表示设备会显示一个带停止按钮的步骤胶囊，并且想收到下面的 `task` 请求。随后服务器一次一个地发请求：
+服务器返回 `{"kind": "device_ack", "phone": {…}}`。状态变化时可在同一连接再次声明，例如 Android 无障碍服务开关变化会更新 `gui`；服务器保留原连接时间，更新其他信息。`"capsule": true` 表示支持带停止按钮的步骤胶囊，并希望接收下述 `task` 通知。之后服务器一次发送一个请求：
 
 ```json
 {"kind": "device_request", "id": "r1", "op": "screen", "params": {}}
 {"kind": "device_request", "id": "r2", "op": "act", "params": {"action": "tap", "x": 68.5, "y": 447.6, "label": "点击热门车站中的「北京」。"}}
 ```
 
-设备回答 `{"kind": "device_result", "id": "r1", "ok": true, "result": …}` 或 `{"kind": "device_result", "id": "r1", "ok": false, "error": "…"}`。
+设备以 `{"kind": "device_result", "id": "r1", "ok": true, "result": …}` 返回成功，或以 `{"kind": "device_result", "id": "r1", "ok": false, "error": "…"}` 返回失败。
 
-`screen` 的结果是一张图加几条关于它的事实：
+`screen` 返回截图和屏幕信息：
 
 ```json
 {"app": "railway12306", "app_name": "铁路12306", "route": "/station-select",
@@ -177,9 +175,9 @@ nanomuse phone trace pt-20260923-230710-5be7 -o trace.html
  "screenshot": "<base64 PNG or JPEG>", "note": "optional"}
 ```
 
-`screenshot` 是整个屏幕，`width` × `height` 像素，和设备执行点击用的是同一个空间，所以图上的一个点就是屏幕上的一个点，不需要换算；设备完全不发尺寸时，服务器从图上读。（`image` 作为同一个字段的旧名字也接受。）模型读这张图，坐标是图里的像素，原点在左上角。`app`、`app_name`、`route` 和 `keyboard` 可选，但有了它们，说明文字、哨兵的摘要和轨迹都会更好。
+`screenshot` 是整屏图片，尺寸为 `width` × `height`，与设备接受点击的坐标空间一致，图中坐标可直接用于点击。未提供尺寸时，服务器从图片读取。旧字段名 `image` 仍被接受。坐标以左上角为原点，单位为图片像素。`app`、`app_name`、`route`、`keyboard` 可选，用于完善画面说明、哨兵摘要和轨迹。
 
-有无障碍树的设备（或者像 MobileGym 模块那样有 DOM）可以加上 `nodes`，即那些有文字或能做事的元素，摊平，最多 120 个，用图片的像素空间：
+如果设备提供无障碍树，或像 MobileGym 一样有 DOM（网页元素结构），可以附 `nodes`。列表为最多 120 个含文字或可操作的元素，使用截图像素坐标：
 
 ```json
 {"nodes": [
@@ -188,86 +186,104 @@ nanomuse phone trace pt-20260923-230710-5be7 -o trace.html
 ]}
 ```
 
-`id` 是进入树的稳定索引路径，`text` / `desc` / `hint` 是元素的文字，`res` 是它的资源 id；标志有 `clickable`、`long_clickable`、`editable`、`password`、`checked`、`scrollable`、`focused`、`selected`、`disabled`。服务器保留前 120 个，给操作器看最有用的 60 个（输入框在前），而且从不强制要求这个列表：WebView、Flutter 应用、游戏或 `FLAG_SECURE` 屏幕都没有，没有它循环也一样。Android 应用在发送前把截图缩到 720 px 宽，收到的坐标再按比例放大回去，所以模型看到的空间就是它点击的空间。
+`id` 是元素在树中的稳定索引路径；`text`、`desc`、`hint` 提供文字；`res` 为资源 ID。可用标记为 `clickable`、`long_clickable`、`editable`、`password`、`checked`、`scrollable`、`focused`、`selected`、`disabled`。服务器保留前 120 项，选其中最有用的 60 项交给操作器，输入框优先。列表不是必需项：WebView、Flutter App、游戏或 `FLAG_SECURE` 屏幕可能不提供，操作循环仍可运行。Android 发送前将截图缩至 720 px 宽，收到坐标后按比例放大，因此模型使用的图片坐标与点击坐标对应。
 
-`act` 的结果是 `{"note": "…", "screen": {…}}`：动作稳定下来之后屏幕的样子，所以一步只要一个来回。
+`act` 返回 `{"note": "…", "screen": {…}}`，包含动作结束且页面稳定后的屏幕，单步只需一次请求往返。
 
-设备必须处理的动作：
+设备需要支持以下动作：
 
 | 动作 | 参数 |
 |---|---|
 | `tap`、`double_tap` | `x`、`y` |
-| `long_press` | `x`、`y`、`seconds`（≤ 5） |
-| `swipe` | `x`、`y`、`x2`、`y2`；或者 `direction` up/down/left/right 加 `distance`（占屏幕的比例）和可选的起点 |
-| `type` | `text`、`clear`（先清空输入框）、`submit`（之后按回车）；知道的话加上输入框的 `x`、`y` |
+| `long_press` | `x`、`y`、`seconds`，≤ 5 |
+| `swipe` | `x`、`y`、`x2`、`y2`；或 `direction`，取 up/down/left/right，配合占屏幕比例的 `distance` 和可选起点 |
+| `type` | `text`、`clear`，表示先清空输入框，`submit`，表示输入后回车；已知时附输入框 `x`、`y` |
 | `enter`、`back`、`home`、`recents` | — |
-| `open_app` | `app`：报到列表里的一个 id 或名字 |
-| `wait` | `seconds`（≤ 10） |
+| `open_app` | `app`，使用声明列表中的 ID 或名称 |
+| `wait` | `seconds`，≤ 10 |
 
-每个带坐标的动作还带 `label`：执行器应当把它显示出来（见下文），也可以记日志；除此之外不需要拿它做别的。
+每个带坐标的动作还含 `label`。执行器应显示它，见下文，也可写入日志，无需另外解析它。
 
-报到时带了 `"capsule": true` 的设备还会收到 `task` 请求（`{"op": "task", "params": {"event": "begin", "text": "<goal>"}}`、`"end"`，以及带着智能体要问用户的那个问题的 `"notice"`），用一个空的 `ok` 回答它们；它们是尽力而为的，3 秒内不回答的设备不会被等。不管任务怎么结束（完成、停止、设备离线、模型失败、聊天运行被取消），`end`（或 `notice`）都会发出，但恰好在那一刻断开的 socket 永远收不到。所以服务器还把进行中的任务放在手机状态里（每条 socket 的 `hello` 里都有 `"phone": {…, "task": {"goal": "…", "since": <unix seconds>}}`，没有任务时为 `null`），设备（重新）连接时应当据此设置胶囊：还在进行的任务拿回它的胶囊，中途结束的任务把胶囊收起来。socket 彻底关闭时，或者一个号称在进行的任务很久没有向设备要任何东西时（MobileGym 模块用三分钟），胶囊也应当自己收起来。
+声明 `"capsule": true` 的设备还会接收 `task` 请求，例如 `{"op": "task", "params": {"event": "begin", "text": "<goal>"}}`，以及 `"end"`、带用户问题的 `"notice"`。设备返回空的成功 `ok` 即可。这些通知尽力发送，3 s 内没有应答就不再等。无论任务完成、被停止、设备离线、模型失败还是聊天取消，服务器都会尝试发送 `end` 或 `notice`，但恰好断线的设备可能收不到。
 
-**停止。** 用户在设备上按下停止时，设备让正在进行的请求失败（以及之后直到下一次 `task begin` 为止的每一个请求），错误里带上标记 `nanomuse:stop`。服务器把它变成 `stopped` 结果：操作器结束循环，`phone_act` 用平实的话报告，主智能体被告知不要继续操作手机，而是问接下来做什么。没有胶囊的设备永远不需要发这个标记。
+因此，服务器也在手机状态中保存正在运行的任务。每条 socket 的 `hello` 都包含 `"phone": {…, "task": {"goal": "…", "since": <unix seconds>}}`，无任务时 `task` 为 `null`。设备连接或重连时应据此恢复胶囊：任务仍在运行就显示，中途已结束就关闭。连接永久关闭，或所谓运行中的任务长时间没有向设备发出任何请求时，也应自行隐藏；MobileGym 使用三分钟超时。
 
-MobileGym 执行器（`demo/mobilegym/apps/nanoMuse/gui.ts`）是一个可读的例子：它在页面里把模拟器的 DOM 渲染成 PNG（`modern-screenshot`，抵消掉手机的 CSS 变换、去掉舞台），尺寸是手机的两倍（720×1600，这样模型读得清小字，点击再按比例缩回手机），遍历 DOM 得到 `nodes`（可交互或有文字、可见、没被遮住的元素；类型从标签和 role 猜），从模拟器的 OS 对象读 App 和路由，并驱动 MobileGym 自己的输入 API 来执行动作，让一次点击落下去就像手指一样。它和 Android 执行器一样拒绝往密码框或验证码框里 `type`：胶囊会请人自己填好，再点「继续」。
+**停止操作**。用户点击「停止」后，执行器应让当前请求及之后所有请求失败，直到收到下一次 `task begin`。错误必须带 `nanomuse:stop`。服务器将其识别为 `stopped`：操作器结束循环，`phone_act` 返回可读说明，主智能体收到指示，不再继续操作手机，先询问下一步。没有胶囊的设备无需发送该标记。
 
-## 显示手指 {#showing-the-finger}
+MobileGym 的 `demo/mobilegym/apps/nanoMuse/gui.ts` 可作为参考。它用 `modern-screenshot` 在页面中将模拟器 DOM 渲染成 PNG，抵消手机 CSS 变换并排除舞台，输出手机两倍尺寸的 720×1600 图片以便读取小字，再将点击缩回手机坐标。它遍历可见、未遮挡、可交互或含文字的 DOM 元素生成 `nodes`，通过标签和 role 推断类型，从模拟器 OS 对象读取 App 和路由，并调用 MobileGym 自身输入 API 执行动作。它和 Android 一样拒绝对密码或验证码输入框调用 `type`，改由胶囊请用户填写并点击「继续」。
 
-一个一声不响地动的执行器，看着让人不安，也没法跟上。设备应当在手机自己的坐标空间里画出 Muse 在做什么，画在一个**不进截图**的图层上（模型不能看到这些标记）。MobileGym 模块是参考实现；Android 应用按同一套规范实现，用了两个无障碍悬浮窗（一个不可触碰的全屏层画标记，另一个是胶囊），截图的那一瞬间两个都隐藏。
+## 显示操作位置 {#showing-the-finger}
 
-| 什么 | 怎么显示 | 时长 |
+设备应把智能体的操作位置和当前动作显示出来，方便用户跟踪。标记使用手机坐标，绘制在不进入截图的独立图层上，避免模型把标记当作页面内容。MobileGym 是参考实现，Android 使用两个无障碍悬浮窗：不可接收触摸的全屏标记层，以及胶囊层；截图瞬间会隐藏两者。
+
+| 操作 | 显示方式 | 时长 |
 |---|---|---|
-| `tap`、`double_tap` | 一个从落点扩散、再淡出的圆环 | 520 ms |
-| `long_press` | 一个保持住、再淡出的圆环 | `seconds`，然后 300 ms 淡出 |
-| `swipe` | 从起点画到终点的一条线，终点有一个圆环 | 滑动本身的时长（320 ms），然后淡出 |
-| `type` | 字符一个一个出现 | 每个字符 40 ms |
-| 每个动作 | 底部一行字幕：`Muse · <label>`（或 `输入 “…”`、`打开 <app>`、`滑动 up`） | 2.6 s，被下一条替换 |
+| `tap`、`double_tap` | 从点击位置扩散并淡出的圆环 | 520 ms |
+| `long_press` | 保持按住状态的圆环，结束后淡出 | 按 `seconds` 保持，再用 300 ms 淡出 |
+| `swipe` | 从起点到终点的路径线，终点带圆环 | 随滑动持续 320 ms，然后淡出 |
+| `type` | 字符逐个出现 | 每字符 40 ms |
+| 所有动作 | 底部说明 `Muse · <label>`，或 `输入 “…”`、`打开 <app>`、`滑动 up` | 2.6 s，下一条会替换 |
 
-动作之后，执行器等 UI 稳定下来（MobileGym 上 650 ms；Android 上等到无障碍事件安静 450 ms，最多 3 s）再取要返回的屏幕。这段等待是动作的一部分，所以 `screen` 读到的永远不会是切换到一半的画面。
+执行动作后先等界面稳定，再返回截图。MobileGym 等 650 ms；Android 等到无障碍事件连续安静 450 ms，最多等 3 s。等待属于动作本身，因此 `screen` 不会读到切换中的画面。
 
 ### 胶囊 {#the-capsule}
 
-在带胶囊的设备上（Android 应用，以及在模拟手机里画同一个胶囊的 MobileGym 模块），任务从来不是无声的：屏幕顶部有一个胶囊，显示小熊猫、正在进行的步骤（*Muse · 点击「查询车票」*）和一个**停止**按钮，盖在正被操作的 App 上面。它在 `task begin` 时出现，跟着每一步走，在 `task end` 时消失：先打一个勾停留片刻，然后手机回到 nanoMuse，那里有智能体的报告（Android 应用把自己拉到前台；MobileGym 模块恢复 nanoMuse 应用）；它不在截图里。停止是用户的刹车；不用长按、没有菜单：点一下，进行中的动作以 `nanomuse:stop` 失败，胶囊显示「已停止」并隐藏自己，手机回到 nanoMuse，智能体不再继续，而是问接下来做什么。智能体需要用户时（`ask`、`blocked`），胶囊长成一张卡片，上面是问题和一个把 nanoMuse 拉到前台的「打开」按钮；停留一分钟，然后收起。
+胶囊是屏幕顶部的小型任务状态条。Android 和 MobileGym 都显示它，浮在被操作 App 上方，包含形象、当前步骤，例如 *Muse · 点击「查询车票」*，以及「停止」。`task begin` 时出现，随步骤更新，`task end` 时短暂显示勾号后收起，手机返回 nanoMuse 查看任务报告。Android 将自身带回前台，MobileGym 恢复 nanoMuse 模拟 App。胶囊不进入截图。
 
-### 桌面上也一样 {#the-same-on-the-desktop}
+点击「停止」即可中止，无需长按或展开菜单。当前动作以 `nanomuse:stop` 失败，胶囊显示「已停止」并隐藏，返回 nanoMuse，智能体询问后续安排。任务需要用户处理，即 `ask`、`blocked` 时，胶囊展开为问题卡片，并提供「打开」返回 nanoMuse，显示一分钟后收起。
 
-桌面版用手机那套词汇画手，只是按指针的尺度缩放（[desktop-muse.md](desktop-muse.md#computer-use)）：沿显示器边缘呼吸的光晕（蓝色是在干活，琥珀色是在等），操作器动过的那个点上的标记（圆环、转动的青色弧、圆点、胶囊里的动作名），拖动是一条带箭头的虚线，屏幕顶部一个胶囊，有脸、*第 N 步*、这一步的话、「我来接手」和「停止」，在 nanoMuse 窗口不在前台时显示。那里没有任何东西流动或扫过；每一处光都以 2.4 s 亮起、2.4 s 暗下的节奏呼吸，在「减弱动态效果」下保持静止。
+### 桌面上的同类提示 {#the-same-on-the-desktop}
 
-**轨迹。** 手机把手指的动作当场显示出来，桌面版还把这次运行留下来可以回看：聊天里，在这次运行最后一次手的调用下面，显示每一步的截图，动作画在上面（点击标记、拖动箭头、滚动的 V 形、标签胶囊里输入的文字或按键组合），还有智能体在这一步之前说的话；可以上一步 / 下一步、用方向键、「放大查看」和「复制这一步」。它完全由手本来就返回的东西拼成：`computer_screen` / `computer_act` / `device_screen` 给出图片，图片的第一行给出标题和尺寸；`computer_act` 的参数给出动作，包括拖动的 `x2`/`y2`（或 `box2`）和滚动的 `dy`。所以工具、MCP 结果和 hub 帧都没有为它增加任何东西。宿主在内存里保留**每次运行 40 步、4 次运行、64 MB 图片**，通过 `GET /nanomuse/cloud/trajectory?session=<id>` 和 `GET /nanomuse/cloud/stage/frame?seq=N` 提供给窗口；格式和上限见 [desktop-muse.md](desktop-muse.md#computer-use)。
+桌面版沿用相同操作提示，并按鼠标指针调整，见 [desktop-muse.md](desktop-muse.md#computer-use)。显示器边缘的光晕用蓝色表示工作、琥珀色表示等待；目标位置显示圆环、旋转青色弧、精确圆点和动作名称；拖动显示带箭头的虚线路径。nanoMuse 窗口不在前台时，屏幕顶部胶囊显示形象、「第 N 步」、步骤说明、「我来接手」和「停止」。光效不流动或扫过，而以 2.4 s 变亮、2.4 s 变暗的节奏变化；开启「减弱动态效果」后保持静止。
 
-## 电脑上的手：以图为单位 {#hands-on-the-computer-the-picture-is-the-unit}
+**轨迹回看**。桌面聊天在本次运行最后一次操作工具调用下，显示各步截图、操作标记和操作前的智能体文字。点击用标记、拖动用箭头、滚动用 V 形符号，输入文字或组合键显示在标签胶囊中。你可以切换上一步、下一步，使用方向键，或点击「放大查看」「复制这一步」。
 
-电脑的手（`computer_screen` / `computer_act`，[every-device.md](every-device.md#hands-on-this-computer)）遵守和手机一样的规则，只是多一步，因为电脑的图和它的指针很少是同一个尺寸：一块 4K 显示器在 X11 和鼠标看来是 3840×2160，在 Electron 看来是 1920×1080 的「逻辑」尺寸，而模型看到的图是 1596×896。0.1.36 之前这几个空间混在一起（告诉模型的是屏幕尺寸，给它看的是更小的图，它报的数字直接拿去点），Linux 上点击落在目标旁边就是这个原因。
+这些内容从既有结果构建：`computer_screen` / `computer_act` / `device_screen` 提供图片，第一行提供标题和尺寸；`computer_act` 参数提供动作、拖动终点 `x2` / `y2` 或 `box2`，以及滚动 `dy`。工具、MCP 结果和 hub 帧无需新增字段。宿主内存最多保留每次运行 40 步、4 次运行、64 MB 图片，通过 `GET /nanomuse/cloud/trajectory?session=<id>`、`GET /nanomuse/cloud/stage/frame?seq=N` 提供给窗口。数据格式和上限见 [desktop-muse.md](desktop-muse.md#computer-use)。
 
-现在**以图为单位**。`computer_screen` 在第一行说明图的尺寸（`<window in front> · 1596×896 · …`），结尾是 *Coordinates: pixels of this 1596×896 picture, (0,0) top-left.*；`computer_act` 接受这张图里的 `x`、`y`（或者一个 `box` `[x1, y1, x2, y2]`，取其中心），`drag` 的 `x2`、`y2` / `box2` 同理。运行时把手自己的空间（操作器的屏幕像素）和图分开，只在动作之前换算一次，再为轨迹和光晕换算一次（`nanomuse/computer/coords.py`，`Mapping`）。图是屏幕按 `[hands] max_image_width` 封顶，再对齐到 Qwen3-VL 缩放用的 28 像素网格（UI-TARS 的 `smart_resize`），这样模型自己的缩放就是恒等变换，它说出的像素就是它看到的像素。`[hands] coords = "norm1000"` 则把 `x`、`y` 变成图上 0–1000 的网格，给按那种方式训练的手的模型用。
+## 电脑操作统一使用图片坐标 {#hands-on-the-computer-the-picture-is-the-unit}
 
-手的空间从哪里来，按后端分：
+电脑的 `computer_screen` / `computer_act` 遵守手机相同原则，见 [every-device.md](every-device.md#hands-on-this-computer)，但需要额外处理显示缩放。4K 显示器对 X11 和鼠标是 3840×2160，对 Electron 是 1920×1080 逻辑尺寸，给模型的图片可能是 1596×896。0.1.36 以前，模型获知屏幕尺寸却看到缩小图片，返回坐标又直接用于点击，导致 Linux 点击偏离目标。
 
-| 后端 | 手的空间 | 说明 |
+现在所有模型坐标以图片为准。`computer_screen` 第一行报告 `<window in front> · 1596×896 · …`，结尾注明 *Coordinates: pixels of this 1596×896 picture, (0,0) top-left.*。`computer_act` 的 `x`、`y` 指图片像素；`box` 为 `[x1, y1, x2, y2]` 并取中心。`drag` 的 `x2`、`y2` / `box2` 使用同样规则。运行时将操作器实际屏幕坐标与图片坐标分开，在执行前通过 `nanomuse/computer/coords.py` 的 `Mapping` 换算，并为轨迹和光晕再次映射。
+
+截图先按 `[hands] max_image_width` 限制，再对齐 Qwen3-VL 使用的 28 像素缩放网格，即 UI-TARS 的 `smart_resize`。这样模型不必再改变图片尺寸，指定像素与看到的像素一致。如果模型按归一化坐标训练，可以设 `[hands] coords = "norm1000"`，让 `x`、`y` 使用覆盖整张图的 0–1000 网格。
+
+各后端的实际操作坐标来源如下：
+
+| 后端 | 实际操作坐标空间 | 说明 |
 |---|---|---|
-| `desktop`（桌面版） | 显示器的逻辑尺寸 × 缩放系数；macOS 上缩放系数为 1（点） | 应用自己的操作器（`@computer-use/nut-js`，移植自 UI-TARS-desktop 的），走本机回环 HTTP；只要应用设置了 `NANOMUSE_OPERATOR_URL`，`auto` 就选它 |
-| `pyautogui` | `pyautogui.size()` | macOS 上是点，其他平台是物理像素；在桌面版下的 Mac 上不用 |
+| `desktop`，桌面版 | 显示器逻辑尺寸 × 缩放系数；macOS 系数为 1，单位为点 | App 自带操作器 `@computer-use/nut-js`，移植自 UI-TARS-desktop，通过回环 HTTP 通信。App 设置 `NANOMUSE_OPERATOR_URL` 后，`auto` 优先使用它 |
+| `pyautogui` | `pyautogui.size()` | macOS 为点，其他平台为物理像素；Mac 桌面版不使用此后端 |
 | `xdotool` | `xdotool getdisplaygeometry` | X11 根窗口像素 |
 
-在桌面版下的 macOS 上**只有一条路**：每张截图、每次移动都由操作器来做，否则工具带着操作器给的原因失败；没有录屏权限时，那句话是「macOS：在系统设置 → 隐私与安全性 → 录屏 里打开 nanoMuse Desktop，然后退出并重新打开应用。」（操作器检测到拒绝和全黑的截图，回答 `403`）。运行时在那里从不回退到 `mss` / `screencapture` 或 `pyautogui`：权限属于应用包，回退会让 TCC 为一个不在面板里的进程再问一次，而一张黑图会被当成屏幕送到模型那里。Linux 和 Windows 保留 Python 回退，不经应用启动的运行时也保留（[desktop.md](desktop.md#macos-permissions)）。
+macOS 桌面版始终由操作器执行截图和输入，失败时直接返回原因，不尝试其他截图程序。缺少录屏权限时会提示在系统设置 → 隐私与安全性 → 录屏中启用 nanoMuse Desktop，再退出重开；拒绝授权或全黑截图会返回 `403`。不回退至 `mss`、`screencapture`、`pyautogui`，是因为权限绑定 App 包，回退会使 TCC（macOS 隐私权限管理机制）为另一个未出现在设置中的进程请求授权，还可能把黑图当作正常屏幕传给模型。Linux、Windows 和不经桌面 App 启动的运行时仍保留 Python 回退，见 [desktop.md](desktop.md#macos-permissions)。
 
-从 0.1.38 起，Mac 上的操作器把截图和输入交给 **nanoMuse Computer Use**，桌面包里的一个小 Swift 应用，两项授权都由它自己持有（截图用 ScreenCaptureKit，macOS 14 及更新版本上是主显示器的 `SCScreenshotManager`，12 和 13 上是 `CGDisplayCreateImage`；鼠标和键盘用 `CGEvent`，任何文字的字符都直接输入）。macOS 把权限归到 LaunchServices 启动的那个进程上，所以通过 `open` 启动的辅助程序在录屏和辅助功能面板里有自己的一行（要打开的是「nanoMuse Computer Use」，不是应用本身），录屏授权要等应用重启那一个进程后才生效，这一步应用会自己做。上面说的操作器契约不变：同样的路由、同样的坐标（点）、缺少授权时同样的 `403`，只是那句话现在点名的是辅助程序。辅助程序取图失败时（ScreenCaptureKit 拒绝、没有图像、辅助程序死掉或根本没启动），操作器**不会**改用一帧 `desktopCapturer` 顶上：`/screenshot` 带着辅助程序自己的话失败（「没有截图：nanoMuse Computer Use 拍不到图，ScreenCaptureKit userDeclined (-3801)：……」，或「……没有启动（……）」），日志写 `helper screenshot failed (…) — not falling back to desktopCapturer`，`computer_screen` 把这句话带进聊天。`desktopCapturer` 和 nut.js 只在没有辅助程序包的构建里仍是那条路（[desktop.md](desktop.md#macos-permissions)）。
+从 0.1.38 起，Mac 操作器把截图和输入交给桌面包中的 Swift 辅助 App **nanoMuse Computer Use**，由它自己持有录屏和辅助功能授权。macOS 14 及更新版使用 ScreenCaptureKit 的 `SCScreenshotManager` 截主屏，12、13 使用 `CGDisplayCreateImage`；鼠标键盘使用 `CGEvent`，可直接输入任意文字系统的字符。
 
-**macOS 上的窗口模式**（[every-device.md](every-device.md#window-mode-macos)）走同一个辅助程序：运行时向操作器要屏幕上的窗口（`GET /windows`：id、进程、应用、bundle id、标题、以点为单位的位置和尺寸），以及某一个窗口自己的像素（`POST /window {id}`：`SCContentFilter(desktopIndependentWindow:)`，不带阴影、不带光标，连同窗口位置一起返回，这样图上的一个像素能对应到屏幕上的一个点）。在应用下的 Mac 上，运行时从不自己截取窗口；窗口模式的鼠标和键盘事件仍由运行时发给窗口所属的进程（`CGEventPostToPid`），这就是为什么辅助功能面板里除了辅助程序那一行，还需要「nanoMuse」那一行。拒绝（辅助程序的录屏那一行没开，`403`）或窗口已不在（`404`）都以操作器的话返回，下一次看屏幕时重试；辅助程序根本不存在时，手对这个目标退回到整个屏幕，原因写进观察里。没有辅助程序包时，运行时保留自己的 `CGWindowListCreateImage` 路径，并在日志里说明（`window mode: the runtime captures windows itself …`）。
+macOS 将权限归给 LaunchServices 启动的进程。辅助 App 通过 `open` 启动，因此在录屏、辅助功能设置中有独立条目，应打开「nanoMuse Computer Use」。录屏授权需重启该辅助进程才生效，桌面 App 会自动处理。操作器路由、点坐标和缺权限时的 `403` 不变，提示中的程序名称改为辅助 App。
 
-Linux 上操作器只在 **X11**（Xorg）下工作。手的空间是以像素计的 X 根窗口（HiDPI 桌面上那是逻辑尺寸 × 缩放系数，1920×1080、缩放 2 的显示器就是 3840×2160），`/info` 会这么说；图就是这个根窗口，按上面的方式为模型缩放。**Wayland** 下没有程序可以驱动的全局屏幕或光标，所以 `/info` 说手是关着的（「Wayland 会话：……请用 Xorg 登录……」），`/screenshot` 用同一句话拒绝（`503`）而不是打开门户的选择器，运行时在第一次尝试时就直说：它不会落到 `xdotool` 或 `pyautogui` 上，那两个会在 XWayland 下启动，然后什么你能看到的东西都动不了。会话类型从 `XDG_SESSION_TYPE` 读，或者从一个没有 `DISPLAY` 的 `WAYLAND_DISPLAY` 判断。0.1.38 在 X11 路径上修了两件事：光晕（手干活时应用沿屏幕画的那个框）也是一个 X 窗口，而 X11 每次映射或重新配置它时都会忘掉它的点击穿透形状，所以点进去的每一下都落了空：现在操作器会等光晕可以穿透之后再移动指针；还有 libnut 的 `type` 在美式键盘布局的符号上丢了 Shift（`*` 打成 `8`，`!` 打成 `1`，`_` 打成 `-`），现在这些以 Shift + 下面那个键的方式输入，ASCII 之外的文字仍像以前一样通过剪贴板和 Ctrl+V 输入。
+辅助程序截图失败时，例如 ScreenCaptureKit 拒绝、没有图像、进程退出或未启动，操作器不会改用 `desktopCapturer`。`/screenshot` 返回辅助程序原因，例如 `no screenshot: nanoMuse Computer Use could not take the picture: ScreenCaptureKit userDeclined (-3801): …` 或 `… did not start (…)`。日志写入 `helper screenshot failed (…) — not falling back to desktopCapturer`，`computer_screen` 将说明显示到聊天。只有未打包辅助 App 的构建继续使用 `desktopCapturer` 和 nut.js，见 [desktop.md](desktop.md#macos-permissions)。
 
-图的尺寸有两重限制：`[hands] max_image_width`（1600）和 2 Mpx 的像素预算（`nanomuse/computer/coords.py`，`PICTURE_MAX_PIXELS`；操作器的 `/screenshot` 接受同样的 `max_pixels`，0 表示屏幕原样），两者都在 28 像素对齐之前保持宽高比。4K 屏幕的边长缩到一半，1080p 略微裁一点；一次请求里带着几张没封顶的 4K 图，正是中继以 `413` 拒绝的那种情况。
+**macOS 窗口模式**也使用同一辅助 App，见 [every-device.md](every-device.md#window-mode-macos)。运行时调用 `GET /windows` 获取窗口 ID、进程、应用、bundle ID、标题和以点计的位置尺寸；调用 `POST /window {id}` 获取该窗口独立像素，使用 `SCContentFilter(desktopIndependentWindow:)`，不含阴影或光标，并返回窗口位置，使图片像素能映射到屏幕点。
 
-`computer_screen` 向客户端报告的（`status()` / 事件）：`picture_size` 和 `screen_size` 分开给。桌面版画预测标记（一个转动的虚线圆环、精确落点上的一个圆点、旁边的动作名、拖动的一条虚线），用的是操作器自己给出的显示器比例，所以你看到的就是它点的地方，不是客户端以为它会点的地方。
+在桌面 App 下，Mac 运行时不自行截取窗口；窗口模式的鼠标键盘事件仍由运行时通过 `CGEventPostToPid` 发往目标进程，因此辅助功能中还需要「nanoMuse」条目授权。辅助 App 没有录屏权限时返回 `403`，窗口消失时返回 `404`，原因原样传回，下次观察再试。辅助 App 完全不存在时，对该目标使用全屏并在观察中说明。未打包辅助 App 的构建则保留运行时的 `CGWindowListCreateImage` 路径，并记录 `window mode: the runtime captures windows itself …`。
+
+Linux 操作器仅支持 **X11（Xorg）**。实际坐标是 X 根窗口像素；HiDPI 下为逻辑尺寸乘缩放系数，例如 1920×1080、缩放 2 对应 3840×2160。`/info` 会说明，截图再按前述规则缩放给模型。
+
+**Wayland** 不允许程序直接控制全局屏幕或光标。因此 `/info` 表示操作工具关闭并提示使用 Xorg 登录，`/screenshot` 以相同说明返回 `503`，不会打开屏幕选择器。运行时首次尝试就明确报告，也不会回退到 `xdotool`、`pyautogui`，因为它们即使在 XWayland 启动，也无法操作用户实际桌面。会话类型由 `XDG_SESSION_TYPE` 判断，或由存在 `WAYLAND_DISPLAY` 而没有 `DISPLAY` 判断。
+
+0.1.38 修复了 X11 的两类问题。其一，光晕本身也是 X 窗口，每次映射或调整配置后，X11 可能丢失点击穿透设置，导致点击被光晕拦住。现在操作器先确认光晕可穿透，再移动指针。其二，libnut 输入美式键盘符号时丢失 Shift，例如 `*` 变 `8`、`!` 变 `1`、`_` 变 `-`；现在按 Shift 加对应键输入。非 ASCII 文字仍通过剪贴板和 Ctrl+V 输入。
+
+图片同时受 `[hands] max_image_width`，默认 1600，以及 2 Mpx 像素总量限制。后者定义为 `nanomuse/computer/coords.py` 的 `PICTURE_MAX_PIXELS`；操作器 `/screenshot` 接受相同 `max_pixels`，0 表示原始屏幕。两项都在对齐 28 像素网格前保持宽高比。4K 屏幕边长约缩至一半，1080p 略作缩小。此前请求含多张未缩小 4K 图片会触发中继 `413`。
+
+`computer_screen` 在 `status()` 和事件中分别提供 `picture_size`、`screen_size`。桌面版使用操作器提供的显示器相对比例绘制旋转虚线圆环、精确圆点、动作名及拖动虚线，因此标记反映实际点击位置。
 
 ## 限制 {#limits}
 
-- 一次一台手机：最近连上的、`gui: true` 的设备就是智能体操作的那台。
-- 操作器看到的正是设备画出来的东西。图里读不出的字它就没法去动：它点到目标旁边时，第一件要查的是截图分辨率低不低。图和点击空间是同一个 `width` × `height`，所以更清楚的图意味着设备要报到（并在其中点击）一个更大的尺寸。
-- MobileGym 里用 iframe 渲染的 App（nanoMuse 自己就是一个）在页内截图里是空白的；操作器会被告知屏幕是黑的，而不是看到错误的东西。
-- 哨兵依据操作器自己对它要按什么的描述来判断，屏幕报了点下面带边界的元素时也看那个元素的文字，两者中更严的那个说了算。一个把「支付」藏在没有文字的图标后面的屏幕不会触发词表，所以付款步骤还另外有操作器自己付款前停下来问的规则，付款也一次只批准一次；Android 应用只允许在用锁屏确认之后，为单个 App 或网站记住一次，并把它列在设置 → 权限的最前面。Android 上审批还会读无障碍树说手指下面是什么，和操作器报告的 label 并排，两者中更严的那个说了算。
-- Android 上：执行器需要 Android 11+；`FLAG_SECURE` 屏幕（银行 App、支付面板、密码管理器）回来是黑的，操作器会被告知；Android 执行器完全拒绝往密码框里 `type`，不管 label 怎么写；而且 Android 可能悄悄拒绝从后台发起的 `open_app`：执行器会说明，并请用户按主屏键再点图标（Android 14 之前，「显示在其他应用上层」权限会有帮助）。文字在输入框允许时通过 `ACTION_SET_TEXT` 输入，否则通过剪贴板粘贴。
+- 一次只操作一台手机，选择最近连接且声明 `gui: true` 的设备。
+- 操作器只能根据设备提供的画面判断，无法操作看不清的文字。点击偏移时先检查截图分辨率。图片和点击共享 `width` × `height` 空间，提供更清晰图片时，设备也要按相应大尺寸声明和接收点击。
+- MobileGym 中由 iframe 嵌入的 App，例如 nanoMuse 自身，在页内截图中会空白。系统会告知操作器画面是黑的，不会误当作有效截图。
+- 哨兵同时检查模型 label 和可用的目标元素文字，取较严格结果。如果付款藏在无文字图标中，敏感词可能无法命中，因此还依赖操作器付款前主动停止并询问，以及付款逐次授权。Android 仅在锁屏确认后才允许为单个 App 或网站保存付款授权，并将其列在设置 → 权限最前面。Android 还会将无障碍树的实际目标文字与模型 label 一起检查。
+- Android 执行器需要 Android 11+。`FLAG_SECURE` 保护的银行 App、支付页或密码管理器会返回黑图，并明确告知操作器。无论 label 如何，Android 执行器都不向密码框 `type`。系统可能拒绝后台 `open_app`，此时执行器会说明并让用户按主屏键、点击图标；Android 14 前，「显示在其他应用上层」权限可改善该情况。输入框允许时使用 `ACTION_SET_TEXT`，否则通过剪贴板粘贴。
 
-Android 实现还会为同一对话、同一已识别应用的后续明确请求保留有限的运行记录，支持可选的大幅纵向滚动，并提示保留完整 JSON 结果。见[继续操作屏幕](android.md#hands-continuity)。
+Android 还会在同一对话、同一已识别 App 的后续明确请求之间保留有限记录，支持可选的更大幅度纵向滚动，并保留完整 JSON 结果，见[继续操作屏幕](android.md#hands-continuity)。

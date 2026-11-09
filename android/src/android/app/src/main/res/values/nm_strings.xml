@@ -1233,4 +1233,15 @@
 
     <string name="nm_coding_installed">Installed</string>
     <string name="nm_coding_not_installed">Not installed</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">Chat background</string>
+    <string name="nm_chat_background_footer">For all chats on this device. Colors follow light or dark mode. Choose Default to reset.</string>
+    <string name="nm_chat_background_default">Default</string>
+    <string name="nm_chat_background_warm">Warm</string>
+    <string name="nm_chat_background_blue">Blue</string>
+    <string name="nm_chat_background_green">Green</string>
+    <string name="nm_chat_background_purple">Purple</string>
+    <string name="nm_chat_in_progress">Task in progress</string>
+    <string name="nm_mcp_oauth_token_failed">Connector sign-in failed (%1$s). Check the connection and OAuth settings, then try again.</string>
 </resources>

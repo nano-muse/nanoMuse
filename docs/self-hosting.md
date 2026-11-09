@@ -10,7 +10,7 @@ nanoMuse is one agent on your own devices, and nothing in it has to go through a
 
 ## 1. No server, your own key
 
-The free allowance on the community relay runs out. When it does, or before, put a key of your own in the app: Alibaba Model Studio (百炼) inside mainland China, OpenRouter or any OpenAI-compatible endpoint elsewhere. The model requests then go from your device to that provider; the relay only sees the sign-in and the hub frames between your devices. [own-key.md](own-key.md) has the steps for every app. Nothing to install, nothing to keep running.
+The free allowance on the community relay runs out. When it does, or before, put a key of your own in the app: Alibaba Model Studio (百炼) inside mainland China, OpenRouter or any OpenAI-compatible endpoint elsewhere. The model requests then go from your device directly to that provider. If you stay signed in, the relay also handles your account and hub traffic, and the apps upload own-key turns to its account record when recording is enabled. Conversation sync and training controls are separate, as described in [privacy.md](privacy.md). [own-key.md](own-key.md) has the steps for every app. Nothing to install, nothing to keep running.
 
 ## 2. Your own relay
 
@@ -97,7 +97,7 @@ The database schema migrates forward on start. Read the release notes before a j
 
 ### Backing up
 
-Everything the relay keeps is `cloud/data/cloud.db` (SQLite) plus `CLOUD_SECRET` in `cloud/.env`. The database is useless without the secret (the identifiers are hashed and encrypted with it, and so is a sign-in code still waiting to be used, which is only six digits), and the secret is useless without the database; back them up together, and never rotate the secret unless you mean to start over:
+The relay stores account data in `cloud/data/cloud.db` (SQLite), uses `CLOUD_SECRET` in `cloud/.env`, and keeps recorded media in `MEDIA_DIR` (by default, `blobs/` beside the database). Back up all three to restore the account data and its media. The database is useless without the secret (the identifiers are hashed and encrypted with it, and so is a sign-in code still waiting to be used, which is only six digits), and the secret is useless without the database; back them up together, and never rotate the secret unless you mean to start over:
 
 ```bash
 cd cloud && docker compose exec -T relay python - > cloud-$(date -u +%Y%m%d).db <<'EOF'
@@ -114,11 +114,23 @@ EOF
 
 The copy is taken with SQLite's own backup API inside the running container (the image has no `sqlite3` command) and streamed out, so it is consistent while the relay keeps writing and lands as a file of yours, outside the data directory that belongs to uid 10001. A plain `cp data/cloud.db` is not consistent: under WAL the newest writes sit in `cloud.db-wal`, and a copy of the main file alone misses them.
 
+The command above backs up the database. Keep copies of `CLOUD_SECRET` and the files under `MEDIA_DIR` alongside it.
+
 Caddy's certificates live in the `caddy_data` volume and are fetched again if lost.
+
+The scheduled backup in `cloud/deploy/nanomuse-hk/backup.sh` requires Python 3 and
+`flock` on the host. Before copying, it checks the space available to an ordinary
+user on both the database and backup filesystems. Each needs at least twice the
+combined database and WAL size, plus 5 GiB for the running service. Concurrent
+runs are refused. A failed capacity check stops the job before copying or
+retention cleanup and reports the required and available bytes in the journal.
+Provide more space or review recovery points before trying again; the check does
+not remove backups and cannot reserve space against other writers. The manual
+command above does not run this preflight check.
 
 ### What your relay stores
 
-Hashed and encrypted identifiers, per-request counts and prices, the devices on the hub, and, only while *Sync conversations between my devices* is on, the text of the conversations so the other devices can show them. No files, no screenshots, no passwords. The full list, and what each switch does, is [privacy.md](privacy.md); as the operator you are the one it now describes.
+The relay keeps hashed and encrypted identifiers, per-request counts and prices, and the devices on the hub. By default, `RECORD_TURNS=1` also keeps full model requests and replies, including turns uploaded by signed-in apps using their own model keys; pictures, audio and clips are stored under `MEDIA_DIR`. Set `RECORD_TURNS=0` to disable that account record. The conversation-sync switch controls the separate cross-device chat copy, and the training switch controls what joins training data. The full list, and what each switch does, is [privacy.md](privacy.md); as the operator you are the one it now describes.
 
 ## 3. A runtime of your own, for the web app
 

@@ -1249,4 +1249,15 @@
 
     <string name="nm_coding_installed">インストール済み</string>
     <string name="nm_coding_not_installed">未インストール</string>
+
+    <!-- Chat canvas choices, local to this device. -->
+    <string name="nm_chat_background_title">チャットの背景</string>
+    <string name="nm_chat_background_footer">この端末のすべてのチャットに適用します。ライトモードとダークモードに合わせて色が変わります。「デフォルト」で元に戻せます。</string>
+    <string name="nm_chat_background_default">デフォルト</string>
+    <string name="nm_chat_background_warm">暖色</string>
+    <string name="nm_chat_background_blue">青</string>
+    <string name="nm_chat_background_green">緑</string>
+    <string name="nm_chat_background_purple">紫</string>
+    <string name="nm_chat_in_progress">タスク進行中</string>
+    <string name="nm_mcp_oauth_token_failed">コネクターへのログインに失敗しました（%1$s）。接続と OAuth 設定を確認して、もう一度お試しください。</string>
 </resources>

@@ -158,6 +158,9 @@ reserve while its uncalibrated estimate still fits, the run permits one provider
 check that estimate. Otherwise a request that cannot be reduced enough stops. A summary
 stream times out after 120 seconds without a chunk; its complete operation, including segments
 and retries, has a 900-second deadline. Stopping the turn cancels the summary request.
+Summary requests reserve their output space before sending the transcript. If it would leave
+too little room for the summary, the phone first splits the transcript into smaller segments
+within the same retry budget. A single message that still cannot fit remains unchanged.
 
 A summary separates background and completed work from the current request, its unfinished
 steps and the next action. When no task is active, those task sections say so instead of
@@ -197,10 +200,10 @@ turn counts its own wait.
 | **Coding agents** (`ui/coding/`) | The Cursor, Codex and Claude Code sessions on your computers, seen and steered from the phone. [coding-agents.md](coding-agents.md). |
 | **Account** (`ui/cloud/`) | Who is signed in, the password, every device holding a key, usage by kind and by model, the ways out. When the free pool is spent or past 80 %, the account page and the refused turn show the ways on: your own key, that is, the providers of the catalogue, the region's first (Alibaba Cloud Bailian for people in mainland China: the UI in simplified Chinese, a phone-number sign-in, or the relay saying so; OpenRouter and OpenAI everywhere else), each saying what it covers; a subscription you already pay for (ChatGPT, Claude, Kimi, OpenRouter sign in instead of a key); and an invitation. See [Your own key](#your-own-key) below. A phone shows and syncs the signed-in account's conversations only: since 0.1.40 every chat has an owner, synced or not, and a sign-out asks *Keep this account's chats on this device* (off by default: the account's chats, memory, feed, goals, routines and face leave the phone; on: put aside until it returns); deleting the account removes all of it; a key the relay refuses (`401 bad_key`) puts the account's data aside as *Keep* would and the sign-in page says so until the next sign-in; only `401 account_deleted` removes it; signed out, only the chats made while signed out show ([sync.md](sync.md)). |
 | **The browser handed over** (`browser/`) | A page that needs you (a login, a verification code, a payment, a CAPTCHA) is handed over instead of described: `browser_use`'s `hand_over` action opens the agent's own tab (same WebView, same session) in the browser sheet with the agent's hold released, a **Your turn** card above the composer says what the page asks of you with *Open the page* and *Done, continue*, the sheet carries the same line and button, and the tool call waits for *Done* (fifteen minutes at most) before the agent goes on from the page as it is. `io.github.nanomuse.browser.BrowserHandOver`. |
-| **Connectors** (`connectors/`, `ui/connectors/`) | The services the agent can be let into: the desktop's catalogue of 75 remote MCP servers (Notion, Linear, GitHub, GitLab, Slack, Stripe, Miro, …), shipped as `assets/nanomuse/connectors.json`. The only Settings row for all of this is *Connectors*; the upstream MCP editor (by address, by command, imported JSON) is *Your own servers* at the end of the page. Open servers add with a tap; a key service takes the key; an OAuth service runs the MCP authorization flow (discovery, dynamic client registration, PKCE in a Custom Tab) and the token goes into the entry's `Authorization` header for the in-guest MCP client, refreshed at app start; a service whose authorization server registers no clients (`clientIdRequired`: GitHub, Slack, Discord, HubSpot, Render, Bitrise, PagerDuty, Box) asks for an OAuth client id and secret made at the vendor's developer page with the app's callback address, which the sheet shows and copies. A connected service is an MCP server entry under the same id; *Your own servers* manages it too. What is connected is shared with the account's other devices through the relay profile, the entries (id, label, address, kind of auth, which device, when), never a token, so the page also lists *On your other devices*: a service connected on the desktop shows as *Connected on <device>. Sign in here to use it on this phone*, one tap into the same sheet. |
+| **Connectors** (`connectors/`, `ui/connectors/`) | The services the agent can be let into: the desktop's catalogue of 75 remote MCP servers (Notion, Linear, GitHub, GitLab, Slack, Stripe, Miro, …), shipped as `assets/nanomuse/connectors.json`. The only Settings row for all of this is *Connectors*; the upstream MCP editor (by address, by command, imported JSON) is *Your own servers* at the end of the page. Open servers add with a tap; a key service takes the key; an OAuth service runs the MCP authorization flow (discovery, dynamic client registration, PKCE in a Custom Tab) and the token goes into the entry's `Authorization` header for the in-guest MCP client, refreshed at app start; a service whose authorization server registers no clients (`clientIdRequired`: GitHub, Slack, Discord, HubSpot, Render, Bitrise, PagerDuty, Box) asks for an OAuth client ID and any client secret required by the provider, registered on the vendor's developer page with the app's callback address, which the sheet shows and copies. A connected service is an MCP server entry under the same id; *Your own servers* manages it too. What is connected is shared with the account's other devices through the relay profile, the entries (id, label, address, kind of auth, which device, when), never a token, so the page also lists *On your other devices*: a service connected on the desktop shows as *Connected on <device>. Sign in here to use it on this phone*, one tap into the same sheet. |
 | **The chat, plain** | While the agent works, the line under its avatar names the step under way (*nanoMuse is using Shell*, *Writing the reply*, *On it: book the table*), never a state of mind. The tool pills, the Computer sheet and the floating step bar are **on by default** since 0.1.37; *Settings → Appearance → Show the agent's steps* turns them off. With them on, a finished step reads *nanoMuse used Shell · Done*, and its sheet closes on ×, swipe or Back. |
 
-The chat sits on the same canvas as the pill bar, the menus and the drawer: pure black in the
+By default, the chat sits on the same canvas as the pill bar, the menus and the drawer: pure black in the
 dark theme, pure white in the light one. Your messages are white pills with black text (black
 pills with white text in light), the agent's replies sit in a pill a shade off the canvas
 (`#1C1C1E` / `#F2F2F7`), and the send button and the scroll-to-latest disc are white with a
@@ -220,8 +223,8 @@ a command longer than six lines is folded behind *Show all*, the description and
 preview scroll in the middle, and Allow and Deny stay in view at the bottom. When reading
 older messages, a slightly lighter fade follows
 the composer's rounded outline. Live browser controls hide it; historical tool pills and
-other tools keep it. In dark-mode home and side chats, pure black surrounds the navigation
-pill and fills the gap below the composer. Its glass stays open to the scrolling content
+other tools keep it. In dark-mode home and side chats, the selected chat background surrounds the navigation
+pill and fills the gap below the composer. The default is pure black. Its glass stays open to the scrolling content
 for live frosted blur. Other tabs keep their navigation appearance. With the keyboard
 open the composer sits on the keyboard and the pill is behind it. The Feed, Ideas, Goals and
 Library lists end above the pill as well, so their last row is never under it.
@@ -229,6 +232,13 @@ Library lists end above the pill as well, so their last row is never under it.
 The web console of the same account is at the relay (`/app`), the desktop app in
 [desktop.md](desktop.md); the phone, the desktop and the web share the design language
 described in [brand.md](brand.md).
+
+**Settings → Appearance → Chat background** offers Default, Warm, Blue, Green and Purple.
+The choice applies immediately to all chats on this device and is kept when the app restarts.
+Each color follows the app's light or dark mode; the header and footer fades and the area
+around the navigation pill follow the same background. Choose **Default** to restore the
+original canvas. Message bubbles, text, accent colors and other screens keep their existing
+colors. Background images, gradients and theme imports are not included.
 
 Under **Settings → Appearance**, the font-size labels for **Chat Input**, **Message Text** and **App Base** follow the app's language.
 
@@ -352,6 +362,26 @@ Leaving sign-in or the Network page ends its pending request, even if the server
 started to answer but has not finished sending the response.
 
 ## Voice input
+
+You can choose voice input and voice output separately from the chat model, including
+models from different providers, using the voice groups and the voice picker.
+For Alibaba Model Studio, `paraformer-realtime-v2` transcribes recorded speech through
+the native DashScope WebSocket API. Read-aloud supports `cosyvoice-v2` through that API
+and `qwen3-tts-flash` through the native HTTP API. The provider's selected region and
+workspace are retained. The API key, model and voice must be available in that region;
+the default CosyVoice voice is `longxiaochun_v2`, and Qwen uses `Cherry`.
+Qwen TTS supplies WAV audio; the app requests that format and plays the returned file
+without relabelling it as MP3. An explicit old CosyVoice `longxiaochun` voice selection
+is normalized to `longxiaochun_v2`.
+
+These adapters transcribe a completed recording or generate a reply's audio. They do
+not provide a full-duplex voice conversation. Qwen ASR Realtime, Qwen TTS Realtime and
+Omni Realtime session protocols are not supported by these voice controls. These
+models are rejected before a provider request; read-aloud keeps its existing fallback
+to the device's speech engine when provider synthesis fails.
+See Alibaba's [Paraformer protocol](https://help.aliyun.com/en/model-studio/websocket-for-paraformer-real-time-service),
+[CosyVoice protocol](https://help.aliyun.com/en/model-studio/cosyvoice-websocket-api) and
+[Qwen TTS HTTP API](https://help.aliyun.com/en/model-studio/qwen-tts-api).
 
 On Android 13 and later, continuous system dictation keeps feeding audio when the recognizer
 starts its next segment. A write that fails on the previous segment's closed pipe cannot
@@ -609,7 +639,7 @@ Remote tasks use the same foreground-service tracking as local replies. A succes
 
 ## Unread replies {#unread-replies}
 
-A successful reply completed while its chat is not visible is marked unread in the Muse drawer and classic session list. Collapsed classic groups retain the unread signal. Opening the conversation clears it. Failed, cancelled and duplicate completions do not create unread indicators. This state is local, kept only for the current process, and independent of running and paused badges. This covers unread replies from issue #531, not its entire working-state and approval proposal.
+A successful reply completed while its chat is not visible is marked unread in the Muse drawer and classic session list. Collapsed classic groups retain the unread signal. Opening the conversation clears it. Failed, cancelled and duplicate completions do not create unread indicators. This state is local, kept only for the current process, and independent of running and paused badges. The Muse drawer also shows a small progress ring for a main or side chat with an active turn tracked on this phone, including direct `@device` tasks started here. It disappears when that turn ends, independently of unread replies. It does not distinguish approval waits, show each chat's current step, or represent work started on another device. Those parts of issue #531 remain separate work.
 
 Visibility follows the resumed chat in both layouts, including a draft after its first message. Switching to another tab, covering the chat with another page, or putting the app in the background makes subsequent replies unread.
 
@@ -641,6 +671,12 @@ Interactive backups ask for confirmation when they include locked conversations.
 
 Selecting another Muse tab counts as leaving the protected conversation for the On exit setting, even while the chat remains retained in the background.
 
+
+## Connector OAuth sign-in {#connector-oauth}
+
+Token exchange and refresh request JSON responses. An OAuth error is treated as a failed sign-in even when the server returns HTTP 200. Failure messages show a fixed error code, without the provider response body or credentials. Invalid refresh responses leave the saved tokens unchanged.
+
+For `incorrect_client_credentials` or `invalid_client`, check the OAuth app client ID and, if the provider requires one, its client secret. For `redirect_uri_mismatch`, compare the provider registration with the callback address shown in the app. For `bad_verification_code` or `invalid_grant`, start sign-in again. A client secret is not required for every connector. GitHub documents its [JSON response negotiation](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) and [token error codes](https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors).
 
 ## Continuing screen tasks {#hands-continuity}
 

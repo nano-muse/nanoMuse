@@ -4,6 +4,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   apiOf, baseUrlFor, capabilitiesForAuth, capabilitiesOf, ChatGptDesk, chatGptOnly, hasUserinfo, keyRefFor, kindOf, LineReader, listModelRows, listModels, loadCatalogue, modelsOf, ownKeyStepDone, ownProviderRow, parseCatalogue, parseListedReasoning, parseModelReasoning, parseReasoningHint, providersWith, reasoningFields, reasoningFor, regionOf, sighted, typedModelIds, unavailableKey, waysOn,
 } from '../lib/providers.js'
@@ -333,9 +336,12 @@ test('ChatGPT sign-in: the runtime’s error ends the login with its code; no ru
   await tick()
   spawned[1].child.say({ event: 'url', url: 'https://auth' })
   await p2
+  spawned[1].child.stderr.emit('data', Buffer.from('OpenAI’s terms cover using a ChatGPT plan inside OpenAI’s own Codex;\nother apps have had this access cut off before. If it stops\nworking, an API key does.\n'))
   spawned[1].child.emit('exit', 1)
   await tick()
   assert.equal(d.login.status, 'error')
+  // what the runtime prints for a person is not the failure: the notice on stderr never becomes the error
+  assert.equal(d.login.error, 'exited')
   // cancel from a waiting state
   const p3 = d.beginLogin()
   await tick()
@@ -495,4 +501,20 @@ test('listModelRows keeps what OpenRouter says about a model; modelsOf carries i
   assert.equal(modelsOf(deepseek, [{ id: 'deepseek-flash', reasoning: { levels: ['low'] } }])[0].reasoning, undefined)
   // ids alone still work
   assert.deepEqual(modelsOf(deepseek, ['deepseek-flash']).map((m) => m.id), ['deepseek-flash'])
+})
+
+const win32 = process.platform === 'win32'
+
+test("the status read starts a runtime that is a .cmd, the shape npm installs on Windows", { skip: !win32 }, async (t) => {
+  // npm's bin is a `.cmd` shim and a bare spawn has refused batch files since node's injection
+  // fixes: without the cmd routing, the desk's own status read fails silently behind one
+  let dir = ''
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  dir = await mkdtemp(join(tmpdir(), 'nm-chatgpt-cmd-'))
+  const script = join(dir, 'nanomuse.mjs')
+  await writeFile(script, `console.log(JSON.stringify({ signed_in: false, label: 'ChatGPT' }))` + '\n')
+  const cli = join(dir, 'nanomuse.cmd')
+  await writeFile(cli, `@"${process.execPath}" "${script}" %*` + '\r\n')
+  const d = new ChatGptDesk({ command: async () => cli, onReady: () => Promise.resolve() })
+  assert.deepEqual(await d.status(), { signedIn: false, label: 'ChatGPT' })
 })

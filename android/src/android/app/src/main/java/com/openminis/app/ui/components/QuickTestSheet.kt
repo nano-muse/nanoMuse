@@ -483,6 +483,8 @@ internal suspend fun performTest(
                                 input = "Hi! This is nanoMuse testing text to speech.",
                                 model = entry.model.id,
                                 voice = entry.model.id,
+                                // nanoMuse: use the native format for fixed-format speech APIs.
+                                responseFormat = voice.preferredOutputFormat(entry.model.id),
                             ),
                         )
                         if (data.isEmpty()) {
