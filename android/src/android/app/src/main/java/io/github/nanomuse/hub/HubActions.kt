@@ -332,7 +332,7 @@ object HubActions {
         val stopped: Boolean
         val result = try {
             runBlocking {
-                HeadlessChatRunner.prompt(context = context, sessionId = sessionId, text = prompt, attachments = emptyList(), thinkingLevel = null, wait = true, timeoutMs = TASK_TIMEOUT_MS, verifyTurn = call.args.has("turn_id"))
+                HeadlessChatRunner.prompt(context = context, sessionId = sessionId, text = prompt, attachments = emptyList(), thinkingLevel = null, wait = true, timeoutMs = TASK_TIMEOUT_MS, persistentTurn = call.args.optString("turn_id").takeIf { call.args.has("turn_id") })
             }
         } finally {
             relay.cancel()
@@ -400,7 +400,7 @@ object HubActions {
         } else call.args.optString("call")
         val conversation = call.args.optString("conversation").takeUnless { call.args.has("turn_id") }
         return running.stop(call.from.optString("id"), id, conversation) { sessionId ->
-            runBlocking { runCatching { HeadlessChatRunner.cancel(context, sessionId) }.getOrDefault(false) }
+            runBlocking { runCatching { HeadlessChatRunner.cancel(context, sessionId, call.args.optString("turn_id").takeIf { call.args.has("turn_id") }) }.getOrDefault(false) }
         }
     }
 

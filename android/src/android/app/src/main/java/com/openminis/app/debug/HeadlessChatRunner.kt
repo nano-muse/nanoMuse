@@ -158,7 +158,7 @@ internal object HeadlessChatRunner {
         thinkingLevel: ThinkingLevel? = null,
         wait: Boolean,
         timeoutMs: Long,
-        verifyTurn: Boolean = false, // nanoMuse: persistent Hub results must belong to this invocation.
+        persistentTurn: String? = null, // nanoMuse: persistent Hub results and stops name this turn.
     ): PromptResult = withContext(Dispatchers.Main) {
         val vm = viewModel(context, sessionId)
         // Apply per-call thinking override BEFORE sendMessage so streamMessage
@@ -215,9 +215,10 @@ internal object HeadlessChatRunner {
         }
         for (att in attachments) vm.addAttachment(att)
         // nanoMuse: bind persistent results to a saved user row, never the session's last reply.
-        if (verifyTurn) {
+        if (persistentTurn != null) {
             require(wait) { "A verified turn must wait for its result" }
             val outcome = io.github.nanomuse.hub.HeadlessTurn.run(
+                turnId = persistentTurn,
                 timeoutMs = timeoutMs,
                 send = { receipt -> vm.nmSendHeadless(text, receipt) },
                 stop = { receipt -> vm.nmCancelHeadless(receipt) },
@@ -523,9 +524,11 @@ internal object HeadlessChatRunner {
         vm.revertCompact()
     }
 
-    suspend fun cancel(context: Context, sessionId: String): Boolean = withContext(Dispatchers.Main) {
+    // nanoMuse: a persistent stop must still match the current, unfinished turn receipt.
+    suspend fun cancel(context: Context, sessionId: String, persistentTurn: String? = null): Boolean = withContext(Dispatchers.Main) {
         val cached = providers[sessionId] ?: return@withContext false
         val vm = cached[ChatViewModel::class.java]
+        if (persistentTurn != null) return@withContext vm.nmCancelHeadless(persistentTurn)
         val wasRunning = vm.isStreaming.value
         if (wasRunning) vm.cancelStream()
         wasRunning

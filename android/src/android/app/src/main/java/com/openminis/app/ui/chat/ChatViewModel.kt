@@ -6297,7 +6297,7 @@ class ChatViewModel(
 
     // nanoMuse: persistent remote turns must start now and own their saved user row.
     internal fun nmSendHeadless(text: String, receipt: io.github.nanomuse.hub.HeadlessTurn.Receipt) {
-        if (_isStreaming.value || _isCompacting.value || text.isBlank()) return
+        if (_isStreaming.value || _isCompacting.value || nmHeadlessReceipt?.pending == true || text.isBlank()) return
         if (checkContextBeforeSend() == PreSendContextAction.ASK_USER) return
         // Auto-compaction still runs in the normal outgoing-request guard. Do not
         // enqueue or leave a prompt for a later dialog after reporting refusal.
@@ -6306,8 +6306,12 @@ class ChatViewModel(
 
     // nanoMuse: an expired wait cannot cancel a later local or remote turn.
     internal fun nmCancelHeadless(receipt: io.github.nanomuse.hub.HeadlessTurn.Receipt) {
-        if (nmHeadlessReceipt === receipt && receipt.cancel()) cancelStream()
+        if (nmHeadlessReceipt === receipt) nmCancelHeadless(receipt.turnId)
     }
+
+    // nanoMuse: remote Stop cannot end local queued work after its own turn completed.
+    internal fun nmCancelHeadless(turnId: String): Boolean =
+        io.github.nanomuse.hub.HeadlessTurn.stop(nmHeadlessReceipt, turnId) { cancelStream() }
 
     fun sendMessage(text: String) {
         // nanoMuse: explicit device work is routed before any local model or avatar action.
@@ -6900,7 +6904,7 @@ class ChatViewModel(
         val editingId = _editingMessageId.value
         if (editingId != null) _editingMessageId.value = null
 
-        viewModelScope.launch {
+        val headlessJob = viewModelScope.launch {
             streamJob = coroutineContext[Job] // nanoMuse: Stop during the setup (session, attachments, the user row) cancels it too, not only the agent loop launched below (#340)
             var streamLaunched = false
             var userRowShown = false // nanoMuse: set once the person's line is on screen; a Stop before that gives the composer its text back (#340)
@@ -7084,7 +7088,7 @@ class ChatViewModel(
                         drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy)
                         AppLogger.info(TAG_STREAM, "send drainQueuedPrompts RETURN")
                     } catch (e: CancellationException) {
-                        headless?.cancel() // nanoMuse: idle does not imply successful completion.
+                        headless?.requestStop() // nanoMuse: idle does not imply successful completion.
                         AppLogger.info(TAG_STREAM, "send runAgentLoop CANCELLED")
                         Log.d(TAG, "Agent loop cancelled")
                     } catch (e: Exception) {
@@ -7109,7 +7113,7 @@ class ChatViewModel(
                         AppLogger.info(TAG_STREAM, "send streamJob FINALLY exit")
                     }
                 } catch (e: CancellationException) {
-                    headless?.cancel() // nanoMuse: cancellation while waiting never completes a turn.
+                    headless?.requestStop() // nanoMuse: cancellation while waiting never completes a turn.
                     AppLogger.info(TAG_STREAM, "send streamJob CANCELLED waiting for slot")
                     Log.d(TAG, "Cancelled while waiting for concurrency slot")
                 }
@@ -7124,7 +7128,7 @@ class ChatViewModel(
                 AppLogger.info(TAG_STREAM, "send streamJob EXIT")
             }
             } catch (e: CancellationException) {
-                headless?.cancel() // nanoMuse: setup cancellation belongs to this receipt.
+                headless?.requestStop() // nanoMuse: setup cancellation belongs to this receipt.
                 // nanoMuse: Stop before the user row is on screen means the message was not sent; the
                 // composer gets its text and attachments back instead of losing them (#340)
                 if (!streamLaunched && !userRowShown) {
@@ -7139,6 +7143,10 @@ class ChatViewModel(
                     _isStreaming.value = false
                 }
             }
+        }
+        // nanoMuse: setup and its child stream must finish before Stop becomes a terminal result.
+        headless?.let { receipt ->
+            headlessJob.invokeOnCompletion { cause -> receipt.jobEnded(cause is CancellationException) }
         }
     }
 
@@ -11720,7 +11728,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
     fun cancelStream() {
         // nanoMuse: Stop belongs to the remote call; no local shell was started.
         if (nmRemoteBridge.cancel()) return
-        nmHeadlessReceipt?.cancel() // nanoMuse: record local Stop before publishing idle.
+        nmHeadlessReceipt?.requestStop() // nanoMuse: request local Stop before publishing idle.
         AppLogger.info(TAG_STREAM, "cancelStream invoked _isStreaming=false (sid=$activeSessionId)")
         if (_isStreaming.value) io.github.nanomuse.ui.feedback.TurnFeedback.stopped(activeSessionId) // nanoMuse: the record hears the Stop; the chat asks why, once (relay 0.31)
         streamJob?.cancel()
