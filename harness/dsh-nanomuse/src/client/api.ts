@@ -63,11 +63,11 @@ export function errorCode(err: unknown): string {
 
 /**
  * What a failed `call` says to the person: the wire's and the relay's common refusals as a
- * plain sentence in the UI language (the relay out of reach, a deadline passed, too many
- * requests, a sign-in no longer valid, the relay in trouble, this computer's host not
- * answering), the relay's refusals of a sign-in (a wrong or expired code, a wrong password,
- * an address the relay does not take), and otherwise `That did not work: <the message as it
- * came>`.
+ * plain sentence in the UI language (the relay out of reach, a deadline passed, a body past
+ * the byte cap, too many requests, a sign-in no longer valid, the relay in trouble, this
+ * computer's host not answering), the relay's refusals of a sign-in (a wrong or expired
+ * code, a wrong password, an address the relay does not take), and otherwise `That did not
+ * work: <the message as it came>`.
  */
 export function failureText(t: Translate, err: unknown): string {
   const code = errorCode(err)
@@ -82,6 +82,9 @@ export function failureText(t: Translate, err: unknown): string {
   if (!code && err instanceof TypeError && /fetch/i.test(text)) return t('errHostDown')
   if (code === 'unreachable') return t('errUnreachable')
   if (code === 'timeout' || code === 'http_504' || status === 504) return t('errTimeout')
+  // a body past the route's byte cap, refused before anything looked at it (an oversized
+  // import paste, an overlong form): the rule, in the person's language, not a raw 413
+  if (code === 'too_large' || status === 413) return t('errTooLarge')
   // the relay's sign-in refusals, said in the person's language as the phones and the console
   // say them (before the status branches: a wrong password is 401 and a carrier's limit 429)
   if (code === 'code_wrong') return t('errCodeWrong')

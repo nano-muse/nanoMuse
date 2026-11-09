@@ -39,6 +39,9 @@ memories to make room. Split a large batch, shorten individual facts yourself, o
 unneeded memories before trying again. Older builds can truncate lines or discard old
 entries, so use a build containing the import-limit fix before moving your full set.
 
+If the pasted text is too large to send, the app asks you to send a smaller amount in
+your selected language. Split it into smaller batches and retry.
+
 If the app cannot write the imported memories to disk, it shows an error instead of
 success. The new lines may still be visible in memory. Check disk space and write
 access, then retry the same import before closing the app; a retry saves the lines

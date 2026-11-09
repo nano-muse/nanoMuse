@@ -87,6 +87,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A CJK character is estimated at one and a half tokens, not the byte rule's three quarters of one.** The context and budget estimates count text at four UTF-8 bytes a token, but a Chinese character is three bytes and one to two tokens from real tokenizers, so a Chinese conversation could pack `max_context_tokens` to twice what the model's window takes and be refused, shortened, and refused again on the same estimate. The estimate now gives a character in the CJK range one and a half tokens, in the direction of the relay's own fallback count, and the two budget guides say so. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 - **Preserved signs and decimal points when comparing memories.** Agent writes, imports and `MEMORY.md` edits now share the same comparison rule, so `-40` is distinct from `40` and `1.23` from `123`.
 - Requested cleanup of the runtime process tree when a Computer use check timed out or its runtime did not exit within the two-second grace period.
+- **Translated oversized-request errors.** Memory imports and other requests that exceed the transport size limit now ask for a smaller amount in the selected interface language.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
