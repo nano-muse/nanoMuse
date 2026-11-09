@@ -209,7 +209,7 @@ function batchShimTarget(file: string): string | undefined {
       .filter((line) => line && !/^(rem(?:\s|$)|::)/i.test(line))
     const last = lines.pop()
     if (!last) return undefined
-    const npmPrefix = /^endlocal\s*&\s*goto\s+#_undefined_#\s*&\s*goto\s+#_undefined_#\s*&\s*/i
+    const npmPrefix = /^endlocal\s*&\s*goto\s+#_undefined_#\s*(?:&\s*goto\s+#_undefined_#|2>nul\s*\|\|\s*title\s+%comspec%)\s*&\s*/i
     const npm = npmPrefix.test(last)
     const invocation = last.replace(npmPrefix, '')
     const match = /^(?:"([^"\r\n]+)"|(node(?:\.exe)?))\s+"([^"\r\n]+\.(?:mjs|cjs|js))"\s+%\*$/i.exec(invocation)

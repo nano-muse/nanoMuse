@@ -54,7 +54,7 @@ async function npmShimClaude(dir) {
     '  SET PATHEXT=%PATHEXT:;.JS;=;%',
     ')',
     '',
-    'endLocal & goto #_undefined_# & goto #_undefined_# & "%_prog%"  "%dp0%\\node_modules\\@scope\\agent\\bin.js" %*',
+    'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\node_modules\\@scope\\agent\\bin.js" %*',
     '',
   ].join('\r\n'))
   return { cli, target }
@@ -76,6 +76,10 @@ test('cliSpawnCommand reads a real npm shim and starts the script it names', asy
   const [file, args] = cliSpawnCommand('win32', cli, ['-p', 'hello world'])
   assert.equal(file, process.execPath)
   assert.deepEqual(args, [target, '-p', 'hello world'])
+  // Also accept the double-goto variant used by other installed launchers.
+  const current = await readFile(cli, 'utf8')
+  await writeFile(cli, current.replace('2>NUL || title %COMSPEC%', '& goto #_undefined_#'))
+  assert.deepEqual(cliSpawnCommand('win32', cli, ['-p', 'hello world']), [file, args])
 })
 
 test('cliSpawnCommand skips a quoted path in a REM comment and takes the invocation', async (t) => {
@@ -118,6 +122,7 @@ test('cliSpawnCommand refuses batch code that merely mentions a script or change
     ['redirected output', `${invoke} >nul`],
     ['a conditional launcher', `if exist missing (\n${invoke}\n)`],
     ['environment changes', `set NODE_OPTIONS=--inspect\n${invoke}`],
+    ['an uninitialized directory variable', '@node "%dp0%\\actual.mjs" %*'],
   ]) {
     await writeFile(cli, body + '\r\n')
     assert.throws(() => cliSpawnCommand('win32', cli, ['prompt']), /batch file/, name)
