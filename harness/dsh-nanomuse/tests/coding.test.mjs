@@ -17,11 +17,11 @@ import { CODING_ACTIONS, CodingService, codingBrief, GATED_CODING_ACTIONS } from
 const posix = process.platform !== 'win32'
 
 /**
- * The fake CLIs are `#!/bin/sh` wrappers. On Windows the shim would be a `.cmd`, which the
- * runner's bare `spawn`/`execFile` refuses outright (EINVAL), so the tests that start a fake
- * CLI stay off it; the readers and the spawn-free service paths need no CLI and run as they are.
+ * The fake CLIs are `#!/bin/sh` wrappers on posix and one-line `.cmd` wrappers around the same
+ * node script on Windows - the shape npm's own global-bin shims have, which the runner starts
+ * through `cliSpawnCommand`. A Windows wrapper stays one line because `cmd` ends an argument at
+ * the first newline; the behaviour lives in the `.mjs` the wrapper points at.
  */
-const needsShCli = posix ? false : 'the fake CLI is a #!/bin/sh wrapper, and a Windows .cmd shim cannot be started by the runner’s bare spawn'
 
 /** The agents' slug of a workspace on this OS: `/` as `-` on Unix; Cursor's `C-Users-…` on Windows. */
 function slugOf(ws) {
@@ -217,20 +217,30 @@ test('readers: a missing home is every agent with no sessions', async () => {
   })
 })
 
-test('readers: detect sees a store without a CLI, and a CLI on PATH', { skip: needsShCli }, async () => {
+test('readers: detect sees a store without a CLI, and a CLI on PATH', async () => {
   await scratch(async (home) => {
     await fixtureHome(home)
     const bin = join(home, 'bin')
     await mkdir(bin)
-    await writeFile(join(bin, 'codex'), '#!/bin/sh\necho "codex-cli 0.42.0"\n')
-    await chmod(join(bin, 'codex'), 0o755)
-    const env = { ...process.env, NANOMUSE_CODING_HOME: home, PATH: bin }
-    assert.equal(which('codex', env), join(bin, 'codex'))
+    // posix gets the sh one-liner; Windows gets a node script behind a .cmd shim, the shape npm's bins have.
+    // PATHEXT is pinned so `which` answers in the spelling this test can assert exactly.
+    const cli = posix ? join(bin, 'codex') : join(bin, 'codex.cmd')
+    if (posix) {
+      await writeFile(cli, '#!/bin/sh\necho "codex-cli 0.42.0"\n')
+      await chmod(cli, 0o755)
+    } else {
+      // the shape npm's shims have: a .cmd that launches a node script, which the shim resolution starts
+      const script = join(bin, 'codex-version.mjs')
+      await writeFile(script, "console.log('codex-cli 0.42.0')\n")
+      await writeFile(cli, `@"${process.execPath}" "${script}" %*\r\n`)
+    }
+    const env = { ...process.env, NANOMUSE_CODING_HOME: home, PATH: bin, ...(posix ? {} : { PATHEXT: '.cmd' }) }
+    assert.equal(which('codex', env), cli)
     assert.equal(which('claude', env), undefined)
     const agents = await detect(true, env)
     const codex = agents.find((a) => a.id === 'codex')
     assert.equal(codex.installed, true)
-    assert.equal(codex.cli, join(bin, 'codex'))
+    assert.equal(codex.cli, cli)
     assert.equal(codex.version, 'codex-cli 0.42.0')
     assert.equal(codex.sessions_root, join(home, '.codex', 'sessions'))
     const claude = agents.find((a) => a.id === 'claude')
@@ -478,9 +488,14 @@ setTimeout(() => process.exit(${fail ? 1 : 0}), ${linger})
   )
   const bin = join(dir, 'bin')
   await mkdir(bin, { recursive: true })
-  const cli = join(bin, 'claude')
-  await writeFile(cli, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
-  await chmod(cli, 0o755)
+  if (posix) {
+    const cli = join(bin, 'claude')
+    await writeFile(cli, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
+    await chmod(cli, 0o755)
+    return cli
+  }
+  const cli = join(bin, 'claude.cmd')
+  await writeFile(cli, `@node "${script}" %*\r\n`)
   return cli
 }
 
@@ -520,7 +535,7 @@ test('runner: stopping a run ends the whole tree on Windows', { skip: posix, tim
   })
 })
 
-test('runner: a run against a fake CLI streams events and ends at the terminal event', { skip: needsShCli }, async () => {
+test('runner: a run against a fake CLI streams events and ends at the terminal event', async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir, { linger: '200' })
     const events = []
@@ -536,7 +551,7 @@ test('runner: a run against a fake CLI streams events and ends at the terminal e
   })
 })
 
-test('runner: a failed resume of an unknown session goes out again as a new chat', { skip: needsShCli }, async () => {
+test('runner: a failed resume of an unknown session goes out again as a new chat', async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir)
     const events = []
@@ -572,13 +587,18 @@ out({ type: 'result', result: 'Fresh start: ' + text, session_id: 'fresh-1', dur
   )
   const bin = join(dir, 'bin')
   await mkdir(bin, { recursive: true })
-  const cli = join(bin, 'cursor-agent')
-  await writeFile(cli, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
-  await chmod(cli, 0o755)
+  if (posix) {
+    const cli = join(bin, 'cursor-agent')
+    await writeFile(cli, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
+    await chmod(cli, 0o755)
+    return cli
+  }
+  const cli = join(bin, 'cursor-agent.cmd')
+  await writeFile(cli, `@node "${script}" %*\r\n`)
   return cli
 }
 
-test('runner: the retry after an unknown session does not splice in the dead chat\'s half line', { skip: needsShCli }, async () => {
+test('runner: the retry after an unknown session does not splice in the dead chat\'s half line', async () => {
   await scratch(async (dir) => {
     const cli = await fakeCursorDeadDelta(dir)
     const events = []
@@ -590,7 +610,7 @@ test('runner: the retry after an unknown session does not splice in the dead cha
   })
 })
 
-test('runner: an error result and a missing CLI are failed runs', { skip: needsShCli }, async () => {
+test('runner: an error result and a missing CLI are failed runs', async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir, { fail: true })
     const run = await startRun({ agent: 'claude', text: 'x', which: () => cli, timeoutMs: 20_000, readerEnv: { NANOMUSE_CODING_HOME: join(dir, 'nohome') } })
@@ -659,7 +679,7 @@ test('service: coding.agents / sessions / session / runs answer in the runtime s
   })
 })
 
-test('service: coding.send with wait streams event frames with the run id and answers with the run; the record survives', { skip: needsShCli }, async () => {
+test('service: coding.send with wait streams event frames with the run id and answers with the run; the record survives', async () => {
   await scratch(async (dir) => {
     const cli = await fakeClaude(dir)
     const store = join(dir, 'state', 'coding', 'runs.json')
