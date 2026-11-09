@@ -38,6 +38,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Restricted Windows coding-agent batch launchers to supported Node shim forms, so quoted script paths in other batch commands could not select a different program. For #854.
+
 - Enabled Windows test coverage for the remote shell: exit codes, stdout and stderr, the working directory, the output bound, and the timeout's tree kill through the taskkill path Windows devices actually take.
 - Enabled Windows test coverage for the harness coding suite: the reader and service tests that need no CLI now run there, and the six that start a fake `#!/bin/sh` CLI skip with the reason named instead of a whole-file POSIX gate.
 - **A quoted command survives the Windows remote shell.** The hub's shell action handed the command to `cmd.exe` through node's default argument escaping, which turns every inner quote into backslash-quote; `cmd` read the backslashes literally, so the interpreter's own `"C:\Program Files\…\node.exe"` arrived as a program name with backslashes in it, and every command carrying a spaced path or a quoted argument answered "is not recognized as an internal or external command". The command line now rides inside one outer pair of quotes with verbatim arguments, which `cmd`'s own `/s` rule strips on arrival, and every quote the caller wrote survives the trip.

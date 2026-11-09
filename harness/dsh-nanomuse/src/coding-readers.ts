@@ -26,7 +26,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { open, readdir, readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, delimiter, dirname, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 
 export type AgentId = 'cursor' | 'codex' | 'claude' | 'dsh'
@@ -189,26 +189,48 @@ export function cliSpawnCommand(platform: NodeJS.Platform, file: string, args: r
   return [process.execPath, [target, ...args]]
 }
 
-/**
- * The node script a batch-file shim launches, when it names one that exists. Comment lines
- * (REM, ::) are skipped - a quoted path there is documentation, not the entry point - and
- * the last candidate wins: npm's shim ends with its invocation.
- */
+// npm's cmd-shim prelude only chooses node.exe beside the shim or node on PATH.
+// Other batch programs can set variables, branch or execute more than one program;
+// starting a quoted script from one of those would not preserve its meaning.
+const NPM_SHIM_PRELUDE = [
+  'echo off', 'goto start', ':find_dp0', 'set dp0=%~dp0', 'exit /b', ':start',
+  'setlocal', 'call :find_dp0', 'if exist "%dp0%\\node.exe" (',
+  'set "_prog=%dp0%\\node.exe"', ') else (', 'set "_prog=node"',
+  'set pathext=%pathext:;.js;=;%', ')',
+].join('\n')
+
+/** Read only a plain Node launcher or npm's known shim, never a quoted path in arbitrary batch code. */
 function batchShimTarget(file: string): string | undefined {
   try {
+    if (statSync(file).size > 128 * 1024) return undefined
     const text = readFileSync(file, 'utf8')
-    let target: string | undefined
-    for (const line of text.split(/\r?\n/)) {
-      const trimmed = line.trim().replace(/^@/, '')
-      if (/^(rem(\s|$)|::)/i.test(trimmed)) continue
-      for (const match of line.matchAll(/"(%~?dp0%?\\)?([^"\r\n]*\.(?:mjs|cjs|js))"/gi)) {
-        const rest = match[2]
-        if (!rest) continue
-        const candidate = match[1] ? join(dirname(file), rest) : resolve(rest)
-        if (existsSync(candidate)) target = candidate
-      }
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/)
+      .map((line) => line.trim().replace(/^@\s*/, ''))
+      .filter((line) => line && !/^(rem(?:\s|$)|::)/i.test(line))
+    const last = lines.pop()
+    if (!last) return undefined
+    const npmPrefix = /^endlocal\s*&\s*goto\s+#_undefined_#\s*&\s*goto\s+#_undefined_#\s*&\s*/i
+    const npm = npmPrefix.test(last)
+    const invocation = last.replace(npmPrefix, '')
+    const match = /^(?:"([^"\r\n]+)"|(node(?:\.exe)?))\s+"([^"\r\n]+\.(?:mjs|cjs|js))"\s+%\*$/i.exec(invocation)
+    if (!match) return undefined
+    const launcher = match[1] ?? match[2] ?? ''
+    if (npm) {
+      const prelude = lines.map((line) => line.replace(/\s+/g, ' ').toLowerCase()).join('\n')
+      if (launcher.toLowerCase() !== '%_prog%' || prelude !== NPM_SHIM_PRELUDE) return undefined
+    } else {
+      if (lines.some((line) => !/^echo\s+off$/i.test(line))) return undefined
+      if (!/(?:^|[\\/])node(?:\.exe)?$/i.test(launcher)) return undefined
+      if (launcher.includes('%') && !/^%~dp0[\\/]node\.exe$/i.test(launcher)) return undefined
     }
-    return target
+    const script = match[3] as string
+    const relative = /^(?:%dp0%|%~dp0)[\\/](.+)$/i.exec(script)
+    if (!npm && /^%dp0%/i.test(script)) return undefined
+    if (!relative && !isAbsolute(script)) return undefined
+    const rest = relative?.[1] ?? script
+    if (rest.includes('%')) return undefined
+    const target = relative ? join(dirname(file), ...rest.split(/[\\/]/)) : resolve(script)
+    return statSync(target).isFile() ? target : undefined
   } catch {
     return undefined
   }

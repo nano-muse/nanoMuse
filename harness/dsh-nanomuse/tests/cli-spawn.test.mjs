@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { access, mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { cliSpawnCommand, versionOf } from '../lib/coding-readers.js'
@@ -69,16 +69,18 @@ test('cliSpawnCommand starts the script the shim names; anything that is not a b
   assert.throws(() => cliSpawnCommand('win32', 'C:\\npm\\claude.cmd', ['-p', 'hello world']), /batch file/)
 })
 
-test('cliSpawnCommand reads a real npm shim and starts the script it names', { skip: !win32 }, async () => {
+test('cliSpawnCommand reads a real npm shim and starts the script it names', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'cli-shim-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
   const { cli, target } = await npmShimClaude(dir)
   const [file, args] = cliSpawnCommand('win32', cli, ['-p', 'hello world'])
   assert.equal(file, process.execPath)
   assert.deepEqual(args, [target, '-p', 'hello world'])
 })
 
-test('cliSpawnCommand skips a quoted path in a REM comment and takes the invocation', { skip: !win32 }, async () => {
+test('cliSpawnCommand skips a quoted path in a REM comment and takes the invocation', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'cli-rem-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
   const target = join(dir, 'node_modules', 'agent', 'cli.mjs')
   await mkdir(dirname(target), { recursive: true })
   await writeFile(target, '')
@@ -95,6 +97,44 @@ test('cliSpawnCommand skips a quoted path in a REM comment and takes the invocat
   const [file, args] = cliSpawnCommand('win32', cli, ['-p', 'hi'])
   assert.equal(file, process.execPath)
   assert.deepEqual(args, [target, '-p', 'hi'])
+})
+
+test('cliSpawnCommand refuses batch code that merely mentions a script or changes its invocation', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'cli-batch-meaning-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const target = join(dir, 'actual.mjs')
+  const decoy = join(dir, 'decoy.js')
+  const cli = join(dir, 'agent.cmd')
+  await writeFile(target, '')
+  await writeFile(decoy, '')
+  const invoke = `@"${process.execPath}" "${target}" %*`
+  for (const [name, body] of [
+    ['echo only', `@echo "${decoy}"`],
+    ['echo after a launcher', `${invoke}\n@echo "${decoy}"`],
+    ['two launchers', `${invoke}\n@node "${decoy}" %*`],
+    ['script assigned to a variable', `set SCRIPT="${decoy}"`],
+    ['a different interpreter', `@python "${target}" %*`],
+    ['additional arguments', `@node "${target}" --changed %*`],
+    ['redirected output', `${invoke} >nul`],
+    ['a conditional launcher', `if exist missing (\n${invoke}\n)`],
+    ['environment changes', `set NODE_OPTIONS=--inspect\n${invoke}`],
+  ]) {
+    await writeFile(cli, body + '\r\n')
+    assert.throws(() => cliSpawnCommand('win32', cli, ['prompt']), /batch file/, name)
+  }
+})
+
+test('cliSpawnCommand rejects a changed npm prelude and a directory named like a script', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'cli-npm-meaning-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const { cli, target } = await npmShimClaude(dir)
+  const original = await readFile(cli, 'utf8')
+  await writeFile(cli, original.replace('SET "_prog=node"', 'SET "_prog=python"'))
+  assert.throws(() => cliSpawnCommand('win32', cli, ['prompt']), /batch file/)
+  await writeFile(cli, original)
+  await rm(target)
+  await mkdir(target)
+  assert.throws(() => cliSpawnCommand('win32', cli, ['prompt']), /batch file/)
 })
 
 test('runner: a run against a .cmd that names no launcher fails, and nothing runs', { skip: !win32, timeout: 30_000 }, async () => {
