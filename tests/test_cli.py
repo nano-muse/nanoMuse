@@ -204,6 +204,23 @@ def test_triggers_commands(tmp_path, monkeypatch):
     assert "no triggers" in plain(runner.invoke(app, ["triggers", "list"]).output)
     assert trigger_id in plain(runner.invoke(app, ["triggers", "list", "--all"]).output)
 
+    # A device trigger needs a signed-in Cloud account as well as the hub: without the
+    # key no hub session opens, so the trigger could never fire. The command used to
+    # write one anyway, while the app and the server refused the same kind.
+    result = runner.invoke(app, ["triggers", "add", "device", "say hi", "--match", "pixel"])
+    assert result.exit_code == 1 and "join the hub first" in plain(result.output)
+    assert "no triggers" in plain(runner.invoke(app, ["triggers", "list"]).output)
+
+    from nanomuse.cloud import CLOUD_KEY
+    from nanomuse.vault import CredentialVault
+
+    CredentialVault(tmp_path / "data" / "vault.enc", tmp_path / "data" / "vault.key").set(
+        CLOUD_KEY, "cloud-key-for-the-test"
+    )
+    result = runner.invoke(app, ["triggers", "add", "device", "say hi", "--match", "pixel"])
+    assert result.exit_code == 0, plain(result.output)
+    assert "device “pixel” coming online" in plain(result.output)
+
 
 def test_phone_trace_commands(tmp_path, monkeypatch):
     for var in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "NANOMUSE_CONFIG"):
