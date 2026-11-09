@@ -120,6 +120,8 @@ through the native menu or a keyboard shortcut is your explicit editing action.
 
 On first start, choose an example task, connect a model or skip that step, and start the conversation. The selected task is placed in the main chat composer when it is empty; an existing draft is kept. You can sign in to nanoMuse Cloud, sign in with ChatGPT, or add a provider key on the model page. A new Cloud account is offered a password, and macOS asks for the permissions the hands need.
 
+On Windows, ChatGPT sign-in and its status check can start a runtime through a recognized Node `.cmd` launcher, including the supported npm form. Other batch programs are refused; use the runtime executable or a supported Node launcher.
+
 A dsh Host started by the shell as a child process, showing the harness's web app in a
 window of ours: the rail (Chats, Search, Feed, Ideas, Goals, Library, Devices, the
 hamburger), the chats column with the main chat and the side chats, the face and name
