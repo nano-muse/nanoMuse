@@ -90,6 +90,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Translated oversized-request errors.** Memory imports and other requests that exceed the transport size limit now ask for a smaller amount in the selected interface language.
 - **Preserved HTML comments when saving document edits.** Inline comments return to comment markup, comments in inline and fenced code remain source text, and multiline fenced comments retain their line breaks. Notes beside URLs and inside tables no longer corrupt link destinations or leak parsing markers.
 - **Kept coding-agent results with the selected computer, agent and chat.** Switching selections hides previous folder suggestions, sessions and transcripts while loading, and ignores delayed replies from the previous selection.
+- Enabled native Windows regression coverage for the runtime shell timeout and its process-tree cleanup, with process-query validation.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
