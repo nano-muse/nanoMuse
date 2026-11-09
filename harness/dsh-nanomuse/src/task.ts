@@ -45,6 +45,9 @@ interface Run {
   readonly approvals: Set<string>
   /** The asker draws `text` in place (`task {stream: true}`): send a message's text as it grows. */
   readonly stream: boolean
+  /** Persistent callers distinguish cancellation from a completed answer. */
+  readonly persistent: boolean
+  stopped: boolean
   /** The text of the model attempt being written, and the timer that sends it. */
   streamed: string
   streamTimer?: ReturnType<typeof setTimeout> | undefined
@@ -188,7 +191,7 @@ export class TaskRunner {
       reject = rej
     })
     const stream = args.stream === true || args.stream === 'true'
-    const run: Run = { callId: call.id, call, sessionId, agent, tools: new Map(), approvals: new Set(), stream, streamed: '', final: '', resolve, reject }
+    const run: Run = { callId: call.id, call, sessionId, agent, tools: new Map(), approvals: new Set(), stream, persistent: boundSession !== undefined, stopped: false, streamed: '', final: '', resolve, reject }
     this.bySession.set(sessionId, run)
     this.byCall.set(call.id, run)
     const timer = setTimeout(() => {
@@ -228,6 +231,7 @@ export class TaskRunner {
       }
     }
     if (!run) return { stopped: false }
+    run.stopped = true
     run.agent.cancel({ kind: 'user' })
     return { stopped: true }
   }
@@ -323,7 +327,9 @@ export class TaskRunner {
       }
       case 'turn/end': {
         const reason = event.data.reason
-        if (reason.kind === 'error') {
+        if (run.persistent && (run.stopped || reason.kind === 'aborted')) {
+          run.reject(new HubError('cancelled', 'The turn was stopped'))
+        } else if (reason.kind === 'error') {
           run.call.event({ stage: 'error', message: String(reason.error.message ?? 'the model failed') })
           run.reject(new HubError('failed', String(reason.error.message ?? 'the model failed')))
         } else if (reason.kind === 'blocked') {

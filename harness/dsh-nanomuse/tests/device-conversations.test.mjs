@@ -110,3 +110,58 @@ test('caller and executor recover a turn across a dropped result and two store r
   assert.equal(restored.turns[0].answer, 'completed on the execution device')
   assert.equal(runs, 1)
 })
+
+for (const rejection of ['no_model', 'not_ready', 'denied', 'not_allowed', 'busy', 'usage']) {
+  test(`a first turn rejected with ${rejection} can start after correction`, async (t) => {
+    const dir = await mkdtemp(join(tmpdir(), 'nm-device-rejection-'))
+    t.after(() => rm(dir, { recursive: true, force: true }))
+    const endpoint = new PersistentTaskEndpoint(await PersistentTurns.open(join(dir, 'turns.json')))
+    let rows = [], configured = false
+    const calls = []
+    const reopen = () => new DeviceConversations(() => rows, async (next) => { rows = structuredClone(next) },
+      () => [{ id: 'target', name: 'Desk', online: true, actions: ['task.status'] }],
+      async (device, action, args) => {
+        calls.push(args)
+        return endpoint.run({ account: 'account-a', caller: 'caller-a', conversation: args.conversation }, args.turn_id, { id: `c${calls.length}`, from: { id: 'caller-a' }, event() {} },
+          async () => {
+            if (!args.new_conversation) throw new HubError('context_lost', 'no context was created')
+            if (!configured) throw new HubError(rejection, 'correct the setup first')
+            return 'session-a'
+          }, async () => ({ text: 'ready' }))
+      })
+    const chat = await reopen().create('target')
+    assert.equal((await reopen().send(chat.id, 'first')).turns[0].error, rejection)
+    configured = true
+    const retry = await reopen().send(chat.id, 'try again')
+    assert.equal(retry.turns[1].state, 'completed')
+    assert.equal(retry.turns[1].answer, 'ready')
+    assert.deepEqual(calls.map((args) => args.new_conversation), [true, true])
+    assert.notEqual(calls[0].turn_id, calls[1].turn_id)
+    assert.equal(calls[0].conversation, calls[1].conversation)
+  })
+}
+
+for (const result of [
+  { state: 'failed', error: 'no_model' },
+  { state: 'failed', error: 'denied' },
+  { state: 'interrupted' },
+  { state: 'cancelled' },
+]) {
+  test(`an accepted ${result.state}/${result.error ?? ''} turn never allows a fresh context`, async () => {
+    let rows = []
+    const calls = []
+    const service = new DeviceConversations(() => rows, async (next) => { rows = next },
+      () => [{ id: 'target', name: 'Desk', online: true, actions: ['task.status'] }],
+      async (_device, _action, args) => {
+        calls.push(args)
+        if (calls.length === 1) return result
+        throw new HubError('context_lost', 'the saved context disappeared')
+      })
+    const chat = await service.create('target')
+    await service.send(chat.id, 'first')
+    assert.equal((await service.send(chat.id, 'follow up')).turns[1].error, 'context_lost')
+    assert.deepEqual(calls.map((args) => args.new_conversation), [true, false])
+    await assert.rejects(service.send(chat.id, 'another follow-up'), { code: 'context_lost' })
+    assert.equal(calls.length, 2)
+  })
+}

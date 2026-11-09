@@ -1,6 +1,6 @@
 # hub：让各台设备协作 {#hub-每台设备都是一个-muse}
 
-## 固定在设备上的对话
+## 固定在设备上的对话 {#persistent-device-conversations}
 
 #815 的本地原型在 Android 和桌面版的「设备」页面提供独立对话。选择在线且支持 `task.status` 的设备，即可新建或重新打开对话。每条对话保存设备 ID 和独立的对话 UUID。目标设备使用本机模型和工具执行，发起设备在本地保留记录，无需开启侧聊同步。
 
@@ -8,11 +8,13 @@
 
 首轮通过 `task {text, conversation, turn_id, new_conversation: true, stream: true}` 发送。后续保留 `conversation`，每轮生成新的 `turn_id`，并设置 `new_conversation: false`。已绑定的会话不存在时返回 `context_lost`，只有首轮可以创建绑定。没有 `turn_id` 的请求沿用原有行为。
 
+如果目标在接收前明确拒绝调用，例如返回 `no_model` 或 `denied`，首轮尚未绑定会话。修正配置后，可以用新的轮次 ID 和 `new_conversation: true` 再次发送。已接收轮次返回的结果，包括 `failed`，以及送达未确定的情况，都不允许重新创建上下文。
+
 目标设备先保存会话绑定和本轮记录，再发送 `event {stage: "accepted", turn_id}` 并执行。绑定按已验证的账号和发起设备隔离。发起端也先保存记录再发送。同一轮重复到达时只返回已记录的状态，同一对话有任务正在执行时，新的一轮返回 `busy`。
 
 断线后用新的 Hub 调用查询 `task.status {conversation, turn_id}`。状态包括 `accepted`、`completed`、`failed`、`cancelled`、`interrupted` 和 `unknown`。完成结果包含 `text`，失败包含 `error`，有说明时还包含 `message`。执行中的结果可带近期进度和未过期审批的 `events` 快照。发起端替换快照，并按轮次 ID 保存最终回复。
 
-查不到记录表示送达情况未确定。目标设备重启后，已接收但没有最终记录的任务显示为中断，部分操作可能已经执行。恢复时不重发。使用 `stop {conversation, turn_id}` 请求停止指定轮次，`stopped` 表示请求是否到达正在执行的任务，最终状态确认停止结果。审批沿用既有权限范围。中继仅转发消息，不保存对话和结果。
+查不到记录表示送达情况未确定。目标设备重启后，已接收但没有最终记录的任务显示为中断，部分操作可能已经执行。恢复时不重发。使用 `stop {conversation, turn_id}` 请求停止指定轮次，`stopped` 表示请求是否到达正在执行的任务，最终状态确认停止结果。已请求停止的轮次结束后保存为 `cancelled`，晚到的回复不能把它改为 `completed`。审批沿用既有权限范围。中继仅转发消息，不保存对话和结果。
 
 在手机、电脑和浏览器中登录同一个 nanoMuse Cloud 账号后，这些设备就能发现彼此。手机和电脑各自运行智能体，并使用本机的操作工具，也就是「手」：手机可以访问 App 和沙箱，电脑可以使用 shell（系统命令）和屏幕。无论连接哪个网络，设备都能向账号下的其他设备请求操作。网页控制台自身没有操作工具，它负责把请求交给其他设备。
 

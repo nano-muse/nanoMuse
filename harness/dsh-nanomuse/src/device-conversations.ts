@@ -7,6 +7,8 @@ export interface OutgoingTurn {
   state: string
   answer?: string
   error?: string
+  /** A definite call rejection, before the target accepted this turn. */
+  rejectedBeforeAcceptance?: boolean
   destination?: { id: string; name: string; conversation: string }
 }
 
@@ -57,7 +59,7 @@ export class DeviceConversations {
       if (!destination && row.turns.some((entry) => !entry.destination && entry.error === 'context_lost')) {
         throw new HubError('context_lost', 'Start a new conversation on this device')
       }
-      first = !!destination || row.turns.every((entry) => entry.destination !== undefined)
+      first = !!destination || row.turns.every((entry) => entry.destination !== undefined || entry.rejectedBeforeAcceptance === true)
       return { ...row, turns: [...row.turns, turn] }
     }))
     try {
@@ -67,8 +69,8 @@ export class DeviceConversations {
       await this.reconcile(id, turn.id, reply)
     } catch (error) {
       // A timeout, close or transport error cannot tell us whether the executor ran.
-      if (error instanceof HubError && ['not_allowed', 'denied', 'usage', 'no_model', 'context_lost', 'busy'].includes(error.code)) {
-        await this.reconcile(id, turn.id, { state: 'failed', error: error.code })
+      if (error instanceof HubError && ['not_allowed', 'denied', 'usage', 'no_model', 'not_ready', 'context_lost', 'busy'].includes(error.code)) {
+        await this.reconcile(id, turn.id, { state: 'failed', error: error.code }, true)
       }
     }
     return this.find(id)
@@ -135,12 +137,13 @@ export class DeviceConversations {
     return result
   }
 
-  private reconcile(id: string, turn: string, reply: Reply): Promise<void> {
+  private reconcile(id: string, turn: string, reply: Reply, rejectedBeforeAcceptance = false): Promise<void> {
     const state = String(reply.state ?? '')
     if (!['unknown', 'accepted', 'completed', 'failed', 'cancelled', 'interrupted'].includes(state)) return Promise.resolve()
     return this.update((rows) => rows.map((row) => row.id !== id ? row : {
       ...row, turns: row.turns.map((entry) => entry.id !== turn || !unsettled(entry.state) ? entry : {
-        ...entry, state, ...(typeof reply.text === 'string' ? { answer: reply.text } : {}),
+        ...entry, state, ...(rejectedBeforeAcceptance ? { rejectedBeforeAcceptance: true } : {}),
+        ...(typeof reply.text === 'string' ? { answer: reply.text } : {}),
         ...(typeof reply.error === 'string' ? { error: reply.error } : {}),
       }),
     }))

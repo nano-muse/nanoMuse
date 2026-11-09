@@ -5,6 +5,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ## [Unreleased]
 
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
+- Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
 
 ### Documentation
 

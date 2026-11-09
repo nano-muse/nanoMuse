@@ -45,7 +45,7 @@ internal class DeviceConversations(
                         throw HubException("context_lost", "Start a new conversation on this device")
                     }
                     val turns = chat.getJSONArray("turns")
-                    first = mention != null || turns(chat).all { it.has("destination") }
+                    first = mention != null || turns(chat).all { it.has("destination") || it.optBoolean("rejectedBeforeAcceptance") }
                     val entry = JSONObject().put("id", turn).put("text", text.trim()).put("state", "unknown")
                     mention?.let {
                         entry.put("destination", JSONObject().put("id", device).put("name", it.device.name).put("conversation", remoteConversation))
@@ -58,7 +58,7 @@ internal class DeviceConversations(
             val result = call(device, "task", args(remoteConversation, turn).put("text", prompt).put("new_conversation", first).put("stream", true))
             reconcile(id, turn, result)
         } catch (error: HubException) {
-            if (error.code in definiteFailures) reconcile(id, turn, JSONObject().put("state", "failed").put("error", error.code))
+            if (error.code in definiteFailures) reconcile(id, turn, JSONObject().put("state", "failed").put("error", error.code), rejectedBeforeAcceptance = true)
         }
         return find(id)
     }
@@ -103,13 +103,14 @@ internal class DeviceConversations(
         persist(JSONArray(next).toString())
     }
 
-    private fun reconcile(id: String, turn: String, result: JSONObject) {
+    private fun reconcile(id: String, turn: String, result: JSONObject, rejectedBeforeAcceptance: Boolean = false) {
         val state = result.optString("state")
         if (state !in states) return
         update { rows ->
             rows.onEach { chat ->
                 if (chat.getString("id") == id) turns(chat).find { it.getString("id") == turn && unsettled(it) }?.let {
                     it.put("state", state)
+                    if (rejectedBeforeAcceptance) it.put("rejectedBeforeAcceptance", true)
                     if (result.has("text")) it.put("answer", result.optString("text"))
                     if (result.has("error")) it.put("error", result.optString("error"))
                 }
@@ -138,7 +139,7 @@ internal class DeviceConversations(
             )
         }
         private val lock = Any()
-        private val definiteFailures = setOf("not_allowed", "denied", "usage", "no_model", "context_lost", "busy")
+        private val definiteFailures = setOf("not_allowed", "denied", "usage", "no_model", "not_ready", "context_lost", "busy")
         private val states = setOf("unknown", "accepted", "completed", "failed", "cancelled", "interrupted")
         private fun args(id: String, turn: String) = JSONObject().put("conversation", id).put("turn_id", turn)
         private fun objects(array: JSONArray?): List<JSONObject> =
