@@ -407,6 +407,9 @@ fixed preset row: a change under *Operating the screen* disposes the client and 
 hands call in flight finishes first). The file is removed when nothing is configured;
 `nanomuse/rooms.json` keeps the rooms (feed, goals with their steps and progress, which
 ideas were tried, the library index, memory).
+
+On Windows, the Computer use checks in Settings can start a runtime through a recognized Node `.cmd` launcher, including the supported npm form. Arbitrary batch programs, including wrappers that invoke Python directly, are refused; use the runtime executable or a supported Node launcher.
+
 `desktop.json` is written to a temporary file beside it and swapped in, and the previous
 copy is kept as `desktop.json.bak`: a save that fails (a full disk, a crash) leaves the
 last good settings, and a damaged file is replaced from the copy at the next start. Both
