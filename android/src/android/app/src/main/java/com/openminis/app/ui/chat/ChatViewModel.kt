@@ -3181,8 +3181,10 @@ class ChatViewModel(
         val messages = listOf(LLMMessage(LLMMessage.Role.USER, userMessage))
         val window = effectiveContextWindowTokens(provider) ?: provider.model.contextWindowTokens
         val input = ContextEstimate.request(messages, prompt)
-        if (input >= window) throw LLMError.ProviderError("Compaction input exceeds context window")
-        val maxOut = minOf(8192, provider.effectiveMaxOutputTokens(provider.model), window - input)
+        // nanoMuse: reserve summary output before splitting, instead of starving its completion.
+        val maxOut = io.github.nanomuse.chat.CompactSummaryBudget.outputTokens(
+            input, window, provider.effectiveMaxOutputTokens(provider.model),
+        )
         return CompactSummary.collect(provider.streamMessage(
             messages = messages,
             systemPrompt = prompt,

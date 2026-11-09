@@ -120,6 +120,8 @@ through the native menu or a keyboard shortcut is your explicit editing action.
 
 On first start, choose an example task, connect a model or skip that step, and start the conversation. The selected task is placed in the main chat composer when it is empty; an existing draft is kept. You can sign in to nanoMuse Cloud, sign in with ChatGPT, or add a provider key on the model page. A new Cloud account is offered a password, and macOS asks for the permissions the hands need.
 
+On Windows, ChatGPT sign-in and its status check can start a runtime through a recognized Node `.cmd` launcher, including the supported npm form. Other batch programs are refused; use the runtime executable or a supported Node launcher.
+
 A dsh Host started by the shell as a child process, showing the harness's web app in a
 window of ours: the rail (Chats, Search, Feed, Ideas, Goals, Library, Devices, the
 hamburger), the chats column with the main chat and the side chats, the face and name
@@ -160,6 +162,8 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   platform, no `xdotool` or `pyautogui` needed, and coordinates that are pixels of the
   picture the model saw ([gui.md](gui.md#hands-on-the-computer-the-picture-is-the-unit)).
   The runtime's own backends remain the fallback when the app is not the one running it.
+  If a Computer use check times out, or its runtime has not exited two seconds after the
+  check finishes, the app asks the system to stop the runtime and its child processes.
   The connectors the runtime's `config.toml` turns on (mailbox, calendar, address book)
   arrive over the same server, and Settings → Connectors shows how to set each one up;
 - **the rooms**: Feed, Ideas, Goals and Library as the phone has them, kept by the host in
@@ -370,6 +374,8 @@ When a conversation upload reaches the relay but its response is lost, a retry k
 
 On Windows, stopping a coding run also asks the system to terminate its child processes, including detached helpers.
 
+On Windows, coding-agent `.cmd` launchers must use a supported npm shim or a plain Node invocation. The app starts the referenced script directly, keeping prompt characters intact. Other batch programs are refused instead of guessing which quoted script to run. Use the agent's executable or reinstall its npm launcher if it is refused.
+
 A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
 
 Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
@@ -377,6 +383,8 @@ Account-state saves are queued in order and written to a private temporary file 
 The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
 
 Dates beside entries in `MEMORY.md` use the computer's local calendar day.
+
+Duplicate memories are compared without regard to case or repeated spaces, but punctuation is preserved. For example, `-40` differs from `40`, and `1.23` differs from `123`. This applies when the agent remembers a fact, when you import memories, and when you edit `MEMORY.md`.
 
 The document editor displays HTML comments as notes and saves them back as comments
 after an edit. Comments inside inline code or fenced code stay source text. Fenced
@@ -405,6 +413,9 @@ fixed preset row: a change under *Operating the screen* disposes the client and 
 hands call in flight finishes first). The file is removed when nothing is configured;
 `nanomuse/rooms.json` keeps the rooms (feed, goals with their steps and progress, which
 ideas were tried, the library index, memory).
+
+On Windows, the Computer use checks in Settings can start a runtime through a recognized Node `.cmd` launcher, including the supported npm form. Arbitrary batch programs, including wrappers that invoke Python directly, are refused; use the runtime executable or a supported Node launcher.
+
 `desktop.json` is written to a temporary file beside it and swapped in, and the previous
 copy is kept as `desktop.json.bak`: a save that fails (a full disk, a crash) leaves the
 last good settings, and a damaged file is replaced from the copy at the next start. Both
