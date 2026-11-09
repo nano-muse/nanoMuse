@@ -162,6 +162,8 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   platform, no `xdotool` or `pyautogui` needed, and coordinates that are pixels of the
   picture the model saw ([gui.md](gui.md#hands-on-the-computer-the-picture-is-the-unit)).
   The runtime's own backends remain the fallback when the app is not the one running it.
+  If a Computer use check times out, or its runtime has not exited two seconds after the
+  check finishes, the app asks the system to stop the runtime and its child processes.
   The connectors the runtime's `config.toml` turns on (mailbox, calendar, address book)
   arrive over the same server, and Settings → Connectors shows how to set each one up;
 - **the rooms**: Feed, Ideas, Goals and Library as the phone has them, kept by the host in
