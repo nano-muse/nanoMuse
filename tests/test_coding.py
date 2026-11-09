@@ -566,6 +566,26 @@ for (const line of [
 }
 process.exit(0);
 """,
+    "writer_conflict": """import fs from "node:fs";
+
+fs.appendFileSync(@CALLS_LOG@, "call\\n");
+fs.writeSync(2, "Error: thread/resume: thread/resume failed: thread " +
+  "01a0c858-5820-7853-ba4c-dee7f183169c already has an active writer (code -32600)\\n");
+process.exit(1);
+""",
+    "terminal_error": """import fs from "node:fs";
+import { spawn } from "node:child_process";
+
+for (const line of [
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"trying"}]}}',
+  '{"type":"result","is_error":true,"result":"the model refused"}',
+]) {
+  fs.writeSync(1, line + "\\n");
+}
+spawn(process.execPath, ["-e", "setTimeout(() => {}, 2000)"],
+  { stdio: ["ignore", process.stdout, process.stderr] }).unref();
+process.exit(0);
+""",
     "helper": """import fs from "node:fs";
 import { spawn } from "node:child_process";
 
@@ -699,16 +719,25 @@ def test_codex_writer_conflict_does_not_start_another_session(
 ) -> None:
     script = tmp_path / "fake-codex"
     calls = tmp_path / "calls"
-    script.write_text(
+    if sys.platform == "win32":
+        exe = tmp_path / "fake-codex.cmd"
+        exe.write_bytes(b'@node "%~dp0fake-codex.mjs" %*\r\n')
+        script = tmp_path / "fake-codex.mjs"
+    else:
+        exe = script
+    _write_fake(
+        script,
         "#!/bin/sh\n"
         f'echo call >> "{calls}"\n'
         "echo 'Error: thread/resume: thread/resume failed: thread "
         "01a0c858-5820-7853-ba4c-dee7f183169c already has an active writer "
         "(code -32600)' >&2\n"
-        "exit 1\n"
+        "exit 1\n",
+        _FAKE_JS["writer_conflict"].replace("@CALLS_LOG@", json.dumps(str(calls))),
     )
-    script.chmod(0o755)
-    monkeypatch.setattr(runner, "which", lambda agent: str(script))
+    if sys.platform != "win32":
+        script.chmod(0o755)
+    monkeypatch.setattr(runner, "which", lambda agent: str(exe))
     monkeypatch.setattr(runner, "_lock_owner", lambda sid: "codex (PID 123)")
     run = asyncio.run(
         start_run(
@@ -755,12 +784,14 @@ def test_a_helper_left_behind_does_not_keep_the_run_open(
 def test_terminal_error_with_zero_exit_stays_failed(
     fake_cursor: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    fake_cursor.write_text(
+    _write_fake(
+        fake_cursor,
         "#!/bin/sh\n"
         'echo \'{"type":"assistant","message":{"content":[{"type":"text","text":"trying"}]}}\'\n'
         'echo \'{"type":"result","is_error":true,"result":"the model refused"}\'\n'
         "sleep 2 &\n"
-        "exit 0\n"
+        "exit 0\n",
+        _FAKE_JS["terminal_error"],
     )
     started = time.monotonic()
     run = asyncio.run(start_run("cursor", "hi", timeout_s=10))
