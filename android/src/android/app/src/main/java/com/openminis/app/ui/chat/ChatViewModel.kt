@@ -6904,7 +6904,7 @@ class ChatViewModel(
         val editingId = _editingMessageId.value
         if (editingId != null) _editingMessageId.value = null
 
-        val headlessJob = viewModelScope.launch {
+        val headlessJob = viewModelScope.launch { // nanoMuse: retain the parent job that owns setup and streaming.
             streamJob = coroutineContext[Job] // nanoMuse: Stop during the setup (session, attachments, the user row) cancels it too, not only the agent loop launched below (#340)
             var streamLaunched = false
             var userRowShown = false // nanoMuse: set once the person's line is on screen; a Stop before that gives the composer its text back (#340)
