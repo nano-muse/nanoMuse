@@ -1,5 +1,19 @@
 # hub：每台设备都是一个 Muse
 
+Codex 会话写入被占用时，运行可携带 `resume_conflict: {process, continuation}`。
+这是 `coding.send` 返回值及 `coding.watch` / `coding.runs` 中运行的可选新增字段，
+运行以 `failed` 结束，不自动重试。确认新建后，仍通过已有权限检查下的
+`coding.send` 发送，`session_id` 为空，`text` 使用返回的上下文文本。
+
+编程子协议 2 增加只读的 `coding.projects`、`coding.project.validate`、
+`coding.item`、`coding.diff` 和快照查询 `coding.watch`，各助手声明独立能力。
+会话与列表支持有版本的分页游标；发送支持去重 `request_id`，并增加
+结构化 `item` 更新。原 Hub 帧与纯文本客户端保持兼容，
+详见[编程协议](coding-agents.md#ios-结构化浏览-协议-2)。
+等待电脑授权的发送可以返回 `authorization` 事件。传 `wait: false` 时，
+发送结果确认已启动的运行，随后通过带 `run_id` 的 `coding.watch` 查询状态，
+旧电脑使用 `coding.runs`，不必让发送请求一直等待。
+
 在手机、电脑和浏览器上登录同一个 nanoMuse Cloud 账号，它们就能看见彼此。每台设备跑着自己的 Muse，带着自己的手（手机上的 App 和沙箱，电脑上的 shell 和屏幕），其中任何一台都可以从任何网络拜托任何另一台做点什么。网页控制台自己没有手；它是通往其余设备的前门。
 
 ```

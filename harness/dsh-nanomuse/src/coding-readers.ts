@@ -28,6 +28,7 @@ import { open, readdir, readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, delimiter, join, resolve } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
+import { history, type TimelineItem } from './coding-timeline.ts'
 
 export type AgentId = 'cursor' | 'codex' | 'claude' | 'dsh'
 
@@ -88,6 +89,7 @@ export interface CodingSession {
   source: string
   resumable: boolean
   transcript?: CodingMessage[]
+  timeline?: TimelineItem[]
 }
 
 /** A session whose transcript changed this recently is "active"; newer than RUNNING_S × 4 with an open turn is "running". */
@@ -539,7 +541,10 @@ async function cursorSession(file: string, ws: string, cliMeta: CursorMeta, full
     // fresh CLI chat in the same workspace with the last exchange quoted)
     resumable: sid in cliMeta,
   }
-  if (full) session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+  if (full) {
+    session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+    session.timeline = history('cursor', lines, clean)
+  }
   return session
 }
 
@@ -580,6 +585,47 @@ async function cursorSessions(limit: number, workspace: string | undefined, env:
 
 // -- Codex -------------------------------------------------------------------------------
 
+export function cleanCodexUser(text: string): string {
+  const value = clean(text)
+  if (/^# AGENTS?\.md instructions(?: for|\s|$)/i.test(value)) return ''
+  return value
+}
+
+async function codexTitles(env: NodeJS.ProcessEnv): Promise<Map<string, string>> {
+  const root = join(home(env), '.codex')
+  const titles = new Map<string, string>()
+  const indexNames = new Map<string, string>()
+  for (const row of await readLines(join(root, 'session_index.jsonl'))) {
+    if (typeof row.id === 'string' && typeof row.thread_name === 'string' && row.thread_name.trim()) {
+      indexNames.set(row.id, row.thread_name.trim())
+    }
+  }
+  const databases = (await readdir(root).catch(() => [] as string[]))
+    .filter((name) => /^state_\d+\.sqlite$/.test(name))
+    .sort((a, b) => Number(b.match(/\d+/)?.[0]) - Number(a.match(/\d+/)?.[0]))
+  for (const file of databases) {
+    try {
+      // Dynamic import keeps older hosts able to fall back to the JSONL index.
+      const { DatabaseSync } = await import('node:sqlite')
+      const db = new DatabaseSync(join(root, file), { readOnly: true })
+      try {
+        const columns = db.prepare('PRAGMA table_info(threads)').all()
+        const hasName = columns.some((column) => column.name === 'name')
+        for (const row of db.prepare(`SELECT id, title${hasName ? ', name' : ''} FROM threads`).all()) {
+          if (typeof row.id !== 'string') continue
+          const name = typeof row.name === 'string' ? row.name.trim() : ''
+          const fallback = typeof row.title === 'string' ? cleanCodexUser(row.title) : ''
+          const value = name || indexNames.get(row.id) || fallback
+          if (value) titles.set(row.id, value)
+        }
+      } finally { db.close() }
+      break
+    } catch { /* Missing or evolving metadata never prevents reading a rollout. */ }
+  }
+  for (const [id, name] of indexNames) if (!titles.has(id)) titles.set(id, name)
+  return titles
+}
+
 async function walk(dir: string, match: (name: string) => boolean, out: string[] = []): Promise<string[]> {
   for (const name of await readdir(dir).catch(() => [] as string[])) {
     const path = join(dir, name)
@@ -601,7 +647,7 @@ async function codexFiles(limit: number, env: NodeJS.ProcessEnv): Promise<string
   return files.slice(0, Math.max(limit * 3, 30)).map(([, f]) => f)
 }
 
-async function codexSession(file: string, full: boolean): Promise<CodingSession | undefined> {
+async function codexSession(file: string, full: boolean, titles: Map<string, string>): Promise<CodingSession | undefined> {
   const lines = await readLines(file)
   const st = await statOf(file)
   if (!st) return undefined
@@ -627,7 +673,7 @@ async function codexSession(file: string, full: boolean): Promise<CodingSession 
       const role = payload.role
       let text = textOf(payload.content)
       if (role === 'user') {
-        text = clean(text)
+        text = cleanCodexUser(text)
         if (!text || text.startsWith('<')) continue
         firstUser = firstUser || text
         lastUser = text
@@ -651,7 +697,7 @@ async function codexSession(file: string, full: boolean): Promise<CodingSession 
   const session: CodingSession = {
     agent: 'codex',
     id: sid,
-    title: title(firstUser) || 'Untitled thread',
+    title: titles.get(sid) || title(firstUser) || 'Untitled thread',
     workspace: cwd,
     path: file,
     created_at: created,
@@ -663,14 +709,18 @@ async function codexSession(file: string, full: boolean): Promise<CodingSession 
     source: originator,
     resumable: true,
   }
-  if (full) session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+  if (full) {
+    session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+    session.timeline = history('codex', lines, cleanCodexUser)
+  }
   return session
 }
 
 async function codexSessions(limit: number, workspace: string | undefined, env: NodeJS.ProcessEnv): Promise<CodingSession[]> {
   const out: CodingSession[] = []
+  const titles = await codexTitles(env)
   for (const f of await codexFiles(limit, env)) {
-    const s = await codexSession(f, false)
+    const s = await codexSession(f, false, titles)
     if (!s || (workspace && !samePath(s.workspace || '', workspace))) continue
     out.push(s)
     if (out.length >= limit) break
@@ -732,7 +782,10 @@ async function claudeSession(file: string, full: boolean): Promise<CodingSession
     source: '',
     resumable: true,
   }
-  if (full) session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+  if (full) {
+    session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+    session.timeline = history('claude', lines, clean)
+  }
   return session
 }
 
@@ -904,7 +957,10 @@ async function dshSession(file: string, full: boolean): Promise<CodingSession | 
     // `dsh headless --session-id` adopts a session of this store, so a chat read here can be continued
     resumable: true,
   }
-  if (full) session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+  if (full) {
+    session.transcript = transcript.slice(-TRANSCRIPT_KEEP)
+    session.timeline = history('dsh', lines, clean)
+  }
   return session
 }
 
@@ -968,7 +1024,7 @@ export async function readSession(agent: AgentId, sessionId: string, env: NodeJS
   }
   if (agent === 'codex') {
     const [f] = await walk(root, (n) => n.startsWith('rollout-') && n.endsWith(`${sessionId}.jsonl`))
-    return f ? codexSession(f, true) : undefined
+    return f ? codexSession(f, true, await codexTitles(env)) : undefined
   }
   if (agent === 'dsh') {
     // the session's own directory is named after its id: <slug>/<id>/session.v4.jsonl.zstd

@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { zstdCompressSync } from 'node:zlib'
 import { cliFor, clean, countProcesses, detect, ownDshEntry, parsePs, parseTasklist, readSession, sessions, sessionsRoot, slugToPath, title, which } from '../lib/coding-readers.js'
-import { agentEnv, commandFor, continuation, normalise, Run, runFromView, startRun } from '../lib/coding-runner.js'
+import { agentEnv, commandFor, continuation, isResumeLockError, normalise, Run, runFromView, startRun } from '../lib/coding-runner.js'
 import { CODING_ACTIONS, CodingService, codingBrief, GATED_CODING_ACTIONS } from '../lib/coding.js'
 
 const posix = process.platform !== 'win32'
@@ -105,6 +105,38 @@ async function fixtureHome(home) {
 }
 
 const SESSION_KEYS = ['agent', 'id', 'title', 'workspace', 'path', 'created_at', 'updated_at', 'messages', 'status', 'last_user', 'last_assistant', 'source', 'resumable']
+
+test('Codex uses the saved desktop name, then index, then real user message', async () => {
+  await scratch(async (home) => {
+    const root = join(home, '.codex')
+    const sid = '0f9a7b6c-1111-2222-3333-444455556666'
+    const path = join(root, 'sessions', `rollout-${sid}.jsonl`)
+    await write(path, [
+      { type: 'session_meta', payload: { id: sid } },
+      { type: 'response_item', payload: { type: 'message', role: 'user', content: '# AGENTS.md instructions for /workspace\nInjected context' } },
+      { type: 'response_item', payload: { type: 'message', role: 'user', content: 'Fix the parser' } },
+    ])
+    const env = { NANOMUSE_CODING_HOME: home }
+    assert.equal((await sessions('codex', 10, undefined, env))[0].title, 'Fix the parser')
+    await write(join(root, 'session_index.jsonl'), [
+      { id: sid, thread_name: 'Old index name' }, 'invalid',
+      { id: sid, thread_name: 'Indexed name' },
+    ])
+    assert.equal((await readSession('codex', sid, env)).title, 'Indexed name')
+    const { DatabaseSync } = await import('node:sqlite')
+    const db = new DatabaseSync(join(root, 'state_5.sqlite'))
+    db.exec('CREATE TABLE threads (id TEXT, title TEXT, name TEXT)')
+    db.prepare('INSERT INTO threads VALUES (?, ?, ?)').run(sid, 'Original prompt', 'Desktop renamed title')
+    db.close()
+    const detail = await readSession('codex', sid, env)
+    assert.equal(detail.title, 'Desktop renamed title')
+    assert.equal((await sessions('codex', 10, undefined, env))[0].title, detail.title)
+    assert.deepEqual(detail.transcript.map((m) => m.text), ['Fix the parser'])
+    assert.deepEqual(detail.timeline.map((m) => m.text), ['Fix the parser'])
+    await writeFile(join(root, 'state_6.sqlite'), 'broken database')
+    assert.equal((await readSession('codex', sid, env)).title, 'Desktop renamed title')
+  })
+})
 
 test('readers: a fixture home gives one session per agent, in the runtime shape', { skip: !posix }, async () => {
   await scratch(async (home) => {
@@ -451,7 +483,7 @@ test('runner: the run view, the saved shape read back, the continuation message'
 })
 
 /** A fake `claude` that prints stream-json, lingers a little past its result, and exits. */
-async function fakeClaude(dir, { linger = '0', fail = false } = {}) {
+async function fakeClaude(dir, { linger = '0', fail = false, failureExitCode = 1 } = {}) {
   const script = join(dir, 'fake-claude.mjs')
   await writeFile(
     script,
@@ -466,7 +498,7 @@ out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', 
 out({ type: 'assistant', message: { content: [{ type: 'text', text: 'You said: ' + text }] } })
 ${fail ? "out({ type: 'result', is_error: true, result: 'the model refused' })" : "out({ type: 'result', result: 'You said: ' + text, session_id: 'fake-1', duration_ms: 3 })"}
 process.stdout.write('garbage line\\n')
-setTimeout(() => process.exit(${fail ? 1 : 0}), ${linger})
+setTimeout(() => process.exit(${fail ? failureExitCode : 0}), ${linger})
 `,
   )
   const bin = join(dir, 'bin')
@@ -595,7 +627,75 @@ test('runner: an error result and a missing CLI are failed runs', { skip: !posix
   })
 })
 
+test('runner: a terminal error stays failed even after text and a zero exit', { skip: !posix }, async () => {
+  await scratch(async (dir) => {
+    const cli = await fakeClaude(dir, { fail: true, failureExitCode: 0 })
+    const run = await startRun({ agent: 'claude', text: 'test', which: () => cli, timeoutMs: 10_000, readerEnv: { NANOMUSE_CODING_HOME: join(dir, 'nohome') } })
+    assert.equal(run.status, 'failed')
+    assert.equal(run.error, 'the model refused')
+  })
+})
+
 // ------------------------------------------------------------------ the service and the hub shapes
+
+test('Codex writer conflicts require confirmation, not a silent fallback', { skip: !posix }, async () => {
+  await scratch(async (dir) => {
+    await fixtureHome(dir)
+    const cli = join(dir, 'fake-codex')
+    const calls = join(dir, 'calls')
+    await writeFile(cli, `#!/bin/sh
+echo call >> "${calls}"
+if [ "$2" = "resume" ]; then
+  echo 'Error: thread/resume: thread/resume failed: thread 0f9a7b6c-1111-2222-3333-444455556666 already has an active writer (code -32600)' >&2
+  exit 1
+fi
+echo '{"type":"thread.started","thread_id":"new-thread"}'
+echo '{"type":"item.completed","item":{"id":"a","type":"agent_message","text":"done"}}'
+echo '{"type":"turn.completed"}'
+`)
+    await chmod(cli, 0o755)
+    const env = { ...process.env, NANOMUSE_CODING_HOME: dir, CODEX_HOME: join(dir, '.codex') }
+    const diagnostics = []
+    const run = await startRun({ agent: 'codex', text: 'how many?', sessionId: '0f9a7b6c-1111-2222-3333-444455556666', which: () => cli, env, readerEnv: env, onDiagnostic: (entry) => diagnostics.push(entry) })
+    assert.equal(run.status, 'failed')
+    assert.ok(run.resume_conflict)
+    assert.match(run.resume_conflict.continuation, /^Continuing an earlier chat/)
+    assert.ok(run.resume_conflict.continuation.endsWith('Now: how many?'))
+    assert.equal((await readFile(calls, 'utf8')).trim(), 'call')
+    assert.deepEqual(runFromView(run.view()).resume_conflict, run.resume_conflict)
+    const failed = diagnostics.find((entry) => entry.stage === 'attempt_failed')
+    assert.equal(failed.lock_error, true)
+    assert.equal(failed.exit_code, 1)
+    assert.equal(diagnostics.filter((entry) => entry.stage === 'attempt').length, 1)
+    assert.equal(diagnostics.at(-1).conflict, true)
+    assert.ok(diagnostics.every((entry) => entry.revision === 'coding-resume-v2'))
+    assert.equal(JSON.stringify(diagnostics).includes('how many?'), false)
+    assert.equal(JSON.stringify(diagnostics).includes(dir), false)
+    assert.equal(JSON.stringify(diagnostics).includes('failed to resume: thread writer'), false)
+    const fresh = await startRun({ agent: 'codex', text: run.resume_conflict.continuation, workspace: run.workspace, which: () => cli, env, readerEnv: env })
+    assert.equal(fresh.status, 'done')
+    assert.equal(fresh.text, run.resume_conflict.continuation)
+    assert.equal(fresh.resumed, false)
+    assert.equal(fresh.result_session_id, 'new-thread')
+    await writeFile(cli, `#!/bin/sh
+echo call >> "${calls}"
+echo '{"type":"turn.failed","error":{"message":"failed to resume: authentication expired"}}'
+exit 1
+`)
+    const auth = await startRun({ agent: 'codex', text: 'test', sessionId: '0f9a7b6c-1111-2222-3333-444455556666', which: () => cli, env, readerEnv: env, onDiagnostic: () => { throw new Error('logger unavailable') } })
+    assert.equal(auth.status, 'failed')
+    assert.equal(auth.resume_conflict, undefined)
+    assert.equal((await readFile(calls, 'utf8')).trim().split('\n').length, 3)
+  })
+})
+
+test('Codex lock recognition excludes authentication and filesystem failures', () => {
+  assert.ok(isResumeLockError('Error: thread/resume: thread/resume failed: thread 0f9a7b6c-1111-2222-3333-444455556666 already has an active writer (code -32600)'))
+  assert.ok(isResumeLockError('session already registered for process 123'))
+  assert.ok(isResumeLockError('thread writer lock held by another Codex process'))
+  assert.equal(isResumeLockError('resume failed: authentication expired'), false)
+  assert.equal(isResumeLockError('failed to open thread writer lock: permission denied'), false)
+})
 
 function fakeHub(devices = []) {
   const calls = []
@@ -620,7 +720,7 @@ function fakeHub(devices = []) {
 }
 
 test('service: the action names and the gate match the runtime', () => {
-  assert.deepEqual([...CODING_ACTIONS], ['coding.agents', 'coding.sessions', 'coding.session', 'coding.send', 'coding.stop', 'coding.runs'])
+  assert.deepEqual([...CODING_ACTIONS], ['coding.agents', 'coding.sessions', 'coding.session', 'coding.send', 'coding.stop', 'coding.runs', 'coding.projects', 'coding.item', 'coding.diff', 'coding.watch', 'coding.project.validate'])
   assert.deepEqual([...GATED_CODING_ACTIONS].sort(), ['coding.send', 'coding.stop'])
   assert.equal(codingBrief('coding.send', { agent: 'codex', text: '  add   a test\nplease ' }), 'Codex: add a test please')
   assert.equal(codingBrief('coding.stop', { run: 'run_1' }), 'run_1')
@@ -665,7 +765,7 @@ test('service: coding.send with wait streams event frames with the run id and an
     assert.equal(result.status, 'done', result.error)
     assert.equal(result.session_id, 'fake-1')
     assert.ok(result.id.startsWith('run_'))
-    assert.deepEqual(frames.map((f) => f.kind), ['started', 'tool', 'text'], 'done is the result, not an event')
+    assert.deepEqual(frames.map((f) => f.kind), ['started', 'started', 'tool', 'text'], 'the start acknowledgement precedes CLI events; done is the result')
     assert.ok(frames.every((f) => f.run === result.id))
     assert.ok(bus.some((m) => m.kind === 'coding' && m.event.kind === 'run' && m.run?.status === 'done'), 'the bus hears the finished run')
     assert.equal((await svc.handle('coding.runs', {})).runs[0].id, result.id)
@@ -682,8 +782,14 @@ test('service: coding.send with wait streams event frames with the run id and an
     // without wait: the run comes back at once, still running, then settles
     const quick = await svc.handle('coding.send', { agent: 'claude', text: 'pong', wait: false })
     assert.equal(quick.status, 'running')
+    const startedWatch = await svc.handle('coding.watch', { agent: 'claude', session_id: '', run_id: quick.id })
+    assert.equal(startedWatch.runs[0].id, quick.id)
     await new Promise((r) => setTimeout(r, 1500))
     assert.equal(svc.listRuns().find((r) => r.id === quick.id).status, 'done')
+    const doneWatch = await svc.handle('coding.watch', { agent: 'claude', session_id: '', run_id: quick.id })
+    assert.equal(doneWatch.status, 'done')
+    assert.equal(doneWatch.runs[0].session_id, 'fake-1')
+    assert.equal(doneWatch.runs[0].output, 'You said: pong')
   })
 })
 

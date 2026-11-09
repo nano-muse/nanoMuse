@@ -56,7 +56,7 @@ Reading is best effort: a line that does not parse is skipped, a missing
 directory is an agent with no sessions. The `~` is the user's home unless
 `NANOMUSE_CODING_HOME` names another directory (a container that mounts the
 host's CLI homes somewhere else, or a test). A session lists its agent, id, title
-(the first user message), workspace, timestamps, message count, the last
+(the stored Codex name, or the first actual user message as a fallback), workspace, timestamps, message count, the last
 exchange and whether it is `resumable`. Cursor IDE chats can be read but not
 resumed from the CLI (`resumable: false`, `source: "ide"`): a message to one
 goes straight out as a fresh CLI chat in the same workspace, with the old chat's
@@ -158,6 +158,127 @@ The desktop app serves the same shapes to its own window under
 lives in the plugin's data directory under `coding/`.
 
 ## Over the hub
+
+### Structured browsing, protocol 2
+
+When a Codex resume fails with a session writer conflict, the computer returns a failed
+run with `resume_conflict: {process, continuation}` instead of silently starting another
+session. `process` is a best-effort process name and PID, empty when unavailable.
+The iOS app offers Cancel or Create conversation. Cancel keeps the question in the draft;
+Create immediately replaces the current chat with a fresh page and starts a new run in
+the same workspace. Its first message is the exact `Continuing… Last exchange… Now…`
+prompt returned by the computer. This carries the last two readable messages, at most
+800 characters each, not a model-generated summary or the entire history. The full prompt
+is shown once and used by the existing exact-text match when the completed run moves
+into history. Merely opening a lock file is not treated as a writer conflict.
+Codex's `thread/resume` error `already has an active writer` is also a writer conflict,
+including when the CLI reports it only on stderr.
+
+For resume diagnostics, update both the desktop plugin and iOS app. In desktop
+development, `npm run start` rebuilds only the Electron shell: build the plugin, quit
+the desktop app, run `npm run prepare-dsh` in `harness/desktop`, then restart it.
+An installed desktop app needs a rebuilt installer. Local desktop logs include
+`coding diagnostic` and the marker `coding-resume-v2`, with attempt outcomes,
+failure categories and session identifiers. They do not include prompts or raw CLI errors.
+On iOS, enable logging under Settings → Logs before reproducing, then open today's log.
+`NanoMuseCoding` entries record the reply's conflict flag, alert decisions and whether
+the completed live prompt exactly matched a new historical user message. These entries
+contain text lengths, not conversation contents. Share only the relevant entries;
+other categories in the same log may contain private data.
+
+On iOS, each response turn's tools are collapsed into one tool-call summary above
+the assistant messages, for both live runs and history. Expand it to browse the
+individual calls. File changes remain below the final reply: selecting a specific
+file opens its recorded line diff directly, while the overall change entry opens
+execution details with inputs, output and the file list.
+The diff uses one horizontal-and-vertical scroll area for long lines. It reserves
+compact columns only when recorded line numbers exist. The Projects / Chats
+filter uses the same pill-style controls as the agent filters above it.
+Opening a file diff starts at the left edge; loading more keeps the current scroll position.
+Added and removed code lines use solid tinted backgrounds, matching coloured line numbers
+and a bright left-edge marker, including patches without recorded line numbers.
+
+The iOS coding screen separates **Projects** and **Chats**, groups project sessions
+by folder, and starts a new conversation with an installed agent in that folder.
+It uses nanoMuse's existing colours and Markdown renderer. Tool rows expand into
+recorded output and file counts; **Execution details** opens the inputs and paged
+output; selecting a file opens its recorded patch directly. Missing patches or counts stay
+unavailable, rather than being reconstructed from today's workspace.
+
+The Projects / Chats switch sits directly above Recent sessions. A conversation
+opens full screen, so scrolling cannot dismiss it. Recorded file changes remain
+visible when a tool row is collapsed and are also grouped below the last assistant
+reply of their turn. Tap a file to open its execution details and recorded diff.
+Older history must be loaded before its file changes can appear in this summary.
+Codex titles use the saved thread name in its read-only `state_*.sqlite` metadata,
+then `session_index.jsonl`, then the first actual user message. Injected
+`AGENTS.md` instructions are excluded from messages and fallback titles.
+
+The Python runtime and desktop plugin answer the same additional hub actions.
+No Remodex relay, pairing code, SDK or daemon is needed. These are coding subprotocol
+2 additions, not a new hub envelope version. Existing plain `transcript` clients
+remain supported; an older computer still supplies plain text to the iOS screen.
+
+| Action | Arguments | Result |
+|---|---|---|
+| `coding.agents` | `fresh?` | `protocol_version: 2`; each agent has `capabilities` |
+| `coding.sessions` | `protocol_version: 2, agent?, workspace?, scope?, limit?, cursor?` | `sessions`, `version`, `next_cursor`, `total`, `bounded` |
+| `coding.projects` | none | Known project folders, IDs, agent IDs, latest update |
+| `coding.project.validate` | `workspace` | Whether an absolute project directory exists; no file contents |
+| `coding.session` | `agent, session_id, protocol_version: 2, limit?, cursor?, tail?` | Session metadata, `timeline`, page metadata, recent owned runs; no duplicate `transcript` payload |
+| `coding.item` | `agent, session_id, item_id, run_id?, limit?, cursor?` | Item, recorded input, paged `output`, `source_truncated` |
+| `coding.diff` | `agent, session_id, diff_reference, run_id?, limit?, cursor?` | Paged patch `data`, path, `diff_scope: item` |
+| `coding.watch` | `agent, session_id, version?, run_id?` | Snapshot `changed`, `version`, status, owned runs |
+| `coding.send` | Existing arguments plus `scope?, request_id?, protocol_version?` | Existing run; structured `item` events and a bounded final timeline |
+
+An item has `id`, `turn_id`, `sequence`, `revision`, `role`, `kind`, `text`, and
+`status`. Kinds are `message`, `command`, `tool`, `file_change`. Command metadata
+contains `display_command`, `cwd`, and, only when recorded, `exit_code` and
+`duration_ms`. Previews carry `input_preview`, `output_preview`, `text_truncated`,
+and files with `path`, optional counts and an opaque `diff_reference`. Repeated
+events replace an item's previous revision, not append another tool row.
+Raw Codex patch hunks and Claude Edit inputs have no original line positions;
+only a recorded unified hunk produces numbered lines.
+
+History pages contain at most 200 items, output/diff pages at most 32,768
+characters. Individual tool outputs are retained up to 262,144 characters and
+report truncation. A cursor is valid only for the same content version; changed
+content returns `stale_cursor`, malformed tokens `invalid_cursor`. Reload from
+the beginning instead of combining incompatible pages. Session discovery scans
+the most recent 500 sessions; `bounded` reports reaching this bound. The iOS list
+loads 100 sessions at a time and supports search and further pages. Chats request
+`tail: true` for the latest 100 items, then prepend earlier pages in chronological order.
+
+`scope: chats` on a new send creates a separate directory under
+`~/Documents/nanoMuse/Chats/`; known Codex rootless directories are also classified
+as Chats. Other workspaces are Projects. Sending and stopping still use the
+existing remote-control/Sentinel gate. Read-only item/diff requests only resolve
+references in the specified session or an associated nanoMuse-owned run, never
+an arbitrary path. Validation does not bypass the send gate.
+
+`request_id` deduplicates an identical send, including concurrent requests.
+Reuse with different content returns `request_conflict`. Finished runs retain
+the identity across restart within the existing 50-run retention. The iOS client
+uses `wait: false` to receive the run ID after the computer's permission gate,
+then follows that run with three-second foreground snapshot requests, including
+while it is running and before a new session has an ID. Completion, failure and
+stop status come from the owned run; a lost long-lived send response is not required.
+Older computers are followed through `coding.runs`. The client does not
+automatically resend after a connection failure. Polling ends when the chat closes;
+history updates do not force-scroll someone reading earlier messages.
+
+A gated send emits `authorization` while waiting for permission on the computer.
+iOS shows that waiting state and includes the computer's error details when a send
+fails. With remote control off, allow the desktop's request card or trust the phone
+before sending. Agent terminal failures end the run even if a helper retains its
+output pipe or the process exits with code zero.
+
+The compatibility adapters browse Codex, Claude Code, Cursor and dsh records,
+and control CLI runs started by nanoMuse. **External-run control and native
+agent approvals are not implemented by these adapters**:
+`control_external_run`, `approve`, and arbitrary `file` capabilities are false.
+The separate Codex app-server control adapter is not part of this stage.
+Cursor IDE sessions retain the existing continue-as-new behaviour.
 
 `device` names another computer; the same request travels as hub actions
 (`coding.agents`, `coding.sessions`, `coding.session`, `coding.send`,

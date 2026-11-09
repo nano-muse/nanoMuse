@@ -14,15 +14,18 @@
  * the finished ones are kept (the last 50) in memory and in `<dir>/coding/runs.json`, so a
  * restart of the app does not lose what was asked and answered.
  */
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { dirname } from 'node:path'
-import { AGENTS, cliFor, detect, isAgentId, readSession, sessions as readSessions, type AgentId, type AgentInfo, type CodingSession } from './coding-readers.ts'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
+import { AGENTS, cliFor, detect, home, isAgentId, readSession, sessions as readSessions, type AgentId, type AgentInfo, type CodingSession } from './coding-readers.ts'
+import { CAPABILITIES, PROTOCOL_VERSION, page, preview, sessionMetadata } from './coding-protocol.ts'
+import { fingerprint, object } from './coding-timeline.ts'
 import { Run, runFromView, startRun, type RunView } from './coding-runner.ts'
 import { HubError, type IncomingCall } from './hub.ts'
 
 /** The hub actions this computer answers, in the runtime's order. */
-export const CODING_ACTIONS = ['coding.agents', 'coding.sessions', 'coding.session', 'coding.send', 'coding.stop', 'coding.runs'] as const
+export const CODING_ACTIONS = ['coding.agents', 'coding.sessions', 'coding.session', 'coding.send', 'coding.stop', 'coding.runs', 'coding.projects', 'coding.item', 'coding.diff', 'coding.watch', 'coding.project.validate'] as const
 export type CodingAction = (typeof CODING_ACTIONS)[number]
 /** The two that do something *to* this computer: the person here agrees first unless remote control is on. */
 export const GATED_CODING_ACTIONS: ReadonlySet<string> = new Set(['coding.send', 'coding.stop'])
@@ -80,6 +83,7 @@ export class CodingService {
   private readonly listeners = new Set<(message: CodingMessage) => void>()
   private readonly streams = new Set<ServerResponse>()
   private loaded: Promise<void> | undefined
+  private readonly requests = new Map<string, { signature: string; task: Promise<RunView> }>()
 
   constructor(private readonly options: CodingServiceOptions) {}
 
@@ -113,7 +117,10 @@ export class CodingService {
     for (const row of rows.slice(-KEEP_RUNS)) {
       if (!row || typeof row !== 'object') continue
       const run = runFromView(row as Record<string, unknown>)
-      if (run) this.runs.set(run.id, run)
+      if (run) {
+        this.runs.set(run.id, run)
+        if (run.request_id) this.requests.set(run.request_id, { signature: run.request_signature, task: Promise.resolve(run.view()) })
+      }
     }
   }
 
@@ -125,7 +132,7 @@ export class CodingService {
       .filter((r) => r.status !== 'running')
       .sort((a, b) => a.started_at - b.started_at)
       .slice(-KEEP_RUNS)
-      .map((r) => r.view())
+      .map((r) => ({ ...r.view(), timeline: r.timeline.values().slice(-100), request_id: r.request_id, request_signature: r.request_signature }))
     try {
       await mkdir(dirname(path), { recursive: true })
       const tmp = `${path}.tmp`
@@ -212,13 +219,37 @@ export class CodingService {
     const s = await readSession(agent, sessionId, this.env)
     if (!s) throw new HubError('no_session', 'that session is not on this computer')
     const d: Result = { ...s, transcript: s.transcript ?? [] }
-    const runs = [...this.runs.values()].filter((r) => r.agent === agent && (r.result_session_id || r.session_id) === sessionId).map((r) => r.view())
+    const runs = [...this.runs.values()].filter((r) => r.agent === agent && (r.result_session_id || r.session_id) === sessionId).slice(-3).map((r) => r.view())
     if (runs.length) d.runs = runs
     return d
   }
 
   /** Start a run; resolves at once with the run (or, with `wait`, when it ends). */
-  async send(agent: string, text: string, sessionId = '', workspace = '', wait = false): Promise<RunView> {
+  async send(agent: string, text: string, sessionId = '', workspace = '', wait = false, requestId = '', scope = ''): Promise<RunView> {
+    const signature = fingerprint([agent, text, sessionId, workspace, scope])
+    if (!requestId) return this.start(agent, text, sessionId, workspace, wait, scope)
+    if (requestId.length > 128) throw new HubError('usage', 'request_id is too long')
+    const prior = this.requests.get(requestId)
+    if (prior) {
+      if (prior.signature !== signature) throw new HubError('request_conflict', 'request_id was used for another message')
+      const started = await prior.task
+      const task = this.tasks.get(started.id)
+      return wait && task ? (await task).view() : this.runs.get(started.id)?.view() ?? started
+    }
+    const task = this.start(agent, text, sessionId, workspace, false, scope, requestId, signature)
+    this.requests.set(requestId, { signature, task })
+    if (this.requests.size > 500) this.requests.delete(this.requests.keys().next().value!)
+    try {
+      const started = await task
+      const running = this.tasks.get(started.id)
+      return wait && running ? (await running).view() : started
+    } catch (error) {
+      this.requests.delete(requestId)
+      throw error
+    }
+  }
+
+  private async start(agent: string, text: string, sessionId: string, workspace: string, wait: boolean, scope: string, requestId = '', signature = ''): Promise<RunView> {
     if (!isAgentId(agent)) throw new HubError('unknown_agent', `no coding agent called '${agent}'`)
     if (!text.trim()) throw new HubError('usage', 'text is required')
     const find = this.options.which ?? ((a: AgentId) => cliFor(a, this.env))
@@ -226,7 +257,12 @@ export class CodingService {
     if (sessionId && [...this.runs.values()].some((r) => r.status === 'running' && r.agent === agent && (r.result_session_id || r.session_id) === sessionId)) {
       throw new HubError('busy', 'that session already has a message running')
     }
-    this.log('info', `coding: ${AGENTS[agent].name}${sessionId ? ` (${sessionId.slice(0, 12)})` : ''}: ${text.slice(0, 100).replace(/\s+/g, ' ')}`)
+    if (scope === 'chats' && !sessionId) {
+      workspace = join(home(this.env), 'Documents', 'nanoMuse', 'Chats', randomUUID())
+      await mkdir(workspace, { recursive: true })
+    }
+    if (workspace && !(await stat(workspace).catch(() => undefined))?.isDirectory()) throw new HubError('invalid_workspace', 'the project folder does not exist')
+    this.log('info', `coding: ${AGENTS[agent].name} session=${sessionId || 'new'} text_chars=${text.length}`)
     const runId = `run_${Math.random().toString(16).slice(2, 10).padEnd(8, '0')}`
     let registered: Run | undefined
     const task = startRun({
@@ -237,8 +273,12 @@ export class CodingService {
       runId,
       env: this.env,
       readerEnv: this.env,
+      structuredEvents: true,
       which: find,
+      onDiagnostic: (entry) => this.log('info', `coding diagnostic: ${JSON.stringify(entry)}`),
       register: (run) => {
+        run.request_id = requestId
+        run.request_signature = signature
         registered = run
         this.runs.set(runId, run)
       },
@@ -316,11 +356,70 @@ export class CodingService {
     await this.load()
     switch (action) {
       case 'coding.agents':
-        return { agents: await this.agents(Boolean(args.fresh)) }
-      case 'coding.sessions':
-        return { sessions: await this.sessions(String(args.agent ?? ''), Number(args.limit) || 30, String(args.workspace ?? '')) }
-      case 'coding.session':
-        return this.session(String(args.agent ?? ''), String(args.session_id ?? ''))
+        return { protocol_version: PROTOCOL_VERSION, agents: (await this.agents(Boolean(args.fresh))).map((a) => ({ ...a, capabilities: CAPABILITIES })) }
+      case 'coding.sessions': {
+        let rows = (await this.sessions(String(args.agent ?? ''), args.protocol_version === 2 ? 500 : Number(args.limit) || 30, String(args.workspace ?? ''))).map((s) => sessionMetadata({ ...s }, home(this.env)))
+        if (args.scope) rows = rows.filter((s) => s.scope === args.scope)
+        if (args.protocol_version !== 2) return { sessions: rows }
+        const { data, ...metadata } = page(rows, args)
+        return { ...metadata, sessions: data, bounded: rows.length === 500 }
+      }
+      case 'coding.projects': {
+        const projects = new Map<string, Result>()
+        for (const row of await this.sessions(undefined, 500)) {
+          const s = sessionMetadata({ ...row }, home(this.env))
+          if (s.scope !== 'projects') continue
+          const id = String(s.project_id)
+          const p = projects.get(id) ?? { id, workspace: s.workspace, name: basename(String(s.workspace)), agents: [], updated_at: 0 }
+          const ids = p.agents as string[]
+          if (!ids.includes(String(s.agent))) ids.push(String(s.agent))
+          p.updated_at = Math.max(Number(p.updated_at), Number(s.updated_at))
+          projects.set(id, p)
+        }
+        return { projects: [...projects.values()].sort((a, b) => Number(b.updated_at) - Number(a.updated_at)) }
+      }
+      case 'coding.project.validate': {
+        const workspace = String(args.workspace || '')
+        if (!isAbsolute(workspace) || !(await stat(workspace).catch(() => undefined))?.isDirectory()) throw new HubError('invalid_workspace', 'an existing absolute project folder is required')
+        return { valid: true, workspace: resolve(workspace) }
+      }
+      case 'coding.session': {
+        const result = sessionMetadata(await this.session(String(args.agent ?? ''), String(args.session_id ?? '')), home(this.env))
+        if (args.protocol_version === 2) delete result.transcript
+        const items = Array.isArray(result.timeline) ? result.timeline : []
+        const { data, ...metadata } = page(items.map(object).map(preview), args)
+        return { ...result, ...metadata, timeline: data, protocol_version: PROTOCOL_VERSION }
+      }
+      case 'coding.item':
+      case 'coding.diff':
+      case 'coding.watch': {
+        const agent = String(args.agent || '')
+        const sid = String(args.session_id || '')
+        const run = this.runs.get(String(args.run_id || ''))
+        const owned = run && run.agent === agent && (run.session_id === sid || run.result_session_id === sid) ? run : undefined
+        const result = owned ? { status: owned.status, runs: [owned.view()], timeline: owned.timeline.values() } : await this.session(agent, sid)
+        const items = (Array.isArray(result.timeline) ? result.timeline : []).map(object)
+        if (action === 'coding.watch') {
+          const version = fingerprint(items.map(preview))
+          return { changed: args.version !== version, version, status: result.status, runs: result.runs || [] }
+        }
+        let itemId = String(args.item_id || '')
+        let index = -1
+        if (action === 'coding.diff') {
+          const match = /^(.*):(\d+)$/.exec(String(args.diff_reference || ''))
+          if (!match) throw new HubError('no_diff', 'that patch is not in this session')
+          itemId = match[1]!
+          index = Number(match[2])
+        }
+        const item = items.find((i) => i.id === itemId)
+        if (!item) throw new HubError('no_item', 'that item is not in this session')
+        if (action === 'coding.diff') {
+          const file = object((Array.isArray(item.files) ? item.files : [])[index])
+          if (!file.diff) throw new HubError('no_diff', 'that patch is not in this session')
+          return { ...page(String(file.diff), args, 16384), path: file.path, diff_scope: item.diff_scope || 'item' }
+        }
+        return { ...preview(item), input: item.input || '', output: page(String(item.output || item.text || ''), args, 16384), source_truncated: Boolean(item.truncated) }
+      }
       case 'coding.stop':
         return { stopped: this.stop(String(args.run ?? '')) }
       case 'coding.runs':
@@ -331,18 +430,21 @@ export class CodingService {
         const sessionId = String(args.session_id ?? '')
         const workspace = String(args.workspace ?? '')
         const wait = args.wait === undefined ? true : Boolean(args.wait)
-        if (!wait || !call) return { ...(await this.send(agent, text, sessionId, workspace, false)) }
+        const requestId = String(args.request_id || '')
+        const scope = String(args.scope || '')
+        if (!wait || !call) return { ...(await this.send(agent, text, sessionId, workspace, false, requestId, scope)) }
         let runId = ''
         const off = this.subscribe((msg) => {
           if (!runId) return
           const ev = msg.event
           if (msg.run?.id !== runId && ev.run !== runId) return
           const kind = String(ev.kind ?? '')
-          if (kind === 'text' || kind === 'tool' || kind === 'started') call.event({ kind: 'coding', ...ev, run: runId })
+          if (kind === 'text' || kind === 'tool' || kind === 'started' || (kind === 'item' && args.protocol_version === 2)) call.event({ kind: 'coding', ...ev, run: runId })
         })
         try {
-          const started = await this.send(agent, text, sessionId, workspace, false)
+          const started = await this.send(agent, text, sessionId, workspace, false, requestId, scope)
           runId = started.id
+          call.event({ kind: 'started', run: runId, session_id: started.session_id })
           const task = this.tasks.get(runId)
           return { ...(task ? (await task).view() : started) }
         } finally {
