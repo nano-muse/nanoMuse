@@ -370,6 +370,8 @@ When a conversation upload reaches the relay but its response is lost, a retry k
 
 On Windows, stopping a coding run also asks the system to terminate its child processes, including detached helpers.
 
+On Windows, coding-agent `.cmd` launchers must use a supported npm shim or a plain Node invocation. The app starts the referenced script directly, keeping prompt characters intact. Other batch programs are refused instead of guessing which quoted script to run. Use the agent's executable or reinstall its npm launcher if it is refused.
+
 A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
 
 Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
@@ -377,6 +379,8 @@ Account-state saves are queued in order and written to a private temporary file 
 The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
 
 Dates beside entries in `MEMORY.md` use the computer's local calendar day.
+
+Duplicate memories are compared without regard to case or repeated spaces, but punctuation is preserved. For example, `-40` differs from `40`, and `1.23` differs from `123`. This applies when the agent remembers a fact, when you import memories, and when you edit `MEMORY.md`.
 
 The development desktop smoke test imports Electron through a file URL on Windows and other platforms. Checkout paths may contain spaces, Unicode, `#` or `%`.
 
