@@ -151,6 +151,15 @@ test('a folded thinking row in the fit-content agent bubble keeps a width (#683)
   assert.doesNotMatch(think, /size/)
 })
 
+test('a wide table stays inside the agent bubble instead of spanning the chat pane', () => {
+  const bubble = 'html[data-nm-muse] [data-chat-flow-kind="assistant-step"] [data-slot="conversation.chat.node"] > [class*="_root"] > [class*="_body"]'
+  const table = rule(`${bubble} .md-table-wide`)
+  assert.match(table, /width:\s*auto;/)
+  assert.match(table, /max-width:\s*100%;/)
+  assert.match(table, /margin-left:\s*0;/)
+  assert.match(table, /padding-left:\s*0;/)
+})
+
 test('in the Muse look the chat is monochrome: ink pills, grey agent pills, the send disc the same ink', () => {
   // the token blocks span several lines
   const block = (selector) => {
