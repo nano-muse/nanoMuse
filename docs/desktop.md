@@ -380,6 +380,8 @@ The desktop keeps at most 64 conversation logs in its sync cache. Older cached e
 
 Dates beside entries in `MEMORY.md` use the computer's local calendar day.
 
+Duplicate memories are compared without regard to case or repeated spaces, but punctuation is preserved. For example, `-40` differs from `40`, and `1.23` differs from `123`. This applies when the agent remembers a fact, when you import memories, and when you edit `MEMORY.md`.
+
 The development desktop smoke test imports Electron through a file URL on Windows and other platforms. Checkout paths may contain spaces, Unicode, `#` or `%`.
 
 Closing the window while its page loads no longer reports a startup failure or quits the app. A page load that fails while the window remains open still reports its error.

@@ -838,13 +838,13 @@ export default class NanomuseRooms extends Service {
       .map((l) => /^\s*(?:[-*•]|\d+[.)])\s+(.*)$/.exec(l)?.[1]?.trim() ?? '')
       .map((l) => l.replace(/^\(?\d{4}-\d{2}-\d{2}\)?[:：]?\s*/, '').trim())
       .filter((l) => l.length > 1)
-    const keep = new Set(lines.map(titleKey))
+    const keep = new Set(lines.map(memoryKey))
     const before = this.store.memory.length
-    this.store.memory = this.store.memory.filter((m) => keep.has(titleKey(m.text)))
-    const have = new Set(this.store.memory.map((m) => titleKey(m.text)))
+    this.store.memory = this.store.memory.filter((m) => keep.has(memoryKey(m.text)))
+    const have = new Set(this.store.memory.map((m) => memoryKey(m.text)))
     for (const line of lines.slice(0, MEMORY_MAX)) {
-      if (have.has(titleKey(line))) continue
-      have.add(titleKey(line))
+      if (have.has(memoryKey(line))) continue
+      have.add(memoryKey(line))
       this.store.memory.push({ id: newId('mem'), at: Date.now(), text: line.slice(0, MEMORY_LINE), source: 'person' })
     }
     if (this.store.memory.length !== before || lines.length) await this.save()
@@ -983,12 +983,12 @@ export default class NanomuseRooms extends Service {
     return this.store.memory
   }
 
-  /** Keep one line; a line already there (loosely compared) is refreshed, not doubled. */
+  /** Keep one line; a line already there (case and spacing aside) is refreshed, not doubled. */
   async remember(text: string, source: MemoryItem['source'] = 'agent'): Promise<MemoryItem | null> {
     const line = text.replace(/\s+/g, ' ').trim().slice(0, MEMORY_LINE)
     if (!line) return null
-    const key = titleKey(line)
-    const existing = this.store.memory.find((m) => titleKey(m.text) === key)
+    const key = memoryKey(line)
+    const existing = this.store.memory.find((m) => memoryKey(m.text) === key)
     if (existing) {
       existing.at = Date.now()
       await this.save()
@@ -1012,12 +1012,10 @@ export default class NanomuseRooms extends Service {
     const lines = text.split(/\r\n?|\n/).map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])(?:\s+|$)/, '').replace(/\s+/g, ' ').trim()).filter(Boolean)
     if (lines.length > 200) throw new RelayError(400, 'memory_import_lines', 'Import at most 200 lines at a time. Nothing was imported.')
     if (lines.some((line) => line.length > MEMORY_LINE)) throw new RelayError(400, 'memory_import_length', 'Each memory must fit within 400 characters. Nothing was imported.')
-    // Punctuation can carry meaning, such as a minus sign or decimal point.
-    const keyOf = (line: string) => line.replace(/\s+/g, ' ').trim().toLowerCase()
-    const known = new Set(this.store.memory.map((item) => keyOf(item.text)))
+    const known = new Set(this.store.memory.map((item) => memoryKey(item.text)))
     const incoming: MemoryItem[] = []
     for (const line of lines) {
-      const key = keyOf(line)
+      const key = memoryKey(line)
       if (known.has(key)) continue
       known.add(key)
       incoming.push({ id: newId('mem'), at: Date.now(), text: line, source: 'import' })
@@ -2354,6 +2352,15 @@ export function goalTitle(text: string): string {
 /** Titles compared loosely, so a post the agent sent twice lands once. */
 function titleKey(title: string): string {
   return title.toLowerCase().replace(/[\s\p{P}]+/gu, '')
+}
+
+/**
+ * One memory line's comparison key: lower case with whitespace folded, punctuation kept.
+ * Punctuation can carry meaning, such as a minus sign or a decimal point, so a correction
+ * and the value it corrects are two lines; every path that writes memory compares this way.
+ */
+function memoryKey(line: string): string {
+  return line.replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
 // ---- the agent's documents -------------------------------------------------------------------
