@@ -88,6 +88,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Preserved signs and decimal points when comparing memories.** Agent writes, imports and `MEMORY.md` edits now share the same comparison rule, so `-40` is distinct from `40` and `1.23` from `123`.
 - Requested cleanup of the runtime process tree when a Computer use check timed out or its runtime did not exit within the two-second grace period.
 - **Translated oversized-request errors.** Memory imports and other requests that exceed the transport size limit now ask for a smaller amount in the selected interface language.
+- **Preserved HTML comments when saving document edits.** Inline comments return to comment markup, comments in inline and fenced code remain source text, and multiline fenced comments retain their line breaks. Notes beside URLs and inside tables no longer corrupt link destinations or leak parsing markers.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
 
 ### Web
