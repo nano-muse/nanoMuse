@@ -673,7 +673,7 @@ def _is_resume_lock_error(text: str) -> bool:
 
 
 def _lock_owner(session_id: str) -> str:
-    if sys.platform == "win32" or not re.fullmatch(r"[0-9a-f-]{36}", session_id, re.I):
+    if _is_windows() or not re.fullmatch(r"[0-9a-f-]{36}", session_id, re.I):
         return ""
     home = Path(os.environ.get("NANOMUSE_CODING_HOME") or Path.home())
     root = Path(os.environ.get("CODEX_HOME") or home / ".codex")
@@ -689,6 +689,10 @@ def _lock_owner(session_id: str) -> str:
         return name[1][:100] + (f" (PID {pid[1]})" if pid else "") if name else ""
     except (OSError, subprocess.TimeoutExpired):
         return ""
+
+
+def _is_windows() -> bool:
+    return sys.platform == "win32"
 
 
 def _continuation(prior: Session, text: str) -> str:
