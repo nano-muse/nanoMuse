@@ -370,6 +370,8 @@ When a conversation upload reaches the relay but its response is lost, a retry k
 
 On Windows, stopping a coding run also asks the system to terminate its child processes, including detached helpers.
 
+On Windows, coding-agent `.cmd` launchers must use a supported npm shim or a plain Node invocation. The app starts the referenced script directly, keeping prompt characters intact. Other batch programs are refused instead of guessing which quoted script to run. Use the agent's executable or reinstall its npm launcher if it is refused.
+
 A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
 
 Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
