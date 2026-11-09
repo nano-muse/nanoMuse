@@ -16,6 +16,10 @@ On Windows, process discovery decodes command output using the console encoding 
 
 The desktop preserves Chinese text and other UTF-8 characters when a coding agent's output arrives across several pipe reads, including the last line without a newline.
 
+When you switch computers or agents on desktop, lists and suggested folders show only
+the current selection. Previous results disappear while the new selection loads. A
+chat composer waits for that chat to load before using its saved workspace.
+
 ## In the apps
 
 When a coding agent cannot resume a saved session, the retry starts a new session with clean output. A partially streamed line from the failed attempt is discarded along with its accumulated output.
