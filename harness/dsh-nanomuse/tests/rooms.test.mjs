@@ -210,6 +210,54 @@ test('memory import distinguishes list markers from negative numbers and decimal
   assert.equal(await run('-40 degrees\n1.23 units'), 0)
 })
 
+function memoryRememberFixture(lines = []) {
+  const self = {
+    store: { memory: lines.map((text, i) => ({ id: `old-${i}`, at: 1, text, source: 'person' })) },
+    saved: [],
+    async save() { this.saved.push(structuredClone(this.store.memory)) },
+  }
+  return { self, run: (text) => Rooms.prototype.remember.call(self, text) }
+}
+
+test('a remembered correction keeps its sign and its decimal point', async () => {
+  const { self, run } = memoryRememberFixture(['Winter lows reach 40 degrees'])
+  // the agent learned a correction: the minus sign is the whole point of the new line
+  const added = await run('Winter lows reach -40 degrees')
+  assert.equal(added?.text, 'Winter lows reach -40 degrees')
+  assert.equal(self.store.memory.length, 2)
+  assert.deepEqual(self.store.memory.map((m) => m.text), ['Winter lows reach 40 degrees', 'Winter lows reach -40 degrees'])
+  await run('1.23 units')
+  await run('123 units')
+  assert.equal(self.store.memory.length, 4)
+  // the refresh still folds case and spacing: one person, two spellings, one line
+  const { self: again, run: recall } = memoryRememberFixture(['Coffee: 2'])
+  await recall('coffee:   2')
+  assert.equal(again.store.memory.length, 1)
+  assert.ok(again.store.memory[0].at > 1, 'the existing line was refreshed, not doubled')
+})
+
+test('the conversation path and the import path compare memory lines the same way', async () => {
+  const { self, run } = memoryImportFixture()
+  await run('Coffee: 2')
+  await Rooms.prototype.remember.call(self, 'coffee 2')
+  assert.equal(self.store.memory.length, 2, 'punctuation is meaning: colon or not are two lines')
+  await Rooms.prototype.remember.call(self, 'COFFEE: 2')
+  assert.equal(self.store.memory.length, 2, 'case and spacing aside, the same line refreshes')
+})
+
+test('MEMORY.md edits keep both a number and its correction', async () => {
+  const self = {
+    store: { memory: [{ id: 'old-0', at: 1, text: 'Winter lows reach 40 degrees', source: 'person' }] },
+    saved: [],
+    async save() { this.saved.push(true) },
+  }
+  await Rooms.prototype.applyMemoryDoc.call(self, '- Winter lows reach 40 degrees\n- Winter lows reach -40 degrees')
+  assert.deepEqual(
+    self.store.memory.map((m) => m.text),
+    ['Winter lows reach 40 degrees', 'Winter lows reach -40 degrees'],
+  )
+})
+
 test('memory import HTTP route accepts a full UTF-8 batch and refuses oversized bodies unchanged', async () => {
   const { Readable } = await import('node:stream')
   const rooms = new Rooms({ reflect: { provide() {} }, logger: { warn() {} } })

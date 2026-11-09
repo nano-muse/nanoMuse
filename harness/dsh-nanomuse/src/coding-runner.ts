@@ -18,7 +18,7 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { AGENTS, cliFor, home, readSession, type AgentId, type CodingSession } from './coding-readers.ts'
+import { AGENTS, cliFor, cliSpawnCommand, home, readSession, type AgentId, type CodingSession } from './coding-readers.ts'
 
 export const RUN_TIMEOUT_MS = 20 * 60 * 1000
 /** Characters of agent text kept per run. */
@@ -593,9 +593,12 @@ export async function startRun(options: StartOptions): Promise<Run> {
       return run
     }
     const [file, ...args] = commandFor(agent, cli, sessionId, run.workspace, attemptText, resume)
+    // an npm-installed CLI is a `.cmd` on Windows, which a bare spawn cannot start at all;
+    // a `.cmd` whose shim cannot be read is refused here, and the refusal fails the run
     let proc: ChildProcess
     try {
-      proc = spawn(file as string, args, {
+      const [spawnFile, spawnArgs] = cliSpawnCommand(process.platform, file as string, args)
+      proc = spawn(spawnFile, spawnArgs, {
         cwd: run.workspace || undefined,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',
