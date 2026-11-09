@@ -332,7 +332,7 @@ object HubActions {
         val stopped: Boolean
         val result = try {
             runBlocking {
-                HeadlessChatRunner.prompt(context = context, sessionId = sessionId, text = prompt, attachments = emptyList(), thinkingLevel = null, wait = true, timeoutMs = TASK_TIMEOUT_MS)
+                HeadlessChatRunner.prompt(context = context, sessionId = sessionId, text = prompt, attachments = emptyList(), thinkingLevel = null, wait = true, timeoutMs = TASK_TIMEOUT_MS, verifyTurn = call.args.has("turn_id"))
             }
         } finally {
             relay.cancel()
@@ -341,7 +341,9 @@ object HubActions {
         if (stopped) throw Refused("cancelled", "${call.senderName} stopped this task")
         val answer = result.responseText?.trim().orEmpty()
         if (result.timedOut) throw Refused("timeout", "the phone's agent did not finish within ten minutes")
-        if (result.status == "Error" && answer.isEmpty()) throw Refused("failed", "the phone's agent could not run this")
+        if (call.args.has("turn_id") && result.status == "Cancelled") throw Refused("cancelled", "This task was stopped on the phone")
+        if (call.args.has("turn_id") && result.status == "Blocked") throw Refused("blocked", "The phone could not start this turn")
+        if (result.status == "Error" && (call.args.has("turn_id") || answer.isEmpty())) throw Refused("failed", "the phone's agent could not run this")
         return JSONObject().put("text", answer.ifBlank { "(no answer)" }).put("conversation", conversation).put("session", sessionId)
             .put("device", Hub.name(context)).put("status", result.status)
     }

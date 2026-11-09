@@ -158,6 +158,7 @@ internal object HeadlessChatRunner {
         thinkingLevel: ThinkingLevel? = null,
         wait: Boolean,
         timeoutMs: Long,
+        verifyTurn: Boolean = false, // nanoMuse: persistent Hub results must belong to this invocation.
     ): PromptResult = withContext(Dispatchers.Main) {
         val vm = viewModel(context, sessionId)
         // Apply per-call thinking override BEFORE sendMessage so streamMessage
@@ -213,6 +214,23 @@ internal object HeadlessChatRunner {
             )
         }
         for (att in attachments) vm.addAttachment(att)
+        // nanoMuse: bind persistent results to a saved user row, never the session's last reply.
+        if (verifyTurn) {
+            require(wait) { "A verified turn must wait for its result" }
+            val outcome = io.github.nanomuse.hub.HeadlessTurn.run(
+                timeoutMs = timeoutMs,
+                send = { receipt -> vm.nmSendHeadless(text, receipt) },
+                stop = { receipt -> vm.nmCancelHeadless(receipt) },
+                text = ::extractText,
+            )
+            return@withContext when (outcome) {
+                io.github.nanomuse.hub.HeadlessTurn.Outcome.NotStarted -> PromptResult("Blocked", null, false)
+                io.github.nanomuse.hub.HeadlessTurn.Outcome.TimedOut -> PromptResult("Timeout", null, true)
+                io.github.nanomuse.hub.HeadlessTurn.Outcome.Cancelled -> PromptResult("Cancelled", null, false)
+                io.github.nanomuse.hub.HeadlessTurn.Outcome.Failed -> PromptResult("Error", null, false)
+                is io.github.nanomuse.hub.HeadlessTurn.Outcome.Completed -> PromptResult("Completed", outcome.text, false)
+            }
+        }
         vm.sendMessage(text)
         if (!wait) return@withContext PromptResult(status = "Running", responseText = null, timedOut = false)
 
