@@ -267,6 +267,8 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   Each answer reaches the account's record as one word (`turn.feedback`, `turn.stopped`)
   and nothing else; nothing is shown while signed out.
 
+In the Muse look, wide reply tables scroll inside the agent bubble instead of extending into the rest of the chat pane.
+
 ## When the allowance is used up, and the relay's other answers
 
 The account's free allowance gates the model, not the sign-in: when the relay answers a
