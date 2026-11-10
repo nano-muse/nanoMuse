@@ -807,6 +807,8 @@ class HubService:
                         str(a.get("text") or ""),
                         session_id=str(a.get("session_id") or ""),
                         workspace=str(a.get("workspace") or ""),
+                        request_id=str(a.get("request_id") or ""),
+                        scope=str(a.get("scope") or ""),
                     )
                     run_id = str(started.get("id") or "")
                     if not bool(a.get("wait", True)):
@@ -814,6 +816,9 @@ class HubService:
                         return
                     # follow the run on the bus; each step goes back as a task event
                     final: dict[str, Any] = started
+                    if started.get("status") in ("done", "failed", "stopped"):
+                        await call.result(started)
+                        return
                     while True:
                         msg = await asyncio.wait_for(queue.get(), timeout=1800)
                         if msg.get("kind") != "coding":
@@ -822,7 +827,9 @@ class HubService:
                         ev = msg.get("event") or {}
                         if run.get("id") != run_id and ev.get("run") != run_id:
                             continue
-                        if ev.get("kind") in ("text", "tool", "started"):
+                        if ev.get("kind") in ("text", "tool", "started") or (
+                            ev.get("kind") == "item" and call.args.get("protocol_version") == 2
+                        ):
                             # the run id rides along so the caller can `coding.stop` it
                             await call.event({"kind": "coding", "run": run_id, **ev})
                         if run.get("id") == run_id and run.get("status") in (
@@ -863,6 +870,8 @@ class HubService:
         key = grant_key(REMOTE_CONTROL_TOOL, call.sender_id)
         if sentinel.grants.match(key) is not None:
             return True
+        if call.action == "coding.send":
+            await call.event({"kind": "authorization"})
         brief = self._brief(call)
         shown = {k: v for k, v in call.args.items() if k != "data"}
         request = ApprovalRequest(

@@ -1,5 +1,11 @@
 # The hub: every device is a Muse
 
+Coding runs may include `resume_conflict: {process, continuation}` when a Codex session
+writer is occupied. This is an optional additive field in `coding.send` results and
+the runs returned by `coding.watch` / `coding.runs`; the run ends as `failed` without
+an automatic retry. A confirmed new conversation uses the existing gated `coding.send`
+with an empty `session_id` and the returned continuation as `text`.
+
 ## Persistent device conversations
 
 The local prototype for #815 opens independent conversations in **Devices** on Android and desktop. Select an online destination that advertises `task.status`, then start or reopen a conversation. Each entry remembers the device ID and its own conversation UUID. The destination uses its own model and tools. The initiator keeps the transcript locally, independently of side-chat sync.
@@ -128,7 +134,17 @@ Two kinds of request travel over the hub:
   (`started`, `text`, `tool`, `done`, `error`, each with the run id so the
   caller can `coding.stop`) and answers with the finished run. Only a computer
   announces these actions: a runtime that has the module, or the desktop app.
-  [coding-agents.md](coding-agents.md).
+  [coding-agents.md](coding-agents.md). Coding subprotocol 2 adds read-only
+  `coding.projects`, `coding.project.validate`, `coding.item`, `coding.diff`,
+  and snapshot `coding.watch`; agents announce per-feature capabilities.
+  `coding.session` and `coding.sessions` accept versioned cursors.
+  `coding.send` accepts an idempotent `request_id` and adds `item` revisions
+  alongside the existing event kinds. A gated send may report `authorization`
+  before starting. With `wait: false`, the result acknowledges the owned run;
+  callers follow its status using `coding.watch` with `run_id`, or `coding.runs`
+  on older computers, instead of keeping the send call open.
+  Details, limits and compatibility are
+  in [the coding contract](coding-agents.md#structured-browsing-protocol-2).
 
 Each device decides what it lets others do. On the phone, *Let other devices
 operate this phone* (*Settings → nanoMuse Cloud → Devices*) off makes the phone

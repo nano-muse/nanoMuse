@@ -435,6 +435,11 @@ If an earlier version already reset your choices, enable the plugins you want ag
 the lost selection cannot be recovered automatically. Your existing `cordis.yml` and
 `cordis.patch.yml` are kept.
 
+Conversation sync checks for changes every minute and when the hub reconnects. If a
+sync notification arrives during a pull that then times out or loses its connection,
+the failed pull and its follow-up stay handled, without stopping the Host. The next
+successful pull continues from the saved cursor.
+
 ## The agent's desktop guide
 
 The preset also includes `skill-creator`, a guide for writing and checking reusable skills. Its model-neutral instructions are shared with Android and the Python runtime. Both bundled guides load only when requested and do not change approval permissions.

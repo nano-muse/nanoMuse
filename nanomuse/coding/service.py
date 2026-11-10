@@ -24,7 +24,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nanomuse.coding import agents
+from nanomuse.coding.protocol import (
+    CAPABILITIES,
+    PROTOCOL_VERSION,
+    PageError,
+    page,
+    preview,
+    session_metadata,
+)
 from nanomuse.coding.runner import Run, start_run
+from nanomuse.coding.timeline import fingerprint
 from nanomuse.logger import logger
 from nanomuse.tools.base import int_arg
 
@@ -38,6 +47,11 @@ ACTIONS = (
     "coding.send",
     "coding.stop",
     "coding.runs",
+    "coding.projects",
+    "coding.item",
+    "coding.diff",
+    "coding.watch",
+    "coding.project.validate",
 )
 KEEP_RUNS = 50
 
@@ -56,6 +70,7 @@ class CodingService:
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._detected: list[dict[str, Any]] = []
         self._detected_at = 0.0
+        self._requests: dict[str, tuple[str, str]] = {}
         self._store: Path | None = None
         data_dir = getattr(svc, "data_dir", None)
         if data_dir is not None:
@@ -98,6 +113,19 @@ class CodingService:
                 run.ended_at = run.ended_at or run.started_at
                 run.error = run.error or "the runtime restarted while this was running"
             run.device = str(row.get("device") or "")
+            conflict = row.get("resume_conflict")
+            if isinstance(conflict, dict) and isinstance(conflict.get("continuation"), str):
+                run.resume_conflict = {
+                    "process": str(conflict.get("process") or ""),
+                    "continuation": conflict["continuation"],
+                }
+            run.request_id = str(row.get("request_id") or "")
+            run.request_signature = str(row.get("request_signature") or "")
+            if run.request_id:
+                self._requests[run.request_id] = (run.request_signature, run.id)
+            for item in row.get("timeline") or []:
+                if isinstance(item, dict) and isinstance(item.get("id"), str):
+                    run.timeline.items[item["id"]] = item
             self.runs[run.id] = run
 
     def _save(self) -> None:
@@ -105,7 +133,12 @@ class CodingService:
         if self._store is None:
             return
         rows = [
-            r.to_dict()
+            {
+                **r.to_dict(),
+                "timeline": r.timeline.values()[-100:],
+                "request_id": r.request_id,
+                "request_signature": r.request_signature,
+            }
             for r in sorted(self.runs.values(), key=lambda r: r.started_at)
             if r.status != "running"
         ][-KEEP_RUNS:]
@@ -155,16 +188,43 @@ class CodingService:
         for r in self.runs.values():
             if r.agent == agent and (r.result_session_id or r.session_id) == session_id:
                 d.setdefault("runs", []).append(r.to_dict())
+        if "runs" in d:
+            d["runs"] = d["runs"][-3:]
         return d
 
     async def send(
-        self, agent: str, text: str, session_id: str = "", workspace: str = "", wait: bool = False
+        self,
+        agent: str,
+        text: str,
+        session_id: str = "",
+        workspace: str = "",
+        wait: bool = False,
+        request_id: str = "",
+        scope: str = "",
     ) -> dict[str, Any]:
         """Start a run; returns at once with the run (or, with ``wait``, when it ends)."""
         if agent not in agents.AGENTS:
             raise CodingError("unknown_agent", f"no coding agent called {agent!r}")
         if not text.strip():
             raise CodingError("usage", "text is required")
+        signature = fingerprint([agent, text, session_id, workspace, scope])
+        if request_id:
+            if len(request_id) > 128:
+                raise CodingError("usage", "request_id is too long")
+            prior = self._requests.get(request_id)
+            if prior:
+                if prior[0] != signature:
+                    raise CodingError("request_conflict", "request_id was used for another message")
+                run = self.runs.get(prior[1])
+                if run is None and prior[1] in self._tasks:
+                    await asyncio.sleep(0)
+                    run = self.runs.get(prior[1])
+                if run:
+                    task = self._tasks.get(run.id)
+                    if wait and task:
+                        await asyncio.shield(task)
+                    return run.to_dict()
+                raise CodingError("stale_request", "that run is no longer retained")
         if not agents.which(agent):
             raise CodingError(
                 "not_installed", f"{agents.AGENTS[agent]['name']} is not installed on this computer"
@@ -179,13 +239,25 @@ class CodingService:
         ]
         if running:
             raise CodingError("busy", "that session already has a message running")
+        if scope == "chats" and not session_id:
+            workspace = str(agents.home() / "Documents" / "nanoMuse" / "Chats" / uuid.uuid4().hex)
+            Path(workspace).mkdir(parents=True, exist_ok=False)
+        if workspace:
+            if not Path(workspace).is_dir():
+                raise CodingError("invalid_workspace", "the project folder does not exist")
         self.svc.app.audit.record(
             "coding_send", agent=agent, session=session_id[:12], summary=text[:100]
         )
 
         run_id = "run_" + uuid.uuid4().hex[:8]
+        if request_id:
+            self._requests[request_id] = (signature, run_id)
+            if len(self._requests) > 500:
+                self._requests.pop(next(iter(self._requests)))
 
         def register(run: Run) -> None:
+            run.request_id = request_id
+            run.request_signature = signature
             self.runs[run_id] = run
 
         async def on_event(ev: dict[str, Any]) -> None:
@@ -211,6 +283,7 @@ class CodingService:
                 on_event=on_event,
                 run_id=run_id,
                 register=register,
+                structured_events=True,
             )
         )
         self._tasks[run_id] = task
@@ -297,22 +370,149 @@ class CodingService:
     def handle(self, action: str, args: dict[str, Any]) -> dict[str, Any]:
         """A ``coding.*`` action asked by another device (synchronous part)."""
         if action == "coding.agents":
-            return {"agents": self.agents(fresh=bool(args.get("fresh")))}
-        if action == "coding.sessions":
             return {
-                "sessions": self.sessions(
+                "protocol_version": PROTOCOL_VERSION,
+                "agents": [
+                    {**a, "capabilities": CAPABILITIES}
+                    for a in self.agents(fresh=bool(args.get("fresh")))
+                ],
+            }
+        if action == "coding.sessions":
+            rows = [
+                session_metadata(s, agents.home())
+                for s in self.sessions(
                     str(args.get("agent") or "") or None,
-                    int_arg(args.get("limit"), 30, 1, 500),
+                    500
+                    if args.get("protocol_version") == 2
+                    else int_arg(args.get("limit"), 30, 1, 500),
                     str(args.get("workspace") or "") or None,
                 )
-            }
+            ]
+            if args.get("scope") in ("projects", "chats"):
+                rows = [s for s in rows if s["scope"] == args["scope"]]
+            if args.get("protocol_version") == 2:
+                result = self._page(rows, args)
+                result["sessions"] = result.pop("data")
+                result["bounded"] = len(rows) == 500
+                return result
+            return {"sessions": rows}
+        if action == "coding.projects":
+            projects: dict[str, dict[str, Any]] = {}
+            for row in self.sessions(limit=500):
+                s = session_metadata(row, agents.home())
+                if s["scope"] != "projects":
+                    continue
+                p = projects.setdefault(
+                    s["project_id"],
+                    {
+                        "id": s["project_id"],
+                        "workspace": s["workspace"],
+                        "name": Path(s["workspace"]).name,
+                        "agents": [],
+                        "updated_at": 0,
+                    },
+                )
+                if s["agent"] not in p["agents"]:
+                    p["agents"].append(s["agent"])
+                p["updated_at"] = max(p["updated_at"], s["updated_at"])
+            return {"projects": sorted(projects.values(), key=lambda p: -p["updated_at"])}
+        if action == "coding.project.validate":
+            workspace = str(args.get("workspace") or "")
+            path = Path(workspace).expanduser()
+            if not workspace or not path.is_absolute() or not path.is_dir():
+                raise CodingError(
+                    "invalid_workspace", "an existing absolute project folder is required"
+                )
+            return {"workspace": str(path.resolve()), "valid": True}
         if action == "coding.session":
-            return self.session(str(args.get("agent") or ""), str(args.get("session_id") or ""))
+            result = self.session(str(args.get("agent") or ""), str(args.get("session_id") or ""))
+            items = result.pop("timeline", [])
+            result = session_metadata(result, agents.home())
+            result["protocol_version"] = PROTOCOL_VERSION
+            if args.get("protocol_version") == 2:
+                result.pop("transcript", None)
+            timeline_page = self._page([preview(i) for i in items], args)
+            timeline_page["timeline"] = timeline_page.pop("data")
+            result.update(timeline_page)
+            return result
+        if action in ("coding.item", "coding.diff", "coding.watch"):
+            agent = str(args.get("agent") or "")
+            session_id = str(args.get("session_id") or "")
+            run = self.runs.get(str(args.get("run_id") or ""))
+            if run and (
+                run.agent != agent or session_id not in (run.session_id, run.result_session_id)
+            ):
+                run = None
+            session = (
+                agents.read_session(agent, session_id)
+                if run is None and agent in agents.AGENTS
+                else None
+            )
+            if session is None and run is None:
+                raise CodingError("no_session", "that session is not on this computer")
+            items = run.timeline.values() if run else session.timeline if session else []
+            if action == "coding.watch":
+                view = [preview(i) for i in items]
+                version = fingerprint(view)
+                runs = (
+                    [run.to_dict()]
+                    if run
+                    else [
+                        r.to_dict()
+                        for r in self.runs.values()
+                        if r.agent == agent and (r.result_session_id or r.session_id) == session_id
+                    ]
+                )
+                runs = runs[-3:]
+                return {
+                    "changed": args.get("version") != version,
+                    "version": version,
+                    "status": run.status if run else session.status if session else "idle",
+                    "runs": runs,
+                }
+            item_id = str(args.get("item_id") or "")
+            file_index = -1
+            if action == "coding.diff":
+                try:
+                    item_id, index = str(args.get("diff_reference") or "").rsplit(":", 1)
+                    file_index = int(index)
+                except (ValueError, TypeError):
+                    raise CodingError("no_diff", "that patch is not in this session") from None
+            item = next((i for i in items if i["id"] == item_id), None)
+            if item is None:
+                raise CodingError("no_item", "that item is not in this session")
+            if action == "coding.diff":
+                files = item.get("files") or []
+                if not 0 <= file_index < len(files) or not files[file_index].get("diff"):
+                    raise CodingError("no_diff", "that patch is not in this session")
+                f = files[file_index]
+                return {
+                    **self._page(str(f["diff"]), args, 16_384),
+                    "path": f["path"],
+                    "diff_scope": item.get("diff_scope", "item"),
+                }
+            return {
+                **preview(item),
+                "input": item.get("input", ""),
+                "output": self._page(
+                    str(item.get("output") or item.get("text") or ""), args, 16_384
+                ),
+                "source_truncated": bool(item.get("truncated")),
+            }
         if action == "coding.stop":
             return {"stopped": self.stop(str(args.get("run") or ""))}
         if action == "coding.runs":
             return {"runs": self.list_runs(int_arg(args.get("limit"), 20, 1, 500))}
         raise CodingError("unknown_action", f"this computer does not do '{action}'")
+
+    @staticmethod
+    def _page(values: list[Any] | str, args: dict[str, Any], default: int = 60) -> dict[str, Any]:
+        try:
+            return page(values, args, default)
+        except PageError as exc:
+            raise CodingError(
+                str(exc), "the content changed; reload it from the beginning"
+            ) from exc
 
     async def remote_send(self, device: str, args: dict[str, Any]) -> dict[str, Any]:
         """``coding.send`` on another computer, followed from here: its steps are re-published
