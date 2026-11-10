@@ -384,6 +384,17 @@ models = true            # the account's models as a source (the apps' "Use nano
 sync = true              # default for the account-wide Data controls → Sync switch (the person's choice, once made, counts)
 
 # ------------------------------------------------------------------------------
+# The fast decision layer (experimental): one small scored question at the
+# start of a run, logged and never acted on (docs/configuration.md)
+# ------------------------------------------------------------------------------
+[decider]
+enabled = false          # off by default; on costs one small model call per run
+mode = "shadow"          # the only mode: decisions are logged, never acted on
+threshold = 0.6          # uncalibrated; the score a shadow answer would need to escalate
+timeout_seconds = 1.5    # past this the run starts without a decision
+model = ""               # empty: the [llm] slot as configured; a name decides on that model instead
+
+# ------------------------------------------------------------------------------
 # The hub: this computer as one of the account's devices (docs/hub.md)
 # ------------------------------------------------------------------------------
 [hub]
