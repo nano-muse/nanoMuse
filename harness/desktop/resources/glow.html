@@ -19,7 +19,8 @@
      or steps aside for the capture (Linux). The idea of a frame breathing round the screen is
      UI-TARS-desktop's ScreenMarker; nothing of it is copied. */
   :root { --accent: #0a66e4; --violet: #7c5cff; --cyan: #06b6d4; --glow: rgba(10,102,228,0.34); --edge: rgba(10,102,228,0.45); --band: min(7vmin, 110px); }
-  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; pointer-events: none; }
+  /* nothing here is text to select: a Cmd+A that reaches the window would keep every later word highlighted */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; pointer-events: none; -webkit-user-select: none; user-select: none; }
   .held { --glow: rgba(255,176,0,0.38); --edge: rgba(255,176,0,0.5); }
   /* the four bands, the colour at the edge gone at half the band; the whole breathes about the centre */
   .glow { position: fixed; inset: 0; opacity: 0; transition: opacity 240ms ease; }
