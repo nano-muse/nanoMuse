@@ -141,6 +141,18 @@ match = { action = "write", path = "*.env" }
 action = "ask"
 reason = "writing dotenv files"
 
+[sentinel.review]
+# Optional model observations. Recommendations never change permissions or execution.
+mode = "off"                       # "off" | "observe"
+# Empty model fields reuse the active chat model for a separate, bounded request.
+provider = ""
+model = ""
+base_url = ""
+api_key = ""                       # use a vault reference for a separate endpoint's key
+timeout = 5.0
+max_input_chars = 6000
+max_output_tokens = 1024
+
 # ------------------------------------------------------------------------------
 [memory]
 enabled = true

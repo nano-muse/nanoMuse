@@ -17,9 +17,9 @@ import time
 import uuid
 from contextvars import ContextVar
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from weakref import WeakValueDictionary
 
 from nanomuse.config import SentinelSettings
@@ -31,6 +31,10 @@ from nanomuse.sentinel.policy import Decision, Policy
 from nanomuse.tools.base import BaseTool, CallAssessment, safe_execute
 from nanomuse.ui import UI, ApprovalRequest
 from nanomuse.vault import PLACEHOLDER_RE, CredentialVault
+
+if TYPE_CHECKING:
+    from nanomuse.llm.base import BaseLLM
+    from nanomuse.sentinel.review import SentinelReviewer
 
 
 def _note(kind: str, data: dict[str, Any]) -> None:
@@ -60,6 +64,8 @@ class TaskContext:
     id: str
     purpose: str = ""
     conversation: str = ""
+    purpose_truncated: bool = False
+    execution_llm: BaseLLM | None = field(default=None, repr=False, compare=False)
 
     @property
     def conversation_id(self) -> str:
@@ -92,6 +98,7 @@ class Sentinel:
         # what another conversation read
         self._tainted: set[str] = set()
         self.grants = GrantStore(persistent_approvals_file)
+        self.reviewer: SentinelReviewer | None = None
         # Wait only for this conversation's approval for a tool, then reassess policy
         # and grants. Other conversations must not wait on its unanswered card.
         # Idle locks disappear, including ones for short-lived standalone tasks.
@@ -130,7 +137,12 @@ class Sentinel:
 
     # ------------------------------------------------------------------ task scope
     def begin_task(
-        self, purpose: str = "", task_id: str | None = None, conversation: str | None = None
+        self,
+        purpose: str = "",
+        task_id: str | None = None,
+        conversation: str | None = None,
+        *,
+        execution_llm: BaseLLM | None = None,
     ) -> Any:
         """Mark the start of an agent run, within ``conversation`` when it has one.
         Returns a token for :meth:`end_task`."""
@@ -138,6 +150,8 @@ class Sentinel:
             id=task_id or uuid.uuid4().hex[:10],
             purpose=purpose.strip()[:200],
             conversation=(conversation or "").strip(),
+            purpose_truncated=len(purpose.strip()) > 200,
+            execution_llm=execution_llm,
         )
         return _current_task.set(ctx)
 
@@ -356,6 +370,17 @@ class Sentinel:
                             f"user declined{': ' + verdict.reason if verdict.reason else ''}"
                         )
 
+        if self.reviewer is not None:
+            self.reviewer.observe(
+                tool=tool.name,
+                args=args,
+                assessment=assessment,
+                purpose=task.purpose if task else "",
+                purpose_truncated=task.purpose_truncated if task else False,
+                decision=decision.value,
+                source=settled_by,
+                execution_llm=task.execution_llm if task else None,
+            )
         self.ui.on_sentinel(decision.value, assessment.summary, reasons)
         _note(
             "sentinel.decision",

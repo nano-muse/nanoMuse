@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from nanomuse.schema import LLMResponse, Message
 
 DeltaCallback = Callable[[str], None]
+
+_upload_turn: ContextVar[bool] = ContextVar("nanomuse_upload_model_turn", default=True)
+
+
+@contextmanager
+def without_turn_upload() -> Iterator[None]:
+    """Keep an observation-only review's text and reasoning out of conversation telemetry."""
+    token = _upload_turn.set(False)
+    try:
+        yield
+    finally:
+        _upload_turn.reset(token)
+
 
 _THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 
@@ -232,6 +247,8 @@ def end_call(
     """After the answer: a Cloud call's response names the turn the relay kept; any other
     provider's turn goes up to the record (and, with *Help improve* on, the training view)
     under an id of our own. The response carries the id either way."""
+    if not _upload_turn.get():
+        return
     from nanomuse.llm import session
 
     if ctx.to_cloud:
@@ -308,4 +325,5 @@ __all__ = [
     "proxied_http",
     "says_no_tools",
     "split_think",
+    "without_turn_upload",
 ]

@@ -9,6 +9,7 @@ user can fire off several requests without waiting for the last one to finish.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import mimetypes
@@ -23,6 +24,7 @@ from datetime import UTC, datetime, timedelta
 from datetime import time as time_of_day
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from nanomuse import __version__, prompts
 from nanomuse.agent import Incoming, MuseAgent
@@ -47,7 +49,7 @@ from nanomuse.reminders import Reminder
 from nanomuse.schema import Attachment, Message, Role
 from nanomuse.sentinel.grants import normalize_scope
 from nanomuse.server import firstrun
-from nanomuse.server.connections import Connections
+from nanomuse.server.connections import Connections, check_base_url
 from nanomuse.server.events import (
     MAIN_THREAD,
     STOPPED_NOTICE,
@@ -2782,6 +2784,13 @@ class MuseService:
                 "deny_tools": s.sentinel.deny_tools,
                 "taint_tracking": s.sentinel.taint_tracking,
                 "egress_allowlist": s.sentinel.egress_allowlist,
+                "review": {
+                    "mode": s.sentinel.review.mode,
+                    "provider": s.sentinel.review.provider,
+                    "model": s.sentinel.review.model,
+                    "base_url": s.sentinel.review.base_url,
+                    "has_api_key": bool(s.sentinel.review.api_key),
+                },
             },
             "sandbox": {
                 "mode": s.sandbox.mode,
@@ -2832,6 +2841,8 @@ class MuseService:
         }
 
     def update_settings(self, data: dict[str, Any]) -> dict[str, Any]:
+        if isinstance(data.get("sentinel_review"), dict):
+            self._update_review_settings(data["sentinel_review"])
         if "profile" in data and isinstance(data["profile"], dict):
             self.update_profile(data["profile"])
         if (mode := data.get("sentinel_mode")) in ("ask", "strict", "auto"):
@@ -2843,6 +2854,72 @@ class MuseService:
             self.settings.agent.language = str(lang)[:20] or "auto"
         self.bus.publish({"kind": "settings", "settings": self.settings_view()})
         return self.settings_view()
+
+    def _update_review_settings(self, changes: dict[str, Any]) -> None:
+        """Save the observer separately from the permissions it is observing."""
+        current = self.settings.sentinel.review
+        values = current.model_dump()
+        for key in ("mode", "provider", "model", "base_url", "api_key"):
+            if changes.get(key) is not None:
+                values[key] = str(changes[key]).strip()
+        if "base_url" in changes:
+            address = check_base_url(values["base_url"])
+            if address:
+                parts = urlsplit(address)
+                if parts.scheme not in ("http", "https") or not parts.hostname:
+                    raise ValueError("The review model address must use HTTP or HTTPS.")
+                if parts.query or parts.fragment:
+                    raise ValueError("The review model address cannot contain a query or fragment.")
+                # Validate a typed port before storing or displaying the address.
+                _ = parts.port
+            values["base_url"] = address
+        if changes.get("api_key") and not values["base_url"]:
+            # The API may offer "same provider as chat" while entering a separate key.
+            # Bind that choice now; TOML/direct configuration must name its own endpoint.
+            inherited = type(current).model_validate({**values, "api_key": ""})
+            effective = self.app.review_llm_settings(inherited)
+            if not effective.endpoint:
+                raise ValueError("Set the review model address before saving a separate API key.")
+            values["provider"] = effective.provider
+            values["base_url"] = effective.endpoint
+        candidate = type(current).model_validate(values)
+
+        before_model = self.app.review_llm_settings(current)
+        after_model = self.app.review_llm_settings(candidate)
+        before = (before_model.provider, (before_model.endpoint or "").rstrip("/"))
+        after = (after_model.provider, (after_model.endpoint or "").rstrip("/"))
+        key = candidate.api_key
+        if changes.get("api_key") is None and before != after:
+            # A saved key belongs to its endpoint, even when both speak the same protocol.
+            key = ""
+        key_name: str | None = None
+        if key and not self.app.vault.has_placeholders(key):
+            # Never replace a value the active endpoint still references. Saving settings
+            # can fail after this write; its previous key must remain valid in that case.
+            key_name = "SENTINEL_REVIEW_API_KEY_" + uuid.uuid4().hex
+            self.app.vault.set(key_name, key)
+            key = "{{vault:" + key_name + "}}"
+        candidate.api_key = key
+        previous_data = self.connections.data
+        self.connections.data = {**previous_data, "sentinel_review": candidate.model_dump()}
+        try:
+            self.connections._save()
+        except Exception:
+            self.connections.data = previous_data
+            if key_name is not None:
+                with contextlib.suppress(Exception):
+                    self.app.vault.delete(key_name)
+            raise
+        self.settings.sentinel.review = candidate
+        # Drop an obsolete key only after its replacement configuration is durable. A
+        # custom vault reference belongs to the person, so only clean up our own slots.
+        if current.api_key != key:
+            match = re.fullmatch(
+                r"\{\{vault:(SENTINEL_REVIEW_API_KEY_[a-f0-9]{32})\}\}", current.api_key
+            )
+            if match:
+                with contextlib.suppress(Exception):
+                    self.app.vault.delete(match.group(1))
 
     def state(self) -> dict[str, Any]:
         return {

@@ -35,7 +35,7 @@ sequenceDiagram
 | Composition root | `nanomuse/app.py` | `NanoMuseApp` wires settings → LLM, tools, vault, Sentinel, memory, goals, agent |
 | Agent loop | `nanomuse/agent/core.py` | prompt assembly, context trimming, stuck detection, session persistence, inbox; optional shared [task budgets](runtime-budgets.md), with logged tool-result shortening |
 | Prompts | `nanomuse/prompts.py` | system prompt, language rule and script detection, goal-advance prompt |
-| Sentinel | `nanomuse/sentinel/gate.py`, `policy.py`, `audit.py` | guard, decision order, approvals, taint, vault resolution, redaction, JSONL audit |
+| Sentinel | `nanomuse/sentinel/gate.py`, `policy.py`, `audit.py`, `review.py` | guard, decision order, approvals, taint, vault resolution, redaction, JSONL audit; optional background model observations never change execution permissions |
 | Vault | `nanomuse/vault/vault.py` | Fernet store, `{{vault:NAME}}` placeholders |
 | Tool base | `nanomuse/tools/base.py` | `BaseTool`, `CallAssessment`, `ToolCollection`, `safe_execute` |
 | Built-in tools | `nanomuse/tools/files.py`, `shell.py`, `web.py`, `email_tool.py`, `browser.py` + `browser_backends.py` (Playwright on the server or the phone's WebView; see [browser.md](browser.md)), `memory_tools.py`, `goal_tools.py`, `terminate.py` | |

@@ -102,7 +102,7 @@ hub 自动重连时，设备触发器会保留上次观察到的在线状态。�
 
 - 「审批」：汇总所有聊天待处理卡片，可直接回答；存在待处理项时优先打开此页。
 - 「活动」：包含每次工具调用、决定和审批的审计记录，拒绝操作也记录。
-- 「权限」：哨兵模式及所有长期授权，每项都可撤销。
+- 「权限」：哨兵模式及所有可撤销的长期授权，也可以开启[模型观察](sentinel.md#optional-model-observations)，在「活动」中查看审核建议。
 - 「日程」：后台工作开关、下次执行时间、排队目标、目标检查、提醒、例程和「当某事发生时」触发器，提供「+ 添加」「现在运行」和取消。webhook 的复制 URL 按钮是唯一显示 key 的位置，创建它的聊天只写地址和请求头。
 - 「记忆」：按类别显示全部记忆，支持手动添加。「忘掉」会删除，模型不再读到该项，并在「最近的改动」保留原文。每轮按关键词选取相关记忆；连接 → 按含义召回配置 embedding（将文字转换为可比较向量）接口后，也能按语义匹配。例如写邮件给房东，可以找到房东姓名，即使两句话没有共同词。「整理」可手动执行，智能体也会每新增八行或每周自动执行，主动性「关闭」时除外。相同事实合并、变化事实留新版、非个人事实的一次性请求删除。模型只提案，nanoMuse 检查合并不增加原文没有的词、不删除用户亲写内容，每次最多移除记忆库五分之一。「最近的改动」列出合并、删除、更新和遗忘，保留旧文并支持「撤销」。产生修改的整理会显示在动态。
 - 「技能」：保存周回顾、旅行规划、收件箱处理等任务步骤，见[技能](#skills)。
@@ -208,7 +208,7 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | POST | `/api/hooks/{id}?key=` | 接收 webhook，无需 App 令牌，以 key 验证，也接受 `X-Hook-Key`。请求体最多 64 KB，JSON 会格式化后作为任务背景。ID 或 key 错误都返回 404；已取消返回 409；请求过密返回 429。 |
 | GET | `/api/files` · `/api/files/{path}?download=1` | 列出或读取工作区文件。HTML、SVG 响应附 `Content-Security-Policy: sandbox`。 |
 | GET | `/api/data/export` | 以 ZIP 导出智能体数据，见 [parity.md](parity.md#open-for-a-decision-the-next-next-list) 备注 37。包含配置档案、侧栏各房间、联系人、授权、`threads/`、`sessions/`、数据目录技能、上传联系人、手机与电脑轨迹、定时投递、nudges 和逐项说明的 README。不含 `vault.enc`、`vault.key`、`server_token`、`push-vapid.json`、设置文件、`logs/`、`workspace/`。数据根若为符号链接或 Windows 联接，先解析一次并固定目标；其内符号链接、硬链接、Windows 重解析点、读取时改变的文件和超过 64 MB 的文件会跳过。数据库通过运行时已打开的连接执行 SQLite 在线备份，包含已提交 WAL 事务，不重新打开源路径。缺少活跃存储、未提交事务、数据库忙碌或过大时跳过，并写入 ZIP README。备份最多重试五秒，临时输出在响应前移除。ZIP 时间戳限制于 1980-2107 年，其他文件通过已验证句柄读取，父目录同时固定。作为附件返回，并附 `Cache-Control: private, no-store`。 |
-| GET / PUT | `/api/settings` | 获取或修改 `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, show_thinking, language}`。读取结果另含 `onboarded`、`llm_ready`。 |
+| GET / PUT | `/api/settings` | 获取或修改 `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, sentinel_review{mode, provider, model, base_url, api_key}, show_thinking, language}`。审核模式为 `off` 或 `observe`。读取结果另含 `onboarded`、`llm_ready` 和 `sentinel.review`，只返回 `has_api_key`，不返回审核 key。 |
 | GET | `/api/connections` | 获取模型、服务商预设、邮件、浏览器、MCP、保险库名称和 `onboarded`。模型含 `key_source`，值为 vault · config · missing · none，引用接口列表时带 `endpoint`。`endpoints` 列出自定义 OpenAI 兼容接口 `{id, label, base_url, key_source, models, slots}`，不含 key。MCP 包含 `connected`、`tools`、`from_app`。 |
 | PUT | `/api/connections/llm` `{provider, model, base_url, tool_mode, api_key}` 或 `{endpoint, model, tool_mode}` | 更换聊天模型。提供 `api_key` 时存保险库，`""` 表示不使用 key，省略则保留。`endpoint` 引用列表中的接口地址和它自己的 key。在全部对话立即生效。地址包含 `user:pass@` 返回 400，凭据应放入 `api_key`；`/api/llm/models`、`/api/connections/gui`、`/image`、`/video` 和接口列表同样拒绝这种地址。 |
 | POST | `/api/connections/llm/test` | 向模型发送简短测试，返回 `{ok, reply, ms}` 或 `{ok: false, error}`。 |

@@ -103,6 +103,7 @@ export interface Grant {
   granted_at: string;
   expires_at: string | null;
   task_id?: string | null;
+  conversation_id?: string | null;
 }
 
 export interface QuestionEvent extends BaseEvent {
@@ -889,6 +890,23 @@ export interface NudgesView {
   error: string | null;
 }
 
+export interface SentinelReviewView {
+  mode: "off" | "observe";
+  provider: string;
+  model: string;
+  base_url: string;
+  has_api_key: boolean;
+}
+
+export interface SentinelReviewUpdate {
+  mode: "off" | "observe";
+  provider?: string;
+  model?: string;
+  base_url?: string;
+  /** Omit to keep the saved key; an empty string explicitly clears it. */
+  api_key?: string;
+}
+
 export interface SettingsView {
   version: string;
   profile: Profile;
@@ -899,6 +917,8 @@ export interface SettingsView {
     deny_tools: string[];
     taint_tracking: boolean;
     egress_allowlist: string[];
+    /** Optional while connecting to a runtime without model review settings. */
+    review?: SentinelReviewView;
   };
   /** Each shell / python call in its own bubblewrap namespace (Linux); status says why not. */
   sandbox: { mode: "auto" | "bwrap" | "off"; active: boolean; status: string };
@@ -1330,6 +1350,15 @@ export interface AuditEntry {
   duration_ms?: number;
   content?: string;
   tool_calls?: string[];
+  /** Observation-only review records never replace a tool call's actual decision. */
+  status?: string;
+  recommendation?: "allow" | "ask" | "deny";
+  actual_decision?: string;
+  decision_source?: string;
+  provider?: string;
+  model?: string;
+  reason?: string;
+  call_hash?: string;
   [key: string]: unknown;
 }
 

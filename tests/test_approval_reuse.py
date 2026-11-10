@@ -8,8 +8,10 @@ from typing import Any
 import pytest
 
 from nanomuse.config import SentinelSettings
+from nanomuse.llm.mock import MockLLM
 from nanomuse.schema import Function, RiskLevel, ToolCall, ToolResult
 from nanomuse.sentinel import AuditLog, Sentinel
+from nanomuse.sentinel.gate import current_task
 from nanomuse.sentinel.grants import GrantStore
 from nanomuse.tools.base import BaseTool, CallAssessment
 from nanomuse.ui import ApprovalDecision, ApprovalRequest, ApprovalScope, HeadlessUI
@@ -301,3 +303,16 @@ async def test_approval_ui_cannot_change_the_executed_arguments(tmp_path: Path) 
     ui.release.set()
     result = await running
     assert json.loads(result.output) == {"payload": {"action": "read"}}
+
+
+def test_task_marks_incomplete_purpose_and_carries_the_execution_model(tmp_path: Path) -> None:
+    gate = gate_for(tmp_path, HeadlessUI())
+    llm = MockLLM([])
+    token = gate.begin_task("x" * 201, conversation="chat-a", execution_llm=llm)
+    try:
+        task = current_task()
+        assert task is not None
+        assert task.purpose == "x" * 200 and task.purpose_truncated
+        assert task.execution_llm is llm
+    finally:
+        gate.end_task(token)

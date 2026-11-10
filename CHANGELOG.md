@@ -46,6 +46,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Added optional observation-only permission reviews to the Python runtime, using the active chat model or a separately configured model, with bounded requests and redacted audit records. For #724.
+
 - Preserved each conversation's tool permissions and reused them after concurrent approval waits, reducing repeated cards while keeping one-time approvals and warning checks separate. For #724.
 
 - **A queued skill invocation runs the skill.** A `/name args` message typed while the agent was working was folded into the running turn as literal slash text, because only the message that started the turn went through the skill expansion, so the model never saw the skill's instructions. Folded messages now expand the same way.
