@@ -49,6 +49,18 @@ Windows x64 应用在启动后及每六小时检查一次较新的正式稳定�
 
 「网络」中的代理不用于 nanoMuse Cloud，包括中继登录、hub 和同步连接。外壳 `proxy.ts` 中的 `DEFAULT_RELAY_HOST` 只参与生成 `NO_PROXY`（绕过代理的地址列表），不能用来选择中继。上述启动方法用于连接自己的服务器，不能修复托管中继网络路径中的连接重置。
 
+## Linux 上连接自己的中继 {#using-your-own-relay-on-linux}
+
+先完全退出 nanoMuse，包括托盘中的后台进程，再使用自己的中继和单独数据目录启动 AppImage：
+
+```sh
+env NANOMUSE_CLOUD_URL='https://relay.example' \
+  NANOMUSE_DESKTOP_HOME="$HOME/.nanomuse/desktop-self-hosted" \
+  /path/to/nanoMuse.AppImage
+```
+
+替换中继地址和 AppImage 路径，然后在该中继注册或登录。以后继续使用同一命令和数据目录，直接打开 AppImage 不会继承这些变量。前面关于独立账号和 profile 覆盖设置优先级的说明同样适用。
+
 ## 桌面版包含什么 {#what-it-is}
 
 首次启动时，先选一个示例任务，再连接模型或跳过，最后开始对话。选中的任务会填入主要聊天的空输入框；已有草稿会保留。模型页可以登录 nanoMuse Cloud、登录 ChatGPT，或添加服务商 key。新建的 Cloud 账号可以设置密码，macOS 还会询问手需要的权限。
