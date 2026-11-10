@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from nanomuse import prompts
 from nanomuse.agent import MuseAgent
 from nanomuse.config import Settings
 from nanomuse.goals import GoalStore
@@ -193,6 +194,22 @@ async def test_sentinel_denial_reaches_model(settings: Settings):
     assert "Sentinel blocked" in tool_msg.content
 
 
+async def test_long_turn_keeps_the_request_and_its_work_in_view(settings: Settings):
+    # the defaults leave max_context_tokens at 0: the request must stay in view anyway
+    settings.agent.max_context_messages = 6
+    settings.agent.max_steps = 4
+    script = [LLMResponse(tool_calls=[tc("add", a=i, b=b) for b in (1, 2)]) for i in range(4)]
+    script.append(LLMResponse(content="Summary."))
+    agent, llm, *_ = make_agent(settings, script)
+
+    assert await agent.run("Add each pair.") == "Summary."
+    for request in llm.calls:
+        assert sum(m.content == "Add each pair." for m in request["messages"]) == 1
+    wrap_up = llm.calls[-1]["messages"]
+    assert wrap_up[-1].content == prompts.MAX_STEPS_PROMPT
+    assert sum(m.role == Role.TOOL for m in wrap_up) >= 2, "the wrap-up saw none of the work"
+
+
 async def test_memory_and_goals_injected_into_prompt(settings: Settings):
     script = [
         LLMResponse(
@@ -277,7 +294,8 @@ async def test_long_tool_turn_keeps_call_result_pairs(
     for request in llm.calls:
         history = [m for m in request["messages"] if m.role != Role.SYSTEM]
         if limit > 0:
-            assert len(history) <= limit + calls_per_step
+            # plus the current request, which stays in view when the window drops it
+            assert len(history) <= limit + calls_per_step + 1
         pending: set[str] = set()
         for message in request["messages"]:
             if message.role == Role.TOOL:

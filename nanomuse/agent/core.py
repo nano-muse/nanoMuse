@@ -485,13 +485,17 @@ class MuseAgent:
                 task_budget.end(token)
 
     def _request_context(
-        self, system_prompt: str, tools: list[dict[str, Any]] | None
+        self,
+        system_prompt: str,
+        tools: list[dict[str, Any]] | None,
+        tail: Message | None = None,
     ) -> list[Message]:
-        window = self.context_messages()
+        window = self.context_messages() + ([tail] if tail else [])
         protected = [m for m in self.messages[self._task_start :] if m.meta.get("user_request")]
-        if self.settings.agent.max_context_tokens:
-            present = {m.meta.get("request_id") for m in window}
-            window = [m for m in protected if m.meta.get("request_id") not in present] + window
+        # A long turn pushes the request out of the message window; without it the model
+        # forgets what it was asked and guesses, so it stays in view whatever the limits.
+        present = {m.meta.get("request_id") for m in window}
+        window = [m for m in protected if m.meta.get("request_id") not in present] + window
         return fit_context(
             [Message.system(system_prompt), *window],
             tools,
@@ -658,8 +662,11 @@ class MuseAgent:
                     self.messages.append(Message.user(prompts.STUCK_PROMPT))
             else:
                 # Step budget exhausted: ask for a wrap-up without tools.
-                self.messages.append(Message.user(prompts.MAX_STEPS_PROMPT))
-                context = self._request_context(system_prompt, None)
+                # The window is taken before the prompt joins the history: as the newest
+                # user message it would be the cutoff, and the wrap-up would see no work.
+                wrap_up = Message.user(prompts.MAX_STEPS_PROMPT)
+                context = self._request_context(system_prompt, None, wrap_up)
+                self.messages.append(wrap_up)
                 response = await task_budget.ask(
                     self.llm,
                     context,

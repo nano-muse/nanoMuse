@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Kept the person's request in view during long turns with the default settings, so a task with many tool calls no longer forgets what it was asked, and the wrap-up at the step limit sees the turn's work.
+
 - Prevented failed coding runs from retrying in a new conversation after a tool had already started or returned a result.
 
 - Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
