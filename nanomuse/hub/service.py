@@ -281,6 +281,9 @@ class HubService:
         client, self.client = self.client, None
         if client is not None:
             await client.stop()
+        # An explicit leave, including a sign-out or account switch, starts a new scope.
+        # Automatic reconnects stay inside the existing client and keep its last frame.
+        self._devices_seen = None
         tasks = [t for t in self._tasks if not t.done()]
         for t in tasks:
             t.cancel()
@@ -676,10 +679,8 @@ class HubService:
     def publish(self) -> None:
         self.svc.bus.publish({"kind": "hub", "hub": self.view()})
 
-    def _hub_state_changed(self, state: str, _detail: str) -> None:
-        """Publish connection state, and make each connection's welcome frame a baseline."""
-        if state == "connecting":
-            self._devices_seen = None
+    def _hub_state_changed(self, _state: str, _detail: str) -> None:
+        """Publish connection state without losing device transitions across reconnects."""
         self.publish()
 
     def _on_devices(self, devices: list[dict[str, Any]]) -> None:

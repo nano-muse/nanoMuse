@@ -38,6 +38,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Preserved device-trigger state across automatic hub reconnects, so an observed offline device returning during the gap still fired its trigger. Explicit hub leave cleared the baseline before joining again. For #883.
+
 - Restricted Windows coding-agent batch launchers to supported Node shim forms, so quoted script paths in other batch commands could not select a different program. For #854.
 
 - Enabled Windows test coverage for the remote shell: exit codes, stdout and stderr, the working directory, the output bound, and the timeout's tree kill through the taskkill path Windows devices actually take.
