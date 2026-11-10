@@ -11,6 +11,8 @@ from nanomuse.tools.base import BaseTool, CallAssessment
 
 class Goals(BaseTool):
     name: str = "goals"
+    purpose: str = "Manage the user's long-term goals and their step-by-step plans."
+    keywords: list[str] = ["goal", "plan", "progress", "long-term"]
     description: str = (
         "Manage the user's long-term goals and their step-by-step plans (persisted across sessions). "
         "Actions: `create` (title, description, steps[], category, due, check_in), "
