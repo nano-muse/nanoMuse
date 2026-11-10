@@ -769,3 +769,125 @@ test('a delayed adapter refresh does not recreate a provider deleted while anoth
     await out.done()
   }
 })
+
+
+test('a late refresh of a removed row is cleaned up without deleting a legitimate re-add of the same id (#889)', async () => {
+  for (const readd of [false, true]) {
+    const out = await cloud()
+    const server = await modelsServer(['first-model'])
+    try {
+      await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'first-key', baseURL: server.url, capabilities: ['chat'] })
+      out.svc.chatOptions()
+      out.settings[LLM_ROW].providers.custom.displayName = 'old label'
+      const update = out.ctx.settings.update
+      let began, release
+      const entered = new Promise((resolve) => { began = resolve })
+      const gate = new Promise((resolve) => { release = resolve })
+      let first = true
+      out.ctx.settings.update = async (...args) => {
+        if (first) { first = false; began(); await gate }
+        return update(...args)
+      }
+      out.svc.refreshOwnRows()
+      await entered
+      delete out.settings[LLM_ROW].providers.custom
+      out.emit('settings/document-updated', LLM_ROW, 1)
+      const saved = readd ? out.api('POST', '/providers/save', { id: 'custom', apiKey: 'new-key', baseURL: server.url, label: 'New source', capabilities: ['chat'] }) : undefined
+      release()
+      await out.svc.busy
+      if (saved) assert.equal((await saved).status, 200)
+      await out.svc.busy
+      const row = out.settings[LLM_ROW].providers.custom
+      if (readd) {
+        assert.equal(row.displayName, 'New source')
+        assert.equal((await out.state()).providers.custom.label, 'New source')
+      } else {
+        assert.equal(row, undefined)
+        assert.equal((await out.state()).providers.custom, undefined)
+      }
+    } finally {
+      await server.close()
+      await out.done()
+    }
+  }
+})
+
+test('an empty catalog-route model list keeps its override after key update and restart (#889)', async () => {
+  const out = await cloud()
+  const baseGet = out.ctx.get
+  out.ctx.get = (name) => name === 'llm' ? { listProviders: () => [], discoverModels: async () => [{ id: 'go-model' }] } : baseGet(name)
+  try {
+    const saved = await out.api('POST', '/providers/save', { id: 'opencode-go', apiKey: 'first-key' })
+    assert.equal(saved.status, 200)
+    out.svc.chatOptions()
+    out.settings[LLM_ROW].providers['opencode-go'].models = []
+    out.emit('settings/document-updated', LLM_ROW, 1)
+    await out.svc.busy
+    const rekeyed = await out.api('POST', '/providers/save', { id: 'opencode-go', row: 'opencode-go', apiKey: 'next-key' })
+    assert.equal(rekeyed.status, 200)
+    assert.equal(rekeyed.body.customModels, true)
+    assert.deepEqual(out.settings[LLM_ROW].providers['opencode-go'].models, [])
+    const again = await restartForCatalog(out)
+    assert.deepEqual(again.settings[LLM_ROW].providers['opencode-go'].models, [])
+    await out.svc.busy
+    await out.svc.stateWrites
+  } finally {
+    await out.done()
+  }
+})
+
+
+test("a new custom endpoint never inherits another endpoint's empty catalog or saved key (#889)", async () => {
+  const out = await cloud()
+  const first = await modelsServer(['first-model'])
+  const second = await modelsServer(['second-model'])
+  try {
+    await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'first-key', baseURL: first.url, capabilities: ['chat'] })
+    out.svc.chatOptions()
+    out.settings[LLM_ROW].providers.custom.models = []
+    out.emit('settings/document-updated', LLM_ROW, 1)
+    await out.svc.busy
+    const added = await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'second-key', baseURL: second.url, capabilities: ['chat'] })
+    assert.equal(added.status, 200)
+    assert.equal(added.body.id, 'custom-2')
+    assert.deepEqual(added.body.models.map((m) => m.id), ['second-model'])
+    assert.equal(added.body.baseURL, second.url)
+    assert.notEqual(added.body.keyRef, (await out.state()).providers.custom.keyRef)
+    assert.deepEqual(out.settings[LLM_ROW].providers.custom.models, [])
+    await out.svc.busy
+    await out.svc.stateWrites
+  } finally {
+    await first.close()
+    await second.close()
+    await out.done()
+  }
+})
+
+
+test('removing and re-adding the same source does not reuse the previous adapter observation (#889)', async () => {
+  const out = await cloud()
+  const server = await modelsServer(['first-model'])
+  try {
+    await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'old-key', baseURL: server.url, capabilities: ['chat'] })
+    out.svc.chatOptions()
+    assert.equal((await out.api('POST', '/providers/remove', { id: 'custom' })).status, 200)
+    const update = out.ctx.settings.update
+    out.ctx.settings.update = async () => undefined // a newly loaded adapter has not exposed the saved row yet
+    const added = await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'new-key', baseURL: server.url, capabilities: ['chat'] })
+    assert.equal(added.status, 200)
+    out.emit('settings/document-updated', LLM_ROW, 1)
+    await out.svc.busy
+    assert.ok((await out.state()).providers.custom, "a missing new adapter row must not reuse the deleted generation's observation")
+    out.ctx.settings.update = update
+    out.svc.refreshOwnRows()
+    await out.svc.busy
+    out.svc.chatOptions()
+    delete out.settings[LLM_ROW].providers.custom
+    out.emit('settings/document-updated', LLM_ROW, 2)
+    await out.svc.busy
+    assert.equal((await out.state()).providers.custom, undefined)
+  } finally {
+    await server.close()
+    await out.done()
+  }
+})

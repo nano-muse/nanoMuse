@@ -632,7 +632,7 @@ export default class NanomuseCloud extends Service {
   readonly hub: HubClient
   private state: State = {}
   /** Own rows observed in a registered adapter, so a startup gap is never a deletion. */
-  private readonly seenOwnRows = new Set<string>()
+  private readonly seenOwnRows = new Map<string, OwnProvider>()
   private sessionStateLoaded = false
   private capacityCache: { providers: CapacityProviders; models: readonly RelayModel[]; result: CapacityProviders } | undefined
   private busy: Promise<unknown> = Promise.resolve()
@@ -1911,7 +1911,7 @@ export default class NanomuseCloud extends Service {
     const entry = this.catalogue.find((p) => p.id === id)
     if (!entry) throw new RelayError(404, 'unknown_provider', 'Not in the catalogue')
     const wantedRow = (input.row ?? '').trim().toLowerCase()
-    const existing = wantedRow ? this.state.providers?.[wantedRow] : this.state.providers?.[id]
+    const existing = wantedRow ? this.state.providers?.[wantedRow] : entry.id === 'custom' ? undefined : this.state.providers?.[id]
     if (wantedRow && (!existing || existing.provider !== id)) throw new RelayError(404, 'not_found', 'No such row')
     const rowId = wantedRow || (entry.id === 'custom' ? this.freeCustomRowId() : id)
     const region = this.region(input.lang ?? '')
@@ -1973,7 +1973,7 @@ export default class NanomuseCloud extends Service {
       models,
       at: Date.now(),
       ...(catalogRoute ? { catalogRoute } : {}),
-      ...(keepCatalogOnly && typed.length ? { customModels: true } : {}),
+      ...(keepCatalogOnly ? { customModels: true } : {}),
     }
     await this.ctx.settings.update(LLM_ROW, { providers: { [rowId]: ownProviderRow(row, entry.reasoning) } })
     this.state = { ...this.state, providers: { ...this.state.providers, [rowId]: row } }
@@ -2035,7 +2035,7 @@ export default class NanomuseCloud extends Service {
       if (!Object.hasOwn(written, id)) {
         // Only an explicit document change after observing this live row is removal.
         // An adapter absent during startup is restored from the saved source instead.
-        if (pruneMissing && this.seenOwnRows.has(id)) {
+        if (pruneMissing && this.seenOwnRows.get(id) === row) {
           nextProviders ??= { ...providers }
           delete nextProviders[id]
           this.seenOwnRows.delete(id)
@@ -2044,7 +2044,7 @@ export default class NanomuseCloud extends Service {
         continue
       }
       if (!raw || typeof raw !== 'object') continue
-      this.seenOwnRows.add(id)
+      this.seenOwnRows.set(id, row)
       const rawModels = (raw as { models?: unknown }).models
       if (!Array.isArray(rawModels)) continue
       const entry = this.catalogue.find((p) => p.id === row.provider)
@@ -2079,6 +2079,7 @@ export default class NanomuseCloud extends Service {
         models: [...nextChat, ...row.models.filter((m) => m.kind !== 'chat')],
         customModels: true,
       }
+      this.seenOwnRows.set(id, nextProviders[id])
     }
     if (!nextProviders) return false
     this.state = { ...this.state, providers: nextProviders }
@@ -2150,15 +2151,29 @@ export default class NanomuseCloud extends Service {
       return
     }
     const written = (current.value as { providers?: Record<string, unknown> } | undefined)?.providers ?? {}
-    void (async () => {
+    void this.serialize(async () => {
       for (const [id, row] of rows) {
         if (this.state.providers?.[id] !== row) continue
         const entry = this.catalogue.find((p) => p.id === row.provider)
         const wanted = ownProviderRow(row, entry?.reasoning)
         if (canonical(written[id] ?? null) === canonical(wanted)) continue
-        await this.ctx.settings.update(LLM_ROW, { providers: { [id]: wanted } }).catch((error: unknown) => this.ctx.logger.warn('nanomuse: own-key row %s not refreshed: %s', id, message(error)))
+        const revision = this.ctx.settings.describe().find((d) => d.ns === LLM_ROW)?.revision
+        await this.ctx.settings.update(LLM_ROW, { providers: { [id]: wanted } }, revision).catch((error: unknown) => this.ctx.logger.warn('nanomuse: own-key row %s not refreshed: %s', id, message(error)))
+        // A native edit can land while a loader write is pending. Do not leave the stale
+        // source behind, or let cleanup race a legitimate save of the same id.
+        const latest = this.state.providers?.[id]
+        if (latest === row) continue
+        const current = this.ctx.settings.describe().find((d) => d.ns === LLM_ROW)
+        const actual = (current?.value as { providers?: Record<string, unknown> } | undefined)?.providers?.[id]
+        if (canonical(actual ?? null) !== canonical(wanted)) continue
+        if (!latest) {
+          await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', id] }], current?.revision)
+        } else {
+          const hint = this.catalogue.find((p) => p.id === latest.provider)?.reasoning
+          await this.ctx.settings.update(LLM_ROW, { providers: { [id]: ownProviderRow(latest, hint) } }, current?.revision)
+        }
       }
-    })()
+    }).catch((error: unknown) => this.ctx.logger.warn('nanomuse: own-key refresh interrupted: %s', message(error)))
   }
 
   /**
@@ -2237,6 +2252,7 @@ export default class NanomuseCloud extends Service {
 
   /** Removes the row and what pointed at it; true when the account's models had to come back on. */
   private async dropOwnRow(id: string, row: OwnProvider): Promise<boolean> {
+    this.seenOwnRows.delete(id)
     try {
       await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', id] }])
     } catch (error: unknown) {
