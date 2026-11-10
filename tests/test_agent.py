@@ -71,6 +71,29 @@ async def test_plain_answer_ends_turn(settings: Settings):
     assert len(llm.calls) == 1
 
 
+async def test_a_queued_skill_message_expands_into_the_running_turn(settings: Settings):
+    """A "/skill args" message typed while the agent works is folded into the run like
+    the message that started it. Without the expansion the model saw the literal slash
+    text, so the queued invocation never ran the skill."""
+    import asyncio
+
+    from nanomuse.skills import SkillLibrary
+    from nanomuse.tools.skills_tool import Skills
+
+    library = SkillLibrary(settings.skills, settings.skills_dir)
+    agent, llm, *_ = make_agent(
+        settings, [LLMResponse(content="ok")], extra_tools=[Skills(library=library)]
+    )
+    agent.skills = library
+    agent.inbox = asyncio.Queue()
+    agent.inbox.put_nowait("/trip-plan Kyoto")
+    await agent.run("first")
+    users = [m.content or "" for m in llm.calls[0]["messages"] if m.role == Role.USER]
+    assert users[0] == "first"
+    assert users[-1].startswith("Kyoto\n\n[The user invoked the skill `trip-plan`.")
+    assert "# Skill: trip-plan" in users[-1]
+
+
 async def test_unknown_tool_reports_error(settings: Settings):
     script = [
         LLMResponse(tool_calls=[tc("does_not_exist", x=1)]),
