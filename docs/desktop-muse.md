@@ -11,6 +11,8 @@ seats a plugin can take; the bundle takes the seats that give the window the sha
 phone app has, hides the harness's own controls behind *Advanced*, and adds what the
 account brings: the same agent on every device, Reach, an open model layer.
 
+In the chat composer, press **Shift+Enter** to add a line break and **Enter** to send. The Enter setting under **Advanced → Harness** chooses how a message is delivered while an agent is busy; it does not change the line-break shortcut.
+
 ## The window
 
 One window: a narrow icon rail on the far left, a column of chats next to it, the

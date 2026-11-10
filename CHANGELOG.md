@@ -119,6 +119,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Clarified the desktop chat shortcuts for line breaks and sending, and the separate busy-agent Enter setting. For #890.
 - Kept tables of four columns or more inside the agent's chat bubble, where they scroll sideways, instead of running past both edges of the bubble.
 
 - Stopped the hands' step text in the on-screen capsule and the action labels from appearing selected after a Cmd+A reached them during computer use.
