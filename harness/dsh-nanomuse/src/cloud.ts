@@ -917,7 +917,10 @@ export default class NanomuseCloud extends Service {
     // is agreed to like a `shell` command — the card on this screen unless remote control is on.
     for (const action of CODING_ACTIONS) {
       this.hub.handle(action, async (args, call) => {
-        if (GATED_CODING_ACTIONS.has(action)) await this.permit(call.from, action, codingBrief(action, args))
+        if (GATED_CODING_ACTIONS.has(action)) {
+          if (action === 'coding.send' && !this.remoteControl && !this.state.trusted?.[call.from.id]) call.event({ kind: 'authorization' })
+          await this.permit(call.from, action, codingBrief(action, args))
+        }
         return this.coding.handle(action, args, call)
       })
     }

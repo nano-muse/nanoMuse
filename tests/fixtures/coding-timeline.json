@@ -1,0 +1,50 @@
+[
+  {
+    "agent": "codex",
+    "rows": [
+      {"type":"response_item","payload":{"type":"message","role":"user","id":"u1","content":[{"type":"input_text","text":"Fix tests"}]}},
+      {"type":"response_item","payload":{"type":"function_call","call_id":"c1","name":"exec_command","arguments":"{\"cmd\":\"pytest -q\",\"workdir\":\"/workspace\"}"}},
+      {"type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"Wall time: 0.5 seconds\nProcess exited with code 1\nFAILED"}},
+      {"type":"response_item","payload":{"type":"custom_tool_call","call_id":"p1","name":"apply_patch","input":"*** Begin Patch\n*** Update File: a.py\n*** Move to: b.py\n@@\n-old\n+new\n*** Delete File: c.py\n*** End Patch"}},
+      {"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"p1","output":"Success"}},
+      {"type":"response_item","payload":{"type":"message","id":"a1","role":"assistant","content":[{"type":"output_text","text":"**Done**"}]}}
+    ],
+    "tool": "c1",
+    "patch": "p1"
+  },
+  {
+    "agent": "claude",
+    "rows": [
+      {"type":"user","uuid":"u1","message":{"content":"Fix tests"}},
+      {"type":"assistant","uuid":"a1","message":{"content":[{"type":"thinking","thinking":"private"},{"type":"tool_use","id":"c1","name":"Bash","input":{"command":"pytest -q"}}]}},
+      {"type":"user","uuid":"r1","message":{"content":[{"type":"tool_result","tool_use_id":"c1","is_error":true,"content":[{"type":"text","text":"FAILED"}]}]}},
+      {"type":"assistant","uuid":"a2","message":{"content":[{"type":"tool_use","id":"p1","name":"Edit","input":{"file_path":"a.py","old_string":"old\n","new_string":"new\n"}}]}},
+      {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"p1","content":"Success"}]}},
+      {"type":"assistant","uuid":"a3","message":{"content":[{"type":"text","text":"**Done**"}]}}
+    ],
+    "tool": "c1",
+    "patch": "p1"
+  },
+  {
+    "agent": "cursor",
+    "rows": [
+      {"role":"user","uuid":"u1","message":{"content":"Fix tests"}},
+      {"type":"assistant","timestamp_ms":1,"message":{"content":[{"type":"text","text":"partial"}]}},
+      {"type":"tool_call","subtype":"started","tool_call":{"shellToolCall":{"args":{"command":"pytest -q"}}}},
+      {"type":"tool_call","subtype":"completed","tool_call":{"shellToolCall":{"args":{"command":"pytest -q"},"result":{"exit_code":1,"output":"FAILED"}}}},
+      {"role":"assistant","uuid":"a1","message":{"content":[{"type":"text","text":"**Done**"}]}}
+    ],
+    "tool": "line-3"
+  },
+  {
+    "agent": "dsh",
+    "rows": [
+      {"type":"user/message","data":{"id":"u1","source":{"kind":"user"},"content":[{"type":"text","text":"Fix tests"}]}},
+      {"type":"user/message","data":{"source":{"kind":"runtime-context"},"content":[{"type":"text","text":"private"}]}},
+      {"type":"tool_call","callId":"c1","tool":"bash","input":{"command":"pytest -q"}},
+      {"type":"tool_result","callId":"c1","status":"failed","result":"FAILED"},
+      {"type":"assistant/message","data":{"id":"a1","message":{"content":[{"type":"reasoning","text":"private"},{"type":"text","text":"**Done**"}]}}}
+    ],
+    "tool": "c1"
+  }
+]

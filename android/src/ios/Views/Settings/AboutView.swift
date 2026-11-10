@@ -96,6 +96,16 @@ struct AboutView: View {
 
             // nanoMuse: where this comes from, and what it is not.
             Section(AppLocalized("Credits")) {
+                // nanoMuse: attribution for the adapted coding patch reader.
+                Link(destination: URL(string: "https://github.com/Emanuele-web04/remodex")!) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Remodex")
+                            Text("Copyright 2025-2026 Emanuele Di Pietro · Apache-2.0")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: { Image(systemName: "terminal") }
+                }
                 Link(destination: URL(string: "https://github.com/OpenMinis/OpenMinis")!) {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {

@@ -31,6 +31,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -39,6 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from nanomuse.coding.timeline import history
 from nanomuse.stdio import decode_output
 
 # The agents nanoMuse knows how to read and drive; `bins` are tried in order.
@@ -102,6 +104,7 @@ class Session:
     source: str = ""  # cursor: ide | cli; codex: originator; claude: -
     resumable: bool = True
     transcript: list[dict[str, Any]] = field(default_factory=list)
+    timeline: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self, with_transcript: bool = False) -> dict[str, Any]:
         d = {
@@ -121,6 +124,7 @@ class Session:
         }
         if with_transcript:
             d["transcript"] = self.transcript
+            d["timeline"] = self.timeline
         return d
 
 
@@ -203,7 +207,11 @@ def _processes() -> list[tuple[str, str]]:
     if plat == "darwin":
         try:
             ps = subprocess.run(
-                ["ps", "-axo", "comm=,args="], capture_output=True, text=True, timeout=8
+                ["ps", "-axo", "comm=,args="],
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=8,
             )
         except (OSError, subprocess.TimeoutExpired):
             return []
@@ -493,6 +501,7 @@ def _cursor_session(
         # (the runner does this at once rather than trying and failing first)
         resumable=sid in cli_meta,
         transcript=transcript,
+        timeline=history("cursor", lines, _clean) if full else [],
     )
 
 
@@ -514,7 +523,55 @@ def _codex_files(limit: int, workspace: str | None = None) -> list[Path]:
     return [f for _, f in candidates]
 
 
-def _codex_session(f: Path, full: bool) -> Session | None:
+def _clean_codex_user(text: str) -> str:
+    value = _clean(text)
+    if re.match(r"^# AGENTS?\.md instructions(?: for|\s|$)", value, re.I):
+        return ""
+    return value
+
+
+def _codex_titles() -> dict[str, str]:
+    root = sessions_root("codex").parent
+    index_names = {
+        row["id"]: row["thread_name"].strip()
+        for row in _read_lines(root / "session_index.jsonl")
+        if isinstance(row.get("id"), str)
+        and isinstance(row.get("thread_name"), str)
+        and row["thread_name"].strip()
+    }
+    titles: dict[str, str] = {}
+    databases = sorted(
+        (f for f in root.glob("state_*.sqlite") if re.fullmatch(r"state_\d+\.sqlite", f.name)),
+        key=lambda f: int(f.stem.split("_")[1]),
+        reverse=True,
+    )
+    for path in databases:
+        try:
+            db = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=0.1)
+            try:
+                has_name = any(row[1] == "name" for row in db.execute("PRAGMA table_info(threads)"))
+                query = "SELECT id, title, " + ("name" if has_name else "NULL") + " FROM threads"
+                for sid, stored, name in db.execute(query):
+                    if not isinstance(sid, str):
+                        continue
+                    value = (
+                        (name.strip() if isinstance(name, str) else "")
+                        or index_names.get(sid, "")
+                        or (_clean_codex_user(stored) if isinstance(stored, str) else "")
+                    )
+                    if value:
+                        titles[sid] = value
+            finally:
+                db.close()
+            break
+        except (OSError, sqlite3.Error):
+            continue
+    for sid, name in index_names.items():
+        titles.setdefault(sid, name)
+    return titles
+
+
+def _codex_session(f: Path, full: bool, titles: dict[str, str] | None = None) -> Session | None:
     lines = _read_lines(f)
     try:
         st = f.stat()
@@ -544,7 +601,7 @@ def _codex_session(f: Path, full: bool) -> Session | None:
             role = payload.get("role")
             text = _text_of(payload.get("content"))
             if role == "user":
-                text = _clean(text)
+                text = _clean_codex_user(text)
                 if not text or text.startswith("<"):
                     continue
                 first_user = first_user or text
@@ -576,7 +633,9 @@ def _codex_session(f: Path, full: bool) -> Session | None:
     return Session(
         agent="codex",
         id=sid,
-        title=_title(first_user) or "Untitled thread",
+        title=(titles if titles is not None else _codex_titles()).get(sid)
+        or _title(first_user)
+        or "Untitled thread",
         workspace=cwd,
         path=str(f),
         created_at=created,
@@ -587,13 +646,15 @@ def _codex_session(f: Path, full: bool) -> Session | None:
         last_assistant=_title(last_assistant, 160),
         source=originator,
         transcript=transcript,
+        timeline=history("codex", lines, _clean_codex_user) if full else [],
     )
 
 
 def _codex_sessions(limit: int, workspace: str | None) -> list[Session]:
     out = []
+    titles = _codex_titles()
     for f in _codex_files(limit, workspace):
-        s = _codex_session(f, full=False)
+        s = _codex_session(f, full=False, titles=titles)
         if s is None or (
             workspace and os.path.realpath(s.workspace or "") != os.path.realpath(workspace)
         ):
@@ -690,6 +751,7 @@ def _claude_session(f: Path, full: bool) -> Session | None:
         last_user=_title(last_user, 160),
         last_assistant=_title(last_assistant, 160),
         transcript=transcript,
+        timeline=history("claude", lines, _clean) if full else [],
     )
 
 
@@ -845,6 +907,7 @@ def _dsh_session(f: Path, full: bool) -> Session | None:
         # `dsh headless --session-id` adopts a session of this store, so a chat read here continues
         resumable=True,
         transcript=transcript,
+        timeline=history("dsh", lines, _clean) if full else [],
     )
 
 

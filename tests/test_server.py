@@ -3054,8 +3054,8 @@ def test_device_trigger_shows_in_the_triggers_view(server):
 
 def test_the_hub_devices_frame_fires_them(server):
     """The hub's `devices` frame, as the hub client hands it over: what was already online
-    when it arrived is not an arrival; the drop and the return are. A reconnect gets a new
-    baseline, so devices that came online while this runtime was away do not fire."""
+    when it arrived is not an arrival; a later offline-to-online transition is, including
+    when its online frame arrives after an automatic reconnect."""
     from nanomuse.cloud import CLOUD_KEY
 
     client, service, llm = server
@@ -3075,19 +3075,39 @@ def test_the_hub_devices_frame_fires_them(server):
     wait_idle(service, "main")
     assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
 
-    # A connection drop loses the transitions while this runtime is away. Its next welcome
-    # frame is a baseline, not a claim that every currently-online device just arrived.
+    # Reconnects compare against the last accepted frame, including an observed offline
+    # device returning during the gap. Repeated connection attempts do not erase it.
     client.portal.call(lambda: service.hub._on_devices([me, {**phone, "online": False}]))
+    service.hub._hub_state_changed("connecting", "")
+    service.hub._hub_state_changed("connecting", "")
+    llm.script.append(LLMResponse(content="The phone returned during the reconnect."))
+    client.portal.call(lambda: service.hub._on_devices([me, phone]))
+    wait_idle(service, "main")
+    assert service.app.triggers.get(trig.id).fired == 2  # type: ignore[union-attr]
+    notice = [e for e in events_of(client, "main", "notice") if e.get("source") == "trigger"]
+    assert notice and notice[-1]["text"] == "Device online: Pixel"
+    # An unchanged welcome frame brings nothing, and this computer never triggers itself.
     service.hub._hub_state_changed("connecting", "")
     client.portal.call(lambda: service.hub._on_devices([me, phone]))
     wait_idle(service, "main")
-    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
-    notice = [e for e in events_of(client, "main", "notice") if e.get("source") == "trigger"]
-    assert notice and notice[-1]["text"] == "Device online: Pixel"
-    # an unchanged frame brings nothing
-    client.portal.call(lambda: service.hub._on_devices([me, phone]))
-    wait_idle(service, "main")
-    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
+    assert service.app.triggers.get(trig.id).fired == 2  # type: ignore[union-attr]
+
+
+def test_leaving_the_hub_discards_the_device_trigger_baseline(server):
+    """Explicit hub leave, including account switches, cannot reuse another account's
+    device state. Its next first frame seeds a new baseline without firing triggers."""
+    from nanomuse.cloud import CLOUD_KEY
+
+    client, service, _llm = server
+    service.app.vault.set(CLOUD_KEY, "cloud-key-for-the-test")
+    trig = service.create_trigger("device", "say hi", match="pixel")
+    phone = {"id": "phone-1", "name": "Pixel", "kind": "phone", "online": False}
+    client.portal.call(lambda: service.hub._on_devices([phone]))
+    client.portal.call(service.hub.leave)
+    assert service.hub._devices_seen is None
+    service.hub._hub_state_changed("connecting", "")
+    client.portal.call(lambda: service.hub._on_devices([{**phone, "online": True}]))
+    assert service.app.triggers.get(trig.id).fired == 0  # type: ignore[union-attr]
 
 
 def test_data_export_keeps_pending_scheduled_delivery_rows(server):
