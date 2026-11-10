@@ -97,6 +97,8 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 
 App 形象下方的「权限」会列出全部授权，每项都可以单独撤销。API 提供 `DELETE /api/approvals/grants/{key}` 和 `DELETE /api/approvals`；终端 `nanomuse chat` 可用 `/forget-approvals` 清除授权。
 
+同一对话同时调用同一工具时，后来的调用会等待当前审批，再重新检查策略和已保存授权。选了可复用的范围后，范围内的调用不再重复弹卡；「允许一次」仍需逐次回答。其他对话不必等待这张卡片，在那里批准同一工具也会保留各自的对话授权。警告、不同目的地和明确拒绝规则仍分别检查。
+
 App 中无人回答的卡片会在 `server.approval_timeout` 秒后超时，默认一小时，并按拒绝处理。等待审批时，智能体仍可接收新消息。服务器停止时尚未处理的卡片，会在重启后标为过期，因为对应任务已不再运行。
 
 ## 污染追踪 {#taint-tracking}

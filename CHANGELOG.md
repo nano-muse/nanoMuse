@@ -46,6 +46,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Preserved each conversation's tool permissions and reused them after concurrent approval waits, reducing repeated cards while keeping one-time approvals and warning checks separate. For #724.
+
 - **A queued skill invocation runs the skill.** A `/name args` message typed while the agent was working was folded into the running turn as literal slash text, because only the message that started the turn went through the skill expansion, so the model never saw the skill's instructions. Folded messages now expand the same way.
 
 - Preserved device-trigger state across automatic hub reconnects, so an observed offline device returning during the gap still fired its trigger. Explicit hub leave cleared the baseline before joining again. For #883.

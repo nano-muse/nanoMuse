@@ -86,6 +86,8 @@ An approval is a capability, not a mood. It is bound to a **grant key**: the too
 
 Everything you granted is listed under the avatar in the app (Permissions), each with its own revoke button; `DELETE /api/approvals/grants/{key}` and `DELETE /api/approvals` do the same from the API, and `nanomuse chat`'s `/forget-approvals` clears them in the console.
 
+Concurrent calls to the same tool in one conversation wait for the pending approval, then check policy and saved permissions again. Choosing a reusable scope avoids a second card for calls it covers; choosing *once* still asks for each call. Another conversation does not wait for that card, and approving the same tool there preserves both conversations' permissions. Warnings, different destinations and explicit denials still apply separately.
+
 In the app an unanswered card times out after `server.approval_timeout` seconds (default one hour) and counts as deny. The agent keeps accepting new messages while a card is waiting. Cards that were still pending when the server stopped are marked expired on restart; the run behind them is gone.
 
 ## Taint tracking
