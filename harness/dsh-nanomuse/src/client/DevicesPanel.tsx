@@ -18,6 +18,7 @@ import { CODING_SECTION, codingNav } from './CodingPanel.tsx'
 import { IconDevices, IconGlobe, IconLaptop, IconPencil, IconPhone, IconRefresh } from './icons.tsx'
 import { useLive, type LiveDevice } from './live.ts'
 import { MoreButton } from './ui.tsx'
+import { DeviceConversationPanel } from './DeviceConversationPanel.tsx'
 
 const DOWNLOAD_URL = 'https://nanomuse.cn/dl/'
 
@@ -153,6 +154,7 @@ export function makeDevicesPanel(t: Translate) {
           ? h(EmptyDevices, { t, signedIn, connected: hub.connected })
           : h('div', { className: 'nm-dv-grid' },
               others.map((d) => h(DeviceCard, { key: d.id, t, device: d, busy, onForget: () => run(() => call('devices/forget', { device_id: d.id })) }))),
+        signedIn ? h(DeviceConversationPanel, { key: live.cloud.hint, t, devices: others }) : null,
         error ? h('div', { style: errorStyle }, error) : null,
         h('p', { className: 'nm-lead', style: { fontSize: 13 } }, t('devicesHint')),
         h('div', null,

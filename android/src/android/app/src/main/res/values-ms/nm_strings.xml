@@ -1260,4 +1260,8 @@
     <string name="nm_chat_background_purple">Ungu</string>
     <string name="nm_chat_in_progress">Tugas sedang dijalankan</string>
     <string name="nm_mcp_oauth_token_failed">Log masuk penyambung gagal (%1$s). Semak sambungan dan tetapan OAuth, kemudian cuba lagi.</string>
+    <string name="nm_device_chats">Perbualan peranti</string>
+    <string name="nm_device_chat_start">Sembang pada peranti ini</string>
+    <string name="nm_device_chat_uncertain">Penghantaran belum pasti. Menyemak hasil pada peranti.</string>
+    <string name="nm_device_chat_interrupted">Terganggu. Peranti mungkin sudah menjalankan beberapa tindakan.</string>
 </resources>

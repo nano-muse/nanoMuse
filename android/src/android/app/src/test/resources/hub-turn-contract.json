@@ -1,0 +1,8 @@
+{
+  "conversation": "6a6945cf-edac-4523-ac93-fdb4ceafeb26",
+  "turn": "3315babe-654f-4747-a420-e82c6b49d7b2",
+  "other": "b332255c-4fb7-49d9-a097-8b11fd6e15a4",
+  "accepted": {"state": "accepted"},
+  "interrupted": {"state": "interrupted"},
+  "completed": {"state": "completed", "text": "one answer"}
+}

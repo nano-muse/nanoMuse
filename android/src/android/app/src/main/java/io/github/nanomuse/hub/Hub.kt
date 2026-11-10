@@ -29,7 +29,7 @@ object Hub {
     private const val KEY_NAME = "hub.name"
     private const val KEY_REMOTE_CONTROL = "hub.remote_control"
 
-    val ACTIONS = listOf("info", "shell", "files", "file.get", "file.put", "open", "screen", "notify", "task", "approve", "stop", "approve.any")
+    val ACTIONS = listOf("info", "shell", "files", "file.get", "file.put", "open", "screen", "notify", "task", "task.status", "approve", "stop", "approve.any")
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
