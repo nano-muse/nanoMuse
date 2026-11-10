@@ -401,6 +401,10 @@ model = ""               # empty: the [llm] slot as configured; a name decides o
 [squad]
 max_depth = 2            # how deep one task tree may go; a root is depth 0
 max_per_root = 0         # assignments per task tree; 0 means no cap at this level
+execute = false          # also run dispatches (needs a caller that forms a squad with a factory; the server and companion do not yet)
+cheap_model = ""         # model for the cheap tier (research, verify); empty means the [llm] slot as configured
+stall_after_errors = 3   # identical errors in a row, with no successful tool call yet, mark a subtask as stalled
+max_tool_calls = 0       # cap on one subtask's tool calls; 0 means no cap of the watch's own
 
 # ------------------------------------------------------------------------------
 # The hub: this computer as one of the account's devices (docs/hub.md)

@@ -309,7 +309,9 @@ def test_a_dispatch_lands_in_the_ledger_and_on_the_bus(tmp_path: Path) -> None:
     assert len(children) == 1
     child = children[0]
     assert child.role == "research" and child.brief == "search"
-    assert child.mode == "work" and child.status == "queued" and child.depth == 1
+    # the default hand-out is consult since the execution step: a body
+    # that names no mode asks and does not act
+    assert child.mode == "consult" and child.status == "queued" and child.depth == 1
 
 
 def test_a_dispatch_mode_comes_from_the_body_when_it_is_a_real_mode(tmp_path: Path) -> None:
@@ -318,7 +320,9 @@ def test_a_dispatch_mode_comes_from_the_body_when_it_is_a_real_mode(tmp_path: Pa
     assert squad.dispatch("verify", "check", {"mode": "consult"}) is True
     assert squad.dispatch("verify", "report", {"mode": "sideways"}) is True
     children = store.children(squad.root_assignment_id or "")
-    assert {c.brief: c.mode for c in children} == {"check": "consult", "report": "work"}
+    # a real mode in the body wins; anything else falls back to the
+    # consult default, never to work
+    assert {c.brief: c.mode for c in children} == {"check": "consult", "report": "consult"}
 
 
 def test_a_duplicate_open_dispatch_is_refused_and_not_sent(tmp_path: Path) -> None:

@@ -500,11 +500,17 @@ An experimental fast decision layer. With it on, each run first asks the configu
 
 ```toml
 [squad]
-max_depth    = 2   # how deep one task tree may go; a root is depth 0
-max_per_root = 0   # assignments per task tree; 0 means no cap at this level
+max_depth          = 2     # how deep one task tree may go; a root is depth 0
+max_per_root       = 0     # assignments per task tree; 0 means no cap at this level
+execute            = false # also run dispatches, when a caller forms a squad with an agent factory
+cheap_model        = ""    # model for the cheap tier (research, verify); empty means the [llm] slot
+stall_after_errors = 3     # identical errors in a row, with no successful tool call yet, stall a subtask
+max_tool_calls     = 0     # cap on one subtask's tool calls; 0 means no cap of the watch's own
 ```
 
 The squad's task ledger, `squad.db` in the data directory. When a squad is formed with a store, each dispatch is written down as an assignment under a root for the squad, past four enqueue guards: the parent must still be open, work never flows back to an ancestor, an open brief is never handed out twice under the same parent, and depth stays within `max_depth`. `max_per_root` caps the size of one task tree and counts assignments only; money stays with the `[cost]` ledger and its monthly budget gate, the second of the two levels. Assignments carry a seven-state lifecycle and a terminal state is written once, by settling, never revised. When the server starts with a ledger on disk it reconciles it once: an assignment the cost ledger shows already spent on a model call is settled as interrupted and never handed out again, and one with no such record is spared exactly one restart. Forming a squad, recording a dispatch, and the reconcile are all that exist so far; nothing runs a recorded assignment yet.
+
+With `execute` on, a dispatch also runs, provided the caller that formed the squad handed it an agent factory (`nanomuse.team.runner.build_factory`) beside the store: a fresh agent is built for the role's preset, the assignment moves to running, and the answer settles it, with a result frame back to the steward carrying the assignment id and a short summary. The server does not form an executing squad yet, so the switch alone changes nothing until that wiring exists. The presets give research and verify a read-only tool face on the cheap model tier, and execute the full face on the default tier; read-only is judged per call from the tools' own risk assessments, and a read-only subtask's calls pass a gate in front of the Sentinel that only adds refusals. A dispatch that names no mode is a consult: it runs read-only whatever role it was given, and only an explicit `mode = "work"` in the dispatch body lets the execute preset act. Notify dispatches are recorded and never run. A subtask whose tool calls make no progress (the same error `stall_after_errors` times with no successful call yet, or past `max_tool_calls` when set) is stopped and settled as stalled, with the counts in its events. A subtask's model calls are recorded in the cost ledger under its assignment id, so the reconcile's evidence check sees them; sends and file writes a subtask makes still leave no line there.
 
 ## `[server]`
 
