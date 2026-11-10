@@ -1260,4 +1260,8 @@
     <string name="nm_chat_background_purple">สีม่วง</string>
     <string name="nm_chat_in_progress">กำลังดำเนินงาน</string>
     <string name="nm_mcp_oauth_token_failed">ลงชื่อเข้าใช้ตัวเชื่อมต่อไม่สำเร็จ (%1$s) โปรดตรวจสอบการเชื่อมต่อและการตั้งค่า OAuth แล้วลองอีกครั้ง</string>
+    <string name="nm_device_chats">การสนทนาบนอุปกรณ์</string>
+    <string name="nm_device_chat_start">สนทนาบนอุปกรณ์นี้</string>
+    <string name="nm_device_chat_uncertain">ยังไม่แน่ใจว่าส่งถึงแล้ว กำลังตรวจสอบผลบนอุปกรณ์</string>
+    <string name="nm_device_chat_interrupted">ถูกขัดจังหวะ อุปกรณ์อาจดำเนินการบางอย่างไปแล้ว</string>
 </resources>

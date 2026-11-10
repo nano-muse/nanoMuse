@@ -185,6 +185,16 @@ def test_a_lone_pending_call_times_out_on_the_callers_ping(client):
         pc.send_json({"type": "result", "id": "c1", "ok": True, "body": {}})
         assert pc.receive_json()["code"] == "unknown_call"
 
+        # A recovery query is a new Hub call. It is independent of the expired
+        # transport id and carries the stable turn identity unchanged.
+        ids = {"conversation": "conversation-fixture", "turn_id": "turn-fixture"}
+        phone.send_json({"type": "call", "id": "status", "to": "pc-1", "action": "task.status", "args": ids})
+        query = pc.receive_json()
+        assert query["action"] == "task.status" and query["args"] == ids
+        recovered = {"state": "completed", "text": "result from the target journal"}
+        pc.send_json({"type": "result", "id": "status", "ok": True, "body": recovered})
+        assert phone.receive_json()["body"] == recovered
+
 
 def test_web_tab_authenticates_in_hello_and_cannot_be_called(client):
     key = sign_up(client, "13800138000")

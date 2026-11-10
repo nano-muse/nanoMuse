@@ -36,7 +36,7 @@ nanoMuse 不会向这些助手安装插件，也不会把它们的模型请求�
 
 读取记录时，无法解析的行会跳过，目录不存在则视为该助手没有会话。`~` 通常指用户主目录；如果设置了 `NANOMUSE_CODING_HOME`，则改用它指定的目录。这适用于将宿主机 CLI 目录挂载到其他位置的容器，也用于测试。
 
-每条会话记录会列出所属助手、id、标题（第一条用户消息）、工作区、时间戳、消息数、最后一轮对话，以及 `resumable`（能否继续原会话）。Cursor 的 IDE（集成开发环境）聊天可以读取，但无法通过 CLI 继续，标记为 `resumable: false`、`source: "ide"`。向这种聊天发消息时，会在同一工作区新建 CLI 会话，并引用旧聊天的标题和最后一轮对话；运行结果标记为 `resumed: false`，应用也会在输入框上方说明。记录中标为可继续、但 CLI 实际找不到的会话，也采用同样的处理方式。
+每条会话记录会列出所属助手、id、标题（Codex 优先使用只读 `state_*.sqlite` 中保存的名称，其次读取 `session_index.jsonl`，都没有时才使用第一条实际用户消息）、工作区、时间戳、消息数、最后一轮对话，以及 `resumable`（能否继续原会话）。Cursor 的 IDE（集成开发环境）聊天可以读取，但无法通过 CLI 继续，标记为 `resumable: false`、`source: "ide"`。向这种聊天发消息时，会在同一工作区新建 CLI 会话，并引用旧聊天的标题和最后一轮对话；运行结果标记为 `resumed: false`，应用也会在输入框上方说明。记录中标为可继续、但 CLI 实际找不到的会话，也采用同样的处理方式。注入的 `AGENTS.md` 指令不会作为聊天消息或备用标题显示。
 
 dsh 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)，这里读取的是 `dsh web` 和 DeepSeek 自家桌面应用保存在 `~/.dsh` 中的聊天。Python 运行时和 nanoMuse 桌面版都能读取并继续这些聊天。运行时通过其依赖包 `zstandard` 读取文件。nanoMuse 桌面版自己的聊天保存在独立的数据目录，不包含在这些记录中。
 
@@ -85,6 +85,50 @@ POST /api/coding/stop    {run, device?}
 桌面版通过本机回环 API（只供这台电脑内部通信的接口）`nanomuse/cloud/coding` 向自己的窗口提供相同数据结构：`GET` 返回助手和运行记录，另有 `GET /sessions`、`GET /sessions/{agent}/{id}`、`POST /send`、`POST /stop`。`GET /events` 以服务器持续推送的方式发送上述运行事件。桌面版的 `runs.json` 保存在插件数据目录下的 `coding/` 中。
 
 ## 通过 hub 访问其他电脑 {#over-the-hub}
+
+### 结构化浏览，协议 2
+
+结构化时间线、文件变更分组和写入冲突确认的展示参考开源软件 Remodex 中远程控制编程智能体的界面。网络与执行仍完全使用 nanoMuse Hub，不需要 Remodex relay、匹配码、SDK 或守护进程。
+
+Codex 续聊出现会话写入占用错误时，电脑返回失败运行及 `resume_conflict: {process, continuation}`，不再自动新建会话。`process` 尽可能提供进程名和 PID，无法查询时为空。iOS 提供「取消」和「新建会话」：取消保留问题草稿，新建立即替换当前聊天页面，并在同一工作区启动新运行。第一条消息是电脑返回的完整 `Continuing… Last exchange… Now…` 文本，只展示一次，并沿用完全匹配切换到历史。上下文取最后两条可读消息，每条最多 800 个字符，不是模型生成的摘要或完整历史。仅打开锁文件不会被认定为写入占用。Codex 的 `thread/resume` 错误 `already has an active writer` 也会识别为占用，即使 CLI 只通过 stderr 返回错误。
+
+排查续聊时，电脑插件和 iOS App 都需要更新。PC 开发环境的 `npm run start` 只重新编译 Electron 外壳：先编译插件，退出桌面版，在 `harness/desktop` 执行 `npm run prepare-dsh`，再启动。已安装的桌面版需要重新打包安装。电脑本地日志中的 `coding diagnostic` 和 `coding-resume-v2` 记录每次尝试的结果、失败分类和会话标识，不记录提示词或原始 CLI 错误。iOS 在「设置 → 日志」开启日志后复现，再打开当天的日志。`NanoMuseCoding` 记录返回结果是否包含占用信息、弹框选择，以及完成后的实时提示词是否完全匹配新历史用户消息。日志只记录文本长度，不记录聊天正文。反馈时只提供相关条目，其他日志类别可能包含私人数据。
+
+iOS 的历史和实时回复都将同一轮工具调用默认折叠为回复顶部的一项汇总，展开后才显示各次调用。文件变更仍显示在最终回复下方：点击具体文件直接打开该文件的行级 diff，点击整体变更入口则查看输入、输出和文件列表。diff 使用同时支持横向和纵向滚动的区域，长代码行可横向查看，仅在记录包含行号时保留紧凑行号栏。「项目 / 聊天」与上方助手筛选项使用相同的胶囊样式。文件 diff 首次打开时从行左侧开始，加载更多时保留当前滚动位置。增删代码行使用明显的绿色、红色底色，行号采用对应颜色，左侧显示亮色标记条。缺少行号的 patch 也保留底色和标记条。
+
+iOS 切换电脑时，会在新列表加载期间隐藏上一台电脑的项目和会话。已打开的对话仍绑定原来的目标设备。如果历史、输出或差异页面加载失败，可点击「刷新」从最新版本的第一页重新读取，不会混合内容变更前后的分页。
+
+iOS 编程助手分为「项目」和「聊天」，项目会话按电脑上的目录聚合，可选择已安装的助手在项目下新建会话。配色和 Markdown 渲染沿用 nanoMuse。工具记录可以展开查看输出和文件变更行数，进入「执行详情」查看输入和分页输出，再进入文件查看该次工具调用留下的 patch。记录缺少 patch、行数或行号时不会推测，也不会把工作区当前的 Git diff 当作历史变更。
+
+「项目 / 聊天」切换位于「最近的会话」紧上方。会话全屏打开，滚动不会关闭页面。工具折叠时仍显示文件变更入口，同一轮的文件变更也会汇总到最后一条助手回复下方。点击具体文件直接查看已记录的 diff，整体入口保留执行详情。尚未加载的旧记录需先向上加载，才会出现在汇总中。Codex 标题优先读取只读 `state_*.sqlite` 中保存的会话名称，其次读取 `session_index.jsonl`，都没有时才使用第一条实际用户消息。注入的 `AGENTS.md` 指令不会作为聊天消息或备用标题显示。
+
+Python 运行时与桌面插件提供相同的协议。这是编程子协议 2 的增量扩展，不改变 Hub 帧版本。旧客户端继续读取 `transcript`，iOS 连接旧电脑时退回纯文本。
+
+| 指令 | 参数 | 返回 |
+|---|---|---|
+| `coding.agents` | `fresh?` | `protocol_version: 2`，各助手的 `capabilities` |
+| `coding.sessions` | `protocol_version: 2, agent?, workspace?, scope?, limit?, cursor?` | 会话、版本、下一页游标、总数、`bounded` |
+| `coding.projects` | 无 | 已知项目目录、ID、助手 ID 和更新时间 |
+| `coding.project.validate` | `workspace` | 验证绝对目录存在，不返回文件内容 |
+| `coding.session` | `agent, session_id, protocol_version: 2, limit?, cursor?, tail?` | 会话元数据、`timeline`、分页信息和关联运行，不重复传输 `transcript` |
+| `coding.item` | `agent, session_id, item_id, run_id?, limit?, cursor?` | 工具记录、输入、分页输出、`source_truncated` |
+| `coding.diff` | `agent, session_id, diff_reference, run_id?, limit?, cursor?` | 分页 patch、文件路径和 `diff_scope: item` |
+| `coding.watch` | `agent, session_id, version?, run_id?` | 快照是否变化、版本、状态和关联运行 |
+| `coding.send` | 原参数加 `scope?, request_id?, protocol_version?` | 原运行结构，加结构化 `item` 事件和有界时间线 |
+
+时间线记录包含稳定 `id`、`turn_id`、`sequence`、`revision`、`role`、`kind`、`text`、`status`。类型包括消息、命令、工具和文件变更。命令展示真实 `display_command` 和 `cwd`，记录提供时才有退出码、耗时。工具预览包含输入、输出预览和截断标记，文件包含路径、可选行数和不透明的 `diff_reference`。同一工具的新版本替换旧记录，不重复追加。Codex 原始 patch 和 Claude Edit 输入没有原始行号，只有标准 unified hunk 才显示行号。
+
+历史分页最多 200 条，输出和 diff 每页最多 32,768 个字符，单个工具输出保留最多 262,144 个字符并标记截断。内容变化使游标失效，返回 `stale_cursor`，格式错误返回 `invalid_cursor`，应从头刷新，不混合不同版本的页。会话发现扫描最近 500 条，到达上限时返回 `bounded`；iOS 每次加载 100 条，可以搜索和继续加载。聊天通过 `tail: true` 先加载最近 100 条，再按时间顺序向上加载旧记录。
+
+新会话传 `scope: chats` 时，在电脑的 `~/Documents/nanoMuse/Chats/` 下创建独立目录；已知 Codex 非项目目录也归为聊天，其余目录归为项目。发送和停止仍通过现有远程控制与 Sentinel 权限检查。工具和 diff 只解析指定会话或其 nanoMuse 运行中的引用，不接受任意文件路径。目录验证不绕过发送权限。
+
+相同 `request_id` 的并发发送只启动一次，不同内容复用同一 ID 返回 `request_conflict`。完成运行在现有 50 条保留范围内跨重启去重。iOS 使用 `wait: false`，电脑端完成权限检查后立即返回运行 ID，再每三秒查询这次运行的快照。运行期间和新会话尚未获得会话 ID 时也会查询，完成、失败和停止状态来自关联运行，不再依赖长时间等待的发送请求。旧电脑通过 `coding.runs` 跟踪。断线后不会自动重发消息，关闭会话后结束轮询，历史更新不会强制滚动。
+
+一旦观察到工具开始执行或返回结果，恢复会话的运行失败后就保留失败状态。错误中出现「not found」也不会自动新建会话重做这次任务。
+
+发送等待电脑授权时会返回 `authorization` 事件，iOS 显示等待授权状态，发送失败时保留电脑返回的具体错误。未开启远程控制时，需要在桌面端允许请求卡片，或者先信任这台手机。Agent 返回终止性错误后，即使后台进程仍持有输出管道或退出码为零，也会结束为失败，不继续空等。
+
+当前兼容级适配器支持浏览 Codex、Claude Code、Cursor 和 dsh，并控制 nanoMuse 发起的 CLI 运行。**尚未接管外部正在运行的 Agent，也未提供原生审批**：`control_external_run`、`approve` 和任意 `file` 能力为 false。独立的 Codex app-server 富控制适配器不属于本阶段。Cursor IDE 会话保留「在同一工作区继续为新会话」行为。
 
 `device` 用于指定另一台电脑。请求会转换为 hub 动作：`coding.agents`、`coding.sessions`、`coding.session`、`coding.send`、`coding.stop`、`coding.runs`，见 [hub.md](hub.md)。
 

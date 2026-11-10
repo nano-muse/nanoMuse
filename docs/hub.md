@@ -1,5 +1,29 @@
 # The hub: every device is a Muse
 
+Coding runs may include `resume_conflict: {process, continuation}` when a Codex session
+writer is occupied. This is an optional additive field in `coding.send` results and
+the runs returned by `coding.watch` / `coding.runs`; the run ends as `failed` without
+an automatic retry. A confirmed new conversation uses the existing gated `coding.send`
+with an empty `session_id` and the returned continuation as `text`.
+
+## Persistent device conversations
+
+The local prototype for #815 opens independent conversations in **Devices** on Android and desktop. Select an online destination that advertises `task.status`, then start or reopen a conversation. Each entry remembers the device ID and its own conversation UUID. The destination uses its own model and tools. The initiator keeps the transcript locally, independently of side-chat sync.
+
+On desktop, each device conversation keeps its own draft while you switch chats. Text edited while a send is waiting stays in the composer when the send returns.
+
+A message beginning with a device mention uses a separate conversation for that turn. The entry shows the one-off destination. Use `@Device Name [device-id] message` when names are ambiguous. The next ordinary message still goes to the bound device.
+
+The first turn sends `task {text, conversation, turn_id, new_conversation: true, stream: true}`. Follow-ups use the same conversation and a fresh turn UUID with `new_conversation: false`. A missing remembered session reports `context_lost`; only a first turn can create a binding. Calls without `turn_id` retain legacy task behavior.
+
+A definite call rejection before acceptance, such as `no_model` or `denied`, leaves a first conversation unbound. After correcting the setup, the caller may send a new turn with `new_conversation: true`. A returned turn result, including `failed`, or an uncertain delivery never grants permission to recreate the context.
+
+The target saves the session binding and turn before executing and emits `event {stage: "accepted", turn_id}` after committing them. The authenticated account and caller device scope the binding. The initiator saves its turn before dispatch. A repeated turn returns its stored state without executing again. A distinct concurrent turn in the same conversation returns `busy`.
+
+After a disconnect, send `task.status {conversation, turn_id}` as a new Hub call. Its `state` is `accepted`, `completed`, `failed`, `cancelled`, `interrupted` or `unknown`. Completed results carry `text`; failures carry `error` and may carry `message`. An accepted result can include an `events` snapshot of recent progress and pending approvals with their remaining timeout. The initiator replaces its snapshot and reconciles the final answer by turn ID.
+
+A missing record means delivery is uncertain. An accepted turn without a terminal record after executor restart is interrupted and may already have had effects. Recovery never resends the turn. `stop {conversation, turn_id}` requests cancellation of the exact live turn. Its `stopped` field acknowledges the request, and the terminal state confirms the outcome. Once a stopped turn ends, it is retained as `cancelled`; late answer text cannot change it to `completed`. On Android, a persistent reply must follow the user message saved for that turn and precede the next user message. A busy or compacting session, a send that did not start, or an empty or errored result reports failure instead of reusing an older reply. Approval scopes follow the existing task rules. The relay forwards calls without storing the transcript or results.
+
 Sign in to the same nanoMuse Cloud account on a phone, a computer and a browser,
 and they see each other. Each device runs its own Muse with its own hands (the
 phone's apps and sandbox, the computer's shell and screen), and any of them can
@@ -110,7 +134,17 @@ Two kinds of request travel over the hub:
   (`started`, `text`, `tool`, `done`, `error`, each with the run id so the
   caller can `coding.stop`) and answers with the finished run. Only a computer
   announces these actions: a runtime that has the module, or the desktop app.
-  [coding-agents.md](coding-agents.md).
+  [coding-agents.md](coding-agents.md). Coding subprotocol 2 adds read-only
+  `coding.projects`, `coding.project.validate`, `coding.item`, `coding.diff`,
+  and snapshot `coding.watch`; agents announce per-feature capabilities.
+  `coding.session` and `coding.sessions` accept versioned cursors.
+  `coding.send` accepts an idempotent `request_id` and adds `item` revisions
+  alongside the existing event kinds. A gated send may report `authorization`
+  before starting. With `wait: false`, the result acknowledges the owned run;
+  callers follow its status using `coding.watch` with `run_id`, or `coding.runs`
+  on older computers, instead of keeping the send call open.
+  Details, limits and compatibility are
+  in [the coding contract](coding-agents.md#structured-browsing-protocol-2).
 
 Each device decides what it lets others do. On the phone, *Let other devices
 operate this phone* (*Settings → nanoMuse Cloud → Devices*) off makes the phone

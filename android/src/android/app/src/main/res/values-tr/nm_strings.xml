@@ -1264,4 +1264,8 @@
     <string name="nm_chat_background_purple">Mor</string>
     <string name="nm_chat_in_progress">Görev devam ediyor</string>
     <string name="nm_mcp_oauth_token_failed">Bağlayıcı oturumu açılamadı (%1$s). Bağlantıyı ve OAuth ayarlarını kontrol edip tekrar deneyin.</string>
+    <string name="nm_device_chats">Cihaz konuşmaları</string>
+    <string name="nm_device_chat_start">Bu cihazda sohbet et</string>
+    <string name="nm_device_chat_uncertain">Teslim belirsiz. Sonuç cihazda kontrol ediliyor.</string>
+    <string name="nm_device_chat_interrupted">Kesintiye uğradı. Cihaz bazı işlemleri zaten yapmış olabilir.</string>
 </resources>

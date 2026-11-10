@@ -267,6 +267,10 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   Each answer reaches the account's record as one word (`turn.feedback`, `turn.stopped`)
   and nothing else; nothing is shown while signed out.
 
+In the Muse look, wide reply tables scroll inside the agent bubble instead of extending into the rest of the chat pane.
+
+The capsule and screen glow display their status text without allowing text selection. Their approval and Stop buttons still respond to clicks.
+
 ## When the allowance is used up, and the relay's other answers
 
 The account's free allowance gates the model, not the sign-in: when the relay answers a
@@ -430,6 +434,11 @@ starts enabled, while agent teams and automatic authorization review remain opti
 If an earlier version already reset your choices, enable the plugins you want again;
 the lost selection cannot be recovered automatically. Your existing `cordis.yml` and
 `cordis.patch.yml` are kept.
+
+Conversation sync checks for changes every minute and when the hub reconnects. If a
+sync notification arrives during a pull that then times out or loses its connection,
+the failed pull and its follow-up stay handled, without stopping the Host. The next
+successful pull continues from the saved cursor.
 
 ## The agent's desktop guide
 

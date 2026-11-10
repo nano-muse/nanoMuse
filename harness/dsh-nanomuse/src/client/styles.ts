@@ -389,6 +389,10 @@ html[data-nm-muse] [data-chat-flow-kind="assistant-step"] [data-slot="conversati
    also leaves it no width of its own; in a fit-content bubble that width is 0, and the row was an
    empty grey pill that took no clicks (#683). Layout containment only; the height still holds. */
 html[data-nm-muse] [data-chat-flow-kind="assistant-step"] [data-slot="conversation.chat.node"] > [class*="_root"] > [class*="_body"] [data-variant="think"]:not([data-expanded]) { contain: layout; }
+/* A table of four columns or more in the bubble: the harness widens it from that same element out
+   to the whole chat pane (negative margin, padding, 100cqw), which in the bubble put the table's
+   edges outside the grey on both sides. Here it stays inside the bubble and scrolls there. */
+html[data-nm-muse] [data-chat-flow-kind="assistant-step"] [data-slot="conversation.chat.node"] > [class*="_root"] > [class*="_body"] .md-table-wide { width: auto; max-width: 100%; margin-left: 0; padding-left: 0; }
 /* Timestamps and per-message actions appear on hover, as Muse keeps its chat quiet. */
 html[data-nm-muse] [data-chat-flow-kind="user"] [class*="_actions"][data-clock],
 html[data-nm-muse] [data-chat-flow-kind="turn-tail"] [class*="_actions"][data-clock] { opacity: 0; transition: opacity 160ms; }
