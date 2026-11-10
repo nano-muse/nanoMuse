@@ -127,7 +127,7 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 技能是包含 `SKILL.md` 的文件夹，文件开头声明名称和简短说明，之后用 Markdown 编写步骤。它遵守 [Agent Skills](https://agentskills.io) 格式，可以与其他智能体共用。内置十二个技能：`skill-creator`、`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`、`phone-messages`、`feishu`、`tencent-meeting`、`amap`、`kuaidi100`、`train-tickets`。用户技能位于 `<data_dir>/skills/<name>/`，同名时覆盖内置技能。
 
-系统提示词提供所有已启用技能的名称和说明。模型按请求选择，例如京都旅行会选 `trip-plan`，再通过 `skills` 工具读取完整步骤。你也可以输入 `/` 查看技能，按 `Tab` 补全首个匹配；`/trip-plan Kyoto, 5 days in November` 会将技能指令和你的任务一起发送。
+系统提示词提供所有已启用技能的名称和说明。模型按请求选择，例如京都旅行会选 `trip-plan`，再通过 `skills` 工具读取完整步骤。你也可以输入 `/` 查看技能，按 `Tab` 补全首个匹配；`/trip-plan Kyoto, 5 days in November` 会将技能指令和你的任务一起发送。 智能体工作期间也可以调用已启用的技能，指令会在下一次模型调用前加入。技能涉及的工具操作仍遵守原有哨兵审批规则。
 
 添加方式有三种：在技能 → 新建中编写，填好名称后有模板；粘贴原始 `SKILL.md`、GitHub 文件或目录链接并点击「获取」；任务成功后要求「把这个存成技能」。智能体写入前会请求审批，因为 `skills` 的 action=save 是敏感操作，即使 `auto` 也需要，删除同样如此。关闭技能会将其从模型索引移除。内置技能的「复制一份改成你的」会创建用户副本并打开编辑。技能脚本和参考文件在[沙箱](sentinel.md#the-sandbox)内只读可见。终端命令为 `nanomuse skills list | show | add | new | remove | enable | disable`。
 
