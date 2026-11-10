@@ -38,6 +38,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **`nanomuse triggers add device` refuses before sign-in.** The command wrote a device trigger whenever the hub was switched on, even with no Cloud account, and no hub session would ever open to fire it; it now answers `join the hub first`, as the app and the server already did. For #884.
+
 - Restricted Windows coding-agent batch launchers to supported Node shim forms, so quoted script paths in other batch commands could not select a different program. For #854.
 
 - Enabled Windows test coverage for the remote shell: exit codes, stdout and stderr, the working directory, the output bound, and the timeout's tree kill through the taskkill path Windows devices actually take.
