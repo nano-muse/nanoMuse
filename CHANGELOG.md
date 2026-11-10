@@ -106,6 +106,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Clarified the desktop chat shortcuts for line breaks and sending, and the separate busy-agent Enter setting. For #890.
+
 - Added a Skills settings page with descriptions, source details and availability controls for all workspaces or the current workspace. Global disabling took precedence, disabled skills were blocked from discovery and loading, and shared skill files stayed unchanged. For #772.
 - Rejected memory imports that exceeded line, length or capacity limits before changing any entries, preserved existing memories, and reported disk-write failures so the import could be retried. For #870.
 
