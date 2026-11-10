@@ -229,6 +229,10 @@ for live frosted blur. Other tabs keep their navigation appearance. With the key
 open the composer sits on the keyboard and the pill is behind it. The Feed, Ideas, Goals and
 Library lists end above the pill as well, so their last row is never under it.
 
+While a reply streams, scrolling towards older messages pauses automatic following immediately.
+New text, tool cards and keyboard layout changes do not resume it. Use the down-arrow
+button, scroll back to the latest message, or send a message to follow the conversation again.
+
 The web console of the same account is at the relay (`/app`), the desktop app in
 [desktop.md](desktop.md); the phone, the desktop and the web share the design language
 described in [brand.md](brand.md).

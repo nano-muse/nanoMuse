@@ -27,6 +27,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.ui.input.pointer.pointerInput
+// nanoMuse: preserve transcript-reading intent across streamed content and layout changes.
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import io.github.nanomuse.chat.ChatScrollFollowConnection
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -315,15 +318,6 @@ private const val ATTACHMENT_PICK_LIMIT = 50
  * make the live anchor transiently read "not at bottom").
  */
 private const val SEND_FOLLOW_GRACE_MS = 2_000L
-
-// [T-android-stream-end-arm-race] How long after streaming→idle the
-// position-driven userScrolledAway net stays suppressed, so the final
-// markdown reflow (which lands ~100-150 ms after _isStreaming clears and
-// changes row heights just like streaming growth did) cannot arm the flag
-// and neuter the stream-end re-pin. Comfortably covers the settle LE's own
-// 220 ms delay plus its 900 ms verification pass.
-private const val STREAM_END_ARM_GRACE_MS = 1_500L
-
 
 /**
  * [T-slash-picker-fixed-height port from iOS 73f1b94a] Locked popup
@@ -879,10 +873,6 @@ fun ChatScreen(
     // separate from lastSendTimeMs above — that one also drives the 300ms
     // IME-residue suppression in the composer and must stay UI-send-only.
     var lastUserAppendMs by remember { mutableStateOf(0L) }
-    // [T-android-stream-end-arm-race] Timestamp of the last streaming→idle
-    // edge. Guards the position-driven userScrolledAway net against the final
-    // markdown reflow that lands just after _isStreaming clears.
-    var lastStreamEndMs by remember { mutableStateOf(0L) }
     androidx.compose.runtime.LaunchedEffect(inputText) {
         if (inputFieldValue.text != inputText) {
             // [T-android-slash-menu-align-ios-prepend] Honor a one-shot caret
@@ -1426,11 +1416,8 @@ fun ChatScreen(
     // streaming glide (LE(streaming-content)) still uses the running average to
     // size its per-frame steps.
 
-    // T138 phase 2 v3: separate "user scrolled away" intent from listState
-    // position. isNearBottom flips false during the transient window where
-    // new items are inserted at index 0 but listState still anchors on the
-    // previous item — that is NOT user intent. Drive auto-follow off
-    // `userScrolledAway` which only toggles on real user drags.
+    // nanoMuse: streaming can move list geometry without user input. Keep reading
+    // intent separate, driven by the nested user-scroll connection below.
     var userScrolledAway by remember { mutableStateOf(false) }
 
     // [T-android-scrollbtn-turn-walk] Up-button turn-walk state, mirroring iOS
@@ -1780,19 +1767,12 @@ fun ChatScreen(
         coroutineScope.launch {
             tracedScrollToItem("SEND-PATH/initial", 0, 0)
             kotlinx.coroutines.delay(100)
-            tracedScrollToItem("SEND-PATH/settle", 0, 0)
+            // nanoMuse: a later reading gesture takes precedence over this delayed pin.
+            if (!userScrolledAway) tracedScrollToItem("SEND-PATH/settle", 0, 0)
         }
     }
-    // T196: timestamp of the last drag-stop. The streaming auto-follow LE
-    // below has three stages (initial scroll → re-pin after frame → settle
-    // after 220 ms) any of which can fire on the *next* token after a drag
-    // ends. When the user drags down while already near the bottom,
-    // userScrolledAway never flips true, so without this grace window the
-    // three stages all run on the next chunk and the user sees the chat
-    // "jump back" three times. 1 s covers a typical fling settle (~500-
-    // 800 ms) plus a small buffer; the user can re-engage follow at any
-    // time by scrolling all the way to the bottom (LE(isNearBottom) above
-    // resets userScrolledAway).
+    // nanoMuse: leave a short grace after a drag before following newly streamed text.
+    // Returning to the bottom is detected by actual user input, not layout timing.
     var lastInterruptMs by remember { mutableStateOf(0L) }
     // [T-android-composer-input-blocked-while-streaming] True only while the
     // user's FINGER is actively dragging the message list. Programmatic scrolls
@@ -1821,11 +1801,8 @@ fun ChatScreen(
                 is androidx.compose.foundation.interaction.DragInteraction.Stop -> {
                     isUserDragging = false
                     lastInterruptMs = System.currentTimeMillis()
-                    val nowAtBottom = isNearBottom.value
-                    val newScrolledAway = !nowAtBottom
-                    if (newScrolledAway != userScrolledAway) {
-                        userScrolledAway = newScrolledAway
-                    }
+                    // nanoMuse: nested user-scroll deltas own follow intent. A drag-stop
+                    // position can already have changed because another chunk was measured.
                 }
                 is androidx.compose.foundation.interaction.DragInteraction.Cancel ->
                     isUserDragging = false
@@ -1833,46 +1810,13 @@ fun ChatScreen(
             }
         }
     }
-    // Re-engage follow whenever the user (manually or via FAB) returns
-    // the viewport to the bottom.
-    //
-    // [T-android-stream-end-anchor-jump] Gate the clear on RECENT USER
-    // INTERACTION. Without this, the final markdown re-render at the
-    // streaming→idle edge briefly collapses the last assistant row's height
-    // (large code blocks / tables / images finalizing their layout), which
-    // clamps firstVisibleItemScrollOffset within the nearBottomThreshold for
-    // one frame. isNearBottom flips true, this LE clears userScrolledAway,
-    // and the stream-end settle LE — whose live-anchor check sees the same
-    // bogus near-bottom offset — then scrollToItem()s the user back to
-    // wherever the layout collapse parked them (often the start of the
-    // current user message, because that's the "first content row" the
-    // settle LE pins on). Only accept the clear when the user actually
-    // dragged into this position recently — a real return-to-bottom gesture
-    // always trails a DragInteraction.Stop, which lastInterruptMs records.
-    // FAB taps also work because the FAB onClick path resets userScrolledAway
-    // directly (line 1124) and never relies on this LE.
-    LaunchedEffect(isNearBottom.value) {
-        if (isNearBottom.value && userScrolledAway) {
-            val sinceDragMs = System.currentTimeMillis() - lastInterruptMs
-            // KEEP userScrolledAway when no recent drag — the at-bottom
-            // reading came from a stream-end layout reflow, not a real
-            // return-to-bottom gesture.
-            if (sinceDragMs > 1500L) return@LaunchedEffect
-            userScrolledAway = false
-        }
-    }
-    // T169 / T170: an IME show/hide animates the LazyColumn's content area,
-    // which can briefly register as a synthetic drag-stop and flip
-    // userScrolledAway=true even though the user never actually scrolled.
-    //
-    // T170: only force-reset when we're actually back at the bottom. Earlier
-    // behaviour of unconditionally clearing userScrolledAway hid the FAB on
-    // users who had scrolled up to read history and then opened the keyboard
-    // to send a follow-up — auto-follow then yanked them away from where
-    // they were reading.
-    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
-    LaunchedEffect(imeBottomPx) {
-        if (userScrolledAway && isNearBottom.value) userScrolledAway = false
+    // nanoMuse: only an actual return gesture, a send or the existing down button
+    // reattaches follow. IME changes and final markdown reflow are layout, not intent.
+    val readingScrollConnection = remember(listState, isNearBottom) {
+        ChatScrollFollowConnection(
+            isNearBottom = { isNearBottom.value },
+            setDetached = { userScrolledAway = it },
+        )
     }
     // [T-android-tool-autoscroll] Start-of-turn edge from ViewModel: resume() /
     // retryLast() / retryFromMessage() / rerunFromToolBlock() emit Unit on
@@ -2047,7 +1991,8 @@ fun ChatScreen(
                             while (
                                 (listState.firstVisibleItemIndex != 0 ||
                                     listState.firstVisibleItemScrollOffset != 0) &&
-                                guard < 120
+                                // nanoMuse: observe reading intent before every animation frame.
+                                !userScrolledAway && guard < 120
                             ) {
                                 guard++
                                 val remaining = listState.firstVisibleItemIndex * avg +
@@ -2073,11 +2018,6 @@ fun ChatScreen(
     val streamingNowFlag = isStreaming
     LaunchedEffect(streamingNowFlag) {
         if (streamingNowFlag) return@LaunchedEffect  // edge fires only on streaming→idle
-        // [T-android-stream-end-arm-race] Stamp the edge BEFORE the 220 ms
-        // delay below: the final reflow that would otherwise arm
-        // userScrolledAway (and turn this very LE into a no-op) fires inside
-        // that window, so the grace has to already be open when it lands.
-        lastStreamEndMs = System.currentTimeMillis()
         // [T-android-stream-end-reflow-flicker-v18] The user-was-reading
         // branch is a HARD NO-OP. After the v18 ChatFlatItems fix (keep
         // rawFragments on the last assistant turn regardless of
@@ -2149,151 +2089,8 @@ fun ChatScreen(
             }
         }
     }
-    // T170: when a user-initiated drag ends near the bottom, give the
-    // streaming follow path one extra pin in case content grew during the
-    // drag (we suppressed the streaming LE while isScrollInProgress). This
-    // mirrors iOS settleAfterInteraction.
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .distinctUntilChanged()
-            .collect { inProgress ->
-                // [T-android-small-drag-snaps-back] Re-pin to bottom after a
-                // drag-end ONLY while actively STREAMING. T170's purpose is to
-                // catch content that grew during a drag we suppressed the
-                // streaming-follow LE for — that only matters mid-stream. When
-                // NOT streaming, a finger lift near the bottom must NOT yank the
-                // viewport back: that was the "small upward drag snaps back to
-                // bottom" bug (logged: settle-after-interaction firing with
-                // firstOff=27/34 right after a sub-threshold peek). The earlier
-                // bottom-item-offset<0 guard could not distinguish a user's
-                // upward peek from content drift — in reverseLayout BOTH push the
-                // bottom item's offset negative — so it never actually gated.
-                // isStreaming is the real discriminator. The streaming-content LE
-                // (gated by lastInterruptMs + isScrollInProgress) handles the
-                // follow itself; this is just the post-drag settle for it.
-                if (!inProgress && !userScrolledAway && isNearBottom.value &&
-                    viewModel.isStreaming.value
-                ) {
-                    tracedScrollToItem("settle-after-interaction", 0, 0)
-                }
-                // [T-android-scroll-fling-stale-userscrolledaway #49] Catch
-                // the stale-userScrolledAway window left by a fling-from-
-                // bottom: DragInteraction.Stop fires at finger lift while
-                // isNearBottom is still true, so the DragStop handler sets
-                // userScrolledAway=false; the fling then carries the
-                // viewport off-bottom. Use the isScrollInProgress→false
-                // edge (past drag AND fling settle) as the authoritative
-                // checkpoint and re-arm userScrolledAway.
-                if (!inProgress && !isNearBottom.value && !userScrolledAway) {
-                    userScrolledAway = true
-                }
-            }
-    }
-
-    // [T-android-updown-fab-asymmetry] Position-driven safety net for the
-    // down-button's gate.
-    //
-    // The re-arm above keys on the `isScrollInProgress` FALLING EDGE, so it only
-    // covers viewport movement that Compose reports as a scroll — drags and
-    // flings. `listState.scrollToItem` (used by every programmatic jump here,
-    // including the up-button's turn-walk) moves the viewport WITHOUT ever
-    // setting that flag, so no edge arrives and `userScrolledAway` stays false
-    // while the user is nowhere near the bottom. The down-button is then hidden
-    // and the only way back is a manual drag — the reported bug.
-    //
-    // Keying on the position itself closes that hole for ALL movers, present and
-    // future, instead of patching each call site. Deliberately one-directional:
-    // this only ARMS the flag. Clearing stays with the existing handlers (drag
-    // stop, jump-to-bottom, send, session switch), because "we drifted near the
-    // bottom" must not be mistaken for "the user chose to follow again" — that
-    // conflation is what T138/T170 were fixed for.
-    //
-    // [T-android-stream-follow-dies-after-first-paragraph] The arm must NOT
-    // fire on content growth. `isNearBottom` goes false for two very different
-    // reasons: (a) the user moved the viewport away, and (b) the streaming
-    // message grew taller than the viewport while the viewport stood still.
-    // Case (b) happens on essentially every multi-paragraph reply — the row at
-    // index 0 gets taller under reverseLayout, so the bottom edge slides out
-    // from under us before the next follow-scroll runs. Arming on (b) was
-    // self-defeating: the flag killed the streaming auto-follow that would
-    // have restored the bottom, so the reply scrolled through its first
-    // paragraph and then froze with the rest hidden behind the tool bar and
-    // composer, with no drag anywhere in the trace (observed 20:35:56.145 —
-    // `scrolledAway=true` 1.4s after send, zero DragInteraction).
-    //
-    // Suppress the arm outright while a turn is streaming. A first attempt
-    // tried to keep the net alive during streaming by demanding a "viewport
-    // moved" signal (isScrollInProgress, or firstVisibleItemIndex changing).
-    // That is not a valid discriminator and the on-device trace disproved it:
-    //
-    //   [20:40:45.050] ScrollFollow userScrolledAway ARMED
-    //                  inProgress=false firstIdx=1 streaming=true
-    //
-    // A growing row at index 0 pushes the previous row across the viewport
-    // boundary, so firstVisibleItemIndex advances 0→1 with the user's finger
-    // nowhere near the screen — indistinguishable, by position alone, from a
-    // real scroll. There is no purely positional test that separates the two.
-    //
-    // So gate on the turn instead: while isStreaming is true, the streaming
-    // auto-follow owns the viewport and an off-bottom reading is expected
-    // drift, not intent. Real user gestures during a stream are still honoured
-    // — the DragInteraction.Stop handler above sets userScrolledAway directly
-    // and does not route through this net. Outside a stream the net keeps its
-    // original T-android-updown-fab-asymmetry behaviour untouched, which is
-    // the case it was actually built for (programmatic turn-walk jumps).
-    //
-    // [T-android-stream-end-arm-race] The window must extend PAST the
-    // streaming→idle edge. The final markdown re-render (code blocks, tables
-    // and lists finishing their real layout) lands AFTER _isStreaming flips
-    // false, and it changes row heights exactly like streaming growth did:
-    //
-    //   21:20:52.959  _isStreaming=false
-    //   21:20:53.066  coldPrewarm.done + firstItem re-compose  (final reflow)
-    //   21:20:53.076  ARMED  inProgress=false firstIdx=1 streaming=false
-    //
-    // 117 ms after the flag cleared, so the isStreaming gate no longer
-    // covered it and the reflow armed userScrolledAway with the user's finger
-    // nowhere near the screen. That in turn made the stream-end settle LE
-    // (which sleeps 220 ms then bails on `if (userScrolledAway)`) a no-op, so
-    // the transcript was left parked mid-reply with the down-FAB showing —
-    // reported as "output stopped but the view isn't at the bottom".
-    //
-    // STREAM_END_ARM_GRACE_MS keeps the suppression alive across that reflow.
-    // It is deliberately longer than the settle LE's own 220 ms delay so the
-    // re-pin gets to run first and legitimately restore the bottom; a real
-    // drag inside the window still arms the flag directly via the
-    // DragInteraction.Stop handler, which never routes through this net.
-    LaunchedEffect(listState) {
-        snapshotFlow { isNearBottom.value }
-            .distinctUntilChanged()
-            .collect { nearBottom ->
-                val firstIdx = listState.firstVisibleItemIndex
-                // Content-growth drift during a live turn is not a user intent.
-                val sinceStreamEnd = System.currentTimeMillis() - lastStreamEndMs
-                val streamingDrift = viewModel.isStreaming.value ||
-                    (lastStreamEndMs > 0L && sinceStreamEnd <= STREAM_END_ARM_GRACE_MS)
-                if (!nearBottom && !userScrolledAway && !streamingDrift) {
-                    userScrolledAway = true
-                    // [T-android-stream-follow-dies-after-first-paragraph]
-                    // Arming kills streaming auto-follow, so record WHY. If a
-                    // "reply stopped scrolling" report ever recurs, this line
-                    // is the first thing to grep: streaming=true here means
-                    // the drift heuristic let a non-gesture through.
-                    AppLogger.debug(
-                        "ScrollFollow",
-                        "userScrolledAway ARMED inProgress=${listState.isScrollInProgress} " +
-                            "firstIdx=$firstIdx streaming=${viewModel.isStreaming.value}",
-                    )
-                } else if (!nearBottom && streamingDrift) {
-                    val why = if (viewModel.isStreaming.value) "streaming content growth"
-                              else "stream-end reflow (+${sinceStreamEnd}ms)"
-                    AppLogger.debug(
-                        "ScrollFollow",
-                        "arm SUPPRESSED ($why) firstIdx=$firstIdx",
-                    )
-                }
-            }
-    }
+    // nanoMuse: scroll completion and list geometry do not change follow intent.
+    // The nested connection above records real input, including wheel and fling returns.
 
     // Auto-focus input on new sessions so keyboard pops up immediately.
     //
@@ -4018,6 +3815,8 @@ fun ChatScreen(
                         bottom = bottomChromeHeight + bottomReserve,
                     ),
                     modifier = Modifier
+                        // nanoMuse: detach on the user's first movement, before any next chunk.
+                        .nestedScroll(readingScrollConnection)
                         .fillMaxWidth()
                         // [T-android-chat-max-content-width] Cap the reading
                         // measure on a wide window, mirroring iOS
@@ -4143,7 +3942,8 @@ fun ChatScreen(
                                 coroutineScope.launch {
                                     tracedScrollToItem("RESUME-BANNER/initial", 0, 0)
                                     kotlinx.coroutines.delay(100)
-                                    tracedScrollToItem("RESUME-BANNER/settle", 0, 0)
+                                    // nanoMuse: a later reading gesture takes precedence over this delayed pin.
+                                    if (!userScrolledAway) tracedScrollToItem("RESUME-BANNER/settle", 0, 0)
                                 }
                             })
                         }
@@ -4939,7 +4739,8 @@ fun ChatScreen(
                                 // land short while late-measuring items shift the
                                 // true bottom; re-issue once layout settles.
                                 kotlinx.coroutines.delay(100)
-                                tracedScrollToItem("FAB-DOWN/settle", 0, 0)
+                                // nanoMuse: a later reading gesture takes precedence over this delayed pin.
+                                if (!userScrolledAway) tracedScrollToItem("FAB-DOWN/settle", 0, 0)
                             }
                         },
                         // nanoMuse: scroll-to-latest, centered under the conversation:
@@ -5973,7 +5774,8 @@ fun ChatScreen(
                             coroutineScope.launch {
                                 tracedScrollToItem("SEND-PATH(keyboard-imeAction)/initial", 0, 0)
                                 kotlinx.coroutines.delay(100)
-                                tracedScrollToItem("SEND-PATH(keyboard-imeAction)/settle", 0, 0)
+                                // nanoMuse: a later reading gesture takes precedence over this delayed pin.
+                                if (!userScrolledAway) tracedScrollToItem("SEND-PATH(keyboard-imeAction)/settle", 0, 0)
                             }
                             true
                         }
