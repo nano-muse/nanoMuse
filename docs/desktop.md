@@ -545,7 +545,7 @@ is still starting. `desktop.log` carries `host: ready after N min` when a start 
 than half a minute. A second start is quicker, since the files have been checked once;
 should every start stay slow, excluding the install folder from real-time scanning helps.
 
-Edits to an own-key provider in Advanced model settings survive app restarts. An empty chat-model list stays empty, while image and video entries remain. Removing an own-key provider row there removes its saved nanoMuse source and moves the chat selection to another available source; saved keys stay in the credential vault. To remove a source and its key together, use Settings → Account. Use Settings → Models to choose another source or switch nanoMuse Cloud models off.
+Edits to an own-key provider in Advanced model settings survive app restarts. Removing its provider row removes the saved nanoMuse source and moves the chat selection to another available source; saved keys stay in the credential vault. A chat-model list loaded empty from configuration disables that source instead of restoring the default catalog, while image and video entries remain. The host can refuse deletion of a custom source's last model; remove the provider row to disable that source. To remove a source and its key together, use Settings → Account. Use Settings → Models to choose another source or switch nanoMuse Cloud models off.
 
 ## macOS permissions
 

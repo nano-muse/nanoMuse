@@ -1975,7 +1975,7 @@ export default class NanomuseCloud extends Service {
       ...(catalogRoute ? { catalogRoute } : {}),
       ...(keepCatalogOnly ? { customModels: true } : {}),
     }
-    await this.ctx.settings.update(LLM_ROW, { providers: { [rowId]: ownProviderRow(row, entry.reasoning) } })
+    await this.writeOwnAdapterRow(row, ownProviderRow(row, entry.reasoning))
     this.state = { ...this.state, providers: { ...this.state.providers, [rowId]: row } }
     await this.writeState()
     await this.adoptOwnDefault(rowId, row)
@@ -2003,7 +2003,7 @@ export default class NanomuseCloud extends Service {
     const entry = this.catalogue.find((p) => p.id === row.provider)
     const name = label.trim().slice(0, 80) || (row.provider === 'custom' ? hostNameOf(row.baseURL) : lang.toLowerCase().startsWith('zh') ? entry?.name_zh : entry?.name) || id
     const renamed: OwnProvider = { ...row, label: name }
-    await this.ctx.settings.update(LLM_ROW, { providers: { [id]: ownProviderRow(renamed, entry?.reasoning) } })
+    await this.writeOwnAdapterRow(renamed, ownProviderRow(renamed, entry?.reasoning))
     this.state = { ...this.state, providers: { ...this.state.providers, [id]: renamed } }
     await this.writeState()
     this.broadcast()
@@ -2035,7 +2035,7 @@ export default class NanomuseCloud extends Service {
       if (!Object.hasOwn(written, id)) {
         // Only an explicit document change after observing this live row is removal.
         // An adapter absent during startup is restored from the saved source instead.
-        if (pruneMissing && this.seenOwnRows.get(id) === row) {
+        if (pruneMissing && !this.ownAdapterDormant(row) && this.seenOwnRows.get(id) === row) {
           nextProviders ??= { ...providers }
           delete nextProviders[id]
           this.seenOwnRows.delete(id)
@@ -2099,6 +2099,9 @@ export default class NanomuseCloud extends Service {
     // Serialize selection changes after the synchronous source edit. Saved credentials stay
     // in the vault; editing a model list is not a request to destroy a key.
     void this.serialize(async () => {
+      for (const row of Object.values(this.state.providers ?? {})) {
+        if (this.ownAdapterDormant(row)) await this.writeOwnAdapterRow(row, {})
+      }
       for (const id of removed) {
         if (!this.state.providers?.[id]) await this.releaseChatRoute(id)
       }
@@ -2151,29 +2154,61 @@ export default class NanomuseCloud extends Service {
       return
     }
     const written = (current.value as { providers?: Record<string, unknown> } | undefined)?.providers ?? {}
+    const before = new Map(rows.map(([id]) => [id, canonical(written[id] ?? null)]))
     void this.serialize(async () => {
       for (const [id, row] of rows) {
         if (this.state.providers?.[id] !== row) continue
         const entry = this.catalogue.find((p) => p.id === row.provider)
-        const wanted = ownProviderRow(row, entry?.reasoning)
-        if (canonical(written[id] ?? null) === canonical(wanted)) continue
-        const revision = this.ctx.settings.describe().find((d) => d.ns === LLM_ROW)?.revision
-        await this.ctx.settings.update(LLM_ROW, { providers: { [id]: wanted } }, revision).catch((error: unknown) => this.ctx.logger.warn('nanomuse: own-key row %s not refreshed: %s', id, message(error)))
-        // A native edit can land while a loader write is pending. Do not leave the stale
-        // source behind, or let cleanup race a legitimate save of the same id.
-        const latest = this.state.providers?.[id]
-        if (latest === row) continue
-        const current = this.ctx.settings.describe().find((d) => d.ns === LLM_ROW)
-        const actual = (current?.value as { providers?: Record<string, unknown> } | undefined)?.providers?.[id]
-        if (canonical(actual ?? null) !== canonical(wanted)) continue
-        if (!latest) {
-          await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', id] }], current?.revision)
-        } else {
-          const hint = this.catalogue.find((p) => p.id === latest.provider)?.reasoning
-          await this.ctx.settings.update(LLM_ROW, { providers: { [id]: ownProviderRow(latest, hint) } }, current?.revision)
-        }
+        const wanted = this.ownAdapterDormant(row) ? undefined : ownProviderRow(row, entry?.reasoning)
+        const expectedWrite = canonical(wanted ?? null)
+        if (canonical(written[id] ?? null) === expectedWrite) continue
+        const descriptor = this.ctx.settings.describe().find((d) => d.ns === LLM_ROW)
+        const live = (descriptor?.value as { providers?: Record<string, unknown> } | undefined)?.providers?.[id]
+        if (this.state.providers?.[id] !== row || canonical(live ?? null) !== before.get(id)) continue
+        await this.writeOwnAdapterRow(row, wanted ?? {}, descriptor?.revision).catch((error: unknown) => this.ctx.logger.warn('nanomuse: own-key row %s not refreshed: %s', id, message(error)))
+        await this.repairOwnRefresh(id, row, expectedWrite)
       }
     }).catch((error: unknown) => this.ctx.logger.warn('nanomuse: own-key refresh interrupted: %s', message(error)))
+  }
+
+  /** An empty list means no chat source, because the host treats [] as its default catalog. */
+  private ownAdapterDormant(row: OwnProvider): boolean {
+    return row.customModels === true && !row.models.some((model) => model.kind === 'chat')
+  }
+
+  private async writeOwnAdapterRow(row: OwnProvider, profile: Record<string, unknown>, revision?: number): Promise<void> {
+    if (this.ownAdapterDormant(row)) {
+      this.seenOwnRows.delete(row.id)
+      await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', row.id] }], revision)
+    } else {
+      await this.ctx.settings.update(LLM_ROW, { providers: { [row.id]: profile } }, revision)
+    }
+  }
+
+  /** Remove only our late write, with bounded retries if another settings row moved. */
+  private async repairOwnRefresh(id: string, row: OwnProvider, expectedWrite: string): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const latest = this.state.providers?.[id]
+      if (latest === row) return
+      const current = this.ctx.settings.describe().find((d) => d.ns === LLM_ROW)
+      if (!current) return
+      // Native descriptors project schema defaults into value. Compare the actual user
+      // override when available, so defaults do not disguise the row this refresh wrote.
+      const document = current.user ?? current.value
+      const actual = (document as { providers?: Record<string, unknown> } | undefined)?.providers?.[id]
+      if (canonical(actual ?? null) !== expectedWrite) return
+      try {
+        if (!latest) {
+          await this.ctx.settings.mutate(LLM_ROW, [{ op: 'unset', path: ['providers', id] }], current.revision)
+        } else {
+          const hint = this.catalogue.find((p) => p.id === latest.provider)?.reasoning
+          await this.writeOwnAdapterRow(latest, ownProviderRow(latest, hint), current.revision)
+        }
+        return
+      } catch (error) {
+        if ((error as { code?: unknown }).code !== 'SETTINGS_CONFLICT' || attempt === 2) throw error
+      }
+    }
   }
 
   /**

@@ -682,7 +682,7 @@ test('Advanced deletion of an observed own provider survives restart without tou
   }
 })
 
-test('an explicitly empty chat catalog survives writes, restart and key updates while media remains (#889)', async () => {
+test('a loaded empty chat catalog stays dormant across restart and key updates while media remains (#889)', async () => {
   const out = await cloud()
   const server = await modelsServer(['first-model', 'second-model', 'qwen-image-3.0'])
   try {
@@ -700,13 +700,13 @@ test('an explicitly empty chat catalog survives writes, restart and key updates 
     assert.deepEqual(saved.providers.custom.models.filter((m) => m.kind === 'chat'), [])
     out.svc.refreshOwnRows()
     await out.svc.busy
-    assert.deepEqual(out.settings[LLM_ROW].providers.custom.models, [])
+    assert.equal(out.settings[LLM_ROW].providers.custom, undefined)
     const again = await restartForCatalog(out)
-    assert.deepEqual(again.settings[LLM_ROW].providers.custom.models, [])
+    assert.equal(again.settings[LLM_ROW].providers.custom, undefined)
     const rekeyed = await out.api('POST', '/providers/save', { id: 'custom', row: 'custom', apiKey: 'updated-key', baseURL: server.url })
     assert.equal(rekeyed.status, 200)
     assert.deepEqual(rekeyed.body.models.filter((m) => m.kind === 'chat'), [])
-    assert.deepEqual(out.settings[LLM_ROW].providers.custom.models, [])
+    assert.equal(out.settings[LLM_ROW].providers.custom, undefined)
     await out.svc.busy
     await out.svc.stateWrites
   } finally {
@@ -826,9 +826,9 @@ test('an empty catalog-route model list keeps its override after key update and 
     const rekeyed = await out.api('POST', '/providers/save', { id: 'opencode-go', row: 'opencode-go', apiKey: 'next-key' })
     assert.equal(rekeyed.status, 200)
     assert.equal(rekeyed.body.customModels, true)
-    assert.deepEqual(out.settings[LLM_ROW].providers['opencode-go'].models, [])
+    assert.equal(out.settings[LLM_ROW].providers['opencode-go'], undefined)
     const again = await restartForCatalog(out)
-    assert.deepEqual(again.settings[LLM_ROW].providers['opencode-go'].models, [])
+    assert.equal(again.settings[LLM_ROW].providers['opencode-go'], undefined)
     await out.svc.busy
     await out.svc.stateWrites
   } finally {
@@ -853,7 +853,7 @@ test("a new custom endpoint never inherits another endpoint's empty catalog or s
     assert.deepEqual(added.body.models.map((m) => m.id), ['second-model'])
     assert.equal(added.body.baseURL, second.url)
     assert.notEqual(added.body.keyRef, (await out.state()).providers.custom.keyRef)
-    assert.deepEqual(out.settings[LLM_ROW].providers.custom.models, [])
+    assert.equal(out.settings[LLM_ROW].providers.custom, undefined)
     await out.svc.busy
     await out.svc.stateWrites
   } finally {
@@ -889,5 +889,54 @@ test('removing and re-adding the same source does not reuse the previous adapter
   } finally {
     await server.close()
     await out.done()
+  }
+})
+
+
+test('late-refresh cleanup retries an unrelated settings conflict but preserves a changed target (#889)', async () => {
+  for (const changedTarget of [false, true]) {
+    const out = await cloud()
+    const server = await modelsServer(['first-model'])
+    try {
+      await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'first-key', baseURL: server.url, capabilities: ['chat'] })
+      await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'other-key', baseURL: server.url, capabilities: ['chat'] })
+      out.svc.chatOptions()
+      out.settings[LLM_ROW].providers.custom.displayName = 'old label'
+      const update = out.ctx.settings.update
+      const mutate = out.ctx.settings.mutate
+      const describe = out.ctx.settings.describe
+      out.ctx.settings.describe = () => describe().map((d) => ({ ...d, user: structuredClone(d.value), value: { ...d.value, providers: Object.fromEntries(Object.entries(d.value.providers ?? {}).map(([id, row]) => [id, { defaultContextWindow: 12345, ...row }])) } }))
+      let began, release
+      const entered = new Promise((resolve) => { began = resolve })
+      const gate = new Promise((resolve) => { release = resolve })
+      let first = true
+      out.ctx.settings.update = async (...args) => { if (first) { first = false; began(); await gate } return update(...args) }
+      let conflicts = 0
+      out.ctx.settings.mutate = async (...args) => {
+        if (args[1][0].path[1] === 'custom' && conflicts++ === 0) {
+          out.settings[LLM_ROW].providers['custom-2'].displayName = 'Other edit'
+          if (changedTarget) out.settings[LLM_ROW].providers.custom.displayName = 'User replacement'
+          throw Object.assign(new Error('concurrent settings edit'), { code: 'SETTINGS_CONFLICT' })
+        }
+        return mutate(...args)
+      }
+      out.svc.refreshOwnRows()
+      await entered
+      delete out.settings[LLM_ROW].providers.custom
+      out.emit('settings/document-updated', LLM_ROW, 1)
+      release()
+      await out.svc.busy
+      assert.equal(out.settings[LLM_ROW].providers['custom-2'].displayName, 'Other edit')
+      if (changedTarget) {
+        assert.equal(out.settings[LLM_ROW].providers.custom.displayName, 'User replacement')
+        assert.equal(conflicts, 1)
+      } else {
+        assert.equal(out.settings[LLM_ROW].providers.custom, undefined)
+        assert.equal(conflicts, 2)
+      }
+    } finally {
+      await server.close()
+      await out.done()
+    }
   }
 })

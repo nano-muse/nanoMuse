@@ -312,7 +312,7 @@ export function ownProviderRow(p: OwnProvider, hint?: ReasoningHint): Record<str
     return {
       displayName: p.label,
       ...(p.keyRef ? { apiKeyEnv: p.keyRef } : {}),
-      ...(chat.length || p.customModels ? { models: chat.map((m) => ({ id: m.id, displayName: m.name, input: m.vision ? ['text', 'image'] : ['text'] })) } : {}),
+      ...(chat.length ? { models: chat.map((m) => ({ id: m.id, displayName: m.name, input: m.vision ? ['text', 'image'] : ['text'] })) } : {}),
     }
   }
   const api = apiOf(p.protocol, p.baseURL)
