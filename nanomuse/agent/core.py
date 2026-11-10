@@ -533,7 +533,7 @@ class MuseAgent:
         step = 0
         empty_replies = 0
         task_token = self.sentinel.begin_task(
-            purpose or user_input, conversation=self.conversation_id
+            purpose or user_input, conversation=self.conversation_id, execution_llm=self.llm
         )
         session_token = llm_session.enter(self.session_id)
         turn_token = llm_session.begin_turn(run, self.turns)

@@ -26,7 +26,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from types import UnionType
 from typing import Any, Literal, Union, get_args, get_origin
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -262,6 +262,41 @@ class SentinelRule(BaseModel):
     reason: str = ""
 
 
+class ReviewSettings(MediaSettings):
+    """An optional observation-only reviewer, with bounded requests and no policy authority."""
+
+    mode: Literal["off", "observe"] = "off"
+    base_url: str = ""
+    timeout: float = Field(default=5.0, ge=0.1, le=30.0, allow_inf_nan=False)
+    max_input_chars: int = Field(default=6000, ge=1000, le=16000)
+    max_output_tokens: int = Field(default=1024, ge=64, le=4096)
+
+    @field_validator("base_url")
+    @classmethod
+    def _review_address(cls, value: str) -> str:
+        if value:
+            parts = urlsplit(value)
+            if parts.scheme not in ("http", "https") or not parts.hostname:
+                raise ValueError("The review model address must use HTTP or HTTPS.")
+            if parts.username is not None or parts.password is not None:
+                raise ValueError("Keep credentials in the review API key field.")
+            if parts.query or parts.fragment:
+                raise ValueError("The review model address cannot contain a query or fragment.")
+            _ = parts.port
+        return value
+
+    @model_validator(mode="after")
+    def _bind_separate_key(self) -> ReviewSettings:
+        # A TOML key must not follow a one-turn provider or a later chat endpoint.
+        # An explicit catalogue provider has a stable endpoint; otherwise require a URL.
+        if self.api_key and not self.base_url:
+            endpoint = self.endpoint
+            if not endpoint:
+                raise ValueError("Set a review provider or address before a separate API key.")
+            self.base_url = endpoint
+        return self
+
+
 class SentinelSettings(BaseModel):
     # ask    : safe/moderate run freely, sensitive actions need approval (default)
     # strict : moderate *and* sensitive actions need approval
@@ -290,6 +325,7 @@ class SentinelSettings(BaseModel):
     # Enable taint tracking: once the agent has read private data, network egress to
     # non-allowlisted destinations requires approval.
     taint_tracking: bool = True
+    review: ReviewSettings = Field(default_factory=ReviewSettings)
 
 
 class MemorySettings(BaseModel):
@@ -940,6 +976,15 @@ def save_app_settings(data_dir: Path, data: dict[str, Any]) -> None:
 
 def apply_app_settings(settings: Settings, data: dict[str, Any]) -> None:
     """Layer app-managed settings over ``settings`` in place."""
+    if isinstance(review := data.get("sentinel_review"), dict):
+        # Empty slot fields deliberately restore the active execution model. Validate the
+        # whole slot so malformed persisted limits cannot create an unbounded observer.
+        values = settings.sentinel.review.model_dump()
+        values.update({k: v for k, v in review.items() if k in values and v is not None})
+        try:
+            settings.sentinel.review = ReviewSettings.model_validate(values)
+        except ValueError:
+            logger.warning("Invalid sentinel_review app settings ignored")
     if llm := data.get("llm"):
         for key in ("provider", "model", "base_url", "api_key", "tool_mode", "vision"):
             if key in llm and llm[key] not in (None, ""):
@@ -1220,6 +1265,7 @@ __all__ = [
     "MCPServerSettings",
     "MCPSettings",
     "MemorySettings",
+    "ReviewSettings",
     "SandboxSettings",
     "SentinelRule",
     "SentinelSettings",

@@ -14,7 +14,7 @@ from nanomuse.background import spawn
 from nanomuse.calendar import CalendarFeeds
 from nanomuse.cloud import CLOUD_KEY, DEFAULT_GUI_MODEL, model_url
 from nanomuse.computer.link import ComputerLink
-from nanomuse.config import CHATGPT_PROVIDER, PROTOCOLS, LLMSettings, Settings
+from nanomuse.config import CHATGPT_PROVIDER, PROTOCOLS, LLMSettings, ReviewSettings, Settings
 from nanomuse.contacts import ContactBook
 from nanomuse.goals import GoalStore
 from nanomuse.llm import BaseLLM, catalogue, create_llm
@@ -28,6 +28,7 @@ from nanomuse.runtime import device, device_mcp_server
 from nanomuse.sandbox import Sandbox
 from nanomuse.search import WebSearchProvider
 from nanomuse.sentinel import AuditLog, Sentinel
+from nanomuse.sentinel.review import ReviewClient, SentinelReviewer
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools import (
     AskUser,
@@ -105,6 +106,14 @@ class NanoMuseApp:
             persistent_approvals_file=settings.data_dir / "approvals.json",
         )
         self.llm = llm or self.make_llm()
+        self.reviewer = SentinelReviewer(
+            settings=lambda: self.settings.sentinel.review,
+            client=self.make_review_llm,
+            audit=self.audit,
+            redact=self.vault.redact,
+            known_secrets=self.review_known_secrets,
+        )
+        self.sentinel.reviewer = self.reviewer
         # Holds: the person takes the browser, the screen or the phone over for a while and
         # the tools wait (docs/browser.md). The server routes the cards; the CLI has none.
         self.holds = Holds(emit=getattr(ui, "on_hold", None))
@@ -202,6 +211,83 @@ class NanoMuseApp:
             return True
         base = str(llm.base_url or "").rstrip("/")
         return bool(base) and base == model_url(self.settings.cloud.base_url).rstrip("/")
+
+    def review_llm_settings(
+        self, review: ReviewSettings | None = None, execution_llm: BaseLLM | None = None
+    ) -> LLMSettings:
+        """Derive the review slot without resolving credentials into plaintext.
+
+        A changed provider or endpoint never inherits the execution slot's key, headers,
+        request body, or proxy. An explicit model alone stays on that slot's endpoint.
+        """
+        review = review or self.settings.sentinel.review
+        current = execution_llm or self.llm
+        while isinstance(inner := getattr(current, "inner", None), BaseLLM):
+            current = inner
+        active = getattr(current, "settings", None)
+        if not isinstance(active, LLMSettings):
+            active = self.settings.llm
+        provider = review.provider or active.provider
+        base_url: str | None = review.base_url
+        if not base_url:
+            base_url = review.endpoint if provider != active.provider else active.endpoint
+        same_endpoint = provider == active.provider and (base_url or "").rstrip("/") == (
+            active.endpoint or ""
+        ).rstrip("/")
+        return LLMSettings(
+            provider=provider,
+            model=review.model or active.model or str(getattr(current, "model", "") or ""),
+            base_url=base_url,
+            api_key=review.api_key or (active.api_key if same_endpoint else ""),
+            extra_headers=dict(active.extra_headers) if same_endpoint else {},
+            extra_body=dict(active.extra_body) if same_endpoint else {},
+            proxy=active.proxy if same_endpoint else "",
+            tool_mode="native",
+            vision="off",
+            stream=False,
+            temperature=0.0,
+            max_tokens=review.max_output_tokens,
+            max_retries=0,
+            timeout=review.timeout,
+        )
+
+    def make_review_llm(
+        self, review: ReviewSettings, execution_llm: BaseLLM | None = None
+    ) -> ReviewClient:
+        """Use the actual turn's model by default, with an independent message list."""
+        settings = self.review_llm_settings(review, execution_llm)
+        if not review.configured and not review.api_key:
+            return ReviewClient(
+                execution_llm or self.llm, settings.provider, settings.model, owned=False
+            )
+        if self.vault.has_placeholders(settings.api_key):
+            key = self.vault.resolve(settings.api_key, strict=False)
+            if self.vault.has_placeholders(key):
+                key = ""
+            settings = settings.model_copy(update={"api_key": key})
+        return ReviewClient(
+            create_llm(settings, data_dir=self.settings.data_dir),
+            settings.provider,
+            settings.model,
+            owned=True,
+        )
+
+    def review_known_secrets(self, execution_llm: BaseLLM | None = None) -> list[str]:
+        """Known plaintext client credentials also need masking outside named secret fields."""
+        values = [self.settings.llm.api_key, self.settings.sentinel.review.api_key]
+        values.extend(self.settings.llm.extra_headers.values())
+        for client in (self.llm, execution_llm):
+            if client is None:
+                continue
+            while isinstance(inner := getattr(client, "inner", None), BaseLLM):
+                client = inner
+            config = getattr(client, "settings", None)
+            if isinstance(config, LLMSettings):
+                values.append(config.api_key)
+                values.extend(config.extra_headers.values())
+        # Vault values are handled by vault.redact; preserve unresolved placeholders as
+        # placeholders. None of these values enters the prompt or observation log.
+        return [value for value in values if value and not self.vault.has_placeholders(value)]
 
     def cloud_signed_in(self) -> bool:
         """Whether the account is signed in on this runtime (the Cloud key is in the vault),
@@ -478,6 +564,7 @@ class NanoMuseApp:
         return self
 
     async def close(self) -> None:
+        await self.reviewer.close()
         await self.tools.cleanup()
         if self.mcp is not None:
             await self.mcp.close()

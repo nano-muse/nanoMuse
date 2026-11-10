@@ -37,7 +37,7 @@ sequenceDiagram
 | 组件组装入口 | `nanomuse/app.py` | `NanoMuseApp` 根据设置组装 LLM、工具、保险库、哨兵、记忆、目标和智能体 |
 | 智能体循环 | `nanomuse/agent/core.py` | 组装提示词、裁剪上下文、检测停滞、持久保存会话、接收中途消息；可选共享[任务预算](runtime-budgets.md)，缩短工具结果时记录日志 |
 | 提示词 | `nanomuse/prompts.py` | 系统提示词、语言规则、文字系统检测，以及推进目标的提示词 |
-| 哨兵 | `nanomuse/sentinel/gate.py`、`policy.py`、`audit.py` | 工具调用检查、决策顺序、审批、污染状态、保险库占位符解析、脱敏和 JSONL 审计日志 |
+| 哨兵 | `nanomuse/sentinel/gate.py`、`policy.py`、`audit.py`、`review.py` | 工具调用检查、决策顺序、审批、污染状态、保险库占位符解析、脱敏和 JSONL 审计日志；可选的后台模型观察不改变执行权限 |
 | 保险库 | `nanomuse/vault/vault.py` | Fernet 加密存储，以及 `{{vault:NAME}}` 机密占位符 |
 | 工具基类 | `nanomuse/tools/base.py` | `BaseTool`、`CallAssessment`、`ToolCollection`、`safe_execute` |
 | 内置工具 | `nanomuse/tools/files.py`、`shell.py`、`web.py`、`email_tool.py`、`browser.py` + `browser_backends.py`，支持服务器 Playwright 或手机 WebView，见 [browser.md](browser.md)；`memory_tools.py`、`goal_tools.py`、`terminate.py` | |

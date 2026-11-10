@@ -86,7 +86,58 @@ An approval is a capability, not a mood. It is bound to a **grant key**: the too
 
 Everything you granted is listed under the avatar in the app (Permissions), each with its own revoke button; `DELETE /api/approvals/grants/{key}` and `DELETE /api/approvals` do the same from the API, and `nanomuse chat`'s `/forget-approvals` clears them in the console.
 
+Concurrent calls to the same tool in one conversation wait for the pending approval, then check policy and saved permissions again. Choosing a reusable scope avoids a second card for calls it covers; choosing *once* still asks for each call. Another conversation does not wait for that card, and approving the same tool there preserves both conversations' permissions. Warnings, different destinations and explicit denials still apply separately.
+
+Recurring reminders and triggers attached to a saved chat reuse that chat's permissions. Each standalone run still has its own conversation scope. Replacing a persisted permission with an until-restart permission removes the old disk record too, so it cannot return after restarting.
+
 In the app an unanswered card times out after `server.approval_timeout` seconds (default one hour) and counts as deny. The agent keeps accepting new messages while a card is waiting. Cards that were still pending when the server stopped are marked expired on restart; the run behind them is gone.
+
+## Optional model observations
+
+The Python runtime can ask a model to observe tool permission decisions. Open
+**Permissions → Model review (observe only)** in the web app, or set
+`[sentinel.review] mode = "observe"` in `config.toml`. The default is `off`.
+This setting is separate from Sentinel's `ask`, `strict` and `auto` policies.
+It applies to the Python runtime, not the phones' native permission gates or DSH's
+own approval system.
+
+An observation is an additional, isolated model request. Empty model settings reuse
+the active execution model, including a model selected for one turn. To use another
+model, configure `provider`, `model`, `base_url` and its optional `api_key` under
+`[sentinel.review]`, or use the form in Permissions. A model-only override can use
+the current provider's credentials. Changing provider or endpoint does not carry
+the previous endpoint's key to the new destination. Keys entered in the web app
+go into the vault; an empty key input keeps the saved key, and the explicit clear
+control removes it. A separate key in `config.toml` must name an explicit provider
+or address, so it cannot follow a chat model to a different endpoint. A failed
+settings save preserves the active endpoint and its original key.
+
+The reviewer receives a bounded task-purpose excerpt, risk flags and a snapshot
+of the actual tool arguments before vault substitution. Known credentials and
+common credential fields are redacted. It does not receive the full conversation,
+tool outputs, or additional file contents. Script dependencies and remote MCP
+implementations are not available to it. Missing or truncated context is marked;
+an `allow` suggestion with incomplete input becomes `ask`. Enabling observation
+shares this limited input with the selected provider and uses additional model
+calls. Redaction is not a guarantee that arbitrary task text contains no private
+information.
+
+Suggestions never grant permission, reject an operation, or answer an approval
+card. Reviews run in the background with a five-second timeout by default, a
+6,000-character input limit and a requested 1,024-token output budget. Some
+provider adapters, including ChatGPT sign-in, do not enforce that token budget;
+the review deadline and the accepted response limit of 256 characters still apply.
+At most four reviews
+run at once; excess work is recorded as skipped. Provider errors, timeouts and
+invalid responses are recorded without changing the normal decision.
+
+**Activity** and `audit.jsonl` show `sentinel_review` records with the suggestion,
+actual permission decision, decision source, model, status and a hash of the
+full call snapshot. Reported token usage is recorded when available. The hash
+identifies the reviewed arguments; it does not certify script dependencies or
+remote code. Raw reviewer reasoning, responses and provider errors are not
+stored in these records. This first mode gathers evidence for evaluating a
+reviewer; it does not offer automatic model approval.
 
 ## Taint tracking
 
