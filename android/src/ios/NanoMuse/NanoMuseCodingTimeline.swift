@@ -340,7 +340,11 @@ struct NanoMuseCodingItemDetail: View {
                     }
                 }
                 if loading { ProgressView() }
-                if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+                if let error {
+                    Text(error).font(.footnote).foregroundStyle(.red)
+                    Button(AppLocalized("Refresh")) { Task { await load(more: false) } }
+                        .disabled(loading)
+                }
             }
             .navigationTitle(AppLocalized("Execution details"))
             .navigationBarTitleDisplayMode(.inline)
@@ -363,7 +367,10 @@ struct NanoMuseCodingItemDetail: View {
             output = more ? output + text : text
             cursor = page["next_cursor"] as? String
             error = (reply["source_truncated"] as? Bool) == true ? AppLocalized("Recorded output was truncated.") : nil
-        } catch { self.error = NanoMuseHubErrors.describe(error) }
+        } catch {
+            if NanoMuseCodingBridge.invalidPage(error) { cursor = nil }
+            self.error = NanoMuseHubErrors.describe(error)
+        }
     }
 }
 
@@ -500,7 +507,11 @@ struct NanoMuseCodingDiffView: View {
                         .fixedSize(horizontal: true, vertical: false)
                         if cursor != nil { Button(AppLocalized("Load more")) { Task { await load(more: true) } }.disabled(loading) }
                         if loading { ProgressView() }
-                        if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+                        if let error {
+                            Text(error).font(.footnote).foregroundStyle(.red)
+                            Button(AppLocalized("Refresh")) { Task { await load(more: false) } }
+                                .disabled(loading)
+                        }
                     }
                     .padding(.horizontal, 12)
                 }
@@ -530,6 +541,9 @@ struct NanoMuseCodingDiffView: View {
             cursor = reply["next_cursor"] as? String
             error = nil
             if !more { initialScrollToken += 1 }
-        } catch { self.error = NanoMuseHubErrors.describe(error) }
+        } catch {
+            if NanoMuseCodingBridge.invalidPage(error) { cursor = nil }
+            self.error = NanoMuseHubErrors.describe(error)
+        }
     }
 }

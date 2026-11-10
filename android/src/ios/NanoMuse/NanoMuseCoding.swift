@@ -157,6 +157,11 @@ enum NanoMuseCodingBridge {
         return description + "\n" + String(hub.message.prefix(2000))
     }
 
+    static func invalidPage(_ error: Error) -> Bool {
+        guard let code = (error as? HubError)?.code else { return false }
+        return code == "stale_cursor" || code == "invalid_cursor"
+    }
+
     /// One `coding.send` event folded into the run (pure, tested).
     static func step(_ run: LiveRun, event ev: [String: Any]) -> LiveRun {
         var r = run
@@ -223,21 +228,30 @@ enum NanoMuseCodingBridge {
 struct NanoMuseCodingView: View {
     @ObservedObject private var hub = NanoMuseHub.shared
     @State private var chosenId: String?
-    @State private var agents: [NanoMuseCodingBridge.Agent] = []
-    @State private var sessions: [NanoMuseCodingBridge.Session] = []
+    @State private var listing = NanoMuseCodingListState()
     @State private var filter: String?
-    @State private var loading = false
-    @State private var error: String?
     @State private var open: NanoMuseCodingBridge.Session?
+    @State private var openComputer: HubDevice?
     @State private var newWith: NanoMuseCodingBridge.Agent?
+    @State private var newComputer: HubDevice?
     @State private var scope = "projects"
     @State private var search = ""
-    @State private var cursor: String?
 
     private var computers: [HubDevice] {
         hub.others.filter { $0.online && $0.isComputer && ($0.actions.isEmpty || $0.actions.contains("coding.sessions")) }
     }
     private var computer: HubDevice? { computers.first { $0.id == chosenId } ?? computers.first }
+    private var current: Bool { listing.device == computer?.id }
+    private var agents: [NanoMuseCodingBridge.Agent] { current ? listing.agents : [] }
+    private var sessions: [NanoMuseCodingBridge.Session] { current ? listing.sessions : [] }
+    private var cursor: String? { current ? listing.cursor : nil }
+    private var error: String? { current ? listing.error : nil }
+    private var loading: Bool { current && listing.request != nil }
+
+    private func show(_ session: NanoMuseCodingBridge.Session, on computer: HubDevice) {
+        openComputer = computer
+        open = session
+    }
 
     var body: some View {
         List {
@@ -287,8 +301,8 @@ struct NanoMuseCodingView: View {
                         ForEach(agents.filter { $0.installed && (filter == nil || filter == $0.id) }) { a in
                             Button {
                                 if scope == "chats", a.richHistory {
-                                    open = NanoMuseCodingBridge.Session(agent: a.id, id: "", title: "", workspace: "", updatedAt: nil, messages: 0, status: "idle", lastUser: "", lastAssistant: "", resumable: true, scope: "chats")
-                                } else { newWith = a }
+                                    show(NanoMuseCodingBridge.Session(agent: a.id, id: "", title: "", workspace: "", updatedAt: nil, messages: 0, status: "idle", lastUser: "", lastAssistant: "", resumable: true, scope: "chats"), on: computer)
+                                } else { newComputer = computer; newWith = a }
                             } label: {
                                 Label(String(format: AppLocalized("New conversation with %@"), a.name), systemImage: "plus.bubble")
                             }
@@ -324,12 +338,12 @@ struct NanoMuseCodingView: View {
                                 Menu {
                                     ForEach(agents.filter(\.installed)) { agent in
                                         Button(agent.name) {
-                                            open = NanoMuseCodingBridge.Session(agent: agent.id, id: "", title: "", workspace: workspace, updatedAt: nil, messages: 0, status: "idle", lastUser: "", lastAssistant: "", resumable: true)
+                                            show(NanoMuseCodingBridge.Session(agent: agent.id, id: "", title: "", workspace: workspace, updatedAt: nil, messages: 0, status: "idle", lastUser: "", lastAssistant: "", resumable: true), on: computer)
                                         }
                                     }
                                 } label: { Label(AppLocalized("Start something new"), systemImage: "plus.bubble") }
                                 ForEach(shown.filter { $0.workspace == workspace }, id: \.key) { s in
-                                    Button { open = s } label: { sessionRow(s) }.buttonStyle(.plain)
+                                    Button { show(s, on: computer) } label: { sessionRow(s) }.buttonStyle(.plain)
                                 }
                             } label: {
                                 Label((workspace as NSString).lastPathComponent, systemImage: "folder")
@@ -338,7 +352,7 @@ struct NanoMuseCodingView: View {
                         }
                     } else {
                         ForEach(shown, id: \.key) { s in
-                            Button { open = s } label: { sessionRow(s) }.buttonStyle(.plain)
+                            Button { show(s, on: computer) } label: { sessionRow(s) }.buttonStyle(.plain)
                         }
                     }
                     if cursor != nil { Button(AppLocalized("Load more")) { load(more: true) }.disabled(loading) }
@@ -365,14 +379,14 @@ struct NanoMuseCodingView: View {
             }
         }
         .task(id: computer?.id) {
-            if computer != nil { load() } else { agents = []; sessions = [] }
+            if computer != nil { load() } else { listing = NanoMuseCodingListState() }
         }
         .fullScreenCover(item: $open, onDismiss: { load() }) { s in
-            if let computer {
+            if let computer = openComputer {
                 NavigationStack {
                     NanoMuseCodingSessionView(computer: computer, session: s, agentName: agents.first { $0.id == s.agent }?.name ?? s.agent,
                                              onNewSession: { open = $0 })
-                        .id(s.key)
+                        .id(computer.id + "|" + s.key)
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) { Button(AppLocalized("Done")) { open = nil } }
                         }
@@ -380,9 +394,11 @@ struct NanoMuseCodingView: View {
             }
         }
         .sheet(item: $newWith) { a in
-            NanoMuseCodingNewSheet(agent: a, device: computer?.id ?? "", scope: a.richHistory ? scope : "projects", workspaces: Array(Set(sessions.filter { $0.scope == "projects" }.map(\.workspace).filter { !$0.isEmpty })).sorted()) { workspace in
+            NanoMuseCodingNewSheet(agent: a, device: newComputer?.id ?? "", scope: a.richHistory ? scope : "projects", workspaces: Array(Set((listing.device == newComputer?.id ? listing.sessions : []).filter { $0.scope == "projects" }.map(\.workspace).filter { !$0.isEmpty })).sorted()) { workspace in
                 newWith = nil
-                open = NanoMuseCodingBridge.Session(agent: a.id, id: "", title: "", workspace: workspace, updatedAt: nil, messages: 0, status: "idle", lastUser: "", lastAssistant: "", resumable: true, scope: a.richHistory ? scope : "projects")
+                if let computer = newComputer {
+                    show(NanoMuseCodingBridge.Session(agent: a.id, id: "", title: "", workspace: workspace, updatedAt: nil, messages: 0, status: "idle", lastUser: "", lastAssistant: "", resumable: true, scope: a.richHistory ? scope : "projects"), on: computer)
+                }
             }
             .presentationDetents([.medium])
         }
@@ -390,20 +406,18 @@ struct NanoMuseCodingView: View {
 
     private func load(more: Bool = false) {
         guard let dev = computer else { return }
-        loading = true
-        error = nil
+        let request = listing.begin(device: dev.id, more: more)
         Task { @MainActor in
             do {
                 let found = try await NanoMuseCodingBridge.agents(device: dev.id)
-                let page = try await NanoMuseCodingBridge.sessionPage(device: dev.id, cursor: more ? cursor : nil)
-                guard computer?.id == dev.id else { loading = false; return }
-                agents = found
-                sessions = more ? sessions + page.sessions.filter { item in !sessions.contains(where: { $0.key == item.key }) } : page.sessions
-                cursor = page.cursor
+                let page = try await NanoMuseCodingBridge.sessionPage(device: dev.id, cursor: request.cursor)
+                listing.complete(request, selectedDevice: computer?.id,
+                                 agents: found, sessions: page.sessions, cursor: page.cursor)
             } catch {
-                self.error = NanoMuseHubErrors.describe(error)
+                listing.fail(request, selectedDevice: computer?.id,
+                             message: NanoMuseHubErrors.describe(error),
+                             invalidCursor: NanoMuseCodingBridge.invalidPage(error))
             }
-            loading = false
         }
     }
 
@@ -757,7 +771,11 @@ struct NanoMuseCodingSessionView: View {
             rich = page.rich
             watchingRun = page.runs.first { $0["status"] as? String == "running" }?["id"] as? String ?? ""
             error = nil
-        } catch { self.error = NanoMuseHubErrors.describe(error) }
+        } catch {
+            guard sessionId == requested, !Task.isCancelled else { return }
+            if NanoMuseCodingBridge.invalidPage(error) { cursor = nil }
+            self.error = NanoMuseHubErrors.describe(error)
+        }
     }
 
     private func send(_ firstMessage: String? = nil) {

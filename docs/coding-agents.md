@@ -202,6 +202,11 @@ Opening a file diff starts at the left edge; loading more keeps the current scro
 Added and removed code lines use solid tinted backgrounds, matching coloured line numbers
 and a bright left-edge marker, including patches without recorded line numbers.
 
+Switching computers on iOS hides the previous computer's projects and sessions while
+the new list loads. An open conversation keeps its original destination. If a paged
+history, output or diff fails to load, use **Refresh** to restart from the latest
+first page; pages from changed content are never combined.
+
 The iOS coding screen separates **Projects** and **Chats**, groups project sessions
 by folder, and starts a new conversation with an installed agent in that folder.
 It uses nanoMuse's existing colours and Markdown renderer. Tool rows expand into

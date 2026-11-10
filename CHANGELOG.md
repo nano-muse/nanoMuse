@@ -209,6 +209,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
+- Kept iOS coding projects and session requests tied to the selected computer, and added refresh recovery for failed output and diff pages.
+
 - Collapsed each coding reply's tool calls into a summary above the reply and opened file diffs directly from specific file entries.
 - Reduced unused diff gutters, enabled horizontal scrolling through long code lines, and matched the Projects / Chats controls to the coding-agent filters.
 - Recognized Codex's `already has an active writer` resume error so iOS offered a new conversation instead of showing only the CLI failure.
