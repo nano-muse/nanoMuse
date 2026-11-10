@@ -36,12 +36,24 @@ Two guards live here, both tightening, neither bypassing:
   detection is a different signal (repeated replies) and is left
   alone.  Calls the Sentinel refuses never reach a tool, so they are
   not the watch's evidence.
-- the *read-only gate* wraps the Sentinel for read-only presets.
-  ``guard`` first asks the preset layer whether the call only reads
+- the *gate and ceiling* wrapper sits in front of the real Sentinel
+  (below).  The gate serves read-only presets: ``guard`` first asks
+  the preset layer whether the call only reads
   (``nanomuse.team.presets.is_read_only_call``) and refuses it on the
-  spot when it does not, before any approval is asked for.  Every
-  call it lets through goes to the real Sentinel's guard unchanged:
-  the wrapper adds refusals and removes nothing.
+  spot when it does not, before any approval is asked for.  The
+  ceiling serves every role: it is the assignment's frozen level,
+  read from the ledger row the factory was handed, never from the
+  preset or the settings of the moment, so nothing reconfigured
+  after the assignment was enqueued can widen it.  A call measured
+  above the ceiling (``nanomuse.team.presets.assessed_risk``) is
+  refused before the wrapped Sentinel is consulted, which is what
+  makes the ceiling unbypassable from inside the assignment: no
+  approval, grant or token the Sentinel might honour is ever
+  reached.  The ceiling bounds the whole assignment, where an
+  approval settles one action.  Every call neither layer refuses
+  goes to the real Sentinel's guard unchanged: the wrapper adds
+  refusals and removes nothing.  An assignment whose row names no
+  level gets no ceiling layer, exactly the second step's wiring.
 """
 
 from __future__ import annotations
@@ -58,9 +70,15 @@ from nanomuse.goals import GoalStore
 from nanomuse.llm.base import BaseLLM
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryStore
-from nanomuse.schema import ToolCall, ToolResult
+from nanomuse.schema import RiskLevel, ToolCall, ToolResult
 from nanomuse.sentinel import AuditLog, Sentinel
-from nanomuse.team.presets import RolePreset, envelope_note, is_read_only_call, read_only_face
+from nanomuse.team.presets import (
+    RolePreset,
+    assessed_risk,
+    envelope_note,
+    is_read_only_call,
+    read_only_face,
+)
 from nanomuse.team.store import Assignment
 from nanomuse.tools.base import BaseTool, ToolCollection, safe_execute
 from nanomuse.ui import UI
@@ -153,9 +171,12 @@ class _TrackedTool(BaseTool):
         return ToolResult(output=f"{result.for_model()} {note}", stop=True)
 
 
-class _GatedSentinel:
-    """The real Sentinel, with the read-only gate in front of guard().
+class _GuardedSentinel:
+    """The real Sentinel, with the squad's refusals in front of guard().
 
+    Two layers refuse here, the read-only gate first (the second
+    step's order, kept), then the assignment's risk ceiling; a call
+    neither refuses goes to the wrapped Sentinel's guard unchanged.
     Only the methods the agent loop uses are spelled out; anything
     else delegates to the wrapped Sentinel untouched.
     """
@@ -164,10 +185,16 @@ class _GatedSentinel:
         self,
         inner: Sentinel,
         *,
+        read_only: bool = False,
+        ceiling: RiskLevel | None = None,
         on_refusal: Callable[[str, str], None] | None = None,
+        on_ceiling_refusal: Callable[[str, str], None] | None = None,
     ) -> None:
         self._inner = inner
+        self._read_only = read_only
+        self._ceiling = ceiling
         self._on_refusal = on_refusal
+        self._on_ceiling_refusal = on_ceiling_refusal
 
     def __getattr__(self, name: str) -> Any:
         inner = self.__dict__.get("_inner")
@@ -186,7 +213,12 @@ class _GatedSentinel:
 
     async def guard(self, call: ToolCall, tool: BaseTool) -> ToolResult:
         args = call.arguments
-        if "__raw__" not in args and not is_read_only_call(tool, args):
+        if "__raw__" in args:
+            # The arguments never parsed: the real Sentinel owns that
+            # case (it runs the call unassessed or not at all), exactly
+            # as it did before this wrapper existed.
+            return await self._inner.guard(call, tool)
+        if self._read_only and not is_read_only_call(tool, args):
             detail = "the call is not read-only under the squad preset"
             if self._on_refusal is not None:
                 self._on_refusal(tool.name, detail)
@@ -194,6 +226,22 @@ class _GatedSentinel:
                 f"refused by the squad preset: {tool.name} may not run in a"
                 f" read-only subtask ({detail})"
             )
+        if self._ceiling is not None:
+            risk = assessed_risk(tool, args)
+            if risk is None or risk.rank > self._ceiling.rank:
+                detail = (
+                    "the call could not be assessed"
+                    if risk is None
+                    else f"the call assesses {risk.value}, above this"
+                    f" assignment's ceiling of {self._ceiling.value}"
+                )
+                if self._on_ceiling_refusal is not None:
+                    self._on_ceiling_refusal(tool.name, detail)
+                return ToolResult.fail(
+                    f"refused by the squad ceiling: {tool.name} may not run in"
+                    f" this assignment ({detail}); the ceiling bounds the whole"
+                    " assignment and no approval inside it can lift it"
+                )
         return await self._inner.guard(call, tool)
 
 
@@ -211,6 +259,23 @@ class SubtaskRun:
 # The factory the squad's executor calls: preset and assignment in,
 # one built run out.
 AgentFactory = Callable[[RolePreset, Assignment], SubtaskRun]
+
+
+def _frozen_ceiling(assignment: Assignment) -> RiskLevel | None:
+    """The ceiling the assignment's ledger row froze, if it froze one.
+
+    The row is the only source: not the preset, not the settings, so
+    nothing reconfigured after enqueue can move it.  Rows are
+    validated at enqueue, so an unrecognized value can only be a
+    hand-edited row; it is read as the tightest level rather than
+    silently widening to none.
+    """
+    if not assignment.level:
+        return None
+    try:
+        return RiskLevel(assignment.level)
+    except ValueError:
+        return RiskLevel.SAFE
 
 
 def _slot_llm(settings: Settings, preset: RolePreset) -> BaseLLM:
@@ -246,6 +311,7 @@ class MuseAgentFactory:
         goals: GoalStore | None = None,
         stall_policy: StallPolicy | None = None,
         on_tool_refused: Callable[[Assignment, str, str], None] | None = None,
+        on_ceiling_refused: Callable[[Assignment, str, str], None] | None = None,
     ) -> None:
         self.settings = settings
         self.tools = tools
@@ -260,6 +326,7 @@ class MuseAgentFactory:
             max_tool_calls=settings.squad.max_tool_calls,
         )
         self.on_tool_refused = on_tool_refused
+        self.on_ceiling_refused = on_ceiling_refused
 
     def _refused(self, assignment: Assignment, tool_name: str, detail: str) -> None:
         self.audit.record(
@@ -268,15 +335,28 @@ class MuseAgentFactory:
         if self.on_tool_refused is not None:
             self.on_tool_refused(assignment, tool_name, detail)
 
+    def _ceiling_refused(self, assignment: Assignment, tool_name: str, detail: str) -> None:
+        self.audit.record(
+            "squad_ceiling_refused", tool=tool_name, assignment=assignment.id, detail=detail
+        )
+        if self.on_ceiling_refused is not None:
+            self.on_ceiling_refused(assignment, tool_name, detail)
+
     def __call__(self, preset: RolePreset, assignment: Assignment) -> SubtaskRun:
         watch = StallWatch(self.stall_policy)
         face = read_only_face(self.tools) if preset.read_only else self.tools
         tracked = ToolCollection(*[_TrackedTool(tool, watch) for tool in face])
+        ceiling = _frozen_ceiling(assignment)
         sentinel: Any = self.sentinel
-        if preset.read_only:
-            sentinel = _GatedSentinel(
+        if preset.read_only or ceiling is not None:
+            sentinel = _GuardedSentinel(
                 self.sentinel,
+                read_only=preset.read_only,
+                ceiling=ceiling,
                 on_refusal=lambda tool_name, detail: self._refused(assignment, tool_name, detail),
+                on_ceiling_refusal=lambda tool_name, detail: self._ceiling_refused(
+                    assignment, tool_name, detail
+                ),
             )
         agent = MuseAgent(
             self.settings,
@@ -307,8 +387,9 @@ def build_factory(
     """The production factory for an executing squad.
 
     With the squad's store given, a read-only refusal is also written
-    to the assignment's events, beside the audit line.  Hand the
-    result to ``Squad.form`` together with the store and
+    to the assignment's events, beside the audit line, and so is a
+    ceiling refusal, under its own event kind.  Hand the result to
+    ``Squad.form`` together with the store and
     ``execute=settings.squad.execute``; the server and the companion
     do not form executing squads yet, so this wiring is the caller's
     to make.
@@ -322,6 +403,15 @@ def build_factory(
                 logger.warning("could not write a squad refusal to the ledger")
 
         kwargs["on_tool_refused"] = _to_events
+    if store is not None and "on_ceiling_refused" not in kwargs:
+
+        def _ceiling_to_events(assignment: Assignment, tool_name: str, detail: str) -> None:
+            try:
+                store.append_event(assignment.id, "ceiling_refused", f"{tool_name}: {detail}")
+            except Exception:  # noqa: BLE001 - the audit line already carries the refusal
+                logger.warning("could not write a squad ceiling refusal to the ledger")
+
+        kwargs["on_ceiling_refused"] = _ceiling_to_events
     return MuseAgentFactory(settings, tools=tools, sentinel=sentinel, ui=ui, audit=audit, **kwargs)
 
 

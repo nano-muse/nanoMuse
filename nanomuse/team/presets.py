@@ -46,6 +46,21 @@ consult assignment runs with the read-only face and gate whatever
 role it was given.  Only an explicit ``work`` assignment lets the
 execute preset use its full face.  ``notify`` assignments are
 recorded only; nothing in the squad runs them.
+
+Every preset also carries a *ceiling*: the highest tool risk its
+assignments may touch, frozen into the assignment's level at
+enqueue (the store composes it against the parent's level, tighter
+wins, so a ceiling can only narrow down a tree).  Research and
+verify cap at ``safe``, the same line as their read-only face.
+Execute caps at ``sensitive``, the top of the scale, which is no cap
+of this layer's own: the role exists to do the full range of work,
+and the control on its sensitive calls is the Sentinel's approval
+flow, which the ceiling never replaces and never loosens.  The
+ceiling is enforced in front of the Sentinel (see
+``nanomuse.team.runner``): a call measured above it is refused
+before the Sentinel is consulted, so no approval or token inside
+the assignment can lift it.  The ceiling bounds the whole
+assignment, where an approval settles one action.
 """
 
 from __future__ import annotations
@@ -94,10 +109,13 @@ the detail lives in the tools' own records, not in your summary."""
 
 @dataclass(frozen=True)
 class RolePreset:
-    """One role's three parts: prompt, tool face, model tier.
+    """One role's parts: prompt, tool face, model tier, risk ceiling.
 
     ``model`` is an explicit model name for this role; empty means the
-    tier's slot as configured, which is the normal case.
+    tier's slot as configured, which is the normal case.  ``ceiling``
+    is the highest tool risk an assignment under this preset may
+    touch (see the module docstring); it is a bound on the whole
+    assignment, not an approval for anything under it.
     """
 
     role: str
@@ -105,6 +123,7 @@ class RolePreset:
     read_only: bool
     system_prompt: str
     model: str = ""
+    ceiling: RiskLevel = RiskLevel.SAFE
 
 
 PRESETS: dict[str, RolePreset] = {
@@ -113,18 +132,21 @@ PRESETS: dict[str, RolePreset] = {
         tier="cheap",
         read_only=True,
         system_prompt=_RESEARCH_PROMPT,
+        ceiling=RiskLevel.SAFE,
     ),
     "verify": RolePreset(
         role="verify",
         tier="cheap",
         read_only=True,
         system_prompt=_VERIFY_PROMPT,
+        ceiling=RiskLevel.SAFE,
     ),
     "execute": RolePreset(
         role="execute",
         tier="default",
         read_only=False,
         system_prompt=_EXECUTE_PROMPT,
+        ceiling=RiskLevel.SENSITIVE,
     ),
 }
 
@@ -137,15 +159,21 @@ def preset_for(role: str) -> RolePreset:
     return preset
 
 
+def tighter(a: RiskLevel, b: RiskLevel) -> RiskLevel:
+    """The stricter of two risk levels; a bound only ever narrows."""
+    return a if a.rank <= b.rank else b
+
+
 def effective_preset(preset: RolePreset, mode: str) -> RolePreset:
     """A preset as a mode tightens it.
 
     ``consult`` (the default hand-out) means ask, do not act: the
-    subtask runs read-only whatever its role says.  ``work`` leaves
-    the preset as it is.  ``notify`` never reaches execution.
+    subtask runs read-only whatever its role says, and its ceiling
+    drops to ``safe`` with it.  ``work`` leaves the preset as it is.
+    ``notify`` never reaches execution.
     """
-    if mode == "consult" and not preset.read_only:
-        return replace(preset, read_only=True)
+    if mode == "consult":
+        return replace(preset, read_only=True, ceiling=tighter(preset.ceiling, RiskLevel.SAFE))
     return preset
 
 
@@ -170,6 +198,28 @@ def is_read_only_call(tool: BaseTool, args: dict[str, Any]) -> bool:
         and not assessment.reads_private_data
         and assessment.risk != RiskLevel.SENSITIVE
     )
+
+
+def assessed_risk(tool: BaseTool, args: dict[str, Any]) -> RiskLevel | None:
+    """The risk one call presents to a ceiling, or None when the
+    call cannot be assessed (a ceiling then refuses it: fail closed).
+
+    Most calls are measured by their own assessment.  A call the
+    read-only rule counts as a read (:func:`is_read_only_call`) is
+    measured at its tool family's declared risk instead: the one
+    shape that separates the two is a search, which assesses
+    moderate only because the query leaves for the owner's own
+    configured provider, and the squad has already judged that
+    shape a read.  Measuring it moderate would make a ``safe``
+    ceiling refuse the research preset's own headline tool.
+    """
+    try:
+        assessment = tool.assess(args)
+    except Exception:  # noqa: BLE001 - an unassessable call has no risk to measure
+        return None
+    if is_read_only_call(tool, args):
+        return tool.risk
+    return assessment.risk
 
 
 def read_only_face(tools: ToolCollection) -> ToolCollection:
@@ -199,9 +249,11 @@ __all__ = [
     "PRESETS",
     "TIERS",
     "RolePreset",
+    "assessed_risk",
     "effective_preset",
     "envelope_note",
     "is_read_only_call",
     "preset_for",
     "read_only_face",
+    "tighter",
 ]

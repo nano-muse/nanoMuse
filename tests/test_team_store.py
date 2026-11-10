@@ -46,15 +46,17 @@ def make_root(store: SquadStore, brief: str = "root task") -> Assignment:
 def test_a_root_and_a_child_round_trip_with_their_fields(tmp_path: Path) -> None:
     store = make_store(tmp_path)
     root = store.create_root(
-        origin="telegram", mode="work", role="steward", brief="plan the week", level="ask"
+        origin="telegram", mode="work", role="steward", brief="plan the week", level="moderate"
     )
     child = store.enqueue(
         parent_id=root.id, origin="user", mode="consult", role="research", brief="find flights"
     )
     assert root.parent_id is None and root.depth == 0 and root.status == "queued"
+    assert root.level == "moderate"
     assert child.parent_id == root.id and child.depth == 1
     assert child.origin == "user" and child.mode == "consult" and child.role == "research"
-    assert child.level == "" and child.outcome == "" and child.result == ""
+    # a child that names no level of its own inherits its parent's
+    assert child.level == "moderate" and child.outcome == "" and child.result == ""
     assert child.created_at and child.settled_at == ""
     assert store.get(child.id) == child
     assert store.children(root.id) == [child]

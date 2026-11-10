@@ -32,6 +32,19 @@ counted by the cost ledger and refused by the monthly budget gate,
 and the two levels stay separate, the ledger here never guesses at
 tokens or money.
 
+An assignment may also carry a *level*: the highest tool risk
+(:class:`~nanomuse.schema.RiskLevel`) its calls may touch while it
+runs, frozen when the assignment is enqueued.  The third squad step
+gave the column this meaning; before that it was an uninterpreted
+tag.  A child's level is composed at enqueue: the tighter of the
+parent's level and the level the caller names, so a level never
+widens down a tree, and a child that names no level inherits its
+parent's.  The empty string means no level was recorded (a row from
+before levels, or a caller that set none), and execution applies no
+ceiling to such an assignment.  Only the named level and the
+parent's frozen one enter the composition: changing a preset or a
+setting afterwards cannot move a level already written.
+
 The lifecycle is seven states: ``queued``, ``running``, ``waiting``,
 ``needs_input`` and the three terminal states ``completed``,
 ``failed``, ``cancelled``.  A terminal state is written once, by
@@ -53,6 +66,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
+
+from nanomuse.schema import RiskLevel
 
 STATUSES = (
     "queued",
@@ -79,6 +94,32 @@ TRANSITIONS: dict[str, frozenset[str]] = {
 }
 RESULT_LIMIT = 2000
 _TRUNCATED = " [truncated]"
+LEVELS = frozenset(level.value for level in RiskLevel)
+
+
+def _check_level(level: str) -> str:
+    """A level is a risk level's name, or empty for no level recorded."""
+    if level and level not in LEVELS:
+        raise ValueError(f"level must be one of {sorted(LEVELS)} or empty, not {level!r}")
+    return level
+
+
+def compose_level(parent_level: str, own_level: str) -> str:
+    """The level a child is frozen at, composed at enqueue.
+
+    The tighter of the parent's level and the child's own, so a
+    level never widens down a tree.  A side that names no level
+    defers to the side that does; both unnamed stays unnamed.
+    """
+    _check_level(parent_level)
+    _check_level(own_level)
+    if parent_level and own_level:
+        parent = RiskLevel(parent_level)
+        own = RiskLevel(own_level)
+        return (parent if parent.rank <= own.rank else own).value
+    return parent_level or own_level
+
+
 # The event kind reconcile_on_startup leaves when it spares an
 # assignment one restart.  A second startup that still finds the
 # assignment open counts these marks and spares it no further.
@@ -398,7 +439,10 @@ class SquadStore:
             " VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', '', '', ?, ?, '')",
             (assignment_id, parent_id, depth, origin, mode, role, brief, level, _now()),
         )
-        self._append_event(assignment_id, "enqueued", f"depth {depth}, mode {mode}")
+        detail = f"depth {depth}, mode {mode}"
+        if level:
+            detail += f", ceiling {level}"
+        self._append_event(assignment_id, "enqueued", detail)
         self._conn.commit()
         return self._require(assignment_id)
 
@@ -413,8 +457,11 @@ class SquadStore:
         assignment_id: str | None = None,
     ) -> Assignment:
         """Open a new task tree.  Roots have no parent, so the parent
-        guards do not apply; the fields are still validated."""
+        guards do not apply; the fields are still validated.  The
+        root's level is the caller's to name (the squad names the
+        ceiling it was formed with); unnamed means no ceiling."""
         brief = self._check_fields(origin, mode, brief)
+        level = _check_level(level)
         return self._insert(
             assignment_id=assignment_id or "a_" + uuid.uuid4().hex[:12],
             parent_id=None,
@@ -437,8 +484,14 @@ class SquadStore:
         level: str = "",
         assignment_id: str | None = None,
     ) -> Assignment:
-        """Hand work out under an open parent, past the four guards."""
+        """Hand work out under an open parent, past the four guards.
+
+        The child's level is composed here, at enqueue, from the
+        parent's frozen level and the level the caller names (see
+        :func:`compose_level`); what is stored never moves again.
+        """
         brief = self._check_fields(origin, mode, brief)
+        level = _check_level(level)
         parent = self.get(parent_id)
         if parent is None:
             raise EnqueueRefused(
@@ -491,7 +544,7 @@ class SquadStore:
             mode=mode,
             role=role,
             brief=brief,
-            level=level,
+            level=compose_level(parent.level, level),
         )
 
     # ------------------------------------------------------------------ lifecycle
@@ -637,6 +690,7 @@ def ledger_evidence(path: Path | str) -> EvidenceFn:
 
 
 __all__ = [
+    "LEVELS",
     "MODES",
     "ORIGINS",
     "RESULT_LIMIT",
@@ -652,6 +706,7 @@ __all__ = [
     "InvalidTransition",
     "ReconcileReport",
     "SquadStore",
+    "compose_level",
     "ledger_evidence",
     "reconcile_on_startup",
 ]
