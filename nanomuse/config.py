@@ -757,7 +757,7 @@ class DeciderSettings(BaseModel):
 
 
 class SquadSettings(BaseModel):
-    """The squad task ledger (experimental).
+    """The squad task ledger and its execution switch (experimental).
 
     When a squad is formed with a store, its dispatches are written
     to ``squad.db`` in the data directory as assignments, past the
@@ -767,10 +767,29 @@ class SquadSettings(BaseModel):
     level.  The cap counts assignments only: real spend stays with
     the cost ledger and its monthly budget gate, which is the second
     of the two levels and the one that refuses on money.
+
+    ``execute`` is the second step's switch: a squad formed with a
+    store, an agent factory and this on also runs its dispatches, one
+    fresh agent per assignment, under the role presets
+    (``nanomuse.team.presets``).  It defaults off, and nothing in the
+    server forms an executing squad yet, so the setting alone changes
+    nothing until a caller wires one up with
+    ``nanomuse.team.runner.build_factory``.  ``cheap_model`` names
+    the model the cheap tier (research, verify) runs on; empty means
+    the ``[llm]`` slot as configured, the decider's rule for its
+    cheap slot.  ``stall_after_errors`` is how many identical errors
+    in a row, with no successful tool call yet, mark a subtask as
+    stalled; ``max_tool_calls`` caps a subtask's tool calls (0 means
+    no cap of the watch's own; the agent's own step limit still
+    applies).
     """
 
     max_depth: int = Field(default=2, ge=0)
     max_per_root: int = Field(default=0, ge=0)
+    execute: bool = False
+    cheap_model: str = ""
+    stall_after_errors: int = Field(default=3, ge=1)
+    max_tool_calls: int = Field(default=0, ge=0)
 
 
 class Settings(BaseModel):
