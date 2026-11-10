@@ -111,6 +111,18 @@ sign-in, Hub and sync traffic. `DEFAULT_RELAY_HOST` in the shell's `proxy.ts` co
 to `NO_PROXY`; it does not select another relay. This launch option points Desktop at
 your server. It does not repair a connection reset on the hosted relay's network path.
 
+## Using your own relay on Linux
+
+Fully quit nanoMuse, including its tray process, before launching the AppImage with your relay and a separate data directory:
+
+```sh
+env NANOMUSE_CLOUD_URL='https://relay.example' \
+  NANOMUSE_DESKTOP_HOME="$HOME/.nanomuse/desktop-self-hosted" \
+  /path/to/nanoMuse.AppImage
+```
+
+Replace the relay address and AppImage path, then register or sign in on that relay. Use the same command and data directory on later launches; a normal AppImage launch does not inherit these variables. The separate-account and profile-override rules above also apply.
+
 ## What it is
 
 Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
