@@ -86,7 +86,10 @@ object HubActions {
                 "open" -> call.result(open(context, call.args.optString("url")))
                 "screen" -> call.result(screen())
                 "notify" -> call.result(notify(context, call.args.optString("text"), call.args.optString("title").ifBlank { "nanoMuse" }, call.senderName))
-                "task" -> task(context, call)
+                "task" -> call.result(task(context, call))
+                "task.status" -> call.result(PersistentTaskEndpoint.get(context).status(
+                    PersistentTaskEndpoint.owner(context, call), call.args.optString("turn_id"),
+                ))
                 "approve" -> approve(call)
                 "stop" -> call.result(JSONObject().put("stopped", stop(context, call)))
                 else -> call.fail("unknown_action", "this phone does not do '${call.action}'")
@@ -286,42 +289,63 @@ object HubActions {
 
     // ── a task for this phone's agent ──────────────────────────────────────
 
-    private fun task(context: Context, call: IncomingCall) {
+    private fun task(context: Context, call: IncomingCall): JSONObject {
         val text = call.args.optString("text").trim()
-        if (text.isEmpty()) { call.fail("usage", "text is required"); return }
+        if (text.isEmpty()) throw Refused("usage", "text is required")
         val app = context.applicationContext as? MinisApp
-        if (app == null || !app.subsystemsReady()) { call.fail("not_ready", "nanoMuse on the phone is still starting"); return }
+        if (app == null || !app.subsystemsReady()) throw Refused("not_ready", "nanoMuse on the phone is still starting")
         val senderId = call.from.optString("id")
         val conversation = running.conversationKey(senderId, call.args.optString("conversation"))
+        if (call.args.has("turn_id")) {
+            val owner = PersistentTaskEndpoint.owner(context, call)
+            return PersistentTaskEndpoint.get(context).run(owner, call.args.optString("turn_id"), call, create = {
+                if (!call.args.optBoolean("new_conversation")) throw Refused("context_lost", "The remote conversation no longer exists")
+                runBlocking { createTaskSession(app, call.senderName) } ?: throw Refused("no_model", "The phone has no model configured")
+            }) { sessionId, emit ->
+                if (PersistentTaskEndpoint.owner(context, call) != owner) throw Refused("denied", "The account changed")
+                if (runBlocking { app.chatRepository.dao.getSession(sessionId) } == null) {
+                    throw Refused("context_lost", "The remote conversation no longer exists")
+                }
+                executeTask(app, call, text, conversation, sessionId, emit)
+            }
+        }
         val sessionId = runBlocking { sessionFor(app, conversation, call.senderName) }
-        if (sessionId == null) { call.fail("no_model", "the phone has no model to think with; sign in to nanoMuse Cloud there"); return }
-        call.event(JSONObject().put("stage", "thinking").put("session", sessionId))
-        AgentForegroundService.startService(app, sessionCount = 1, toolStatus = context.getString(R.string.nm_hub_task_from, call.senderName))
+            ?: throw Refused("no_model", "the phone has no model to think with; sign in to nanoMuse Cloud there")
+        return executeTask(app, call, text, conversation, sessionId)
+    }
+
+    private fun executeTask(
+        context: MinisApp, call: IncomingCall, text: String, conversation: String, sessionId: String,
+        emit: (JSONObject) -> Unit = call::event,
+    ): JSONObject {
+        val senderId = call.from.optString("id")
+        emit(JSONObject().put("stage", "thinking").put("session", sessionId))
+        AgentForegroundService.startService(context, sessionCount = 1, toolStatus = context.getString(R.string.nm_hub_task_from, call.senderName))
         val prompt = HubTasks.prompt(
             text,
             prefix = if (call.senderKind == "web") null else context.getString(R.string.nm_hub_task_prefix, call.senderName),
             language = call.args.optString("language"),
         )
-        val relay = relayApprovals(context, call, sessionId)
+        val relay = relayApprovals(context, call, sessionId, emit)
         running.started(call.id, senderId, conversation, sessionId)
         Provenance.arm(sessionId, Provenance.RUN_HUB) // the turn is another device's, for the record
         val stopped: Boolean
         val result = try {
             runBlocking {
-                HeadlessChatRunner.prompt(context = app, sessionId = sessionId, text = prompt, attachments = emptyList(), thinkingLevel = null, wait = true, timeoutMs = TASK_TIMEOUT_MS)
+                HeadlessChatRunner.prompt(context = context, sessionId = sessionId, text = prompt, attachments = emptyList(), thinkingLevel = null, wait = true, timeoutMs = TASK_TIMEOUT_MS, persistentTurn = call.args.optString("turn_id").takeIf { call.args.has("turn_id") })
             }
         } finally {
             relay.cancel()
             stopped = running.finished(call.id)
         }
-        if (stopped) { call.fail("cancelled", "${call.senderName} stopped this task"); return }
+        if (stopped) throw Refused("cancelled", "${call.senderName} stopped this task")
         val answer = result.responseText?.trim().orEmpty()
-        if (result.timedOut) { call.fail("timeout", "the phone's agent did not finish within ten minutes"); return }
-        if (result.status == "Error" && answer.isEmpty()) { call.fail("failed", "the phone's agent could not run this"); return }
-        call.result(
-            JSONObject().put("text", answer.ifBlank { "(no answer)" }).put("conversation", conversation).put("session", sessionId)
-                .put("device", Hub.name(context)).put("status", result.status),
-        )
+        if (result.timedOut) throw Refused("timeout", "the phone's agent did not finish within ten minutes")
+        if (call.args.has("turn_id") && result.status == "Cancelled") throw Refused("cancelled", "This task was stopped on the phone")
+        if (call.args.has("turn_id") && result.status == "Blocked") throw Refused("blocked", "The phone could not start this turn")
+        if (result.status == "Error" && (call.args.has("turn_id") || answer.isEmpty())) throw Refused("failed", "the phone's agent could not run this")
+        return JSONObject().put("text", answer.ifBlank { "(no answer)" }).put("conversation", conversation).put("session", sessionId)
+            .put("device", Hub.name(context)).put("status", result.status)
     }
 
     /**
@@ -330,14 +354,14 @@ object HubActions {
      * on this phone's screen stays too, and whichever side answers first decides. The decision
      * goes back as `approval_result`.
      */
-    private fun relayApprovals(context: Context, call: IncomingCall, sessionId: String): CoroutineScope {
+    private fun relayApprovals(context: Context, call: IncomingCall, sessionId: String, emit: (JSONObject) -> Unit): CoroutineScope {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val seen = HashSet<String>()
         scope.launch {
             RiskGate.pending.collect { req ->
                 if (req != null && req.sessionId == sessionId && seen.add(req.id)) {
                     relayed[req.id] = call.from.optString("id")
-                    call.event(
+                    emit(
                         JSONObject().put("stage", "approval").put("approval_id", req.id).put("preview", req.preview)
                             .put("risk", req.assessment.riskClass.name.lowercase()).put("reason", req.assessment.reason)
                             .put("device", Hub.name(context)).put("timeout", RiskGate.TIMEOUT_MS / 1000),
@@ -356,7 +380,7 @@ object HubActions {
                             RiskDecision.TIMEOUT -> "expired"
                             else -> "approved"
                         }
-                        call.event(JSONObject().put("stage", "approval_result").put("approval_id", req.id).put("status", status))
+                        emit(JSONObject().put("stage", "approval_result").put("approval_id", req.id).put("status", status))
                     }
                 }
             }
@@ -370,10 +394,14 @@ object HubActions {
      * `cancelled`. Only the asker's own runs; `{stopped: false}` when there is nothing to end.
      */
     private fun stop(context: Context, call: IncomingCall): Boolean {
-        val sessionId = running.find(call.from.optString("id"), call.args.optString("call"), call.args.optString("conversation")) ?: return false
-        val ended = runBlocking { runCatching { HeadlessChatRunner.cancel(context, sessionId) }.getOrDefault(false) }
-        if (ended) running.markStopped(sessionId)
-        return ended
+        val id = if (call.args.has("turn_id")) {
+            PersistentTaskEndpoint.get(context).callId(PersistentTaskEndpoint.owner(context, call), call.args.optString("turn_id"))
+                ?: return false
+        } else call.args.optString("call")
+        val conversation = call.args.optString("conversation").takeUnless { call.args.has("turn_id") }
+        return running.stop(call.from.optString("id"), id, conversation) { sessionId ->
+            runBlocking { runCatching { HeadlessChatRunner.cancel(context, sessionId, call.args.optString("turn_id").takeIf { call.args.has("turn_id") }) }.getOrDefault(false) }
+        }
     }
 
     /**
@@ -397,6 +425,12 @@ object HubActions {
         p.getString(key, null)?.let { existing ->
             if (runCatching { app.chatRepository.dao.getSession(existing) }.getOrNull() != null) return existing
         }
+        val sessionId = createTaskSession(app, sender) ?: return null
+        p.edit().putString(key, sessionId).apply()
+        return sessionId
+    }
+
+    private suspend fun createTaskSession(app: MinisApp, sender: String): String? {
         val providers = app.providerRepository
         val defaultGroupId = providers.defaultPrimaryGroupId
         val seedModelId = defaultGroupId
@@ -413,7 +447,6 @@ object HubActions {
         if (defaultGroupId != null) {
             app.chatRepository.updateSessionBinding(session.id, """{"type":"group","groupId":"$defaultGroupId"}""", seedModelId)
         }
-        p.edit().putString(key, session.id).apply()
         return session.id
     }
 }

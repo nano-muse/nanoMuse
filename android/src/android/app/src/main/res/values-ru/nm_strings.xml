@@ -1272,4 +1272,8 @@
     <string name="nm_chat_background_purple">Фиолетовый</string>
     <string name="nm_chat_in_progress">Задача выполняется</string>
     <string name="nm_mcp_oauth_token_failed">Не удалось войти в коннектор (%1$s). Проверьте подключение и настройки OAuth и повторите попытку.</string>
+    <string name="nm_device_chats">Чаты на устройствах</string>
+    <string name="nm_device_chat_start">Начать чат на этом устройстве</string>
+    <string name="nm_device_chat_uncertain">Доставка не подтверждена. Проверяем результат на устройстве.</string>
+    <string name="nm_device_chat_interrupted">Прервано. Устройство могло уже выполнить некоторые действия.</string>
 </resources>

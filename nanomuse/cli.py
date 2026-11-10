@@ -944,7 +944,7 @@ def triggers_add(
     lead: Annotated[int, typer.Option(help="event: minutes before the start")] = 30,
 ) -> None:
     """Add a trigger. Mail triggers need the email connector, event triggers a calendar,
-    device triggers the hub."""
+    device triggers a signed-in Cloud account with the hub on."""
     from nanomuse.triggers import TriggerStore
 
     s = _settings(config)
@@ -954,9 +954,18 @@ def triggers_add(
     if kind == "event" and not (s.connectors.calendar.enabled and s.connectors.calendar.feeds):
         console.print("[red]no calendar feed is set up (connectors.calendar)[/red]")
         raise typer.Exit(1)
-    if kind == "device" and not s.hub.enabled:
-        console.print("[red]the hub is turned off (hub.enabled)[/red]")
-        raise typer.Exit(1)
+    if kind == "device":
+        if not s.hub.enabled:
+            console.print("[red]the hub is turned off (hub.enabled)[/red]")
+            raise typer.Exit(1)
+        from nanomuse.cloud import CLOUD_KEY
+        from nanomuse.vault import CredentialVault
+
+        if not CredentialVault(s.vault_file, s.vault_key_file).get(CLOUD_KEY):
+            # the same gate as the app and the server (NanoMuseApp.trigger_kinds): with no
+            # Cloud key no hub session opens, so the trigger would never fire
+            console.print("[red]join the hub first: sign in to nanoMuse Cloud in the app[/red]")
+            raise typer.Exit(1)
     try:
         item = TriggerStore(s.triggers_db).create(kind, text, match=match, lead_minutes=lead)
     except ValueError as exc:

@@ -51,6 +51,9 @@ import { cloudOffFailure, relayFailure, transportFailure, type RelayRefusal } fr
 import { Relay, RelayError, type Account, type Estimate, type Invite, type ProfileWrite, type RelayModel, type SignIn } from './relay.ts'
 import { homeWorkspace } from './home.ts'
 import { TaskRunner, textOf } from './task.ts'
+import { PersistentTaskEndpoint } from './persistent-task-endpoint.ts'
+import { PersistentTurns } from './persistent-turns.ts'
+import { DeviceConversations, type DeviceConversation } from './device-conversations.ts'
 import { Turns, aggregateWork, type WorkItem } from './work.ts'
 import { SCREEN_RUN_IDLE_MS, ScreenRuns, Trajectory, type ScreenRun, type StepAction, type TrajectoryView } from './trajectory.ts'
 import { describeCall } from './steps.ts'
@@ -423,6 +426,7 @@ interface State {
   trusted?: Record<string, { name: string; at: number }>
   /** The session each other device's conversation lives in (`<device id>\n<conversation>` → session id). */
   taskSessions?: Record<string, string>
+  deviceConversations?: Record<string, DeviceConversation[]>
   /** Conversations synced between the account's devices (C7, C8): the cursor, the ids, what the relay knows. */
   sync?: SyncState
   /** The hands model the person chose; absent means the account's default. */
@@ -631,6 +635,7 @@ export default class NanomuseCloud extends Service {
   readonly profile: ProfileStore
   readonly hub: HubClient
   private state: State = {}
+  private readonly deviceChats = new Map<string, DeviceConversations>()
   private sessionStateLoaded = false
   private capacityCache: { providers: CapacityProviders; models: readonly RelayModel[]; result: CapacityProviders } | undefined
   private busy: Promise<unknown> = Promise.resolve()
@@ -962,16 +967,56 @@ export default class NanomuseCloud extends Service {
         },
       })
       this.tasks = runner
+      let journal: Promise<PersistentTaskEndpoint> | undefined
+      const endpoint = () => journal ??= PersistentTurns.open(join(dshHome(), 'nanomuse', 'hub-turns.json'))
+        .then((store) => new PersistentTaskEndpoint(store))
+      const owner = (args: Record<string, unknown>, from: Caller) => ({
+        account: this.state.account?.id ?? '',
+        caller: from.id,
+        conversation: String(args.conversation ?? ''),
+      })
       ctx.effect(() => runner.attach(), 'nanomuse cloud: tasks')
       ctx.effect(
         () =>
           this.hub.handle('task', async (args, call) => {
+            if (args.turn_id !== undefined) {
+              const identity = owner(args, call.from)
+              const turn = String(args.turn_id)
+              const bound = await endpoint()
+              const existing = bound.status(identity, turn)
+              if (existing.state !== 'unknown') return existing
+              if (!String(args.text ?? '').trim()) throw new HubError('usage', 'text is required')
+              await this.permit(call.from, 'task', brief('task', args))
+              if (this.state.account?.id !== identity.account) throw new HubError('denied', 'The account changed')
+              return bound.run(identity, turn, call, () => {
+                if (args.new_conversation !== true) throw new HubError('context_lost', 'The remote conversation no longer exists')
+                return runner.createTaskSession(call.from)
+              },
+                async (session, event) => {
+                  if (this.state.account?.id !== identity.account) throw new HubError('denied', 'The account changed')
+                  const key = JSON.stringify([identity.account, identity.caller, identity.conversation])
+                  if (this.state.taskSessions?.[key] !== session) {
+                    this.state.taskSessions = { ...this.state.taskSessions, [key]: session }
+                    await this.writeState()
+                  }
+                  return runner.task(args, { ...call, event }, session as SessionId)
+                })
+            }
             await this.permit(call.from, 'task', brief('task', args))
             return runner.task(args, call)
           }),
         'nanomuse cloud: task',
       )
-      ctx.effect(() => this.hub.handle('stop', (args, call) => runner.stop(args, call)), 'nanomuse cloud: stop')
+      ctx.effect(() => this.hub.handle('task.status', async (args, call) => {
+        const identity = owner(args, call.from)
+        return (await endpoint()).status(identity, String(args.turn_id ?? ''))
+      }), 'nanomuse cloud: task status')
+      ctx.effect(() => this.hub.handle('stop', async (args, call) => {
+        if (args.turn_id === undefined) return runner.stop(args, call)
+        const identity = owner(args, call.from)
+        const id = (await endpoint()).callId(identity, String(args.turn_id))
+        return id ? runner.stop({ call: id }, call) : { stopped: false }
+      }), 'nanomuse cloud: stop')
       ctx.effect(() => this.hub.handle('approve', (args, call) => this.phoneApprove(args, call) ?? runner.approve(args, call)), 'nanomuse cloud: approve')
       ctx.effect(() => () => {
         this.tasks = undefined
@@ -3789,7 +3834,7 @@ export default class NanomuseCloud extends Service {
    */
   private actions(): string[] {
     const out = [...ACTIONS, ...REMOTE_ACTIONS]
-    if (this.tasks) out.push('approve', 'task', 'stop')
+    if (this.tasks) out.push('approve', 'task', 'stop', 'task.status')
     out.push(...CODING_ACTIONS)
     return out
   }
@@ -3850,6 +3895,7 @@ export default class NanomuseCloud extends Service {
         ...(raw.remoteControl === true ? { remoteControl: true } : {}),
         ...(raw.trusted && typeof raw.trusted === 'object' ? { trusted: trustedOf(raw.trusted) } : {}),
         ...(raw.taskSessions && typeof raw.taskSessions === 'object' ? { taskSessions: raw.taskSessions } : {}),
+        ...(raw.deviceConversations && typeof raw.deviceConversations === 'object' ? { deviceConversations: raw.deviceConversations } : {}),
         ...(raw.sync && typeof raw.sync === 'object' ? { sync: raw.sync } : {}),
         ...(raw.media && typeof raw.media === 'object' ? { media: raw.media } : {}),
         ...(typeof raw.handsProvider === 'string' && raw.handsProvider ? { handsProvider: raw.handsProvider } : {}),
@@ -3978,6 +4024,31 @@ export default class NanomuseCloud extends Service {
       }),
       prompts: prompts.map((p) => p.key),
     }
+  }
+
+  private deviceConversations(): DeviceConversations {
+    const account = this.state.account?.id
+    if (!account || this.changingAccount) throw new HubError('not_allowed', 'Sign in to use device conversations')
+    const existing = this.deviceChats.get(account)
+    if (existing) return existing
+    const checkAccount = () => {
+      if (this.state.account?.id !== account || this.changingAccount) throw new HubError('not_allowed', 'The account changed')
+    }
+    const chats = new DeviceConversations(
+      () => this.state.deviceConversations?.[account] ?? [],
+      async (rows) => {
+        checkAccount()
+        this.state.deviceConversations = { ...this.state.deviceConversations, [account]: rows }
+        await this.writeState()
+      },
+      () => this.hub.devices.filter((device) => device.id !== this.hub.deviceId && device.kind !== 'web'),
+      (device, action, args, onEvent) => {
+        checkAccount()
+        return this.hub.call(device, action, args, { onEvent, timeoutMs: action === 'task' ? 15 * 60_000 : 10_000 })
+      },
+    )
+    this.deviceChats.set(account, chats)
+    return chats
   }
 
   private async writeState(): Promise<void> {
@@ -4323,6 +4394,20 @@ export default class NanomuseCloud extends Service {
         }
       }
       if (req.method === 'POST' && route === '/profile/refresh') return send(res, 200, await this.pullProfile(true))
+      if (req.method === 'POST' && route === '/devices/conversations') {
+        const body = await json(req)
+        const chats = this.deviceConversations()
+        const id = String(body.id ?? '')
+        if (body.action === 'create') return send(res, 200, await chats.create(String(body.device ?? '')))
+        if (body.action === 'send') return send(res, 200, await chats.send(id, String(body.text ?? '')))
+        if (body.action === 'refresh') return send(res, 200, await chats.refresh(id))
+        if (body.action === 'stop') return send(res, 200, { stopped: await chats.stop(id) })
+        if (body.action === 'approve') {
+          await chats.approve(id, String(body.approval_id ?? ''), body.allow === true)
+          return send(res, 204)
+        }
+        return send(res, 200, chats.list())
+      }
       if (req.method === 'POST' && route === '/devices/refresh') {
         this.hub.refreshDevices()
         return send(res, 204)
