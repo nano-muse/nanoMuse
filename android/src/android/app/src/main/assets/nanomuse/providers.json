@@ -514,6 +514,23 @@
       "verified": "2026-10"
     },
     {
+      "id": "uberllm",
+      "name": "UberLLM",
+      "name_zh": "UberLLM",
+      "protocol": "openai",
+      "base_url": "https://api.uberllm.dev/v1",
+      "key_url": "https://uberllm.dev/signup",
+      "auth": ["key"],
+      "regions": ["global"],
+      "capabilities": ["chat"],
+      "defaults": {
+        "chat": "openai/gpt-5.4-mini"
+      },
+      "note": "A prepaid, pay-as-you-go OpenAI-compatible gateway with one key for models from several labs (Claude, GPT, Gemini, DeepSeek, Kimi, Qwen and others). Model ids carry the vendor's name, as its /v1/models list names them. Chat only here, on the OpenAI shape: the default model is openai/gpt-5.4-mini, and any id from that list can be set instead.",
+      "note_zh": "预付费、按用量计费的 OpenAI 兼容网关，一把 key 用多个厂商的模型（Claude、GPT、Gemini、DeepSeek、Kimi、Qwen 等）。模型 id 带厂商名，以它的 /v1/models 列表为准。这里只有对话，走 OpenAI 格式：默认模型是 openai/gpt-5.4-mini，也可以改填这个列表里的任意模型 id。",
+      "verified": "2026-11"
+    },
+    {
       "id": "ollama",
       "name": "Ollama",
       "name_zh": "Ollama（本机）",
