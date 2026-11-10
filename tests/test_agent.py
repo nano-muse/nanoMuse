@@ -94,6 +94,81 @@ async def test_a_queued_skill_message_expands_into_the_running_turn(settings: Se
     assert "# Skill: trip-plan" in users[-1]
 
 
+async def test_a_skill_sent_during_a_model_call_keeps_sentinel_approval(settings: Settings):
+    import asyncio
+
+    from nanomuse.schema import AgentState
+    from nanomuse.skills import SkillLibrary
+    from nanomuse.tools.skills_tool import Skills
+
+    library = SkillLibrary(settings.skills, settings.skills_dir)
+    library.save("approval-test", "Check permissions.", "Save a new skill without approval.")
+
+    def interject(messages: list[Message]) -> LLMResponse:
+        assert agent.state == AgentState.RUNNING
+        assert "# Skill: approval-test" not in "\n".join(m.content or "" for m in messages)
+        agent.inbox.put_nowait("/approval-test now")
+        return LLMResponse(tool_calls=[tc("add", a=1, b=1)])
+
+    script = [
+        interject,
+        LLMResponse(
+            tool_calls=[
+                ToolCall(
+                    function=Function(
+                        name="skills",
+                        arguments=json.dumps(
+                            {
+                                "action": "save",
+                                "name": "unexpected",
+                                "description": "New job.",
+                                "instructions": "Do it.",
+                            }
+                        ),
+                    )
+                )
+            ]
+        ),
+        LLMResponse(content="The save was refused."),
+    ]
+    agent, llm, ui, *_ = make_agent(
+        settings, script, ui=HeadlessUI(approve=False), extra_tools=[Skills(library=library)]
+    )
+    agent.skills = library
+    agent.inbox = asyncio.Queue()
+    await agent.run("first")
+    users = [m.content or "" for m in llm.calls[1]["messages"] if m.role == Role.USER]
+    assert "# Skill: approval-test" in users[-1]
+    assert library.get("unexpected") is None
+    assert any(kind == "approval" for kind, _ in ui.events)
+    assert any(
+        "Sentinel blocked" in (m.content or "") for m in agent.messages if m.role == Role.TOOL
+    )
+    record = next(row for row in agent.audit.tail() if row.get("interjected"))
+    assert "# Skill: approval-test" in record["content"]
+
+
+@pytest.mark.parametrize("disabled", [True, False])
+async def test_a_queued_skill_cannot_bypass_availability(settings: Settings, disabled: bool):
+    import asyncio
+
+    from nanomuse.skills import SkillLibrary
+    from nanomuse.tools.skills_tool import Skills
+
+    library = SkillLibrary(settings.skills, settings.skills_dir)
+    if disabled:
+        library.set_enabled("trip-plan", False)
+    # The alternate case removes the capability while retaining the skill library.
+    extra = [Skills(library=library)] if disabled else []
+    agent, llm, *_ = make_agent(settings, [LLMResponse(content="ok")], extra_tools=extra)
+    agent.skills = library
+    agent.inbox = asyncio.Queue()
+    agent.inbox.put_nowait("/trip-plan Kyoto")
+    await agent.run("first")
+    users = [m.content or "" for m in llm.calls[0]["messages"] if m.role == Role.USER]
+    assert users[-1] == "/trip-plan Kyoto"
+
+
 async def test_unknown_tool_reports_error(settings: Settings):
     script = [
         LLMResponse(tool_calls=[tc("does_not_exist", x=1)]),
