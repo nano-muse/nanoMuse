@@ -61,10 +61,11 @@ export function DeviceConversationPanel({ t, devices }: { t: Translate; devices:
     void work.catch((err: unknown) => setError(failureText(t, err)))
   }
   const send = (id: string) => {
+    const text = drafts[id] ?? ''
     setSending(true)
-    run(api<DeviceConversation>('send', { id, text: drafts[id] ?? '' }).then((row) => {
+    run(api<DeviceConversation>('send', { id, text }).then((row) => {
       save(row)
-      setDrafts((old) => ({ ...old, [id]: '' }))
+      setDrafts((old) => old[id] === text ? { ...old, [id]: '' } : old)
     }).finally(() => setSending(false)))
   }
   const stateText = (state: string) => state === 'unknown' ? t('deviceChatUnknown')

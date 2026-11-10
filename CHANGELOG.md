@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
+
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
 - Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
 - Matched Android persistent task replies and stop requests to their original turn, and rejected blocked, empty or errored runs instead of returning an older answer or stopping later work.
