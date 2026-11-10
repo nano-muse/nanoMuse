@@ -21,6 +21,7 @@ process.env.NANOMUSE_PY = join(tmpdir(), 'nanomuse-runtime-that-does-not-exist')
 /** The slice of a dsh Context the cloud service touches, kept in memory. */
 function fakeContext({ defaultModel } = {}) {
   const credentials = new Map()
+  const listeners = new Map()
   const settings = { [LLM_ROW]: { providers: {} } }
   const selection = { current: defaultModel ?? { provider: 'deepseek-official', model: 'deepseek-chat' } }
   const ctx = {
@@ -48,9 +49,14 @@ function fakeContext({ defaultModel } = {}) {
     },
     inject() { /* the session API, the web server, the connectors: not in these tests */ },
     effect(fn) { fn() },
-    on() { return () => undefined },
+    on(name, callback) {
+      const callbacks = listeners.get(name) ?? new Set()
+      callbacks.add(callback)
+      listeners.set(name, callbacks)
+      return () => callbacks.delete(callback)
+    },
   }
-  return { ctx, credentials, settings, selection }
+  return { ctx, credentials, settings, selection, emit: (name, ...args) => { for (const callback of listeners.get(name) ?? []) callback(...args) } }
 }
 
 /** A provider's `/models`, OpenAI's shape, on the loopback. */
@@ -620,6 +626,144 @@ test('a trimmed model catalog (#525): editing llm-pi-ai models or saving with ca
     assert.equal(customOnly.status, 200)
     assert.deepEqual(customOnly.body.models.map((m) => m.id), ['glm-5.1', 'kimi-k2.5'])
     assert.deepEqual(out.settings[LLM_ROW].providers.custom.models.map((m) => m.id), ['glm-5.1', 'kimi-k2.5'])
+  } finally {
+    await server.close()
+    await out.done()
+  }
+})
+
+
+async function restartForCatalog(out, { delayed = false } = {}) {
+  const fake = fakeContext({ defaultModel: out.selection.current })
+  if (!delayed) fake.settings[LLM_ROW].providers = structuredClone(out.settings[LLM_ROW].providers)
+  const describe = fake.ctx.settings.describe
+  let available = !delayed
+  fake.ctx.settings.describe = () => available ? describe() : []
+  const svc = new NanomuseCloud(fake.ctx, { baseURL: 'https://relay.invalid', deviceName: 'test-desktop', statePath: out.statePath })
+  svc.hub.start = () => undefined
+  svc.refresh = async () => svc.status()
+  await svc[Service.init]()
+  await svc.busy
+  return { ...fake, svc, ready() { available = true } }
+}
+
+test('Advanced deletion of an observed own provider survives restart without touching other endpoints or keys (#889)', async () => {
+  const out = await cloud()
+  const server = await modelsServer(['first-model', 'second-model'])
+  try {
+    const first = await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'first-key', baseURL: server.url, capabilities: ['chat', 'vision'] })
+    const second = await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'second-key', baseURL: server.url, capabilities: ['chat', 'vision'] })
+    assert.equal(first.status, 200)
+    assert.equal(second.status, 200)
+    const firstId = first.body.id
+    const secondId = second.body.id
+    out.svc.chatOptions()
+    out.svc.state.handsProvider = firstId
+    out.svc.state.handsModel = 'first-model'
+    out.svc.state.media = { imageProvider: firstId, imageModel: 'image-model', videoProvider: secondId, videoModel: 'video-model' }
+    const survivor = structuredClone(out.settings[LLM_ROW].providers[secondId])
+    const keys = new Map(out.credentials)
+    delete out.settings[LLM_ROW].providers[firstId]
+    out.emit('settings/document-updated', LLM_ROW, 1)
+    await out.svc.busy
+    assert.equal((await out.state()).providers[firstId], undefined)
+    assert.equal((await out.state()).handsProvider, undefined)
+    assert.equal((await out.state()).media.imageProvider, undefined)
+    assert.equal((await out.state()).media.videoProvider, secondId)
+    assert.equal(out.selection.current.provider, secondId)
+    assert.deepEqual(out.settings[LLM_ROW].providers[secondId], survivor)
+    assert.deepEqual(out.credentials, keys)
+    const again = await restartForCatalog(out)
+    assert.equal(again.settings[LLM_ROW].providers[firstId], undefined)
+    assert.deepEqual(again.settings[LLM_ROW].providers[secondId], survivor)
+  } finally {
+    await server.close()
+    await out.done()
+  }
+})
+
+test('an explicitly empty chat catalog survives writes, restart and key updates while media remains (#889)', async () => {
+  const out = await cloud()
+  const server = await modelsServer(['first-model', 'second-model', 'qwen-image-3.0'])
+  try {
+    await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'first-key', baseURL: server.url, capabilities: ['chat', 'vision', 'image'] })
+    const other = await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'other-key', baseURL: server.url, capabilities: ['chat'] })
+    out.svc.chatOptions()
+    out.settings[LLM_ROW].providers.custom.models = []
+    out.emit('settings/document-updated', LLM_ROW, 1)
+    await out.svc.busy
+    assert.equal(out.selection.current.provider, other.body.id)
+    assert.deepEqual(out.svc.chatOptions().filter((m) => m.provider === 'custom'), [])
+    assert.deepEqual(out.svc.imageOptions().filter((m) => m.provider === 'custom').map((m) => m.id), ['qwen-image-3.0'])
+    const saved = await out.state()
+    assert.equal(saved.providers.custom.customModels, true)
+    assert.deepEqual(saved.providers.custom.models.filter((m) => m.kind === 'chat'), [])
+    out.svc.refreshOwnRows()
+    await out.svc.busy
+    assert.deepEqual(out.settings[LLM_ROW].providers.custom.models, [])
+    const again = await restartForCatalog(out)
+    assert.deepEqual(again.settings[LLM_ROW].providers.custom.models, [])
+    const rekeyed = await out.api('POST', '/providers/save', { id: 'custom', row: 'custom', apiKey: 'updated-key', baseURL: server.url })
+    assert.equal(rekeyed.status, 200)
+    assert.deepEqual(rekeyed.body.models.filter((m) => m.kind === 'chat'), [])
+    assert.deepEqual(out.settings[LLM_ROW].providers.custom.models, [])
+    await out.svc.busy
+    await out.svc.stateWrites
+  } finally {
+    await server.close()
+    await out.done()
+  }
+})
+
+test('adapter startup gaps are not deletion and Cloud rows stay managed (#889)', async () => {
+  const out = await cloud({ signedIn: true })
+  const server = await modelsServer(['first-model'])
+  try {
+    await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'first-key', baseURL: server.url, capabilities: ['chat'] })
+    const saved = await out.state()
+    const again = await restartForCatalog(out, { delayed: true })
+    again.emit('settings/document-updated', LLM_ROW, 1)
+    assert.ok(again.svc.state.providers.custom)
+    again.ready()
+    again.emit('settings/document-updated', LLM_ROW, 2)
+    again.svc.refreshOwnRows()
+    await again.svc.busy
+    await new Promise((r) => setTimeout(r, 20))
+    assert.deepEqual(again.settings[LLM_ROW].providers.custom.models.map((m) => m.id), saved.providers.custom.models.map((m) => m.id))
+    again.settings[LLM_ROW].providers[PROVIDER_ID] = { models: ACCOUNT_MODELS }
+    again.svc.chatOptions()
+    delete again.settings[LLM_ROW].providers[PROVIDER_ID]
+    again.emit('settings/document-updated', LLM_ROW, 3)
+    await again.svc.busy
+    assert.ok(again.svc.state.account)
+    assert.deepEqual(again.svc.state.models, ACCOUNT_MODELS)
+  } finally {
+    await server.close()
+    await out.done()
+  }
+})
+
+
+test('a delayed adapter refresh does not recreate a provider deleted while another row was being written (#889)', async () => {
+  const out = await cloud()
+  const server = await modelsServer(['first-model'])
+  try {
+    await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'first-key', baseURL: server.url, capabilities: ['chat'] })
+    const second = await out.api('POST', '/providers/save', { id: 'custom', apiKey: 'second-key', baseURL: server.url, capabilities: ['chat'] })
+    out.svc.chatOptions()
+    out.settings[LLM_ROW].providers.custom.displayName = 'old label'
+    const update = out.ctx.settings.update
+    let release
+    const gate = new Promise((resolve) => { release = resolve })
+    out.ctx.settings.update = async (...args) => { await gate; return update(...args) }
+    out.svc.refreshOwnRows()
+    delete out.settings[LLM_ROW].providers[second.body.id]
+    out.emit('settings/document-updated', LLM_ROW, 1)
+    release()
+    await out.svc.busy
+    await new Promise((r) => setTimeout(r, 20))
+    assert.equal(out.settings[LLM_ROW].providers[second.body.id], undefined)
+    assert.equal((await out.state()).providers[second.body.id], undefined)
   } finally {
     await server.close()
     await out.done()

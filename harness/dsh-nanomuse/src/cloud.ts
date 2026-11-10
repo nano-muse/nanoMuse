@@ -631,6 +631,8 @@ export default class NanomuseCloud extends Service {
   readonly profile: ProfileStore
   readonly hub: HubClient
   private state: State = {}
+  /** Own rows observed in a registered adapter, so a startup gap is never a deletion. */
+  private readonly seenOwnRows = new Set<string>()
   private sessionStateLoaded = false
   private capacityCache: { providers: CapacityProviders; models: readonly RelayModel[]; result: CapacityProviders } | undefined
   private busy: Promise<unknown> = Promise.resolve()
@@ -866,7 +868,7 @@ export default class NanomuseCloud extends Service {
     this.ctx.effect(
       () =>
         this.ctx.on('settings/document-updated', (ns) => {
-          if (String(ns) === LLM_ROW && this.reconcileOwnRows()) this.broadcast()
+          if (String(ns) === LLM_ROW && this.reconcileOwnRows(true)) this.broadcast()
         }),
       'nanomuse cloud: own-key catalog edits',
     )
@@ -1945,14 +1947,16 @@ export default class NanomuseCloud extends Service {
     const typedInput = input.models ?? (wantedRow || existing?.customModels ? existingChatIds : undefined)
     const typed = typedModelIds(typedInput).filter((m) => !catalogRoute || served.includes(m))
     const typedRows = typed.map((mId) => listed.find((m) => m.id === mId) ?? existing?.models.find((m) => m.id === mId) ?? { id: mId })
-    const restRows = keepCatalogOnly && typed.length
+    const restRows = keepCatalogOnly
       ? listed.filter((m) => !typed.includes(m.id) && kindOf(m.id) !== 'chat' && m.id !== entry.defaults.chat)
       : listed.filter((m) => !typed.includes(m.id))
-    let models = modelsOf({ ...entry, capabilities }, [...typedRows, ...restRows])
+    const chosenRows = [...typedRows, ...restRows]
+    let models = keepCatalogOnly && !chosenRows.length ? [] : modelsOf({ ...entry, capabilities }, chosenRows)
     if (entry.user_capabilities) models = models.map((m) => ({ ...m, vision: capabilities.includes('vision') }))
     // A row with no chat model cannot be served (the model adapter refuses a route that resolves
     // no models) and nothing could pick from it: a plain sentence, before anything is written.
-    if (!models.some((m) => m.kind === 'chat')) throw new RelayError(400, 'no_models', 'The endpoint did not list its models (GET /models). Type the ids of the models it serves, separated by commas.')
+    const keptEmptyCatalog = input.models === undefined && existing?.customModels === true && existingChatIds?.length === 0
+    if (!models.some((m) => m.kind === 'chat') && !keptEmptyCatalog) throw new RelayError(400, 'no_models', 'The endpoint did not list its models (GET /models). Type the ids of the models it serves, separated by commas.')
     const keyRef = keptKeyRef || (apiKey ? keyRefFor(rowId) : '')
     if (keyRef && !keptKeyRef) await this.ctx.credentials.set(credentialRef(keyRef), apiKey)
     // a hand-made endpoint reads as its host unless named, so several are told apart
@@ -2012,7 +2016,7 @@ export default class NanomuseCloud extends Service {
    * person trimmed or edited the catalog there (#525). Non-chat (`image`, `video`) models
    * stay on the row; a model's learned `reasoning` levels and `vision` capability are kept.
    */
-  private reconcileOwnRows(): boolean {
+  private reconcileOwnRows(pruneMissing = false): boolean {
     const providers = this.state.providers
     if (!providers) return false
     let written: Record<string, unknown> | undefined
@@ -2024,10 +2028,23 @@ export default class NanomuseCloud extends Service {
     }
     if (!written) return false
     let nextProviders: Record<string, OwnProvider> | undefined
+    const removed: string[] = []
     for (const [id, row] of Object.entries(providers)) {
       if (id === CHATGPT_PROVIDER || id === PROVIDER_ID) continue
       const raw = written[id]
+      if (!Object.hasOwn(written, id)) {
+        // Only an explicit document change after observing this live row is removal.
+        // An adapter absent during startup is restored from the saved source instead.
+        if (pruneMissing && this.seenOwnRows.has(id)) {
+          nextProviders ??= { ...providers }
+          delete nextProviders[id]
+          this.seenOwnRows.delete(id)
+          removed.push(id)
+        }
+        continue
+      }
       if (!raw || typeof raw !== 'object') continue
+      this.seenOwnRows.add(id)
       const rawModels = (raw as { models?: unknown }).models
       if (!Array.isArray(rawModels)) continue
       const entry = this.catalogue.find((p) => p.id === row.provider)
@@ -2054,9 +2071,8 @@ export default class NanomuseCloud extends Service {
           ...(prev?.reasoning ? { reasoning: prev.reasoning } : {}),
         })
       }
-      if (!nextChat.length) continue
       const sameChat = nextChat.length === chatNow.length && nextChat.every((m, i) => m.id === chatNow[i]?.id && m.name === chatNow[i]?.name && m.vision === chatNow[i]?.vision)
-      if (sameChat) continue
+      if (sameChat && (nextChat.length > 0 || row.customModels === true)) continue
       nextProviders ??= { ...providers }
       nextProviders[id] = {
         ...row,
@@ -2066,9 +2082,30 @@ export default class NanomuseCloud extends Service {
     }
     if (!nextProviders) return false
     this.state = { ...this.state, providers: nextProviders }
-    void this.alignTrimmedChatSelection(nextProviders)
+    for (const id of removed) {
+      if (this.state.handsProvider === id) {
+        delete this.state.handsProvider
+        delete this.state.handsModel
+      }
+      const media = this.state.media
+      if (media?.imageProvider === id || media?.videoProvider === id) {
+        const next = { ...media }
+        if (next.imageProvider === id) { delete next.imageProvider; delete next.imageModel }
+        if (next.videoProvider === id) { delete next.videoProvider; delete next.videoModel }
+        this.state = { ...this.state, media: next }
+      }
+    }
+    // Serialize selection changes after the synchronous source edit. Saved credentials stay
+    // in the vault; editing a model list is not a request to destroy a key.
+    void this.serialize(async () => {
+      for (const id of removed) {
+        if (!this.state.providers?.[id]) await this.releaseChatRoute(id)
+      }
+      await this.alignTrimmedChatSelection(this.state.providers ?? {})
+      await this.writeState()
+      await this.writeHands()
+    }).catch((error: unknown) => this.ctx.logger.warn('nanomuse: model choices not aligned: %s', message(error)))
     void this.writeState().catch((error: unknown) => this.ctx.logger.warn('nanomuse: state write failed: %s', message(error)))
-    void this.writeHands().catch((error: unknown) => this.ctx.logger.warn('nanomuse: hands model not written: %s', message(error)))
     return true
   }
 
@@ -2081,7 +2118,10 @@ export default class NanomuseCloud extends Service {
       const row = providers[current.provider]
       if (!row || row.models.some((m) => m.kind === 'chat' && m.id === current.model)) return
       const nextModel = this.ownModelFor(row, 'chat')
-      if (!nextModel) return
+      if (!nextModel) {
+        await this.releaseChatRoute(current.provider)
+        return
+      }
       await svc.saveSelection({ provider: current.provider, model: nextModel })
       await this.mainChatFollows(current.provider, nextModel)
     } catch {
@@ -2112,6 +2152,7 @@ export default class NanomuseCloud extends Service {
     const written = (current.value as { providers?: Record<string, unknown> } | undefined)?.providers ?? {}
     void (async () => {
       for (const [id, row] of rows) {
+        if (this.state.providers?.[id] !== row) continue
         const entry = this.catalogue.find((p) => p.id === row.provider)
         const wanted = ownProviderRow(row, entry?.reasoning)
         if (canonical(written[id] ?? null) === canonical(wanted)) continue

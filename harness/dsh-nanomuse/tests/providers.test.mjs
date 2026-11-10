@@ -518,3 +518,9 @@ test("the status read starts a runtime that is a .cmd, the shape npm installs on
   const d = new ChatGptDesk({ command: async () => cli, onReady: () => Promise.resolve() })
   assert.deepEqual(await d.status(), { signedIn: false, label: 'ChatGPT' })
 })
+
+
+test('an explicitly empty catalog-route override does not rediscover the default chat list (#889)', () => {
+  const row = ownProviderRow({ id: 'route', provider: 'route', label: 'Route', protocol: 'openai', baseURL: 'https://provider.example/v1', keyRef: '', capabilities: ['chat'], models: [], at: 0, catalogRoute: true, customModels: true })
+  assert.deepEqual(row.models, [])
+})
