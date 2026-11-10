@@ -417,9 +417,11 @@ class MuseAgent:
             # Never start in the middle of a tool exchange: advance to the next user message.
             while cutoff < len(msgs) and msgs[cutoff].role != Role.USER:
                 cutoff += 1
-            if cutoff >= len(msgs):
-                # A single long turn can fill the window. Keep the leading tool
-                # exchange whole, even if that takes a few messages over the limit.
+            if cutoff >= len(msgs) or all(m.role != Role.USER for m in msgs[cutoff + 1 :]):
+                # A single long turn can fill the window, and after one the next user
+                # message is the only boundary left: cutting there would leave the model
+                # nothing of the work before it. Keep the newest messages instead, with the
+                # leading tool exchange whole, even if that takes a few over the limit.
                 cutoff = slice(-limit, None).indices(len(msgs))[0]
                 while 0 < cutoff < len(msgs) and msgs[cutoff].role == Role.TOOL:
                     cutoff -= 1
@@ -484,6 +486,16 @@ class MuseAgent:
             finally:
                 task_budget.end(token)
 
+    def _previous_requests(self) -> list[Message]:
+        """The requests of the turn before this one. "Carry on" or "send that report" means
+        nothing once a long turn has pushed them out of the window."""
+        earlier = self.messages[: self._task_start]
+        starts = [i for i, m in enumerate(earlier) if m.meta.get("turn_start")]
+        if not starts:
+            # history saved before turns were marked: its last request
+            return [m for m in earlier if m.meta.get("user_request")][-1:]
+        return [m for m in earlier[starts[-1] :] if m.meta.get("user_request")]
+
     def _request_context(
         self,
         system_prompt: str,
@@ -491,9 +503,12 @@ class MuseAgent:
         tail: Message | None = None,
     ) -> list[Message]:
         window = self.context_messages() + ([tail] if tail else [])
-        protected = [m for m in self.messages[self._task_start :] if m.meta.get("user_request")]
+        protected = self._previous_requests() + [
+            m for m in self.messages[self._task_start :] if m.meta.get("user_request")
+        ]
         # A long turn pushes the request out of the message window; without it the model
-        # forgets what it was asked and guesses, so it stays in view whatever the limits.
+        # forgets what it was asked and guesses, so it stays in view whatever the limits,
+        # and so do the previous turn's.
         present = {m.meta.get("request_id") for m in window}
         window = [m for m in protected if m.meta.get("request_id") not in present] + window
         return fit_context(
@@ -528,7 +543,9 @@ class MuseAgent:
         if language:
             self.ui_language = language
         user_input = self._expand_skill(user_input)
-        self.messages.append(self.user_message(user_input, files))
+        request = self.user_message(user_input, files)
+        request.meta["turn_start"] = True
+        self.messages.append(request)
         attached = {"files": [a.path for a in files]} if files else {}
         self.audit.record("user_message", content=user_input, **attached)
         system_prompt = self.build_system_prompt(user_input, await self.recall_for(user_input))

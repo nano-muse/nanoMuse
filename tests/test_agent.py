@@ -210,6 +210,20 @@ async def test_long_turn_keeps_the_request_and_its_work_in_view(settings: Settin
     assert sum(m.role == Role.TOOL for m in wrap_up) >= 2, "the wrap-up saw none of the work"
 
 
+async def test_the_turn_after_a_long_one_sees_its_request_and_work(settings: Settings):
+    settings.agent.max_context_messages = 6
+    script = [LLMResponse(tool_calls=[tc("add", a=i, b=b) for b in (1, 2)]) for i in range(4)]
+    script += [LLMResponse(content="Paused."), LLMResponse(content="Finished.")]
+    agent, llm, *_ = make_agent(settings, script)
+
+    await agent.run("Add each pair.")
+    assert await agent.run("Carry on with what is left.") == "Finished."
+    follow_up = llm.calls[-1]["messages"]
+    assert sum(m.content == "Add each pair." for m in follow_up) == 1
+    assert follow_up[-1].content == "Carry on with what is left."
+    assert any(m.role == Role.TOOL for m in follow_up), "the follow-up saw none of the work"
+
+
 async def test_memory_and_goals_injected_into_prompt(settings: Settings):
     script = [
         LLMResponse(
@@ -268,9 +282,35 @@ async def test_context_window_trims_at_user_boundary(settings: Settings):
         Message.assistant("a1"),
         Message.user("u2"),
         Message.assistant("a2"),
+        Message.user("u3"),
+        Message.assistant("a3"),
     ]
     ctx = agent.context_messages()
-    assert [m.content for m in ctx] == ["u2", "a2"]
+    assert [m.content for m in ctx] == ["u2", "a2", "u3", "a3"]
+
+
+async def test_context_window_keeps_the_work_before_the_only_boundary(settings: Settings):
+    # cutting at the newest user message would leave nothing of what came before it
+    settings.agent.max_context_messages = 4
+    agent, *_ = make_agent(settings, [])
+    from nanomuse.schema import Message
+
+    agent.messages = [
+        Message.user("u1"),
+        Message.assistant(tool_calls=[tc("add")]),
+        Message.tool("2", "x", "add"),
+        Message.assistant("a1"),
+        Message.user("u2"),
+        Message.assistant("a2"),
+    ]
+    ctx = agent.context_messages()
+    assert [m.role for m in ctx] == [
+        Role.ASSISTANT,
+        Role.TOOL,
+        Role.ASSISTANT,
+        Role.USER,
+        Role.ASSISTANT,
+    ]
 
 
 @pytest.mark.parametrize(
