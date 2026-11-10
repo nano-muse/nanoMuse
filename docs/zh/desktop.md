@@ -78,6 +78,8 @@ Electron 外壳将 dsh Host 作为子进程启动，再把 harness 的网页应�
 
 使用 Muse 外观时，较宽的回复表格会在智能体气泡内横向滚动，不会伸出气泡占用聊天区。
 
+胶囊和屏幕边缘光效中的状态文字不可选中，审批和停止按钮仍可点击。
+
 ## 额度不足及其他中继响应 {#when-the-allowance-is-used-up-and-the-relay-s-other-answers}
 
 免费额度只限制模型调用，不影响登录。中继返回 `allowance_exhausted` 时，桌面版会在未能执行的那轮消息下显示与手机、网页版相同的卡片：
