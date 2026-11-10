@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Prevented failed coding runs from retrying in a new conversation after a tool had already started or returned a result.
+
 - Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
 
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
@@ -104,6 +106,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Kept coding-agent results with the selected computer, agent and chat.** Switching selections hides previous folder suggestions, sessions and transcripts while loading, and ignores delayed replies from the previous selection.
 - Enabled native Windows regression coverage for the runtime shell timeout and its process-tree cleanup, with process-query validation.
 - **The Docker web app could use a different host port.** Set `NANOMUSE_RUNTIME_PORT` when port 8787 is occupied, including when a local relay shares the host. The default and the container port remain 8787. ([#717](https://github.com/nano-muse/nanoMuse/pull/717))
+- Added structured coding history, paged tool output and recorded patches over the existing hub, with send deduplication and per-agent capabilities.
+- Read Codex's saved session names instead of injected instructions and retained diffs from JSON-wrapped patch calls.
+- Ended coding runs on terminal errors even when output pipes stayed open, and returned owned-run status before a new session reached disk.
 
 ### Web
 
@@ -116,6 +121,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Clarified the desktop chat shortcuts for line breaks and sending, and the separate busy-agent Enter setting. For #890.
 - Kept tables of four columns or more inside the agent's chat bubble, where they scroll sideways, instead of running past both edges of the bubble.
 
 - Stopped the hands' step text in the on-screen capsule and the action labels from appearing selected after a Cmd+A reached them during computer use.
@@ -168,6 +174,11 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Fixed the macOS helper restart during startup and delayed replies from its old process.** The restart button now waits for the replacement helper, shows a failure when it cannot restart, and clears the old black-screen notice only after a confirmed restart. For [#715](https://github.com/nano-muse/nanoMuse/issues/715).
 - **The feed's daily batch no longer turns up on the phone.** The desktop writes the feed in a chat of its own each morning (*Feed · <date>*, archived when done); with *Also sync side chats* on, that chat went up like any other and appeared on the account's phones every day, deleted or not. The rooms now remember their batches' chats and the sync leaves them out, like another device's task. ([#713](https://github.com/nano-muse/nanoMuse/issues/713))
 - **A chat another device sends a task to, and every chat the rooms open, start in the `~/nanoMuse` workspace** instead of the bare home folder. On Windows a workspace that is the whole profile folder could not run a single `workspace-write` command: the sandbox's temp root lies inside it, and a session begun from the web console or the phone failed at the first step. ([#705](https://github.com/nano-muse/nanoMuse/issues/705))
+- Added the same project, timeline, tool-detail and recorded-diff hub actions for Codex, Claude Code, Cursor and dsh.
+- Matched Codex's stored session names and parsed both raw and JSON-wrapped patch calls.
+- Acknowledged coding runs before CLI startup, reported permission waits and retained terminal failures even with a zero exit code.
+
+- Prevented the Host from exiting when a sync notification or hub reconnection arrived during a conversation pull that then timed out or lost its connection. Failed follow-up pulls remained handled, and later pulls continued from the saved cursor.
 
 ### Android
 
@@ -214,10 +225,21 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
+- Kept iOS coding projects and session requests tied to the selected computer, and added refresh recovery for failed output and diff pages.
+
+- Collapsed each coding reply's tool calls into a summary above the reply and opened file diffs directly from specific file entries.
+- Reduced unused diff gutters, enabled horizontal scrolling through long code lines, and matched the Projects / Chats controls to the coding-agent filters.
+- Recognized Codex's `already has an active writer` resume error so iOS offered a new conversation instead of showing only the CLI failure.
+- Added local coding-session diagnostics on iOS and desktop to trace resume failures, conflict prompts and live-to-history matching without logging conversation text.
+- Asked before starting a new conversation when Codex reported a session writer conflict, opened the new chat immediately after confirmation, and matched its full continuation prompt when replacing live replies with history.
 - Requested JSON for connector OAuth sign-in and refresh, rejected malformed tokens and HTTP 200 OAuth errors, and showed safe error codes instead of provider response text. For #869.
 
 - **A task sent with `@<device>` no longer answers 「完成」 when nothing came back.** An `@Mac …` line whose task did not run showed *Done*, as if the work had happened; it now says the device finished without an answer, and the steps above it say what did happen. ([#718](https://github.com/nano-muse/nanoMuse/issues/718))
 - **Kept System Auto reply speech on the chosen language-specific voice.** An inactive concrete voice later in the Voice Output group no longer overrides Auto. A concrete System voice explicitly selected for Voice Output still takes priority. For [#722](https://github.com/nano-muse/nanoMuse/issues/722).
+
+- Grouped coding sessions into Projects and Chats, added project-scoped conversations, Markdown replies, expandable tools and nested file diffs using nanoMuse colours.
+- Moved the coding scope switch above recent sessions, opened conversations full screen and showed file changes below replies and beside collapsed tools.
+- Followed sent coding messages with short status requests, enabled stopping after startup confirmation and displayed authorization waits and computer error details.
 
 ### Project
 
@@ -2526,3 +2548,5 @@ The first release: an open-source personal AI agent inspired by Meta's Muse. One
 ### Command line
 
 `nanomuse chat`, `run`, `serve`, `daemon`, `goals`, `reminders`, `triggers`, `calendar`, `contacts`, `skills`, `memory`, `vault`, `phone`, `audit`, `config`, `doctor`.
+- Opened file diffs at the left edge instead of midway through long lines.
+- Highlighted added and removed diff lines with stronger backgrounds, coloured line numbers and left-edge markers.

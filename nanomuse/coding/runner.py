@@ -18,7 +18,9 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import signal
+import subprocess
 import sys
 import time
 import uuid
@@ -28,6 +30,8 @@ from pathlib import Path
 from typing import Any
 
 from nanomuse.coding.agents import AGENTS, Session, read_session, which
+from nanomuse.coding.protocol import preview
+from nanomuse.coding.timeline import Timeline
 from nanomuse.logger import logger
 from nanomuse.tools.shell import kill_tree, scrubbed_env
 
@@ -102,11 +106,15 @@ class Run:
     result_session_id: str = ""
     resumed: bool = False
     error: str = ""
+    resume_conflict: dict[str, str] | None = None
     tools: int = 0
     device: str = ""  # the other computer this ran on, when it did (the service's shadow runs)
     process: asyncio.subprocess.Process | None = None
     # the message being streamed (Cursor sends deltas, then the whole message)
     current: str = ""
+    timeline: Timeline = field(default_factory=Timeline, repr=False, compare=False)
+    request_id: str = ""
+    request_signature: str = ""
     # the wind-down a stop() scheduled (kept so it is not collected half-way)
     _finish: asyncio.Task[None] | None = field(default=None, repr=False, compare=False)
 
@@ -129,7 +137,9 @@ class Run:
             "output": (self.output + ("\n" + self.current if self.current else ""))[-OUTPUT_LIMIT:],
             "resumed": self.resumed,
             "error": self.error,
+            **({"resume_conflict": self.resume_conflict} if self.resume_conflict else {}),
             "tools": self.tools,
+            "timeline": [preview(i) for i in self.timeline.values()][-100:],
             **({"device": self.device} if self.device else {}),
         }
 
@@ -441,6 +451,7 @@ async def start_run(
     timeout_s: float = RUN_TIMEOUT_S,
     run_id: str = "",
     register: Callable[[Run], None] | None = None,
+    structured_events: bool = False,
 ) -> Run:
     """Send ``text`` into ``session_id`` of ``agent`` (a new session when empty) and follow
     it to the end. Returns the finished ``Run``; ``on_event`` sees each step as it happens.
@@ -506,6 +517,7 @@ async def start_run(
         run.process = proc
         run.resumed = resume
         saw_done = False
+        terminal_failed = False
         stderr_tail = ""
         last_error = ""
         err_task: asyncio.Task[None] | None = None
@@ -524,14 +536,18 @@ async def start_run(
                 while True:
                     # After the agent's final message we stop waiting for EOF: a helper the
                     # CLI leaves running in the background may keep our pipe open forever.
-                    if saw_done:
-                        patience = 0.5 if proc.returncode is not None else 5
-                        try:
-                            raw = await asyncio.wait_for(proc.stdout.readline(), patience)
-                        except TimeoutError:
+                    patience = 0.5 if proc.returncode is not None else 5
+                    try:
+                        raw = await asyncio.wait_for(proc.stdout.readline(), patience)
+                    except TimeoutError:
+                        if (
+                            saw_done
+                            or terminal_failed
+                            or run.status == "stopped"
+                            or proc.returncode is not None
+                        ):
                             break
-                    else:
-                        raw = await proc.stdout.readline()
+                        continue
                     if not raw:
                         break
                     line = raw.decode("utf-8", "replace").strip()
@@ -543,13 +559,27 @@ async def start_run(
                         continue
                     if not isinstance(obj, dict):
                         continue
+                    revisions = {k: i["revision"] for k, i in run.timeline.items.items()}
+                    run.timeline.feed(agent, obj)
+                    for key, item in run.timeline.items.items():
+                        if revisions.get(key) != item["revision"]:
+                            if structured_events:
+                                await emit(RunEvent("item", extra={"item": preview(item)}))
                     for ev in _normalise(agent, obj, run):
                         if ev.kind == "done":
                             saw_done = True
                         elif ev.kind == "error" and ev.text:
                             last_error = ev.text
+                        if ev.kind == "error" and (
+                            obj.get("type") in ("turn.failed", "result")
+                            or (obj.get("type") == "status" and obj.get("phase") == "turn_end")
+                        ):
+                            terminal_failed = True
                         await emit(ev)
-                await _wait_exit(proc, grace_s=15 if saw_done else 60)
+                await _wait_exit(
+                    proc,
+                    grace_s=15 if saw_done or terminal_failed or run.status == "stopped" else 60,
+                )
                 await asyncio.wait({err_task}, timeout=2)
                 if not err_task.done():
                     err_task.cancel()
@@ -584,7 +614,7 @@ async def start_run(
             await emit(RunEvent("error", "stopped", extra={"stopped": True}))
             return run
         rc = proc.returncode or 0
-        if rc == 0 and (saw_done or run.output):
+        if rc == 0 and not terminal_failed and (saw_done or run.output):
             run.status, run.ended_at = "done", time.time()
             if not saw_done:
                 await emit(
@@ -592,8 +622,23 @@ async def start_run(
                 )
             return run
         # A failed resume of a chat the CLI does not know: try once more as a new chat.
-        lower = (stderr_tail + " " + run.output).lower()
-        if attempt == 1 and resume and _looks_like_unknown_session(lower):
+        diagnostic = "\n".join((stderr_tail, last_error, run.output))
+        if resume and agent == "codex" and _is_resume_lock_error(diagnostic):
+            run.resume_conflict = {
+                "process": await asyncio.to_thread(_lock_owner, session_id),
+                "continuation": _continuation(prior, text) if prior else text,
+            }
+            run.status, run.ended_at = "failed", time.time()
+            run.error = (last_error or stderr_tail.strip() or "session writer is occupied")[:2000]
+            await emit(RunEvent("error", run.error, extra={"final": True}))
+            return run
+        lower = diagnostic.lower()
+        # A later provider error can say "not found" after a tool already acted.
+        # Reopening as a new chat would repeat that work under the same request.
+        observed_tool = run.tools > 0 or any(
+            item.get("kind") != "message" for item in run.timeline.values()
+        )
+        if attempt == 1 and resume and not observed_tool and _looks_like_unknown_session(lower):
             attempt_text = _continuation(prior, text) if prior is not None else text
             resume = False
             run.output = ""
@@ -610,6 +655,49 @@ async def start_run(
         await emit(RunEvent("error", run.error, extra={"final": True}))
         return run
     return run
+
+
+def _is_resume_lock_error(text: str) -> bool:
+    if re.search(r"permission denied|failed to (?:open|remove|inspect).*writer lock", text, re.I):
+        return False
+    return bool(
+        re.search(
+            r"(?:thread|session)[^\n]{0,160}"
+            r"(?:locked|in use|already (?:open|running|registered|has an active writer)"
+            r"|held by|owned by)",
+            text,
+            re.I,
+        )
+        or re.search(r"(?:writer|write|writing)[ -]lock", text, re.I)
+        or re.search(
+            r"(?:another|other) (?:codex )?process[^\n]{0,100}(?:thread|session|writ|lock)",
+            text,
+            re.I,
+        )
+    )
+
+
+def _lock_owner(session_id: str) -> str:
+    if _is_windows() or not re.fullmatch(r"[0-9a-f-]{36}", session_id, re.I):
+        return ""
+    home = Path(os.environ.get("NANOMUSE_CODING_HOME") or Path.home())
+    root = Path(os.environ.get("CODEX_HOME") or home / ".codex")
+    try:
+        result = subprocess.run(
+            ["lsof", "-Fpc", "--", str(root / "thread-writer-locks" / f"{session_id}.lock")],
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+        output = result.stdout.decode("utf-8", errors="replace")
+        name, pid = re.search(r"^c(.+)$", output, re.M), re.search(r"^p(\d+)$", output, re.M)
+        return name[1][:100] + (f" (PID {pid[1]})" if pid else "") if name else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def _is_windows() -> bool:
+    return sys.platform == "win32"
 
 
 def _continuation(prior: Session, text: str) -> str:
@@ -652,8 +740,6 @@ def _looks_like_unknown_session(text: str) -> bool:
             "no conversation",
             "invalid chat",
             "no session",
-            "failed to resume",
-            "resume",
         )
     )
 
