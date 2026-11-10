@@ -5,6 +5,11 @@
 // streamed while the model writes it when the asker asked for that.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { PersistentTurns } from '../lib/persistent-turns.js'
+import { PersistentTaskEndpoint } from '../lib/persistent-task-endpoint.js'
 import { STREAM_INTERVAL_MS, TaskRunner, frame, grantKey, preview, textOf } from '../lib/task.js'
 
 /** The slice of a dsh Context the runner touches. */
@@ -378,3 +383,37 @@ test('a new attempt starts its text afresh, and a caller that did not ask gets n
   await p2
   off()
 })
+
+const owner = { account: 'test-account', caller: 'phone-1', conversation: '11111111-1111-4111-8111-111111111111' }
+const turn = '22222222-2222-4222-8222-222222222222'
+async function endpointFixture(t) {
+  const dir = await mkdtemp(join(tmpdir(), 'nm-persistent-task-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const file = join(dir, 'turns.json')
+  const reopen = async () => new PersistentTaskEndpoint(await PersistentTurns.open(file))
+  return { endpoint: await reopen(), reopen }
+}
+for (const { reason, remoteStop } of [
+  { reason: { kind: 'aborted', reason: { kind: 'user' } }, remoteStop: true },
+  { reason: { kind: 'completed' }, remoteStop: true },
+  { reason: { kind: 'aborted', reason: { kind: 'user' } }, remoteStop: false },
+]) {
+  test(`a ${remoteStop ? 'remotely' : 'locally'} stopped persistent turn remains cancelled after ${reason.kind}`, async (t) => {
+    const h = fakeContext()
+    const { r, off } = runner(h)
+    t.after(off)
+    const { endpoint, reopen } = await endpointFixture(t)
+    const call = fakeCall('c1')
+    const result = endpoint.run(owner, turn, call, () => r.createTaskSession(call.from),
+      (session, event) => r.task({ text: 'work', conversation: owner.conversation }, { ...call, event }, session))
+    for (let i = 0; i < 200 && !h.agents.get('session-1')?.sent.length; i++) await wait(5)
+    assert.ok(h.agents.get('session-1')?.sent.length)
+    if (remoteStop) {
+      assert.deepEqual(await r.stop({ call: endpoint.callId(owner, turn) }, fakeCall('stop')), { stopped: true })
+    }
+    h.emit('session-1', 'assistant/message', { message: { content: [{ type: 'text', text: 'late reply after stop' }] }, interrupted: true })
+    h.emit('session-1', 'turn/end', { turn: 1, reason })
+    assert.deepEqual(await result, { state: 'cancelled' })
+    assert.deepEqual((await reopen()).status(owner, turn), { state: 'cancelled' })
+  })
+}

@@ -4,6 +4,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
+
+- Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
+- Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
+- Matched Android persistent task replies and stop requests to their original turn, and rejected blocked, empty or errored runs instead of returning an older answer or stopping later work.
+
 ### Documentation
 
 - Documented supported migration paths for memories, reference files and connectors, and the limits of importing another assistant's archive. For #870.
@@ -107,6 +113,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Desktop
 
 - Clarified the desktop chat shortcuts for line breaks and sending, and the separate busy-agent Enter setting. For #890.
+- Kept tables of four columns or more inside the agent's chat bubble, where they scroll sideways, instead of running past both edges of the bubble.
 
 - Stopped the hands' step text in the on-screen capsule and the action labels from appearing selected after a Cmd+A reached them during computer use.
 - Added a Skills settings page with descriptions, source details and availability controls for all workspaces or the current workspace. Global disabling took precedence, disabled skills were blocked from discovery and loading, and shared skill files stayed unchanged. For #772.
