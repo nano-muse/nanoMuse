@@ -211,6 +211,8 @@ Windows 的只读和工作区可写 PowerShell 命令使用 DSH 受限令牌 ACL
 
 首次启动可能耗时数分钟，Windows 尤其明显。Host 只有加载完 profile 所有插件才公布地址，全新安装的 `resources/dsh/node_modules` 约有 20 000 个文件，Windows Defender 首读时逐个扫描，慢盘或外置盘还会更久。0.1.41 及以前，外壳等待 120 秒便报 `the host did not announce its address within 120 s`，而 Host 仍在加载，有报告显示只差六秒就绪。现在只要 Host 还运行就继续等；两分钟后显示「还在启动」、原因及最近输出，十分钟后询问继续等待或退出。只有退出才停止仍在启动的 Host。超过半分钟的启动会在 `desktop.log` 记录 `host: ready after N min`。文件经过首次检查后，第二次通常更快；若每次都慢，将安装目录加入实时扫描排除项可能有帮助。
 
+在高级模型设置中修改自己的 key 对应的服务商后，重启应用会保留修改。在这里删除服务商行，会移除 nanoMuse 保存的对应来源，并将对话切换到其他可用来源；保险库中保存的 key 不会删除。从配置读入的对话模型列表为空时，会停用该对话来源，不会恢复默认模型，图像和视频配置仍会保留。底层设置可能拒绝删除自定义来源的最后一个模型，这时请删除对应服务商行。若要同时移除来源和 key，请通过设置 → 账号操作。切换模型来源或关闭 nanoMuse Cloud 模型，请使用设置 → 模型。
+
 ## macOS 权限 {#macos-permissions}
 
 手需要「录屏」权限截图，需要「辅助功能」权限控制鼠标和键盘。0.1.38 起，这两项属于独立的 **nanoMuse Computer Use** 辅助应用，位置为 `nanoMuse.app/Contents/Helpers/nanoMuse Computer Use.app`，bundle id 为 `io.github.nanomuse.desktop.computer-use`。在系统设置 → 隐私与安全性 → 录屏，以及辅助功能中，需要开启的都是它，而非 nanoMuse 桌面版本身。

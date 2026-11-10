@@ -121,6 +121,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Preserved own-provider deletions made in Advanced settings across restarts, and kept loaded empty chat catalogs disabled without removing saved keys or unrelated sources. For #889.
 - Clarified the desktop chat shortcuts for line breaks and sending, and the separate busy-agent Enter setting. For #890.
 - Kept tables of four columns or more inside the agent's chat bubble, where they scroll sideways, instead of running past both edges of the bubble.
 
