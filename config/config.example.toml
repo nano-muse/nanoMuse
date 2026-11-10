@@ -409,6 +409,16 @@ max_tool_calls = 0       # cap on one subtask's tool calls; 0 means no cap of th
 # here; it defaults to sensitive, no extra limit (docs/configuration.md, [squad])
 
 # ------------------------------------------------------------------------------
+# The tool bridge (experimental): the tool list keeps a direct core plus
+# find_tools and use_tool; the rest is reached by name, through the same
+# Sentinel guard (docs/configuration.md)
+# ------------------------------------------------------------------------------
+[tool_bridge]
+enabled = false          # off by default; on shrinks the list the model carries on every call
+auto = false             # engage by context window instead of by hand; never engages today, the repo keeps no window data
+window_threshold = 0     # a known context window below this many tokens engages auto
+
+# ------------------------------------------------------------------------------
 # The hub: this computer as one of the account's devices (docs/hub.md)
 # ------------------------------------------------------------------------------
 [hub]

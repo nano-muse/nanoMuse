@@ -37,6 +37,7 @@ from nanomuse.schema import AgentState, Attachment, Message, Role, ToolResult, n
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
+from nanomuse.tools.bridge import ToolBridge, build_tool_bridge
 from nanomuse.ui import UI
 
 
@@ -92,6 +93,13 @@ class MuseAgent:
         self.sentinel = sentinel
         self.ui = ui
         self.audit = audit
+        # The tool bridge's view of the collection, when [tool_bridge] turns
+        # it on: the model's list is the view (a direct core plus find_tools
+        # and use_tool), while self.tools stays the full collection every
+        # internal probe reads. Built once, here, so the list on every call
+        # of the conversation is the same bytes. None when off, and off is
+        # the default: nothing about the list or the dispatch changes.
+        self._bridge: ToolBridge | None = build_tool_bridge(tools, sentinel, settings)
         self.memory = memory
         self.goals = goals
         self.calendar = calendar
@@ -400,7 +408,9 @@ class MuseAgent:
             sentinel_mode=self.settings.sentinel.mode,
             sandbox=self.sandbox_note(),
             contacts=self.contacts_note(),
-            tool_names=", ".join(t.name for t in self.tools),
+            tool_names=", ".join(
+                self._bridge.names() if self._bridge is not None else [t.name for t in self.tools]
+            ),
             user_profile=profile,
             memories=memories,
             goals=goals
@@ -604,7 +614,7 @@ class MuseAgent:
         attached = {"files": [a.path for a in files]} if files else {}
         self.audit.record("user_message", content=user_input, **attached)
         system_prompt = self.build_system_prompt(user_input, await self.recall_for(user_input))
-        tool_params = self.tools.to_params()
+        tool_params = self._bridge.params() if self._bridge is not None else self.tools.to_params()
         final: str | None = None
         step = 0
         empty_replies = 0
@@ -689,6 +699,10 @@ class MuseAgent:
                     if budget is not None:
                         budget.check()
                     tool = self.tools.get(call.name)
+                    if tool is None and self._bridge is not None:
+                        # a call to one of the bridge's own tools, which live
+                        # in the view, not in the collection itself
+                        tool = self._bridge.get(call.name)
                     if tool is None:
                         summary = f"{call.name}(?)"
                     elif "__raw__" in call.arguments:
@@ -703,7 +717,12 @@ class MuseAgent:
                     self.ui.on_tool_call(call, summary)
                     if tool is None:
                         result = ToolResult.fail(
-                            f"unknown tool '{call.name}'. Available tools: {', '.join(t.name for t in self.tools)}"
+                            f"unknown tool '{call.name}'. Available tools: "
+                            + ", ".join(
+                                self._bridge.names()
+                                if self._bridge is not None
+                                else [t.name for t in self.tools]
+                            )
                         )
                     else:
                         result = await self.sentinel.guard(call, tool)

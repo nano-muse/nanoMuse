@@ -792,6 +792,39 @@ class SquadSettings(BaseModel):
     max_tool_calls: int = Field(default=0, ge=0)
 
 
+class ToolBridgeSettings(BaseModel):
+    """The tool bridge (experimental): fewer tools per call, the rest by name.
+
+    Off by default, and off means the model's tool list is exactly
+    what it was: every tool, in full.  With it on, the list the model
+    is given each call keeps a small direct core (the conversation
+    controls and the everyday workspace, command and web tools) plus
+    two meta tools, ``find_tools`` and ``use_tool``; the remaining
+    tools are reached through them.  A call made through ``use_tool``
+    goes through the same Sentinel guard as a direct call, so
+    approvals, grants and the audit record work exactly as before.
+    Sending tools (mail, notifications, a task handed to another
+    device) and anything named like the approval machinery itself
+    never travel the bridge: they stay direct, always.  The point is
+    room in the context window for small or cheap models, not money:
+    a bridged call costs the same as a direct one, plus one short
+    listing of a schema when the model looks a tool up first.
+
+    ``auto`` is the second way on: the bridge turns itself on when
+    the chosen model's context window is known and below
+    ``window_threshold``.  Nothing in the repository today records a
+    model's window (the provider catalogue carries capabilities, not
+    windows), so the window is always unknown, auto never engages,
+    and the bridge stays off until either ``enabled`` is set or a
+    window source exists.  That is deliberate: a guessed window
+    would switch the bridge on and off on a fiction.
+    """
+
+    enabled: bool = False
+    auto: bool = False
+    window_threshold: int = Field(default=0, ge=0)
+
+
 class Settings(BaseModel):
     data_dir: Path = DEFAULT_DATA_DIR
     log_level: str = "INFO"
@@ -816,6 +849,7 @@ class Settings(BaseModel):
     cost: CostSettings = Field(default_factory=CostSettings)
     decider: DeciderSettings = Field(default_factory=DeciderSettings)
     squad: SquadSettings = Field(default_factory=SquadSettings)
+    tool_bridge: ToolBridgeSettings = Field(default_factory=ToolBridgeSettings)
     # Where the settings came from (informational).
     source: str | None = None
 

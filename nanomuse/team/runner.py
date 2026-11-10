@@ -141,6 +141,8 @@ class _TrackedTool(BaseTool):
             name=inner.name,
             description=inner.description,
             parameters=inner.parameters,
+            purpose=inner.purpose,
+            keywords=inner.keywords,
             risk=inner.risk,
             reads_private_data=inner.reads_private_data,
             egress=inner.egress,

@@ -514,6 +514,27 @@ With `execute` on, a dispatch also runs, provided the caller that formed the squ
 
 Every assignment is also frozen at enqueue with a risk ceiling (the assignment's `level` in the ledger): the highest tool risk its calls may touch. A child's ceiling is the tighter of its parent's ceiling and its role preset's, so a ceiling only ever narrows down a tree and never widens; research and verify cap at `safe`, a consult assignment caps at `safe` whatever its role, and execute caps at `sensitive`, the top of the scale. The root takes the ceiling the caller forming the squad names (there is no `[squad]` key for it), which defaults to `sensitive`: no extra limit, so the layer refuses nothing and the Sentinel's own judgements are the only ones. The frozen ceiling is read from the ledger row when the assignment runs, so changing a preset or a setting afterwards does not move it. At run time the ceiling sits in front of the Sentinel, beside the read-only gate: a call assessed above the ceiling is refused on the spot, before the Sentinel is consulted, and the refusal is written to the assignment's events as `ceiling_refused`. Because the Sentinel is never reached, no approval, standing permission or approval token inside the assignment can lift the ceiling: a token settles one sensitive action, the ceiling bounds the whole assignment. A call at or under the ceiling goes to the Sentinel unchanged, approvals and all. Assignments recorded before ceilings existed carry no level and get no ceiling layer. The decider takes no part in any of this; it never sets or reads a ceiling.
 
+## `[tool_bridge]`
+
+```toml
+[tool_bridge]
+enabled          = false # on: the tool list shrinks to a direct core plus find_tools and use_tool
+auto             = false # engage by context window instead of by hand (never engages today, see below)
+window_threshold = 0     # a known context window below this many tokens engages auto
+```
+
+The tool bridge, experimental and off by default. A run carries the whole tool list on every model call, and with the full tool set that list is long; a model with a small context window spends a real share of it just reading the tools. With the bridge on, the list the model sees keeps a direct core (`terminate`, `ask_user`, `files`, `shell`, `python_execute`, `web_search`, `web_fetch`) plus two meta tools, `find_tools` and `use_tool`, and everything else is reached by name: `find_tools(query)` searches a word index over the bridged tools' names, one-line purposes and keywords and returns the full schema of the best three matches, or says plainly that nothing matches, since there is no near miss it would rather invent; and `use_tool(name, arguments)` runs one of them. The list is built once when the agent is built, so every call in a conversation sends the same bytes.
+
+`use_tool` is not a second way to run a tool. It hands the named call to the same Sentinel guard a direct call goes through, with the named tool's own assessment in front of it, so policy, approvals, grants, the audit log and the cost ledger see the call exactly as they would have directly. One difference stays, and it is in the safe direction: a bridged call passes the guard twice, once as `use_tool` and once as the tool itself, so it may be asked about twice and never zero times. `find_tools` and `use_tool` make no model calls of their own, and a bridged execution is charged like the direct call it is.
+
+Two kinds of tool never go through the bridge and stay listed directly beside the core, called by their own names only. Sending tools: `send_email`, `device_notify` and `delegate` are named in the bridge's exempt list, and any tool whose name carries a sending word (`send`, `notify`, `publish`) is exempt by that word, including tools that arrive later from an MCP server, so the decision to send is always made with the sending tool in front of the model. The approval machinery is the second kind: no tool is offered for it today, and a name carrying `sentinel`, `gatekeeper`, `grant` or `approval` is refused by `use_tool` on sight. The classification is one function over three named sets in `nanomuse/tools/bridge.py`, and a test walks every tool the runtime ships and fails if one is in no set, so a new tool cannot drift in unclassified. Tools that arrive at run time with generated names (MCP tools, device tools) are classified by the same rules: exempt by word when a word matches, bridged otherwise.
+
+Inside a squad preset the bridge reaches only the tools the preset's face holds, because the bridge is built over the collection the agent was given, and the named call still passes the preset's read-only gate and risk ceiling in front of the Sentinel. The envelope presents the named call's own assessment and family risk, so those layers judge the call the model named, not the envelope around it.
+
+The switch is one function. `enabled` on is on. Otherwise `auto` engages the bridge only when the selected model's context window is known and below `window_threshold`, and no window is known today: the provider catalogue records capabilities, not context windows, so `auto` never engages until a window source exists. That is deliberate; a guessed window would switch the bridge on a fiction.
+
+The bridge buys context headroom for small-window and cheaper models. It does not save money: a bridged call costs what the direct call costs, and a find first is one short schema listing more. It exists so a model with little room can still reach the whole tool set.
+
 ## `[server]`
 
 ```toml

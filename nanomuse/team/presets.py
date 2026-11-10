@@ -218,7 +218,7 @@ def assessed_risk(tool: BaseTool, args: dict[str, Any]) -> RiskLevel | None:
     except Exception:  # noqa: BLE001 - an unassessable call has no risk to measure
         return None
     if is_read_only_call(tool, args):
-        return tool.risk
+        return tool.family_risk(args)
     return assessment.risk
 
 
