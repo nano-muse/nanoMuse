@@ -760,6 +760,52 @@ def test_codex_writer_conflict_does_not_start_another_session(
     assert not runner._looks_like_unknown_session("failed to resume: authentication expired")
 
 
+@pytest.mark.parametrize("phase", ["item.started", "item.completed"])
+def test_resume_failure_after_tool_work_does_not_repeat_actions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    calls = tmp_path / "effects"
+    rows = [
+        {"type": "thread.started", "thread_id": "existing-session"},
+        {
+            "type": phase,
+            "item": {
+                "id": "command-1",
+                "type": "command_execution",
+                "command": "record-effect",
+                "aggregated_output": "effect recorded",
+                "exit_code": 0,
+            },
+        },
+        {"type": "turn.failed", "error": {"message": "response resource not found"}},
+    ]
+    script = tmp_path / "fake-codex"
+    exe = script
+    if sys.platform == "win32":
+        exe = tmp_path / "fake-codex.cmd"
+        exe.write_bytes(b'@node "%~dp0fake-codex.mjs" %*\r\n')
+        script = tmp_path / "fake-codex.mjs"
+    _write_fake(
+        script,
+        "#!/bin/sh\n"
+        f'echo effect >> "{calls}"\n'
+        + "\n".join("echo '" + json.dumps(row) + "'" for row in rows)
+        + "\nexit 1\n",
+        'import fs from "node:fs";\n'
+        + f'fs.appendFileSync({json.dumps(str(calls))}, "effect\\n");\n'
+        + f"for (const row of {json.dumps(rows)}) console.log(JSON.stringify(row));\n"
+        + "process.exitCode = 1;\n",
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(runner, "which", lambda agent: str(exe))
+    monkeypatch.setattr(runner, "read_session", lambda agent, sid: None)
+    run = asyncio.run(start_run("codex", "act once", session_id="existing-session", timeout_s=10))
+    assert run.status == "failed"
+    assert run.resumed
+    assert calls.read_text().splitlines() == ["effect"]
+    assert run.error == "response resource not found"
+
+
 def test_a_helper_left_behind_does_not_keep_the_run_open(
     fake_cursor: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -762,7 +762,9 @@ export async function startRun(options: StartOptions): Promise<Run> {
       await emit({ kind: 'error', text: run.error, final: true })
       return run
     }
-    if (attempt === 1 && resume && looksLikeUnknownSession(lower)) {
+    // A provider's later "not found" error is not proof that no tool has acted.
+    const observedTool = run.tools > 0 || run.timeline.values().some((item) => item.kind !== 'message')
+    if (attempt === 1 && resume && !observedTool && looksLikeUnknownSession(lower)) {
       attemptText = prior ? continuation(prior, text) : text
       resume = false
       run.output = ''

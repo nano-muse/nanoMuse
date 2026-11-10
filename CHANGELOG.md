@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Prevented failed coding runs from retrying in a new conversation after a tool had already started or returned a result.
+
 ### Documentation
 
 - Documented supported migration paths for memories, reference files and connectors, and the limits of importing another assistant's archive. For #870.

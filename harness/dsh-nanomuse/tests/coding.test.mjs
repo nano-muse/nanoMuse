@@ -716,6 +716,33 @@ exit 1
   })
 })
 
+test('runner: a provider failure after a tool does not repeat its effects in a new chat', async () => {
+  await scratch(async (dir) => {
+    const script = join(dir, 'fake-codex.mjs')
+    const calls = join(dir, 'effects')
+    const cli = join(dir, posix ? 'fake-codex' : 'fake-codex.cmd')
+    await writeFile(cli, posix
+      ? `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`
+      : `@"${process.execPath}" "${script}" %*\r\n`)
+    await chmod(cli, 0o755)
+    for (const phase of ['item.started', 'item.completed']) {
+      const rows = [
+        { type: 'thread.started', thread_id: 'existing-session' },
+        { type: phase, item: { id: 'command-1', type: 'command_execution', command: 'record-effect', aggregated_output: 'effect recorded', exit_code: 0 } },
+        { type: 'turn.failed', error: { message: 'response resource not found' } },
+      ]
+      await writeFile(calls, '')
+      await writeFile(script, `import fs from 'node:fs';\nfs.appendFileSync(${JSON.stringify(calls)}, 'effect\\n');\nfor (const row of ${JSON.stringify(rows)}) console.log(JSON.stringify(row));\nprocess.exitCode = 1;\n`)
+      const env = { ...process.env, NANOMUSE_CODING_HOME: join(dir, 'empty-home') }
+      const run = await startRun({ agent: 'codex', text: 'act once', sessionId: 'existing-session', which: () => cli, env, readerEnv: env, timeoutMs: 10_000 })
+      assert.equal(run.status, 'failed', phase)
+      assert.equal(run.resumed, true, phase)
+      assert.equal(run.error, 'response resource not found', phase)
+      assert.equal((await readFile(calls, 'utf8')).trim(), 'effect', phase)
+    }
+  })
+})
+
 test('Codex lock recognition excludes authentication and filesystem failures', () => {
   assert.ok(isResumeLockError('Error: thread/resume: thread/resume failed: thread 0f9a7b6c-1111-2222-3333-444455556666 already has an active writer (code -32600)'))
   assert.ok(isResumeLockError('session already registered for process 123'))

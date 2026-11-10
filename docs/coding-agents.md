@@ -263,6 +263,8 @@ references in the specified session or an associated nanoMuse-owned run, never
 an arbitrary path. Validation does not bypass the send gate.
 
 `request_id` deduplicates an identical send, including concurrent requests.
+After observing a tool start or result, a failed resumed run stays failed. An error
+containing "not found" cannot silently start a new conversation and repeat the work.
 Reuse with different content returns `request_conflict`. Finished runs retain
 the identity across restart within the existing 50-run retention. The iOS client
 uses `wait: false` to receive the run ID after the computer's permission gate,

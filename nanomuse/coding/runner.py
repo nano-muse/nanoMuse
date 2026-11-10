@@ -633,7 +633,12 @@ async def start_run(
             await emit(RunEvent("error", run.error, extra={"final": True}))
             return run
         lower = diagnostic.lower()
-        if attempt == 1 and resume and _looks_like_unknown_session(lower):
+        # A later provider error can say "not found" after a tool already acted.
+        # Reopening as a new chat would repeat that work under the same request.
+        observed_tool = run.tools > 0 or any(
+            item.get("kind") != "message" for item in run.timeline.values()
+        )
+        if attempt == 1 and resume and not observed_tool and _looks_like_unknown_session(lower):
             attempt_text = _continuation(prior, text) if prior is not None else text
             resume = False
             run.output = ""
