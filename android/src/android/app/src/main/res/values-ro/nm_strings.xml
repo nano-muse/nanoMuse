@@ -1270,6 +1270,7 @@
     <string name="nm_mcp_oauth_token_failed">Autentificarea la conector a eșuat (%1$s). Verifică conexiunea și setările OAuth, apoi încearcă din nou.</string>
     <string name="nm_device_chats">Conversații pe dispozitive</string>
     <string name="nm_device_chat_start">Conversează pe acest dispozitiv</string>
+    <string name="nm_device_chat_here">Pe acest dispozitiv</string>
     <string name="nm_device_chat_uncertain">Livrare incertă. Se verifică rezultatul pe dispozitiv.</string>
     <string name="nm_device_chat_interrupted">Întrerupt. Dispozitivul poate să fi executat deja unele acțiuni.</string>
 </resources>

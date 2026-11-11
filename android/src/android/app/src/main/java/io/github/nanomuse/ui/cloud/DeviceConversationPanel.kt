@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -28,6 +27,7 @@ import com.openminis.app.R
 import io.github.nanomuse.cloud.NanoMuseCloud
 import io.github.nanomuse.hub.Device
 import io.github.nanomuse.hub.DeviceConversations
+import io.github.nanomuse.ui.home.DeviceChatStartDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -35,17 +35,23 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 @Composable
-internal fun DeviceConversationPanel(devices: List<Device>) {
+internal fun DeviceConversationPanel(
+    devices: List<Device>,
+    initialChatId: String? = null,
+    routeOnly: Boolean = false,
+    onClose: () -> Unit = {},
+) {
     val context = LocalContext.current
     val account = NanoMuseCloud.account(context)?.accountId?.takeIf { it.isNotBlank() } ?: return
     val service = remember(context, account) { DeviceConversations.open(context, account) }
     val scope = rememberCoroutineScope()
     var rows by remember(account) { mutableStateOf(emptyList<JSONObject>()) }
-    var selected by remember(account) { mutableStateOf("") }
+    var selected by remember(account) { mutableStateOf(initialChatId.orEmpty()) }
     val drafts = remember(account) { mutableStateMapOf<String, String>() }
     var events by remember(account, selected) { mutableStateOf(emptyList<JSONObject>()) }
     var error by remember(account) { mutableStateOf(false) }
     var sending by remember(account) { mutableStateOf(false) }
+    var choosingDevice by remember(account) { mutableStateOf(false) }
     val chat = rows.find { it.optString("id") == selected }
     val device = devices.find { it.id == chat?.optString("device") }
     val activeDevice = chat?.let { row ->
@@ -64,9 +70,24 @@ internal fun DeviceConversationPanel(devices: List<Device>) {
             } catch (_: Exception) { error = true }
         }
     }
-    LaunchedEffect(service) {
-        runCatching { withContext(Dispatchers.IO) { service.list() } }.onSuccess { rows = it }.onFailure { error = true }
+    fun closeChat() {
+        val id = selected
+        if (id.isBlank()) {
+            if (routeOnly) onClose() else selected = ""
+            return
+        }
+        scope.launch {
+            withContext(Dispatchers.IO) { service.saveDraft(id, drafts[id].orEmpty()) }
+            if (routeOnly) onClose() else selected = ""
+        }
     }
+    LaunchedEffect(service) {
+        runCatching { withContext(Dispatchers.IO) { service.list() } }.onSuccess { loaded ->
+            rows = loaded
+            loaded.forEach { row -> drafts.putIfAbsent(row.getString("id"), row.optString("draft")) }
+        }.onFailure { error = true }
+    }
+    LaunchedEffect(initialChatId) { if (initialChatId != null) selected = initialChatId }
     LaunchedEffect(service, selected, activeDevice?.online) {
         events = emptyList()
         if (selected.isBlank() || activeDevice?.online != true) return@LaunchedEffect
@@ -77,27 +98,43 @@ internal fun DeviceConversationPanel(devices: List<Device>) {
             delay(2500)
         }
     }
+    val draftId = chat?.optString("id").orEmpty()
+    val draftValue = drafts[draftId].orEmpty()
+    LaunchedEffect(service, draftId, draftValue) {
+        if (draftId.isBlank()) return@LaunchedEffect
+        delay(250)
+        withContext(Dispatchers.IO) { service.saveDraft(draftId, draftValue) }
+    }
 
-    Text(stringResource(R.string.nm_device_chats), style = MaterialTheme.typography.titleMedium)
-    devices.filter { it.online && "task.status" in it.actions }.forEach { target ->
-        TextButton(onClick = {
+    if (!routeOnly) {
+        Text(stringResource(R.string.nm_device_chats), style = MaterialTheme.typography.titleMedium)
+        TextButton(onClick = { choosingDevice = true }) {
+            Text(stringResource(R.string.nm_device_chat_start))
+        }
+        rows.forEach { row ->
+            TextButton(onClick = { selected = row.getString("id") }) {
+                val current = devices.find { it.id == row.optString("device") }
+                val prompt = DeviceConversations.turns(row).firstOrNull()?.optString("text")?.take(48) ?: row.getString("id").take(8)
+                Text("${deviceConversationLabel(row, current)} · $prompt", color = deviceConversationColor(row.getString("device")))
+            }
+        }
+        if (error && chat == null) Text(stringResource(R.string.nm_hub_err_generic), color = MaterialTheme.colorScheme.error)
+    }
+
+    if (choosingDevice) DeviceChatStartDialog(
+        devices = devices,
+        onLocal = { choosingDevice = false },
+        onDevice = { target ->
+            choosingDevice = false
             run {
                 val row = withContext(Dispatchers.IO) { service.create(target) }
                 save(row)
                 selected = row.getString("id")
             }
-        }) {
-            Text("${stringResource(R.string.nm_device_chat_start)} · ${target.name} · ${target.id.takeLast(6)}")
-        }
-    }
-    rows.forEach { row ->
-        TextButton(onClick = { selected = row.getString("id") }) {
-            val current = devices.find { it.id == row.optString("device") }
-            val prompt = DeviceConversations.turns(row).firstOrNull()?.optString("text")?.take(48) ?: row.getString("id").take(8)
-            Text("${deviceLabel(row, current)} · $prompt", color = deviceColor(row.getString("device")))
-        }
-    }
-    if (error && chat == null) Text(stringResource(R.string.nm_hub_err_generic), color = MaterialTheme.colorScheme.error)
+        },
+        onDismiss = { choosingDevice = false },
+        showLocal = false,
+    )
 
     chat?.let { row ->
         val id = row.getString("id")
@@ -105,8 +142,8 @@ internal fun DeviceConversationPanel(devices: List<Device>) {
         val turns = DeviceConversations.turns(row)
         val text = drafts[id].orEmpty()
         AlertDialog(
-            onDismissRequest = { selected = "" },
-            title = { Text(deviceLabel(row, device), color = deviceColor(row.getString("device"))) },
+            onDismissRequest = { closeChat() },
+            title = { Text(deviceConversationLabel(row, device), color = deviceConversationColor(row.getString("device"))) },
             text = {
                 Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
                     Text(stringResource(if (device?.online == true) R.string.nm_devices_online else R.string.nm_devices_offline))
@@ -139,14 +176,17 @@ internal fun DeviceConversationPanel(devices: List<Device>) {
                 }
             },
             confirmButton = {
-                val maySend = text.trimStart().startsWith("@") || (device?.online == true &&
+                val maySend = text.trimStart().startsWith("@") || (device?.online == true && "task.status" in device.actions &&
                     turns.none { !it.has("destination") && it.optString("error") == "context_lost" })
                 TextButton(enabled = !sending && !pending && maySend && text.isNotBlank(), onClick = {
                     sending = true
                     run {
                         try {
-                            save(withContext(Dispatchers.IO) { service.send(id, text) })
-                            if (drafts[id] == text) drafts.remove(id)
+                            save(withContext(Dispatchers.IO) {
+                                service.saveDraft(id, text)
+                                service.send(id, text).also { service.saveDraft(id, "") }
+                            })
+                            if (drafts[id] == text) drafts[id] = ""
                         } finally { sending = false }
                     }
                 }) { Text(stringResource(R.string.nm_coding_send)) }
@@ -156,16 +196,9 @@ internal fun DeviceConversationPanel(devices: List<Device>) {
                     if (pending) TextButton(enabled = activeDevice?.online == true, onClick = {
                         run { withContext(Dispatchers.IO) { service.stop(id) } }
                     }) { Text(stringResource(R.string.nm_coding_stop)) }
-                    TextButton(onClick = { selected = "" }) { Text(stringResource(android.R.string.cancel)) }
+                    TextButton(onClick = { closeChat() }) { Text(stringResource(android.R.string.cancel)) }
                 }
             },
         )
     }
 }
-
-private fun deviceLabel(row: JSONObject, device: Device?): String {
-    val icon = if ((device?.kind ?: row.optString("kind")) == "phone") "📱" else "▣"
-    return "$icon ${device?.name ?: row.getString("name")} · ${row.getString("device").takeLast(6)}"
-}
-
-private fun deviceColor(id: String): Color = Color.hsl(Math.floorMod(id.hashCode(), 360).toFloat(), 0.42f, 0.48f)

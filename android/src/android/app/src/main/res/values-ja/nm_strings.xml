@@ -1262,6 +1262,7 @@
     <string name="nm_mcp_oauth_token_failed">コネクターへのログインに失敗しました（%1$s）。接続と OAuth 設定を確認して、もう一度お試しください。</string>
     <string name="nm_device_chats">デバイスの会話</string>
     <string name="nm_device_chat_start">このデバイスで会話する</string>
+    <string name="nm_device_chat_here">このデバイスで</string>
     <string name="nm_device_chat_uncertain">配信状況が不明です。デバイスに結果を問い合わせています。</string>
     <string name="nm_device_chat_interrupted">中断されました。デバイスがすでに一部の操作を実行した可能性があります。</string>
 </resources>
