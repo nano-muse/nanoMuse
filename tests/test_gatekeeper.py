@@ -175,10 +175,13 @@ def test_decisions_match_the_in_process_policy(supervisor, client):
 
 @pytest.mark.skipif(not _SUPPORTED, reason=_UNSUPPORTED_REASON)
 async def test_a_persistent_grant_survives_a_restart(tmp_path: Path):
-    from nanomuse.sentinel.grants import GrantStore
+    from nanomuse.sentinel.grants import GrantStore, policy_fingerprint
 
     grants_path = tmp_path / "grants.json"
-    store = GrantStore(grants_path)
+    # Stamped with the fingerprint of the settings the supervisor below is
+    # started with, as the gatekeeper's own store stamps what it records;
+    # an unstamped grant would not be honoured by it.
+    store = GrantStore(grants_path, fingerprint=lambda: policy_fingerprint(SETTINGS))
     store.add("send_email", "boss@example.com", "always")
     assessment = CallAssessment(
         risk=RiskLevel.SENSITIVE,

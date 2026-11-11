@@ -51,7 +51,7 @@ from typing import Any
 from nanomuse.config import SentinelSettings
 from nanomuse.logger import logger
 from nanomuse.sentinel.audit import AuditLog, HmacSigner, _canonical
-from nanomuse.sentinel.grants import GrantStore, grant_key, normalize_scope
+from nanomuse.sentinel.grants import GrantStore, grant_key, normalize_scope, policy_fingerprint
 from nanomuse.sentinel.policy import Decision, Policy
 from nanomuse.tools.base import CallAssessment
 
@@ -511,8 +511,12 @@ class GatekeeperServer:
         key: bytes,
     ):
         self.socket_path = Path(socket_path)
+        # The settings are a snapshot loaded once at start (the supervisor
+        # hands them over as a file); the policy and the fingerprint the
+        # grants are bound to both read this copy.
+        self.settings = settings
         self.policy = Policy(settings)
-        self.grants = GrantStore(grants_path)
+        self.grants = GrantStore(grants_path, fingerprint=lambda: policy_fingerprint(self.settings))
         self.audit = AuditLog(audit_path, signer=HmacSigner(key), key_id="gatekeeper")
         self._stop = False
 
