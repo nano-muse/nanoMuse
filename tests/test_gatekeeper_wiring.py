@@ -15,7 +15,7 @@ from nanomuse.config import SentinelRule, SentinelSettings, Settings
 from nanomuse.schema import RiskLevel
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.sentinel.gatekeeper import GatekeeperClient, GatekeeperSupervisor
-from nanomuse.sentinel.grants import GrantStore
+from nanomuse.sentinel.grants import GrantStore, policy_fingerprint
 from nanomuse.tools.base import CallAssessment
 from nanomuse.ui import ApprovalDecision, ApprovalRequest, HeadlessUI
 from tests.test_gatekeeper import _drop_spawn_key, _spawn_key
@@ -111,9 +111,15 @@ async def test_gatekeeper_permission_settles_a_local_ask(tmp_path: Path):
     # A standing permission recorded in the gatekeeper's store before it started.
     # Both sides share the settings in production (the app hands the supervisor
     # the same [sentinel] section), so its policy asks too, and its permission
-    # is what settles.
-    GrantStore(tmp_path / "approvals.json").add("echo", None, "always", None)
-    sup = await _started(tmp_path, SentinelSettings(always_ask_tools=["echo"]))
+    # is what settles. The seed is stamped with those settings' fingerprint,
+    # the way the gatekeeper's own store stamps what it records: a grant
+    # stamped under another configuration, or by an older version that
+    # stamped nothing, would not be honoured.
+    keeper_settings = SentinelSettings(always_ask_tools=["echo"])
+    GrantStore(
+        tmp_path / "approvals.json", fingerprint=lambda: policy_fingerprint(keeper_settings)
+    ).add("echo", None, "always", None)
+    sup = await _started(tmp_path, keeper_settings)
     try:
         ui = ScopedUI(approve=False)  # a prompt would deny the call outright
         gate = _gate(tmp_path, sup, SentinelSettings(always_ask_tools=["echo"]), ui)

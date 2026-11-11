@@ -27,7 +27,13 @@ from nanomuse.logger import logger
 from nanomuse.schema import RiskLevel, ToolCall, ToolResult
 from nanomuse.sentinel.audit import AuditLog, channel_of
 from nanomuse.sentinel.gatekeeper import GatekeeperClient, GatekeeperUnavailable
-from nanomuse.sentinel.grants import Grant, GrantStore, grant_key, normalize_scope
+from nanomuse.sentinel.grants import (
+    Grant,
+    GrantStore,
+    grant_key,
+    normalize_scope,
+    policy_fingerprint,
+)
 from nanomuse.sentinel.policy import Decision, Policy, PolicyResult
 from nanomuse.tools.base import BaseTool, CallAssessment, safe_execute
 from nanomuse.ui import UI, ApprovalRequest
@@ -105,7 +111,9 @@ class Sentinel:
         # loop per thread shares this Sentinel and clearing a side chat must not forget
         # what another conversation read
         self._tainted: set[str] = set()
-        self.grants = GrantStore(persistent_approvals_file)
+        self.grants = GrantStore(
+            persistent_approvals_file, fingerprint=lambda: policy_fingerprint(self.settings)
+        )
         self.reviewer: SentinelReviewer | None = None
         # Wait only for this conversation's approval for a tool, then reassess policy
         # and grants. Other conversations must not wait on its unanswered card.
