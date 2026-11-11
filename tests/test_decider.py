@@ -515,3 +515,164 @@ async def test_disabled_hook_builds_nothing_and_logs_nothing(
     assert result == "plain run"
     assert len(llm.calls) == 1
     assert not (settings.data_dir / "decider-log.jsonl").exists()
+
+
+# ------------------------------------------------------------------ active routing
+
+
+def test_probability_at_or_above_counts_the_top_levels() -> None:
+    from nanomuse.llm.decider import ScoreAnswer
+
+    answer = ScoreAnswer(score=0.725, probabilities=[0.05, 0.1, 0.15, 0.3, 0.4])
+    assert answer.probability_at_or_above(0.6) == pytest.approx(0.7)
+    assert answer.probability_at_or_above(0.5) == pytest.approx(0.85)
+    assert answer.probability_at_or_above(0.0) == pytest.approx(1.0)
+    assert answer.probability_at_or_above(1.0) == pytest.approx(0.4)
+
+
+def test_active_mode_and_escalated_model_settings() -> None:
+    cfg = DeciderSettings()
+    assert cfg.escalated_model == ""
+    with pytest.raises(ValueError):
+        DeciderSettings(mode="loud")  # type: ignore[arg-type]
+    active = DeciderSettings(mode="active", escalated_model="strong-model")
+    assert active.mode == "active"
+    assert active.escalated_model == "strong-model"
+
+
+def test_active_settings_parse_from_toml(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(
+        """
+[decider]
+enabled = true
+mode = "active"
+escalated_model = "strong-model"
+"""
+    )
+    parsed = load_settings(cfg).decider
+    assert parsed.mode == "active"
+    assert parsed.escalated_model == "strong-model"
+
+
+def enable_active(
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    decider: Decider,
+    *,
+    escalated_model: str = "strong-model",
+    escalated_llm: MockLLM | None = None,
+) -> MockLLM:
+    """Wire an agent's decider to a double, with the factory patched so the
+    escalated client is the given MockLLM (or a plain one)."""
+    settings.decider.enabled = True
+    settings.decider.mode = "active"
+    settings.decider.escalated_model = escalated_model
+    monkeypatch.setattr("nanomuse.agent.core.build_decider", lambda _settings: decider)
+    strong = escalated_llm if escalated_llm is not None else MockLLM([LLMResponse(content="x")])
+    monkeypatch.setattr("nanomuse.llm.factory.llm_ready", lambda *_a, **_k: True)
+    monkeypatch.setattr("nanomuse.llm.factory.create_llm", lambda *_a, **_k: strong)
+    return strong
+
+
+async def test_active_trigger_swaps_the_run_to_the_escalated_model(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = backend_replying({"answers": [{"probabilities": [0.0, 0.0, 0.0, 0.2, 0.8]}]})
+    decider = make_decider(tmp_path, backend)
+    strong = MockLLM([LLMResponse(content="the strong answer")])
+    enable_active(settings, monkeypatch, decider, escalated_llm=strong)
+    agent, llm = make_agent(settings, [LLMResponse(content="the plain answer")])
+    result = await agent.run("do the hard thing")
+    assert result == "the strong answer"
+    assert len(strong.calls) == 1  # the main loop ran on the escalated client
+    assert len(llm.calls) == 0  # the configured client never ran
+    assert agent.llm is llm  # and the original client is back afterwards
+    (line,) = log_lines(tmp_path)
+    assert line["mode"] == "active"
+    assert line["p_escalate"] == pytest.approx(1.0)
+    assert line["acted"] is True
+    assert line["model"] == "strong-model"
+    assert line["would_choose"] == "escalated"
+
+
+async def test_active_swap_is_restored_when_the_run_raises(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(_messages: list) -> LLMResponse:
+        raise RuntimeError("the strong model is down")
+
+    backend = backend_replying({"answers": [{"probabilities": [0.0, 0.0, 0.0, 0.0, 1.0]}]})
+    decider = make_decider(tmp_path, backend)
+    strong = MockLLM([boom])
+    enable_active(settings, monkeypatch, decider, escalated_llm=strong)
+    agent, llm = make_agent(settings, [LLMResponse(content="unused")])
+    with pytest.raises(RuntimeError, match="the strong model is down"):
+        await agent.run("do the hard thing")
+    assert agent.llm is llm
+
+
+async def test_active_spread_out_mass_does_not_swap(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # score reaches the would-escalate line (0.6) but only 0.4 of the mass
+    # sits on the escalated levels: not a confident hard score
+    backend = backend_replying({"answers": [{"probabilities": [0.0, 0.0, 0.6, 0.4, 0.0]}]})
+    decider = make_decider(tmp_path, backend)
+    strong = enable_active(settings, monkeypatch, decider)
+    agent, llm = make_agent(settings, [LLMResponse(content="the plain answer")])
+    result = await agent.run("a middling task")
+    assert result == "the plain answer"
+    assert len(llm.calls) == 1
+    assert len(strong.calls) == 0
+    assert agent.llm is llm
+    (line,) = log_lines(tmp_path)
+    assert line["acted"] is False
+    assert line["p_escalate"] == pytest.approx(0.4)
+    assert line["inactive_reason"] == "below_threshold"
+    assert line["model"] == settings.llm.model
+
+
+async def test_active_without_an_escalated_model_logs_and_routes_nothing(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = backend_replying({"answers": [{"probabilities": [0.0, 0.0, 0.0, 0.0, 1.0]}]})
+    decider = make_decider(tmp_path, backend)
+    settings.decider.enabled = True
+    settings.decider.mode = "active"
+    settings.decider.escalated_model = ""
+    monkeypatch.setattr("nanomuse.agent.core.build_decider", lambda _settings: decider)
+
+    def forbidden_create(*_a: object, **_k: object) -> MockLLM:
+        raise AssertionError("create_llm ran with no escalated model configured")
+
+    monkeypatch.setattr("nanomuse.llm.factory.create_llm", forbidden_create)
+    agent, llm = make_agent(settings, [LLMResponse(content="the plain answer")])
+    result = await agent.run("do the hard thing")
+    assert result == "the plain answer"
+    assert len(llm.calls) == 1
+    (line,) = log_lines(tmp_path)
+    assert line["mode"] == "active"
+    assert line["acted"] is False
+    assert line["inactive_reason"] == "no_escalated_model"
+    assert line["model"] == settings.llm.model
+
+
+async def test_active_backend_failure_still_runs_the_task(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decider = make_decider(tmp_path, _RaisingBackend())
+    strong = enable_active(settings, monkeypatch, decider)
+    agent, llm = make_agent(settings, [LLMResponse(content="still fine")])
+    result = await agent.run("do it anyway")
+    assert result == "still fine"
+    assert len(llm.calls) == 1
+    assert len(strong.calls) == 0
+    assert agent.llm is llm
+    (line,) = log_lines(tmp_path)
+    assert line["ok"] is False
+    assert line["failure"] == "backend_error"
+    assert line["mode"] == "active"
+    assert line["acted"] is False
+    assert line["p_escalate"] is None
+    assert line["inactive_reason"] == "no_decision"

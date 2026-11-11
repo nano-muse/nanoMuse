@@ -126,6 +126,11 @@ class MuseAgent:
         # The decision layer for this agent, built from the [decider] settings on
         # the first run that wants it; None until then and forever when disabled.
         self._built_decider: Decider | None = None
+        # The escalated client for active decider routing: the [llm] slot with
+        # [decider] escalated_model in it, built once and kept under its model
+        # name (a None client under a name is a build that failed, kept so a run
+        # does not retry it). None until an active run first wants it.
+        self._built_escalated: tuple[str, BaseLLM | None] | None = None
         self.last_budget: dict[str, Any] = {}
         self._task_start = 0
         # The language of the screens the person reads this conversation on, from the latest
@@ -461,35 +466,134 @@ class MuseAgent:
         return len({sig(m) for m in assistants}) == 1
 
     # ------------------------------------------------------------------ decision layer
-    async def _decider_shadow(self, user_input: str) -> None:
-        """The decision layer's one shadow question per run: how hard is this task.
+    def _run_model_name(self) -> str:
+        """The model the current client runs, named the way run()'s cost
+        accounting names it: the client's own settings first, the
+        configured [llm] model next, the client's label last."""
+        return str(
+            getattr(getattr(self.llm, "settings", None), "model", None)
+            or self.settings.llm.model
+            or getattr(self.llm, "name", "")
+        )
+
+    def _escalated_client(self, model: str) -> BaseLLM | None:
+        """The client for ``model`` on this agent's [llm] slot, built once.
+
+        None when the slot cannot answer or the build fails; active
+        routing then routes nothing, which the caller logs.  Building
+        a client places no call, so building it before the decision
+        costs nothing when the score does not escalate.
+        """
+        if self._built_escalated is not None and self._built_escalated[0] == model:
+            return self._built_escalated[1]
+        client: BaseLLM | None = None
+        try:
+            from nanomuse.llm.factory import create_llm, llm_ready
+
+            slot = self.settings.llm.model_copy(update={"model": model})
+            if llm_ready(slot, data_dir=self.settings.data_dir):
+                client = create_llm(slot, data_dir=self.settings.data_dir)
+        except Exception:  # noqa: BLE001 - an unbuildable upgrade is no upgrade
+            logger.exception("decider escalated client could not be built")
+            client = None
+        self._built_escalated = (model, client)
+        return client
+
+    def _routing_plan(
+        self,
+        outcome: DecideOutcome,
+        *,
+        escalated_client: BaseLLM | None,
+        escalated_model: str,
+        current_model: str,
+    ) -> dict[str, Any]:
+        """What active mode does with one outcome, as decision log fields.
+
+        Pure in the outcome and the names it is handed, so the log
+        line (written by annotate, inside decide) and the swap after
+        decide returns always agree.  The run escalates only when the
+        probability mass on the levels centred at or above the
+        threshold reaches the threshold itself, an escalated model is
+        configured, it is not the model already running, and its
+        client built.
+        """
+        cfg = self.settings.decider
+        fields: dict[str, Any] = {"mode": cfg.mode, "acted": False, "model": current_model}
+        answers = outcome.answers or []
+        first = answers[0] if answers else None
+        if not isinstance(first, ScoreAnswer):
+            fields["p_escalate"] = None
+            fields["inactive_reason"] = "no_decision"
+            return fields
+        p_escalate = first.probability_at_or_above(cfg.threshold)
+        fields["p_escalate"] = round(p_escalate, 4)
+        if not escalated_model:
+            fields["inactive_reason"] = "no_escalated_model"
+        elif escalated_model == current_model:
+            fields["inactive_reason"] = "same_model"
+        elif escalated_client is None:
+            fields["inactive_reason"] = "escalated_unavailable"
+        elif p_escalate < cfg.threshold:
+            fields["inactive_reason"] = "below_threshold"
+        else:
+            fields["acted"] = True
+            fields["model"] = escalated_model
+        return fields
+
+    async def _decider_route(self, user_input: str) -> BaseLLM | None:
+        """The decision layer's one question per run: how hard is this task.
 
         Only with ``[decider] enabled``; with it off this returns before
         anything is built or called.  The answer is written to the
-        decision log with the tier it would have picked at the
-        configured threshold, and changes nothing about the run: the
-        model, the tools and the budget are all exactly as they would
-        have been.  The decider fails open on its own; this wrapper
-        swallows anything else, because a shadow observer must never
+        decision log with the tier it picked at the configured
+        threshold.  In shadow mode that is all that happens: the run's
+        model, tools and budget are exactly as they would have been.
+        In active mode a confident hard score also swaps this run's
+        client for the escalated one, and this returns the original
+        client so the caller restores it when the run ends; the
+        run's cost entry then names the model that actually ran,
+        because run() reads it from the client in place.  Subtask
+        agents built by the squad factory are MuseAgents too and
+        take the same path.  The decider fails open on its own; this
+        wrapper swallows anything else, because the layer must never
         break a task.
         """
         cfg = self.settings.decider
         if not cfg.enabled:
-            return
+            return None
         try:
             if self._built_decider is None:
                 self._built_decider = build_decider(self.settings)
             threshold = cfg.threshold
+            active = cfg.mode == "active"
+            current_model = self._run_model_name()
+            escalated_model = cfg.escalated_model if active else ""
+            escalated_client = (
+                self._escalated_client(escalated_model)
+                if escalated_model and escalated_model != current_model
+                else None
+            )
 
             def annotate(outcome: DecideOutcome) -> dict[str, Any]:
                 answers = outcome.answers or []
                 first = answers[0] if answers else None
                 if isinstance(first, ScoreAnswer):
                     tier = "escalated" if first.score >= threshold else "default"
-                    return {"would_choose": tier}
-                return {"would_choose": None}
+                    fields: dict[str, Any] = {"would_choose": tier}
+                else:
+                    fields = {"would_choose": None}
+                if active:
+                    fields.update(
+                        self._routing_plan(
+                            outcome,
+                            escalated_client=escalated_client,
+                            escalated_model=escalated_model,
+                            current_model=current_model,
+                        )
+                    )
+                return fields
 
-            await self._built_decider.decide(
+            outcome = await self._built_decider.decide(
                 "task_difficulty",
                 DecideRequest(
                     state=user_input[:2000],
@@ -497,8 +601,21 @@ class MuseAgent:
                 ),
                 annotate=annotate,
             )
-        except Exception:  # noqa: BLE001 - shadow mode observes; it never interferes
-            logger.exception("decider shadow call failed")
+            if active:
+                plan = self._routing_plan(
+                    outcome,
+                    escalated_client=escalated_client,
+                    escalated_model=escalated_model,
+                    current_model=current_model,
+                )
+                if plan["acted"] and escalated_client is not None:
+                    original = self.llm
+                    self.llm = escalated_client
+                    return original
+            return None
+        except Exception:  # noqa: BLE001 - the layer routes or observes; it never breaks a run
+            logger.exception("decider routing call failed")
+            return None
 
     # ------------------------------------------------------------------ main loop
     async def run(
@@ -514,61 +631,70 @@ class MuseAgent:
         # The cost gate's hard mode refuses here, before any work or spend;
         # a no-op unless a recorder with a hard gate is installed.
         cost_recording.preflight()
-        await self._decider_shadow(user_input)
-        token = task_budget.begin(self.settings.agent.budget, inherit=False)
-        budget = task_budget.current()
-        assert budget is not None
-        self._task_start = len(self.messages)
-        deadline = asyncio.timeout(self.settings.agent.budget.max_seconds or None)
+        # Active decider routing may swap this run's client for the escalated
+        # one; swapped_from is the original client, restored in the finally
+        # below, after the cost entry has named the model that actually ran.
+        swapped_from = await self._decider_route(user_input)
         try:
-            async with deadline:
-                return await self._run(
-                    user_input, purpose=purpose, files=files, language=language, run=run
-                )
-        except (task_budget.BudgetExceeded, TimeoutError) as exc:
-            if isinstance(exc, TimeoutError) and not deadline.expired():
-                raise
-            reason = exc.reason if isinstance(exc, task_budget.BudgetExceeded) else "time"
-            budget.stopped = reason
-            reply_language = language or self.ui_language or self.settings.agent.language
-            if reply_language in ("", "auto"):
-                reply_language = "zh" if prompts.detect_language(user_input) == "Chinese" else "en"
-            final = task_budget.BudgetExceeded(reason).message(reply_language)
-            self._repair_dangling_tool_calls(reason=final)
-            self.messages.append(Message.assistant(final))
-            self.ui.on_assistant_message(final, None)
-            self.state = AgentState.FINISHED
-            self._save_session()
-            return final
-        finally:
+            token = task_budget.begin(self.settings.agent.budget, inherit=False)
+            budget = task_budget.current()
+            assert budget is not None
+            self._task_start = len(self.messages)
+            deadline = asyncio.timeout(self.settings.agent.budget.max_seconds or None)
             try:
-                self.last_budget = budget.snapshot()
-                # Feed the cost ledger from the real run; bookkeeping only, so a
-                # ledger failure never reaches the finished task.
-                try:
-                    # The ledger names the model that ran: the one in
-                    # the llm's own settings.  The client's ``name`` is
-                    # the wrapper's label (the prompt adapter's is
-                    # "prompt_tools"), never a model id, so it is only
-                    # a last resort: pricing by it missed every real
-                    # model and recorded zero costs.
-                    cost_recording.record_finished_task(
-                        task_id=self.conversation_id or self.session_id,
-                        model=str(
-                            getattr(getattr(self.llm, "settings", None), "model", None)
-                            or self.settings.llm.model
-                            or getattr(self.llm, "name", "")
-                        ),
-                        snapshot=self.last_budget,
+                async with deadline:
+                    return await self._run(
+                        user_input, purpose=purpose, files=files, language=language, run=run
                     )
-                except Exception:
-                    logger.exception("cost ledger recording failed")
-                # a line in the audit log when a budget is in force or was reached; a task
-                # with no limits set leaves the log as it was
-                if budget.limited or budget.stopped:
-                    self.audit.record("task_budget", **self.last_budget)
+            except (task_budget.BudgetExceeded, TimeoutError) as exc:
+                if isinstance(exc, TimeoutError) and not deadline.expired():
+                    raise
+                reason = exc.reason if isinstance(exc, task_budget.BudgetExceeded) else "time"
+                budget.stopped = reason
+                reply_language = language or self.ui_language or self.settings.agent.language
+                if reply_language in ("", "auto"):
+                    reply_language = (
+                        "zh" if prompts.detect_language(user_input) == "Chinese" else "en"
+                    )
+                final = task_budget.BudgetExceeded(reason).message(reply_language)
+                self._repair_dangling_tool_calls(reason=final)
+                self.messages.append(Message.assistant(final))
+                self.ui.on_assistant_message(final, None)
+                self.state = AgentState.FINISHED
+                self._save_session()
+                return final
             finally:
-                task_budget.end(token)
+                try:
+                    self.last_budget = budget.snapshot()
+                    # Feed the cost ledger from the real run; bookkeeping only, so a
+                    # ledger failure never reaches the finished task.
+                    try:
+                        # The ledger names the model that ran: the one in
+                        # the llm's own settings.  The client's ``name`` is
+                        # the wrapper's label (the prompt adapter's is
+                        # "prompt_tools"), never a model id, so it is only
+                        # a last resort: pricing by it missed every real
+                        # model and recorded zero costs.
+                        cost_recording.record_finished_task(
+                            task_id=self.conversation_id or self.session_id,
+                            model=str(
+                                getattr(getattr(self.llm, "settings", None), "model", None)
+                                or self.settings.llm.model
+                                or getattr(self.llm, "name", "")
+                            ),
+                            snapshot=self.last_budget,
+                        )
+                    except Exception:
+                        logger.exception("cost ledger recording failed")
+                    # a line in the audit log when a budget is in force or was reached; a task
+                    # with no limits set leaves the log as it was
+                    if budget.limited or budget.stopped:
+                        self.audit.record("task_budget", **self.last_budget)
+                finally:
+                    task_budget.end(token)
+        finally:
+            if swapped_from is not None:
+                self.llm = swapped_from
 
     def _request_context(
         self, system_prompt: str, tools: list[dict[str, Any]] | None
