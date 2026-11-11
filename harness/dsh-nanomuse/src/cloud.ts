@@ -1539,6 +1539,12 @@ export default class NanomuseCloud extends Service {
     return list?.find((r) => r.id === scheduleId)?.title.slice(0, 80) ?? ''
   }
 
+  /** A chat's title as the chats column shows it; '' when it cannot be read. */
+  async chatTitle(sessionId: string): Promise<string> {
+    const ctx = this.sessionCtx
+    return ctx ? this.sessionTitle(ctx, sessionId as SessionId, Date.now()).catch(() => '') : ''
+  }
+
   async revokeGrant(id: string): Promise<boolean> {
     const before = this.state.grants?.length ?? 0
     const grants = (this.state.grants ?? []).filter((g) => g.id !== id)

@@ -10,7 +10,52 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from './cloud.ts'
 import type {} from './rooms.ts'
-import { AREAS, languageName } from './rooms.ts'
+import { AREAS, languageName, ruleOf } from './rooms.ts'
+import type { ScheduleRecordLike } from './rooms.ts'
+
+/** One task as the schedule service's `catalog` gives it: every chat's, active or not. */
+export interface ScheduleCatalogEntryLike extends ScheduleRecordLike {
+  sessionId: string
+  status: 'active' | 'inactive'
+  timeZone?: string
+}
+
+interface ScheduleCatalogLike {
+  catalog(): Promise<ScheduleCatalogEntryLike[]>
+  delete(request: { sessionId: string; id: string }): Promise<{ id: string; deleted: boolean }>
+}
+
+/** A task row for `schedule_list_all`: what it is, when it runs next, and which chat it runs in. */
+export interface ScheduleRow {
+  id: string
+  title: string
+  rule: string
+  time_zone?: string
+  next_run: string
+  chat_id: string
+  chat_title: string
+  this_chat: boolean
+}
+
+/**
+ * The active tasks of every chat, this chat's first. A task runs in the chat it was made in
+ * (dsh-schedule delivers to its original session), but it is the person's task, not the chat's.
+ */
+export function scheduleRows(entries: readonly ScheduleCatalogEntryLike[], here: string, titles: ReadonlyMap<string, string>): ScheduleRow[] {
+  return entries
+    .filter((e) => e.status === 'active')
+    .map((e) => ({
+      id: e.id,
+      title: e.title,
+      rule: ruleOf(e),
+      ...(e.timeZone ? { time_zone: e.timeZone } : {}),
+      next_run: e.scheduledAt,
+      chat_id: e.sessionId,
+      chat_title: titles.get(e.sessionId) ?? '',
+      this_chat: e.sessionId === here,
+    }))
+    .sort((a, b) => Number(b.this_chat) - Number(a.this_chat))
+}
 
 export const name = 'nanomuse-rooms-tools'
 export const inject = ['tools', 'nanomuseRooms', 'nanomuseCloud']
@@ -151,6 +196,76 @@ export function apply(ctx: Context): void {
     'nanomuse rooms: draw_new_look',
   )
 
+  /** dsh-schedule's service, when it is loaded; its own tools see one chat's tasks only. */
+  const scheduler = () => ctx.get('schedule' as never) as ScheduleCatalogLike | undefined
+
+  ctx.effect(
+    () =>
+      ctx.tools.register(
+        defineTool({
+          name: 'schedule_list_all',
+          description: "List every active scheduled task on this computer, in every chat, with the chat each one runs in. schedule_list shows only this chat's tasks; use this one when the person asks what tasks they have, and before schedule_create, so a task that already exists in another chat is not made twice.",
+          parameters: {},
+          output: {
+            schema: {
+              type: 'object',
+              properties: {
+                tasks: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: { id: { type: 'string' }, title: { type: 'string' }, rule: { type: 'string' }, time_zone: { type: 'string' }, next_run: { type: 'string' }, chat_id: { type: 'string' }, chat_title: { type: 'string' }, this_chat: { type: 'boolean' } },
+                    required: ['id', 'title', 'rule', 'next_run', 'chat_id', 'chat_title', 'this_chat'],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ['tasks'],
+              additionalProperties: false,
+            },
+            render: (_args, value) => [{ type: 'text', text: JSON.stringify(value.tasks) }],
+          },
+          async execute(_args, exec) {
+            const schedule = scheduler()
+            if (!schedule) throw new Error('Scheduled tasks are not available on this computer.')
+            const entries = await schedule.catalog()
+            const titles = new Map<string, string>()
+            for (const id of new Set(entries.filter((e) => e.status === 'active').map((e) => e.sessionId))) titles.set(id, await ctx.nanomuseCloud.chatTitle(id))
+            return { tasks: scheduleRows(entries, String(exec.agent?.session.id ?? ''), titles) }
+          },
+          presentCall: () => ({ card: 'generic', title: 'List all scheduled tasks', kind: 'read', rawInput: {} }),
+        }),
+      ),
+    'nanomuse rooms: schedule_list_all',
+  )
+
+  ctx.effect(
+    () =>
+      ctx.tools.register(
+        defineTool({
+          name: 'schedule_delete_any',
+          description: 'Delete one scheduled task by its id from schedule_list_all, whichever chat it runs in: a duplicate, or one the person no longer wants. To move a task to this chat, delete it here and make it again with schedule_create.',
+          parameters: {
+            id: { type: 'string', required: true, description: 'The task id from schedule_list_all.' },
+          },
+          output: {
+            schema: { type: 'object', properties: { id: { type: 'string' }, deleted: { type: 'boolean' }, title: { type: 'string' } }, additionalProperties: false },
+            render: (_args, value) => [{ type: 'text', text: value.deleted ? `Deleted the scheduled task "${value.title}".` : `No scheduled task with id ${value.id}.` }],
+          },
+          async execute(args) {
+            const schedule = scheduler()
+            if (!schedule) throw new Error('Scheduled tasks are not available on this computer.')
+            const entry = (await schedule.catalog()).find((e) => e.id === args.id && e.status === 'active')
+            if (!entry) return { id: args.id, deleted: false, title: '' }
+            const result = await schedule.delete({ sessionId: entry.sessionId, id: entry.id })
+            return { id: entry.id, deleted: result.deleted, title: entry.title }
+          },
+          presentCall: (args) => ({ card: 'generic', title: `Delete scheduled task ${args.id || ''}`, kind: 'delete', rawInput: args }),
+        }),
+      ),
+    'nanomuse rooms: schedule_delete_any',
+  )
+
   ctx.inject(['systemPrompt'], (ctx) => {
     // The first conversation (C4): what the model is told for the chat it is bound to, by
     // phase — nothing anywhere else, nothing once it is over. The assembly names its agent.
@@ -187,6 +302,7 @@ export function apply(ctx: Context): void {
             } else {
               lines.push('', 'You remember nothing about the person yet; when they tell you something they will expect you to know next time, keep it with remember.')
             }
+            lines.push('', "Scheduled tasks belong to the person, not to one chat: a task runs in the chat it was made in, and every chat can see and stop it. Before schedule_create, call schedule_list_all; when the same task already exists in another chat, say so and do not make it again. When the person asks what tasks they have, answer from schedule_list_all, not schedule_list.")
             // the words under the face: the person watches the step's own description there
             lines.push('', `Where a tool takes a \`description\` or \`step\` argument (bash, pwsh, run_code, the computer_* tools), write there what the step does for the person, in ${languageName(rooms.lang)}, in a few words ("打开携程网站", "Check the login page") — it is shown under your face while the tool runs. Fill it in on every such call.`)
             return lines.join('\n')
