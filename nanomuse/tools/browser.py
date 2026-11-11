@@ -502,8 +502,10 @@ class Browser(BaseTool):
             scheme = urlparse(url).scheme.lower()
         except ValueError:
             return False
-        if scheme not in ("http", "https", "ws", "wss"):
+        if scheme in ("about", "data", "blob"):
             return True
+        if scheme not in ("http", "https", "ws", "wss"):
+            return False
         host = host_of(url)
         if not host:
             return False

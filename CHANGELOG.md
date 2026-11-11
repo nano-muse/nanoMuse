@@ -46,6 +46,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **The browser tool's SSRF guard refuses file:// and other non-network schemes.** Navigations and subresources outside HTTP(S) and in-memory resources (about, data, blob) were allowed through because the guard only inspected HTTP/HTTPS protocols, allowing local file access; the guard now explicitly permits only safe browser schemes and denies file:// and custom protocols.
+
 - Added optional observation-only permission reviews to the Python runtime, using the active chat model or a separately configured model, with bounded requests and redacted audit records. For #724.
 
 - Preserved each conversation's tool permissions and reused them after concurrent approval waits, reducing repeated cards while keeping one-time approvals and warning checks separate. For #724.

@@ -19,7 +19,19 @@ EXAMPLE_HOST_ADDRESS = "93.184.216.34"
 
 
 def _is_example_host(host: bytes | str | None) -> bool:
-    return isinstance(host, str) and (host == "example" or host.endswith(".example"))
+    if not isinstance(host, str):
+        return False
+    h = host.lower()
+    return (
+        h == "example"
+        or h.endswith(".example")
+        or h == "example.com"
+        or h.endswith(".example.com")
+        or h == "example.org"
+        or h.endswith(".example.org")
+        or h == "example.net"
+        or h.endswith(".example.net")
+    )
 
 
 @pytest.fixture(autouse=True)

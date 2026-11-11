@@ -530,3 +530,37 @@ async def test_fetch_checks_every_redirect_hop(tmp_path: Path, monkeypatch):
     res = await tool.execute(action="fetch", url="https://shop.example/inside")
     assert not res.ok and "redirect to a private or local address" in (res.error or "")
     assert not any(c[1][0].startswith("http://169.254") for c in backend.calls if c[0] == "fetch")
+
+
+async def test_url_guard_refuses_local_file_and_disallowed_schemes(tmp_path: Path):
+    """The browser SSRF guard refuses file:// and other local/custom schemes, while permitting
+    subresource and in-memory schemes (about, data, blob) and globally routable HTTP(S)."""
+    tool = Browser(workspace=tmp_path)
+    assert not await tool._url_allowed("file:///etc/passwd")
+    assert not await tool._url_allowed("file:///C:/Windows/System32/drivers/etc/hosts")
+    assert not await tool._url_allowed("javascript:alert(1)")
+    assert not await tool._url_allowed("chrome://settings")
+    assert not await tool._url_allowed("http://127.0.0.1:8080")
+    assert not await tool._url_allowed("http://localhost:3000")
+    assert await tool._url_allowed("about:blank")
+    assert await tool._url_allowed("data:image/png;base64,iVBORw0KGgo=")
+    assert await tool._url_allowed("blob:https://example.com/f00b4r")
+    assert await tool._url_allowed("https://example.com")
+
+
+async def test_navigate_refuses_landing_on_local_file(tmp_path: Path):
+    """A navigation whose final URL lands on file:// is refused before reading the DOM."""
+    backend = FakeBackend()
+    tool, _ = tool_with(backend, tmp_path)
+
+    async def goto_file(_url: str) -> None:
+        backend.page_url = "file:///etc/passwd"
+        backend.page_title = "passwd"
+
+    backend.goto = goto_file  # type: ignore[method-assign]
+    res = await tool.execute(action="navigate", url="https://example.com")
+    assert not res.ok
+    assert "refusing a navigation whose final URL is a private or local address" in (
+        res.error or ""
+    )
+    assert "file:///etc/passwd" in (res.error or "")
