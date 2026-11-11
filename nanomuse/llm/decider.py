@@ -1,4 +1,4 @@
-"""A fast decision layer in the shape of TypeSafe's Jev, run in shadow mode.
+"""A fast decision layer in the shape of TypeSafe's Jev.
 
 The decider answers small questions about a task before the real work
 starts: a choice among named options, a score against graded criteria,
@@ -8,6 +8,12 @@ OpenMausBot validates Jev's answers: the options are a closed set,
 every probability is a finite number in [0, 1], the probabilities sum
 to 1 within 0.1, and the chosen answer is the most probable one.  An
 answer that fails validation counts as no decision.
+
+It runs in shadow mode by default: answers are logged, never acted
+on.  In active mode one caller, the agent loop, may act on the
+run-entry difficulty score: a confident hard score routes that run to
+a stronger model.  Acting is the caller's move; this module only
+answers and logs.
 
 Fail open is the whole posture: disabled, no key, a timeout, a backend
 error or a malformed answer all return "no decision" with the failure
@@ -132,6 +138,20 @@ class ScoreAnswer:
     @property
     def margin(self) -> float:
         return _top_and_margin(self.probabilities)[1]
+
+    def probability_at_or_above(self, threshold: float) -> float:
+        """The probability mass on the levels centred at or above ``threshold``.
+
+        Level i of n is centred at i / (n - 1), the same centres the
+        score averages over, so at 0.6 the top two of the five
+        difficulty levels count.  This is the confidence an active
+        caller routes on: a high weighted score with its mass spread
+        over the middle levels does not reach it.
+        """
+        levels = len(self.probabilities)
+        if levels < 2:
+            return 0.0
+        return sum(p for i, p in enumerate(self.probabilities) if i / (levels - 1) >= threshold)
 
 
 @dataclass(frozen=True)

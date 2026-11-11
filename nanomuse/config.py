@@ -734,26 +734,42 @@ class CostSettings(BaseModel):
 
 
 class DeciderSettings(BaseModel):
-    """The fast decision layer (experimental; shadow mode only).
+    """The fast decision layer (experimental).
 
     Off by default, and off means no call and no log.  When on, one
     small call at the start of a run asks the model slot to score the
     task's difficulty; the answer is validated, recorded in the cost
     ledger under its own model, and written to the decision log beside
-    the ledger.  ``mode`` has one value for now: ``shadow``, log only,
-    never acted on, so ``threshold`` is only the line the log names
-    when it says which tier a score would have picked.  ``model``
+    the ledger.  ``mode`` is ``shadow`` (the score is only logged,
+    with the tier it would have picked) or ``active`` (a confident
+    hard score routes the run to ``escalated_model`` for that run
+    only).  ``threshold`` does both jobs: it is the line the shadow
+    log names when it says which tier a score would have picked, and
+    in active mode it splits the score's levels (the levels centred
+    at or above it count as escalated) and gates the switch (the
+    probability mass on those levels must reach it too).  Its 0.6
+    default is the line the shadow step shipped with.  On the
+    synthetic benchmark corpus the two cheapest judging models
+    returned no answer that passed validation, so with them there
+    was nothing to calibrate; a judge that keeps the answer format
+    met the bar at 0.6 exactly (every acted item hard, no false
+    trigger on the easy levels), so the default stands calibrated
+    on the benchmark for such a judge (the configuration docs give
+    the runs and the numbers).  ``model``
     empty decides on the ``[llm]`` slot as configured (the deployment's
     cheap tier); a name decides on the same slot with that model.
-    The layer never approves or refuses anything; that stays with the
-    Sentinel.
+    ``escalated_model`` is the stronger model an active run escalates
+    to; empty leaves active mode with nothing to route to, so it logs
+    and routes nothing.  The layer never approves or refuses
+    anything; that stays with the Sentinel.
     """
 
     enabled: bool = False
-    mode: Literal["shadow"] = "shadow"
+    mode: Literal["shadow", "active"] = "shadow"
     threshold: float = Field(default=0.6, ge=0, le=1)
     timeout_seconds: float = Field(default=1.5, gt=0)
     model: str = ""
+    escalated_model: str = ""
 
 
 class SquadSettings(BaseModel):
