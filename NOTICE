@@ -30,6 +30,13 @@ android/deps/proot (https://github.com/nano-muse/proot).
 
 Other components and their licences: THIRD_PARTY_NOTICES.md.
 
+The coding timeline's apply_patch reader is adapted from Remodex,
+Copyright 2025-2026 Emanuele Di Pietro, Apache License 2.0.
+nanoMuse modifications: provider-neutral records, bounded details,
+stable item identities and unknown counts when the source lacks them.
+The original licence is in THIRD_PARTY_NOTICES.md, under "Apache License 2.0 (Remodex)".
+No Remodex relay or app-server transport is included.
+
 nanoMuse is not affiliated with, endorsed by, or derived from Meta
 Platforms, Inc. or its Muse product. "Muse" is a trademark of Meta
 Platforms, Inc.

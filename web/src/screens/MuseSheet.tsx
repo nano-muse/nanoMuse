@@ -29,6 +29,8 @@ import { ApprovalCard, RiskBadge, grantSubject, scopeLabel, toolIcon } from "../
 import { noteStopped } from "../components/Feedback";
 import { LoadError } from "../components/LoadError";
 import { Sheet } from "../components/Sheet";
+import { SentinelReviewSettings } from "../components/SentinelReviewSettings";
+import { SentinelReviewRow } from "../components/SentinelReviewRow";
 import { intlLocale, localReason, useT } from "../i18n";
 import { useStore } from "../store";
 import type {
@@ -951,8 +953,9 @@ function ActivityView({ open }: { open: boolean }) {
   const { state } = useStore();
   const t = useT();
   const name = state.profile?.name ?? "nanoMuse";
-  const entries = (data?.audit ?? []).filter((e) => e.event === "tool_call").reverse();
-  const gui = entries.filter((e) => e.channel === "gui").length;
+  const calls = (data?.audit ?? []).filter((e) => e.event === "tool_call");
+  const entries = (data?.audit ?? []).filter((e) => e.event === "tool_call" || e.event === "sentinel_review").reverse();
+  const gui = calls.filter((e) => e.channel === "gui").length;
   return (
     <div className="pb-2">
       <p className="text-[12.5px] text-muted mb-2">
@@ -962,8 +965,8 @@ function ActivityView({ open }: { open: boolean }) {
         <p className="text-[12.5px] text-muted mb-2">
           {t("On the phone's screen: {gui} of {total} steps ({pct}%). The screen is the last resort; a skill, a fetch or the browser comes first.", {
             gui: String(gui),
-            total: String(entries.length),
-            pct: String(Math.round((gui / entries.length) * 100)),
+            total: String(calls.length),
+            pct: String(Math.round((gui / calls.length) * 100)),
           })}
         </p>
       )}
@@ -978,7 +981,9 @@ function ActivityView({ open }: { open: boolean }) {
       )}
       <ul className="space-y-1.5">
         {entries.map((e, i) => (
-          <AuditRow key={`${e.ts}-${i}`} entry={e} />
+          e.event === "sentinel_review"
+            ? <SentinelReviewRow key={`${e.ts}-${i}`} entry={e} />
+            : <AuditRow key={`${e.ts}-${i}`} entry={e} />
         ))}
       </ul>
     </div>
@@ -987,7 +992,7 @@ function ActivityView({ open }: { open: boolean }) {
 
 // ------------------------------------------------------------------ permissions
 function PermissionsView({ open }: { open: boolean }) {
-  const { state, toast } = useStore();
+  const { state, toast, refreshSettings } = useStore();
   const t = useT();
   const [data, reload] = useActivity(open);
 
@@ -1022,7 +1027,7 @@ function PermissionsView({ open }: { open: boolean }) {
         <p className="mt-1 text-[12.5px] text-muted">
           {mode === "ask" && t("Safe and moderate actions run freely; anything sensitive (email, shell, purchases) waits for you.")}
           {mode === "strict" && t("Moderate and sensitive actions both wait for your approval.")}
-          {mode === "auto" && t("Everything is approved automatically except explicit deny rules. Use with care.")}
+          {mode === "auto" && t("Ordinary actions run automatically. Deny rules still apply; warnings and private data sent to unapproved destinations still need permission.")}
         </p>
         {data?.tainted && (
           <p className="mt-2 text-[12.5px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
@@ -1030,6 +1035,15 @@ function PermissionsView({ open }: { open: boolean }) {
           </p>
         )}
       </div>
+      {state.settings?.sentinel.review && <SentinelReviewSettings
+        value={state.settings.sentinel.review}
+        chatModel={state.settings.llm.model}
+        onSave={async (review) => {
+          const saved = await api.updateSettings({ sentinel_review: review });
+          await refreshSettings();
+          return saved.sentinel.review!;
+        }}
+      />}
       <GrantList grants={data?.grants ?? []} onRevoke={revoke} />
       <PermissionList title={t("Always ask (from config)")} tools={state.settings?.sentinel.always_ask_tools ?? []} muted />
       {(data?.grants.length ?? 0) > 0 && (
@@ -1085,7 +1099,7 @@ function GrantList({ grants, onRevoke }: { grants: Grant[]; onRevoke: (g: Grant)
             </div>
             <ul className="space-y-1.5">
               {group.rows.map((g) => (
-                <li key={g.key} className="flex items-center gap-2.5 rounded-2xl bg-surface-2/60 px-3 py-2">
+                <li key={JSON.stringify([g.key, g.conversation_id ?? "", g.scope])} className="flex items-center gap-2.5 rounded-2xl bg-surface-2/60 px-3 py-2">
                   <span className="text-accent">{toolIcon(g.tool, 15)}</span>
                   <div className="min-w-0 flex-1">
                     <div className="text-[13.5px] font-medium truncate">{grantSubject(g.tool, g.target)}</div>

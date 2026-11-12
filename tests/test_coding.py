@@ -566,6 +566,26 @@ for (const line of [
 }
 process.exit(0);
 """,
+    "writer_conflict": """import fs from "node:fs";
+
+fs.appendFileSync(@CALLS_LOG@, "call\\n");
+fs.writeSync(2, "Error: thread/resume: thread/resume failed: thread " +
+  "01a0c858-5820-7853-ba4c-dee7f183169c already has an active writer (code -32600)\\n");
+process.exit(1);
+""",
+    "terminal_error": """import fs from "node:fs";
+import { spawn } from "node:child_process";
+
+for (const line of [
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"trying"}]}}',
+  '{"type":"result","is_error":true,"result":"the model refused"}',
+]) {
+  fs.writeSync(1, line + "\\n");
+}
+spawn(process.execPath, ["-e", "setTimeout(() => {}, 2000)"],
+  { stdio: ["ignore", process.stdout, process.stderr] }).unref();
+process.exit(0);
+""",
     "helper": """import fs from "node:fs";
 import { spawn } from "node:child_process";
 
@@ -694,6 +714,98 @@ def test_start_run_streams_and_falls_back_to_a_new_chat(
     assert run.status == "failed" and "not installed" in run.error
 
 
+def test_codex_writer_conflict_does_not_start_another_session(
+    coding_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script = tmp_path / "fake-codex"
+    calls = tmp_path / "calls"
+    if sys.platform == "win32":
+        exe = tmp_path / "fake-codex.cmd"
+        exe.write_bytes(b'@node "%~dp0fake-codex.mjs" %*\r\n')
+        script = tmp_path / "fake-codex.mjs"
+    else:
+        exe = script
+    _write_fake(
+        script,
+        "#!/bin/sh\n"
+        f'echo call >> "{calls}"\n'
+        "echo 'Error: thread/resume: thread/resume failed: thread "
+        "01a0c858-5820-7853-ba4c-dee7f183169c already has an active writer "
+        "(code -32600)' >&2\n"
+        "exit 1\n",
+        _FAKE_JS["writer_conflict"].replace("@CALLS_LOG@", json.dumps(str(calls))),
+    )
+    if sys.platform != "win32":
+        script.chmod(0o755)
+    monkeypatch.setattr(runner, "which", lambda agent: str(exe))
+    monkeypatch.setattr(runner, "_lock_owner", lambda sid: "codex (PID 123)")
+    run = asyncio.run(
+        start_run(
+            "codex", "how many?", session_id="01a0c858-5820-7853-ba4c-dee7f183169c", timeout_s=10
+        )
+    )
+    assert run.status == "failed"
+    assert calls.read_text().strip() == "call"
+    assert run.resume_conflict is not None
+    assert run.resume_conflict["process"] == "codex (PID 123)"
+    assert run.resume_conflict["continuation"].endswith("Now: how many?")
+    assert run.to_dict()["resume_conflict"] == run.resume_conflict
+    assert runner._is_resume_lock_error("session already registered for process 123")
+    assert runner._is_resume_lock_error(
+        "Error: thread/resume: thread/resume failed: thread "
+        "01a0c858-5820-7853-ba4c-dee7f183169c already has an active writer (code -32600)"
+    )
+    assert not runner._is_resume_lock_error("resume failed: authentication expired")
+    assert not runner._is_resume_lock_error("failed to open thread writer lock: permission denied")
+    assert not runner._looks_like_unknown_session("failed to resume: authentication expired")
+
+
+@pytest.mark.parametrize("phase", ["item.started", "item.completed"])
+def test_resume_failure_after_tool_work_does_not_repeat_actions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    calls = tmp_path / "effects"
+    rows = [
+        {"type": "thread.started", "thread_id": "existing-session"},
+        {
+            "type": phase,
+            "item": {
+                "id": "command-1",
+                "type": "command_execution",
+                "command": "record-effect",
+                "aggregated_output": "effect recorded",
+                "exit_code": 0,
+            },
+        },
+        {"type": "turn.failed", "error": {"message": "response resource not found"}},
+    ]
+    script = tmp_path / "fake-codex"
+    exe = script
+    if sys.platform == "win32":
+        exe = tmp_path / "fake-codex.cmd"
+        exe.write_bytes(b'@node "%~dp0fake-codex.mjs" %*\r\n')
+        script = tmp_path / "fake-codex.mjs"
+    _write_fake(
+        script,
+        "#!/bin/sh\n"
+        f'echo effect >> "{calls}"\n'
+        + "\n".join("echo '" + json.dumps(row) + "'" for row in rows)
+        + "\nexit 1\n",
+        'import fs from "node:fs";\n'
+        + f'fs.appendFileSync({json.dumps(str(calls))}, "effect\\n");\n'
+        + f"for (const row of {json.dumps(rows)}) console.log(JSON.stringify(row));\n"
+        + "process.exitCode = 1;\n",
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(runner, "which", lambda agent: str(exe))
+    monkeypatch.setattr(runner, "read_session", lambda agent, sid: None)
+    run = asyncio.run(start_run("codex", "act once", session_id="existing-session", timeout_s=10))
+    assert run.status == "failed"
+    assert run.resumed
+    assert calls.read_text().splitlines() == ["effect"]
+    assert run.error == "response resource not found"
+
+
 def test_a_helper_left_behind_does_not_keep_the_run_open(
     fake_cursor: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -713,6 +825,25 @@ def test_a_helper_left_behind_does_not_keep_the_run_open(
     run = asyncio.run(start_run("cursor", "hi", timeout_s=20))
     assert run.status == "done" and run.output == "ok" and run.result_session_id == "S-new"
     assert time.monotonic() - t0 < 10
+
+
+def test_terminal_error_with_zero_exit_stays_failed(
+    fake_cursor: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_fake(
+        fake_cursor,
+        "#!/bin/sh\n"
+        'echo \'{"type":"assistant","message":{"content":[{"type":"text","text":"trying"}]}}\'\n'
+        'echo \'{"type":"result","is_error":true,"result":"the model refused"}\'\n'
+        "sleep 2 &\n"
+        "exit 0\n",
+        _FAKE_JS["terminal_error"],
+    )
+    started = time.monotonic()
+    run = asyncio.run(start_run("cursor", "hi", timeout_s=10))
+    assert run.status == "failed"
+    assert run.error == "the model refused"
+    assert time.monotonic() - started < 8
 
 
 def test_a_cancelled_run_takes_its_agent_down_with_it(

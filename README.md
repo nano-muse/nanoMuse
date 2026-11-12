@@ -85,7 +85,7 @@ All downloads come from the [latest release](https://github.com/nano-muse/nanoMu
   </tr>
   <tr>
     <td width="50%" valign="top"><b>A look of its own.</b><br>Describe one, your image model draws it, a video model makes it move. A small dragon by default.</td>
-    <td width="50%" valign="top"><b>Any model.</b><br>The relay's allowance, your own key at one of twenty-five providers (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek and more), or a plan you already pay for: ChatGPT, Claude, Kimi. A provider without picture or video models leaves those two off, and the app says so.</td>
+    <td width="50%" valign="top"><b>Any model.</b><br>The relay's allowance, your own key at one of twenty-six providers (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek and more), or a plan you already pay for: ChatGPT, Claude, Kimi. A provider without picture or video models leaves those two off, and the app says so.</td>
   </tr>
 </table>
 
@@ -141,8 +141,8 @@ Everyone whose change has landed on `main`, from GitHub's contributors list.
 <a href="https://github.com/Mola-maker"><img src="https://avatars.githubusercontent.com/u/229602071?v=4&s=48" width="48" height="48" alt="Mola-maker"></a>
 <a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
 <a href="https://github.com/Longfellow1"><img src="https://avatars.githubusercontent.com/u/53395614?v=4&s=48" width="48" height="48" alt="Longfellow1"></a>
-<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
+<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
 <a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>

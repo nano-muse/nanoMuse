@@ -72,7 +72,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -197,9 +197,21 @@ class MemoryBody(BaseModel):
     category: str = "profile"
 
 
+class SentinelReviewBody(BaseModel):
+    """An optional observer. It cannot grant or deny permission to execute tools."""
+
+    mode: Literal["off", "observe"] | None = None
+    provider: str | None = Field(default=None, max_length=200)
+    model: str | None = Field(default=None, max_length=200)
+    base_url: str | None = Field(default=None, max_length=2000)
+    # Omitted / null keeps the saved key, and an empty string removes it.
+    api_key: str | None = Field(default=None, max_length=4000)
+
+
 class SettingsBody(BaseModel):
     profile: dict[str, Any] | None = None
     sentinel_mode: str | None = None
+    sentinel_review: SentinelReviewBody | None = None
     show_thinking: bool | None = None
     language: str | None = None
 
@@ -982,7 +994,10 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.put("/api/settings", dependencies=dep)
     async def put_settings(body: SettingsBody) -> dict[str, Any]:
-        return svc.update_settings(body.model_dump(exclude_none=True))
+        try:
+            return svc.update_settings(body.model_dump(exclude_none=True))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     # ------------------------------------------------------------------ files
     # ------------------------------------------------------------------ connections

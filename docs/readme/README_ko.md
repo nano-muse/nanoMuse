@@ -85,7 +85,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
   </tr>
   <tr>
     <td width="50%" valign="top"><b>자기만의 모습.</b><br>말로 묘사하면 이미지 모델이 그리고, 비디오 모델이 움직이게 합니다. 기본은 작은 용입니다.</td>
-    <td width="50%" valign="top"><b>어떤 모델이든.</b><br>릴레이의 무료 사용량, 스물다섯 곳(Bailian, OpenRouter, OpenAI, Gemini, DeepSeek 등) 중 한 곳의 내 키, 또는 이미 결제 중인 요금제: ChatGPT, Claude, Kimi. 이미지나 영상 모델이 없는 제공자에서는 그 두 기능이 꺼지고, 앱이 그렇게 말해 줍니다.</td>
+    <td width="50%" valign="top"><b>어떤 모델이든.</b><br>릴레이의 무료 사용량, 스물여섯 곳(Bailian, OpenRouter, OpenAI, Gemini, DeepSeek 등) 중 한 곳의 내 키, 또는 이미 결제 중인 요금제: ChatGPT, Claude, Kimi. 이미지나 영상 모델이 없는 제공자에서는 그 두 기능이 꺼지고, 앱이 그렇게 말해 줍니다.</td>
   </tr>
 </table>
 
@@ -141,8 +141,8 @@ VPS 한 대, 한 시간: [docs/self-hosting.md](../self-hosting.md). 세 가지 
 <a href="https://github.com/Mola-maker"><img src="https://avatars.githubusercontent.com/u/229602071?v=4&s=48" width="48" height="48" alt="Mola-maker"></a>
 <a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
 <a href="https://github.com/Longfellow1"><img src="https://avatars.githubusercontent.com/u/53395614?v=4&s=48" width="48" height="48" alt="Longfellow1"></a>
-<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
+<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
 <a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>

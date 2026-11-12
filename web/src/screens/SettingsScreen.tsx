@@ -73,7 +73,7 @@ const MODES: Array<{ id: "ask" | "strict" | "auto"; title: string; text: string;
   {
     id: "auto",
     title: "Hands-off",
-    text: "Approve everything automatically except explicit deny rules. For trusted, unattended runs only.",
+    text: "Ordinary actions run automatically. Deny rules still apply; warnings and private data sent to unapproved destinations still need permission.",
     icon: <ShieldAlert size={18} />,
   },
 ];

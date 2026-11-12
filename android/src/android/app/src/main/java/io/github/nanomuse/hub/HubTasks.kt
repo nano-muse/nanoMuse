@@ -18,12 +18,20 @@ internal class HubTasks {
     fun conversationKey(senderId: String, conversation: String?): String =
         conversation?.trim().orEmpty().ifBlank { "from-" + senderId.ifBlank { "unknown" } }
 
-    fun started(callId: String, senderId: String, conversation: String, sessionId: String) {
+    @Synchronized fun started(callId: String, senderId: String, conversation: String, sessionId: String) {
         runs[callId] = Run(senderId, conversation, sessionId)
     }
 
     /** Forgets the run; true when a `stop` ended it, so the task answers `cancelled`. */
-    fun finished(callId: String): Boolean = runs.remove(callId)?.stopped == true
+    @Synchronized fun finished(callId: String): Boolean = runs.remove(callId)?.stopped == true
+
+    /** Keep the selected run registered until cancellation has been requested. */
+    @Synchronized fun stop(senderId: String, callId: String?, conversation: String?, cancel: (String) -> Boolean): Boolean {
+        val sessionId = find(senderId, callId, conversation) ?: return false
+        if (!cancel(sessionId)) return false
+        markStopped(sessionId)
+        return true
+    }
 
     /**
      * The session a `stop` from [senderId] would end: an explicit [callId] selects only that run.

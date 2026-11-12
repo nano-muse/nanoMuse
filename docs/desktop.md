@@ -111,6 +111,18 @@ sign-in, Hub and sync traffic. `DEFAULT_RELAY_HOST` in the shell's `proxy.ts` co
 to `NO_PROXY`; it does not select another relay. This launch option points Desktop at
 your server. It does not repair a connection reset on the hosted relay's network path.
 
+## Using your own relay on Linux
+
+Fully quit nanoMuse, including its tray process, before launching the AppImage with your relay and a separate data directory:
+
+```sh
+env NANOMUSE_CLOUD_URL='https://relay.example' \
+  NANOMUSE_DESKTOP_HOME="$HOME/.nanomuse/desktop-self-hosted" \
+  /path/to/nanoMuse.AppImage
+```
+
+Replace the relay address and AppImage path, then register or sign in on that relay. Use the same command and data directory on later launches; a normal AppImage launch does not inherit these variables. The separate-account and profile-override rules above also apply.
+
 ## What it is
 
 Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
@@ -266,6 +278,10 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   its own after a minute and a half (`live.stopped` carries the sessions still asked).
   Each answer reaches the account's record as one word (`turn.feedback`, `turn.stopped`)
   and nothing else; nothing is shown while signed out.
+
+In the Muse look, wide reply tables scroll inside the agent bubble instead of extending into the rest of the chat pane.
+
+The capsule and screen glow display their status text without allowing text selection. Their approval and Stop buttons still respond to clicks.
 
 ## When the allowance is used up, and the relay's other answers
 
@@ -431,6 +447,11 @@ If an earlier version already reset your choices, enable the plugins you want ag
 the lost selection cannot be recovered automatically. Your existing `cordis.yml` and
 `cordis.patch.yml` are kept.
 
+Conversation sync checks for changes every minute and when the hub reconnects. If a
+sync notification arrives during a pull that then times out or loses its connection,
+the failed pull and its follow-up stay handled, without stopping the Host. The next
+successful pull continues from the saved cursor.
+
 ## The agent's desktop guide
 
 The preset also includes `skill-creator`, a guide for writing and checking reusable skills. Its model-neutral instructions are shared with Android and the Python runtime. Both bundled guides load only when requested and do not change approval permissions.
@@ -544,6 +565,8 @@ asks whether to keep waiting or quit, and quitting is the only thing that stops 
 is still starting. `desktop.log` carries `host: ready after N min` when a start took longer
 than half a minute. A second start is quicker, since the files have been checked once;
 should every start stay slow, excluding the install folder from real-time scanning helps.
+
+Edits to an own-key provider in Advanced model settings survive app restarts. Removing its provider row removes the saved nanoMuse source and moves the chat selection to another available source; saved keys stay in the credential vault. A chat-model list loaded empty from configuration disables that source instead of restoring the default catalog, while image and video entries remain. The host can refuse deletion of a custom source's last model; remove the provider row to disable that source. To remove a source and its key together, use Settings → Account. Use Settings → Models to choose another source or switch nanoMuse Cloud models off.
 
 ## macOS permissions
 

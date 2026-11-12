@@ -1264,4 +1264,8 @@
     <string name="nm_chat_background_purple">Lila</string>
     <string name="nm_chat_in_progress">Aufgabe läuft</string>
     <string name="nm_mcp_oauth_token_failed">Anmeldung beim Konnektor fehlgeschlagen (%1$s). Prüfe die Verbindung und die OAuth-Einstellungen und versuche es erneut.</string>
+    <string name="nm_device_chats">Gerätegespräche</string>
+    <string name="nm_device_chat_start">Auf diesem Gerät chatten</string>
+    <string name="nm_device_chat_uncertain">Zustellung unklar. Das Ergebnis wird auf dem Gerät abgefragt.</string>
+    <string name="nm_device_chat_interrupted">Unterbrochen. Das Gerät hat möglicherweise bereits Aktionen ausgeführt.</string>
 </resources>

@@ -1230,4 +1230,8 @@
     <string name="nm_chat_background_purple">紫色</string>
     <string name="nm_chat_in_progress">工作進行中</string>
     <string name="nm_mcp_oauth_token_failed">連接器登入失敗（%1$s）。請檢查網路連線及 OAuth 設定後重試。</string>
+    <string name="nm_device_chats">裝置對話</string>
+    <string name="nm_device_chat_start">在此裝置上聊天</string>
+    <string name="nm_device_chat_uncertain">送達狀態未知，正在查詢裝置上的結果。</string>
+    <string name="nm_device_chat_interrupted">任務已中斷，裝置可能已經執行了部分操作。</string>
 </resources>

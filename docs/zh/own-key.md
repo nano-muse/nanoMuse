@@ -44,6 +44,7 @@ Android、iPhone 和桌面版都在 设置 → 模型 配置；网页控制台�
 | Cheaper Inference | ● | | | | 海外 | [cheaperinference.com](https://cheaperinference.com/signup) |
 | Opper | ● | | | | 海外 | [platform.opper.ai](https://platform.opper.ai) |
 | AtmoRouter | ● | | | | 海外 | [atmorouter.dev](https://atmorouter.dev/dashboard/keys) |
+| UberLLM | ● | | | | 海外 | [uberllm.dev](https://uberllm.dev/signup) |
 | Ollama / LM Studio / vLLM（本机） | ● | | | | 都可以 | 不需要 key |
 
 视频一栏只有百炼，是因为 nanoMuse 当前接入的是百炼视频 API（程序调用服务的接口）。其他厂商的视频模型使用各自的任务接口，本轮尚未接入。图片方面，OpenRouter 使用 Image API，例如 `openai/gpt-image-2`；Gemini 使用 `gemini-2.5-flash-image`。
@@ -73,6 +74,7 @@ Android、iPhone 和桌面版都在 设置 → 模型 配置；网页控制台�
 - **API Route**。 登录后打开 [API keys](https://www.api-route.com/api-keys) 创建 key，再充值。地址为 `https://global.api-route.com/v1`。默认模型 `gpt-6.1-sol` 已用 `/v1/models` 和真实对话请求核验，其他 id 须从该 key 可访问的模型列表选择。费用按所选模型的[当前价格](https://www.api-route.com/pricing)从 API Route 预付余额扣除，与 nanoMuse Cloud 分别计费。此处只提供对话，图片输入、图片生成和视频尚未核验，详见[服务商文档](https://www.api-route.com/docs/overview)。
 - **Opper**。 在 [platform.opper.ai](https://platform.opper.ai) 的「API Keys」创建 key，可按服务商原价访问 50 多家服务商的 700 多个模型，不加价，网关部署在欧盟。地址为 `https://api.opper.ai/v3/compat`。默认模型为 `claude-sonnet-4-6`，也可选择 `https://api.opper.ai/v3/compat/models` 中任意 id；使用 `anthropic/claude-sonnet-4-6` 这样的 `provider/model` id 可固定线路。此处只通过 OpenAI 格式提供对话。
 - **AtmoRouter**。 从 [atmorouter.dev/dashboard/keys](https://atmorouter.dev/dashboard/keys) 获取 key，按量访问多家模型厂商。地址为 `https://atmorouter.dev/v1`。模型 id 含线路前缀，以 `https://atmorouter.dev/v1/models` 为准，默认是 `cc/claude-sonnet-4-6`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
+- **UberLLM**。 从 [uberllm.dev/signup](https://uberllm.dev/signup) 获取 key，预付费、按量计费，5 美元起，没有月费，一把 key 访问多家模型厂商，价格通常低于官方标价（[当前价格](https://uberllm.dev/models)）。地址为 `https://api.uberllm.dev/v1`。模型 id 带厂商名，以 `https://api.uberllm.dev/v1/models` 为准，默认是 `openai/gpt-5.4-mini`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
 
 **将 key 填入 nanoMuse**。
 

@@ -15,10 +15,12 @@
  * then waits for the process and kills it after a grace period. `Run.stop()` ends the
  * process group.
  */
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { execFile, spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AGENTS, cliFor, cliSpawnCommand, home, readSession, type AgentId, type CodingSession } from './coding-readers.ts'
+import { Timeline, type TimelineItem } from './coding-timeline.ts'
+import { preview } from './coding-protocol.ts'
 
 export const RUN_TIMEOUT_MS = 20 * 60 * 1000
 /** Characters of agent text kept per run. */
@@ -38,7 +40,9 @@ export interface RunView {
   output: string
   resumed: boolean
   error: string
+  resume_conflict?: { process: string; continuation: string }
   tools: number
+  timeline?: Record<string, unknown>[]
   /** The other computer this ran on, when it did. */
   device?: string
 }
@@ -46,7 +50,7 @@ export interface RunView {
 export type RunStatus = 'running' | 'done' | 'failed' | 'stopped'
 
 export interface RunEvent {
-  kind: 'started' | 'text' | 'tool' | 'done' | 'error'
+  kind: 'started' | 'text' | 'tool' | 'done' | 'error' | 'item'
   text: string
   [extra: string]: unknown
 }
@@ -62,11 +66,15 @@ export class Run {
   result_session_id = ''
   resumed = false
   error = ''
+  resume_conflict: RunView['resume_conflict']
   tools = 0
   device = ''
   process: ChildProcess | undefined
   /** The message being streamed (Cursor sends deltas, then the whole message). */
   current = ''
+  readonly timeline = new Timeline()
+  request_id = ''
+  request_signature = ''
 
   constructor(
     readonly id: string,
@@ -101,6 +109,8 @@ export class Run {
       tools: this.tools,
     }
     if (this.device) view.device = this.device
+    if (this.resume_conflict) view.resume_conflict = this.resume_conflict
+    if (this.timeline.items.size) view.timeline = this.timeline.values().slice(-100).map(preview)
     return view
   }
 
@@ -141,8 +151,16 @@ export function runFromView(row: Record<string, unknown>): Run | undefined {
   run.result_session_id = String(row.session_id ?? '')
   run.resumed = Boolean(row.resumed)
   run.error = String(row.error ?? '')
+  if (isObj(row.resume_conflict) && typeof row.resume_conflict.continuation === 'string') {
+    run.resume_conflict = { process: String(row.resume_conflict.process ?? ''), continuation: row.resume_conflict.continuation }
+  }
   run.tools = Number(row.tools ?? 0) || 0
   run.device = String(row.device ?? '')
+  run.request_id = String(row.request_id || '')
+  run.request_signature = String(row.request_signature || '')
+  for (const item of Array.isArray(row.timeline) ? row.timeline : []) {
+    if (item && typeof item.id === 'string') run.timeline.items.set(item.id, item as TimelineItem)
+  }
   if (run.status === 'running') {
     // it was going when the app stopped; the process went with it
     run.status = 'stopped'
@@ -483,6 +501,7 @@ export interface StartOptions {
   sessionId?: string
   workspace?: string
   onEvent?: OnEvent
+  structuredEvents?: boolean
   timeoutMs?: number
   runId?: string
   /** Sees the `Run` as soon as it exists, before the process starts. */
@@ -492,9 +511,31 @@ export interface StartOptions {
   env?: NodeJS.ProcessEnv
   /** The transcripts' home (tests); defaults to the process environment's. */
   readerEnv?: NodeJS.ProcessEnv
+  /** Local lifecycle diagnostics, without prompts, output, paths or raw CLI errors. */
+  onDiagnostic?: (entry: Record<string, string | number | boolean>) => void
 }
 
-const UNKNOWN_SESSION_WORDS = ['not found', 'no such', 'unknown chat', 'could not find', 'does not exist', 'no conversation', 'invalid chat', 'no session', 'failed to resume', 'resume']
+const UNKNOWN_SESSION_WORDS = ['not found', 'no such', 'unknown chat', 'could not find', 'does not exist', 'no conversation', 'invalid chat', 'no session']
+
+export function isResumeLockError(text: string): boolean {
+  if (/permission denied|failed to (?:open|remove|inspect).*writer lock/i.test(text)) return false
+  return /(?:thread|session)[^\n]{0,160}(?:locked|in use|already (?:open|running|registered|has an active writer)|held by|owned by)/i.test(text)
+    || /(?:writer|write|writing)[ -]lock/i.test(text)
+    || /(?:another|other) (?:codex )?process[^\n]{0,100}(?:thread|session|writ|lock)/i.test(text)
+}
+
+async function lockOwner(sessionId: string, env: NodeJS.ProcessEnv): Promise<string> {
+  if (process.platform === 'win32' || !/^[0-9a-f-]{36}$/i.test(sessionId)) return ''
+  const path = join(env.CODEX_HOME || join(home(env), '.codex'), 'thread-writer-locks', `${sessionId}.lock`)
+  return new Promise((resolve) => {
+    execFile('lsof', ['-Fpc', '--', path], { timeout: 2000, maxBuffer: 8192 }, (error, stdout) => {
+      if (error) return resolve('')
+      const name = /^c(.+)$/m.exec(stdout)?.[1]
+      const pid = /^p(\d+)$/m.exec(stdout)?.[1]
+      resolve(name ? `${name.slice(0, 100)}${pid ? ` (PID ${pid})` : ''}` : '')
+    })
+  })
+}
 
 function looksLikeUnknownSession(text: string): boolean {
   return UNKNOWN_SESSION_WORDS.some((k) => text.includes(k))
@@ -554,6 +595,13 @@ export async function startRun(options: StartOptions): Promise<Run> {
   if (!text) throw new Error('text is required')
   const sessionId = options.sessionId ?? ''
   const run = new Run(options.runId || `run_${Math.random().toString(16).slice(2, 10).padEnd(8, '0')}`, agent, sessionId, options.workspace ?? '', text)
+  const diagnose = (stage: string, fields: Record<string, string | number | boolean> = {}) => {
+    try {
+      options.onDiagnostic?.({ revision: 'coding-resume-v2', stage, run: run.id, agent, asked_session: sessionId, ...fields })
+    } catch {
+      // Diagnostics must not interrupt a send.
+    }
+  }
   options.register?.(run)
   const find = options.which ?? ((a: AgentId) => cliFor(a, options.env ?? process.env))
   const prior = sessionId ? await readSession(agent, sessionId, options.readerEnv ?? process.env) : undefined
@@ -574,6 +622,8 @@ export async function startRun(options: StartOptions): Promise<Run> {
     run.status = status
     run.error = error
     run.ended_at = Date.now() / 1000
+    diagnose('finished', { status, resumed: run.resumed, result_session: run.result_session_id,
+      conflict: Boolean(run.resume_conflict), output_chars: run.output.length, error_chars: error.length })
   }
 
   let resume = Boolean(sessionId)
@@ -583,9 +633,12 @@ export async function startRun(options: StartOptions): Promise<Run> {
     attemptText = continuation(prior, text)
     await emit({ kind: 'tool', text: 'that chat was made in the IDE and cannot be reopened from the command line; starting a new one in the same workspace', phase: 'note' })
   }
+  diagnose('prepared', { prior_found: Boolean(prior), prior_resumable: prior?.resumable ?? false,
+    resume, text_chars: text.length, prompt_chars: attemptText.length })
   const timeoutMs = options.timeoutMs ?? RUN_TIMEOUT_MS
 
   for (const attempt of [1, 2]) {
+    diagnose('attempt', { attempt, resume, prompt_chars: attemptText.length })
     const cli = find(agent)
     if (!cli) {
       finish('failed', `${AGENTS[agent].name} is not installed on this computer`)
@@ -613,6 +666,7 @@ export async function startRun(options: StartOptions): Promise<Run> {
     run.process = proc
     run.resumed = resume
     let sawDone = false
+    let terminalFailed = false
     let stderrTail = ''
     let lastError = ''
     const lines = new LineQueue()
@@ -640,12 +694,11 @@ export async function startRun(options: StartOptions): Promise<Run> {
       }
       // After the agent's final message we stop waiting for EOF: a helper the CLI leaves
       // running in the background may keep our pipe open forever.
-      const patience = sawDone ? (exited(proc) ? 500 : 5000) : left
+      const patience = run.status === 'stopped' || sawDone || terminalFailed ? (exited(proc) ? 500 : 5000) : Math.min(left, 5000)
       const raw = await lines.next(patience)
       if (raw === undefined) {
-        if (sawDone) break
-        timedOut = true
-        break
+        if (run.status === 'stopped' || sawDone || terminalFailed || exited(proc)) break
+        continue
       }
       if (raw === null) break
       const line = raw.trim()
@@ -657,9 +710,17 @@ export async function startRun(options: StartOptions): Promise<Run> {
         continue
       }
       if (!isObj(obj)) continue
+      const revisions = new Map([...run.timeline.items].map(([key, item]) => [key, item.revision]))
+      run.timeline.feed(agent, obj)
+      for (const [key, item] of run.timeline.items) {
+        if (options.structuredEvents && revisions.get(key) !== item.revision) await emit({ kind: 'item', text: '', item: preview(item) })
+      }
       for (const ev of normalise(agent, obj, run)) {
         if (ev.kind === 'done') sawDone = true
-        else if (ev.kind === 'error' && ev.text) lastError = ev.text
+        else if (ev.kind === 'error') {
+          if (ev.text) lastError = ev.text
+          if (obj.type === 'turn.failed' || obj.type === 'result' || (obj.type === 'status' && obj.phase === 'turn_end')) terminalFailed = true
+        }
         await emit(ev)
       }
     }
@@ -674,26 +735,42 @@ export async function startRun(options: StartOptions): Promise<Run> {
       await emit({ kind: 'error', text: run.error })
       return run
     }
-    await waitExit(proc, sawDone ? 15_000 : 60_000)
+    await waitExit(proc, sawDone || terminalFailed || run.status === 'stopped' ? 15_000 : 60_000)
     if (run.status === 'stopped') {
       run.ended_at = Date.now() / 1000
       await emit({ kind: 'error', text: 'stopped', stopped: true })
       return run
     }
     const rc = proc.exitCode ?? 0
-    if (rc === 0 && (sawDone || run.output)) {
+    if (rc === 0 && !terminalFailed && (sawDone || run.output)) {
       finish('done')
       if (!sawDone) await emit({ kind: 'done', text: run.output, session_id: run.result_session_id })
       return run
     }
     // A failed resume of a chat the CLI does not know: try once more as a new chat.
-    const lower = `${stderrTail} ${run.output}`.toLowerCase()
-    if (attempt === 1 && resume && looksLikeUnknownSession(lower)) {
+    const diagnostic = `${stderrTail}\n${lastError}\n${run.output}`
+    const lower = diagnostic.toLowerCase()
+    diagnose('attempt_failed', { attempt, resume, exit_code: rc, terminal_failed: terminalFailed,
+      lock_error: isResumeLockError(diagnostic), unknown_session: looksLikeUnknownSession(lower),
+      markers: ['resume', 'lock', 'thread', 'session', 'another process', 'permission denied', 'authentication', ...UNKNOWN_SESSION_WORDS]
+        .filter((word) => lower.includes(word)).join(','),
+      stderr_chars: stderrTail.length, error_chars: lastError.length, output_chars: run.output.length })
+    if (resume && agent === 'codex' && isResumeLockError(diagnostic)) {
+      run.resume_conflict = { process: await lockOwner(sessionId, options.env ?? process.env),
+        continuation: prior ? continuation(prior, text) : text }
+      finish('failed', (lastError || stderrTail.trim() || 'session writer is occupied').slice(0, 2000))
+      await emit({ kind: 'error', text: run.error, final: true })
+      return run
+    }
+    // A provider's later "not found" error is not proof that no tool has acted.
+    const observedTool = run.tools > 0 || run.timeline.values().some((item) => item.kind !== 'message')
+    if (attempt === 1 && resume && !observedTool && looksLikeUnknownSession(lower)) {
       attemptText = prior ? continuation(prior, text) : text
       resume = false
       run.output = ''
       // the half-streamed line of the dead chat is not the new chat's first word either
       run.current = ''
+      diagnose('fallback', { reason: 'unknown_session', prompt_chars: attemptText.length })
       await emit({ kind: 'tool', text: 'that chat cannot be resumed from the command line; starting a new one in the same workspace', phase: 'note' })
       continue
     }

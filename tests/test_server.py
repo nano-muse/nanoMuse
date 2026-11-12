@@ -1145,6 +1145,232 @@ def test_settings_and_profile(server, settings: Settings):
     )
 
 
+def test_review_settings_are_optional_persisted_and_never_return_a_key(server, settings: Settings):
+    from nanomuse.config import apply_app_settings, load_app_settings
+
+    client, service, llm = server
+    initial = client.get("/api/settings").json()["sentinel"]["review"]
+    assert initial == {
+        "mode": "off",
+        "provider": "",
+        "model": "",
+        "base_url": "",
+        "has_api_key": False,
+    }
+    secret = "review-" + "test-credential"
+    response = client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "mode": "observe",
+                "provider": "openai",
+                "model": "review-model",
+                "base_url": "https://review.example/v1",
+                "api_key": secret,
+            }
+        },
+    )
+    assert response.status_code == 200
+    review = response.json()["sentinel"]["review"]
+    assert review["mode"] == "observe" and review["has_api_key"]
+    assert response.json()["sentinel"]["mode"] == "ask"
+    saved = load_app_settings(settings.data_dir)
+    assert secret not in json.dumps(saved)
+    assert secret not in response.text
+    assert secret not in client.get("/api/state").text
+    assert service.app.vault.resolve(settings.sentinel.review.api_key) == secret
+    restored = Settings()
+    apply_app_settings(restored, saved)
+    assert restored.sentinel.review.mode == "observe"
+    assert restored.sentinel.review.model == "review-model"
+    assert restored.sentinel.review.api_key == settings.sentinel.review.api_key
+    # Changing settings alone does not contact either provider.
+    assert not llm.calls
+
+
+def test_review_key_is_kept_only_for_its_endpoint_and_can_be_cleared(server):
+    client, service, _ = server
+    client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "provider": "openai",
+                "model": "review-model",
+                "base_url": "https://review.example/v1",
+                "api_key": "review-test-key",
+            }
+        },
+    )
+    same = client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "model": "another-model",
+                "base_url": "https://review.example/v1/",
+                "api_key": None,
+            }
+        },
+    ).json()["sentinel"]["review"]
+    assert same["has_api_key"]
+    changed = client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "base_url": "https://other.example/v1",
+            }
+        },
+    ).json()["sentinel"]["review"]
+    assert not changed["has_api_key"]
+    assert not any(
+        name.startswith("SENTINEL_REVIEW_API_KEY_") for name in service.app.vault.names()
+    )
+    client.put("/api/settings", json={"sentinel_review": {"api_key": "another-test-key"}})
+    cleared = client.put("/api/settings", json={"sentinel_review": {"api_key": ""}})
+    assert not cleared.json()["sentinel"]["review"]["has_api_key"]
+    assert not any(
+        name.startswith("SENTINEL_REVIEW_API_KEY_") for name in service.app.vault.names()
+    )
+
+
+def test_review_key_requires_an_unambiguous_destination(server, settings: Settings):
+    client, service, _ = server
+    settings.llm.provider = "openai"
+    settings.llm.base_url = None
+    response = client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "api_key": "separate-test-key",
+            }
+        },
+    )
+    assert response.status_code == 400
+    assert not any(
+        name.startswith("SENTINEL_REVIEW_API_KEY_") for name in service.app.vault.names()
+    )
+
+
+def test_review_protocol_key_stays_at_its_original_endpoint(server, settings: Settings):
+    client, service, _ = server
+    settings.llm.provider = "deepseek"
+    saved = client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "provider": "openai",
+                "api_key": "separate-test-key",
+                "base_url": "",
+            }
+        },
+    )
+    assert saved.status_code == 200
+    assert saved.json()["sentinel"]["review"]["base_url"] == "https://api.openai.com/v1"
+    settings.llm.provider = "openai"
+    settings.llm.base_url = "https://other.example/v1"
+    effective = service.app.review_llm_settings()
+    assert effective.endpoint == "https://api.openai.com/v1"
+    assert service.app.vault.resolve(effective.api_key) == "separate-test-key"
+
+
+def test_review_explicit_key_is_bound_when_other_model_fields_inherit(server, settings: Settings):
+    client, _, _ = server
+    saved = client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "model": "review-model",
+                "api_key": "separate-test-key",
+            }
+        },
+    ).json()["sentinel"]["review"]
+    assert saved["provider"] == settings.llm.provider
+    assert saved["base_url"] == settings.llm.base_url
+    reused = client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "mode": "observe",
+                "provider": "",
+                "model": "",
+                "base_url": "",
+                "api_key": "",
+            }
+        },
+    ).json()["sentinel"]["review"]
+    assert reused == {
+        "mode": "observe",
+        "provider": "",
+        "model": "",
+        "base_url": "",
+        "has_api_key": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"mode": "auto"},
+        {"provider": "unknown-review-provider"},
+        {"base_url": "https://user:password@review.example/v1"},
+        {"base_url": "https://review.example/v1?api_key=not-for-urls"},
+        {"base_url": "file:///tmp/review"},
+    ],
+)
+def test_review_settings_reject_invalid_changes_without_mutation(server, changes):
+    client, service, _ = server
+    before = client.get("/api/settings").json()["sentinel"]["review"]
+    response = client.put("/api/settings", json={"sentinel_review": changes})
+    assert response.status_code in (400, 422)
+    assert client.get("/api/settings").json()["sentinel"]["review"] == before
+    assert not any(
+        name.startswith("SENTINEL_REVIEW_API_KEY_") for name in service.app.vault.names()
+    )
+
+
+@pytest.mark.parametrize("clear_key", [False, True])
+def test_failed_review_settings_save_preserves_active_endpoint_and_its_key(
+    server, settings: Settings, monkeypatch: pytest.MonkeyPatch, clear_key: bool
+) -> None:
+    from nanomuse.config import load_app_settings
+
+    client, service, _ = server
+    client.put(
+        "/api/settings",
+        json={
+            "sentinel_review": {
+                "mode": "observe",
+                "model": "review-model",
+                "base_url": "https://first.example/v1",
+                "api_key": "first-test-key",
+            }
+        },
+    ).raise_for_status()
+    previous = settings.sentinel.review
+    before_disk = load_app_settings(settings.data_dir)
+    before_names = service.app.vault.names()
+
+    def fail_save() -> None:
+        raise OSError("simulated settings write failure")
+
+    monkeypatch.setattr(service.connections, "_save", fail_save)
+    with pytest.raises(OSError, match="simulated"):
+        service.update_settings(
+            {
+                "sentinel_review": {
+                    "base_url": "https://second.example/v1",
+                    "api_key": "" if clear_key else "second-test-key",
+                }
+            }
+        )
+    assert settings.sentinel.review is previous
+    active = service.app.review_llm_settings()
+    assert active.endpoint == "https://first.example/v1"
+    assert service.app.vault.resolve(active.api_key) == "first-test-key"
+    assert load_app_settings(settings.data_dir) == before_disk
+    assert service.connections.data["sentinel_review"] == before_disk["sentinel_review"]
+    assert service.app.vault.names() == before_names
+
+
 def test_user_name_reaches_the_instructions(server, settings: Settings):
     client, _, _ = server
     client.put("/api/settings", json={"profile": {"user_name": "Sam"}})
@@ -3054,8 +3280,8 @@ def test_device_trigger_shows_in_the_triggers_view(server):
 
 def test_the_hub_devices_frame_fires_them(server):
     """The hub's `devices` frame, as the hub client hands it over: what was already online
-    when it arrived is not an arrival; the drop and the return are. A reconnect gets a new
-    baseline, so devices that came online while this runtime was away do not fire."""
+    when it arrived is not an arrival; a later offline-to-online transition is, including
+    when its online frame arrives after an automatic reconnect."""
     from nanomuse.cloud import CLOUD_KEY
 
     client, service, llm = server
@@ -3075,19 +3301,39 @@ def test_the_hub_devices_frame_fires_them(server):
     wait_idle(service, "main")
     assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
 
-    # A connection drop loses the transitions while this runtime is away. Its next welcome
-    # frame is a baseline, not a claim that every currently-online device just arrived.
+    # Reconnects compare against the last accepted frame, including an observed offline
+    # device returning during the gap. Repeated connection attempts do not erase it.
     client.portal.call(lambda: service.hub._on_devices([me, {**phone, "online": False}]))
+    service.hub._hub_state_changed("connecting", "")
+    service.hub._hub_state_changed("connecting", "")
+    llm.script.append(LLMResponse(content="The phone returned during the reconnect."))
+    client.portal.call(lambda: service.hub._on_devices([me, phone]))
+    wait_idle(service, "main")
+    assert service.app.triggers.get(trig.id).fired == 2  # type: ignore[union-attr]
+    notice = [e for e in events_of(client, "main", "notice") if e.get("source") == "trigger"]
+    assert notice and notice[-1]["text"] == "Device online: Pixel"
+    # An unchanged welcome frame brings nothing, and this computer never triggers itself.
     service.hub._hub_state_changed("connecting", "")
     client.portal.call(lambda: service.hub._on_devices([me, phone]))
     wait_idle(service, "main")
-    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
-    notice = [e for e in events_of(client, "main", "notice") if e.get("source") == "trigger"]
-    assert notice and notice[-1]["text"] == "Device online: Pixel"
-    # an unchanged frame brings nothing
-    client.portal.call(lambda: service.hub._on_devices([me, phone]))
-    wait_idle(service, "main")
-    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
+    assert service.app.triggers.get(trig.id).fired == 2  # type: ignore[union-attr]
+
+
+def test_leaving_the_hub_discards_the_device_trigger_baseline(server):
+    """Explicit hub leave, including account switches, cannot reuse another account's
+    device state. Its next first frame seeds a new baseline without firing triggers."""
+    from nanomuse.cloud import CLOUD_KEY
+
+    client, service, _llm = server
+    service.app.vault.set(CLOUD_KEY, "cloud-key-for-the-test")
+    trig = service.create_trigger("device", "say hi", match="pixel")
+    phone = {"id": "phone-1", "name": "Pixel", "kind": "phone", "online": False}
+    client.portal.call(lambda: service.hub._on_devices([phone]))
+    client.portal.call(service.hub.leave)
+    assert service.hub._devices_seen is None
+    service.hub._hub_state_changed("connecting", "")
+    client.portal.call(lambda: service.hub._on_devices([{**phone, "online": True}]))
+    assert service.app.triggers.get(trig.id).fired == 0  # type: ignore[union-attr]
 
 
 def test_data_export_keeps_pending_scheduled_delivery_rows(server):

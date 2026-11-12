@@ -85,7 +85,7 @@ Tous les téléchargements viennent de la [dernière version](https://github.com
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Une apparence à lui.</b><br>Décrivez-la, votre modèle d'image la dessine, un modèle vidéo la fait bouger. Un petit dragon par défaut.</td>
-    <td width="50%" valign="top"><b>N'importe quel modèle.</b><br>Le crédit du relais, votre propre clé chez l'un des vingt-cinq fournisseurs (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek et d'autres), ou un abonnement que vous payez déjà : ChatGPT, Claude, Kimi. Sans modèle d'image ou de vidéo chez le fournisseur, ces deux fonctions restent éteintes et l'application le dit.</td>
+    <td width="50%" valign="top"><b>N'importe quel modèle.</b><br>Le crédit du relais, votre propre clé chez l'un des vingt-six fournisseurs (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek et d'autres), ou un abonnement que vous payez déjà : ChatGPT, Claude, Kimi. Sans modèle d'image ou de vidéo chez le fournisseur, ces deux fonctions restent éteintes et l'application le dit.</td>
   </tr>
 </table>
 
@@ -141,8 +141,8 @@ Toutes les personnes dont un changement a été intégré dans `main`, d'après 
 <a href="https://github.com/Mola-maker"><img src="https://avatars.githubusercontent.com/u/229602071?v=4&s=48" width="48" height="48" alt="Mola-maker"></a>
 <a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
 <a href="https://github.com/Longfellow1"><img src="https://avatars.githubusercontent.com/u/53395614?v=4&s=48" width="48" height="48" alt="Longfellow1"></a>
-<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
+<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
 <a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>

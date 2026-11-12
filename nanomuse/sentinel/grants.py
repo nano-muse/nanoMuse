@@ -183,6 +183,7 @@ class GrantStore:
         now = time.time()
         targets: list[str | None] = [p for p in target.split(",") if p] if target else [None]
         first: Grant | None = None
+        persist_changed = scope in PERSISTED_SCOPES
         for t in targets:
             grant = Grant(
                 key=grant_key(tool, t),
@@ -193,11 +194,19 @@ class GrantStore:
                 expires_at=now + DAY if scope == "24h" else None,
                 conversation_id=conversation_id if scope == "conversation" else None,
             )
-            # one grant per key: the new decision replaces the old one
-            self._grants = [g for g in self._grants if g.key != grant.key]
+            # A conversation's answer replaces only its own grant. Another chat may
+            # have approved the same tool too; neither decision revokes the other.
+            replaced = [
+                g
+                for g in self._grants
+                if g.key == grant.key and g.conversation_id == grant.conversation_id
+            ]
+            persist_changed |= any(g.scope in PERSISTED_SCOPES for g in replaced)
+            self._grants = [g for g in self._grants if g not in replaced]
             self._grants.append(grant)
             first = first or grant
-        if scope in PERSISTED_SCOPES:
+        # Replacing a durable grant with a session grant must remove it from disk too.
+        if persist_changed:
             self._save()
         return first
 

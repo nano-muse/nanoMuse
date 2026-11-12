@@ -11,13 +11,16 @@ program) with a lifetime — see :mod:`nanomuse.sentinel.grants`.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
 from contextvars import ContextVar
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+from weakref import WeakValueDictionary
 
 from nanomuse.config import SentinelSettings
 from nanomuse.logger import logger
@@ -28,6 +31,10 @@ from nanomuse.sentinel.policy import Decision, Policy
 from nanomuse.tools.base import BaseTool, CallAssessment, safe_execute
 from nanomuse.ui import UI, ApprovalRequest
 from nanomuse.vault import PLACEHOLDER_RE, CredentialVault
+
+if TYPE_CHECKING:
+    from nanomuse.llm.base import BaseLLM
+    from nanomuse.sentinel.review import SentinelReviewer
 
 
 def _note(kind: str, data: dict[str, Any]) -> None:
@@ -57,6 +64,8 @@ class TaskContext:
     id: str
     purpose: str = ""
     conversation: str = ""
+    purpose_truncated: bool = False
+    execution_llm: BaseLLM | None = field(default=None, repr=False, compare=False)
 
     @property
     def conversation_id(self) -> str:
@@ -89,6 +98,13 @@ class Sentinel:
         # what another conversation read
         self._tainted: set[str] = set()
         self.grants = GrantStore(persistent_approvals_file)
+        self.reviewer: SentinelReviewer | None = None
+        # Wait only for this conversation's approval for a tool, then reassess policy
+        # and grants. Other conversations must not wait on its unanswered card.
+        # Idle locks disappear, including ones for short-lived standalone tasks.
+        self._approval_locks: WeakValueDictionary[tuple[str, str | None], asyncio.Lock] = (
+            WeakValueDictionary()
+        )
 
     # ------------------------------------------------------------------ taint
     @staticmethod
@@ -121,7 +137,12 @@ class Sentinel:
 
     # ------------------------------------------------------------------ task scope
     def begin_task(
-        self, purpose: str = "", task_id: str | None = None, conversation: str | None = None
+        self,
+        purpose: str = "",
+        task_id: str | None = None,
+        conversation: str | None = None,
+        *,
+        execution_llm: BaseLLM | None = None,
     ) -> Any:
         """Mark the start of an agent run, within ``conversation`` when it has one.
         Returns a token for :meth:`end_task`."""
@@ -129,6 +150,8 @@ class Sentinel:
             id=task_id or uuid.uuid4().hex[:10],
             purpose=purpose.strip()[:200],
             conversation=(conversation or "").strip(),
+            purpose_truncated=len(purpose.strip()) > 200,
+            execution_llm=execution_llm,
         )
         return _current_task.set(ctx)
 
@@ -187,27 +210,28 @@ class Sentinel:
         key = grant_key(self.APP_TOOL, app_id)
         task = _current_task.get()
         conversation = task.conversation_id if task else None
-        if self.settings.mode == "auto":
-            return True
-        grant = self.grants.match(key, conversation)
-        if grant is not None:
-            return True
-        request = ApprovalRequest(
-            tool=self.APP_TOOL,
-            args={"app": app_id, "name": label},
-            summary=f"Let {muse} use {label}?",
-            risk=RiskLevel.MODERATE,
-            reasons=["the first action in this application"],
-            purpose=task.purpose if task else "",
-            target=app_id,
-            grant_key=key,
-            grant_options=["once", "conversation", "always"],
-        )
-        asked_at = time.monotonic()
-        verdict = await self.ui.ask_approval(request)
-        scope = normalize_scope(verdict.scope)
-        if verdict.approved and scope in ("conversation", "always"):
-            self.grants.add(self.APP_TOOL, app_id, scope, conversation)
+        async with self._approval_locks.setdefault((self.APP_TOOL, conversation), asyncio.Lock()):
+            if self.settings.mode == "auto":
+                return True
+            grant = self.grants.match(key, conversation)
+            if grant is not None:
+                return True
+            request = ApprovalRequest(
+                tool=self.APP_TOOL,
+                args={"app": app_id, "name": label},
+                summary=f"Let {muse} use {label}?",
+                risk=RiskLevel.MODERATE,
+                reasons=["the first action in this application"],
+                purpose=task.purpose if task else "",
+                target=app_id,
+                grant_key=key,
+                grant_options=["once", "conversation", "always"],
+            )
+            asked_at = time.monotonic()
+            verdict = await self.ui.ask_approval(request)
+            scope = normalize_scope(verdict.scope)
+            if verdict.approved and scope in ("conversation", "always"):
+                self.grants.add(self.APP_TOOL, app_id, scope, conversation)
         _note(
             "approval.result",
             {
@@ -258,90 +282,105 @@ class Sentinel:
         target = assessment.target if assessment.target is not None else assessment.egress_target
         key = grant_key(tool.name, target)
         task = _current_task.get()
-        result_policy = self.policy.evaluate(tool.name, args, assessment, tainted=self.tainted)
-        decision, reasons = result_policy.decision, list(result_policy.reasons)
-        approved: bool | None = None
-        scope: str | None = None
-        # who settled a question the policy raised: the policy itself (none raised), auto
-        # mode, a standing permission, the person, or nobody in time
-        settled_by = "policy"
+        conversation = task.conversation_id if task else None
+        async with self._approval_locks.setdefault((tool.name, conversation), asyncio.Lock()):
+            result_policy = self.policy.evaluate(tool.name, args, assessment, tainted=self.tainted)
+            decision, reasons = result_policy.decision, list(result_policy.reasons)
+            approved: bool | None = None
+            scope: str | None = None
+            # who settled a question the policy raised: the policy itself (none raised), auto
+            # mode, a standing permission, the person, or nobody in time
+            settled_by = "policy"
 
-        if decision == Decision.ASK:
-            grant = (
-                None
-                if assessment.warnings
-                else self.grants.match(key, task.conversation_id if task else None)
-            )
-            # auto mode skips the question, except for a call that carries a warning or
-            # one that would send data private to this conversation out to a host nobody
-            # allowlisted: steps 6 and 5 of the policy keep those an ASK whatever the
-            # mode, and the gate honours it (docs/sentinel.md), so an unattended pass asks
-            # or stops rather than reading a file and mailing it somewhere
-            waved_through = assessment.warnings or result_policy.tainted_ask
-            if self.settings.mode == "auto" and not waved_through:
-                decision = Decision.ALLOW
-                settled_by = "auto"
-                reasons.append("auto mode: approval skipped")
-            elif grant is not None:
-                decision = Decision.ALLOW
-                settled_by = "grant"
-                scope = grant.scope
-                reasons.append(f"covered by your '{grant.scope}' permission for {grant.key}")
-            else:
-                options = self.grant_options(assessment, target)
-                request = ApprovalRequest(
-                    tool=tool.name,
-                    args=args,
-                    summary=assessment.summary,
-                    risk=assessment.risk,
-                    reasons=reasons,
-                    warnings=assessment.warnings,
-                    egress_target=assessment.egress_target,
-                    purpose=task.purpose if task else "",
-                    target=target,
-                    grant_key=key,
-                    grant_options=options,  # type: ignore[arg-type]
+            if decision == Decision.ASK:
+                grant = (
+                    None
+                    if assessment.warnings
+                    else self.grants.match(key, task.conversation_id if task else None)
                 )
-                asked_at = time.monotonic()
-                verdict = await self.ui.ask_approval(request)
-                approved, scope = verdict.approved, normalize_scope(verdict.scope)
-                settled_by = _settled_by(verdict)
-                _note(
-                    "approval.result",
-                    {
-                        "tool": tool.name,
-                        "channel": channel_of(tool.name),
-                        "risk": assessment.risk.value,
-                        "allow": bool(approved),
-                        "scope": scope if approved else "",
-                        "by": settled_by,
-                        "waited_s": round(time.monotonic() - asked_at, 1),
-                        "warnings": len(assessment.warnings),
-                    },
-                )
-                if verdict.approved:
+                # auto mode skips the question, except for a call that carries a warning or
+                # one that would send data private to this conversation out to a host nobody
+                # allowlisted: steps 6 and 5 of the policy keep those an ASK whatever the
+                # mode, and the gate honours it (docs/sentinel.md), so an unattended pass asks
+                # or stops rather than reading a file and mailing it somewhere
+                waved_through = assessment.warnings or result_policy.tainted_ask
+                if self.settings.mode == "auto" and not waved_through:
                     decision = Decision.ALLOW
-                    if scope not in options:
-                        logger.warning(
-                            "scope '{}' was not offered for {}; treating as once", scope, key
-                        )
-                        scope = "once"
-                    bind = target
-                    if scope == "conversation" and assessment.egress_target is None:
-                        # "For this conversation" on a tool whose target is not a destination
-                        # (shell, where it is the list of programs) means the tool for the rest
-                        # of the conversation: a job that needs `git` now will need `ls` and
-                        # `wc` next, and asking for each new program is noise, not safety.
-                        # Warnings still stop every call; destinations (mail recipients,
-                        # hosts) stay bound.
-                        bind = None
-                    self.grants.add(tool.name, bind, scope, task.conversation_id if task else None)
+                    settled_by = "auto"
+                    reasons.append("auto mode: approval skipped")
+                elif grant is not None:
+                    decision = Decision.ALLOW
+                    settled_by = "grant"
+                    scope = grant.scope
+                    reasons.append(f"covered by your '{grant.scope}' permission for {grant.key}")
                 else:
-                    decision = Decision.DENY
-                    reasons.append(
-                        f"user declined{': ' + verdict.reason if verdict.reason else ''}"
+                    options = self.grant_options(assessment, target)
+                    request = ApprovalRequest(
+                        tool=tool.name,
+                        args=deepcopy(args),
+                        summary=assessment.summary,
+                        risk=assessment.risk,
+                        reasons=reasons,
+                        warnings=assessment.warnings,
+                        egress_target=assessment.egress_target,
+                        purpose=task.purpose if task else "",
+                        target=target,
+                        grant_key=key,
+                        grant_options=options,  # type: ignore[arg-type]
                     )
+                    asked_at = time.monotonic()
+                    verdict = await self.ui.ask_approval(request)
+                    approved, scope = verdict.approved, normalize_scope(verdict.scope)
+                    settled_by = _settled_by(verdict)
+                    _note(
+                        "approval.result",
+                        {
+                            "tool": tool.name,
+                            "channel": channel_of(tool.name),
+                            "risk": assessment.risk.value,
+                            "allow": bool(approved),
+                            "scope": scope if approved else "",
+                            "by": settled_by,
+                            "waited_s": round(time.monotonic() - asked_at, 1),
+                            "warnings": len(assessment.warnings),
+                        },
+                    )
+                    if verdict.approved:
+                        decision = Decision.ALLOW
+                        if scope not in options:
+                            logger.warning(
+                                "scope '{}' was not offered for {}; treating as once", scope, key
+                            )
+                            scope = "once"
+                        bind = target
+                        if scope == "conversation" and assessment.egress_target is None:
+                            # "For this conversation" on a tool whose target is not a destination
+                            # (shell, where it is the list of programs) means the tool for the rest
+                            # of the conversation: a job that needs `git` now will need `ls` and
+                            # `wc` next, and asking for each new program is noise, not safety.
+                            # Warnings still stop every call; destinations (mail recipients,
+                            # hosts) stay bound.
+                            bind = None
+                        self.grants.add(
+                            tool.name, bind, scope, task.conversation_id if task else None
+                        )
+                    else:
+                        decision = Decision.DENY
+                        reasons.append(
+                            f"user declined{': ' + verdict.reason if verdict.reason else ''}"
+                        )
 
+        if self.reviewer is not None:
+            self.reviewer.observe(
+                tool=tool.name,
+                args=args,
+                assessment=assessment,
+                purpose=task.purpose if task else "",
+                purpose_truncated=task.purpose_truncated if task else False,
+                decision=decision.value,
+                source=settled_by,
+                execution_llm=task.execution_llm if task else None,
+            )
         self.ui.on_sentinel(decision.value, assessment.summary, reasons)
         _note(
             "sentinel.decision",

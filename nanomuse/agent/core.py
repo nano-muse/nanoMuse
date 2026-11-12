@@ -136,10 +136,19 @@ class MuseAgent:
                 break
             if incoming.language:
                 self.ui_language = incoming.language
-            self.messages.append(self.user_message(incoming.text, incoming.files))
-            self.audit.record("user_message", content=incoming.text, interjected=True)
+            text = self._expand_skill(incoming.text)
+            self.messages.append(self.user_message(text, incoming.files))
+            self.audit.record("user_message", content=text, interjected=True)
             count += 1
         return count
+
+    def _expand_skill(self, text: str) -> str:
+        """A message that opens with a skill's slash command (``/weekly-review …``) gets
+        the skill's instructions, whether it starts a turn or is folded into one already
+        running."""
+        if self.skills is not None and "skills" in self.tools:
+            return self.skills.expand(text)
+        return text
 
     def user_message(self, text: str, files: list[Attachment] | None = None) -> Message:
         """The user's message as the model gets it: the text, a line per attached file
@@ -514,9 +523,7 @@ class MuseAgent:
         self.turns += 1
         if language:
             self.ui_language = language
-        if self.skills is not None and "skills" in self.tools:
-            # "/weekly-review …" — the skill's instructions ride along with the message
-            user_input = self.skills.expand(user_input)
+        user_input = self._expand_skill(user_input)
         self.messages.append(self.user_message(user_input, files))
         attached = {"files": [a.path for a in files]} if files else {}
         self.audit.record("user_message", content=user_input, **attached)
@@ -526,7 +533,7 @@ class MuseAgent:
         step = 0
         empty_replies = 0
         task_token = self.sentinel.begin_task(
-            purpose or user_input, conversation=self.conversation_id
+            purpose or user_input, conversation=self.conversation_id, execution_llm=self.llm
         )
         session_token = llm_session.enter(self.session_id)
         turn_token = llm_session.begin_turn(run, self.turns)

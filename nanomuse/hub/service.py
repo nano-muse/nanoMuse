@@ -281,6 +281,9 @@ class HubService:
         client, self.client = self.client, None
         if client is not None:
             await client.stop()
+        # An explicit leave, including a sign-out or account switch, starts a new scope.
+        # Automatic reconnects stay inside the existing client and keep its last frame.
+        self._devices_seen = None
         tasks = [t for t in self._tasks if not t.done()]
         for t in tasks:
             t.cancel()
@@ -676,10 +679,8 @@ class HubService:
     def publish(self) -> None:
         self.svc.bus.publish({"kind": "hub", "hub": self.view()})
 
-    def _hub_state_changed(self, state: str, _detail: str) -> None:
-        """Publish connection state, and make each connection's welcome frame a baseline."""
-        if state == "connecting":
-            self._devices_seen = None
+    def _hub_state_changed(self, _state: str, _detail: str) -> None:
+        """Publish connection state without losing device transitions across reconnects."""
         self.publish()
 
     def _on_devices(self, devices: list[dict[str, Any]]) -> None:
@@ -806,6 +807,8 @@ class HubService:
                         str(a.get("text") or ""),
                         session_id=str(a.get("session_id") or ""),
                         workspace=str(a.get("workspace") or ""),
+                        request_id=str(a.get("request_id") or ""),
+                        scope=str(a.get("scope") or ""),
                     )
                     run_id = str(started.get("id") or "")
                     if not bool(a.get("wait", True)):
@@ -813,6 +816,9 @@ class HubService:
                         return
                     # follow the run on the bus; each step goes back as a task event
                     final: dict[str, Any] = started
+                    if started.get("status") in ("done", "failed", "stopped"):
+                        await call.result(started)
+                        return
                     while True:
                         msg = await asyncio.wait_for(queue.get(), timeout=1800)
                         if msg.get("kind") != "coding":
@@ -821,7 +827,9 @@ class HubService:
                         ev = msg.get("event") or {}
                         if run.get("id") != run_id and ev.get("run") != run_id:
                             continue
-                        if ev.get("kind") in ("text", "tool", "started"):
+                        if ev.get("kind") in ("text", "tool", "started") or (
+                            ev.get("kind") == "item" and call.args.get("protocol_version") == 2
+                        ):
                             # the run id rides along so the caller can `coding.stop` it
                             await call.event({"kind": "coding", "run": run_id, **ev})
                         if run.get("id") == run_id and run.get("status") in (
@@ -862,6 +870,8 @@ class HubService:
         key = grant_key(REMOTE_CONTROL_TOOL, call.sender_id)
         if sentinel.grants.match(key) is not None:
             return True
+        if call.action == "coding.send":
+            await call.event({"kind": "authorization"})
         brief = self._brief(call)
         shown = {k: v for k, v in call.args.items() if k != "data"}
         request = ApprovalRequest(

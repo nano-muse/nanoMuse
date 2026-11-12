@@ -85,7 +85,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
   </tr>
   <tr>
     <td width="50%" valign="top"><b>有自己的形象。</b><br>描述一句，你的圖像模型來畫，影片模型讓它動起來。預設是一隻小龍。</td>
-    <td width="50%" valign="top"><b>任何模型。</b><br>中繼的額度；自己在二十五家服務商（百煉、OpenRouter、OpenAI、Gemini、DeepSeek 等）任一家的 key；或者你已經在付費的方案：ChatGPT、Claude、Kimi。服務商沒有圖片或影片模型，這兩項就不開，App 會直說。</td>
+    <td width="50%" valign="top"><b>任何模型。</b><br>中繼的額度；自己在二十六家服務商（百煉、OpenRouter、OpenAI、Gemini、DeepSeek 等）任一家的 key；或者你已經在付費的方案：ChatGPT、Claude、Kimi。服務商沒有圖片或影片模型，這兩項就不開，App 會直說。</td>
   </tr>
 </table>
 
@@ -141,8 +141,8 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 <a href="https://github.com/Mola-maker"><img src="https://avatars.githubusercontent.com/u/229602071?v=4&s=48" width="48" height="48" alt="Mola-maker"></a>
 <a href="https://github.com/wsvn53"><img src="https://avatars.githubusercontent.com/u/912204?v=4&s=48" width="48" height="48" alt="wsvn53"></a>
 <a href="https://github.com/Longfellow1"><img src="https://avatars.githubusercontent.com/u/53395614?v=4&s=48" width="48" height="48" alt="Longfellow1"></a>
-<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
+<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
 <a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
