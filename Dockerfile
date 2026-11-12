@@ -37,7 +37,9 @@ COPY --chown=muse:muse nanomuse ./nanomuse
 COPY --chown=muse:muse config/config.example.toml ./config/config.example.toml
 
 RUN if [ "$WITH_BROWSER" = "1" ]; then \
-      pip install --no-cache-dir ".[browser,channels]" \
+      apt-get update \
+      && apt-get install -y --no-install-recommends libatomic1 \
+      && pip install --no-cache-dir ".[browser,channels]" \
       && playwright install --with-deps chromium \
       && chmod -R a+rX /ms-playwright \
       && rm -rf /var/lib/apt/lists/*; \
