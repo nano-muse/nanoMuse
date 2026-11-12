@@ -10,7 +10,7 @@ with an empty `session_id` and the returned continuation as `text`.
 
 The #815 prototype opens independent conversations from **New chat** or **Devices** on Android and desktop. Choose a destination by its stable device ID; its availability is shown separately. You can create a conversation while the device is offline or does not support persistent tasks, keep a draft there, and send only when it reconnects with `task.status`. It never falls back to local execution or automatically resends. Each entry remembers the device ID and its own conversation UUID. The destination uses its own model and tools. The initiator keeps the transcript locally, independently of side-chat sync.
 
-On desktop, each device conversation keeps its own draft while you switch chats. Text edited while a send is waiting stays in the composer when the send returns.
+On desktop, each device conversation keeps its own draft while you switch chats. Text edited while a send is waiting stays in the composer when the send returns. Drafts are saved in input order, and a send response clears only the draft that was sent. Android also preserves a newer saved draft when an earlier send finishes.
 
 A message beginning with a device mention uses a separate conversation for that turn. The entry shows the one-off destination. Use `@Device Name [device-id] message` when names are ambiguous. The next ordinary message still goes to the bound device.
 
