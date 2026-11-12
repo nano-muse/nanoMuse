@@ -2,6 +2,10 @@
 
 Bundled skills in Settings → Skills can be read, exported and switched off. Their name, content and files are managed by the app, so Edit, Update and Delete are unavailable. To customize one, export it and import a copy with a different name. The bundled `skill-creator` guide uses provider-neutral instructions.
 
+The model sees every skill enabled for the current conversation, including its name, up to 1024 Unicode characters of its description and its actual `SKILL.md` path. Full instructions stay on disk until needed. Importing or updating a skill preserves its complete source, including license, allowed tools and nested metadata. Quoted and multiline descriptions are parsed as text; nested fields cannot replace top-level names or descriptions. File viewing shows the actual source, and editing a skill keeps its existing directory ID. Names without ASCII letters also receive a stable directory ID.
+
+Fields already discarded by an older import need the original file or URL to restore them. Updating from that source keeps the existing skill's enablement and conversation overrides.
+
 `android/` is nanoMuse for the phone: [OpenMinis](https://github.com/OpenMinis/OpenMinis)
 1.13 (GPL-3.0): a native app whose agent runs **on the phone**, with a Linux shell, a
 browser, MCP servers, skills and scheduled tasks inside the APK, with nanoMuse's own

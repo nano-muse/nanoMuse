@@ -625,12 +625,8 @@ fun SkillDetailScreen(
                 if (parsed == null) {
                     updateStatus = UpdateStatus.Failed(context.getString(R.string.skill_detail_error_invalid))
                 } else {
-                    val ok = skillRepository.update(
-                        id = skill.id,
-                        name = parsed.name,
-                        description = parsed.description,
-                        body = parsed.body,
-                    )
+                    // nanoMuse: retain full source and keep the existing skill's stable ID.
+                    val ok = skillRepository.updateFromContent(skill.id, content)
                     updateStatus = if (ok) UpdateStatus.Done else UpdateStatus.Failed(context.getString(R.string.skill_detail_error_update_failed))
                 }
             }
@@ -1135,28 +1131,13 @@ fun SkillFileViewerScreen(
     val skill = skills.find { it.id == skillId }
     if (skill == null) { onBack(); return }
 
+    val context = LocalContext.current // nanoMuse: report invalid edited skill source.
     val isSkillMd = relativePath.equals("SKILL.md", ignoreCase = true)
     val fileName = relativePath.substringAfterLast('/')
 
-    // For SKILL.md, reconstruct from the in-memory record (so frontmatter
-    // edits stay in sync with DB metadata). For sibling files, read straight
-    // from disk.
+    // nanoMuse: show the actual file, including license, tools and nested metadata.
     val initialContent = remember(skillId, relativePath, skill.updatedAt) {
-        if (isSkillMd) {
-            buildString {
-                appendLine("---")
-                appendLine("name: ${skill.name}")
-                appendLine("version: ${skill.version}")
-                if (skill.description.isNotEmpty()) {
-                    appendLine("description: ${skill.description}")
-                }
-                appendLine("---")
-                appendLine()
-                append(skill.body)
-            }
-        } else {
-            skillRepository.readSkillFile(skillId, relativePath) ?: ""
-        }
+        skillRepository.readSkillFile(skillId, relativePath) ?: ""
     }
 
     var isEditing by remember { mutableStateOf(false) }
@@ -1174,15 +1155,16 @@ fun SkillFileViewerScreen(
                 actions = {
                     if (isEditing) {
                         MinisTextButton(onClick = {
-                            if (isSkillMd) {
-                                // SKILL.md edits go through importFromContent so
-                                // YAML frontmatter changes flow back into DB metadata.
-                                skillRepository.importFromContent(editContent, skill.importSource)
+                            // nanoMuse: invalid source keeps the editor open instead of losing the edit.
+                            val saved = if (isSkillMd) {
+                                skillRepository.updateFromContent(skillId, editContent)
                             } else {
                                 skillRepository.writeSkillFile(skillId, relativePath, editContent)
                             }
-                            isEditing = false
-                            onBack()
+                            if (saved) {
+                                isEditing = false
+                                onBack()
+                            } else Toast.makeText(context, R.string.skill_detail_error_invalid, Toast.LENGTH_LONG).show()
                         }) { Text(stringResource(R.string.skill_file_save)) }
                     } else if (!skill.isReadOnly) { // nanoMuse: bundled source files are read-only.
                         MinisTextButton(onClick = {
