@@ -6,6 +6,42 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DeviceConversationsTest {
+    @Test fun clearingASubmittedDraftPreservesAnEditMadeDuringTheRemoteRun() {
+        var disk = "[]"
+        val desk = Device("desk", "Desk", "computer", "", "", true, listOf("task.status"), 0)
+        lateinit var service: DeviceConversations
+        lateinit var chat: String
+        fun reopen() = DeviceConversations(
+            devices = { listOf(desk) }, load = { disk }, persist = { disk = it },
+            invoke = { _, _, _ ->
+                service.saveDraft(chat, "A follow-up written while waiting")
+                JSONObject().put("state", "completed").put("text", "Done")
+            },
+        )
+        service = reopen()
+        chat = service.create(desk).getString("id")
+        service.saveDraft(chat, "Submitted prompt")
+        service.send(chat, "Submitted prompt")
+        service.clearDraftIfUnchanged(chat, "Submitted prompt")
+        assertEquals("A follow-up written while waiting", reopen().draft(chat))
+    }
+
+    @Test fun clearingAnUnchangedSubmittedDraftDoesNotTouchAnotherConversation() {
+        var disk = "[]"
+        val desk = Device("desk", "Desk", "computer", "", "", true, listOf("task.status"), 0)
+        val service = DeviceConversations(
+            devices = { listOf(desk) }, load = { disk }, persist = { disk = it },
+            invoke = { _, _, _ -> error("Saving a draft must not dispatch") },
+        )
+        val first = service.create(desk).getString("id")
+        val second = service.create(desk).getString("id")
+        service.saveDraft(first, "Submitted prompt")
+        service.saveDraft(second, "Other draft")
+        service.clearDraftIfUnchanged(first, "Submitted prompt")
+        assertEquals("", service.draft(first))
+        assertEquals("Other draft", service.draft(second))
+    }
+
     @Test fun recoveringAnUncertainTurnOnlyQueriesTheOriginalTarget() {
         var disk = "[]"
         val actions = mutableListOf<String>()
@@ -91,6 +127,49 @@ class DeviceConversationsTest {
             }
             assertEquals(2, calls.size)
         }
+    }
+
+    @Test fun anOfflineDestinationKeepsItsDraftWithoutDispatching() {
+        var disk = "[]"
+        var desk = Device("desk", "Desk", "computer", "", "", false, listOf("task", "task.status"), 0)
+        val actions = mutableListOf<String>()
+        fun reopen() = DeviceConversations(
+            devices = { listOf(desk) }, load = { disk }, persist = { disk = it },
+            invoke = { _, action, _ -> actions += action; JSONObject().put("state", "completed") },
+        )
+        val id = reopen().create(desk).getString("id")
+        reopen().saveDraft(id, "keep this while the desktop is offline")
+
+        val error = runCatching { reopen().send(id, "keep this while the desktop is offline") }.exceptionOrNull()
+
+        assertEquals("device_offline", (error as HubException).code)
+        assertTrue(actions.isEmpty())
+        assertEquals("keep this while the desktop is offline", reopen().draft(id))
+    }
+
+    @Test fun boundConversationsKeepTheirStableDeviceAndSeparateRemoteContexts() {
+        var disk = "[]"
+        var desk = Device("desk-stable", "Office", "computer", "", "", true, listOf("task", "task.status"), 0)
+        val sent = mutableListOf<Pair<String, JSONObject>>()
+        val service = DeviceConversations(
+            devices = { listOf(desk) }, load = { disk }, persist = { disk = it },
+            invoke = { target, action, args ->
+                assertEquals("desk-stable", target)
+                assertEquals("task", action)
+                sent += target to args
+                JSONObject().put("state", "completed").put("text", "answer")
+            },
+        )
+        val a = service.create(desk).getString("id")
+        val b = service.create(desk).getString("id")
+        desk = desk.copy(name = "Renamed Office")
+
+        service.send(a, "context A")
+        service.send(b, "context B")
+
+        assertEquals("desk-stable", service.list().first { it.getString("id") == a }.getString("device"))
+        assertEquals(setOf(a, b), sent.map { it.second.getString("conversation") }.toSet())
+        assertNotEquals(sent[0].second.getString("conversation"), sent[1].second.getString("conversation"))
     }
 
 }

@@ -7,11 +7,14 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,6 +43,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +65,13 @@ import com.openminis.app.R
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.ui.theme.ChatColors
+import io.github.nanomuse.cloud.NanoMuseCloud
+import io.github.nanomuse.hub.DeviceConversations
+import io.github.nanomuse.ui.cloud.deviceConversationColor
+import io.github.nanomuse.ui.cloud.deviceConversationLabel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.text.DateFormat
 import java.util.Date
 
@@ -77,8 +88,10 @@ fun SideChatDrawer(
     chatRepository: ChatRepository,
     mainSessionId: String?,
     currentSessionId: String?,
+    currentDeviceChatId: String? = null,
     onOpenMain: () -> Unit,
     onOpenSession: (String) -> Unit,
+    onOpenDeviceChat: (String) -> Unit = {},
     onNewChat: () -> Unit,
     onAllChats: () -> Unit,
     onSettings: () -> Unit,
@@ -92,6 +105,20 @@ fun SideChatDrawer(
     val hubConnected by io.github.nanomuse.hub.Hub.connected.collectAsState()
     val hubDevices by io.github.nanomuse.hub.Hub.devices.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
+    var query by remember { mutableStateOf("") }
+    val accountId = NanoMuseCloud.account(context)?.accountId?.takeIf { it.isNotBlank() }
+    var deviceChats by remember(accountId) { mutableStateOf(emptyList<JSONObject>()) }
+    LaunchedEffect(accountId, currentDeviceChatId) {
+        deviceChats = if (accountId == null) emptyList() else runCatching {
+            withContext(Dispatchers.IO) { DeviceConversations.open(context, accountId).list() }
+        }.getOrDefault(emptyList())
+    }
+    val visibleDeviceChats = remember(deviceChats, hubDevices, query) {
+        deviceChats.filter { row ->
+            val target = hubDevices.find { it.id == row.optString("device") }
+            query.isBlank() || (target?.name ?: row.optString("name")).contains(query, ignoreCase = true)
+        }
+    }
     val othersOnline = remember(hubDevices) { hubDevices.count { it.online && it.kind != "web" && it.id != io.github.nanomuse.hub.Hub.deviceId(context) } }
     // nanoMuse: computers whose runtime can show and steer coding agents (Cursor, Codex, Claude Code)
     val codingComputers = remember(hubDevices) {
@@ -99,7 +126,6 @@ fun SideChatDrawer(
     }
     // nanoMuse: a chat from another device of the account is the same chat here (contract C8) — no
     // badge per chat; the turns written elsewhere carry "From Pixel 8" in the bubble instead
-    var query by remember { mutableStateOf("") }
     val sideChats = remember(sessions, mainSessionId, query) {
         sessions
             .filter { it.id != mainSessionId }
@@ -217,6 +243,54 @@ fun SideChatDrawer(
             }
         }
 
+        if (visibleDeviceChats.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.nm_device_chats).uppercase(),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+                color = nmMuted,
+                modifier = Modifier.padding(start = 26.dp, end = 12.dp, top = 14.dp, bottom = 4.dp),
+            )
+            Column(Modifier.heightIn(max = 200.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                visibleDeviceChats.forEach { row ->
+                    val id = row.getString("id")
+                    val deviceId = row.getString("device")
+                    val target = hubDevices.find { it.id == deviceId }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 1.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (id == currentDeviceChatId) nmRowSelected else Color.Transparent)
+                            .clickable { onOpenDeviceChat(id) }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = if (target?.kind == "phone") "📱" else "▣",
+                            color = deviceConversationColor(deviceId),
+                            modifier = Modifier.padding(end = 10.dp),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = deviceConversationLabel(row, target),
+                                fontSize = 14.sp,
+                                color = deviceConversationColor(deviceId),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = stringResource(if (target?.online == true) R.string.nm_devices_online else R.string.nm_devices_offline),
+                                fontSize = 12.sp,
+                                color = nmMuted,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = 26.dp, end = 12.dp, top = 14.dp),
@@ -239,7 +313,7 @@ fun SideChatDrawer(
             }
         }
 
-        if (sideChats.isEmpty()) {
+        if (sideChats.isEmpty() && visibleDeviceChats.isEmpty()) {
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp),
                 verticalArrangement = Arrangement.Center,

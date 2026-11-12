@@ -4522,6 +4522,7 @@ export default class NanomuseCloud extends Service {
         const chats = this.deviceConversations()
         const id = String(body.id ?? '')
         if (body.action === 'create') return send(res, 200, await chats.create(String(body.device ?? '')))
+        if (body.action === 'draft') return send(res, 200, await chats.saveDraft(id, String(body.text ?? '')))
         if (body.action === 'send') return send(res, 200, await chats.send(id, String(body.text ?? '')))
         if (body.action === 'refresh') return send(res, 200, await chats.refresh(id))
         if (body.action === 'stop') return send(res, 200, { stopped: await chats.stop(id) })

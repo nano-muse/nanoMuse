@@ -1267,6 +1267,7 @@
     <string name="nm_mcp_oauth_token_failed">La connexion au connecteur a échoué (%1$s). Vérifiez la connexion et les paramètres OAuth, puis réessayez.</string>
     <string name="nm_device_chats">Conversations sur les appareils</string>
     <string name="nm_device_chat_start">Discuter sur cet appareil</string>
+    <string name="nm_device_chat_here">Sur cet appareil</string>
     <string name="nm_device_chat_uncertain">Envoi incertain. Recherche du résultat sur cet appareil.</string>
     <string name="nm_device_chat_interrupted">Interrompu. Certaines actions ont peut-être déjà été effectuées.</string>
 </resources>

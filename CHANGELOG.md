@@ -8,6 +8,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
 
+- Added device-bound conversation choices to the standard new-chat flow on Android and desktop; offline or older devices keep a selectable route for drafts without local fallback or automatic resend. For #815.
+
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
 - Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
 - Matched Android persistent task replies and stop requests to their original turn, and rejected blocked, empty or errored runs instead of returning an older answer or stopping later work.
@@ -195,6 +197,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Kept device-chat drafts edited while another turn was running, and made long device and bound-conversation lists scrollable. For #815.
 - Paused automatic following as soon as a person scrolled towards older messages, and kept new reply chunks, tool cards and keyboard layout changes from resuming it. For #898.
 - Reserved output space before summarizing long conversations, so nearly full inputs were split instead of leaving the summary only a few output tokens. For #719.
 - Added progress rings to active main and side chats in the Muse drawer, using this phone's existing task tracking while preserving unread reply markers. Approval and per-chat step indicators remain separate work. For #531.

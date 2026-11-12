@@ -1266,6 +1266,7 @@
     <string name="nm_mcp_oauth_token_failed">No se pudo iniciar sesión en el conector (%1$s). Revisa la conexión y la configuración de OAuth e inténtalo de nuevo.</string>
     <string name="nm_device_chats">Conversaciones en dispositivos</string>
     <string name="nm_device_chat_start">Chatear en este dispositivo</string>
+    <string name="nm_device_chat_here">En este dispositivo</string>
     <string name="nm_device_chat_uncertain">Entrega incierta. Consultando el resultado en el dispositivo.</string>
     <string name="nm_device_chat_interrupted">Interrumpido. El dispositivo puede haber realizado algunas acciones.</string>
 </resources>
