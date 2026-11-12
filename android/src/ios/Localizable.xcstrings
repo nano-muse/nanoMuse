@@ -1,6 +1,65 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Claude sign-in is unavailable in this version. Choose another model or use an API key.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude sign-in is unavailable in this version. Choose another model or use an API key."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此版本暂不支持 Claude 登录。请选择其他模型，或使用 API 密钥。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此版本暫不支援 Claude 登入。請選擇其他模型，或使用 API 金鑰。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Claude-Anmeldung ist in dieser Version nicht verfügbar. Wähle ein anderes Modell oder verwende einen API-Schlüssel."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El inicio de sesión de Claude no está disponible en esta versión. Elige otro modelo o usa una clave API."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion à Claude est indisponible dans cette version. Choisissez un autre modèle ou utilisez une clé API."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このバージョンでは Claude にログインできません。別のモデルを選ぶか、API キーを使用してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 버전에서는 Claude에 로그인할 수 없습니다. 다른 모델을 선택하거나 API 키를 사용하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В этой версии вход в Claude недоступен. Выберите другую модель или используйте API-ключ."
+          }
+        }
+      }
+    },
     "Conversation in use" : {
       "extractionState" : "manual",
       "localizations" : {

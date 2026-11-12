@@ -189,7 +189,7 @@ final class AnthropicAgentProvider: AgentProvider {
             model: .other(model.id),
             messages: cachedMessages,
             maxTokens: maxTokens,
-            system: provider.resolveSystemPrompt(systemPrompt),
+            system: try provider.resolveSystemPrompt(systemPrompt), // nanoMuse: fail before sending if OAuth is unavailable.
             temperature: provider.effectiveTemperature(0.7),
             tools: anthropicTools,
             toolChoice: .init(type: .auto)
@@ -958,7 +958,7 @@ final class AnthropicAgentProvider: AgentProvider {
             model: .other(model.id),
             messages: allMessages,
             maxTokens: 1,
-            system: provider.resolveSystemPrompt(systemPrompt),
+            system: try provider.resolveSystemPrompt(systemPrompt), // nanoMuse: fail before sending if OAuth is unavailable.
             temperature: provider.effectiveTemperature(0),
             tools: anthropicTools
         )
