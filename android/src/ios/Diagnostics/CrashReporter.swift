@@ -267,10 +267,12 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
         let gap = previous > 0 ? now - previous : .infinity
         if gap < Self.crashLoopWindowSeconds {
             defaults.set(true, forKey: Self.crashLoopTriggeredKey)
-            logger.warning("[CrashLoop] second foreground crash in \(String(format: "%.1f", gap))s — next launch will skip session restore")
+            // nanoMuse: marker-based restore protection is a heuristic, not a confirmed crash.
+            logger.warning("[CrashLoop] repeated foreground exit markers in \(String(format: "%.1f", gap))s, next launch will skip session restore")
         } else {
             defaults.removeObject(forKey: Self.crashLoopTriggeredKey)
-            logger.info("[CrashLoop] foreground crash recorded (gap=\(previous > 0 ? String(format: "%.1fs", gap) : "first"))")
+            // nanoMuse: record the observation without claiming its cause or incident time.
+            logger.info("[CrashLoop] foreground exit marker recorded (gap=\(previous > 0 ? String(format: "%.1fs", gap) : "first"))")
         }
         defaults.set(now, forKey: Self.crashLoopLastCrashAtKey)
     }
@@ -625,66 +627,24 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
             return false
         }
 
-        let crashType: String
+        // nanoMuse: phase snapshots cannot establish the signal, termination cause or exact time.
+        let crashType = NanoMuseCrashEvidence.markerType(lastPhase: lastPhase)
         if lastPhase == "active" || lastPhase == "inactive" {
             // [T-ios-session-crash-loop] The previous run died while the user
             // was looking at it — the shape of the session-restore loop. Feed
             // the counter that decides whether to skip restore next launch.
             lastRunWasForegroundCrash = true
             noteForegroundCrash()
-            if runningShell {
-                crashType = "⚠️ FOREGROUND CRASH during shell execution"
-            } else if let mem = memoryMB, mem >= 350 {
-                crashType = "⚠️ FOREGROUND CRASH (high memory: \(mem)MB)"
-            } else {
-                crashType = "⚠️ FOREGROUND CRASH (SIGKILL — app was in use)"
-            }
-        } else if lastPhase == "background" {
-            if let rem = bgTaskRemaining, rem > 0 && rem < 5 {
-                crashType = "Background Task Timeout (task expired with \(String(format: "%.1f", rem))s left)"
-            } else if let mem = memoryMB, mem >= 300 {
-                crashType = "Background Jetsam (high memory: \(mem)MB)"
-            } else if let free = memoryFreeMB, free < 500 {
-                crashType = "Background Jetsam (system memory pressure)"
-            } else if runningShell || (activeSessionCount ?? 0) > 0 {
-                // [T-ios-bgkeepalive-diag] Report the observable facts only —
-                // memory was not tight, work was tracked as in flight, and these
-                // keep-alive legs were recorded — WITHOUT asserting a cause. The
-                // earlier wording ("WITH WORK IN FLIGHT" + ⚠️) implied the kill
-                // was caused by keep-alive stopping too early; the three reports
-                // that prompted it never established that (their last BKA event
-                // predates the kill by 1-28 min, so the evaluation may simply not
-                // have run in that window). Keep this branch purely descriptive so
-                // it does not pre-commit a future investigation to one hypothesis.
-                //
-                // Note `shell=running` is only as trustworthy as the ring-buffer
-                // counter: it could latch high on builds before the didAbort fix,
-                // and could under-count on duplicate-terminal races before the
-                // liveStarts fix.
-                let legs = [
-                    bgSilentAudioLeg == true ? "audio" : nil,
-                    (bgTaskGrants ?? 0) > 0 ? "bgTask×\(bgTaskGrants ?? 0)" : nil,
-                ].compactMap { $0 }
-                let legStr = legs.isEmpty ? "none recorded" : legs.joined(separator: "+")
-                let workBits = [
-                    runningShell ? "shell=running" : nil,
-                    (activeSessionCount ?? 0) > 0 ? "sessions=\(activeSessionCount ?? 0)" : nil,
-                ].compactMap { $0 }.joined(separator: ",")
-                crashType = "Background Termination (memory not tight; \(workBits); keep-alive legs: \(legStr)) — cause undetermined"
-            } else {
-                // Idle + memory fine: the ordinary way iOS reclaims a suspended app.
-                crashType = "Background Termination (idle app reclaimed — normal)"
-            }
-        } else {
-            crashType = "Unknown Termination"
         }
 
-        logger.warning("Stale launch marker found — previous exit was abnormal: phase=\(lastPhase)")
+        // nanoMuse: absence of a clean-exit callback is not proof of abnormal termination.
+        logger.warning("Stale launch marker found, previous termination unconfirmed: phase=\(lastPhase)")
 
         let savedShellCommands = (markerInfo?["shellCommands"] as? [[String: Any]]) ?? []
 
         writeReport(
             type: crashType,
+            evidence: NanoMuseCrashEvidence(source: .launchMarker), // nanoMuse: provenance.
             callStack: nil,
             savedShellCommands: savedShellCommands,
             lastPhase: lastPhase,
@@ -740,21 +700,12 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
                         stack = lines.joined(separator: "\n")
                     }
 
-                    let liveCommands = ShellCommandRingBuffer.syncSnapshot
-                    let timeFmt = DateFormatter()
-                    timeFmt.dateFormat = "HH:mm:ss"
-                    let savedCmds: [[String: Any]] = liveCommands.map { entry in
-                        var d: [String: Any] = [
-                            "index": entry.index,
-                            "startedAt": timeFmt.string(from: entry.startedAt),
-                            "command": entry.command,
-                            "sessionId": entry.sessionId
-                        ]
-                        if let code = entry.exitCode { d["exitCode"] = code }
-                        if let dur = entry.duration { d["duration"] = dur }
-                        return d
-                    }
-                    writeReport(type: type, callStack: stack, savedShellCommands: savedCmds)
+                    // nanoMuse: the delivered diagnostic is not evidence about this process's commands.
+                    writeReport(type: type, evidence: NanoMuseCrashEvidence(
+                        source: .metricKit, periodStart: payload.timeStampBegin,
+                        periodEnd: payload.timeStampEnd,
+                        diagnosticBuild: "\(diag.applicationVersion) (\(diag.metaData.applicationBuildVersion))"
+                    ), callStack: stack, savedShellCommands: [])
                 }
             }
 
@@ -776,7 +727,12 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
                         }
                         stack = lines.joined(separator: "\n")
                     }
-                    writeReport(type: type, callStack: stack, savedShellCommands: [])
+                    // nanoMuse: distinguish the collection period from the time of delivery.
+                    writeReport(type: type, evidence: NanoMuseCrashEvidence(
+                        source: .metricKit, periodStart: payload.timeStampBegin,
+                        periodEnd: payload.timeStampEnd,
+                        diagnosticBuild: "\(diag.applicationVersion) (\(diag.metaData.applicationBuildVersion))"
+                    ), callStack: stack, savedShellCommands: [])
                     logger.warning("[MetricKit] Hang diagnostic: \(type)")
                 }
             }
@@ -799,7 +755,9 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
             let offset = (frame["offsetIntoBinaryTextSegment"] as? Int) ?? 0
             let address = (frame["address"] as? Int) ?? 0
             let indent = String(repeating: "  ", count: depth)
-            lines.append("\(indent)\(binary) 0x\(String(address, radix: 16)) +\(offset)")
+            // nanoMuse: retain the image identity needed to select matching symbols.
+            let image = (frame["binaryUUID"] as? String).map { " uuid=\($0)" } ?? ""
+            lines.append("\(indent)\(binary) 0x\(String(address, radix: 16)) +\(offset)\(image)")
             if let subFrames = frame["subFrames"] as? [[String: Any]] {
                 appendFrames(subFrames, to: &lines, depth: depth + 1)
             }
@@ -810,6 +768,7 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
 
     private func writeReport(
         type: String,
+        evidence: NanoMuseCrashEvidence, // nanoMuse: every report names its evidence source.
         callStack: String?,
         savedShellCommands: [[String: Any]] = [],
         lastPhase: String? = nil,
@@ -843,22 +802,15 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
         let now = Date()
         let df = DateFormatter()
 
-        let crashDate: Date
-        if let ts = lastPhaseAt {
-            let inputDf = DateFormatter()
-            inputDf.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-            crashDate = inputDf.date(from: ts) ?? now
-        } else {
-            crashDate = now
-        }
-
-        df.dateFormat = "yyyyMMdd-HHmmss"
-        let filename = "crash-\(df.string(from: crashDate)).log"
+        // nanoMuse: last phase time is an observation, not an incident timestamp.
+        // A unique suffix also preserves diagnostics delivered within the same second.
+        let filename = evidence.filename(generatedAt: now)
 
         let info = Bundle.main.infoDictionary
         let version = (info?["CFBundleShortVersionString"] as? String) ?? "?"
         let build = (info?["CFBundleVersion"] as? String) ?? "?"
-        let displayBuild = markerBuild ?? "\(version) (\(build))"
+        // nanoMuse: a delayed diagnostic may describe a different app build.
+        let displayBuild = markerBuild ?? evidence.diagnosticBuild ?? "unknown"
         let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
         var deviceModel = "unknown"
         var sysinfo = utsname()
@@ -868,16 +820,19 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
         }
 
         df.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let dateStr = df.string(from: crashDate)
+        let dateStr = df.string(from: now) // nanoMuse: report generation time only.
 
         var report = """
         === nanoMuse Crash Report ===
         Date:    \(dateStr)
         Type:    \(type)
         Build:   \(displayBuild)
-        OS:      \(osVersion)
-        Device:  \(deviceModel)
+        Report writer OS: \(osVersion)
+        Report writer device: \(deviceModel)
         """
+        // nanoMuse: make delayed MetricKit reports and marker inference explicit.
+        report += "\n" + evidence.header(generatedAt: now)
+        report += "\nReport writer build: \(version) (\(build))" // nanoMuse: separate provenance.
 
         // [T-crash-injected-dylib-tag] Surface tweak/hook injection right in
         // the header. Field case 2026-08-01 (1.11 build 14, iPhone14,3): five
@@ -1004,10 +959,12 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
                 report += "                               \(title)\n"
             }
         } else {
-            report += "(no active WebViews)\n"
+            // nanoMuse: missing historical data does not mean that no views were active.
+            report += evidence.includesPreviousRunArtifacts ? "(none recorded)\n" : "(not captured for this MetricKit diagnostic)\n"
         }
 
-        report += "\n--- Last Shell Commands (before exit) ---\n"
+        // nanoMuse: saved marker commands describe the last observation, not a proven exit time.
+        report += "\n--- Shell Commands (last recorded observation) ---\n"
 
         if savedShellCommands.isEmpty {
             report += "(none recorded)\n"
@@ -1035,7 +992,8 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
         }
 
         let logLines = logRingSnapshot()
-        report += "\n--- Last \(logLines.count) Log Lines (before exit) ---\n"
+        // nanoMuse: this ring belongs to the report-writing process, often a later launch.
+        report += "\n--- Current Report-Writing Process Log Tail (not incident-time evidence) ---\n"
         if logLines.isEmpty {
             report += "(none recorded)\n"
         } else {
@@ -1044,13 +1002,17 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
             }
         }
 
-        let hangSnapshot = (try? String(contentsOf: Self.hangSnapshotURL, encoding: .utf8)) ?? ""
+        // nanoMuse: do not attach this run's signal/hang files to a delayed system diagnostic.
+        let hangSnapshot = evidence.includesPreviousRunArtifacts
+            ? ((try? String(contentsOf: Self.hangSnapshotURL, encoding: .utf8)) ?? "") : ""
         if !hangSnapshot.isEmpty {
             report += "\n--- Last HangDetector Stacks (before exit) ---\n"
             report += hangSnapshot + "\n"
         }
 
-        let crashStack = (try? String(contentsOf: Self.crashStackURL, encoding: .utf8)) ?? ""
+        // nanoMuse: only the launch marker can refer to retained previous-run artifacts.
+        let crashStack = evidence.includesPreviousRunArtifacts
+            ? ((try? String(contentsOf: Self.crashStackURL, encoding: .utf8)) ?? "") : ""
         if !crashStack.isEmpty {
             report += "\n--- Signal/Exception Crash Stack ---\n"
             report += crashStack + "\n"
@@ -1060,7 +1022,7 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
         if let stack = callStack {
             report += stack + "\n"
         } else {
-            report += "(none — SIGKILL has no stack)\n"
+            report += evidence.unavailableStack + "\n" // nanoMuse: no inferred signal.
         }
         report += "\n=== End ===\n"
 

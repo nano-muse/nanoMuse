@@ -760,6 +760,26 @@ opens: a microphone running with nothing on screen would read as a fault. The Si
 in the nine `AppShortcuts.strings` tables (one per `<lang>.lproj`, legacy `.strings` because the
 deployment target is iOS 16), the intent's own strings in `Localizable.xcstrings` (#296, #298).
 
+## Crash and exit diagnostics
+
+Missing Claude sign-in customization now returns a provider error instead of terminating
+the app. API-key requests do not require that customization. The check also covers
+background title generation and warmup requests, whose model can differ from the main chat.
+
+Reports in **Settings → Logs** distinguish a leftover launch marker from a MetricKit
+diagnostic. A marker means that no clean-exit callback removed it; it does not prove a
+crash, SIGKILL, watchdog termination or memory failure. Its phase and memory values are
+the last recorded observations. Session-restore protection still uses repeated foreground
+exit markers as a recovery heuristic.
+
+The report date is its generation time. MetricKit reports also name their diagnostic
+period, which is not an exact incident timestamp, and label the log tail as belonging to
+the process writing the report. They do not attach that process's shell commands, signal
+file or hang snapshot as evidence of the earlier incident. Reports delivered in the same
+second keep separate files. To diagnose a reported trap, use the system `.ips` and the
+matching build's symbols; for a SIGKILL, inspect its
+[Termination Reason](https://developer.apple.com/documentation/xcode/sigkill).
+
 ## Building on a Mac
 
 Requirements are upstream's, in [android/BUILDING.md](../android/BUILDING.md): a recent Xcode

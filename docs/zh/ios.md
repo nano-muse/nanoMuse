@@ -122,6 +122,14 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 
 App Intent 是系统调用快捷指令的接口，无法直接控制 SwiftUI 语音面板，冷启动时甚至还没有窗口。因此指令先在 `NanoMuseVoicePrompt` 保存请求；指定会话时，通过与通知相同的 `NotificationNavigationStore`、`.openSessionFromIntent` 跳转。`NanoMuseChatHooks` 只取属于当前聊天的请求，沿现有麦克风按钮流程打开内嵌面板，显示后调用 `VoiceInputViewModel.handleMainButtonTap` 及权限检查开始录音。录音、转写共用原流程，文字仍进入 `inputText`。超过 30 秒的请求丢弃。iOS 的 App Intent 不能接收任意自由语音，所以该指令负责进入语音输入，不能在一句唤起语中直接完成提问；录音时也会打开 App，让用户看到麦克风状态。Siri 语句保存在九种语言各自 `<lang>.lproj` 的 `AppShortcuts.strings`，因最低 iOS 16 而使用传统 `.strings`；指令自身文案在 `Localizable.xcstrings`，见 #296、#298。
 
+## 崩溃与退出诊断 {#crash-and-exit-diagnostics}
+
+构建中缺少 Claude 登录配置时，请求会返回可恢复的服务商错误，不再终止 App。API key 请求不依赖这项配置。检查也覆盖后台标题生成和预热请求，它们使用的模型可能与主要聊天不同。
+
+「设置 → 日志」中的报告会区分残留启动标记和 MetricKit 诊断。标记残留只表示没有正常退出回调将它移除，不能证明发生了崩溃、SIGKILL、看门狗终止或内存故障。其中的阶段和内存数值是最后一次记录的观察值。连续前台退出标记仍作为跳过会话恢复的保护依据，但它只是恢复时使用的判断线索。
+
+报告日期表示生成报告的时间。MetricKit 报告另列诊断覆盖时段，该时段不是事件的准确发生时间；日志尾部也会注明来自生成报告的进程。报告不会把这个进程的终端命令、信号文件或卡顿快照当作更早事件的证据，同一秒收到的报告也会分别保存。排查运行时陷阱需要系统 `.ips` 和对应构建的符号；SIGKILL 应查看系统报告中的 [Termination Reason](https://developer.apple.com/documentation/xcode/sigkill)。
+
 ## 在 Mac 上构建 {#building-on-a-mac}
 
 构建环境沿用上游要求，见 [android/BUILDING.md](../../android/BUILDING.md)：较新 Xcode，项目使用 iOS 26 SDK；Homebrew 安装 `ninja meson llvm lld libarchive pkg-config`；构建 rclone 使用 Go 1.25。

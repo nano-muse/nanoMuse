@@ -40,30 +40,7 @@ final class AnthropicProvider: LLMProvider {
     /// where signature-less thinking blocks are rejected.
     let isOfficialAnthropicEndpoint: Bool
 
-    /// Required system prompt prefix for Claude Code OAuth credentials.
-    ///
-    /// The value is not hardcoded here: at build time the "Generate Provider
-    /// Customization" script phase reads the `ANTHROPIC_OAUTH_IDENTIFIER_PROMPT`
-    /// build setting (sourced from `Configs/ProviderCustomization.xcconfig`) and
-    /// emits `ProviderCustomizationGenerated.anthropicOAuthIdentifierPrompt`,
-    /// which is compiled into the binary. The value is deliberately NOT stored
-    /// in Info.plist. That xcconfig is tracked in the private repo (filled in)
-    /// but excluded from the public mirror, which ships only
-    /// `ProviderCustomization.xcconfig.example` with an empty value — so a build
-    /// there generates an empty string and fails here the first time an OAuth
-    /// (Claude Code) request needs the prompt, by design.
-    static let claudeCodeSystemPrompt: String = {
-        let value = ProviderCustomizationGenerated.anthropicOAuthIdentifierPrompt
-        guard !value.isEmpty else {
-            fatalError(
-                "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT is not configured. Copy "
-                + "Configs/ProviderCustomization.xcconfig.example to "
-                + "Configs/ProviderCustomization.xcconfig and set "
-                + "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT before building with Claude Code OAuth."
-            )
-        }
-        return value
-    }()
+    // nanoMuse: OAuth customization is validated per request by NanoMuseAnthropicPrompt.
 
     /// Parse the `-<major>-<minor>` (or `-<major>.<minor>`) version out of a Claude model id.
     /// The minor segment is optional: a single-segment version (`claude-fable-5`,
@@ -213,10 +190,19 @@ final class AnthropicProvider: LLMProvider {
     /// Build the effective system prompt.
     /// For Claude Code OAuth, uses array format with the required prefix as a separate text block.
     /// This ensures Anthropic's server-side check sees the exact Claude Code prompt as the first block.
-    func resolveSystemPrompt(_ userPrompt: String?) -> MessageParameter.System? {
-        if isClaudeCode {
-            // OAuth (Claude Code): two blocks — base system prompt + user system prompt with cache
-            let base = MessageParameter.Cache(text: Self.claudeCodeSystemPrompt, cacheControl: nil)
+    // nanoMuse: unavailable OAuth configuration is a recoverable provider error, not a process trap.
+    func resolveSystemPrompt(_ userPrompt: String?) throws -> MessageParameter.System? {
+        let prefix: String?
+        do {
+            prefix = try NanoMuseAnthropicPrompt.prefix(
+                isOAuth: isClaudeCode,
+                configuredIdentifier: ProviderCustomizationGenerated.anthropicOAuthIdentifierPrompt
+            )
+        } catch NanoMuseAnthropicPrompt.ConfigurationError.missingOAuthPrefix {
+            throw LLMError.providerError(message: AppLocalized("Claude sign-in is unavailable in this version. Choose another model or use an API key."))
+        }
+        if let prefix {
+            let base = MessageParameter.Cache(text: prefix, cacheControl: nil)
             guard let extra = userPrompt, !extra.isEmpty else {
                 return .list([base])
             }
@@ -242,7 +228,7 @@ final class AnthropicProvider: LLMProvider {
             model: .other(model.id),
             messages: messages.map { $0.toAnthropicMessage() },
             maxTokens: maxTokens,
-            system: resolveSystemPrompt(systemPrompt),
+            system: try resolveSystemPrompt(systemPrompt), // nanoMuse: fail before sending if OAuth is unavailable.
             temperature: effectiveTemperature(temperature)
         )
 
@@ -289,7 +275,7 @@ final class AnthropicProvider: LLMProvider {
             model: .other(model.id),
             messages: messages.map { $0.toAnthropicMessage() },
             maxTokens: maxTokens,
-            system: resolveSystemPrompt(systemPrompt),
+            system: try resolveSystemPrompt(systemPrompt), // nanoMuse: fail before sending if OAuth is unavailable.
             temperature: effectiveTemperature(temperature)
         )
 

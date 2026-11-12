@@ -242,6 +242,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
+- Replaced the missing Claude sign-in configuration trap with a recoverable provider error, including background title and warmup requests, while keeping API-key requests independent. For #911.
+
+- Distinguished unconfirmed exit markers from system crash diagnostics, separated report-generation times and delivery logs from incident evidence, and preserved reports delivered in the same second. For #911.
+
 - Kept iOS coding projects and session requests tied to the selected computer, and added refresh recovery for failed output and diff pages.
 
 - Collapsed each coding reply's tool calls into a summary above the reply and opened file diffs directly from specific file entries.
