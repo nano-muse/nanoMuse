@@ -1591,8 +1591,33 @@ export default class NanomuseCloud extends Service {
 
   /** A chat's title as the chats column shows it; '' when it cannot be read. */
   async chatTitle(sessionId: string): Promise<string> {
+    const access = this.scheduleSessionAccess(sessionId)
+    if (!access(sessionId)) return ''
     const ctx = this.sessionCtx
-    return ctx ? this.sessionTitle(ctx, sessionId as SessionId, Date.now()).catch(() => '') : ''
+    const title = ctx ? await this.sessionTitle(ctx, sessionId as SessionId, Date.now()).catch(() => '') : ''
+    return access(sessionId) ? title : ''
+  }
+
+  /** A schedule operation keeps its caller and account while it awaits storage or approval. */
+  scheduleSessionAccess(caller: string): (sessionId: string) => boolean {
+    const epoch = this.accountEpoch
+    const account = this.state.account?.id ?? ''
+    const visible = (sessionId: string): boolean => {
+      if (!sessionId || this.isClearedSession(sessionId)) return false
+      const seen = new Set<string>()
+      let id: string | undefined = sessionId
+      while (id && !seen.has(id)) {
+        seen.add(id)
+        const owner = this.state.sync?.owners?.[id]
+        if (owner && owner !== account) return false
+        const header: Session['header'] | undefined = this.sessionCtx?.sessions.get(id as SessionId)?.header
+        id = header?.origin === 'subagent' ? header.parentSession : undefined
+      }
+      return true
+    }
+    return (sessionId) => epoch === this.accountEpoch && !this.changingAccount
+      && !this.state.accountTransition && (this.state.account?.id ?? '') === account
+      && visible(caller) && visible(sessionId)
   }
 
   async revokeGrant(id: string): Promise<boolean> {

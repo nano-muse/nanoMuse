@@ -18,6 +18,7 @@ export interface ScheduleCatalogEntryLike extends ScheduleRecordLike {
   sessionId: string
   status: 'active' | 'inactive'
   timeZone?: string
+  prompt?: string
 }
 
 interface ScheduleCatalogLike {
@@ -55,6 +56,10 @@ export function scheduleRows(entries: readonly ScheduleCatalogEntryLike[], here:
       this_chat: e.sessionId === here,
     }))
     .sort((a, b) => Number(b.this_chat) - Number(a.this_chat))
+}
+
+function scheduleIdentity(entry: ScheduleCatalogEntryLike): string {
+  return JSON.stringify([entry.id, entry.sessionId, entry.title, ruleOf(entry), entry.timeZone, entry.prompt])
 }
 
 export const name = 'nanomuse-rooms-tools'
@@ -204,23 +209,21 @@ export function apply(ctx: Context): void {
       ctx.tools.register(
         defineTool({
           name: 'schedule_list_all',
-          description: "List every active scheduled task on this computer, in every chat, with the chat each one runs in. schedule_list shows only this chat's tasks; use this one when the person asks what tasks they have, and before schedule_create, so a task that already exists in another chat is not made twice.",
+          description: "List active scheduled tasks across accessible chats in the current account, with the chat each one runs in. schedule_list shows only this chat's tasks; use this one when the person asks what tasks they have, and before schedule_create, so a task that already exists in another chat is not made twice.",
           parameters: {},
           output: {
             schema: {
               type: 'object',
               properties: {
                 tasks: {
-                  type: 'array',
+                  type: 'array', required: true,
                   items: {
                     type: 'object',
-                    properties: { id: { type: 'string' }, title: { type: 'string' }, rule: { type: 'string' }, time_zone: { type: 'string' }, next_run: { type: 'string' }, chat_id: { type: 'string' }, chat_title: { type: 'string' }, this_chat: { type: 'boolean' } },
-                    required: ['id', 'title', 'rule', 'next_run', 'chat_id', 'chat_title', 'this_chat'],
+                    properties: { id: { type: 'string', required: true }, title: { type: 'string', required: true }, rule: { type: 'string', required: true }, time_zone: { type: 'string' }, next_run: { type: 'string', required: true }, chat_id: { type: 'string', required: true }, chat_title: { type: 'string', required: true }, this_chat: { type: 'boolean', required: true } },
                     additionalProperties: false,
                   },
                 },
               },
-              required: ['tasks'],
               additionalProperties: false,
             },
             render: (_args, value) => [{ type: 'text', text: JSON.stringify(value.tasks) }],
@@ -228,10 +231,14 @@ export function apply(ctx: Context): void {
           async execute(_args, exec) {
             const schedule = scheduler()
             if (!schedule) throw new Error('Scheduled tasks are not available on this computer.')
-            const entries = await schedule.catalog()
+            const caller = String(exec.agent?.session.id ?? '')
+            const access = ctx.nanomuseCloud.scheduleSessionAccess(caller)
+            if (!access(caller)) throw new Error('This chat cannot read scheduled tasks.')
+            const entries = (await schedule.catalog()).filter((entry) => access(entry.sessionId))
             const titles = new Map<string, string>()
             for (const id of new Set(entries.filter((e) => e.status === 'active').map((e) => e.sessionId))) titles.set(id, await ctx.nanomuseCloud.chatTitle(id))
-            return { tasks: scheduleRows(entries, String(exec.agent?.session.id ?? ''), titles) }
+            if (!access(caller) || exec.signal.aborted) throw new Error('The scheduled-task request is no longer active.')
+            return { tasks: scheduleRows(entries.filter((entry) => access(entry.sessionId)), caller, titles) }
           },
           presentCall: () => ({ card: 'generic', title: 'List all scheduled tasks', kind: 'read', rawInput: {} }),
         }),
@@ -252,13 +259,32 @@ export function apply(ctx: Context): void {
             schema: { type: 'object', properties: { id: { type: 'string' }, deleted: { type: 'boolean' }, title: { type: 'string' } }, additionalProperties: false },
             render: (_args, value) => [{ type: 'text', text: value.deleted ? `Deleted the scheduled task "${value.title}".` : `No scheduled task with id ${value.id}.` }],
           },
-          async execute(args) {
+          async execute(args, exec) {
             const schedule = scheduler()
             if (!schedule) throw new Error('Scheduled tasks are not available on this computer.')
-            const entry = (await schedule.catalog()).find((e) => e.id === args.id && e.status === 'active')
+            const caller = String(exec.agent?.session.id ?? '')
+            const access = ctx.nanomuseCloud.scheduleSessionAccess(caller)
+            if (!access(caller)) throw new Error('This chat cannot delete scheduled tasks.')
+            const entry = (await schedule.catalog()).find((e) => e.id === args.id && e.status === 'active' && access(e.sessionId))
             if (!entry) return { id: args.id, deleted: false, title: '' }
-            const result = await schedule.delete({ sessionId: entry.sessionId, id: entry.id })
-            return { id: entry.id, deleted: result.deleted, title: entry.title }
+            const identity = scheduleIdentity(entry)
+            const approval = ctx.get('approval')
+            if (!approval || !exec.agent || exec.signal.aborted) throw new Error('Approval is not available for this scheduled task.')
+            const reason = `Delete scheduled task "${entry.title}" from chat ${entry.sessionId}.`
+            const answer = await approval.request({
+              agent: exec.agent, toolName: 'schedule_delete_any', callId: exec.callId,
+              reason, displayReason: { en: reason, zh: `删除对话 ${entry.sessionId} 中的定时任务「${entry.title}」。` },
+              signal: exec.signal,
+            })
+            if (answer !== 'allowed-once') throw new Error('Scheduled-task deletion was not approved.')
+            if (!access(entry.sessionId) || exec.signal.aborted) throw new Error('The scheduled-task request is no longer active.')
+            const current = (await schedule.catalog()).find((e) => e.id === entry.id && e.status === 'active' && e.sessionId === entry.sessionId)
+            if (!current) return { id: args.id, deleted: false, title: '' }
+            if (scheduleIdentity(current) !== identity) throw new Error('The scheduled task changed while approval was pending. List the tasks again.')
+            if (!access(current.sessionId) || exec.signal.aborted) throw new Error('The scheduled-task request is no longer active.')
+            const result = await schedule.delete({ sessionId: current.sessionId, id: current.id })
+            if (!access(current.sessionId)) throw new Error('The scheduled-task request is no longer active.')
+            return { id: current.id, deleted: result.deleted, title: current.title }
           },
           presentCall: (args) => ({ card: 'generic', title: `Delete scheduled task ${args.id || ''}`, kind: 'delete', rawInput: args }),
         }),
@@ -302,7 +328,7 @@ export function apply(ctx: Context): void {
             } else {
               lines.push('', 'You remember nothing about the person yet; when they tell you something they will expect you to know next time, keep it with remember.')
             }
-            lines.push('', "Scheduled tasks belong to the person, not to one chat: a task runs in the chat it was made in, and every chat can see and stop it. Before schedule_create, call schedule_list_all; when the same task already exists in another chat, say so and do not make it again. When the person asks what tasks they have, answer from schedule_list_all, not schedule_list.")
+            lines.push('', "A scheduled task runs in the chat it was made in. Use schedule_list_all to see tasks across accessible chats in the current account. schedule_delete_any requires approval before deleting a task. Before schedule_create, call schedule_list_all; when the same task already exists in another chat, say so and do not make it again. When the person asks what tasks they have, answer from schedule_list_all, not schedule_list.")
             // the words under the face: the person watches the step's own description there
             lines.push('', `Where a tool takes a \`description\` or \`step\` argument (bash, pwsh, run_code, the computer_* tools), write there what the step does for the person, in ${languageName(rooms.lang)}, in a few words ("打开携程网站", "Check the login page") — it is shown under your face while the tool runs. Fill it in on every such call.`)
             return lines.join('\n')

@@ -646,12 +646,14 @@ prompt as a user bubble, for as long as the batch ran. A `nanomuse-feed` fence t
 writes in any chat (the phone's way of posting) lands in the Feed too and shows as a
 *Posted to your feed* card.
 
-Scheduled tasks belong to you, not to one chat. Each runs in the chat it was made in (the
-harness's schedule plugin delivers it there, and restores that chat if it is closed), but
-the agent sees and stops every chat's tasks: `schedule_list_all` lists the active tasks of
-all chats with the chat each runs in, and `schedule_delete_any` deletes one by its id,
-whichever chat holds it. Before it creates a task the agent checks that list, so asking
-for the same reminder in a second chat no longer makes a second copy that runs twice.
+Scheduled tasks run in the chat where they were created. The harness's schedule plugin
+delivers each reminder there, restoring the chat if it is closed. `schedule_list_all`
+lets the agent see active tasks across accessible chats in the current account, including
+each task's chat. Cleared chats and chats known to belong to another account are excluded.
+`schedule_delete_any` requests approval before deleting a task from another chat or this
+one. A rejected request leaves it in place. The agent is instructed to check the catalogue
+before creating a task, which helps it notice an existing reminder; this does not enforce
+uniqueness when separate requests create tasks concurrently.
 
 ## The hamburger
 
