@@ -415,7 +415,11 @@ class MuseAgent:
         else:
             cutoff = len(msgs) - limit
             # Never start in the middle of a tool exchange: advance to the next user message.
-            while cutoff < len(msgs) and msgs[cutoff].role != Role.USER:
+            # The step-limit wrap-up prompt is not a boundary: cutting there would leave the
+            # next turn only the wrap-up, none of the work it sums up.
+            while cutoff < len(msgs) and (
+                msgs[cutoff].role != Role.USER or msgs[cutoff].meta.get("wrap_up")
+            ):
                 cutoff += 1
             if cutoff >= len(msgs) or all(m.role != Role.USER for m in msgs[cutoff + 1 :]):
                 # A single long turn can fill the window, and after one the next user
@@ -511,6 +515,8 @@ class MuseAgent:
         # and so do the previous turn's.
         present = {m.meta.get("request_id") for m in window}
         window = [m for m in protected if m.meta.get("request_id") not in present] + window
+        # pinned requests may carry pictures: the cap counts them too
+        window = keep_newest_images(window, self.settings.agent.max_context_images)
         return fit_context(
             [Message.system(system_prompt), *window],
             tools,
@@ -682,6 +688,7 @@ class MuseAgent:
                 # The window is taken before the prompt joins the history: as the newest
                 # user message it would be the cutoff, and the wrap-up would see no work.
                 wrap_up = Message.user(prompts.MAX_STEPS_PROMPT)
+                wrap_up.meta["wrap_up"] = True
                 context = self._request_context(system_prompt, None, wrap_up)
                 self.messages.append(wrap_up)
                 response = await task_budget.ask(
