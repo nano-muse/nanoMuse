@@ -395,6 +395,14 @@ timeout_seconds = 1.5    # past this the run starts without a decision
 model = ""               # empty: the [llm] slot as configured; a name decides on that model instead
 
 # ------------------------------------------------------------------------------
+# The squad task ledger (experimental): dispatches a formed squad makes
+# are written to squad.db in the data directory (docs/configuration.md)
+# ------------------------------------------------------------------------------
+[squad]
+max_depth = 2            # how deep one task tree may go; a root is depth 0
+max_per_root = 0         # assignments per task tree; 0 means no cap at this level
+
+# ------------------------------------------------------------------------------
 # The hub: this computer as one of the account's devices (docs/hub.md)
 # ------------------------------------------------------------------------------
 [hub]

@@ -496,6 +496,16 @@ model           = ""       # empty: the [llm] slot as configured
 
 An experimental fast decision layer. With it on, each run first asks the configured model slot (at temperature 0) to score the task's difficulty; the answer's probability distribution is validated, the call is recorded in the cost ledger under its own model, and one line lands in `decider-log.jsonl` in the data directory: the score, the top probability and its margin, the latency, and a hash of the message, never the message itself. The score changes nothing about the run: shadow mode only observes, so the threshold is a line in the log (which tier the score would have picked), not a switch. Any failure (no key, a timeout, an answer that does not validate) is logged as its kind and the run proceeds exactly as before. The layer never approves or refuses anything; that stays with the Sentinel.
 
+## `[squad]`
+
+```toml
+[squad]
+max_depth    = 2   # how deep one task tree may go; a root is depth 0
+max_per_root = 0   # assignments per task tree; 0 means no cap at this level
+```
+
+The squad's task ledger, `squad.db` in the data directory. When a squad is formed with a store, each dispatch is written down as an assignment under a root for the squad, past four enqueue guards: the parent must still be open, work never flows back to an ancestor, an open brief is never handed out twice under the same parent, and depth stays within `max_depth`. `max_per_root` caps the size of one task tree and counts assignments only; money stays with the `[cost]` ledger and its monthly budget gate, the second of the two levels. Assignments carry a seven-state lifecycle and a terminal state is written once, by settling, never revised. When the server starts with a ledger on disk it reconciles it once: an assignment the cost ledger shows already spent on a model call is settled as interrupted and never handed out again, and one with no such record is spared exactly one restart. Forming a squad, recording a dispatch, and the reconcile are all that exist so far; nothing runs a recorded assignment yet.
+
 ## `[server]`
 
 ```toml

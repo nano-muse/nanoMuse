@@ -756,6 +756,23 @@ class DeciderSettings(BaseModel):
     model: str = ""
 
 
+class SquadSettings(BaseModel):
+    """The squad task ledger (experimental).
+
+    When a squad is formed with a store, its dispatches are written
+    to ``squad.db`` in the data directory as assignments, past the
+    ledger's enqueue guards.  ``max_depth`` caps how deep one task
+    tree may go (a root is depth 0).  ``max_per_root`` caps how many
+    assignments one root's tree may hold; 0 means no cap at this
+    level.  The cap counts assignments only: real spend stays with
+    the cost ledger and its monthly budget gate, which is the second
+    of the two levels and the one that refuses on money.
+    """
+
+    max_depth: int = Field(default=2, ge=0)
+    max_per_root: int = Field(default=0, ge=0)
+
+
 class Settings(BaseModel):
     data_dir: Path = DEFAULT_DATA_DIR
     log_level: str = "INFO"
@@ -779,6 +796,7 @@ class Settings(BaseModel):
     server: ServerSettings = Field(default_factory=ServerSettings)
     cost: CostSettings = Field(default_factory=CostSettings)
     decider: DeciderSettings = Field(default_factory=DeciderSettings)
+    squad: SquadSettings = Field(default_factory=SquadSettings)
     # Where the settings came from (informational).
     source: str | None = None
 
@@ -809,6 +827,10 @@ class Settings(BaseModel):
     @property
     def decider_log_file(self) -> Path:
         return self.data_dir / "decider-log.jsonl"
+
+    @property
+    def squad_db(self) -> Path:
+        return self.data_dir / "squad.db"
 
     @property
     def reminders_db(self) -> Path:
