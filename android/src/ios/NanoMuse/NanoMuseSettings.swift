@@ -245,9 +245,11 @@ enum NanoMuseLinks {
 
 /// Settings → Computers: this phone on the hub, the other devices, and what can be asked of them.
 struct NanoMuseComputersView: View {
+    var onDeviceChat: ((HubDevice) -> Void)?
+
     var body: some View {
         List {
-            NanoMuseDevicesSection()
+            NanoMuseDevicesSection(onDeviceChat: onDeviceChat)
             NanoMuseReachSection()
         }
         .navigationTitle(AppLocalized("Computers"))

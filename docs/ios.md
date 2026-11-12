@@ -41,6 +41,19 @@ The rules of [CONTRIBUTING.md](../CONTRIBUTING.md) apply unchanged: new code in 
 the `NanoMuse/` folder), an edit inside an upstream Swift file carries a `// nanoMuse:` comment,
 and rebranding is the script, never a hand edit.
 
+## Device chats
+
+In the Muse layout, open **New Chat** and choose one of your account's devices. You can also
+start a device chat under **Computers** in the chat drawer. Reopen it from **Side chats**.
+Follow-ups go to the selected device, and each device chat has its own context and draft.
+You can create the chat while the target is offline. Sending requires the target to be online
+and support `task.status`.
+
+A leading `@Device Name` delegates that turn to another compatible device. Use
+`@Device Name [device-id]` if two devices have the same name. After a disconnect, reopening the
+chat or tapping **Refresh** checks the saved turn on the target. The iPhone keeps the transcript
+on the initiating device. See [the Hub protocol](hub.md#persistent-device-conversations).
+
 ## What is nanoMuse here
 
 Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pull):

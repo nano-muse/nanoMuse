@@ -807,7 +807,7 @@ struct AIChatView: View {
         .alert(AppLocalized("Task Running"), isPresented: $showNewChatStopConfirm) {
             Button(AppLocalized("Stop & New Chat"), role: .destructive) {
                 vm.cancel()
-                NotificationCenter.default.post(name: .newChatRequested, object: nil)
+                NotificationCenter.default.post(name: .newChatRequested, object: "menu") // nanoMuse: offer the destination picker
             }
             Button(AppLocalized("Cancel"), role: .cancel) {}
         } message: {
@@ -1932,7 +1932,7 @@ struct AIChatView: View {
         if vm.isProcessing {
             showNewChatStopConfirm = true
         } else {
-            NotificationCenter.default.post(name: .newChatRequested, object: nil)
+            NotificationCenter.default.post(name: .newChatRequested, object: "menu") // nanoMuse: offer the destination picker
         }
     }
 

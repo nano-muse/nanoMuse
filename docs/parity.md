@@ -362,11 +362,11 @@ notes above; a settled item keeps its number and says how it went.
     own providers on a DashScope host (Alibaba Cloud Bailian), since the
     iPhone's image and clip code speaks DashScope's API only. *Proposal:* the card on the web,
     and the OpenAI image shape on the iPhone, when someone asks.
-41. **Start a conversation on another device (#815).** Android and desktop now offer the
-    destination picker in the normal *New chat* flow as well as under *Devices*. Identity is
-    keyed by device ID and shown separately from availability; an offline or older device can
-    keep its own draft without local execution or automatic resend. iOS and web can continue to
-    use the same Hub task contract, but do not yet have this destination picker.
+41. **Start a conversation on another device (#815).** Android, desktop and iPhone offer the
+    destination picker in *New chat*. The iPhone also offers this from *Computers* in the Muse
+    chat drawer. Each chat remembers the target's device ID, even when the target is offline,
+    and keeps its own draft. Android and desktop can host persistent tasks. The iPhone can
+    start them on a supported device.
 
 ## Keeping this true
 
