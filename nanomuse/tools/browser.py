@@ -285,8 +285,10 @@ class Browser(BaseTool):
         if self.on_frame is None:
             return
         try:
-            jpeg = await backend.screenshot(self.frame_quality)
             url = await backend.url()
+            if not by_user and not await self._url_allowed(url):
+                return
+            jpeg = await backend.screenshot(self.frame_quality)
             title = await backend.title()
         except Exception as exc:  # noqa: BLE001
             logger.debug("browser frame: {}", exc)
@@ -432,6 +434,11 @@ class Browser(BaseTool):
                 )
             await self._frame(backend, f"Opened {host_of(url) or url}")
             return await self._state(backend, brief=True)
+        current_url = await backend.url()
+        if not await self._url_allowed(current_url):
+            return ToolResult.fail(
+                f"refusing to operate a page whose URL is a private or local address: {current_url}"
+            )
         if action == "extract":
             await self._frame(backend, "Read the page")
             return await self._state(backend, brief=False)
@@ -497,13 +504,18 @@ class Browser(BaseTool):
         return ToolResult.fail(f"unknown action '{action}'")
 
     async def _url_allowed(self, url: str) -> bool:
-        """Whether a browser network request stays on globally routable HTTP(S)."""
+        """Whether a URL is a public network request or an in-memory browser resource."""
         try:
-            scheme = urlparse(url).scheme.lower()
+            parsed = urlparse(url)
         except ValueError:
             return False
-        if scheme not in ("http", "https", "ws", "wss"):
+        scheme = parsed.scheme.lower()
+        if scheme == "about":
+            return not parsed.netloc and parsed.path in ("blank", "srcdoc")
+        if scheme in ("data", "blob"):
             return True
+        if scheme not in ("http", "https", "ws", "wss"):
+            return False
         host = host_of(url)
         if not host:
             return False
@@ -528,7 +540,11 @@ class Browser(BaseTool):
             if location is None:
                 break
             next_host = host_of(location)
-            if next_host is None or await asyncio.to_thread(_is_private_host, next_host):
+            if (
+                urlparse(location).scheme.lower() not in ("http", "https")
+                or next_host is None
+                or await asyncio.to_thread(_is_private_host, next_host)
+            ):
                 return ToolResult.fail(
                     f"refusing to follow a redirect to a private or local address: {location}"
                 )

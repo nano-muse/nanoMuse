@@ -17,8 +17,25 @@ internal class DeviceConversations(
 
     fun list(): List<JSONObject> = synchronized(lock) { read() }
 
+    fun draft(id: String): String = find(id).optString("draft")
+
+    fun saveDraft(id: String, text: String) {
+        update { rows ->
+            rows.onEach { chat -> if (chat.getString("id") == id) chat.put("draft", text) }
+        }
+    }
+
+    /** Clear only the submitted draft; edits made while the target works are newer data. */
+    fun clearDraftIfUnchanged(id: String, submitted: String) {
+        update { rows ->
+            rows.onEach { chat ->
+                if (chat.getString("id") == id && chat.optString("draft") == submitted) chat.put("draft", "")
+            }
+        }
+    }
+
     fun create(device: Device): JSONObject {
-        requireDevice(device.id)
+        if (devices().none { it.id == device.id }) throw HubException("not_found", "The device is no longer on this account")
         val chat = JSONObject().put("id", UUID.randomUUID().toString()).put("device", device.id)
             .put("name", device.name).put("kind", device.kind).put("turns", JSONArray())
         update { it + chat }

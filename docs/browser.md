@@ -59,6 +59,10 @@ The tool's actions, identical on both backends:
 the final URL after navigation, so `localhost`, private addresses and a public URL that
 redirects into the local network are refused. The Playwright backend also repeats the check
 immediately before browser requests continue, narrowing the DNS check-to-connect window.
+Local file and custom browser schemes are refused before the agent reads, screenshots or
+operates the current page. Blank and inline documents (`about:blank`, `about:srcdoc`),
+data URLs and blob resources remain available. The browser's `fetch` follows HTTP(S)
+redirects only. The user's own take-over view continues to show the page they are using.
 
 Every action that changes the page sends a frame to the chat: a JPEG of the page, its title and URL, and a caption of what just happened ("Clicked 'Sign in'"). Frames are the size of the profile's viewport in CSS pixels, so a point on the picture is the same point on the page; the take-over relies on that. They stay in memory on the server for the session; the last dozen per chat.
 

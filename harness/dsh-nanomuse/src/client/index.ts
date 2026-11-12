@@ -52,7 +52,7 @@ import { SKILLS_SECTION, makeSkillsSection } from './Skills.tsx'
 import { DICTATION_SECTION, FILES_SECTION, makeDictationSection, makeFilesSection, makePermissionsSection, PERMISSIONS_SECTION } from './Pages.tsx'
 import { makeTurnError } from './RefusalCard.tsx'
 import { CHANNELS_SECTION, COMPUTER_SECTION, createShellStore, DATA_SECTION, HARNESS_SECTION, HELP_SECTION, LEGAL_SECTION, makeGeneralSection, makeHarnessSection, MuseSettings, STORAGE_SECTION, WALLET_SECTION, type MuseSettingsProps, type OnboardingStep, type SectionRow } from './MuseSettings.tsx'
-import { MuseSidebar, type MuseSidebarProps, type PanelMeta } from './MuseSidebar.tsx'
+import { MuseSidebar, requestNewChatPicker, type MuseSidebarProps, type PanelMeta } from './MuseSidebar.tsx'
 import { makeOnboarding, type OnboardingOwnerProps } from './Onboarding.tsx'
 import { DEVICES_PANEL, FEED_PANEL, GOALS_PANEL, IDEAS_PANEL, ISSUES_URL, LIBRARY_PANEL } from './panels.ts'
 import { getPrefs, recordApproval, subscribePrefs, usePrefs } from './prefs.ts'
@@ -295,7 +295,7 @@ export function apply(ctx: ClientContext): void {
     layout.selectPanel(id)
   }
   const sidebarInjected = () => ({
-    startSession: () => { workspaces.startSession() },
+    startSession: requestNewChatPicker,
     toggleSidebar: () => { layout.toggleSidebar() },
     selectPanel,
     openSettings,

@@ -353,7 +353,7 @@ interface ScheduleLike {
   list(request: { sessionId: SessionId }): Promise<ScheduleRecordLike[]>
   delete(request: { sessionId: SessionId; id: string }): Promise<unknown>
 }
-interface ScheduleRecordLike {
+export interface ScheduleRecordLike {
   id: string
   kind: string
   title: string
@@ -2310,7 +2310,7 @@ function categoryLabel(category: Category, zh: boolean): string {
   return labels[category][zh ? 1 : 0]
 }
 
-function ruleOf(r: ScheduleRecordLike): string {
+export function ruleOf(r: ScheduleRecordLike): string {
   const hhmm = (t: string | undefined) => (t ?? '').slice(0, 5)
   switch (r.kind) {
     case 'daily':
