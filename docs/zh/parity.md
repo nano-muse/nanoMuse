@@ -156,6 +156,7 @@ nanoMuse 在手机（Android、iOS）、电脑和浏览器中提供同一个智�
 38. **界面语言**。手机跟随系统，Android 为 17 种、iOS 为 9 种；网页可在 App 中选择自动、en、zh-CN；桌面通过 harness 语言设置支持英文、中文。提议按用户需求扩展桌面 `locales.ts`，先考虑 de（德语）和 ja（日语）；手机应用内语言覆盖由上游决定。
 39. **网页首次对话**。已与手机交互一致，由运行时保存状态。`nanomuse/server/firstrun.py` 管理阶段、附加提示词和存储，状态在资料旁的 `firstrun.json`；`nanomuse/fences.py` 解析代码块；路由为 `/api/firstrun*`，WebSocket 消息为 `firstrun`。`web/src/components/FirstConversation.tsx` 显示三句开场和起名卡片，引导清单已移除单独的「认识你的 nanoMuse」页。称呼同时写入资料和「Call them: …」记忆，运行时不使用 USER.md。身份表单仍在设置中供后续修改。约定补充保存点击「开始」时的 `lang`，保证模型附加提示中的开场与用户看到的一致。完整流程见 [web.md](web.md#the-first-run-and-the-chat-s-opening)。
 40. **四项模型用途设置，0.1.41**。Android、iOS 和桌面使用统一模型页，保存 key 后提供「用它来做什么」，自有模型对话或屏幕失败后提供「这次改用 nanoMuse Cloud」。网页在「连接」中提供同样四项，由 `PUT /api/connections/gui`、`/image`、`/video` 配置，均支持「自动」，1.0.1 起也支持失败轮次改用 Cloud。网页暂未提供用途卡片，自有 key 表单设置对话来源，图片和视频在各自行配置。项目托管 Cloud 不提供媒体生成。iOS 图片和视频目前仅支持 DashScope API，因此只列阿里云百炼等 DashScope 地址上的自有服务商。后续可按需求补网页用途卡片和 iPhone 的 OpenAI 图片接口。
+41. **在其他设备上开始对话（#815）**。Android 和桌面版的普通「新建对话」流程及「设备」页面均可选择目标设备。身份使用稳定的设备 ID，与在线状态分开显示。离线或旧版设备可以保留独立草稿，不会改成本机执行，也不会自动重发。iOS 和网页仍可使用相同 Hub 任务协议，但尚无此目标选择器。
 
 ## 如何维护这份对照表 {#keeping-this-true}
 

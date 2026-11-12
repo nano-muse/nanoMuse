@@ -8,6 +8,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
 
+- Added device-bound conversation choices to the standard new-chat flow on Android and desktop; offline or older devices keep a selectable route for drafts without local fallback or automatic resend. For #815.
+
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
 - Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
 - Matched Android persistent task replies and stop requests to their original turn, and rejected blocked, empty or errored runs instead of returning an older answer or stopping later work.
@@ -45,6 +47,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
+
+- Refused local-file and custom-scheme pages before browser tool reads, screenshots and actions, limited blank-page aliases to `about:blank` and `about:srcdoc`, and kept browser fetch redirects on HTTP(S). In-memory data and blob resources and the user's take-over view remained available. For #339.
 
 - Added optional observation-only permission reviews to the Python runtime, using the active chat model or a separately configured model, with bounded requests and redacted audit records. For #724.
 
@@ -127,6 +131,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Let the agent list accessible scheduled tasks across chats and request approval to delete one, with guidance to check existing tasks before creating another. For #905.
+
 - Documented launching the Linux AppImage with a separate self-hosted relay profile. For #895.
 
 - Preserved own-provider deletions made in Advanced settings across restarts, and kept loaded empty chat catalogs disabled without removing saved keys or unrelated sources. For #889.
@@ -192,6 +198,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Android
 
 - Disclosed every enabled skill with up to 1024 Unicode description characters, preserved imported SKILL.md metadata, parsed quoted and nested frontmatter correctly, and accepted non-ASCII skill names. For #912.
+- Kept device-chat drafts edited while another turn was running, and made long device and bound-conversation lists scrollable. For #815.
 - Paused automatic following as soon as a person scrolled towards older messages, and kept new reply chunks, tool cards and keyboard layout changes from resuming it. For #898.
 - Reserved output space before summarizing long conversations, so nearly full inputs were split instead of leaving the summary only a few output tokens. For #719.
 - Added progress rings to active main and side chats in the Muse drawer, using this phone's existing task tracking while preserving unread reply markers. Approval and per-chat step indicators remain separate work. For #531.

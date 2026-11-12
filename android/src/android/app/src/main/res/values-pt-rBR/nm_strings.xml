@@ -1267,6 +1267,7 @@
     <string name="nm_mcp_oauth_token_failed">Falha ao entrar no conector (%1$s). Verifique a conexão e as configurações do OAuth e tente novamente.</string>
     <string name="nm_device_chats">Conversas em equipamentos</string>
     <string name="nm_device_chat_start">Conversar neste equipamento</string>
+    <string name="nm_device_chat_here">Neste equipamento</string>
     <string name="nm_device_chat_uncertain">Entrega incerta. Consultando o resultado no equipamento.</string>
     <string name="nm_device_chat_interrupted">Interrompido. O equipamento pode já ter executado algumas ações.</string>
 </resources>

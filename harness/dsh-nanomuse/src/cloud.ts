@@ -1589,6 +1589,37 @@ export default class NanomuseCloud extends Service {
     return list?.find((r) => r.id === scheduleId)?.title.slice(0, 80) ?? ''
   }
 
+  /** A chat's title as the chats column shows it; '' when it cannot be read. */
+  async chatTitle(sessionId: string): Promise<string> {
+    const access = this.scheduleSessionAccess(sessionId)
+    if (!access(sessionId)) return ''
+    const ctx = this.sessionCtx
+    const title = ctx ? await this.sessionTitle(ctx, sessionId as SessionId, Date.now()).catch(() => '') : ''
+    return access(sessionId) ? title : ''
+  }
+
+  /** A schedule operation keeps its caller and account while it awaits storage or approval. */
+  scheduleSessionAccess(caller: string): (sessionId: string) => boolean {
+    const epoch = this.accountEpoch
+    const account = this.state.account?.id ?? ''
+    const visible = (sessionId: string): boolean => {
+      if (!sessionId || this.isClearedSession(sessionId)) return false
+      const seen = new Set<string>()
+      let id: string | undefined = sessionId
+      while (id && !seen.has(id)) {
+        seen.add(id)
+        const owner = this.state.sync?.owners?.[id]
+        if (owner && owner !== account) return false
+        const header: Session['header'] | undefined = this.sessionCtx?.sessions.get(id as SessionId)?.header
+        id = header?.origin === 'subagent' ? header.parentSession : undefined
+      }
+      return true
+    }
+    return (sessionId) => epoch === this.accountEpoch && !this.changingAccount
+      && !this.state.accountTransition && (this.state.account?.id ?? '') === account
+      && visible(caller) && visible(sessionId)
+  }
+
   async revokeGrant(id: string): Promise<boolean> {
     const before = this.state.grants?.length ?? 0
     const grants = (this.state.grants ?? []).filter((g) => g.id !== id)
@@ -4491,6 +4522,7 @@ export default class NanomuseCloud extends Service {
         const chats = this.deviceConversations()
         const id = String(body.id ?? '')
         if (body.action === 'create') return send(res, 200, await chats.create(String(body.device ?? '')))
+        if (body.action === 'draft') return send(res, 200, await chats.saveDraft(id, String(body.text ?? '')))
         if (body.action === 'send') return send(res, 200, await chats.send(id, String(body.text ?? '')))
         if (body.action === 'refresh') return send(res, 200, await chats.refresh(id))
         if (body.action === 'stop') return send(res, 200, { stopped: await chats.stop(id) })

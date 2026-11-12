@@ -530,3 +530,109 @@ async def test_fetch_checks_every_redirect_hop(tmp_path: Path, monkeypatch):
     res = await tool.execute(action="fetch", url="https://shop.example/inside")
     assert not res.ok and "redirect to a private or local address" in (res.error or "")
     assert not any(c[1][0].startswith("http://169.254") for c in backend.calls if c[0] == "fetch")
+
+
+async def test_url_guard_refuses_local_file_and_disallowed_schemes(tmp_path: Path):
+    """The browser SSRF guard refuses file:// and other local/custom schemes, while permitting
+    subresource and in-memory schemes (about, data, blob) and globally routable HTTP(S)."""
+    tool = Browser(workspace=tmp_path)
+    assert not await tool._url_allowed("file:///etc/passwd")
+    assert not await tool._url_allowed("file:///C:/Windows/System32/drivers/etc/hosts")
+    assert not await tool._url_allowed("javascript:alert(1)")
+    assert not await tool._url_allowed("chrome://settings")
+    assert not await tool._url_allowed("about:config")
+    assert not await tool._url_allowed("about:downloads")
+    assert not await tool._url_allowed("http://127.0.0.1:8080")
+    assert not await tool._url_allowed("http://localhost:3000")
+    assert await tool._url_allowed("about:blank")
+    assert await tool._url_allowed("about:blank#fragment")
+    assert await tool._url_allowed("about:srcdoc")
+    assert await tool._url_allowed("data:image/png;base64,iVBORw0KGgo=")
+    assert await tool._url_allowed("blob:https://example.com/f00b4r")
+    assert await tool._url_allowed("https://example.com")
+
+
+async def test_navigate_refuses_landing_on_local_file(tmp_path: Path):
+    """A navigation whose final URL lands on file:// is refused before reading the DOM."""
+    backend = FakeBackend()
+    tool, _ = tool_with(backend, tmp_path)
+
+    async def goto_file(_url: str) -> None:
+        backend.page_url = "file:///etc/passwd"
+        backend.page_title = "passwd"
+
+    backend.goto = goto_file  # type: ignore[method-assign]
+    res = await tool.execute(action="navigate", url="https://example.com")
+    assert not res.ok
+    assert "refusing a navigation whose final URL is a private or local address" in (
+        res.error or ""
+    )
+    assert "file:///etc/passwd" in (res.error or "")
+
+
+@pytest.mark.parametrize(
+    "action,args",
+    [
+        ("extract", {}),
+        ("screenshot", {}),
+        ("click", {"index": 0}),
+        ("type", {"index": 1, "text": "input"}),
+        ("press", {"key": "Enter"}),
+        ("scroll", {}),
+        ("back", {}),
+        ("wait", {}),
+    ],
+)
+async def test_actions_do_not_read_or_operate_a_blocked_page(
+    tmp_path: Path, action: str, args: dict[str, Any]
+) -> None:
+    backend = FakeBackend()
+    backend.page_url = "file:///fixture-page.html"
+    tool, frames = tool_with(backend, tmp_path)
+    result = await tool.execute(action=action, **args)
+    assert not result.ok
+    assert not backend.calls and not frames
+    assert not (tmp_path / "screenshots").exists()
+
+
+async def test_click_landing_on_a_blocked_page_does_not_export_a_frame(tmp_path: Path) -> None:
+    backend = FakeBackend()
+    backend.page_url = "https://example.com"
+    tool, frames = tool_with(backend, tmp_path)
+
+    async def click(_x: float, _y: float) -> None:
+        backend.page_url = "file:///fixture-page.html"
+
+    backend.click_at = click  # type: ignore[method-assign]
+    result = await tool.execute(action="click", index=0)
+    assert not result.ok and not frames
+    assert not any(name == "screenshot" for name, _ in backend.calls)
+
+
+async def test_user_can_still_view_their_own_page_during_takeover(tmp_path: Path) -> None:
+    backend = FakeBackend()
+    backend.page_url = "file:///fixture-page.html"
+    tool, frames = tool_with(backend, tmp_path)
+    await tool.user_action("look", "main")
+    assert frames and frames[-1].by_user
+    assert frames[-1].url == backend.page_url
+    assert not (await tool.execute(action="screenshot")).ok
+
+
+@pytest.mark.parametrize(
+    "location", ["file://example.com/fixture-page.html", "ftp://example.com/fixture.txt"]
+)
+async def test_fetch_refuses_non_http_redirect_before_calling_the_backend(
+    tmp_path: Path, location: str
+) -> None:
+    backend = FakeBackend()
+    tool, _ = tool_with(backend, tmp_path)
+
+    async def fetch(url: str, **_kwargs: Any) -> dict[str, Any]:
+        backend.calls.append(("fetch", url))
+        return {"status": 302, "headers": {"location": location}, "url": url}
+
+    backend.fetch = fetch  # type: ignore[method-assign]
+    result = await tool.execute(action="fetch", url="https://example.com/redirect")
+    assert not result.ok
+    assert backend.calls == [("fetch", "https://example.com/redirect")]

@@ -1274,6 +1274,7 @@
     <string name="nm_mcp_oauth_token_failed">Logowanie do łącznika nie powiodło się (%1$s). Sprawdź połączenie i ustawienia OAuth, a następnie spróbuj ponownie.</string>
     <string name="nm_device_chats">Rozmowy na urządzeniach</string>
     <string name="nm_device_chat_start">Rozmawiaj na tym urządzeniu</string>
+    <string name="nm_device_chat_here">Na tym urządzeniu</string>
     <string name="nm_device_chat_uncertain">Niepewne dostarczenie. Sprawdzanie wyniku na urządzeniu.</string>
     <string name="nm_device_chat_interrupted">Przerwano. Urządzenie mogło już wykonać niektóre działania.</string>
 </resources>
