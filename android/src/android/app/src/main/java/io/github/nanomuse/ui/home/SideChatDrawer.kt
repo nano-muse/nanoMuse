@@ -7,6 +7,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -250,7 +252,7 @@ fun SideChatDrawer(
                 color = nmMuted,
                 modifier = Modifier.padding(start = 26.dp, end = 12.dp, top = 14.dp, bottom = 4.dp),
             )
-            Column(Modifier.heightIn(max = 200.dp).fillMaxWidth()) {
+            Column(Modifier.heightIn(max = 200.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 visibleDeviceChats.forEach { row ->
                     val id = row.getString("id")
                     val deviceId = row.getString("device")

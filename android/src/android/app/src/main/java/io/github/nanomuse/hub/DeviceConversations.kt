@@ -25,6 +25,15 @@ internal class DeviceConversations(
         }
     }
 
+    /** Clear only the submitted draft; edits made while the target works are newer data. */
+    fun clearDraftIfUnchanged(id: String, submitted: String) {
+        update { rows ->
+            rows.onEach { chat ->
+                if (chat.getString("id") == id && chat.optString("draft") == submitted) chat.put("draft", "")
+            }
+        }
+    }
+
     fun create(device: Device): JSONObject {
         if (devices().none { it.id == device.id }) throw HubException("not_found", "The device is no longer on this account")
         val chat = JSONObject().put("id", UUID.randomUUID().toString()).put("device", device.id)

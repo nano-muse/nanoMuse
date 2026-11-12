@@ -631,6 +631,12 @@ Recovered environment-variable metadata also refreshes the running app when the 
 
 ## Direct tasks to another device
 
+New chat lets you choose this phone or another device of the same account. Choosing another
+device creates an independent conversation bound to its device ID; the destination picker and
+the device-chat section in the drawer scroll when their lists are long. Offline destinations
+keep the conversation and its draft, but sending waits for a compatible online device. Drafts
+are saved per conversation, including text edited while an earlier request is still running.
+
 Start a message with `@Device name` to send its text directly to that device over the Hub. The local model does not spend a turn deciding how to delegate. The remote device uses its own model, tools and configuration. This is one task, not a persistent execution destination for subsequent messages.
 
 The chat shows the device name, tool steps and response text while they arrive. Partial text replaces the current segment instead of adding duplicate messages. Destinations that do not stream still return their final answer. Approvals use the same local cards and scoped grants as model-delegated tasks; Stop cancels this call on the destination and withdraws its pending cards.

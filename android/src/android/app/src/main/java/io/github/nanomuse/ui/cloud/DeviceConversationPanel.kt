@@ -76,7 +76,7 @@ internal fun DeviceConversationPanel(
             if (routeOnly) onClose() else selected = ""
             return
         }
-        scope.launch {
+        run {
             withContext(Dispatchers.IO) { service.saveDraft(id, drafts[id].orEmpty()) }
             if (routeOnly) onClose() else selected = ""
         }
@@ -103,7 +103,11 @@ internal fun DeviceConversationPanel(
     LaunchedEffect(service, draftId, draftValue) {
         if (draftId.isBlank()) return@LaunchedEffect
         delay(250)
-        withContext(Dispatchers.IO) { service.saveDraft(draftId, draftValue) }
+        try {
+            withContext(Dispatchers.IO) { service.saveDraft(draftId, draftValue) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) { error = true }
     }
 
     if (!routeOnly) {
@@ -184,7 +188,7 @@ internal fun DeviceConversationPanel(
                         try {
                             save(withContext(Dispatchers.IO) {
                                 service.saveDraft(id, text)
-                                service.send(id, text).also { service.saveDraft(id, "") }
+                                service.send(id, text).also { service.clearDraftIfUnchanged(id, text) }
                             })
                             if (drafts[id] == text) drafts[id] = ""
                         } finally { sending = false }

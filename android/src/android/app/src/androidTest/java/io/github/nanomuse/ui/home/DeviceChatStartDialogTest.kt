@@ -3,6 +3,8 @@ package io.github.nanomuse.ui.home
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.nanomuse.hub.Device
 import org.junit.Assert.assertEquals
@@ -13,6 +15,17 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class DeviceChatStartDialogTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun aLongDestinationListKeepsTheLastDeviceReachable() {
+        val devices = (1..24).map { device("desk-$it", "Desk $it", online = true, persistent = true) }
+        var selected = ""
+        compose.setContent {
+            DeviceChatStartDialog(devices, onLocal = {}, onDevice = { selected = it.id }, onDismiss = {})
+        }
+        compose.onNodeWithTag("device-chat-target:desk-24")
+            .performScrollTo().assertIsDisplayed().performClick()
+        assertEquals("desk-24", selected)
+    }
 
     @Test fun localChoiceStartsALocalChat() {
         var local = false

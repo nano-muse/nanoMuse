@@ -6,6 +6,42 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DeviceConversationsTest {
+    @Test fun clearingASubmittedDraftPreservesAnEditMadeDuringTheRemoteRun() {
+        var disk = "[]"
+        val desk = Device("desk", "Desk", "computer", "", "", true, listOf("task.status"), 0)
+        lateinit var service: DeviceConversations
+        lateinit var chat: String
+        fun reopen() = DeviceConversations(
+            devices = { listOf(desk) }, load = { disk }, persist = { disk = it },
+            invoke = { _, _, _ ->
+                service.saveDraft(chat, "A follow-up written while waiting")
+                JSONObject().put("state", "completed").put("text", "Done")
+            },
+        )
+        service = reopen()
+        chat = service.create(desk).getString("id")
+        service.saveDraft(chat, "Submitted prompt")
+        service.send(chat, "Submitted prompt")
+        service.clearDraftIfUnchanged(chat, "Submitted prompt")
+        assertEquals("A follow-up written while waiting", reopen().draft(chat))
+    }
+
+    @Test fun clearingAnUnchangedSubmittedDraftDoesNotTouchAnotherConversation() {
+        var disk = "[]"
+        val desk = Device("desk", "Desk", "computer", "", "", true, listOf("task.status"), 0)
+        val service = DeviceConversations(
+            devices = { listOf(desk) }, load = { disk }, persist = { disk = it },
+            invoke = { _, _, _ -> error("Saving a draft must not dispatch") },
+        )
+        val first = service.create(desk).getString("id")
+        val second = service.create(desk).getString("id")
+        service.saveDraft(first, "Submitted prompt")
+        service.saveDraft(second, "Other draft")
+        service.clearDraftIfUnchanged(first, "Submitted prompt")
+        assertEquals("", service.draft(first))
+        assertEquals("Other draft", service.draft(second))
+    }
+
     @Test fun recoveringAnUncertainTurnOnlyQueriesTheOriginalTarget() {
         var disk = "[]"
         val actions = mutableListOf<String>()
