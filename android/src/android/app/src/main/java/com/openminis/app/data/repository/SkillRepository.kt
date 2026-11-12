@@ -176,7 +176,7 @@ class SkillRepository(private val context: Context) {
         )
 
         // nanoMuse: malformed legacy frontmatter must fail before changing saved metadata.
-        val prepared = prepareSkillMd(updated, sourceContent) ?: return false
+        val prepared = prepareSkillMd(updated, sourceContent, preserveBody = body == null) ?: return false
         db.execSQL(
             "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
             arrayOf<Any>(updated.name, updated.description, updated.version, updated.updatedAt, id)
@@ -763,7 +763,7 @@ class SkillRepository(private val context: Context) {
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return false
         // nanoMuse: quote a renamed value and retain the rest of the imported frontmatter.
-        if (!writeSkillMd(current.copy(name = trimmed))) return false
+        if (!writeSkillMd(current.copy(name = trimmed), preserveBody = true)) return false
         val refreshed = current.copy(name = trimmed, updatedAt = System.currentTimeMillis())
         db.execSQL(
             "UPDATE skills SET name=?, updated_at=? WHERE id=?",
@@ -1331,18 +1331,19 @@ class SkillRepository(private val context: Context) {
     }
 
     // nanoMuse: edits retain existing unknown fields; imports are saved verbatim.
-    private fun prepareSkillMd(skill: Skill, sourceContent: String? = null): String? = try {
+    private fun prepareSkillMd(skill: Skill, sourceContent: String? = null, preserveBody: Boolean = false): String? = try {
         val file = File(File(skillsDir, skill.id), "SKILL.md")
         io.github.nanomuse.skills.SkillDocuments.render(
             skill,
             previousContent = if (sourceContent == null) file.takeIf { it.isFile }?.readText() else null,
             importedContent = sourceContent,
+            preserveBody = preserveBody,
         )
     } catch (_: Exception) { null }
 
     // nanoMuse: reject invalid legacy YAML without destroying the source or changing the DB.
-    private fun writeSkillMd(skill: Skill, sourceContent: String? = null, preparedContent: String? = null): Boolean {
-        val content = preparedContent ?: prepareSkillMd(skill, sourceContent) ?: return false
+    private fun writeSkillMd(skill: Skill, sourceContent: String? = null, preparedContent: String? = null, preserveBody: Boolean = false): Boolean {
+        val content = preparedContent ?: prepareSkillMd(skill, sourceContent, preserveBody) ?: return false
         val dir = File(skillsDir, skill.id)
         dir.mkdirs()
         File(dir, "SKILL.md").writeText(content)

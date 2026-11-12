@@ -91,21 +91,47 @@ class SkillRepositoryInstrumentedTest {
         assertTrue(requireNotNull(repo.skillPromptFragment("session")).contains("<name>报告助手</name>"))
     }
 
+    @Test fun metadataOnlyEditsKeepAValidDiskBodyThatChangedAfterTheRecordWasLoaded() {
+        val repo = SkillRepository(isolatedContext())
+        val source = "---\nname: sample\ndescription: valid text\n---\nInstructions"
+        val installed = requireNotNull(repo.importFromContent(source))
+        val file = File(repo.skillFileHostPath(installed.id, "SKILL.md"))
+        for (newline in listOf("\r\n", "\r")) {
+            val newerBody = newline + "New body not in the stored record" + newline
+            file.writeText(listOf("---", "emoji: 😀", "name: sample", "description: valid text", "---")
+                .joinToString(newline, postfix = newline) + newerBody)
+            assertTrue(repo.renameSkill(installed.id, "New name"))
+            assertEquals(newerBody, file.readText().substringAfter("\n---\n"))
+            assertTrue(repo.update(installed.id, description = "New description"))
+            assertEquals(newerBody, file.readText().substringAfter("\n---\n"))
+            assertTrue(repo.update(installed.id, body = "An explicit replacement"))
+            assertEquals("An explicit replacement", file.readText().substringAfter("\n---\n"))
+        }
+    }
+
     @Test fun malformedLegacyYamlRejectsMetadataEditsWithoutCrashingOrChangingTheFile() {
         val context = isolatedContext()
         val repo = SkillRepository(context)
         val source = "---\nname: sample\ndescription: valid text\n---\nInstructions"
         val installed = requireNotNull(repo.importFromContent(source))
         val file = File(repo.skillFileHostPath(installed.id, "SKILL.md"))
-        val legacy = "---\nname: sample\ndescription: Use: reports\n---\nInstructions"
-        file.writeText(legacy)
-        assertFalse(repo.renameSkill(installed.id, "New name"))
-        assertFalse(repo.update(installed.id, description = "New description"))
-        assertEquals(legacy, file.readText())
-        val reopened = SkillRepository(context).skills.value.first { it.id == installed.id }
-        assertEquals("sample", reopened.name)
-        assertEquals("valid text", reopened.description)
-        assertTrue(repo.updateFromContent(installed.id, source))
-        assertEquals(source, file.readText())
+        for (legacy in listOf(
+            "---\nname: sample\ndescription: Use: reports\n---\nInstructions",
+            "name: sample\nlicense: KEEP-LICENSE\nNew body not in the stored record",
+            "---\nname: sample\nlicense: KEEP-LICENSE\nNew body not in the stored record",
+            "---\ndescription: No name\nlicense: KEEP-LICENSE\n---\nNew body not in the stored record",
+            "---\nname: [not, a, scalar]\nlicense: KEEP-LICENSE\n---\nNew body not in the stored record",
+        )) {
+            file.writeText(legacy)
+            repo.reloadFromDisk()
+            assertFalse(repo.renameSkill(installed.id, "New name"))
+            assertFalse(repo.update(installed.id, description = "New description"))
+            assertEquals(legacy, file.readText())
+            val reopened = SkillRepository(context).skills.value.first { it.id == installed.id }
+            assertEquals("sample", reopened.name)
+            assertEquals("valid text", reopened.description)
+            assertTrue(repo.updateFromContent(installed.id, source))
+            assertEquals(source, file.readText())
+        }
     }
 }

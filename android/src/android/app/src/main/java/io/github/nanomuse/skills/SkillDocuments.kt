@@ -16,16 +16,24 @@ import java.util.Locale
 object SkillDocuments {
     private const val MAX_DESCRIPTION_CODE_POINTS = 1024
 
-    private data class Document(val lines: List<String>, val end: Int) {
+    private data class Document(val lines: List<String>, val end: Int, val rawBody: String) {
         val header: String get() = lines.subList(1, end).joinToString("\n")
         val body: String get() = lines.drop(end + 1).joinToString("\n").trim('\n')
     }
 
     private fun document(content: String): Document? {
-        val lines = content.trimStart('\uFEFF', ' ', '\t', '\r', '\n').lines()
+        val normalized = content.trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+        val lines = normalized.lines()
         if (lines.firstOrNull()?.trimEnd() != "---") return null
         val end = (1 until lines.size).firstOrNull { lines[it].trimEnd() == "---" } ?: return null
-        return Document(lines, end)
+        var bodyStart = 0
+        repeat(end + 1) {
+            val newline = normalized.indexOfAny(charArrayOf('\r', '\n'), bodyStart)
+            bodyStart = if (newline < 0) normalized.length else {
+                newline + if (normalized[newline] == '\r' && normalized.getOrNull(newline + 1) == '\n') 2 else 1
+            }
+        }
+        return Document(lines, end, normalized.substring(bodyStart))
     }
 
     private fun yaml(): Yaml {
@@ -68,10 +76,14 @@ object SkillDocuments {
         skill: SkillRepository.Skill,
         previousContent: String? = null,
         importedContent: String? = null,
+        preserveBody: Boolean = false,
     ): String {
         if (importedContent != null) return importedContent
         val parser = yaml()
-        val doc = previousContent?.let(::document)
+        val doc = previousContent?.let {
+            requireNotNull(parse(it)) { "Existing skill frontmatter is missing, incomplete or invalid" }
+            requireNotNull(document(it))
+        }
         val header = linkedMapOf<Any?, Any?>()
         if (doc != null) {
             // A semantic rewrite supports quoted keys without duplicating them, while
@@ -83,7 +95,8 @@ object SkillDocuments {
         header["name"] = skill.name
         header["description"] = skill.description
         header["version"] = skill.version
-        return "---\n" + parser.dump(header) + "---\n" + skill.body
+        val body = if (preserveBody && doc != null) doc.rawBody else skill.body
+        return "---\n" + parser.dump(header) + "---\n" + body
     }
 
     /** Values persisted by the legacy parser retained these scalar delimiters. */

@@ -142,6 +142,31 @@ class SkillDocumentsTest {
         assertEquals("First\n---\nLast", parsed.description)
     }
 
+    @Test fun missingOrUnterminatedPreviousFrontmatterCannotBeRewritten() {
+        for (previous in listOf(
+            "name: sample\nlicense: KEEP-LICENSE\nNew body not in the stored record",
+            "---\nname: sample\nlicense: KEEP-LICENSE\nNew body not in the stored record",
+            "---\ndescription: No name\nlicense: KEEP-LICENSE\n---\nNew body not in the stored record",
+            "---\nname: [not, a, scalar]\nlicense: KEEP-LICENSE\n---\nNew body not in the stored record",
+        )) {
+            assertThrows(IllegalArgumentException::class.java) {
+                SkillDocuments.render(skill(), previousContent = previous)
+            }
+        }
+    }
+
+    @Test fun metadataOnlyEditsRetainTheCurrentDiskBodyWithCrLfOrCrAndNonBmpHeaderText() {
+        for (newline in listOf("\r\n", "\r")) {
+            val diskBody = newline + "New body not in the stored record" + newline
+            val previous = listOf("---", "emoji: 😀", "name: sample", "description: Current", "---")
+                .joinToString(newline, postfix = newline) + diskBody
+            val edited = SkillDocuments.render(skill(body = "Stale body"), previousContent = previous, preserveBody = true)
+            assertEquals(diskBody, edited.substringAfter("\n---\n"))
+            val replaced = SkillDocuments.render(skill(body = "Explicit body"), previousContent = previous)
+            assertEquals("Explicit body", replaced.substringAfter("\n---\n"))
+        }
+    }
+
     @Test fun invalidOrUnboundedFrontmatterDoesNotConstructCustomObjects() {
         assertNull(SkillDocuments.parse("---\nname: sample\nmetadata: !!java.lang.ProcessBuilder [unsafe]\n---\nBody"))
         assertNull(SkillDocuments.parse("---\nname: first\nname: duplicate\n---\nBody"))
