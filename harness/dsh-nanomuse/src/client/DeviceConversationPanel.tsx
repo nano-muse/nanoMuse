@@ -4,6 +4,7 @@ import type { DeviceConversation } from '../device-conversations.ts'
 import { call, failureText, type Translate } from './api.ts'
 import type { LiveDevice } from './live.ts'
 import { canStartBoundDeviceChat, deviceChatAccent, deviceChatLabel } from '../device-chat.ts'
+import { DeviceChatDrafts } from '../device-chat-drafts.ts'
 
 const openListeners = new Set<(id: string) => void>()
 let queuedConversationId: string | null = null
@@ -27,6 +28,7 @@ export function DeviceConversationPanel({ t, devices }: { t: Translate; devices:
   const [events, setEvents] = useState<Event[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const currentDrafts = useRef(new DeviceChatDrafts((id, text) => api<DeviceConversation>('draft', { id, text })))
   const pendingDrafts = useRef(new Map<string, string>())
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chat = chats.find((row) => row.id === selected)
@@ -46,7 +48,7 @@ export function DeviceConversationPanel({ t, devices }: { t: Translate; devices:
     pendingDrafts.current.clear()
     if (draftTimer.current) clearTimeout(draftTimer.current)
     draftTimer.current = null
-    if (pending.length) void Promise.all(pending.map(([id, text]) => api<DeviceConversation>('draft', { id, text })))
+    if (pending.length) void Promise.all(pending.map(([id, text]) => currentDrafts.current.save(id, text)))
       .catch((err: unknown) => { if (showError) setError(failureText(t, err)) })
   }
   const queueDraft = (id: string, text: string) => {
@@ -60,7 +62,7 @@ export function DeviceConversationPanel({ t, devices }: { t: Translate; devices:
     void api<DeviceConversation[]>('list').then((rows) => {
       if (active) {
         setChats(rows)
-        setDrafts((old) => Object.fromEntries(rows.map((row) => [row.id, old[row.id] ?? row.draft ?? ''])))
+        setDrafts(currentDrafts.current.hydrate(rows))
       }
     })
       .catch((err: unknown) => { if (active) setError(failureText(t, err)) })
@@ -101,12 +103,13 @@ export function DeviceConversationPanel({ t, devices }: { t: Translate; devices:
     void work.catch((err: unknown) => setError(failureText(t, err)))
   }
   const send = (id: string) => {
-    const text = drafts[id] ?? ''
+    const text = currentDrafts.current.get(id)
     setSending(true)
-    run(api<DeviceConversation>('draft', { id, text }).then(() => api<DeviceConversation>('send', { id, text })).then((row) => {
+    run(currentDrafts.current.save(id, text).then(() => api<DeviceConversation>('send', { id, text })).then((row) => {
       save(row)
-      if (drafts[id] === text) {
-        setDrafts((old) => ({ ...old, [id]: '' }))
+      const cleared = currentDrafts.current.clearSent(id, text)
+      if (cleared) {
+        setDrafts(cleared)
         queueDraft(id, '')
       }
     }).finally(() => setSending(false)))
@@ -142,7 +145,7 @@ export function DeviceConversationPanel({ t, devices }: { t: Translate; devices:
       h('textarea', { value: drafts[chat.id] ?? '', 'aria-label': t('deviceChatSend'),
         onChange: (e: ChangeEvent<HTMLTextAreaElement>) => {
           const value = e.currentTarget.value
-          setDrafts((old) => ({ ...old, [chat.id]: value }))
+          setDrafts(currentDrafts.current.set(chat.id, value))
           queueDraft(chat.id, value)
         } }),
       h(Button, { disabled: sending || pending || !drafts[chat.id]?.trim()
