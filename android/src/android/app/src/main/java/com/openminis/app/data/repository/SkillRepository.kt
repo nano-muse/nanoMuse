@@ -44,10 +44,7 @@ class SkillRepository(private val context: Context) {
         private const val TAG = "SkillRepository"
         private const val DB_NAME = "skills.db"
         private const val DB_VERSION = 3
-        private const val MAX_SKILLS_IN_PROMPT = 20
-        private const val MAX_SKILL_DESC_LENGTH = 200
-        private const val RECENT_WINDOW_MS = 7L * 24 * 3600 * 1000
-        private const val RECENT_SLOTS = 10
+        // nanoMuse: model discovery limits and YAML parsing live in SkillDocuments.
         private const val NORMALIZE_THRESHOLD = 1000.0
 
         /** [T-android-skill-export] How long an exported zip stays on disk
@@ -143,7 +140,8 @@ class SkillRepository(private val context: Context) {
 
     // -- CRUD --
 
-    fun add(name: String, description: String, body: String, version: String = "1.0.0", source: ImportSource = ImportSource.FILE, sourceURL: String? = null): Skill? {
+    // nanoMuse: imports retain their original SKILL.md instead of dropping unrecognized metadata.
+    fun add(name: String, description: String, body: String, version: String = "1.0.0", source: ImportSource = ImportSource.FILE, sourceURL: String? = null, sourceContent: String? = null): Skill? {
         val id = slugify(name)
         if (id.isBlank()) return null
         if (_skills.value.any { it.id == id }) return null
@@ -159,29 +157,39 @@ class SkillRepository(private val context: Context) {
         )
 
         insertDb(skill)
-        writeSkillMd(skill)
+        writeSkillMd(skill, sourceContent) // nanoMuse: retain full imported source.
         _skills.value = _skills.value + skill
         Log.i(TAG, "Added skill: ${skill.id}")
         return skill
     }
 
-    fun update(id: String, name: String? = null, description: String? = null, body: String? = null): Boolean {
+    // nanoMuse: full-content updates keep unknown YAML fields and update the stored version.
+    fun update(id: String, name: String? = null, description: String? = null, body: String? = null, version: String? = null, sourceContent: String? = null): Boolean {
         val current = _skills.value.find { it.id == id } ?: return false
         if (current.isReadOnly) return false // nanoMuse: protect bundled metadata and content.
         val updated = current.copy(
             name = name ?: current.name,
             description = description ?: current.description,
+            version = version ?: current.version, // nanoMuse: file and URL updates carry their version.
             body = body ?: current.body,
             updatedAt = System.currentTimeMillis(),
         )
 
+        // nanoMuse: malformed legacy frontmatter must fail before changing saved metadata.
+        val prepared = prepareSkillMd(updated, sourceContent) ?: return false
         db.execSQL(
             "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
             arrayOf<Any>(updated.name, updated.description, updated.version, updated.updatedAt, id)
         )
-        writeSkillMd(updated)
+        writeSkillMd(updated, sourceContent, prepared) // nanoMuse: render errors were checked before the DB update.
         _skills.value = _skills.value.map { if (it.id == id) updated else it }
         return true
+    }
+
+    // nanoMuse: replacing source keeps the existing ID, enablement and session overrides.
+    fun updateFromContent(id: String, content: String): Boolean {
+        val parsed = parseSkillMd(content) ?: return false
+        return update(id, parsed.name, parsed.description, parsed.body, parsed.version, content)
     }
 
     fun delete(id: String) {
@@ -247,78 +255,14 @@ class SkillRepository(private val context: Context) {
 
     /**
      * Build the system-prompt fragment that makes skills discoverable.
-     * Discloses up to [MAX_SKILLS_IN_PROMPT] skills with 3-tier priority
-     * (bundled > 7-day recent > most-used), matching iOS SkillStore.
+     * nanoMuse: disclose all enabled descriptions, with a Unicode-safe 1024-character limit.
+     * Full instructions stay on disk until the model chooses a skill.
      * Returns null when the session has no enabled skills.
      */
-    fun skillPromptFragment(sessionId: String): String? {
-        val enabled = _skills.value.filter { isEnabledForSession(it.id, sessionId) }
-        if (enabled.isEmpty()) return null
-
-        val total = enabled.size
-        val selected: List<Skill>
-        val hasMore: Boolean
-
-        if (total <= MAX_SKILLS_IN_PROMPT) {
-            selected = enabled.sortedByDescending { it.updatedAt }
-            hasMore = false
-        } else {
-            val picked = linkedMapOf<String, Skill>() // preserves insertion order + id dedupe
-            // Priority 1: bundled
-            enabled.filter { it.importSource == ImportSource.BUNDLED }
-                .forEach { picked.putIfAbsent(it.id, it) }
-            // Priority 2: recently updated (within 7 days), up to RECENT_SLOTS more
-            val cutoff = System.currentTimeMillis() - RECENT_WINDOW_MS
-            val recentLimit = minOf(RECENT_SLOTS, MAX_SKILLS_IN_PROMPT - picked.size).coerceAtLeast(0)
-            enabled.asSequence()
-                .filter { it.updatedAt > cutoff && it.id !in picked }
-                .sortedByDescending { it.updatedAt }
-                .take(recentLimit)
-                .forEach { picked.putIfAbsent(it.id, it) }
-            // Priority 3: fill remaining slots by useCount (desc)
-            if (picked.size < MAX_SKILLS_IN_PROMPT) {
-                val remaining = MAX_SKILLS_IN_PROMPT - picked.size
-                enabled.asSequence()
-                    .filter { it.id !in picked }
-                    .sortedByDescending { it.useCount }
-                    .take(remaining)
-                    .forEach { picked.putIfAbsent(it.id, it) }
-            }
-            selected = picked.values.toList()
-            hasMore = total > selected.size
-        }
-
-        val xml = buildString {
-            append("<available_skills>\n")
-            for (skill in selected) {
-                var desc = skill.description
-                if (desc.length > MAX_SKILL_DESC_LENGTH) {
-                    desc = desc.substring(0, MAX_SKILL_DESC_LENGTH) + "…"
-                }
-                append("  <skill>\n")
-                append("    <name>").append(escapeXml(skill.name)).append("</name>\n")
-                append("    <description>").append(escapeXml(desc)).append("</description>\n")
-                append("    <path>/var/minis/skills/").append(skill.id).append("/SKILL.md</path>\n")
-                append("  </skill>\n")
-            }
-            append("</available_skills>")
-        }
-
-        return buildString {
-            append("Skills:\n")
-            append("Reusable instruction sets stored at /var/minis/skills/<name>/SKILL.md. Read the SKILL.md file to load full instructions before using a skill.\n\n")
-            append(xml)
-            if (hasMore) {
-                val selectedIds = selected.mapTo(HashSet(selected.size)) { it.id }
-                val omitted = enabled.filter { it.id !in selectedIds }
-                val maxUndisclosed = (100 - selected.size).coerceAtLeast(0)
-                val names = omitted.take(maxUndisclosed).joinToString(", ") { it.name }
-                append("\n\n")
-                append(omitted.size).append(" more skills not shown above: ").append(names)
-                append(". List /var/minis/skills/ or grep to search all.")
-            }
-        }
-    }
+    // nanoMuse: use the same discovery renderer as the import regression tests.
+    fun skillPromptFragment(sessionId: String): String? = io.github.nanomuse.skills.SkillDocuments.prompt(
+        _skills.value.filter { isEnabledForSession(it.id, sessionId) },
+    )
 
     /**
      * Record that a skill's SKILL.md was read. Matches iOS `SkillStore.recordSkillUse`:
@@ -418,7 +362,7 @@ class SkillRepository(private val context: Context) {
                     replaced.updatedAt, id
                 )
             )
-            writeSkillMd(replaced)
+            writeSkillMd(replaced, content) // nanoMuse: preserve unknown frontmatter and original formatting.
             _skills.value = _skills.value.map { if (it.id == id) replaced else it }
             return replaced
         }
@@ -429,6 +373,7 @@ class SkillRepository(private val context: Context) {
             version = parsed.version,
             source = source,
             sourceURL = sourceURL,
+            sourceContent = content, // nanoMuse: a new import preserves the same source as a replacement.
         )
     }
 
@@ -614,12 +559,8 @@ class SkillRepository(private val context: Context) {
         val parsed = parseSkillMd(content)
             ?: return@withContext UpdateResult.Failure("Downloaded SKILL.md is not valid (missing YAML frontmatter or 'name:' field)")
 
-        val ok = update(
-            id = skillId,
-            name = parsed.name,
-            description = parsed.description,
-            body = parsed.body,
-        )
+        // nanoMuse: replace full source so license, tools and metadata survive URL updates.
+        val ok = updateFromContent(skillId, content)
         if (!ok) return@withContext UpdateResult.Failure("Failed to write updated skill")
 
         // Re-download sibling files (scripts/, references/, etc.). Unlike
@@ -821,12 +762,8 @@ class SkillRepository(private val context: Context) {
         if (current.isReadOnly) return false // nanoMuse: all rename entry points keep bundled names intact.
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return false
-        val file = File(File(skillsDir, skillId), "SKILL.md")
-        if (file.exists()) {
-            val original = file.readText()
-            val updated = original.replaceFirst(Regex("(?m)^name:\\s*.*$"), "name: $trimmed")
-            if (updated != original) file.writeText(updated)
-        }
+        // nanoMuse: quote a renamed value and retain the rest of the imported frontmatter.
+        if (!writeSkillMd(current.copy(name = trimmed))) return false
         val refreshed = current.copy(name = trimmed, updatedAt = System.currentTimeMillis())
         db.execSQL(
             "UPDATE skills SET name=?, updated_at=? WHERE id=?",
@@ -1292,9 +1229,11 @@ class SkillRepository(private val context: Context) {
             // BLANK here, never at that literal. The check below is written
             // against blankness for that reason; adding the iOS literal would
             // be matching a value this platform cannot produce.
-            val nameStale = name.isBlank()
-            val descStale = description == ">" || description == "|" || description.isBlank()
-            if (descStale || nameStale) {
+            val nameStale = name.isBlank() || io.github.nanomuse.skills.SkillDocuments.isQuoted(name) // nanoMuse: heal legacy quoted scalars.
+            val descStale = description == ">" || description == "|" || description.isBlank() ||
+                io.github.nanomuse.skills.SkillDocuments.isQuoted(description) // nanoMuse: heal legacy quoted scalars.
+            val versionStale = version.isBlank() || io.github.nanomuse.skills.SkillDocuments.isQuoted(version) // nanoMuse
+            if (descStale || nameStale || versionStale) {
                 val skillMd = File(skillsDir, "$id/SKILL.md")
                 if (skillMd.exists()) {
                     val reparsed = parseSkillMd(runCatching { skillMd.readText() }.getOrNull() ?: "")
@@ -1309,7 +1248,7 @@ class SkillRepository(private val context: Context) {
                     // overwritten.
                     if (reparsed != null) {
                         var changed = false
-                        if (descStale && reparsed.description.isNotBlank()) {
+                        if (descStale && reparsed.description.isNotBlank() && reparsed.description != description) {
                             description = reparsed.description
                             changed = true
                         }
@@ -1317,11 +1256,11 @@ class SkillRepository(private val context: Context) {
                         // name, so reparsed.name is always real here — but the
                         // isNotBlank() guard is kept so this stays correct if
                         // that parser contract ever loosens.
-                        if (nameStale && reparsed.name.isNotBlank()) {
+                        if (nameStale && reparsed.name.isNotBlank() && reparsed.name != name) {
                             name = reparsed.name
                             changed = true
                         }
-                        if (version.isBlank()) {
+                        if (versionStale && reparsed.version != version) { // nanoMuse
                             version = reparsed.version
                             changed = true
                         }
@@ -1391,18 +1330,23 @@ class SkillRepository(private val context: Context) {
         )
     }
 
-    private fun writeSkillMd(skill: Skill) {
+    // nanoMuse: edits retain existing unknown fields; imports are saved verbatim.
+    private fun prepareSkillMd(skill: Skill, sourceContent: String? = null): String? = try {
+        val file = File(File(skillsDir, skill.id), "SKILL.md")
+        io.github.nanomuse.skills.SkillDocuments.render(
+            skill,
+            previousContent = if (sourceContent == null) file.takeIf { it.isFile }?.readText() else null,
+            importedContent = sourceContent,
+        )
+    } catch (_: Exception) { null }
+
+    // nanoMuse: reject invalid legacy YAML without destroying the source or changing the DB.
+    private fun writeSkillMd(skill: Skill, sourceContent: String? = null, preparedContent: String? = null): Boolean {
+        val content = preparedContent ?: prepareSkillMd(skill, sourceContent) ?: return false
         val dir = File(skillsDir, skill.id)
         dir.mkdirs()
-        val content = buildString {
-            appendLine("---")
-            appendLine("name: ${skill.name}")
-            appendLine("description: ${skill.description}")
-            appendLine("version: ${skill.version}")
-            appendLine("---")
-            append(skill.body)
-        }
         File(dir, "SKILL.md").writeText(content)
+        return true
     }
 
     private fun readSkillMdBody(id: String): String {
@@ -1419,31 +1363,8 @@ class SkillRepository(private val context: Context) {
         val body: String,
     )
 
-    /**
-     * Parse a SKILL.md file into [ParsedSkill]. Mirrors iOS SkillStore.parse(skillMD:).
-     *
-     * Recognized YAML frontmatter forms (delimited by `---` … `---`):
-     *
-     *   description: short text
-     *   description: |
-     *     line one
-     *     line two           ← preserved with newlines
-     *   description: >
-     *     line one
-     *     line two           ← folded into a single space-joined line
-     *
-     * The block-scalar variants (`|` and `>`) matter in practice — many
-     * authored SKILL.md files (e.g. hyperframes, bilibili-hub) use
-     * `description: >` to either fold a multi-line description or as a
-     * placeholder with an empty body. The previous parser stored the
-     * literal string `">"` for those skills, which is what surfaced in the
-     * skills list as a confusing single-character description.
-     *
-     * Returns null only if the document doesn't start with `---` or if
-     * the closing `---` is missing — caller treats null as "not a SKILL.md".
-     * If frontmatter parses but `name` is blank we also return null so
-     * import paths can fall back (e.g. derive name from the GitHub URL).
-     */
+    // nanoMuse: safe, bounded YAML supports quoted scalars and nested metadata without
+    // letting child keys replace top-level name, description or version.
     /**
      * Public re-exposure for the "Update from File" UI. Same parser, same
      * `null = invalid SKILL.md` contract. Lives on the instance for symmetry
@@ -1452,89 +1373,11 @@ class SkillRepository(private val context: Context) {
      */
     fun parseSkillMdPublic(content: String): ParsedSkill? = parseSkillMd(content)
 
-    private fun parseSkillMd(content: String): ParsedSkill? {
-        val trimmed = content.trimStart()
-        if (!trimmed.startsWith("---")) return null
+    // nanoMuse: one frontmatter parser for imports, updates and rescans.
+    private fun parseSkillMd(content: String): ParsedSkill? = io.github.nanomuse.skills.SkillDocuments.parse(content)
 
-        // Find the closing `---` on a line by itself (matches iOS — and avoids
-        // false matches against horizontal rules later in the document).
-        val lines = trimmed.lines()
-        var frontmatterEndLine = -1
-        for (i in 1 until lines.size) {
-            if (lines[i].trim() == "---") {
-                frontmatterEndLine = i
-                break
-            }
-        }
-        if (frontmatterEndLine < 0) return null
-
-        var name = ""
-        var description = ""
-        var version = "1.0.0"
-
-        var i = 1
-        while (i < frontmatterEndLine) {
-            val line = lines[i]
-            val colonIdx = line.indexOf(':')
-            if (colonIdx < 0) { i++; continue }
-            val key = line.substring(0, colonIdx).trim().lowercase()
-            val rawValue = line.substring(colonIdx + 1).trim()
-
-            // YAML block scalar: `|` keeps newlines, `>` folds them into spaces.
-            // Body lines continue while they are indented (or empty); a
-            // dedented line ends the block.
-            //
-            // T151: also accept the YAML chomping indicators `>-`, `>+`, `|-`,
-            // `|+` (and any explicit indentation digit suffix). Real-world
-            // skill frontmatter — qbt-hub, for one — opens its description
-            // with `description: >-` so trailing newlines are stripped, but
-            // the previous strict `==` match treated that as a plain string
-            // literal, leaving the renderer to display the raw `>-` marker.
-            val isBlockScalar = rawValue.startsWith("|") || rawValue.startsWith(">")
-            val resolved: String
-            if (isBlockScalar && i + 1 < frontmatterEndLine) {
-                val fold = rawValue.startsWith(">")
-                val blockLines = mutableListOf<String>()
-                var j = i + 1
-                while (j < frontmatterEndLine) {
-                    val next = lines[j]
-                    if (next.isEmpty() || next[0].isWhitespace()) {
-                        blockLines.add(next.trim())
-                    } else break
-                    j++
-                }
-                resolved = if (fold) {
-                    blockLines.joinToString(" ").trim()
-                } else {
-                    blockLines.joinToString("\n").trim('\n')
-                }
-                i = j
-            } else {
-                resolved = rawValue
-                i++
-            }
-
-            when (key) {
-                "name" -> name = resolved
-                "description" -> description = resolved
-                "version" -> version = resolved
-            }
-        }
-
-        if (name.isBlank()) return null
-
-        val bodyStartLine = frontmatterEndLine + 1
-        val body = if (bodyStartLine < lines.size) {
-            lines.subList(bodyStartLine, lines.size).joinToString("\n").trim('\n')
-        } else ""
-
-        return ParsedSkill(name, description, version, body)
-    }
-
-    private fun slugify(name: String): String =
-        name.lowercase()
-            .replace(Regex("[^a-z0-9]+"), "-")
-            .trim('-')
+    // nanoMuse: keep skill directory identifiers consistent across import paths.
+    private fun slugify(name: String): String = io.github.nanomuse.skills.SkillDocuments.id(name)
 
     private fun escapeXml(text: String): String =
         text.replace("&", "&amp;")

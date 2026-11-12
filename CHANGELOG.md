@@ -191,6 +191,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Disclosed every enabled skill with up to 1024 Unicode description characters, preserved imported SKILL.md metadata, parsed quoted and nested frontmatter correctly, and accepted non-ASCII skill names. For #912.
 - Paused automatic following as soon as a person scrolled towards older messages, and kept new reply chunks, tool cards and keyboard layout changes from resuming it. For #898.
 - Reserved output space before summarizing long conversations, so nearly full inputs were split instead of leaving the summary only a few output tokens. For #719.
 - Added progress rings to active main and side chats in the Muse drawer, using this phone's existing task tracking while preserving unread reply markers. Approval and per-chat step indicators remain separate work. For #531.

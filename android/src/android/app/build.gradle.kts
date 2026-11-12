@@ -244,6 +244,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    // nanoMuse: parse imported skill frontmatter with safe, bounded YAML construction.
+    implementation("org.yaml:snakeyaml:2.7")
+
     // Core
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")

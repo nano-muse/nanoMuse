@@ -2,6 +2,10 @@
 
 在 设置 → 技能 中，可以阅读、导出或停用内置技能。它们的名称、内容和文件由 App 维护，因此不能编辑、更新或删除。要自行修改，请先导出，再改名后导入为副本。内置 `skill-creator` 指南不依赖特定模型服务商。
 
+模型会看到当前对话中每个已启用技能的名称、最多 1024 个 Unicode 字符的描述，以及实际 `SKILL.md` 路径，完整指令仍按需从文件读取。导入或更新技能会保留完整源文件，包括许可证、允许的工具和嵌套元数据。带引号或多行描述会按文本解析，嵌套字段不能覆盖顶层名称或描述。查看文件时显示实际内容，编辑技能不会更改已有目录 ID。名称中没有英文字母或数字时，也会生成稳定的目录 ID。
+
+旧版导入时已丢失的字段，需要用原文件或原网址更新才能恢复。更新会保留已有技能的启用状态和各对话的覆盖设置。
+
 `android/` 是 nanoMuse 的 Android 原生 App，基于 [OpenMinis](https://github.com/OpenMinis/OpenMinis) 1.13，使用 GPL-3.0 许可证。智能体直接在手机上运行，APK（Android 安装包）内包含 Linux shell（运行终端命令的环境）、浏览器、MCP 服务器（通过通用协议提供工具的服务）、技能和定时任务，再加入 nanoMuse 的身份、设计和功能。nanoMuse 自有代码位于 `io.github.nanomuse.*`，对 OpenMinis 文件的改动均标有 `// nanoMuse:`。
 
 应用 id 为 `io.github.nanomuse.app`，系统用 `nanomuse://` 这一 URL scheme（唤起 App 的链接前缀）识别它，避免与同机安装的 OpenMinis 争用前缀。App 内仍使用上游的 `minis://…`，以兼容沙箱、系统提示词和模型。系统传入的 `nanomuse://` 会按 `minis://` 处理；App 打开自身链接时，直接指定 `MainActivity`，不交给系统选择处理程序，实现见 `io.github.nanomuse.deeplink.OwnScheme`。
