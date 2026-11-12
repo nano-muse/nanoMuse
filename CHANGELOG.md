@@ -48,6 +48,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **The cost ledger now records real runs, and the monthly budget can refuse work.** Each finished task's metered usage lands in a ledger persisted under the data directory (on when the `[cost]` settings set a monthly budget or a price), priced by the ledger's own table. The budget gate has three modes: `off` records only, `warn` raises the alert and work continues, `hard` refuses new tasks once the month's recorded spend reaches the budget, with room for one approved task at a time past it. Reconciliation against a real vendor bill is still undone; the prices remain the person's own table.
+
 - Fixed browser-enabled Docker builds failing because the Playwright driver could not load `libatomic.so.1`, and added a Chromium startup check alongside the standard image build in CI.
 
 - Refused local-file and custom-scheme pages before browser tool reads, screenshots and actions, limited blank-page aliases to `about:blank` and `about:srcdoc`, and kept browser fetch redirects on HTTP(S). In-memory data and blob resources and the user's take-over view remained available. For #339.

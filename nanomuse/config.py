@@ -709,6 +709,30 @@ class ServerSettings(BaseModel):
     start_grace: float = 4.0
 
 
+class PriceSettings(BaseModel):
+    """Per-million-token rates for one model, in USD (the cost ledger's table)."""
+
+    input_per_million: float = Field(default=0, ge=0, allow_inf_nan=False)
+    output_per_million: float = Field(default=0, ge=0, allow_inf_nan=False)
+
+
+class CostSettings(BaseModel):
+    """The cost ledger over real runs, and the monthly budget gate.
+
+    Recording is on only when a monthly budget or at least one price is
+    set; with neither, no ledger is kept and nothing changes.  ``mode``
+    is the gate: ``off`` records only, ``warn`` raises the ledger's
+    alert at the budget line, ``hard`` refuses new tasks once the
+    month's recorded spend reaches the budget (one approved task at a
+    time can be let past it).
+    """
+
+    monthly_budget_usd: float = Field(default=0, ge=0, allow_inf_nan=False)
+    mode: Literal["off", "warn", "hard"] = "off"
+    device_id: str = ""  # empty: the ledger calls this device "this-device"
+    prices: dict[str, PriceSettings] = Field(default_factory=dict)
+
+
 class Settings(BaseModel):
     data_dir: Path = DEFAULT_DATA_DIR
     log_level: str = "INFO"
@@ -730,6 +754,7 @@ class Settings(BaseModel):
     hub: HubSettings = Field(default_factory=HubSettings)
     mcp: MCPSettings = Field(default_factory=MCPSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
+    cost: CostSettings = Field(default_factory=CostSettings)
     # Where the settings came from (informational).
     source: str | None = None
 
@@ -752,6 +777,10 @@ class Settings(BaseModel):
     @property
     def goals_db(self) -> Path:
         return self.data_dir / "goals.db"
+
+    @property
+    def cost_ledger_file(self) -> Path:
+        return self.data_dir / "cost_ledger.jsonl"
 
     @property
     def reminders_db(self) -> Path:

@@ -457,6 +457,32 @@ A server that does not answer is logged and skipped, and the agent starts withou
 
 Three Chinese services the built-in skills know come as MCP servers, and `config/config.example.toml` has the block for each: 高德地图 (hosted, `AMAP_KEY` in the vault), 12306 (`npx -y 12306-mcp`, no key; trains, query only) and 快递100 (hosted, `KUAIDI100_KEY`; parcels, paid per tracking number). Which of them have actually been run inside the phone's root file system, and what else is out there: [services.md](services.md).
 
+## `[cost]`
+
+```toml
+[cost]
+monthly_budget_usd = 0     # 0: no monthly budget set
+mode               = "off" # off | warn | hard
+device_id          = ""    # empty: this device is recorded as "this-device"
+
+[cost.prices."model-name"]
+input_per_million  = 0
+output_per_million = 0
+```
+
+The cost ledger over real runs. Each finished task's metered usage (the agent loop already
+meters every call for `[agent.budget]`) lands in a ledger persisted as `cost_ledger.jsonl`
+in the data directory, priced by this section's own per-million-token table; a model with
+no price entry records zero rather than guessing. Three views sum the same entries by
+task, by device and by model, and a monthly budget raises one alert record per month when
+spending reaches it. Recording is on only when a monthly budget or at least one price is
+set; with neither, no ledger is kept and nothing changes.
+
+`mode` is the budget gate. `off` records only. `warn` raises the alert and work continues.
+`hard` refuses a new task before it starts once the month's recorded spend reaches the
+budget; one approved task at a time can be let past it. The gate reads only recorded
+spend, so with no monthly budget set there is nothing to gate on in any mode.
+
 ## `[server]`
 
 ```toml
