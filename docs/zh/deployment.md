@@ -44,6 +44,8 @@ docker logs muse                          # the URL with the access token
 
 **附带浏览器的镜像**。`-browser` 标签包括 `:latest-browser`、`:X.Y.Z-browser`、`:edge-browser`，支持 linux/amd64。它们打包了 Chromium 浏览器和 Playwright 浏览器控制库，并在启动时启用浏览器工具。智能体可以操作网站，你也可以在手机上查看操作过程或接管，见 [App → 浏览器视图](app.md#what-is-on-the-screen)。这类镜像约大 400 MB。镜像通过 `NANOMUSE_BROWSER_ENABLED=1` 开启工具；在其他环境中，只要已安装 Playwright 和 Chromium，这个变量同样有效。
 
+Dockerfile 会先安装 Playwright 驱动所需的 `libatomic1`，再运行浏览器安装程序，避免构建因缺少 `libatomic.so.1` 而失败。CI 会构建两种镜像，并以浏览器镜像的普通用户启动 Chromium 进行检查。
+
 手动构建镜像：
 
 ```bash

@@ -283,3 +283,29 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke test
         run: docker run --rm nanomuse:ci version
+      - name: Build browser image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: false
+          load: true
+          build-args: WITH_BROWSER=1
+          tags: nanomuse:ci-browser
+          cache-from: type=gha,scope=browser
+          cache-to: type=gha,mode=max,scope=browser
+      - name: Start Chromium as the browser image user
+        run: |
+          docker run --rm -i --entrypoint python nanomuse:ci-browser - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+
+          assert os.environ["NANOMUSE_BROWSER_ENABLED"] == "1"
+          assert os.getuid() != 0
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch(timeout=15000)
+              page = browser.new_page()
+              page.set_content("<title>nanoMuse browser check</title><p>ready</p>")
+              assert page.title() == "nanoMuse browser check"
+              assert page.locator("p").inner_text() == "ready"
+              browser.close()
+          PY
