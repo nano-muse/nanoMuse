@@ -55,6 +55,8 @@ final class AnthropicAgentProvider: AgentProvider {
         maxTokens: Int,
         thinkingLevel: ThinkingLevel
     ) async throws -> AsyncThrowingStream<AgentStreamEvent, Error> {
+        // nanoMuse: reject unavailable OAuth before queuing process-wide request patches.
+        let resolvedSystemPrompt = try provider.resolveSystemPrompt(systemPrompt)
         pendingToolResultImages.removeAll()
         #if DEBUG
         AgentRequestTrace.shared.step("anthropic.convertMessages", detail: "input messages=\(messages.count)")
@@ -189,7 +191,7 @@ final class AnthropicAgentProvider: AgentProvider {
             model: .other(model.id),
             messages: cachedMessages,
             maxTokens: maxTokens,
-            system: try provider.resolveSystemPrompt(systemPrompt), // nanoMuse: fail before sending if OAuth is unavailable.
+            system: resolvedSystemPrompt, // nanoMuse: OAuth configuration was validated first.
             temperature: provider.effectiveTemperature(0.7),
             tools: anthropicTools,
             toolChoice: .init(type: .auto)
@@ -936,6 +938,8 @@ final class AnthropicAgentProvider: AgentProvider {
         systemPrompt: String?,
         tools: [AgentToolDefinition]
     ) async throws -> LLMUsage {
+        // nanoMuse: a failed warmup must not leave request patches for another call.
+        let resolvedSystemPrompt = try provider.resolveSystemPrompt(systemPrompt)
         pendingToolResultImages.removeAll()
         let anthropicMessages = convertMessages(messages)
         let anthropicTools = convertTools(tools)
@@ -958,7 +962,7 @@ final class AnthropicAgentProvider: AgentProvider {
             model: .other(model.id),
             messages: allMessages,
             maxTokens: 1,
-            system: try provider.resolveSystemPrompt(systemPrompt), // nanoMuse: fail before sending if OAuth is unavailable.
+            system: resolvedSystemPrompt, // nanoMuse: OAuth configuration was validated first.
             temperature: provider.effectiveTemperature(0),
             tools: anthropicTools
         )

@@ -762,6 +762,10 @@ deployment target is iOS 16), the intent's own strings in `Localizable.xcstrings
 
 ## Crash and exit diagnostics
 
+Missing Claude sign-in customization now returns a provider error instead of terminating
+the app. API-key requests do not require that customization. The check also covers
+background title generation and warmup requests, whose model can differ from the main chat.
+
 Reports in **Settings → Logs** distinguish a leftover launch marker from a MetricKit
 diagnostic. A marker means that no clean-exit callback removed it; it does not prove a
 crash, SIGKILL, watchdog termination or memory failure. Its phase and memory values are
