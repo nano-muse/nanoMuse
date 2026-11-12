@@ -129,6 +129,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Let the agent list accessible scheduled tasks across chats and request approval to delete one, with guidance to check existing tasks before creating another. For #905.
+
 - Documented launching the Linux AppImage with a separate self-hosted relay profile. For #895.
 
 - Preserved own-provider deletions made in Advanced settings across restarts, and kept loaded empty chat catalogs disabled without removing saved keys or unrelated sources. For #889.
