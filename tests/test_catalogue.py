@@ -9,10 +9,10 @@ from nanomuse.llm import catalogue
 from nanomuse.llm.factory import create_llm
 
 
-def test_the_packaged_file_is_read_once_and_has_the_twenty_six_providers():
+def test_the_packaged_file_is_read_once_and_has_the_twenty_seven_providers():
     cat = catalogue.load()
     assert cat.source.endswith("providers.json")
-    assert len(cat.providers) == 26
+    assert len(cat.providers) == 27
     assert cat.get("bailian").capabilities == ["chat", "vision", "image", "video"]
     assert cat.get("nowhere") is None
     # the same object on every call
@@ -109,6 +109,29 @@ def test_uberllm_uses_openai_chat_without_advertising_unverified_capabilities():
     assert settings.endpoint == provider.base_url
     assert settings.model == "openai/gpt-5.4-mini"
     assert LLMSettings(provider="uberllm", model="qwen/qwen3-32b").model == "qwen/qwen3-32b"
+
+
+def test_synap_uses_openai_chat_without_advertising_unverified_capabilities():
+    cat = catalogue.load()
+    provider = cat.get("synap")
+    assert provider is not None
+    assert provider.auth == ["key"]
+    assert provider.key_url == "https://synap402.com/account.html#keys"
+    assert provider.capabilities == ["chat"]
+    assert provider.defaults == {"chat": "qwen3-coder-30b"}
+    assert provider in cat.providers_for("chat", "global")
+    for capability in ("vision", "image", "video"):
+        assert provider not in cat.providers_for(capability, "global")
+    assert check_provider("synap") == "synap"
+    assert resolve_provider("synap", None) == (
+        "openai",
+        "https://synap402.com/v1",
+    )
+    settings = LLMSettings(provider="synap")
+    assert settings.protocol == "openai"
+    assert settings.endpoint == provider.base_url
+    assert settings.model == "qwen3-coder-30b"
+    assert LLMSettings(provider="synap", model="gpt-oss-20b").model == "gpt-oss-20b"
 
 
 def test_providers_for_a_capability_in_a_region_keeps_the_catalogue_order():

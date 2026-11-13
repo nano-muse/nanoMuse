@@ -30,6 +30,7 @@ describe("the model slots (the Models contract)", () => {
     expect(entryFor("openai", "https://gateway.example.ai/v1")).toBeNull();
     expect(entryFor("openai", "https://gateway.example.dev/v1")).toBeNull();
     expect(entryFor("openai", "https://eu.openrouter.ai/api/v1")?.id).toBe("openrouter");
+    expect(entryFor("openai", "https://synap402.com/v1")?.id).toBe("synap");
     expect(entryFor("openai", "")).toBeNull();
   });
 
