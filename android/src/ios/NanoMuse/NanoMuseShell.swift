@@ -346,6 +346,11 @@ final class NanoMuseKeyboardWatcher: ObservableObject {
 
 struct NanoMuseHomeView: View {
     @StateObject private var main = NanoMuseMainChat()
+    @ObservedObject private var deviceChats = NanoMuseDeviceConversations.shared
+    @ObservedObject private var hub = NanoMuseHub.shared
+    @State private var chooseChatDestination = false
+    @State private var deviceChatError: String?
+    private let deviceChatPrefix = "__device__"
     @StateObject private var keyboard = NanoMuseKeyboardWatcher()
     @ObservedObject private var star = NanoMuseStar.shared
     @ObservedObject private var allowance = NanoMuseAllowance.shared
@@ -387,7 +392,7 @@ struct NanoMuseHomeView: View {
         keyboard.visible || (tab == .chat && voiceMode.isVoiceActive)
     }
 
-    var body: some View {
+    private var roomsAndDrawer: some View {
         // The chat never gets the bottom bar as a `safeAreaInset`. 0.1.36 to 0.1.39 had it as
         // one, and an inset on the NavigationStack's ancestor reaches the chat inside it through
         // UIKit's safe area. What the device showed (iPad, 0.1.39; the maintainer's iPhone,
@@ -445,7 +450,9 @@ struct NanoMuseHomeView: View {
                     tab = .chat
                 },
                 onOpenSession: { id in openSideChat(id) },
-                onNewChat: { openSideChat(NanoMuseMainChat.draftPrefix + UUID().uuidString) },
+                onNewChat: { chooseNewChat() },
+                deviceChats: deviceChats,
+                deviceChatPrefix: deviceChatPrefix,
                 onPinMain: { id in
                     chatPath.removeAll()
                     main.pin(id)
@@ -458,6 +465,10 @@ struct NanoMuseHomeView: View {
                 onSettings: { showNanoMuseSettings = true }
             )
         }
+    }
+
+    var body: some View {
+        roomsAndDrawer
         .nanoMuseStudioPresenter(enabled: !showClassic)
         .nanoMuseAgentPagePresenter(
             enabled: !showClassic,
@@ -491,7 +502,21 @@ struct NanoMuseHomeView: View {
             }
         }
         .sheet(isPresented: $showDevices) {
-            NanoMusePageSheet(title: AppLocalized("Computers")) { NanoMuseComputersView() }
+            NanoMusePageSheet(title: AppLocalized("Computers")) {
+                NanoMuseComputersView(onDeviceChat: deviceChats.available ? startDeviceChat : nil)
+            }
+        }
+        .sheet(isPresented: $chooseChatDestination) {
+            NanoMusePageSheet(title: AppLocalized("New Chat")) {
+                NanoMuseDeviceChatPicker(onLocal: startLocalChat, onDevice: startDeviceChat)
+            }
+        }
+        .alert(AppLocalized("Device chat"), isPresented: Binding(
+            get: { deviceChatError != nil }, set: { if !$0 { deviceChatError = nil } }
+        )) {
+            Button(AppLocalized("OK"), role: .cancel) {}
+        } message: {
+            Text(deviceChatError ?? "")
         }
         .sheet(isPresented: $showNanoMuseSettings) {
             NavigationStack {
@@ -503,10 +528,19 @@ struct NanoMuseHomeView: View {
             }
         }
         .onAppear {
+            deviceChats.load()
             if main.chatId == nil { main.resolve() }
             // A notification tap that launched the app cold: the conversation it named.
             if let id = NotificationNavigationStore.shared.takePending() { openSideChat(id) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .nanoMuseAccountSwitched)) { _ in
+            deviceChats.load()
+            if let id = chatPath.last, id.hasPrefix(deviceChatPrefix),
+               !deviceChats.chats.contains(where: { deviceChatPrefix + $0.id == id }) {
+                chatPath.removeAll()
+            }
+        }
+        .nmOnChange(of: hub.connected) { _ in deviceChats.load() }
         .onReceive(NotificationCenter.default.publisher(for: .soulMdChanged)) { _ in
             agentName = Self.currentAgentName()
         }
@@ -555,14 +589,15 @@ struct NanoMuseHomeView: View {
             guard let id = note.userInfo?["sessionId"] as? String, !id.isEmpty else { return }
             openSideChat(id)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .newChatRequested)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .newChatRequested)) { note in
             // *New Chat* in the ••• menu, ⌘N, the *Context Full* alert and the relay's refusal
             // cards all post this; upstream's ContentView answers it, and in this layout that view
             // is only on screen under the classic cover, so the tap did nothing (#392). A fresh
             // draft side chat here, as the drawer's new chat button opens one; with the classic
             // cover up, ContentView handles it inside the sheet.
             guard !showClassic else { return }
-            openSideChat(NanoMuseMainChat.draftPrefix + UUID().uuidString)
+            if note.object as? String == "menu" { chooseNewChat() }
+            else { startLocalChat() }
         }
         .onReceive(NanoMuseVoicePrompt.shared.$pending) { request in
             // The Action Button's voice prompt with no chat named (#296): the main chat, on
@@ -594,6 +629,36 @@ struct NanoMuseHomeView: View {
             vm.nmSendNow(text)
         } else {
             NotificationCenter.default.post(name: .nanoMuseComposerPrefill, object: main.chatId, userInfo: ["text": text, "send": true])
+        }
+    }
+
+    private func chooseNewChat() {
+        deviceChats.load()
+        if deviceChats.storageError {
+            deviceChatError = AppLocalized("Could not open the saved device chats.")
+        }
+        if deviceChats.available, !hub.others.isEmpty {
+            chooseChatDestination = true
+        } else {
+            startLocalChat()
+        }
+    }
+
+    private func startLocalChat() {
+        chooseChatDestination = false
+        openSideChat(NanoMuseMainChat.draftPrefix + UUID().uuidString)
+    }
+
+    private func startDeviceChat(_ device: HubDevice) {
+        do {
+            let id = try deviceChats.create(device)
+            chooseChatDestination = false
+            showDevices = false
+            openSideChat(deviceChatPrefix + id)
+        } catch let failure as HubError {
+            deviceChatError = NanoMuseHubErrors.describe(failure)
+        } catch {
+            deviceChatError = AppLocalized("Could not save the device chat.")
         }
     }
 
@@ -689,13 +754,17 @@ struct NanoMuseHomeView: View {
             .animation(.easeInOut(duration: 0.25), value: star.pending)
             .animation(.easeInOut(duration: 0.25), value: allowance.pending)
             .navigationDestination(for: String.self) { id in
-                let draft = id.hasPrefix(NanoMuseMainChat.draftPrefix)
-                AIChatView(sessionId: draft ? nil : id, draftId: draft ? id : nil)
-                    .id(id)
-                    // The side chat keeps the system bar, with the main chat's scrim behind it,
-                    // and no Muse header over its list.
-                    .environment(\.nmSystemBarScrim, true)
-                    .environment(\.nmTopOverlay, 0)
+                if id.hasPrefix(deviceChatPrefix) {
+                    NanoMuseDeviceChatView(conversations: deviceChats, id: String(id.dropFirst(deviceChatPrefix.count)))
+                        .id(id)
+                } else {
+                    let draft = id.hasPrefix(NanoMuseMainChat.draftPrefix)
+                    AIChatView(sessionId: draft ? nil : id, draftId: draft ? id : nil)
+                        .id(id)
+                        // The side chat keeps the system bar and no Muse header over its list.
+                        .environment(\.nmSystemBarScrim, true)
+                        .environment(\.nmTopOverlay, 0)
+                }
             }
         }
     }
@@ -1147,6 +1216,8 @@ struct NanoMuseDrawer: View {
     var onOpenMain: () -> Void
     var onOpenSession: (String) -> Void
     var onNewChat: () -> Void
+    @ObservedObject var deviceChats: NanoMuseDeviceConversations
+    var deviceChatPrefix: String
     var onPinMain: (String) -> Void
     var onDevices: () -> Void
     var onCoding: () -> Void
@@ -1161,6 +1232,8 @@ struct NanoMuseDrawer: View {
     @State private var query = ""
     @State private var dragOffset: CGFloat = 0
     @State private var deleteCandidate: String?
+    @State private var deleteDeviceChat: NanoMuseDeviceConversations.Chat?
+    @State private var deviceChatSaveError = false
     /// Reduce Motion on: the panel fades in instead of sliding in from the edge.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The agent's name follows Dynamic Type, capped as the header's lines are (NanoMuseHeaderMetrics).
@@ -1211,6 +1284,15 @@ struct NanoMuseDrawer: View {
         let own = sessions.filter { !$0.isRemote && $0.id != mainId }
         guard !q.isEmpty else { return own }
         return own.filter { ($0.title ?? "").lowercased().contains(q) || ($0.lastMessage ?? "").lowercased().contains(q) }
+    }
+
+    private var filteredDeviceChats: [NanoMuseDeviceConversations.Chat] {
+        guard deviceChats.available else { return [] }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return deviceChats.chats.filter { chat in
+            let name = deviceChats.device(for: chat.destination)?.name ?? chat.destination.name
+            return q.isEmpty || name.localizedCaseInsensitiveContains(q) || chat.title.localizedCaseInsensitiveContains(q)
+        }
     }
 
     private var mainSelected: Bool { currentId == nil || currentId == mainId }
@@ -1275,7 +1357,7 @@ struct NanoMuseDrawer: View {
             .padding(.trailing, 10)
             .padding(.top, 14)
 
-            if filtered.isEmpty {
+            if filtered.isEmpty && filteredDeviceChats.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Image(systemName: "bubble.left.and.bubble.right")
                         .font(.system(size: 22))
@@ -1291,6 +1373,7 @@ struct NanoMuseDrawer: View {
                 Spacer(minLength: 0)
             } else {
                 List {
+                    deviceChatRows
                     ForEach(filtered) { session in
                         Button {
                             close()
@@ -1378,6 +1461,58 @@ struct NanoMuseDrawer: View {
             .padding(.vertical, 8)
         }
         .background(NanoMuseTones.surface.ignoresSafeArea())
+        .alert(AppLocalized("Delete chat"), isPresented: Binding(
+            get: { deleteDeviceChat != nil }, set: { if !$0 { deleteDeviceChat = nil } }
+        ), presenting: deleteDeviceChat) { chat in
+            Button(AppLocalized("Cancel"), role: .cancel) {}
+            Button(AppLocalized("Delete"), role: .destructive) {
+                do {
+                    try deviceChats.remove(chat)
+                    if currentId == deviceChatPrefix + chat.id { onOpenMain() }
+                } catch {
+                    deviceChatSaveError = true
+                }
+            }
+        } message: { chat in
+            if chat.pending?.state == .unknown {
+                Text(AppLocalized("The turn may still be running on the other device. Removing this chat does not stop it, and you will lose this iPhone's saved way to recover its result."))
+            } else {
+                Text(AppLocalized("This removes the device chat from this iPhone."))
+            }
+        }
+        .alert(AppLocalized("Could not save the device chat."), isPresented: $deviceChatSaveError) {
+            Button(AppLocalized("OK"), role: .cancel) {}
+        }
+    }
+
+    private var deviceChatRows: some View {
+        ForEach(filteredDeviceChats) { chat in
+            let id = deviceChatPrefix + chat.id
+            let name = deviceChats.device(for: chat.destination)?.name ?? chat.destination.name
+            Button {
+                close()
+                onOpenSession(id)
+            } label: {
+                Label {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(chat.turns.isEmpty ? name : chat.title).lineLimit(1)
+                        if !chat.turns.isEmpty {
+                            Text(name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                } icon: {
+                    Image(systemName: chat.destination.symbol)
+                }
+            }
+            .listRowBackground(id == currentId ? NanoMuseTones.fill : Color.clear)
+            .contextMenu {
+                if chat.pending?.state != .accepted, !deviceChats.sending.contains(chat.id) {
+                    Button(role: .destructive) { deleteDeviceChat = chat } label: {
+                        Label(AppLocalized("Delete chat"), systemImage: "trash")
+                    }
+                }
+            }
+        }
     }
 
     private func fixedRow(_ title: String, symbol: String, value: String? = nil, selected: Bool = false, action: @escaping () -> Void) -> some View {

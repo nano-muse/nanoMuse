@@ -25,6 +25,12 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 
 仍须遵守 [CONTRIBUTING.md](../../CONTRIBUTING.md)：自有代码放入新文件，即 `NanoMuse/`；修改上游 Swift 文件时在相应位置标 `// nanoMuse:`；名称和品牌调整通过脚本生成，不手改结果。
 
+## 设备对话 {#device-chats}
+
+在 Muse 布局中打开「新建对话」，选择同账号下的一台设备。也可以从聊天抽屉的「电脑」页面发起设备对话，再从「旁聊」打开。按 Command-N 也会打开同一个设备选择列表。后续消息会发往选定的设备，每个设备对话各有自己的上下文和草稿。目标离线时也可以创建对话，发送时目标需要在线并支持 `task.status`。
+
+在消息开头输入 `@设备名`，可以把这一轮交给另一台支持设备对话的设备。如果有重名设备，请输入 `@设备名 [设备ID]`。断线后，重新打开对话或点「刷新」可向目标设备查询原轮次的状态。iPhone 将对话记录保存在发起设备上。移除设备对话只会删除这台 iPhone 上的副本。投递状态不确定时，确认框会说明目标可能仍在运行，移除后会失去这台 iPhone 保存的恢复信息；这不会停止远端轮次。详见 [Hub 协议](hub.md#persistent-device-conversations)。
+
 ## 这里哪些是 nanoMuse 的 {#what-is-nanomuse-here}
 
 `python scripts/rebrand.py` 应用以下调整。脚本可重复执行且结果一致，每次更新上游后都应运行：
