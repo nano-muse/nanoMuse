@@ -162,7 +162,19 @@ Every user message, model turn, decision, approval, tool call and result is appe
 ```bash
 nanomuse audit -n 50          # table
 nanomuse audit --json         # raw lines
+nanomuse audit --verify       # check the hash chain
 ```
+
+Every entry carries a hash-chain link (`seq`, `prev`, `entry_hash`,
+HMAC-SHA256 over the entry), so editing, deleting or reordering a line
+after the fact is found by `nanomuse audit --verify`. Lines written before
+signing have no hash fields and verify as unsigned. The signing key is
+never the vault key: it is injected, read from the OS keychain, or kept in
+its own `audit.key` file next to the log (mode 600 on POSIX; on Windows
+the file's access list is read instead, since Windows has no mode bits,
+and a file open to a broad group is refused). The chain is
+tamper-evident, not unforgeable: anyone who holds the device and the key
+can re-sign a whole chain, and this page says so out loud.
 
 The app's activity sheet (tap the avatar) reads the same file.
 

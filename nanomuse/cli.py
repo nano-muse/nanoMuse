@@ -1407,11 +1407,26 @@ def audit(
     config: ConfigOpt = None,
     n: Annotated[int, typer.Option("-n", help="Entries to show")] = 20,
     as_json: Annotated[bool, typer.Option("--json", help="Raw JSON lines")] = False,
+    verify: Annotated[bool, typer.Option("--verify", help="Check the hash chain instead")] = False,
 ) -> None:
     """Show the most recent audit entries."""
     from nanomuse.sentinel import AuditLog
 
     s = _settings(config)
+    if verify:
+        report = AuditLog(s.audit_file).verify()
+        console.print(
+            f"checked={report.checked} unsigned={report.unsigned} "
+            f"corrupt={len(report.corrupt)} broken={len(report.broken)} "
+            f"last_seq={report.last_seq}"
+        )
+        for item in report.corrupt:
+            console.print(f"[red]corrupt line {item['line']}: {item['reason']}[/red]")
+        for item in report.broken:
+            console.print(f"[red]broken line {item['line']}: {'; '.join(item['reasons'])}[/red]")
+        if not report.ok:
+            raise typer.Exit(1)
+        return
     entries = AuditLog(s.audit_file).tail(n)
     if as_json:
         for e in entries:
