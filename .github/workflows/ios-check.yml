@@ -48,6 +48,14 @@ jobs:
             tests/ios/AnthropicPromptChecks.swift -o "$RUNNER_TEMP/anthropic-prompt-checks"
           "$RUNNER_TEMP/anthropic-prompt-checks"
 
+      - name: Persistent device chat lifecycle checks
+        timeout-minutes: 2
+        run: |
+          swiftc -target "$(uname -m)-apple-macosx14.0" \
+            android/src/ios/NanoMuse/NanoMuseDeviceConversations.swift \
+            tests/ios/DeviceConversationsChecks.swift -o "$RUNNER_TEMP/device-conversations-checks"
+          "$RUNNER_TEMP/device-conversations-checks"
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}

@@ -245,7 +245,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### iOS
 
-- Added device chats to New Chat and the Computers list on iPhone. Follow-ups use the selected device, and reopening a chat after a disconnect checks the original turn. For #815.
+- Added device chats to New Chat, including Command-N, and the Computers list on iPhone. Follow-ups use the selected device, and reopening a chat after a disconnect checks the original turn. For #815.
 
 - Replaced the missing Claude sign-in configuration trap with a recoverable provider error, including background title and warmup requests, while keeping API-key requests independent. For #911.
 

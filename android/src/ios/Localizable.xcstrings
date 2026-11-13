@@ -1,6 +1,65 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "The turn may still be running on the other device. Removing this chat does not stop it, and you will lose this iPhone's saved way to recover its result.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The turn may still be running on the other device. Removing this chat does not stop it, and you will lose this iPhone's saved way to recover its result."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这一轮可能仍在另一台设备上运行。移除此对话不会停止它，也会删除这台 iPhone 保存的结果恢复信息。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這一輪可能仍在另一台裝置上執行。移除此對話不會停止它，也會刪除這台 iPhone 儲存的結果復原資訊。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Vorgang läuft möglicherweise noch auf dem anderen Gerät. Das Entfernen dieses Chats stoppt ihn nicht. Dabei gehen die auf diesem iPhone gespeicherten Informationen zur Wiederherstellung des Ergebnisses verloren."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El turno puede seguir ejecutándose en el otro dispositivo. Eliminar este chat no lo detiene y perderás la información guardada en este iPhone para recuperar el resultado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le tour peut encore être en cours sur l'autre appareil. Supprimer cette conversation ne l'arrête pas et efface les informations enregistrées sur cet iPhone pour récupérer le résultat."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このターンは別のデバイスでまだ実行中の可能性があります。このチャットを削除しても停止しません。また、この iPhone に保存された、結果の取得に必要な情報も失われます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 턴은 다른 기기에서 아직 실행 중일 수 있습니다. 이 채팅을 삭제해도 중지되지 않으며, 결과를 복구하기 위해 이 iPhone에 저장된 정보도 사라집니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Этот запрос может ещё выполняться на другом устройстве. Удаление чата не остановит его. Также будут удалены сохранённые на этом iPhone данные для получения результата."
+          }
+        }
+      }
+    },
     "Claude sign-in is unavailable in this version. Choose another model or use an API key.": {
       "extractionState": "manual",
       "localizations": {

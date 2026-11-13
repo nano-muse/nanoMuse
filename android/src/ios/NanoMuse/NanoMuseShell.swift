@@ -1473,8 +1473,12 @@ struct NanoMuseDrawer: View {
                     deviceChatSaveError = true
                 }
             }
-        } message: { _ in
-            Text(AppLocalized("This removes the device chat from this iPhone."))
+        } message: { chat in
+            if chat.pending?.state == .unknown {
+                Text(AppLocalized("The turn may still be running on the other device. Removing this chat does not stop it, and you will lose this iPhone's saved way to recover its result."))
+            } else {
+                Text(AppLocalized("This removes the device chat from this iPhone."))
+            }
         }
         .alert(AppLocalized("Could not save the device chat."), isPresented: $deviceChatSaveError) {
             Button(AppLocalized("OK"), role: .cancel) {}
