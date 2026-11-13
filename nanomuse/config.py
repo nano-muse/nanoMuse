@@ -325,6 +325,19 @@ class SentinelSettings(BaseModel):
     # Enable taint tracking: once the agent has read private data, network egress to
     # non-allowlisted destinations requires approval.
     taint_tracking: bool = True
+    # Put the gatekeeper process (nanomuse/sentinel/gatekeeper.py) in the loop: it
+    # holds the audit signing key and its own copy of the standing permissions, is
+    # consulted on every tool call, can veto any of them, and settles calls its
+    # permissions cover. Off by default. When on, a gatekeeper that cannot start
+    # or cannot be reached refuses calls rather than letting them through
+    # undecided, and the app itself does not start without one. The key comes
+    # from the OS keychain (service nanomuse-gatekeeper, account audit-signing);
+    # provision it with `nanomuse gatekeeper-keygen`.
+    gatekeeper: bool = False
+    # Where the gatekeeper listens; the default is gatekeeper.sock in the data
+    # directory. On macOS a socket path is limited to about 100 characters, so a
+    # deep data directory needs a shorter explicit path.
+    gatekeeper_socket: Path | None = None
     review: ReviewSettings = Field(default_factory=ReviewSettings)
 
 

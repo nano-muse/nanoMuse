@@ -229,6 +229,8 @@ taint_tracking     = true
 egress_allowlist   = ["duckduckgo.com", "*.duckduckgo.com", "wikipedia.org", "*.wikipedia.org",
                       "github.com", "*.github.com", "*.githubusercontent.com", "pypi.org", "*.pypi.org"]
 audit_file         = ""              # default <data_dir>/audit.jsonl
+gatekeeper         = false           # consult the gatekeeper process on every call (Linux, macOS, Windows)
+gatekeeper_socket  = ""              # default <data_dir>/gatekeeper.sock; macOS paths stay under ~100 chars
 
 [[sentinel.rules]]                   # first match wins; values are glob patterns matched against str(arg)
 tool   = "shell"

@@ -33,6 +33,7 @@ from nanomuse.runtime import device, device_mcp_server
 from nanomuse.sandbox import Sandbox
 from nanomuse.search import WebSearchProvider
 from nanomuse.sentinel import AuditLog, Sentinel
+from nanomuse.sentinel.gatekeeper import GatekeeperClient, GatekeeperSupervisor
 from nanomuse.sentinel.review import ReviewClient, SentinelReviewer
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools import (
@@ -103,12 +104,32 @@ class NanoMuseApp:
         )
         self.skills = SkillLibrary(settings.skills, own_dir=settings.skills_dir)
         self.audit = AuditLog(settings.audit_file, session_id=self.session_id)
+        # The gatekeeper process, when [sentinel] gatekeeper is on: it holds the
+        # audit signing key (read from the OS keychain by the child, never by
+        # this process) and its own copy of the standing permissions, which live
+        # in the same approvals file the local store uses. It starts in start()
+        # and stops in close(); an app that asked for it does not run without it.
+        self._gatekeeper_supervisor: GatekeeperSupervisor | None = None
+        gatekeeper_client: GatekeeperClient | None = None
+        if settings.sentinel.gatekeeper:
+            gatekeeper_socket = settings.sentinel.gatekeeper_socket or (
+                settings.data_dir / "gatekeeper.sock"
+            )
+            self._gatekeeper_supervisor = GatekeeperSupervisor(
+                gatekeeper_socket,
+                settings.sentinel,
+                key_material=None,
+                audit_path=settings.data_dir / "gatekeeper-audit.jsonl",
+                grants_path=settings.data_dir / "approvals.json",
+            )
+            gatekeeper_client = GatekeeperClient(gatekeeper_socket)
         self.sentinel = Sentinel(
             settings.sentinel,
             audit=self.audit,
             ui=ui,
             vault=self.vault,
             persistent_approvals_file=settings.data_dir / "approvals.json",
+            gatekeeper=gatekeeper_client,
         )
         self.llm = llm or self.make_llm()
         self.reviewer = SentinelReviewer(
@@ -591,12 +612,19 @@ class NanoMuseApp:
 
     async def start(self) -> NanoMuseApp:
         """Connect optional MCP servers. Call once before using the agent."""
+        if self._gatekeeper_supervisor is not None:
+            # Fail closed: no key in the keychain, a platform that cannot name
+            # its peer or a child that will not start all stop the app here
+            # rather than letting it run ungated.
+            await self._gatekeeper_supervisor.start()
         if self.mcp is not None:
             for tool in await self.mcp.connect():
                 self.tools.add(tool)
         return self
 
     async def close(self) -> None:
+        if self._gatekeeper_supervisor is not None:
+            await self._gatekeeper_supervisor.stop()
         await self.reviewer.close()
         await self.tools.cleanup()
         if self.mcp is not None:
