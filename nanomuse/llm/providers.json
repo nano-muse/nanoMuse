@@ -531,6 +531,23 @@
       "verified": "2026-11"
     },
     {
+      "id": "synap",
+      "name": "Synap",
+      "name_zh": "Synap",
+      "protocol": "openai",
+      "base_url": "https://synap402.com/v1",
+      "key_url": "https://synap402.com/account.html#keys",
+      "auth": ["key"],
+      "regions": ["global"],
+      "capabilities": ["chat"],
+      "defaults": {
+        "chat": "qwen3-coder-30b"
+      },
+      "note": "A pay-as-you-go OpenAI-compatible API for open-weight models (Qwen3 Coder, Qwen3.5, GLM, DeepSeek V4, gpt-oss, Gemma and others). Its public /v1/models list names the models that can be called now, with per-token prices. Chat only here, on the OpenAI shape: the default model is qwen3-coder-30b, and any id from that list can be set instead.",
+      "note_zh": "按用量付费的 OpenAI 兼容 API，提供开放权重模型（Qwen3 Coder、Qwen3.5、GLM、DeepSeek V4、gpt-oss、Gemma 等）。公开的 /v1/models 列表给出现在可以调用的模型和按 token 计的价格。这里只有对话，走 OpenAI 格式：默认模型是 qwen3-coder-30b，也可以改填这个列表里的任意模型 id。",
+      "verified": "2026-11"
+    },
+    {
       "id": "ollama",
       "name": "Ollama",
       "name_zh": "Ollama（本机）",

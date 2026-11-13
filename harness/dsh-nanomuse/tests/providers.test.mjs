@@ -80,6 +80,18 @@ test('UberLLM is offered for own-key chat without unverified media capabilities'
   }
 })
 
+test('Synap is offered for own-key chat without unverified media capabilities', () => {
+  const provider = catalogue.find((p) => p.id === 'synap')
+  assert.ok(provider)
+  assert.equal(baseUrlFor(provider, 'global'), 'https://synap402.com/v1')
+  assert.equal(provider.defaults.chat, 'qwen3-coder-30b')
+  assert.deepEqual(capabilitiesForAuth(provider, 'key'), ['chat'])
+  assert.ok(waysOn(catalogue, 'global').rest.some((p) => p.id === 'synap'))
+  for (const capability of ['vision', 'image', 'video']) {
+    assert.ok(!providersWith(catalogue, capability, 'global').some((p) => p.id === 'synap'))
+  }
+})
+
 test('loadCatalogue reads the asset next to lib/ and gives an empty list for a missing file', async () => {
   assert.ok((await loadCatalogue()).length >= 15)
   assert.deepEqual(await loadCatalogue('/nonexistent/providers.json'), [])

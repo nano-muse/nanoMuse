@@ -27,6 +27,10 @@ describe("the model slots (the Models contract)", () => {
     expect(entryFor("openai", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")?.id).toBe("bailian");
     expect(entryFor("openai", "https://api.openai.com/v1")?.id).toBe("openai");
     expect(entryFor("openai", "https://gateway.example.com/v1")).toBeNull();
+    expect(entryFor("openai", "https://gateway.example.ai/v1")).toBeNull();
+    expect(entryFor("openai", "https://gateway.example.dev/v1")).toBeNull();
+    expect(entryFor("openai", "https://eu.openrouter.ai/api/v1")?.id).toBe("openrouter");
+    expect(entryFor("openai", "https://synap402.com/v1")?.id).toBe("synap");
     expect(entryFor("openai", "")).toBeNull();
   });
 

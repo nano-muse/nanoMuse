@@ -168,6 +168,17 @@ class Provider:
         }
 
 
+def _near(host: str, listed: str) -> bool:
+    """Whether ``host`` sits next to a listed host: a sibling under the same parent domain
+    (``dashscope-intl.aliyuncs.com`` next to ``dashscope.aliyuncs.com``), or a subdomain when
+    the listed host is a domain of its own (``eu.openrouter.ai`` under ``openrouter.ai``).
+    A listed domain of its own never stands for its whole top-level domain."""
+    parent = listed.split(".", 1)[1]
+    if "." in parent:
+        return host.endswith("." + parent)
+    return host.endswith("." + listed)
+
+
 @dataclass
 class Catalogue:
     providers: list[Provider]
@@ -202,7 +213,7 @@ class Catalogue:
                 return p
         # a subdomain of a listed host (regional endpoints such as dashscope-intl)
         for p in self.providers:
-            if any(host.endswith("." + h.split(".", 1)[-1]) for h in p.hosts() if "." in h):
+            if any(_near(host, h) for h in p.hosts() if "." in h):
                 return p
         return None
 
