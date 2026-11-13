@@ -1600,6 +1600,27 @@ def phone_trace(
             )
 
 
+@app.command("gatekeeper-keygen")
+def gatekeeper_keygen() -> None:
+    """Create the gatekeeper's audit signing key in the OS keychain.
+
+    The gatekeeper ([sentinel] gatekeeper = true) reads its key from the
+    keychain and never writes it; this command is the one provisioning path.
+    Running it again rotates the key, which starts the gatekeeper's audit
+    chain over."""
+    from nanomuse.sentinel.gatekeeper import GatekeeperUnavailable, provision_gatekeeper_key
+
+    try:
+        provision_gatekeeper_key()
+    except GatekeeperUnavailable as exc:
+        console.print(f"[red]✗[/red] {exc}")
+        raise typer.Exit(1) from exc
+    console.print(
+        "Gatekeeper key stored in the OS keychain "
+        "(service nanomuse-gatekeeper, account audit-signing)."
+    )
+
+
 @app.command()
 def version() -> None:
     """Print the version."""
