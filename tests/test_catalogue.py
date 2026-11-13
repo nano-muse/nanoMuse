@@ -151,6 +151,11 @@ def test_by_base_url_finds_the_entry_for_a_host_or_nothing():
     assert cat.by_base_url("https://api.deepseek.com").id == "deepseek"
     assert cat.by_base_url("https://dashscope.aliyuncs.com/compatible-mode/v1").id == "bailian"
     assert cat.by_base_url("https://gateway.example.net/v1") is None
+    # a vendor on a domain of its own never stands for its whole top-level domain
+    assert cat.by_base_url("https://gateway.example.com/v1") is None
+    assert cat.by_base_url("https://gateway.example.ai/v1") is None
+    assert cat.by_base_url("https://gateway.example.dev/v1") is None
+    assert cat.by_base_url("https://eu.openrouter.ai/api/v1").id == "openrouter"
     assert cat.by_base_url("") is None
     # two editions on one host are told apart by the whole address, the host is only the fallback
     assert cat.by_base_url("https://opencode.ai/zen/v1").id == "opencode-zen"

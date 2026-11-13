@@ -128,6 +128,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **Showed an unlisted gateway under its own host.** A vendor on a domain of its own (`openrouter.ai`, `atmorouter.dev`) stood for every host under the same top-level domain, so `gateway.example.ai` read as OpenRouter in the runtime and the console. Such a vendor now stands only for its own subdomains; regional siblings such as `dashscope-intl.aliyuncs.com` still find Bailian.
 - **Kept Daily, setup and avatar views on the newest refresh.** Overlapping loads no longer replace newer information or report old errors after leaving. Avatar refreshes preserve drafts and the current candidate choice, while a different drawing session requires a new choice.
 - **Kept skill suggestions through failed refreshes.** The chat slash menu retained its loaded skills when a reload failed and ignored superseded answers. Turning skills off also hid cached suggestions and disabled their keyboard completion.
 - **Kept the newest skills list when saves overlap.** Older responses no longer hide newly saved skills, failed refreshes keep the loaded list, and pending reads do not report errors after leaving the page.
