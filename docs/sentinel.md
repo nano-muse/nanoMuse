@@ -90,6 +90,8 @@ Concurrent calls to the same tool in one conversation wait for the pending appro
 
 Recurring reminders and triggers attached to a saved chat reuse that chat's permissions. Each standalone run still has its own conversation scope. Replacing a persisted permission with an until-restart permission removes the old disk record too, so it cannot return after restarting.
 
+A grant is bound to the configuration it was given under, as well as to its key. When the Sentinel or the gatekeeper records one, it stamps it with a fingerprint: a hash of the approval policy in the `[sentinel]` section (the mode, `always_ask_tools`, `always_allow_tools`, `deny_tools`, `egress_allowlist`, the rules and `taint_tracking`), never the configuration itself. While the policy stands, the grant settles calls as before. Change any of those fields and the grants given under the old policy stop settling and stop being listed, the skip is written to the log, and the call asks again. They are paused, not deleted: put the configuration back and they count again, and revoking one works whatever the configuration. Reordering one of the lists changes nothing, because a list only says what is in it; reordering the rules does, because the first matching rule wins. The audit file's path and the gatekeeper switch stay out of the fingerprint: one is a path, the other is how a decision travels, and the gatekeeper stamps grants in its own store from its own copy of the same settings, so nothing about the binding crosses the gatekeeper protocol. The fingerprint binds a grant to the policy, not to the tools or the model: a tool whose behaviour changes under the same name is not caught by it. Grants written before this binding existed carry no fingerprint and are not honoured: after an upgrade, a standing permission has to be given once more.
+
 In the app an unanswered card times out after `server.approval_timeout` seconds (default one hour) and counts as deny. The agent keeps accepting new messages while a card is waiting. Cards that were still pending when the server stopped are marked expired on restart; the run behind them is gone.
 
 ## Optional model observations
@@ -162,9 +164,80 @@ Every user message, model turn, decision, approval, tool call and result is appe
 ```bash
 nanomuse audit -n 50          # table
 nanomuse audit --json         # raw lines
+nanomuse audit --verify       # check the hash chain
 ```
 
+Every entry carries a hash-chain link (`seq`, `prev`, `entry_hash`,
+HMAC-SHA256 over the entry), so editing, deleting or reordering a line
+after the fact is found by `nanomuse audit --verify`. Lines written before
+signing have no hash fields and verify as unsigned. The signing key is
+never the vault key: it is injected, read from the OS keychain, or kept in
+its own `audit.key` file next to the log (mode 600 on POSIX; on Windows
+the file's access list is read instead, since Windows has no mode bits,
+and a file open to a broad group is refused). The chain is
+tamper-evident, not unforgeable: anyone who holds the device and the
+key can re-sign a whole chain. Key separation is what the
+[gatekeeper](#gatekeeper-opt-in) below is for: it holds a key of its
+own, in a process of its own, and signs a chain of its own; this chain
+keeps the key arrangements described above either way.
+
 The app's activity sheet (tap the avatar) reads the same file.
+
+## Gatekeeper (opt-in)
+
+`nanomuse/sentinel/gatekeeper.py` is the key separation the audit section
+above calls for. It is off by default; `[sentinel] gatekeeper = true` puts it
+in the loop, and the in-process Sentinel stays in charge of everything else
+(prompts, execution, the audit log) either way.
+
+When it is on, the app spawns the gatekeeper as a child process at startup
+and stops it at shutdown. An app that asked for it does not start without
+it: no key, a platform that cannot name its peer, or a child that will not
+start all stop startup rather than letting the agent run ungated. The key is
+handed over on a file descriptor at spawn on Linux and macOS; on Windows,
+and in production generally, the child reads it from the OS keychain
+instead (service nanomuse-gatekeeper, account audit-signing, provisioned
+by `nanomuse gatekeeper-keygen`; on Windows that is Credential Manager,
+whose stored secrets Windows protects per user). There is no file fallback.
+
+The channel follows the platform. On Linux and macOS it is a Unix socket
+the child creates with mode 600, and every connection is checked against
+the peer's user id (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS). On
+Windows it is a named pipe whose access list grants only the owner's SID,
+and the client's SID is read from its process token before anything is
+served. A peer running as another user gets no answer on any platform. On
+macOS a socket path is limited to about 100 characters, so a deep data
+directory needs `[sentinel] gatekeeper_socket` set to a shorter path; on
+Windows the configured path names the pipe instead (one pipe per data
+directory).
+
+Every tool call is consulted before anything runs, and the answers fold in
+conservatively:
+
+- Its deny is final. No local permission or prompt settles it.
+- A standing permission it holds settles a call the local policy would have
+  asked about. Both sides read the same approvals file, and when the person
+  gives a standing permission at the prompt, the Sentinel mirrors it to the
+  gatekeeper (a new `grant` request) so its store can settle the next call.
+- Its ask makes the call ask even where the local policy would not; the
+  local flow then runs, prompt included.
+- It never loosens a local deny, and a bare agreement from its own policy
+  copy does not settle a local ask: only its permissions do.
+- A gatekeeper that cannot be reached refuses the call. There is no silent
+  fallback to the local policy.
+
+The gatekeeper holds a snapshot of the rules taken at start (editing rules
+means restarting the app), re-evaluates each call with its own copy instead
+of trusting the advice the agent computed, and signs its decision into its
+own audit log (`gatekeeper-audit.jsonl` in the data directory, a separate
+chain from the app's execution log). The request carries the call's
+arguments so the rules see them, but its audit entry records only their
+shapes, never their values, and the key never crosses the channel in either
+direction.
+
+What is not covered yet: the per-app permission prompt for the hands
+(`allow_app`) still settles locally, reloading the rules without a restart,
+and running the gatekeeper as a different OS user.
 
 ## What this does and does not protect against
 

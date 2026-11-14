@@ -1407,11 +1407,26 @@ def audit(
     config: ConfigOpt = None,
     n: Annotated[int, typer.Option("-n", help="Entries to show")] = 20,
     as_json: Annotated[bool, typer.Option("--json", help="Raw JSON lines")] = False,
+    verify: Annotated[bool, typer.Option("--verify", help="Check the hash chain instead")] = False,
 ) -> None:
     """Show the most recent audit entries."""
     from nanomuse.sentinel import AuditLog
 
     s = _settings(config)
+    if verify:
+        report = AuditLog(s.audit_file).verify()
+        console.print(
+            f"checked={report.checked} unsigned={report.unsigned} "
+            f"corrupt={len(report.corrupt)} broken={len(report.broken)} "
+            f"last_seq={report.last_seq}"
+        )
+        for item in report.corrupt:
+            console.print(f"[red]corrupt line {item['line']}: {item['reason']}[/red]")
+        for item in report.broken:
+            console.print(f"[red]broken line {item['line']}: {'; '.join(item['reasons'])}[/red]")
+        if not report.ok:
+            raise typer.Exit(1)
+        return
     entries = AuditLog(s.audit_file).tail(n)
     if as_json:
         for e in entries:
@@ -1583,6 +1598,27 @@ def phone_trace(
                 f"[bold]{rec.get('status')}[/bold] after {rec.get('steps')} steps, "
                 f"{rec.get('seconds')} s: {rec.get('message', '')}"
             )
+
+
+@app.command("gatekeeper-keygen")
+def gatekeeper_keygen() -> None:
+    """Create the gatekeeper's audit signing key in the OS keychain.
+
+    The gatekeeper ([sentinel] gatekeeper = true) reads its key from the
+    keychain and never writes it; this command is the one provisioning path.
+    Running it again rotates the key, which starts the gatekeeper's audit
+    chain over."""
+    from nanomuse.sentinel.gatekeeper import GatekeeperUnavailable, provision_gatekeeper_key
+
+    try:
+        provision_gatekeeper_key()
+    except GatekeeperUnavailable as exc:
+        console.print(f"[red]✗[/red] {exc}")
+        raise typer.Exit(1) from exc
+    console.print(
+        "Gatekeeper key stored in the OS keychain "
+        "(service nanomuse-gatekeeper, account audit-signing)."
+    )
 
 
 @app.command()

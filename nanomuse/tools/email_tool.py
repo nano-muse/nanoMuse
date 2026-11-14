@@ -127,6 +127,8 @@ class _EmailBase(BaseTool):
 
 class ReadEmails(_EmailBase):
     name: str = "read_emails"
+    purpose: str = "Read the user's mailbox: the most recent or searched messages."
+    keywords: list[str] = ["email", "mail", "inbox", "read"]
     description: str = (
         "Read the user's mailbox over IMAP. Returns the most recent messages (sender, date, subject, "
         "text body). Filters: unread_only, search (IMAP TEXT search), folder (default INBOX)."
@@ -217,6 +219,8 @@ class ReadEmails(_EmailBase):
 
 class SendEmail(_EmailBase):
     name: str = "send_email"
+    purpose: str = "Send an email from the user's account."
+    keywords: list[str] = ["email", "send", "mail", "write to"]
     description: str = (
         "Send an email from the user's account over SMTP. Always show the user the draft (to, subject, "
         "body) before sending unless they explicitly asked you to send without review."

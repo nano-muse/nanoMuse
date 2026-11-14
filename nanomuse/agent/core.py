@@ -16,10 +16,19 @@ from nanomuse.agent.context import fit_context
 from nanomuse.calendar import CalendarFeeds
 from nanomuse.config import Settings
 from nanomuse.contacts import ContactBook
+from nanomuse.cost import recording as cost_recording
 from nanomuse.goals import GoalStore
 from nanomuse.llm import budget as task_budget
 from nanomuse.llm import session as llm_session
 from nanomuse.llm.base import BaseLLM
+from nanomuse.llm.decider import (
+    DecideOutcome,
+    Decider,
+    DecideRequest,
+    ScoreAnswer,
+    build_decider,
+    difficulty_question,
+)
 from nanomuse.llm.vision import keep_newest_images
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryItem, MemoryStore
@@ -28,6 +37,7 @@ from nanomuse.schema import AgentState, Attachment, Message, Role, ToolResult, n
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
+from nanomuse.tools.bridge import ToolBridge, build_tool_bridge
 from nanomuse.ui import UI
 
 
@@ -83,6 +93,13 @@ class MuseAgent:
         self.sentinel = sentinel
         self.ui = ui
         self.audit = audit
+        # The tool bridge's view of the collection, when [tool_bridge] turns
+        # it on: the model's list is the view (a direct core plus find_tools
+        # and use_tool), while self.tools stays the full collection every
+        # internal probe reads. Built once, here, so the list on every call
+        # of the conversation is the same bytes. None when off, and off is
+        # the default: nothing about the list or the dispatch changes.
+        self._bridge: ToolBridge | None = build_tool_bridge(tools, sentinel, settings)
         self.memory = memory
         self.goals = goals
         self.calendar = calendar
@@ -106,6 +123,9 @@ class MuseAgent:
         # before the next model call instead of waiting for the current run to finish.
         self.inbox: asyncio.Queue[str | Incoming] | None = None
         self._told_no_vision = False
+        # The decision layer for this agent, built from the [decider] settings on
+        # the first run that wants it; None until then and forever when disabled.
+        self._built_decider: Decider | None = None
         self.last_budget: dict[str, Any] = {}
         self._task_start = 0
         # The language of the screens the person reads this conversation on, from the latest
@@ -388,7 +408,9 @@ class MuseAgent:
             sentinel_mode=self.settings.sentinel.mode,
             sandbox=self.sandbox_note(),
             contacts=self.contacts_note(),
-            tool_names=", ".join(t.name for t in self.tools),
+            tool_names=", ".join(
+                self._bridge.names() if self._bridge is not None else [t.name for t in self.tools]
+            ),
             user_profile=profile,
             memories=memories,
             goals=goals
@@ -444,6 +466,46 @@ class MuseAgent:
 
         return len({sig(m) for m in assistants}) == 1
 
+    # ------------------------------------------------------------------ decision layer
+    async def _decider_shadow(self, user_input: str) -> None:
+        """The decision layer's one shadow question per run: how hard is this task.
+
+        Only with ``[decider] enabled``; with it off this returns before
+        anything is built or called.  The answer is written to the
+        decision log with the tier it would have picked at the
+        configured threshold, and changes nothing about the run: the
+        model, the tools and the budget are all exactly as they would
+        have been.  The decider fails open on its own; this wrapper
+        swallows anything else, because a shadow observer must never
+        break a task.
+        """
+        cfg = self.settings.decider
+        if not cfg.enabled:
+            return
+        try:
+            if self._built_decider is None:
+                self._built_decider = build_decider(self.settings)
+            threshold = cfg.threshold
+
+            def annotate(outcome: DecideOutcome) -> dict[str, Any]:
+                answers = outcome.answers or []
+                first = answers[0] if answers else None
+                if isinstance(first, ScoreAnswer):
+                    tier = "escalated" if first.score >= threshold else "default"
+                    return {"would_choose": tier}
+                return {"would_choose": None}
+
+            await self._built_decider.decide(
+                "task_difficulty",
+                DecideRequest(
+                    state=user_input[:2000],
+                    questions=[difficulty_question()],
+                ),
+                annotate=annotate,
+            )
+        except Exception:  # noqa: BLE001 - shadow mode observes; it never interferes
+            logger.exception("decider shadow call failed")
+
     # ------------------------------------------------------------------ main loop
     async def run(
         self,
@@ -455,6 +517,10 @@ class MuseAgent:
     ) -> str:
         if self.state == AgentState.RUNNING:
             raise RuntimeError("agent is already running")
+        # The cost gate's hard mode refuses here, before any work or spend;
+        # a no-op unless a recorder with a hard gate is installed.
+        cost_recording.preflight()
+        await self._decider_shadow(user_input)
         token = task_budget.begin(self.settings.agent.budget, inherit=False)
         budget = task_budget.current()
         assert budget is not None
@@ -483,6 +549,26 @@ class MuseAgent:
         finally:
             try:
                 self.last_budget = budget.snapshot()
+                # Feed the cost ledger from the real run; bookkeeping only, so a
+                # ledger failure never reaches the finished task.
+                try:
+                    # The ledger names the model that ran: the one in
+                    # the llm's own settings.  The client's ``name`` is
+                    # the wrapper's label (the prompt adapter's is
+                    # "prompt_tools"), never a model id, so it is only
+                    # a last resort: pricing by it missed every real
+                    # model and recorded zero costs.
+                    cost_recording.record_finished_task(
+                        task_id=self.conversation_id or self.session_id,
+                        model=str(
+                            getattr(getattr(self.llm, "settings", None), "model", None)
+                            or self.settings.llm.model
+                            or getattr(self.llm, "name", "")
+                        ),
+                        snapshot=self.last_budget,
+                    )
+                except Exception:
+                    logger.exception("cost ledger recording failed")
                 # a line in the audit log when a budget is in force or was reached; a task
                 # with no limits set leaves the log as it was
                 if budget.limited or budget.stopped:
@@ -555,7 +641,7 @@ class MuseAgent:
         attached = {"files": [a.path for a in files]} if files else {}
         self.audit.record("user_message", content=user_input, **attached)
         system_prompt = self.build_system_prompt(user_input, await self.recall_for(user_input))
-        tool_params = self.tools.to_params()
+        tool_params = self._bridge.params() if self._bridge is not None else self.tools.to_params()
         final: str | None = None
         step = 0
         empty_replies = 0
@@ -640,6 +726,10 @@ class MuseAgent:
                     if budget is not None:
                         budget.check()
                     tool = self.tools.get(call.name)
+                    if tool is None and self._bridge is not None:
+                        # a call to one of the bridge's own tools, which live
+                        # in the view, not in the collection itself
+                        tool = self._bridge.get(call.name)
                     if tool is None:
                         summary = f"{call.name}(?)"
                     elif "__raw__" in call.arguments:
@@ -654,7 +744,12 @@ class MuseAgent:
                     self.ui.on_tool_call(call, summary)
                     if tool is None:
                         result = ToolResult.fail(
-                            f"unknown tool '{call.name}'. Available tools: {', '.join(t.name for t in self.tools)}"
+                            f"unknown tool '{call.name}'. Available tools: "
+                            + ", ".join(
+                                self._bridge.names()
+                                if self._bridge is not None
+                                else [t.name for t in self.tools]
+                            )
                         )
                     else:
                         result = await self.sentinel.guard(call, tool)

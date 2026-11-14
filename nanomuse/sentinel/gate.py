@@ -26,8 +26,15 @@ from nanomuse.config import SentinelSettings
 from nanomuse.logger import logger
 from nanomuse.schema import RiskLevel, ToolCall, ToolResult
 from nanomuse.sentinel.audit import AuditLog, channel_of
-from nanomuse.sentinel.grants import Grant, GrantStore, grant_key, normalize_scope
-from nanomuse.sentinel.policy import Decision, Policy
+from nanomuse.sentinel.gatekeeper import GatekeeperClient, GatekeeperUnavailable
+from nanomuse.sentinel.grants import (
+    Grant,
+    GrantStore,
+    grant_key,
+    normalize_scope,
+    policy_fingerprint,
+)
+from nanomuse.sentinel.policy import Decision, Policy, PolicyResult
 from nanomuse.tools.base import BaseTool, CallAssessment, safe_execute
 from nanomuse.ui import UI, ApprovalRequest
 from nanomuse.vault import PLACEHOLDER_RE, CredentialVault
@@ -87,17 +94,26 @@ class Sentinel:
         ui: UI,
         vault: CredentialVault | None = None,
         persistent_approvals_file: Path | None = None,
+        gatekeeper: GatekeeperClient | None = None,
     ):
         self.settings = settings
         self.policy = Policy(settings)
         self.audit = audit
         self.ui = ui
         self.vault = vault
+        # The gatekeeper process, when [sentinel] gatekeeper is on: consulted on
+        # every call before anything runs. Its no is final, a permission it holds
+        # settles a call the policy would have asked about, and its asking makes
+        # the call ask even where the policy would not. It never loosens a local
+        # deny, and a call it cannot judge does not run (see guard()).
+        self.gatekeeper = gatekeeper
         # private data was read in these conversations; per conversation, because one agent
         # loop per thread shares this Sentinel and clearing a side chat must not forget
         # what another conversation read
         self._tainted: set[str] = set()
-        self.grants = GrantStore(persistent_approvals_file)
+        self.grants = GrantStore(
+            persistent_approvals_file, fingerprint=lambda: policy_fingerprint(self.settings)
+        )
         self.reviewer: SentinelReviewer | None = None
         # Wait only for this conversation's approval for a tool, then reassess policy
         # and grants. Other conversations must not wait on its unanswered card.
@@ -262,6 +278,93 @@ class Sentinel:
         )
         return bool(verdict.approved)
 
+    # ------------------------------------------------------------------ gatekeeper
+    async def _consult_gatekeeper(
+        self,
+        tool: BaseTool,
+        args: dict[str, Any],
+        assessment: CallAssessment,
+        key: str,
+        task: TaskContext | None,
+        result_policy: PolicyResult,
+        decision: Decision,
+        reasons: list[str],
+        scope: str | None,
+    ) -> ToolResult | tuple[Decision, list[str], str | None, str]:
+        """Ask the gatekeeper process about this call and fold its answer in.
+
+        Its deny is final: no local permission or prompt settles it. A standing
+        permission it holds settles a call the policy would have asked about.
+        Its ask makes the call ask even where the policy would not (the local
+        flow in guard() then runs, prompt included). It never loosens a local
+        deny, and a bare agreement from its own policy copy does not settle a
+        local ask: only its permissions do. A gatekeeper that cannot be reached
+        refuses the call outright: with the separation switched on, falling back
+        to the local policy would hand the decision back to the very process it
+        exists to keep honest, silently."""
+        assert self.gatekeeper is not None
+        try:
+            gk = await asyncio.to_thread(
+                self.gatekeeper.decide,
+                tool.name,
+                args,
+                assessment,
+                tainted=self.tainted,
+                conversation=task.conversation_id if task else None,
+                advice={
+                    "decision": result_policy.decision.value,
+                    "reasons": list(result_policy.reasons),
+                },
+            )
+        except GatekeeperUnavailable as exc:
+            why = f"the gatekeeper is unavailable: {exc}"
+            logger.warning("sentinel: {}", why)
+            self.ui.on_sentinel("deny", assessment.summary, [why])
+            result = ToolResult.fail(
+                f"Sentinel blocked '{tool.name}': {why}. Do not retry the same call; "
+                "tell the user the gatekeeper needs attention."
+            )
+            self.audit.record(
+                "tool_call",
+                tool=tool.name,
+                channel=channel_of(tool.name),
+                args=self._redact_obj(args),
+                summary=assessment.summary,
+                risk=assessment.risk.value,
+                decision="deny",
+                approved=None,
+                reasons=[why],
+                tainted=self.tainted,
+                egress_target=assessment.egress_target,
+                grant_key=key,
+                purpose=task.purpose if task else "",
+                ok=False,
+                error=result.error,
+            )
+            return result
+        if gk.decision == Decision.DENY:
+            return (Decision.DENY, list(gk.reasons), scope, "gatekeeper")
+        if gk.decision == Decision.ALLOW and gk.grant_scope and decision == Decision.ASK:
+            return (Decision.ALLOW, list(gk.reasons), gk.grant_scope, "gatekeeper")
+        if gk.decision == Decision.ASK and decision == Decision.ALLOW:
+            merged = list(reasons) + [r for r in gk.reasons if r not in reasons]
+            return (Decision.ASK, merged, scope, "policy")
+        return (decision, reasons, scope, "policy")
+
+    async def _mirror_grant(
+        self, tool: str, target: str | None, scope: str, conversation: str | None
+    ) -> None:
+        """Tell the gatekeeper about a standing permission the person just gave,
+        so its own store can settle the next call. Best effort: the local store
+        has the grant either way, so a gatekeeper that misses it simply asks
+        again next time and the local permission settles it then."""
+        if self.gatekeeper is None or scope == "once":
+            return
+        try:
+            await asyncio.to_thread(self.gatekeeper.grant, tool, target, scope, conversation)
+        except GatekeeperUnavailable as exc:
+            logger.warning("sentinel: permission not mirrored to the gatekeeper: {}", exc)
+
     # ------------------------------------------------------------------ main entry
     async def guard(self, call: ToolCall, tool: BaseTool) -> ToolResult:
         args = call.arguments
@@ -291,6 +394,14 @@ class Sentinel:
             # who settled a question the policy raised: the policy itself (none raised), auto
             # mode, a standing permission, the person, or nobody in time
             settled_by = "policy"
+
+            if self.gatekeeper is not None:
+                consulted = await self._consult_gatekeeper(
+                    tool, args, assessment, key, task, result_policy, decision, reasons, scope
+                )
+                if isinstance(consulted, ToolResult):
+                    return consulted  # the gatekeeper could not judge: fail closed
+                decision, reasons, scope, settled_by = consulted
 
             if decision == Decision.ASK:
                 grant = (
@@ -362,6 +473,9 @@ class Sentinel:
                             # hosts) stay bound.
                             bind = None
                         self.grants.add(
+                            tool.name, bind, scope, task.conversation_id if task else None
+                        )
+                        await self._mirror_grant(
                             tool.name, bind, scope, task.conversation_id if task else None
                         )
                     else:
