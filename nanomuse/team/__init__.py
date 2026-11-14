@@ -1,0 +1,63 @@
+"""The sub-agent squad package (Phase 4, mock scope)."""
+
+from nanomuse.team.presets import (
+    PRESETS,
+    RolePreset,
+    effective_preset,
+    envelope_note,
+    is_read_only_call,
+    preset_for,
+    read_only_face,
+)
+from nanomuse.team.squad import (
+    AUTHORITIES,
+    ApprovalGate,
+    ApprovalToken,
+    Specialist,
+    Squad,
+    SquadBus,
+    SquadFrame,
+    SquadRefusal,
+)
+from nanomuse.team.store import (
+    AlreadySettled,
+    Assignment,
+    AssignmentEvent,
+    AssignmentNotFound,
+    EnqueueRefused,
+    GuardReason,
+    InvalidTransition,
+    ReconcileReport,
+    SquadStore,
+    ledger_evidence,
+    reconcile_on_startup,
+)
+
+__all__ = [
+    "AUTHORITIES",
+    "PRESETS",
+    "AlreadySettled",
+    "ApprovalGate",
+    "ApprovalToken",
+    "Assignment",
+    "AssignmentEvent",
+    "AssignmentNotFound",
+    "EnqueueRefused",
+    "GuardReason",
+    "InvalidTransition",
+    "ReconcileReport",
+    "RolePreset",
+    "Specialist",
+    "Squad",
+    "SquadBus",
+    "SquadFrame",
+    "SquadRefusal",
+    "SquadStore",
+    "effective_preset",
+    "envelope_note",
+    "is_read_only_call",
+    "ledger_evidence",
+    "preset_for",
+    "read_only_face",
+    "reconcile_on_startup",
+]
