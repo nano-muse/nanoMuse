@@ -65,6 +65,8 @@ class PhoneScreen(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = "phone_screen"
+    purpose: str = "Look at the phone's current screen."
+    keywords: list[str] = ["phone", "screen", "screenshot", "look"]
     description: str = (
         "Look at the phone's current screen: a screenshot, plus which app is open, the screen "
         "size in pixels and whether the keyboard is up. Coordinates for `phone_act` are pixels "
@@ -94,6 +96,8 @@ class PhoneAct(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = "phone_act"
+    purpose: str = "Do one thing on the phone (tap, type, swipe), then see the screen."
+    keywords: list[str] = ["phone", "tap", "type", "swipe", "act"]
     description: str = (
         "Do one thing on the phone and get the screen after it. Actions: `tap`, `long_press`, "
         "`double_tap` at `x`/`y` (pixels of the last screenshot), with `label`, the words of "
@@ -374,6 +378,8 @@ class PhoneTask(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = "phone_task"
+    purpose: str = "Hand a job on the user's phone to the GUI operator."
+    keywords: list[str] = ["phone", "gui", "task", "operator", "app"]
     description: str = (
         "Hand a job on the user's phone to the GUI operator: it opens the app, looks at the "
         "screen, taps, types and swipes step by step until the job is done, then reports what it "

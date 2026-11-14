@@ -71,6 +71,8 @@ class ComputerScreen(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = "computer_screen"
+    purpose: str = "Look at this computer's screen: screenshot and the window in front."
+    keywords: list[str] = ["screen", "screenshot", "computer", "look"]
     description: str = (
         "Look at this computer's screen: a screenshot, which window is in front and the "
         "picture's size as W×H. Coordinates for `computer_act` are pixels of that picture, "
@@ -111,6 +113,8 @@ class ComputerAct(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = "computer_act"
+    purpose: str = "Do one action on this computer's screen, then look again."
+    keywords: list[str] = ["click", "type", "computer", "screen", "act"]
     description: str = (
         "One action on this computer's screen, then a fresh look. `click`, `double_click`, "
         "`right_click`, `middle_click` or `move` at `x`/`y`, pixels of the last screenshot, "
@@ -470,6 +474,8 @@ class ComputerTask(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = "computer_task"
+    purpose: str = "Hand a job on this computer's screen to the GUI operator."
+    keywords: list[str] = ["computer", "gui", "task", "operator", "app"]
     description: str = (
         "Hand a job on this computer's screen to the operator: it opens the application, looks "
         "at the screen, clicks, types and scrolls step by step until the job is done, then "
