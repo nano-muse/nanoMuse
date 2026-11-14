@@ -7,7 +7,10 @@ embeddings); when an embedding endpoint is available (``embeddings.py``) a secon
 ranking by meaning is fused in. Memories can always be listed and *forgotten* by the
 user. Every change is logged with the text it replaced, so it can be undone: the
 tidy-up's merges, rewrites and drops (see ``consolidate.py``), and a forget from the
-chat, the app or the command line alike.
+chat, the app or the command line alike. Each line also carries its provenance: which
+model wrote it and how sure the writer was (``MemoryItem.model`` / ``confidence``),
+so a conflict between two lines can be resolved by a stated rule
+(:func:`resolve_conflict`) instead of a silent merge.
 """
 
 from __future__ import annotations
@@ -48,9 +51,68 @@ class MemoryItem:
     created_at: str
     source: str
     updated_at: str = ""
+    #: which model wrote this line (a plain model id, never a key or an address);
+    #: empty for lines a person wrote and for lines written before provenance existed
+    model: str = ""
+    #: how sure the writer was that this is a durable fact about the user, 0.0 to 1.0;
+    #: None means unknown (old lines, lines a person wrote by hand, which count as 1.0
+    #: when a conflict is resolved)
+    confidence: float | None = None
 
     def render(self) -> str:
         return f"[{self.id}] ({self.category}) {self.content}"
+
+
+#: words that mark a line as an explicit correction of an older fact, in either language
+_NEGATION_MARKERS: tuple[str, ...] = (
+    "no longer",
+    "not anymore",
+    "never again",
+    "moved from",
+    "changed from",
+    "no more",
+    "不再",
+    "不是",
+    "已经搬",
+    "改叫",
+    "不再是",
+    "以前是",
+)
+
+
+def _negates(content: str) -> bool:
+    lowered = content.lower()
+    return any(marker in lowered for marker in _NEGATION_MARKERS)
+
+
+def _effective_time(item: MemoryItem) -> str:
+    return item.updated_at or item.created_at
+
+
+def resolve_conflict(a: MemoryItem, b: MemoryItem) -> tuple[MemoryItem, str]:
+    """Which of two conflicting lines wins, and why. Pure function, no storage.
+
+    Order: a line the person wrote beats one a model wrote; an explicit correction
+    beats a plain statement; a newer fact beats an older inference; a higher
+    confidence beats a lower one. When nothing separates them, both are kept and
+    the caller must not merge them silently.
+    """
+    if (a.source == "user") != (b.source == "user"):
+        return (a, "user-overrides") if a.source == "user" else (b, "user-overrides")
+    if _negates(a.content) != _negates(b.content):
+        return (a, "negation") if _negates(a.content) else (b, "negation")
+    if _effective_time(a) != _effective_time(b):
+        return (a, "newer") if _effective_time(a) > _effective_time(b) else (b, "newer")
+    a_conf = 1.0 if a.source == "user" else a.confidence
+    b_conf = 1.0 if b.source == "user" else b.confidence
+    if a_conf is not None and b_conf is not None and a_conf != b_conf:
+        return (a, "higher-confidence") if a_conf > b_conf else (b, "higher-confidence")
+    return (a, "keep-both")
+
+
+def _check_confidence(confidence: float | None) -> None:
+    if confidence is not None and not 0.0 <= confidence <= 1.0:
+        raise ValueError("memory confidence must be between 0.0 and 1.0")
 
 
 @dataclass
@@ -126,6 +188,10 @@ class MemoryStore:
             self._conn.execute(
                 "ALTER TABLE memories ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
             )
+        if "model" not in columns:
+            self._conn.execute("ALTER TABLE memories ADD COLUMN model TEXT NOT NULL DEFAULT ''")
+        if "confidence" not in columns:
+            self._conn.execute("ALTER TABLE memories ADD COLUMN confidence REAL")
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS memory_log (
@@ -160,10 +226,18 @@ class MemoryStore:
         self._conn.close()
 
     # ------------------------------------------------------------------ CRUD
-    def add(self, content: str, category: str = "general", source: str = "agent") -> MemoryItem:
+    def add(
+        self,
+        content: str,
+        category: str = "general",
+        source: str = "agent",
+        model: str = "",
+        confidence: float | None = None,
+    ) -> MemoryItem:
         content = content.strip()
         if not content:
             raise ValueError("memory content is empty")
+        _check_confidence(confidence)
         # De-duplicate exact matches.
         row = self._conn.execute("SELECT * FROM memories WHERE content = ?", (content,)).fetchone()
         if row:
@@ -174,27 +248,43 @@ class MemoryStore:
             category=category or "general",
             created_at=_now(),
             source=source,
+            model=model,
+            confidence=confidence,
         )
         self._insert(item)
         self._conn.commit()
         return item
 
     def update(
-        self, memory_id: str, content: str, category: str | None = None
+        self,
+        memory_id: str,
+        content: str,
+        category: str | None = None,
+        model: str | None = None,
+        confidence: float | None = None,
     ) -> MemoryItem | None:
-        """Change what a memory says (the fact moved on); keeps its id and age."""
+        """Change what a memory says (the fact moved on); keeps its id and age.
+
+        ``model`` and ``confidence`` are only rewritten when given: passing nothing
+        keeps the provenance the line already had."""
         content = content.strip()
         if not content:
             raise ValueError("memory content is empty")
+        _check_confidence(confidence)
         item = self.get(memory_id)
         if item is None:
             return None
         item.content = content
         item.category = category or item.category
+        if model is not None:
+            item.model = model
+        if confidence is not None:
+            item.confidence = confidence
         item.updated_at = _now()
         self._conn.execute(
-            "UPDATE memories SET content = ?, category = ?, updated_at = ? WHERE id = ?",
-            (item.content, item.category, item.updated_at, item.id),
+            "UPDATE memories SET content = ?, category = ?, updated_at = ?, model = ?, "
+            "confidence = ? WHERE id = ?",
+            (item.content, item.category, item.updated_at, item.model, item.confidence, item.id),
         )
         self._conn.commit()
         return item
@@ -391,15 +481,20 @@ class MemoryStore:
         category: str = "",
         action: str = "merge",
         reason: str = "",
+        model: str | None = None,
+        confidence: float | None = None,
     ) -> MemoryChange | None:
         """Put one memory in the place of ``ids`` and log the change.
 
         The new memory is added by the user if any of the old ones was; its age is the
-        oldest of them, so a merged fact does not look freshly learned.
+        oldest of them, so a merged fact does not look freshly learned. Provenance is
+        inherited from the first replaced line unless the caller says otherwise, so a
+        merge does not silently launder where a fact came from.
         """
         before = [m for m in (self.get(i) for i in ids) if m is not None]
         if not before or not content.strip():
             return None
+        _check_confidence(confidence)
         after = MemoryItem(
             id="m_" + uuid.uuid4().hex[:8],
             content=content.strip(),
@@ -407,6 +502,8 @@ class MemoryStore:
             created_at=min(m.created_at for m in before),
             source="user" if any(m.source == "user" for m in before) else "agent",
             updated_at=_now(),
+            model=model if model is not None else before[0].model,
+            confidence=confidence if confidence is not None else before[0].confidence,
         )
         for m in before:
             self._conn.execute("DELETE FROM memories WHERE id = ?", (m.id,))
@@ -501,8 +598,18 @@ class MemoryStore:
     # ------------------------------------------------------------------ helpers
     def _insert(self, item: MemoryItem) -> None:
         self._conn.execute(
-            "INSERT INTO memories (id, content, category, created_at, source, updated_at) VALUES (?,?,?,?,?,?)",
-            (item.id, item.content, item.category, item.created_at, item.source, item.updated_at),
+            "INSERT INTO memories (id, content, category, created_at, source, updated_at, model, "
+            "confidence) VALUES (?,?,?,?,?,?,?,?)",
+            (
+                item.id,
+                item.content,
+                item.category,
+                item.created_at,
+                item.source,
+                item.updated_at,
+                item.model,
+                item.confidence,
+            ),
         )
 
     def _log(
@@ -531,6 +638,7 @@ class MemoryStore:
 
     @staticmethod
     def _row(row: sqlite3.Row) -> MemoryItem:
+        fields = set(row.keys())
         return MemoryItem(
             id=row["id"],
             content=row["content"],
@@ -538,6 +646,8 @@ class MemoryStore:
             created_at=row["created_at"],
             source=row["source"],
             updated_at=row["updated_at"] or "",
+            model=row["model"] if "model" in fields else "",
+            confidence=row["confidence"] if "confidence" in fields else None,
         )
 
     @staticmethod
@@ -553,4 +663,12 @@ class MemoryStore:
         )
 
 
-__all__ = ["MemoryChange", "MemoryItem", "MemoryStore", "content_hash", "similarity", "tokenize"]
+__all__ = [
+    "MemoryChange",
+    "MemoryItem",
+    "MemoryStore",
+    "content_hash",
+    "resolve_conflict",
+    "similarity",
+    "tokenize",
+]

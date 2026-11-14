@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
-from nanomuse.memory import MemoryStore
+from nanomuse.memory import MemoryItem, MemoryStore, resolve_conflict
 from nanomuse.schema import RiskLevel, ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment, int_arg
 
@@ -12,6 +13,15 @@ from nanomuse.tools.base import BaseTool, CallAssessment, int_arg
 def _short(value: Any, limit: int = 80) -> str:
     text = str(value or "").strip().replace("\n", " ")
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _provenance(item: MemoryItem) -> str:
+    bits = []
+    if item.model:
+        bits.append(f"written by {item.model}")
+    if item.confidence is not None:
+        bits.append(f"confidence {item.confidence:.2f}")
+    return f" ({'; '.join(bits)})" if bits else ""
 
 
 class Remember(BaseTool):
@@ -35,11 +45,20 @@ class Remember(BaseTool):
                 "type": "string",
                 "description": "id (m_xxxxxxxx) of an existing memory this one updates",
             },
+            "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "how sure the writer is that this is a durable fact, 0.0 to 1.0; omit when unknown",
+            },
         },
         "required": ["content"],
     }
     risk: RiskLevel = RiskLevel.SAFE
     store: MemoryStore
+    # The model id the runtime is running as (from settings); "" means unknown and
+    # the line keeps whatever provenance it already had. Never a key or an address.
+    model: str = ""
 
     def assess(self, args: dict[str, Any]) -> CallAssessment:
         a = super().assess(args)
@@ -50,7 +69,12 @@ class Remember(BaseTool):
         return a
 
     async def execute(
-        self, content: str = "", category: str = "general", replaces: str = "", **_: Any
+        self,
+        content: str = "",
+        category: str = "general",
+        replaces: str = "",
+        confidence: float | None = None,
+        **_: Any,
     ) -> ToolResult:
         try:
             if replaces:
@@ -58,26 +82,59 @@ class Remember(BaseTool):
                 if old is None:
                     return ToolResult.fail(f"no memory with id {replaces}")
                 change = self.store.replace(
-                    [replaces], content, category=category or old.category, action="rewrite"
+                    [replaces],
+                    content,
+                    category=category or old.category,
+                    action="rewrite",
+                    model=self.model or None,
+                    confidence=confidence,
                 )
                 if change is None or change.after is None:
                     return ToolResult.fail("memory content is empty")
                 return ToolResult(
                     output=f"Updated {replaces} → {change.after.id}: {change.after.content}"
                 )
-            # The same fact in other words: update that line rather than keep two.
+            # The same fact in other words: update that line rather than keep two,
+            # unless the existing line wins on principle: a line the person wrote,
+            # or an explicit correction, is never silently rewritten by the model.
             for _score, twin in self.store.similar(content, threshold=0.8, limit=1):
                 if twin.content.strip() == content.strip():
                     break  # an exact repeat: add() hands back the existing line
+                candidate = MemoryItem(
+                    id="",
+                    content=content,
+                    category=category or twin.category,
+                    created_at=datetime.now(UTC).isoformat(timespec="seconds"),
+                    source="agent",
+                    model=self.model,
+                    confidence=confidence,
+                )
+                winner, reason = resolve_conflict(candidate, twin)
+                if winner is twin and reason in ("user-overrides", "negation"):
+                    return ToolResult(
+                        output=(
+                            f"Kept {twin.id}: {twin.content} (the existing memory wins: {reason})"
+                        )
+                    )
                 change = self.store.replace(
-                    [twin.id], content, category=category or twin.category, action="rewrite"
+                    [twin.id],
+                    content,
+                    category=category or twin.category,
+                    action="rewrite",
+                    model=self.model or None,
+                    confidence=confidence,
                 )
                 if change is not None and change.after is not None:
                     return ToolResult(
                         output=f"Updated {twin.id} → {change.after.id}: {change.after.content} "
                         f"(was: {twin.content})"
                     )
-            item = self.store.add(content, category=category or "general")
+            item = self.store.add(
+                content,
+                category=category or "general",
+                model=self.model,
+                confidence=confidence,
+            )
         except ValueError as exc:
             return ToolResult.fail(str(exc))
         note = ""
@@ -116,7 +173,7 @@ class Recall(BaseTool):
         items = await self.store.search_async(query, limit=int_arg(limit, 10, 1, 50))
         if not items:
             return ToolResult(output="No matching memories.")
-        return ToolResult(output="\n".join(i.render() for i in items))
+        return ToolResult(output="\n".join(i.render() + _provenance(i) for i in items))
 
 
 class Forget(BaseTool):
