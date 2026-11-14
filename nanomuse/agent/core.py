@@ -16,10 +16,19 @@ from nanomuse.agent.context import fit_context
 from nanomuse.calendar import CalendarFeeds
 from nanomuse.config import Settings
 from nanomuse.contacts import ContactBook
+from nanomuse.cost import recording as cost_recording
 from nanomuse.goals import GoalStore
 from nanomuse.llm import budget as task_budget
 from nanomuse.llm import session as llm_session
 from nanomuse.llm.base import BaseLLM
+from nanomuse.llm.decider import (
+    DecideOutcome,
+    Decider,
+    DecideRequest,
+    ScoreAnswer,
+    build_decider,
+    difficulty_question,
+)
 from nanomuse.llm.vision import keep_newest_images
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryItem, MemoryStore
@@ -106,6 +115,9 @@ class MuseAgent:
         # before the next model call instead of waiting for the current run to finish.
         self.inbox: asyncio.Queue[str | Incoming] | None = None
         self._told_no_vision = False
+        # The decision layer for this agent, built from the [decider] settings on
+        # the first run that wants it; None until then and forever when disabled.
+        self._built_decider: Decider | None = None
         self.last_budget: dict[str, Any] = {}
         self._task_start = 0
         # The language of the screens the person reads this conversation on, from the latest
@@ -444,6 +456,46 @@ class MuseAgent:
 
         return len({sig(m) for m in assistants}) == 1
 
+    # ------------------------------------------------------------------ decision layer
+    async def _decider_shadow(self, user_input: str) -> None:
+        """The decision layer's one shadow question per run: how hard is this task.
+
+        Only with ``[decider] enabled``; with it off this returns before
+        anything is built or called.  The answer is written to the
+        decision log with the tier it would have picked at the
+        configured threshold, and changes nothing about the run: the
+        model, the tools and the budget are all exactly as they would
+        have been.  The decider fails open on its own; this wrapper
+        swallows anything else, because a shadow observer must never
+        break a task.
+        """
+        cfg = self.settings.decider
+        if not cfg.enabled:
+            return
+        try:
+            if self._built_decider is None:
+                self._built_decider = build_decider(self.settings)
+            threshold = cfg.threshold
+
+            def annotate(outcome: DecideOutcome) -> dict[str, Any]:
+                answers = outcome.answers or []
+                first = answers[0] if answers else None
+                if isinstance(first, ScoreAnswer):
+                    tier = "escalated" if first.score >= threshold else "default"
+                    return {"would_choose": tier}
+                return {"would_choose": None}
+
+            await self._built_decider.decide(
+                "task_difficulty",
+                DecideRequest(
+                    state=user_input[:2000],
+                    questions=[difficulty_question()],
+                ),
+                annotate=annotate,
+            )
+        except Exception:  # noqa: BLE001 - shadow mode observes; it never interferes
+            logger.exception("decider shadow call failed")
+
     # ------------------------------------------------------------------ main loop
     async def run(
         self,
@@ -455,6 +507,10 @@ class MuseAgent:
     ) -> str:
         if self.state == AgentState.RUNNING:
             raise RuntimeError("agent is already running")
+        # The cost gate's hard mode refuses here, before any work or spend;
+        # a no-op unless a recorder with a hard gate is installed.
+        cost_recording.preflight()
+        await self._decider_shadow(user_input)
         token = task_budget.begin(self.settings.agent.budget, inherit=False)
         budget = task_budget.current()
         assert budget is not None
@@ -483,6 +539,26 @@ class MuseAgent:
         finally:
             try:
                 self.last_budget = budget.snapshot()
+                # Feed the cost ledger from the real run; bookkeeping only, so a
+                # ledger failure never reaches the finished task.
+                try:
+                    # The ledger names the model that ran: the one in
+                    # the llm's own settings.  The client's ``name`` is
+                    # the wrapper's label (the prompt adapter's is
+                    # "prompt_tools"), never a model id, so it is only
+                    # a last resort: pricing by it missed every real
+                    # model and recorded zero costs.
+                    cost_recording.record_finished_task(
+                        task_id=self.conversation_id or self.session_id,
+                        model=str(
+                            getattr(getattr(self.llm, "settings", None), "model", None)
+                            or self.settings.llm.model
+                            or getattr(self.llm, "name", "")
+                        ),
+                        snapshot=self.last_budget,
+                    )
+                except Exception:
+                    logger.exception("cost ledger recording failed")
                 # a line in the audit log when a budget is in force or was reached; a task
                 # with no limits set leaves the log as it was
                 if budget.limited or budget.stopped:
