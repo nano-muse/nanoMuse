@@ -30,6 +30,8 @@ class CodingAgents(BaseTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = "coding_agents"
+    purpose: str = "Run one of the user's coding agents on a coding job in a repository."
+    keywords: list[str] = ["code", "coding agent", "cursor", "codex", "repository"]
     description: str = (
         "The user's coding agents (Cursor, Codex, Claude Code, DeepSeek Harness as `dsh`) on "
         "this computer or on another of their computers (`device`). Actions: `agents` (which "

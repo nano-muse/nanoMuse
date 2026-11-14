@@ -111,6 +111,8 @@ def playwright_available() -> bool:
 
 class Browser(BaseTool):
     name: str = "browser"
+    purpose: str = "Control a real web browser: open pages, click, fill forms, read pages."
+    keywords: list[str] = ["browser", "website", "click", "form", "page"]
     description: str = (
         "Control a real web browser to complete tasks on websites (search, read, fill forms, click). "
         "Actions: `navigate` (url), `extract` (read current page + numbered interactive elements), "
