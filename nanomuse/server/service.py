@@ -64,6 +64,13 @@ from nanomuse.server.providers import ChatGPTSignIn, Providers
 from nanomuse.server.push import PushService
 from nanomuse.server.webui import WebUI, current_thread
 from nanomuse.sync import ConversationSync, parse_mention, system_note
+from nanomuse.team.store import (
+    EvidenceFn,
+    ReconcileReport,
+    SquadStore,
+    ledger_evidence,
+    reconcile_on_startup,
+)
 from nanomuse.telemetry import telemetry
 from nanomuse.tools.browser import Browser
 from nanomuse.tools.coding_tool import CodingAgents
@@ -459,6 +466,21 @@ class MuseService:
         self.chatgpt = ChatGPTSignIn(self)
         self.coding = CodingService(self)
         self.app.tools.add(CodingAgents(coding=self.coding))
+        # The squad task ledger joins only when a previous run wrote one: with no
+        # squad.db there is nothing to reconcile, and the store is not created just
+        # by starting the server.  Evidence comes from the cost ledger file: an
+        # assignment that already spent on a model call is never handed out again.
+        # start() reconciles the ledger once; nothing is resumed by it.
+        self.squad_store: SquadStore | None = None
+        self.squad_evidence: EvidenceFn | None = None
+        self.squad_reconcile: ReconcileReport | None = None
+        if settings.squad_db.exists():
+            self.squad_store = SquadStore(
+                settings.squad_db,
+                max_depth=settings.squad.max_depth,
+                max_per_root=settings.squad.max_per_root,
+            )
+            self.squad_evidence = ledger_evidence(settings.cost_ledger_file)
         self.token = self._load_token()
         self._scheduler: asyncio.Task[None] | None = None
         # webhook deliveries accepted, by trigger id (monotonic seconds): the rate limit's
@@ -507,6 +529,14 @@ class MuseService:
         await self._step("tools", self.app.start(), 90)
         self._started = True
         self._recover_deliveries()
+        if self.squad_store is not None and self.squad_reconcile is None:
+            self.squad_reconcile = reconcile_on_startup(self.squad_store, self.squad_evidence)
+            if self.squad_reconcile.interrupted or self.squad_reconcile.retry_marked:
+                logger.info(
+                    "squad ledger reconciled: {} interrupted, {} spared one restart",
+                    len(self.squad_reconcile.interrupted),
+                    len(self.squad_reconcile.retry_marked),
+                )
         await self._step("cloud account and hub", self.hub.start(), 30)
         self.sync.start()
         self._scheduler = asyncio.create_task(self._goal_scheduler(), name="goal-scheduler")

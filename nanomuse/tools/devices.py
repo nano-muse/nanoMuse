@@ -99,6 +99,8 @@ class _DeviceTool(BaseTool):
 
 class Devices(_DeviceTool):
     name: str = "devices"
+    purpose: str = "List the user's other devices on the hub and whether each is online."
+    keywords: list[str] = ["devices", "hub", "online", "other device"]
     description: str = (
         "The user's other devices on the nanoMuse hub (phone, other computers) and whether "
         "each is online. Use a device's name as listed here in the device_* tools and delegate."
@@ -121,6 +123,8 @@ class Devices(_DeviceTool):
 
 class DeviceShell(_DeviceTool):
     name: str = "device_shell"
+    purpose: str = "Run a shell command on another device."
+    keywords: list[str] = ["device", "shell", "command", "remote"]
     description: str = (
         "Run a shell command on another device. On a phone it runs inside the nanoMuse app's "
         "Linux sandbox (Alpine), not on Android itself; the phone's own apps are reached with "
@@ -179,6 +183,8 @@ class DeviceShell(_DeviceTool):
 
 class DeviceFiles(_DeviceTool):
     name: str = "device_files"
+    purpose: str = "List a folder on another device."
+    keywords: list[str] = ["device", "files", "folder", "list"]
     description: str = "List a folder on another device (default: its home / downloads folder)."
     parameters: dict[str, Any] = {
         "type": "object",
@@ -219,6 +225,8 @@ class DeviceFiles(_DeviceTool):
 class DeviceGet(_DeviceTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "device_get"
+    purpose: str = "Copy a file from another device into this computer's workspace."
+    keywords: list[str] = ["device", "file", "copy", "download"]
     description: str = (
         "Copy a file from another device into this computer's workspace (folder `from-devices/`). "
         "Up to 8 MB. Pictures come back so you can look at them."
@@ -266,6 +274,8 @@ class DeviceGet(_DeviceTool):
 class DevicePut(_DeviceTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "device_put"
+    purpose: str = "Copy a file from this computer's workspace to another device."
+    keywords: list[str] = ["device", "file", "copy", "upload"]
     description: str = (
         "Copy a file from this computer's workspace to another device. Up to 8 MB; an existing "
         "file there is left alone unless force=true."
@@ -325,6 +335,8 @@ class DevicePut(_DeviceTool):
 
 class DeviceOpen(_DeviceTool):
     name: str = "device_open"
+    purpose: str = "Open a URL, file or folder on another device with its default app."
+    keywords: list[str] = ["device", "open", "url", "file"]
     description: str = "Open a URL, file or folder on another device with its default app."
     parameters: dict[str, Any] = {
         "type": "object",
@@ -349,6 +361,8 @@ class DeviceOpen(_DeviceTool):
 class DeviceScreen(_DeviceTool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "device_screen"
+    purpose: str = "Look at another device's screen; a picture comes back."
+    keywords: list[str] = ["device", "screen", "screenshot", "look"]
     description: str = (
         "Look at another device's screen: a picture comes back to you. On a phone this is what "
         "is on the phone's screen right now."
@@ -405,6 +419,8 @@ class DeviceScreen(_DeviceTool):
 
 class DeviceNotify(_DeviceTool):
     name: str = "device_notify"
+    purpose: str = "Show a notification on another device."
+    keywords: list[str] = ["notify", "notification", "device", "alert"]
     description: str = "Show a notification on another device."
     parameters: dict[str, Any] = {
         "type": "object",
@@ -437,6 +453,8 @@ class Delegate(_DeviceTool):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str = "delegate"
+    purpose: str = "Hand a whole task to the Muse on another device and wait for its answer."
+    keywords: list[str] = ["delegate", "device", "task", "hand over"]
     description: str = (
         "Hand a whole task, in plain words, to the Muse running on another device and wait for "
         "its answer (up to ten minutes). Use it when the job needs that device's apps, screen, "

@@ -11,6 +11,8 @@ from nanomuse.tools.base import BaseTool, CallAssessment
 
 class Contacts(BaseTool):
     name: str = "contacts"
+    purpose: str = "Look people up in the user's address book."
+    keywords: list[str] = ["contacts", "address book", "person", "address"]
     description: str = (
         "The user's address book. Use it whenever the user names a person you need to write "
         "to, call, or know something about; do not guess an address. Actions: `search`, "

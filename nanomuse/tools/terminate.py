@@ -11,6 +11,8 @@ from nanomuse.ui import UI
 
 class Terminate(BaseTool):
     name: str = "terminate"
+    purpose: str = "End the current task, reporting success or why it could not be done."
+    keywords: list[str] = ["finish", "done", "end task", "complete"]
     description: str = (
         "Finish the current task. Call this when the request is fully handled (status=success) "
         "or when you cannot make progress (status=failure). Put your final answer / summary for "
@@ -32,6 +34,8 @@ class Terminate(BaseTool):
 
 class AskUser(BaseTool):
     name: str = "ask_user"
+    purpose: str = "Ask the user a question and wait for the answer."
+    keywords: list[str] = ["ask", "question", "clarify"]
     description: str = (
         "Ask the user a clarifying question and wait for the answer. Use it when the request is "
         "ambiguous, when you need a decision or missing information (never guess credentials, "

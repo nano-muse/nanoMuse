@@ -40,6 +40,8 @@ def _slug(text: str) -> str:
 
 class Calendar(BaseTool):
     name: str = "calendar"
+    purpose: str = "Read the user's calendar and agenda from their calendar feeds."
+    keywords: list[str] = ["calendar", "agenda", "events", "schedule"]
     description: str = (
         "The user's calendar (read from their calendar feeds). Actions: `agenda`, the events "
         "on a `day` ('today', 'tomorrow' or 'YYYY-MM-DD') and the `days` after it (default 1, "
