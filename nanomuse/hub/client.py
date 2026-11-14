@@ -430,27 +430,92 @@ class HubClient:
         args: dict[str, Any] | None = None,
         timeout: float = 120.0,
         on_event: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+        call_id: str | None = None,
+        retries: int = 0,
     ) -> dict[str, Any]:
         """Ask device ``to`` to carry out ``action``; the result body, or :class:`HubError`.
-        ``on_event`` gets every progress frame (tool steps, approvals, images) meanwhile."""
-        call_id = uuid.uuid4().hex[:16]
+        ``on_event`` gets every progress frame (tool steps, approvals, images) meanwhile.
+
+        ``retries`` re-sends the call with the *same* id when the connection drops
+        before an answer arrives: a relay that kept the finished answer replays it
+        instead of running the action again (docs/hub.md), so a retried call does not
+        become a second side effect. The total wait is still ``timeout``; a call that
+        times out or is refused is never retried, since the relay may still be
+        carrying it. The default (no retries) keeps the old behaviour exactly.
+        """
+        call_id = call_id or uuid.uuid4().hex[:16]
         loop = asyncio.get_running_loop()
-        p = _Pending(done=loop.create_future(), on_event=on_event)
-        self._pending[call_id] = p
+        deadline = loop.time() + timeout
+        attempts = 0
         try:
-            try:
-                await self._send(
-                    {"type": "call", "id": call_id, "to": to, "action": action, "args": args or {}}
-                )
+            while True:
+                p = _Pending(done=loop.create_future(), on_event=on_event)
+                self._pending[call_id] = p
                 try:
-                    frame = await asyncio.wait_for(p.done, timeout)
-                except TimeoutError:
-                    raise HubError(
-                        "timeout", f"no answer from the device within {int(timeout)} s"
-                    ) from None
+                    await self._send(
+                        {
+                            "type": "call",
+                            "id": call_id,
+                            "to": to,
+                            "action": action,
+                            "args": args or {},
+                            # Only a re-send says so: a relay that kept the finished
+                            # answer replays it, and a plain re-send stays a new call.
+                            "retry": attempts > 0,
+                        }
+                    )
+                    remaining = deadline - loop.time()
+                    if remaining <= 0:
+                        raise HubError(
+                            "timeout", f"no answer from the device within {int(timeout)} s"
+                        )
+                    try:
+                        frame = await asyncio.wait_for(p.done, remaining)
+                    except TimeoutError:
+                        raise HubError(
+                            "timeout", f"no answer from the device within {int(timeout)} s"
+                        ) from None
+                except HubError as exc:
+                    if exc.code != "disconnected" or attempts >= retries:
+                        raise
+                    attempts += 1
+                    remaining = deadline - loop.time()
+                    if remaining <= 0:
+                        raise HubError(
+                            "timeout", f"no answer from the device within {int(timeout)} s"
+                        ) from None
+                    try:
+                        await asyncio.wait_for(self.connected.wait(), remaining)
+                    except TimeoutError:
+                        raise HubError(
+                            "timeout", f"no answer from the device within {int(timeout)} s"
+                        ) from None
+                    continue
+                finally:
+                    self._pending.pop(call_id, None)
+                    for t in list(p.tasks):
+                        if not t.done():
+                            t.cancel()
                 if frame.get("type") == "error":
+                    code = str(frame.get("code") or "error")
+                    if code == "disconnected" and attempts < retries:
+                        attempts += 1
+                        remaining = deadline - loop.time()
+                        if remaining <= 0:
+                            raise HubError(
+                                "timeout",
+                                f"no answer from the device within {int(timeout)} s",
+                            )
+                        try:
+                            await asyncio.wait_for(self.connected.wait(), remaining)
+                        except TimeoutError:
+                            raise HubError(
+                                "timeout",
+                                f"no answer from the device within {int(timeout)} s",
+                            ) from None
+                        continue
                     raise HubError(
-                        str(frame.get("code") or "error"),
+                        code,
                         str(frame.get("message") or "the hub refused the call"),
                     )
                 if not frame.get("ok"):
@@ -458,11 +523,8 @@ class HubClient:
                         str(frame.get("error") or "failed"),
                         str(frame.get("message") or "the device could not do it"),
                     )
-            finally:
-                self._pending.pop(call_id, None)
-                for t in list(p.tasks):
-                    if not t.done():
-                        t.cancel()
+                body = frame.get("body")
+                return body if isinstance(body, dict) else {}
         except (HubError, asyncio.CancelledError) as exc:
             if action == "task" and (
                 isinstance(exc, asyncio.CancelledError) or exc.code == "timeout"
@@ -475,8 +537,6 @@ class HubClient:
                         timeout=TASK_STOP_TIMEOUT_S,
                     )
             raise
-        body = frame.get("body")
-        return body if isinstance(body, dict) else {}
 
     async def request_devices(self) -> None:
         await self._send({"type": "devices"})
