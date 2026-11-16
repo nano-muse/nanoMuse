@@ -105,9 +105,53 @@ Push needs a secure context: `https://` or `localhost`. Over plain `http://` on 
 
 Non-secret choices made in Connections are stored in `<data_dir>/app-settings.json` and layered over `config.toml` on every start, for the CLI too, so a phone-only setup never needs a file edited. Secrets are only ever referenced from there as `{{vault:NAME}}`.
 
+### OpenViking memories
+
+Use *Memory spaces* to select Personal, Work or a project. *Start a conversation in
+this space* opens a new thread bound to that choice; existing chats keep Personal.
+The selected space controls the profile, local notes and remote memory section.
+Other devices connected to this runtime can use the same spaces; independently
+running desktop plugins retain their own configuration. Non-personal chats stay
+on this runtime because current conversation sync does not carry space identity.
+
+The panel shows queued and failed background profile-learning jobs. Retry failed
+learning there. Within *Export, restore or clear this space*, download a backup
+before clearing. Clearing turns capture off and checks that the exported state
+has not changed. It covers the space's managed memories and recorded remote
+sessions; local chat timelines, audit logs and untracked remote sessions remain.
+Restore adopts facts without replaying captured conversations. See the exact
+[backup scope and limits](configuration.md#memory-backups).
+
+When the runtime's [OpenViking integration](configuration.md#memoryopenviking) is
+enabled, *Memory* shows a separate remote section above local memories. Search or
+browse folders, open an entry, then edit and save or confirm its deletion. If a
+file changed since you opened it, your draft stays on screen; reload the current
+version before trying again. Deleting removes the extracted file, while archived
+conversations remain and can recreate it if reprocessed.
+
+The capture switch controls automatic conversation saves and persists across
+restarts. Turning it off keeps recall, existing memories and queued turns. You
+can still ask the agent explicitly to remember a fact. The section also shows
+pending writes, extraction in progress and recent failures. *Retry pending turns*
+retries the local queue; a completed submission is separate from completed
+extraction. These controls manage the Python runtime, including gateway-connected
+clients; the desktop DSH plugin has its own configuration.
+
+The *Personal profile* panel shows the runtime's learned facts, their source
+quotes, scope and expiry. Explicit facts can become active automatically; inferred
+preferences need *Use this fact*. Edit an incorrect fact or choose *Stop using*.
+*Show previous and expired facts* includes the history and lets you restore a
+fact. Stopping use affects the profile; remote files and archived conversations
+remain. This profile is local to the runtime, so clients using the same runtime
+share it. The capture switch also stops new profile learning. To try it, state a
+lasting answer preference, check its source in this panel, then open a new
+conversation and see whether the answer follows it.
+
 ### Opening the app on something
 
 The page takes a few query parameters, which the Android app uses and a bookmark can too: `?thread=<id>` opens a conversation, `?tab=goals` (feed, ideas, library, connections) a tab; `&draft=<text>` puts text in the composer without sending it; `&attach=<json>` (the JSON list of `{path, name, mime, size}` that `POST /api/files/upload` returned) adds files already in the workspace as attachment chips. They are read once and removed from the address bar. This is how **Share → nanoMuse** works on the phone: the app uploads the shared files (`POST /api/files/upload`), starts a thread (`POST /api/threads`) named after the subject or the first file, and opens it with the text as a draft and the files attached, waiting for what to do with them. On the phone the agent also has the phone's own capabilities as tools and the workspace appears in the Files app: [device.md](device.md).
+
+Automation clients can send `capture_memory: false` with REST or WebSocket messages for one-off tasks. This controls memory writes, while the conversation itself remains in chat history. See [capture controls](configuration.md#memoryopenviking) for the full scope.
 
 ## Background work
 
@@ -138,7 +182,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | PATCH / DELETE | `/api/threads/{id}` | rename / delete |
 | POST | `/api/threads/{id}/clear` | clear the conversation |
 | GET | `/api/threads/{id}/events?limit=&before=` | timeline events |
-| POST | `/api/threads/{id}/send` `{text, files?, language?, via?}` | queue a message; returns immediately. `files`: workspace paths from the upload below, ten at most; text may be empty when there are files. `language` (since 1.0.0): the BCP-47 tag of the client's screens (`en`, `zh-CN`); the reply is written in that language unless *Reply language* fixes one. Without it the script of the message decides, as before. `via: "cloud"` is *Use nanoMuse Cloud this time*: this one turn runs on the account's recommended chat model under the account's key, the next is back on the configured model, and `[llm]` does not move; the user bubble, the reply and a failure of that turn carry `model_used`. `401 signed_out` when no account is signed in |
+| POST | `/api/threads/{id}/send` `{text, files?, language?, via?, capture_memory?}` | queue a message; returns immediately. `files`: workspace paths from the upload below, ten at most; text may be empty when there are files. `language` (since 1.0.0): the BCP-47 tag of the client's screens (`en`, `zh-CN`); the reply is written in that language unless *Reply language* fixes one. Without it the script of the message decides, as before. `via: "cloud"` is *Use nanoMuse Cloud this time*: this one turn runs on the account's recommended chat model under the account's key, the next is back on the configured model, and `[llm]` does not move; the user bubble, the reply and a failure of that turn carry `model_used`. `401 signed_out` when no account is signed in. `capture_memory: false` excludes the task from automatic memory capture and blocks model memory writes; defaults to true, rejected for forwarded device chats |
 | POST | `/api/threads/{id}/stop` | stop the run in that chat: the queue is dropped, pending approval and question cards there expire, the conversation stays usable. `{ok: false}` when nothing was running |
 | POST | `/api/files/upload?name=` (body: the bytes) | a file to attach: lands in `attachments/<date>/` under a safe version of `name`; returns `{path, name, size, kind, mime}` for `files`. 413 above `server.max_upload_mb` |
 | POST | `/api/approvals/{id}` `{approved, scope, reason}` | answer a card; `scope` is one of the card's `grant_options` (`once`, `conversation`, `session`, `24h`, `always`; `task` is still read as `conversation`) |
@@ -151,6 +195,23 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | POST | `/api/goals/{id}/check-in` | send the reminder message now |
 | POST / DELETE | `/api/goals/{id}/proposal/accept`, `/api/goals/{id}/proposal` | accept / dismiss the agent's proposed plan change |
 | GET / POST | `/api/memory` · DELETE `/api/memory/{id}` | list / add `{content, category}` / forget |
+| GET | `/api/memory/openviking/status` | enabled, capture switch, pending queue count and latest extraction task states |
+| GET | `/api/memory/openviking/profile?history=false` | current personal facts and whether profile learning is enabled; history includes previous and expired facts |
+| GET / POST | `/api/memory/spaces` | owner ID, spaces and learning counts; POST `{id, label}` creates a space |
+| POST | `/api/memory/spaces/{space}/retry` | retry failed background profile learning |
+| GET | `/api/memory/spaces/{space}/export` | versioned backup of managed memories and recorded turn evidence |
+| POST | `/api/memory/spaces/{space}/clear` `{revision}` | clear the exported state after version and active-task checks; capture stays off |
+| POST | `/api/memory/spaces/{space}/restore` `{data}` | restore an exported backup for the same owner and space, without conversation replay |
+| POST | `/api/memory/openviking/profile/{id}` `{version, action, value?}` | confirm, edit or reject one personal fact; edit requires value, 409 on concurrent changes |
+| GET | `/api/memory/openviking/entries?uri=&query=&offset=` | browse or search the configured user memory space, 50 entries per page |
+| GET | `/api/memory/openviking/entry?uri=` | read visible text and its opaque `revision` |
+| PUT / DELETE | `/api/memory/openviking/entry` `{uri, revision, content?}` | update / delete one remote file; update requires content, 409 if its revision changed |
+| PUT | `/api/memory/openviking/capture` `{enabled}` | persist automatic capture for the current identity |
+| POST | `/api/memory/openviking/retry` | retry queued writes; extraction continues on OpenViking |
+
+Memory, profile and OpenViking endpoints accept `?space=personal` (the default).
+`POST /api/threads` accepts `{title, memory_space}` for new scoped chats. A thread's
+space is persisted locally and cannot be switched while keeping its old context.
 | POST | `/api/memory/tidy` (`?dry_run=1`) | one tidy-up pass now; the report lists what was merged and dropped (or would be) |
 | GET | `/api/memory/changes` · POST `/api/memory/changes/{id}/restore` | the log of merges, drops and updates, newest first; undo one |
 | GET | `/api/ideas?refresh=1` | cached or regenerated suggestions |

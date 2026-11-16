@@ -243,6 +243,8 @@ class ConversationSync:
     def _eligible(self, thread: Thread) -> bool:
         """Synced from here: not a chat for or from another device, the signed-in account's
         or nobody's yet (C10), and — with side chats off (C9) — the main chat only."""
+        if getattr(thread, "memory_space", "personal") != "personal":
+            return False
         if thread.device or thread.remote_from or thread.main_of:
             return False
         if not self._mine(thread):

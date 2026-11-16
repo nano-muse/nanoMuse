@@ -27,6 +27,11 @@ import type {
   MediaSlotData,
   MemoryChange,
   MemoryItem,
+  OpenVikingDocument,
+  OpenVikingPage,
+  OpenVikingStatus,
+  PersonalProfile,
+  PersonalFact,
   NudgesView,
   ProvidersView,
   PushInfo,
@@ -53,6 +58,10 @@ import type {
 } from "./types";
 import { signedParams } from "./ticket";
 import { readStorage, writeStorage } from "./util";
+
+function memoryPath(path: string, space: string): string {
+  return space === "personal" ? path : `${path}${path.includes("?") ? "&" : "?"}space=${encodeURIComponent(space)}`;
+}
 
 const TOKEN_KEY = "nanomuse_token";
 
@@ -244,7 +253,7 @@ export const api = {
   doneHold: (id: string) => request<HoldEvent>(`/api/holds/${encodeURIComponent(id)}/done`, json({})),
   health: () => request<{ ok: boolean; version: string; auth: boolean }>("/api/health"),
   threads: () => request<ThreadMeta[]>("/api/threads"),
-  createThread: (title: string) => request<ThreadMeta>("/api/threads", json({ title })),
+  createThread: (title: string, memory_space = "personal") => request<ThreadMeta>("/api/threads", json({ title, memory_space })),
   renameThread: (id: string, title: string) =>
     request<ThreadMeta>(`/api/threads/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }),
   deleteThread: (id: string) => request<{ ok: boolean }>(`/api/threads/${id}`, { method: "DELETE" }),
@@ -281,14 +290,35 @@ export const api = {
   acceptProposal: (id: string) => request<Goal>(`/api/goals/${id}/proposal/accept`, { method: "POST" }),
   dismissProposal: (id: string) => request<Goal>(`/api/goals/${id}/proposal`, { method: "DELETE" }),
   deleteGoal: (id: string) => request<{ ok: boolean }>(`/api/goals/${id}`, { method: "DELETE" }),
-  memory: () => request<MemoryItem[]>("/api/memory"),
-  addMemory: (content: string, category: string) =>
-    request<MemoryItem>("/api/memory", json({ content, category })),
-  forgetMemory: (id: string) => request<{ ok: boolean }>(`/api/memory/${id}`, { method: "DELETE" }),
-  tidyMemory: () => request<TidyReport>("/api/memory/tidy", { method: "POST" }),
-  memoryChanges: (limit = 30) => request<MemoryChange[]>(`/api/memory/changes?limit=${limit}`),
-  restoreMemoryChange: (id: string) =>
-    request<MemoryChange>(`/api/memory/changes/${id}/restore`, { method: "POST" }),
+  memory: (space = "personal") => request<MemoryItem[]>(memoryPath("/api/memory", space)),
+  personalProfile: (history = false, space = "personal") => request<PersonalProfile>(memoryPath(`/api/memory/openviking/profile?history=${history}`, space)),
+  personalReview: (item: PersonalFact, action: "confirm" | "reject" | "edit", value = "", space = "personal") =>
+    request<PersonalFact>(memoryPath(`/api/memory/openviking/profile/${encodeURIComponent(item.id)}`, space), json({ version: item.version, action, value })),
+  openVikingStatus: (space = "personal") => request<OpenVikingStatus>(memoryPath("/api/memory/openviking/status", space)),
+  openVikingEntries: (uri = "", query = "", offset = 0, space = "personal") =>
+    request<OpenVikingPage>(memoryPath(`/api/memory/openviking/entries?${new URLSearchParams({ uri, query, offset: String(offset) })}`, space)),
+  openVikingRead: (uri: string, space = "personal") =>
+    request<OpenVikingDocument>(memoryPath(`/api/memory/openviking/entry?${new URLSearchParams({ uri })}`, space)),
+  openVikingUpdate: (entry: OpenVikingDocument, space = "personal") =>
+    request<{ ok: boolean }>(memoryPath("/api/memory/openviking/entry", space), { ...json(entry), method: "PUT" }),
+  openVikingDelete: (entry: Pick<OpenVikingDocument, "uri" | "revision">, space = "personal") =>
+    request<{ ok: boolean }>(memoryPath("/api/memory/openviking/entry", space), { ...json(entry), method: "DELETE" }),
+  openVikingCapture: (enabled: boolean, space = "personal") =>
+    request<{ ok: boolean }>(memoryPath("/api/memory/openviking/capture", space), { ...json({ enabled }), method: "PUT" }),
+  openVikingRetry: (space = "personal") => request<{ accepted: number }>(memoryPath("/api/memory/openviking/retry", space), { method: "POST" }),
+  addMemory: (content: string, category: string, space = "personal") =>
+    request<MemoryItem>(memoryPath("/api/memory", space), json({ content, category })),
+  forgetMemory: (id: string, space = "personal") => request<{ ok: boolean }>(memoryPath(`/api/memory/${id}`, space), { method: "DELETE" }),
+  tidyMemory: (space = "personal") => request<TidyReport>(memoryPath("/api/memory/tidy", space), { method: "POST" }),
+  memoryChanges: (limit = 30, space = "personal") => request<MemoryChange[]>(memoryPath(`/api/memory/changes?limit=${limit}`, space)),
+  restoreMemoryChange: (id: string, space = "personal") =>
+    request<MemoryChange>(memoryPath(`/api/memory/changes/${id}/restore`, space), { method: "POST" }),
+  memorySpaces: (space = "personal") => request<{ owner: string; spaces: Array<{id: string; label: string}>; learning: {pending: number; failed: number} }>(memoryPath("/api/memory/spaces", space)),
+  createMemorySpace: (id: string, label: string) => request<{id: string}>("/api/memory/spaces", json({ id, label })),
+  retryLearning: (space: string) => request<unknown>(`/api/memory/spaces/${encodeURIComponent(space)}/retry`, json({})),
+  exportMemory: (space: string) => request<Record<string, unknown> & {revision: string}>(`/api/memory/spaces/${encodeURIComponent(space)}/export`),
+  clearMemorySpace: (space: string, revision: string) => request<unknown>(`/api/memory/spaces/${encodeURIComponent(space)}/clear`, json({ revision })),
+  restoreMemorySpace: (space: string, data: unknown) => request<unknown>(`/api/memory/spaces/${encodeURIComponent(space)}/restore`, json({ data })),
   ideas: (refresh = false) => request<IdeasData>(`/api/ideas${refresh ? "?refresh=1" : ""}`),
   activity: (n = 150) => request<ActivityData>(`/api/activity?n=${n}`),
   feed: (limit = 60) => request<FeedItem[]>(`/api/feed?limit=${limit}`),

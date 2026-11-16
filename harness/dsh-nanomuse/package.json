@@ -10,7 +10,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": "^22.19.0 || >=24"
   },
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -47,6 +47,7 @@
       "types": "./lib/types/hands-tools.d.ts",
       "default": "./lib/hands-tools.js"
     },
+    "./openviking": "./openviking.mjs",
     "./client": {
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
@@ -56,6 +57,7 @@
   "files": [
     "lib",
     "assets",
+    "openviking.mjs",
     "cordis.patch.yml",
     "presets"
   ],
@@ -92,6 +94,7 @@
     "@deepseek-ai/dsh-mcp-client": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-skill-filesystem": "0.2.0-rc.2",
     "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "@deepseek-ai/dsh-user-approval": "0.2.0-rc.2",
@@ -114,6 +117,7 @@
     "@deepseek-ai/dsh-mcp-client": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-skill-filesystem": "0.2.0-rc.2",
     "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "@deepseek-ai/dsh-user-approval": "0.2.0-rc.2",
@@ -126,5 +130,8 @@
     "react": "^18.2.0",
     "react-dom": "18.3.1",
     "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "@openviking/dsh-memory-plugin": "0.5.34"
   }
 }

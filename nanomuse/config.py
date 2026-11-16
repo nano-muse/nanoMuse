@@ -268,6 +268,39 @@ class SentinelSettings(BaseModel):
     taint_tracking: bool = True
 
 
+class OpenVikingSettings(BaseModel):
+    """Optional external conversation memory, shared by the runtime's threads."""
+
+    enabled: bool = False
+    url: str = "http://127.0.0.1:1933"
+    api_key: str = Field(default="", repr=False)
+    auth_mode: Literal["api_key", "trusted"] = "api_key"
+    account: str = ""
+    user: str = ""
+    peer_id: str = ""
+    profile_id: str = Field(default="", pattern=r"^(?:[A-Za-z0-9_-]{1,100})?$")
+    capture_conversations: bool = True
+    personalization: bool = True
+    personalization_timeout: float = Field(default=15.0, ge=0.1, le=60)
+    timeout: float = Field(default=5.0, ge=0.1, le=60)
+    max_chars: int = Field(default=8000, ge=128, le=32000)
+
+    @field_validator("url")
+    @classmethod
+    def _endpoint(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if (
+            parsed.scheme not in ("http", "https")
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("OpenViking URL must be HTTP(S), without credentials or query")
+        return value.rstrip("/")
+
+
 class MemorySettings(BaseModel):
     enabled: bool = True
     max_inject: int = 20
@@ -286,6 +319,7 @@ class MemorySettings(BaseModel):
     # different service for embeddings than for chat — Ollama next to DeepSeek, say.
     embedding_base_url: str = ""
     embedding_api_key: str = ""
+    openviking: OpenVikingSettings = Field(default_factory=OpenVikingSettings)
 
     @field_validator("embedding_base_url")
     @classmethod
@@ -752,6 +786,17 @@ def _provider_key_vars(base_url: str) -> tuple[str, ...]:
 
 
 def _apply_env_overrides(raw: dict[str, Any]) -> None:
+    for env, key in (
+        ("NANOMUSE_OPENVIKING_ENABLED", "enabled"),
+        ("NANOMUSE_OPENVIKING_URL", "url"),
+        ("NANOMUSE_OPENVIKING_API_KEY", "api_key"),
+        ("NANOMUSE_OPENVIKING_AUTH_MODE", "auth_mode"),
+        ("NANOMUSE_OPENVIKING_ACCOUNT", "account"),
+        ("NANOMUSE_OPENVIKING_USER", "user"),
+        ("NANOMUSE_OPENVIKING_PEER_ID", "peer_id"),
+    ):
+        if (val := os.environ.get(env)) not in (None, ""):
+            raw.setdefault("memory", {}).setdefault("openviking", {})[key] = val
     llm = raw.setdefault("llm", {})
     mapping = {
         "NANOMUSE_LLM_PROVIDER": "provider",

@@ -252,6 +252,220 @@ Recall is by keyword (rare words weigh more, Chinese is matched by character pai
 
 `auto` tries the endpoint once per start and falls back to keyword recall when the call fails, saying why in the log: one failed call, not one per turn; an endpoint that was unreachable is tried again after five minutes. `on` insists: recall still falls back, but the failure is a warning and `nanomuse doctor` fails on it. `off` never embeds. `embedding_api_key` empty means the model's own key on its own endpoint; set from the app it is a `{{vault:EMBEDDINGS_API_KEY}}` reference. The gateway headers in `llm.extra_headers` go to the model's endpoint only, not to another one named here. *Connections → Recall by meaning* in the app sets all of this and tests it; `nanomuse memory recall "…"` shows what would be recalled, with each memory's closeness.
 
+### `[memory.openviking]`
+
+The Python runtime can use OpenViking alongside its local explicit memory. This
+covers the web console, terminal and devices whose `nanomuse-gateway` forwards
+conversations to this runtime. The desktop DSH plugin is configured separately
+in [Desktop](desktop.md#openviking-memory).
+
+```toml
+[memory.openviking]
+enabled = true
+url = "http://127.0.0.1:1933"
+api_key = "${NANOMUSE_OPENVIKING_API_KEY:-}"
+auth_mode = "api_key"
+account = ""
+user = ""
+peer_id = ""
+profile_id = ""
+capture_conversations = true
+personalization = true
+personalization_timeout = 15.0
+timeout = 5.0
+max_chars = 8000
+```
+
+Disabled by default; `[memory] enabled = false` disables it too. Restart the
+runtime after changing these settings. For trusted identity headers, set
+`auth_mode = "trusted"` and supply both `account` and `user`. Use the same server
+identity across entry points when they should share memory. API-key mode derives
+the identity from the server's credential. `peer_id` optionally identifies this
+agent; empty keeps memory in the user's shared space. Credentials belong in the
+environment or the vault, such as `{{vault:OPENVIKING_API_KEY}}`.
+
+Environment overrides are `NANOMUSE_OPENVIKING_ENABLED`, `NANOMUSE_OPENVIKING_URL`,
+`NANOMUSE_OPENVIKING_API_KEY`, `NANOMUSE_OPENVIKING_AUTH_MODE`,
+`NANOMUSE_OPENVIKING_ACCOUNT`, `NANOMUSE_OPENVIKING_USER` and
+`NANOMUSE_OPENVIKING_PEER_ID`. No OpenViking SDK is required.
+
+Before a model turn, the agent retries pending writes and recalls relevant
+OpenViking memory. Recall is marked as historical evidence, and reads mark the
+conversation as having accessed private data. After a completed user turn, it
+saves the actual user input and final answer into a separate OpenViking session
+and commits it for asynchronous extraction. Background prompts, cancelled turns,
+old restored history, tool output, screenshots and reasoning are not captured.
+Known vault values and vault references are scrubbed. Each message and recalled
+context is capped at `max_chars`. Reads and writes pass through the Sentinel as
+moderate-risk, configured outbound operations, named `openviking_recall` and
+`openviking_sync`; deny rules and strict-mode approvals still apply.
+
+`<data_dir>/openviking-outbox.db` retains failed writes with owner-only file
+permissions. Retries happen at subsequent turns and normal shutdown, with a
+total `timeout` budget per operation. Changing the endpoint, credential or
+identity leaves the previous queue isolated. A timeout after server acceptance
+can result in a repeated message. Accepted commits remain the server's
+responsibility; extraction can still fail after acceptance. Local conversation
+continues when recall or synchronization is unavailable.
+
+The app's *Memory* page has a separate *OpenViking memories* section. Browse
+folders, search, open a file, edit its text or delete that file. It shows the
+pending queue and the latest 20 extraction tasks. *Retry pending turns* resends
+queued writes; failed extraction tasks already accepted by OpenViking need
+investigation on that server. Updates use the file's revision to reject concurrent
+changes. Deletion checks the revision before removing one file, without recursive
+directory deletion. Files outside the configured user's memory space are refused.
+
+*Automatically save conversations* overrides `capture_conversations` for the
+current endpoint and identity, persists across restarts and takes effect without
+a restart. Turning it off keeps existing memories and pending writes; recall and
+explicit saves remain available. For automation or one-off tasks, send
+`capture_memory: false` to the runtime's message API. This skips automatic capture
+for that task and prevents the model from using the local or remote memory write
+tools. If such a message arrives during a turn, capture is skipped for the whole
+turn. This flag is rejected for chats forwarded to another device because the
+current hub protocol cannot enforce it there. Omitting the flag keeps existing
+clients working. Automation sent as an ordinary user message is still eligible
+for extraction unless this flag or the capture switch excludes it.
+
+The model's `openviking_memory` tool can list, search, read, explicitly remember,
+correct or delete remote memories. Changes pass through the Sentinel; update and
+delete are sensitive actions. Authenticated memory-page actions supply approval
+for that one action, while explicit deny rules still win. The model cannot change
+the capture switch. The local `remember`, `recall`, `forget` tools and tidy history
+continue to manage SQLite separately.
+
+With `personalization = true`, the runtime also maintains a personal profile in
+`openviking-outbox.db`. A persisted owner ID and memory space identify the profile;
+rotating the OpenViking credential keeps it and the capture switch. An empty
+`profile_id` allocates an ID for the configured endpoint and account/user identity.
+Set `profile_id` to an existing owner's ID only for a deliberate owner migration.
+Changing the endpoint or account/user with no explicit ID creates another owner.
+Legacy profiles migrate only from the exact current connection's namespace.
+Outbound queues remain bound to their original connection and credential, so a
+credential change never retargets pending conversations. This derived profile is
+local to this runtime and complements OpenViking's remote memories.
+
+After an eligible completed turn, user evidence is queued on disk. While the
+runtime is idle, a background worker calls its currently configured conversation
+model to extract up to six proposed facts. The reply does not wait for that model
+call. Each attempt has a `personalization_timeout` budget. Failed attempts retry
+after 30 seconds, up to five attempts; the memory page can retry failed jobs.
+Shutdown cancellation leaves the job queued. Learning needs the runtime to stay
+online; short-lived CLI processes may leave jobs for a later running instance.
+Each space holds up to 1,000 pending jobs; a job retains at most the last eight
+eligible user messages, capped at 8,000 characters each and 32,000 in total.
+Only proposals supported by a verbatim user quote are accepted. Explicit facts
+retain that quote as their value; inferred preferences stay as candidates until
+confirmed in the memory page. Assistant replies and restored conversation history
+are not sources for this profile. Extraction failures leave the existing profile
+intact. Manual review invalidates previously queued proposals, so stale learning
+cannot undo a correction. Turning capture off pauses queued learning too.
+
+The profile distinguishes personal facts, preferences, projects, temporary states
+and experiences. Scoped facts participate only in matching queries, with a small
+set of technical terms also recognizing coding and deployment questions. Temporary
+states expire after seven days by default, with a 30-day maximum. Experiences
+default to 90 days, with a 180-day maximum. Other proposed lifetimes are optional
+and capped at 365 days. One-off wording such as "this time" does not establish a
+lasting preference. Novel wording and topic matching still depend on the model.
+
+Active facts are supplied before later replies, including in new conversations.
+Current user instructions take precedence, and the profile takes precedence over
+older remote evidence. It grants no permissions and cannot override the Sentinel.
+Candidates and expired facts do not participate. Explicit corrections can replace
+earlier facts while retaining their history; an owner-confirmed fact requires an
+explicit correction before automatic replacement.
+
+In *Memory → OpenViking memories → Personal profile*, inspect source quotes,
+scope and expiry, confirm candidates, edit facts or stop using them. Reviews check
+versions to reject concurrent changes. Stopping use retains a rejection marker
+to prevent the same value being learned again, including under a renamed topic;
+the owner can restore it explicitly. It does not delete remote OpenViking files
+or archived conversations. To erase those, manage them separately. Setting
+`personalization = false` disables profile learning and profile context. Turning
+off automatic capture stops new learning while keeping existing facts available;
+background turns and `capture_memory: false` turns do not teach the profile.
+
+#### Memory spaces
+
+*Memory → Memory spaces* starts with *Personal* and *Work*. Add a named project
+space and start a conversation from it. The choice is persisted with that thread;
+existing conversations and old clients keep `personal`. Spaces separately bind
+profile facts, explicit local memory tools and remote retrieval. They do not
+inherit another space's personal preferences. Non-personal spaces use a derived
+OpenViking peer ID, while Personal keeps the configured peer and existing data.
+Remote retrieval uses `find` within the selected memory root and validates hit
+URIs. Turning OpenViking off leaves scoped conversations readable, with their
+memory tools unavailable until the integration returns.
+
+All spaces belong to one runtime owner and use its runtime token. They are logical
+memory boundaries, not isolated operating-system users or hosted tenants. Other
+tools still follow their own Sentinel and filesystem policies. Clients connected
+to this runtime share its spaces. The standalone desktop DSH plugin retains its
+separate memory configuration and does not load these local profiles. Current
+conversation sync does not carry space identity, so non-personal conversations
+stay on this runtime rather than being synced as personal chats to older clients.
+
+#### Memory backups
+
+Within a space, download a backup before enabling *Clear after exporting*. Export
+includes all stored profile revisions, rejection markers, current local notes,
+visible remote memory files, recorded captured turns, and pending sync/learning
+evidence. It excludes credentials, chat timelines, local undo logs and Sentinel
+audit logs. Recorded turns cover captures made after this feature was installed;
+older remote sessions are known only where retained pending/commit records identify
+them. Backups fail rather than truncate above 1,000 remote tree entries, 32,000
+characters in a remote file, or 10 MB in total.
+
+Clear checks the exported revision, requires conversations and known extraction
+tasks to finish, disables capture, invalidates learning, deletes recorded remote
+sessions and visible remote memory files, then erases the space's local facts,
+undo history, vectors and pending jobs. Sessions whose ownership was never recorded,
+other remote peers, local chat timelines and audit logs are managed separately.
+This is logical deletion, not a promise to erase storage backups or free pages.
+Network failures can leave a partially cleared remote space with capture off;
+retain the downloaded backup, export the remaining state and inspect before retrying.
+
+Restore requires the same owner ID and space, validates paths and the checksum,
+adopts facts and creates missing remote memory files. It refuses to overwrite
+different existing remote text and keeps current profile topics. It does not
+replay captured conversations or queued jobs, recreate original remote archives,
+or turn capture on. The exported turn evidence remains in the downloaded backup.
+These authenticated controls use the Sentinel; explicit deny rules still apply.
+
+Deleting an extracted memory does not delete archived conversations. Reprocessing
+an archive can recreate it. Clearing a chat, disabling this integration or deleting
+a local memory does not erase server memories or the outbox.
+
+For a real check, tell the agent a distinctive project name and identifier. Wait
+for the server's commit task to complete, open a new runtime thread and ask for
+that identifier. Inspect both the stored memory and the recall request. An
+answer in the original thread does not establish cross-session recall.
+
+To inspect remote recall directly in a local development server, use the same
+identity as the runtime:
+
+```sh
+curl --fail-with-body -sS http://127.0.0.1:1933/api/v1/search/search \
+  -H 'Content-Type: application/json' \
+  -H 'X-OpenViking-Account: personal' \
+  -H 'X-OpenViking-User: me' \
+  -d '{"query":"project identifier","mode":"context","context_type":"memory","max_tokens":1000,"rewrite":false}'
+```
+
+Replace the identity headers when needed. Context mode uses `context_type` to
+select memories and does not accept `target_uri`; the legacy `/search/find`
+fallback uses `target_uri` instead. An HTTP 200 response with no entries means
+no relevant indexed memory was found, not a connection failure. Commit acceptance
+alone does not mean extraction has completed.
+
+In Docker, `127.0.0.1` refers to the container. Set a URL reachable from that
+container; a host service bound only to loopback is not reachable just by using
+`host.docker.internal`. Use an appropriate network configuration or an
+authenticated service endpoint. The running container must include this version
+of the Python code; rebuilding the desktop plugin alone does not update it.
+
 ## `[skills]`
 
 ```toml

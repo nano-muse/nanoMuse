@@ -143,6 +143,21 @@ embeddings = "auto"
 # embedding_model = "qwen3-embedding:0.6b"           # empty → the endpoint's default
 # embedding_api_key = "{{vault:EMBEDDINGS_API_KEY}}"  # empty → the model's key
 
+[memory.openviking]
+enabled = false
+url = "http://127.0.0.1:1933"   # from a container, use a reachable host address
+api_key = "${NANOMUSE_OPENVIKING_API_KEY:-}"
+auth_mode = "api_key"         # trusted: also set account and user
+account = ""
+user = ""
+peer_id = ""                  # empty: shared user memory across runtime threads
+profile_id = ""               # empty: persist a runtime-owner ID; set it for deliberate migration
+capture_conversations = true # default; the memory page can override it for this identity
+personalization = true       # learn a reviewable personal profile from eligible user turns
+personalization_timeout = 15.0 # seconds per background profile-learning attempt
+timeout = 5.0                 # total seconds per recall or sync operation
+max_chars = 8000              # per captured message and recalled context
+
 # ------------------------------------------------------------------------------
 # Connectors
 # ------------------------------------------------------------------------------

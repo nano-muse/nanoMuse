@@ -284,6 +284,7 @@ export interface ThreadMeta {
   busy: boolean;
   queued: number;
   events: number;
+  memory_space?: string;
   /** a chat addressed to another device of the account: what is typed here runs there */
   device?: string;
   device_name?: string;
@@ -783,6 +784,53 @@ export interface MemoryItem {
   source: string;
   /** set when the line was rewritten or is the result of a merge */
   updated_at?: string;
+}
+
+export interface PersonalFact {
+  id: string;
+  key: string;
+  kind: "profile" | "preference" | "project" | "state" | "experience";
+  value: string;
+  scope: string[];
+  confidence: "explicit" | "inferred" | "confirmed";
+  status: "active" | "candidate" | "expired" | "rejected" | "superseded";
+  version: number;
+  updated_at: string;
+  expires_at: string | null;
+  evidence: Array<{ quote: string; at: string; before?: string }>;
+}
+
+export interface PersonalProfile {
+  learning_enabled: boolean;
+  items: PersonalFact[];
+}
+
+export interface OpenVikingStatus {
+  enabled: boolean;
+  capture: boolean;
+  pending: number;
+  tasks: { state: string }[];
+}
+
+export interface OpenVikingEntry {
+  uri: string;
+  name: string;
+  directory: boolean;
+  abstract: string;
+}
+
+export interface OpenVikingPage {
+  root: string;
+  uri: string;
+  items: OpenVikingEntry[];
+  has_more: boolean;
+  offset: number;
+}
+
+export interface OpenVikingDocument {
+  uri: string;
+  content: string;
+  revision: string;
 }
 
 /** One entry of the memory log: a tidy-up merge or drop, or an update the agent made. Undoable. */

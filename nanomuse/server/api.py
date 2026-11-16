@@ -88,9 +88,11 @@ from nanomuse.fences import MAX_NAME
 from nanomuse.hub.client import HubError
 from nanomuse.llm.chatgpt import ChatGPTError
 from nanomuse.logger import logger
+from nanomuse.memory import MemoryStore
 from nanomuse.server import tickets
 from nanomuse.server.channels_api import install_channels
 from nanomuse.server.events import MAIN_THREAD
+from nanomuse.server.openviking_api import install_openviking
 from nanomuse.server.service import MuseService, goal_to_dict
 from nanomuse.server.update import UpdateCheck
 
@@ -116,10 +118,12 @@ class SendBody(BaseModel):
     # "cloud": *Use nanoMuse Cloud this time*; this one turn runs on the account's recommended
     # chat model, the next is back on the configured model. 401 `signed_out` when signed out.
     via: str = Field("", max_length=20)
+    capture_memory: bool = True
 
 
 class ThreadBody(BaseModel):
     title: str = ""
+    memory_space: str = Field(default="personal", pattern=r"^[a-z][a-z0-9_-]{0,47}$")
 
 
 class FeedInstructionsBody(BaseModel):
@@ -577,7 +581,10 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.post("/api/threads", dependencies=dep)
     async def create_thread(body: ThreadBody) -> dict[str, Any]:
-        return svc.create_thread(body.title).meta()
+        try:
+            return svc.create_thread(body.title, body.memory_space).meta()
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.patch("/api/threads/{thread_id}", dependencies=dep)
     async def rename_thread(thread_id: str, body: ThreadBody) -> dict[str, Any]:
@@ -623,7 +630,12 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
         thread = _thread_or_404(thread_id)
         try:
             event = svc.send(
-                thread.id, body.text, files=body.files, language=body.language, via=body.via
+                thread.id,
+                body.text,
+                files=body.files,
+                language=body.language,
+                via=body.via,
+                capture_memory=body.capture_memory,
             )
         except (ValueError, PermissionError) as exc:
             raise HTTPException(400, str(exc)) from exc
@@ -880,47 +892,62 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
         return {"ok": True, "trigger": item.id, "fired": item.fired}
 
     # ------------------------------------------------------------------ memory
+    install_openviking(app, svc, dep)
+
+    def memory_store(space: str) -> MemoryStore | None:
+        try:
+            return svc.app.memory_hub.local(space)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
     @app.get("/api/memory", dependencies=dep)
-    async def list_memory() -> list[dict[str, Any]]:
-        if svc.app.memory is None:
+    async def list_memory(space: str = "personal") -> list[dict[str, Any]]:
+        store = memory_store(space)
+        if store is None:
             return []
-        return [m.__dict__ for m in svc.app.memory.all()]
+        return [m.__dict__ for m in store.all()]
 
     @app.post("/api/memory", dependencies=dep)
-    async def add_memory(body: MemoryBody) -> dict[str, Any]:
-        if svc.app.memory is None:
+    async def add_memory(body: MemoryBody, space: str = "personal") -> dict[str, Any]:
+        store = memory_store(space)
+        if store is None:
             raise HTTPException(400, "memory is disabled")
-        item = svc.app.memory.add(body.content, body.category or "profile", source="user")
+        item = store.add(body.content, body.category or "profile", source="user")
         svc.bus.publish({"kind": "memory"})
         return item.__dict__
 
     @app.delete("/api/memory/{memory_id}", dependencies=dep)
-    async def forget_memory(memory_id: str) -> dict[str, Any]:
-        if svc.app.memory is None or not svc.app.memory.forget(memory_id):
+    async def forget_memory(memory_id: str, space: str = "personal") -> dict[str, Any]:
+        store = memory_store(space)
+        if store is None or not store.forget(memory_id):
             raise HTTPException(404, "no such memory")
         svc.bus.publish({"kind": "memory"})
         return {"ok": True}
 
     @app.post("/api/memory/tidy", dependencies=dep)
-    async def tidy_memory(dry_run: bool = False) -> dict[str, Any]:
+    async def tidy_memory(dry_run: bool = False, space: str = "personal") -> dict[str, Any]:
         """One tidy-up pass now (merge duplicates, drop non-facts); ``dry_run`` only plans."""
         try:
-            return await svc.tidy_memory(dry_run=dry_run)
+            return await svc.tidy_memory(dry_run=dry_run, space=space)
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
 
     @app.get("/api/memory/changes", dependencies=dep)
-    async def memory_changes(limit: int = Query(30, ge=1, le=200)) -> list[dict[str, Any]]:
+    async def memory_changes(
+        limit: int = Query(30, ge=1, le=200), space: str = "personal"
+    ) -> list[dict[str, Any]]:
         """What tidy-ups and updates changed, newest first; each entry can be restored."""
-        if svc.app.memory is None:
+        store = memory_store(space)
+        if store is None:
             return []
-        return [c.to_dict() for c in svc.app.memory.history(limit)]
+        return [c.to_dict() for c in store.history(limit)]
 
     @app.post("/api/memory/changes/{change_id}/restore", dependencies=dep)
-    async def restore_memory_change(change_id: str) -> dict[str, Any]:
-        if svc.app.memory is None:
+    async def restore_memory_change(change_id: str, space: str = "personal") -> dict[str, Any]:
+        store = memory_store(space)
+        if store is None:
             raise HTTPException(400, "memory is disabled")
-        change = svc.app.memory.restore(change_id)
+        change = store.restore(change_id)
         if change is None:
             raise HTTPException(404, "no such change")
         svc.bus.publish({"kind": "memory"})
@@ -2109,6 +2136,7 @@ async def _handle_ws_message(
                 files=[str(f) for f in files][:10] if isinstance(files, list) else None,
                 language=str(data.get("language") or "")[:20],
                 via=str(data.get("via") or "")[:20],
+                capture_memory=data.get("capture_memory", True) is not False,
             )
         elif kind == "approval":
             approval_id = str(data.get("id", ""))

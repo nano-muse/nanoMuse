@@ -338,6 +338,7 @@ class Thread:
     # the main chat of another account of this device (contract C10): kept while someone
     # else is signed in, hidden from them, back as `main` when that account returns
     main_of: str = ""
+    memory_space: str = "personal"
 
     def meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {
@@ -348,6 +349,7 @@ class Thread:
             "busy": self.busy,
             "queued": self.inbox.qsize(),
             "events": len(self.timeline.events),
+            "memory_space": self.memory_space,
         }
         if self.device:
             meta["device"] = self.device
@@ -484,6 +486,8 @@ class MuseService:
         self._started = True
         await self._step("cloud account and hub", self.hub.start(), 30)
         self.sync.start()
+        self.app.memory_hub.busy = lambda: any(t.busy for t in self.threads.values())
+        self.app.memory_hub.changed = lambda: self.bus.publish({"kind": "memory"})
         self._scheduler = asyncio.create_task(self._goal_scheduler(), name="goal-scheduler")
         self.starting = ""
         logger.info(
@@ -774,7 +778,11 @@ class MuseService:
                 logger.warning("threads index: ignoring the entry with the id {!r}", tid)
                 continue
             thread = self._make_thread(
-                tid, m.get("title", tid), m.get("created_at"), m.get("updated_at")
+                tid,
+                m.get("title", tid),
+                m.get("created_at"),
+                m.get("updated_at"),
+                memory_space=m.get("memory_space", "personal"),
             )
             if m.get("device"):
                 thread.device = str(m["device"])
@@ -796,6 +804,7 @@ class MuseService:
                 "title": t.title,
                 "created_at": t.created_at,
                 "updated_at": t.updated_at,
+                "memory_space": t.memory_space,
             }
             if t.device:
                 m["device"] = t.device
@@ -828,6 +837,7 @@ class MuseService:
         title: str,
         created_at: str | None = None,
         updated_at: str | None = None,
+        memory_space: str = "personal",
     ) -> Thread:
         timeline = Timeline(thread_id, self._thread_file(thread_id, ".json"))
         # Cards that were waiting for an answer when the server stopped can't be answered
@@ -861,6 +871,7 @@ class MuseService:
             ui=self.ui,
             audit=self.app.audit,
             memory=self.app.memory,
+            openviking=self.app.openviking,
             goals=self.app.goals,
             calendar=self.app.calendar,
             contacts=self.app.contacts,
@@ -880,7 +891,9 @@ class MuseService:
             updated_at=updated_at or created_at or now_iso(),
             timeline=timeline,
             agent=agent,
+            memory_space=memory_space,
         )
+        self.app.memory_hub.bind(agent, memory_space)
         self.threads[thread_id] = thread
         return thread
 
@@ -891,9 +904,9 @@ class MuseService:
             self._save_index()
         return thread.timeline
 
-    def create_thread(self, title: str = "") -> Thread:
+    def create_thread(self, title: str = "", memory_space: str = "personal") -> Thread:
         tid = "t_" + uuid.uuid4().hex[:8]
-        thread = self._make_thread(tid, title.strip() or "Side chat")
+        thread = self._make_thread(tid, title.strip() or "Side chat", memory_space=memory_space)
         self._save_index()
         self.bus.publish({"kind": "thread", "thread": thread.meta()})
         self.sync.thread_changed(thread)
@@ -979,7 +992,13 @@ class MuseService:
                 dst.unlink()
             if src_path.exists():
                 src_path.replace(dst)
-        moved = self._make_thread(new_id, thread.title, thread.created_at, thread.updated_at)
+        moved = self._make_thread(
+            new_id,
+            thread.title,
+            thread.created_at,
+            thread.updated_at,
+            memory_space=thread.memory_space,
+        )
         moved.device, moved.device_name = thread.device, thread.device_name
         moved.remote_from = thread.remote_from
         moved.origin_device, moved.origin_device_name = (
@@ -1078,6 +1097,7 @@ class MuseService:
         files: list[str] | None = None,
         language: str = "",
         via: str = "",
+        capture_memory: bool = True,
     ) -> dict[str, Any]:
         """Queue a message for a thread. Returns the timeline event that was created.
 
@@ -1086,7 +1106,11 @@ class MuseService:
         screens when the client said; the agent answers in it (see MuseAgent.run).
         ``via="cloud"`` is *Use nanoMuse Cloud this time*: this one turn runs on the
         account's recommended chat model (see :meth:`cloud_once`); the next is back on
-        the configured model. A CloudError when that is not possible."""
+        the configured model. A CloudError when that is not possible.
+        ``capture_memory=False`` excludes this task from automatic conversation capture
+        and prevents model memory writes. Forwarded devices cannot enforce this flag."""
+        if self.app.memory_hub.archiving:
+            raise ValueError("Memory backup or deletion is in progress. Try again shortly.")
         text = text.strip()
         language = language.strip()
         attachments = [self.attachment(path) for path in files or []]
@@ -1100,6 +1124,10 @@ class MuseService:
             thread.agent.ui_language = language
         if thread.device:
             # a chat addressed to another device: the text runs there, not here
+            if thread.memory_space != "personal":
+                raise ValueError("This device cannot preserve the selected memory space")
+            if not capture_memory:
+                raise ValueError("This device does not support excluding memory capture")
             if thread.busy:
                 raise ValueError(f"{thread.device_name or 'the device'} is still busy")
             if once is not None and once[0] is not None:
@@ -1164,10 +1192,16 @@ class MuseService:
             if label:
                 thread.purposes[text] = label
         if once is not None:
-            thread.inbox.put_nowait(Incoming(text, attachments, language, once[0], once[1]))
+            thread.inbox.put_nowait(
+                Incoming(
+                    text, attachments, language, once[0], once[1], capture_memory=capture_memory
+                )
+            )
         else:
             thread.inbox.put_nowait(
-                Incoming(text, attachments, language) if attachments or language else text
+                Incoming(text, attachments, language, capture_memory=capture_memory)
+                if attachments or language or not capture_memory
+                else text
             )
         self._ensure_worker(thread)
         return event
@@ -1245,6 +1279,7 @@ class MuseService:
             while not thread.inbox.empty():
                 item = thread.inbox.get_nowait()
                 incoming = item if isinstance(item, Incoming) else Incoming(item)
+                self.app.memory_hub.bind(thread.agent, thread.memory_space)
                 text = incoming.text
                 thread.busy = True
                 thread.agent.inbox = thread.inbox
@@ -1265,12 +1300,21 @@ class MuseService:
                     )
                     self.ui.begin_run(thread.id, background=purpose, model_used=incoming.model)
                     final = await thread.agent.run(
-                        text, purpose=purpose, files=incoming.files, language=incoming.language
+                        text,
+                        purpose=purpose,
+                        files=incoming.files,
+                        language=incoming.language,
+                        capture_memory=incoming.capture_memory,
                     )
                     quiet, final = (
                         prompts.split_quiet(final or "") if purpose else (False, final or "")
                     )
                     self._finish_run(thread, purpose, final.strip(), quiet)
+                    if (
+                        self.app.openviking is not None
+                        and self.settings.memory.openviking.personalization
+                    ):
+                        self.bus.publish({"kind": "memory"})
                 except asyncio.CancelledError:
                     if thread.stopping:
                         self._settle_stopped(thread)
@@ -2048,11 +2092,11 @@ class MuseService:
         except ValueError:
             return True
 
-    async def tidy_memory(self, dry_run: bool = False) -> dict[str, Any]:
+    async def tidy_memory(self, dry_run: bool = False, space: str = "personal") -> dict[str, Any]:
         """One pass of ``memory.tidy``: merge duplicates, keep the newer fact, drop what
         was never a fact about the user. What changed goes to the Feed and to the log
         behind *Memory → Recent changes*, where each change can be undone."""
-        store = self.app.memory
+        store = self.app.memory_hub.local(space)
         if store is None:
             raise ValueError("memory is disabled")
         if self._tidying:

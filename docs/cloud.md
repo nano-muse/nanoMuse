@@ -166,6 +166,11 @@ nothing more is stored (the place is computed when the page is drawn).
 
 ## Conversation sync
 
+Python runtime conversations in non-personal memory spaces stay on that runtime.
+The current sync contract does not carry memory-space identity, so these chats are
+excluded even when side-chat sync is enabled. Existing personal chats keep the
+same sync behavior. See [memory spaces](configuration.md#memory-spaces).
+
 *Settings → Data controls → Sync conversations between my devices* (0.1.36,
 relay 0.19) is the other switch on that page, **on by default** for a signed-in
 account. With it on, each device pushes the text of its turns to the relay and

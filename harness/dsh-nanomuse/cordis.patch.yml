@@ -79,3 +79,12 @@
     # client per connection in every chat.
     - id: nanomuse-connectors
       name: dsh-nanomuse/connectors
+
+    # Optional long-term memory. Enable this row in the person's profile after
+    # deploying OpenViking. Credentials stay in ~/.openviking/ovcli.conf.
+    - id: openviking-memory-runtime
+      name: dsh-nanomuse/openviking
+      disabled: true
+      config:
+        captureToolResults: false
+        commitTokenThreshold: 1000

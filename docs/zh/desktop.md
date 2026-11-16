@@ -199,6 +199,56 @@ CLI 自己的 `~/.dsh` 不会被碰。主目录下的 `nanomuse/hands.json`（�
 不用重启就生效（进行中的一次手的调用先做完）。什么都没配时这个文件会被删除；`nanomuse/rooms.json`
 保存房间（动态，目标连同它们的步骤和进度，哪些点子试过了，资源库索引，记忆）。
 
+### OpenViking 记忆 {#openviking-memory}
+
+桌面版已随包携带固定版本的 OpenViking 官方 DSH 插件，默认关闭。
+没有安装或启动 OpenViking，也可以正常使用 nanoMuse。
+本次接入覆盖桌面端 DSH 对话，不会迁移已有的个人资料记忆，也没有接通手机 App
+和 Python 智能体各自的记忆库。
+
+部署 OpenViking 后：
+
+1. 在运行 nanoMuse 的电脑上创建 `~/.openviking/ovcli.conf`
+   （Windows 为 `%USERPROFILE%\.openviking\ovcli.conf`）：
+
+   ```json
+   {
+     "url": "http://127.0.0.1:1933",
+     "api_key": ""
+   }
+   ```
+
+   把 URL 换成你的服务地址，启用了鉴权就填写 API key。远程服务使用 HTTPS。
+   服务采用 trusted 模式时，还要填写服务端配置的 `account` 和 `user`。
+   妥善保管此文件，凭据不写入对话或代码仓库。
+
+2. 在现有 `~/.nanomuse/desktop/profiles/nanomuse/cordis.patch.yml`
+   中加入下面这一行配置，保留文件里的其他条目：
+
+   ```yaml
+   - id: openviking-memory-runtime
+     disabled: false
+   ```
+
+   设置了 `NANOMUSE_DESKTOP_HOME` 时，使用该主目录下的
+   `profiles/nanomuse/cordis.patch.yml`。独立运行 DSH 时，修改当前 profile 的配置。
+   依赖已经随 nanoMuse 插件提供，不要在同一 profile 再安装一份 OpenViking 插件。
+
+3. 完全退出并重新打开 nanoMuse，再新建对话。
+
+插件在处理新输入前召回相关记忆，自动采集用户和智能体的消息，默认不采集工具结果。
+当 OpenViking 报告待处理内容达到 1,000 tokens、对话压缩前或会话正常关闭时，
+插件会提交待处理消息。记忆提取在服务端执行，消息写入成功不代表提取已经完成。
+写入失败时使用官方插件的本地重试队列。服务不可用时，对话继续运行，但没有召回的上下文，
+网络请求仍可能等待一段时间才返回失败。
+
+验证跨会话记忆时，先告诉它一条容易辨认的偏好，完全退出应用以提交较短的对话，
+等服务端完成提取后再打开应用，在新对话中询问这条偏好。同时查看 OpenViking 保存的记忆，
+不要只看回答。这里的记忆与个人资料抽屉里的本地记忆列表分别保存。
+把配置中的 `disabled` 改回 `true` 可关闭接入，但不会删除服务端已有记忆或本地待重试内容。
+身份、工作区范围和其他选项见
+[官方 DSH 接入文档](https://github.com/volcengine/OpenViking/blob/main/docs/en/agent-integrations/17-dsh.md)。
+
 ## 模型 {#models}
 
 「设置 → 模型」紧跟在「通用」后面，模型替你做的每件事占一行：「对话」「操作屏幕」「生成图片」

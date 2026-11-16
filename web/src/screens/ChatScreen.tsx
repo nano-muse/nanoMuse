@@ -235,7 +235,7 @@ export function ChatScreen() {
                   <MonitorSmartphone size={11} /> <span className="truncate">{t("from {device}", { device: thread.remote_from.name })}</span>
                 </span>
               ) : (
-                <span className="truncate rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-fg/80">{thread.title}</span>
+                <span className="truncate rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-fg/80">{thread.title}{thread.memory_space && thread.memory_space !== "personal" ? ` · ${t("Memory space")}: ${thread.memory_space}` : ""}</span>
               )
             ) : undefined
           }

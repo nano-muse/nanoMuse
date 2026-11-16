@@ -73,6 +73,16 @@ Our own code, GPL-3.0-or-later like the rest. Third-party code inside it keeps i
 
 The desktop app is a plugin for [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh) (`@deepseek-ai/dsh` and the `@deepseek-ai/dsh-*` packages, 0.2.0-rc.2, MIT), carried inside nanoMuse Desktop unmodified with every package's licence file; it is not vendored in this repository (`harness/dsh-nanomuse/package.json`, `harness/desktop/scripts/prepare-dsh.mjs`). "DeepSeek Harness" and "DSH" are DeepSeek's names; *harness* in `harness/` is the word ([harness/README.md](harness/README.md#licence-and-names)). The shell is [Electron](https://github.com/electron/electron) (MIT), installed by npm at build time.
 
+### OpenViking DSH memory plugin (Apache-2.0)
+
+The desktop bundle includes the unmodified
+[`@openviking/dsh-memory-plugin`](https://github.com/volcengine/OpenViking/tree/main/examples/dsh-memory-plugin)
+0.5.34 as an npm dependency, under Apache-2.0. The optional bridge at
+`harness/dsh-nanomuse/openviking.mjs` loads its automatic recall, capture and commit
+hooks. The OpenViking server is deployed separately. Upstream source and licence:
+[OpenViking](https://github.com/volcengine/OpenViking),
+[Apache-2.0 licence](https://github.com/volcengine/OpenViking/blob/main/LICENSE).
+
 ### MemGUI-Bench (MIT)
 
 The phone operator (`nanomuse/phone/operator.py`) is a port of the `mobile_use` operator in [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench) (`src/mobile_world/agents/implementations/qwen3vl.py` and its prompt): the tool schema, the system prompt's wording, the `Thought` / `Action` / `<tool_call>` reply shape, the 999-grid coordinates and the step history. Rewritten in nanoMuse's own structure, with rules added (passwords, payments, `ask_user`), Sentinel labels and traces.

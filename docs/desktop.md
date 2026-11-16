@@ -257,6 +257,62 @@ hands call in flight finishes first). The file is removed when nothing is config
 `nanomuse/rooms.json` keeps the rooms (feed, goals with their steps and progress, which
 ideas were tried, the library index, memory).
 
+### OpenViking memory
+
+The desktop bundle includes the pinned official OpenViking DSH plugin. It is disabled
+by default, so OpenViking does not need to be installed or running to use nanoMuse.
+This integration covers desktop DSH conversations. It does not migrate the existing
+profile memory or connect the phone apps and the Python agent's memory store.
+
+After deploying OpenViking:
+
+1. Create `~/.openviking/ovcli.conf` on the computer running nanoMuse
+   (`%USERPROFILE%\.openviking\ovcli.conf` on Windows):
+
+   ```json
+   {
+     "url": "http://127.0.0.1:1933",
+     "api_key": ""
+   }
+   ```
+
+   Replace the URL with your server's address and set its API key if authentication
+   is enabled. Use HTTPS for a remote server. For trusted-mode servers, also set
+   `account` and `user` to the identities configured on that server. Keep this file
+   private. Credentials are not stored in conversation messages or the repository.
+
+2. Add this row to the existing
+   `~/.nanomuse/desktop/profiles/nanomuse/cordis.patch.yml`, preserving its other rows:
+
+   ```yaml
+   - id: openviking-memory-runtime
+     disabled: false
+   ```
+
+   With `NANOMUSE_DESKTOP_HOME`, use that home's `profiles/nanomuse/cordis.patch.yml`.
+   For a standalone DSH installation, use the active profile's own patch instead.
+   The dependency is included with the nanoMuse bundle; do not install a second
+   copy of the OpenViking bundle into the same profile.
+
+3. Fully quit and reopen nanoMuse, then start a new conversation.
+
+The plugin recalls relevant memories before processing new user input and captures
+user and assistant messages. Tool results are excluded by default. It commits pending
+messages when OpenViking reports at least 1,000 pending tokens, before compaction,
+and during a normal session shutdown. Memory extraction happens on the server, so
+a successful write is not proof that extraction has finished. Failed writes use the
+upstream plugin's local retry queue. When the server is unavailable, conversation
+continues without recalled context; requests can still take time to fail.
+
+To check cross-session memory, tell it a distinctive preference, fully quit the app
+to commit a short conversation, wait for extraction on the server, then reopen it
+and ask about the preference in a new chat. Check the saved memory in OpenViking as
+well as the answer. This is separate from the local profile drawer's memory list.
+Set the row's `disabled` back to `true` to stop the integration; this does not delete
+previously stored server memory or pending writes. See the
+[upstream DSH guide](https://github.com/volcengine/OpenViking/blob/main/docs/en/agent-integrations/17-dsh.md)
+for server identity, workspace scope and additional settings.
+
 ## Models
 
 Settings → Models, right after General, is one row per thing a model does: *Chat*,

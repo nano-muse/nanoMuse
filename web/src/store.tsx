@@ -600,6 +600,9 @@ const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
+  // Hash navigation subscribes to this callback. Keep it stable so new server
+  // events do not jump back to the section named in the original URL.
+  const setTab = useCallback((tab: Tab) => dispatch({ type: "tab", tab }), []);
   const wsRef = useRef<ReturnType<typeof connectWs> | null>(null);
 
   useEffect(() => {
@@ -814,7 +817,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       refreshGoals,
       refreshSettings,
       refreshHub,
-      setTab: (tab) => dispatch({ type: "tab", tab }),
+      setTab,
       setDrawer: (open) => dispatch({ type: "drawer", open }),
       openThread: (thread) => dispatch({ type: "activeThread", thread }),
       markFeedSeen: (at) => dispatch({ type: "feedSeen", at }),
@@ -831,7 +834,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       toast: (text) => dispatch({ type: "toast", toast: t(text) }),
     }),
-    [state, loadEvents, refreshGoals, refreshSettings, refreshHub],
+    [state, loadEvents, refreshGoals, refreshSettings, refreshHub, setTab],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

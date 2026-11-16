@@ -103,9 +103,40 @@ nanomuse serve --port 9000 --no-qr
 
 在「连接」里做的非密钥选择存在 `<data_dir>/app-settings.json`，每次启动时叠在 `config.toml` 之上（命令行也一样），所以只用手机的配置方式从来不需要改文件。密钥在那里永远只以 `{{vault:NAME}}` 的形式被引用。
 
+### OpenViking 记忆 {#openviking-memories}
+
+先在「记忆空间」选择「个人」「工作」或项目，再点「在此空间开始对话」，新线程会绑定
+这个选择；已有聊天继续使用个人空间。画像、本地笔记和远程记忆区域都按所选空间显示。
+连接同一运行时的其他设备可以使用这些空间，独立运行的桌面插件仍使用自己的配置。
+当前会话同步未携带空间身份，因此非个人空间聊天留在当前运行时。
+
+面板会显示后台画像学习的待处理和失败数量，可以重试失败任务。在「导出、恢复或清理
+此空间」中，先下载备份再清理。清理会关闭采集，并检查导出后数据是否变化，范围包括
+该空间管理的记忆和有记录的远程会话；本地聊天记录、审计日志及未记录归属的远程会话
+仍保留。恢复只采用事实，不重放采集对话，完整[范围和限制](configuration.md#memory-backups)
+见配置说明。
+
+「个人画像」显示运行时学到的事实、来源原话、适用范围和有效期。明确事实可以自动生效，
+推测出的偏好需要点「采用这条事实」确认。发现错误可以修改或「停止使用」，勾选
+「显示已替换和过期的事实」可查看历史并恢复使用。停止使用只影响画像，不会删除远程文件
+或归档对话。画像保存在当前运行时，连接同一运行时的客户端共用；关闭自动采集也会停止
+学习新画像。测试时先说一条长期回答偏好，在此处检查来源，再新建对话看回答是否遵循。
+
+运行时启用 [OpenViking 接入](configuration.md#memory-openviking) 后，「记忆」页会在
+本地记忆上方显示独立的远程区域。搜索或浏览目录，打开条目后可以修改保存，也可以确认
+删除。文件在你打开后发生变化时，页面保留草稿并提示重新加载，再决定如何修改。
+删除只移除提取后的文件，归档对话仍然保留，重新处理归档可能再次生成它。
+
+「自动保存对话」开关控制对话采集，重启后保留。关闭后仍能召回，已有记忆和待同步内容
+不会被清除，也可以明确要求智能体记住某个事实。区域内同时显示待同步数量、正在提取的
+任务和近期失败。「重试待同步内容」重试本地队列；提交成功与提取完成分别显示。
+这些操作管理 Python 运行时，包括通过 gateway 接入的客户端，桌面 DSH 插件单独配置。
+
 ### 带着东西打开应用 {#opening-the-app-on-something}
 
 页面接受几个查询参数，Android 应用在用，书签也可以用：`?thread=<id>` 打开一段对话，`?tab=goals`（feed、ideas、library、connections）打开一个标签页；`&draft=<text>` 把文字放进输入框但不发送；`&attach=<json>`（`POST /api/files/upload` 返回的 `{path, name, mime, size}` 的 JSON 列表）把已经在工作区里的文件加成附件小标签。它们只读一次，然后从地址栏里去掉。手机上的**分享 → nanoMuse** 就是这么做的：应用上传分享来的文件（`POST /api/files/upload`），开一个以主题或第一个文件命名的会话（`POST /api/threads`），然后带着文字作为草稿、文件作为附件打开它，等你说要拿它们做什么。在手机上，智能体还把手机自己的能力当工具用，工作区也会出现在「文件」应用里：[device.md](device.md)。
+
+自动化客户端可在 REST 或 WebSocket 消息中传入 `capture_memory: false`，排除一次性任务。它控制记忆写入，聊天历史仍保留，完整范围见[采集控制](configuration.md#memory-openviking)。
 
 ## 后台工作 {#background-work}
 
@@ -136,7 +167,7 @@ nanomuse serve --port 9000 --no-qr
 | PATCH / DELETE | `/api/threads/{id}` | 重命名 / 删除 |
 | POST | `/api/threads/{id}/clear` | 清空对话 |
 | GET | `/api/threads/{id}/events?limit=&before=` | 时间线事件 |
-| POST | `/api/threads/{id}/send` `{text, files?, language?, via?}` | 把一条消息排进队列；立即返回。`files`：下面那个上传接口返回的工作区路径，最多十个；有文件时文字可以为空。`language`（1.0.0 起）：客户端界面语言的 BCP-47 标签（`en`、`zh-CN`）；除非「回复语言」固定了一种，回复就用这种语言写。不带它时照旧按消息的文字书写系统判断。`via: "cloud"` 是「这次改用 nanoMuse Cloud」：这一个回合用账号的 key 在账号推荐的聊天模型上跑，下一回合回到配置的模型，`[llm]` 不动；用户气泡、回复和这一回合的失败提示都带 `model_used`。没有登录账号时回 `401 signed_out` |
+| POST | `/api/threads/{id}/send` `{text, files?, language?, via?, capture_memory?}` | 把一条消息排进队列；立即返回。`files`：下面那个上传接口返回的工作区路径，最多十个；有文件时文字可以为空。`language`（1.0.0 起）：客户端界面语言的 BCP-47 标签（`en`、`zh-CN`）；除非「回复语言」固定了一种，回复就用这种语言写。不带它时照旧按消息的文字书写系统判断。`via: "cloud"` 是「这次改用 nanoMuse Cloud」：这一个回合用账号的 key 在账号推荐的聊天模型上跑，下一回合回到配置的模型，`[llm]` 不动；用户气泡、回复和这一回合的失败提示都带 `model_used`。没有登录账号时回 `401 signed_out`。`capture_memory: false` 跳过该任务的自动采集并禁止模型写入记忆，默认 true，转发给其他设备的会话不支持此限制 |
 | POST | `/api/threads/{id}/stop` | 停掉那个聊天里正在跑的一轮：队列丢弃，那里待处理的审批和提问卡片过期，对话照常能用。没有东西在跑时返回 `{ok: false}` |
 | POST | `/api/files/upload?name=` （请求体：文件字节） | 一个要附上的文件：落到 `attachments/<date>/` 下，文件名是 `name` 的安全版本；返回给 `files` 用的 `{path, name, size, kind, mime}`。超过 `server.max_upload_mb` 返回 413 |
 | POST | `/api/approvals/{id}` `{approved, scope, reason}` | 回答一张卡片；`scope` 是这张卡片 `grant_options` 中的一个（`once`、`conversation`、`session`、`24h`、`always`；`task` 仍按 `conversation` 读） |
@@ -149,6 +180,23 @@ nanomuse serve --port 9000 --no-qr
 | POST | `/api/goals/{id}/check-in` | 现在就发那条提醒消息 |
 | POST / DELETE | `/api/goals/{id}/proposal/accept`、`/api/goals/{id}/proposal` | 接受 / 驳回智能体提议的计划变更 |
 | GET / POST | `/api/memory` · DELETE `/api/memory/{id}` | 列出 / 添加 `{content, category}` / 忘掉 |
+| GET | `/api/memory/openviking/status` | 是否启用、采集开关、待同步数量和近期提取任务状态 |
+| GET | `/api/memory/openviking/profile?history=false` | 当前个人事实与画像学习开关，history 包含历史和已过期事实 |
+| GET / POST | `/api/memory/spaces` | 所有者 ID、空间和学习数量；POST `{id, label}` 创建空间 |
+| POST | `/api/memory/spaces/{space}/retry` | 重试失败的后台画像学习 |
+| GET | `/api/memory/spaces/{space}/export` | 导出带版本的受管理记忆及采集轮次依据 |
+| POST | `/api/memory/spaces/{space}/clear` `{revision}` | 检查版本和活动任务后清理导出状态，采集保持关闭 |
+| POST | `/api/memory/spaces/{space}/restore` `{data}` | 恢复相同所有者和空间的备份，不重放对话 |
+| POST | `/api/memory/openviking/profile/{id}` `{version, action, value?}` | 确认、更正或拒绝单条个人事实，更正需带 value，并发修改时返回 409 |
+| GET | `/api/memory/openviking/entries?uri=&query=&offset=` | 浏览或搜索当前用户的记忆空间，每页 50 条 |
+| GET | `/api/memory/openviking/entry?uri=` | 读取可见正文及其 `revision` 版本标记 |
+| PUT / DELETE | `/api/memory/openviking/entry` `{uri, revision, content?}` | 修改或删除单个文件，修改需带正文，版本变化时返回 409 |
+| PUT | `/api/memory/openviking/capture` `{enabled}` | 保存当前身份的自动采集开关 |
+| POST | `/api/memory/openviking/retry` | 重试待同步内容，提取仍由 OpenViking 异步完成 |
+
+本地记忆、画像和 OpenViking 接口支持 `?space=personal`，不传时使用个人空间。
+`POST /api/threads` 支持 `{title, memory_space}` 创建空间对话。空间随线程保存在本地，
+不能在保留旧上下文的同时切换到另一空间。
 | POST | `/api/memory/tidy`（`?dry_run=1`） | 现在就整理一遍；报告列出合并了什么、丢掉了什么（或者将会合并、丢掉什么） |
 | GET | `/api/memory/changes` · POST `/api/memory/changes/{id}/restore` | 合并、丢弃和更新的记录，最新的在前；撤销其中一条 |
 | GET | `/api/ideas?refresh=1` | 缓存的或重新生成的建议 |

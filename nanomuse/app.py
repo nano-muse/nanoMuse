@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import uuid
 from datetime import datetime
@@ -21,6 +22,8 @@ from nanomuse.llm import BaseLLM, catalogue, create_llm
 from nanomuse.llm.catalogue import Provider
 from nanomuse.logger import logger, setup_logging
 from nanomuse.memory import Embedder, MemoryIndex, MemoryStore
+from nanomuse.memory.hub import MemoryHub
+from nanomuse.memory.openviking import OpenVikingManage, OpenVikingMemory
 from nanomuse.phone import PhoneLink
 from nanomuse.phone.operator import AUTO_LANGUAGE, COMPUTER, PhoneOperator
 from nanomuse.reminders import ReminderStore
@@ -81,6 +84,13 @@ class NanoMuseApp:
 
         self.vault = CredentialVault(settings.vault_file, settings.vault_key_file)
         self.memory = MemoryStore(settings.memory_db) if settings.memory.enabled else None
+        ov = settings.memory.openviking
+        self.openviking: OpenVikingMemory | None = None
+        if settings.memory.enabled and ov.enabled:
+            key = self.vault.resolve(ov.api_key, strict=True)
+            self.openviking = OpenVikingMemory(
+                ov, settings.data_dir / "openviking-outbox.db", api_key=key
+            )
         self.embedder: Embedder | None = None
         self.attach_embedder()
         self.goals = GoalStore(settings.goals_db)
@@ -135,6 +145,7 @@ class NanoMuseApp:
                 on_event=getattr(ui, "on_hands", None),
             )
         self.tools = self._build_tools()
+        self.memory_hub = MemoryHub(self)
         self.agent = MuseAgent(
             settings=settings,
             llm=self.llm,
@@ -143,12 +154,14 @@ class NanoMuseApp:
             ui=ui,
             audit=self.audit,
             memory=self.memory,
+            openviking=self.openviking,
             goals=self.goals,
             calendar=self.calendar,
             contacts=self.contacts,
             skills=self.skills,
             session_file=settings.data_dir / "sessions" / f"{self.session_id}.json",
         )
+        self.memory_hub.bind(self.agent, "personal")
 
     def attach_embedder(self) -> None:
         """(Re)build the embedding client from the current settings and give the memory
@@ -333,6 +346,8 @@ class NanoMuseApp:
             tools.add(
                 Remember(store=self.memory), Recall(store=self.memory), Forget(store=self.memory)
             )
+        if self.openviking is not None:
+            tools.add(OpenVikingManage(bridge=self.openviking, vault=self.vault))
         if s.connectors.email.enabled:
             tools.add(
                 ReadEmails(settings=s.connectors.email, vault=self.vault),
@@ -473,9 +488,16 @@ class NanoMuseApp:
         if self.mcp is not None:
             for tool in await self.mcp.connect():
                 self.tools.add(tool)
+        self.memory_hub.start()
         return self
 
     async def close(self) -> None:
+        await self.memory_hub.close()
+        if self.openviking is not None:
+            with contextlib.suppress(TimeoutError):
+                async with asyncio.timeout(self.settings.memory.openviking.timeout):
+                    await self.agent.sync_openviking()
+            await self.openviking.close()
         await self.tools.cleanup()
         if self.mcp is not None:
             await self.mcp.close()

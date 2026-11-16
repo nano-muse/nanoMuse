@@ -234,6 +234,12 @@ class MemoryStore:
         self._conn.commit()
         return cur.rowcount
 
+    def erase(self) -> None:
+        """Erase explicit memory, undo history and derived vectors together."""
+        with self._conn:
+            for table in ("memories", "memory_log", "memory_meta", "memory_vectors"):
+                self._conn.execute(f"DELETE FROM {table}")
+
     def count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0])
 

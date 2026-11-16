@@ -44,6 +44,9 @@ sequenceDiagram
 | 手机 | `nanomuse/phone/link.py`、`screen.py`、`operator.py`、`trace.py`、`nanomuse/tools/phone.py` | 已连接的设备，以及经 App 的 WebSocket 走的请求/响应；屏幕是一张截图加一段说明文字；操作器循环（MemGUI 的 `mobile_use` 方言，坐标落在 999 网格上），用它自己的模型；JSONL 轨迹和它的 HTML 渲染；`phone_screen` / `phone_act` / `phone_task` 和它们在哨兵里的评估（见 [gui.md](gui.md)） |
 | LLM | `nanomuse/llm/base.py`、`openai_chat.py`、`openai_responses.py`、`prompt_tools.py`、`factory.py`、`mock.py`；`catalogue.py` + `providers.json`、`chatgpt.py`、`codex.py`、`chatgpt_proxy.py` | `BaseLLM`、带 `<think>` 过滤的流式输出、重试、基于提示的工具调用、给测试用的 `MockLLM`；服务商目录（谁覆盖对话、视觉、图像、视频）；ChatGPT 登录（PKCE、令牌存储）以及 `provider = "chatgpt"` 和 `nanomuse chatgpt proxy` 背后 Chat Completions ↔ Codex Responses 的转换 |
 | 记忆、目标 | `nanomuse/memory/store.py`、`nanomuse/memory/consolidate.py`、`nanomuse/goals/store.py` | SQLite；注入记忆时按罕见词（IDF）排序，词按任何字母文字切分，中日韩按双字；整理计划器和它的检查，判不了的合并一律拒绝；带撤销的变更日志 |
+| 外部记忆 | `nanomuse/memory/openviking.py` | 可选的 OpenViking HTTP 接入，读写经过哨兵，完成的对话轮次保存在按身份隔离的待同步队列中。见[配置](configuration.md#memory-openviking) |
+| 个人画像 | `nanomuse/memory/personal.py` | 从符合采集条件的用户原话中提取事实，支持候选项确认、适用范围、到期和更正历史，保存在当前运行时；内部学习和读取经过哨兵。见[配置](configuration.md#memory-openviking) |
+| 记忆空间 | `nanomuse/memory/hub.py`、`learning.py`、`archive.py` | 同一运行时所有者的稳定身份，按空间绑定存储和工具，后台持久化学习，以及带版本检查的显式导出、清理和恢复；空间不提供托管租户隔离。见[配置](configuration.md#memory-spaces) |
 | App 服务器 | `nanomuse/server/service.py`、`api.py`、`webui.py`、`events.py` | 线程和工作任务、REST + WebSocket、把回调变成事件的 `UI` 实现、时间线持久化 |
 | 前端 | `web/src/` | React + TypeScript + Tailwind；`store.tsx`（状态、WebSocket）、`screens/`（各个标签页）、`components/`（卡片、形象、Markdown） |
 | 终端 | `nanomuse/console.py`、`nanomuse/cli.py` | 基于 Rich 的控制台界面，审批就在行内；Typer 命令 |

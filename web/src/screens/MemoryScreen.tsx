@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { PageBar } from "../components/BackBar";
 import { LoadError } from "../components/LoadError";
+import { MemorySpacesPanel } from "../components/MemorySpacesPanel";
+import { OpenVikingMemoryPanel } from "../components/OpenVikingMemoryPanel";
 import { useT } from "../i18n";
 import { useStore } from "../store";
 import type { MemoryChange, MemoryItem } from "../types";
@@ -12,6 +14,11 @@ const CATEGORIES = ["profile", "preference", "people", "routine", "constraint", 
 
 /** "Your Memory files, which you can read and edit directly." */
 export function MemoryScreen() {
+  const [space, setSpace] = useState("personal");
+  return <MemoryContent key={space} space={space} onSpace={setSpace} />;
+}
+
+function MemoryContent({ space, onSpace }: { space: string; onSpace: (space: string) => void }) {
   const { state, toast, openThread, setTab } = useStore();
   // null until the first answer: the empty state must not flash while the list is on its way
   const [items, setItems] = useState<MemoryItem[] | null>(null);
@@ -25,13 +32,13 @@ export function MemoryScreen() {
   const t = useT();
 
   const load = () =>
-    Promise.all([api.memory().then(setItems), api.memoryChanges().then(setChanges)])
+    Promise.all([api.memory(space).then(setItems), api.memoryChanges(30, space).then(setChanges)])
       .then(() => setLoadError(null))
       .catch((e: Error) => (items === null ? setLoadError(e.message) : toast(e.message)));
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.memoryVersion]);
+  }, [state.memoryVersion, space]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, MemoryItem[]>();
@@ -43,7 +50,7 @@ export function MemoryScreen() {
     if (!content.trim()) return;
     setAdding(true);
     try {
-      await api.addMemory(content.trim(), category);
+      await api.addMemory(content.trim(), category, space);
       setContent("");
       await load();
     } catch (e) {
@@ -56,7 +63,7 @@ export function MemoryScreen() {
   const forget = async (m: MemoryItem) => {
     if (!window.confirm(t("Forget “{text}”?", { text: m.content.slice(0, 60) }))) return;
     try {
-      await api.forgetMemory(m.id);
+      await api.forgetMemory(m.id, space);
       setItems((prev) => prev?.filter((x) => x.id !== m.id) ?? prev);
     } catch (e) {
       toast((e as Error).message);
@@ -68,7 +75,7 @@ export function MemoryScreen() {
   const tidy = async () => {
     setTidying(true);
     try {
-      const report = await api.tidyMemory();
+      const report = await api.tidyMemory(space);
       toast(
         report.changed === 0
           ? t("Nothing to tidy: {n} memories, all distinct.", { n: report.considered })
@@ -87,7 +94,7 @@ export function MemoryScreen() {
 
   const restore = async (c: MemoryChange) => {
     try {
-      await api.restoreMemoryChange(c.id);
+      await api.restoreMemoryChange(c.id, space);
       await load();
     } catch (e) {
       toast((e as Error).message);
@@ -116,6 +123,9 @@ export function MemoryScreen() {
       />
 
       <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
+        <MemorySpacesPanel space={space} onSpace={onSpace} version={state.memoryVersion} onChange={() => void load()} />
+        <OpenVikingMemoryPanel key={space} version={state.memoryVersion} space={space} />
+        <h2 className="px-1 text-sm font-semibold text-muted">{t("Local memories")}</h2>
         <div className="rounded-3xl bg-surface border border-border/70 shadow-sm p-3.5 space-y-2.5">
           <textarea
             value={content}

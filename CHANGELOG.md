@@ -10,11 +10,29 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Added stable memory ownership, spaces and background profile learning.** Credential rotation kept personal profiles without retargeting pending conversations. New chats selected separate personal, work or project memory, and durable learning jobs retried in the background without delaying replies. Non-personal chats stayed off the legacy conversation sync path.
+
+- **Added a personal profile alongside OpenViking.** Eligible user turns supplied quoted facts, inferred preferences waited for confirmation, scoped and expired facts stayed out of unrelated answers, and explicit corrections retained history. Learning and retrieval passed through the Sentinel and respected capture exclusions.
+
+- **Added remote memory tools and capture controls.** The agent browsed, read, corrected and deleted OpenViking entries through the Sentinel, checked revisions before changes, persisted the automatic capture switch and accepted `capture_memory: false` for one-off runtime tasks.
+
+- **Corrected OpenViking context search parameters.** Recall used the memory context filter instead of an unsupported target URI, so current servers accepted the request without falling back to legacy search.
+
+- **Added optional OpenViking memory to the Python agent used by web and gateway-connected devices.** Completed user turns were queued for extraction, relevant history was recalled before replies, and unavailable services left pending writes on disk. Both operations passed through the Sentinel, while local explicit memories remained separate.
+
 ### Web
+
+- **Added memory space and backup controls.** The memory page created spaces and scoped conversations, retried profile learning, exported managed memory, cleared a checked snapshot and restored facts without replaying archived conversations. Other spaces, chat timelines and audit logs stayed separate.
+
+- **Added personal profile review.** The memory page displayed source quotes, scope, expiry and history, with version-checked controls to confirm, correct or stop using a fact. Profiles remained local to the connected runtime.
+
+- **Added OpenViking memory management.** The memory page searched and browsed remote entries, edited or deleted individual files, kept drafts after conflicting edits and showed pending writes separately from recent extraction tasks.
 
 - **Each Feed section showed its own load error and retry.** Posts, activity, Next up and calendar requests kept their last successful content when a refresh failed; retrying one section no longer refetched the others.
 
 ### Desktop
+
+- **Added optional OpenViking memory for desktop conversations.** The bundled official DSH plugin recalled relevant context, captured user and assistant messages, and committed pending memory. It stayed disabled until enabled in the person's profile, with connection credentials in OpenViking's local config file.
 
 - **Synced turns from another computer stay above a newer local prompt and arrive without a reload.** On the desktop, a hub `sync` frame that arrived while a pull was already running was dropped until the next minute tick, and a remote bubble inserted before this computer's first prompt or from a device with a skewed clock stayed below the new local prompt until the window was reloaded. An in-flight pull now runs a follow-up pull when a newer `sync` frame arrives, reconnecting the hub socket or bringing the window back to the front pulls as well, and remote bubbles record when they were received locally and reposition inside the chat flow as new prompts mount. For #395.
 
