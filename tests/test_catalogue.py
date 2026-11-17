@@ -9,10 +9,10 @@ from nanomuse.llm import catalogue
 from nanomuse.llm.factory import create_llm
 
 
-def test_the_packaged_file_is_read_once_and_has_the_twenty_six_providers():
+def test_the_packaged_file_is_read_once_and_has_the_twenty_seven_providers():
     cat = catalogue.load()
     assert cat.source.endswith("providers.json")
-    assert len(cat.providers) == 26
+    assert len(cat.providers) == 27
     assert cat.get("bailian").capabilities == ["chat", "vision", "image", "video"]
     assert cat.get("nowhere") is None
     # the same object on every call
@@ -109,6 +109,32 @@ def test_uberllm_uses_openai_chat_without_advertising_unverified_capabilities():
     assert settings.endpoint == provider.base_url
     assert settings.model == "openai/gpt-5.4-mini"
     assert LLMSettings(provider="uberllm", model="qwen/qwen3-32b").model == "qwen/qwen3-32b"
+
+
+def test_trustedrouter_uses_openai_chat_without_advertising_unverified_capabilities():
+    cat = catalogue.load()
+    provider = cat.get("trustedrouter")
+    assert provider is not None
+    assert provider.auth == ["key"]
+    assert provider.key_url == "https://trustedrouter.com/console/api-keys"
+    assert provider.capabilities == ["chat"]
+    assert provider.defaults == {"chat": "deepseek/deepseek-v4-flash"}
+    assert provider in cat.providers_for("chat", "global")
+    for capability in ("vision", "image", "video"):
+        assert provider not in cat.providers_for(capability, "global")
+    assert check_provider("trustedrouter") == "trustedrouter"
+    assert resolve_provider("trustedrouter", None) == (
+        "openai",
+        "https://api.trustedrouter.com/v1",
+    )
+    settings = LLMSettings(provider="trustedrouter")
+    assert settings.protocol == "openai"
+    assert settings.endpoint == provider.base_url
+    assert settings.model == "deepseek/deepseek-v4-flash"
+    assert (
+        LLMSettings(provider="trustedrouter", model="anthropic/claude-sonnet-4.5").model
+        == "anthropic/claude-sonnet-4.5"
+    )
 
 
 def test_providers_for_a_capability_in_a_region_keeps_the_catalogue_order():
