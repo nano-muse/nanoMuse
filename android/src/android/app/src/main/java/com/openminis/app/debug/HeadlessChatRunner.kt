@@ -354,12 +354,16 @@ internal object HeadlessChatRunner {
         val app = app(context)
         val vm = viewModel(context, sessionId)
         val ready = withContext(Dispatchers.Default) {
-            withTimeoutOrNull(5000L) { vm.activeEntryId.first { it != null } }
+            withTimeoutOrNull(5000L) {
+                vm.nmAwaitSessionReady() // nanoMuse: resolve tool blocks only after history restore.
+                vm.activeEntryId.first { it != null }
+            }
         }
         if (ready == null) {
             return@withContext PromptResult(
                 status = "Error",
-                responseText = "no_provider_resolved_in_5s",
+                responseText = if (vm.nmSessionReady) "no_provider_resolved_in_5s"
+                    else "session_not_ready_in_5s", // nanoMuse: refuse before resolving the tool row.
                 timedOut = false,
                 deletedMessageCount = 0,
                 retriedMessageId = assistantMessageId,
@@ -431,6 +435,7 @@ internal object HeadlessChatRunner {
         // resolved before it can call provider.sendMessage for the summary.
         val ready = withContext(Dispatchers.Default) {
             withTimeoutOrNull(5000L) {
+                vm.nmAwaitSessionReady() // nanoMuse: summaries must not observe unrestored history.
                 vm.activeEntryId.first { it != null }
             }
         }
@@ -439,7 +444,8 @@ internal object HeadlessChatRunner {
                 status = "Error",
                 summary = null,
                 timedOut = false,
-                error = "no_provider_resolved_in_5s",
+                error = if (vm.nmSessionReady) "no_provider_resolved_in_5s"
+                    else "session_not_ready_in_5s", // nanoMuse: report restore refusal, never an old summary.
             )
         }
         if (vm.isStreaming.value) {
@@ -521,10 +527,13 @@ internal object HeadlessChatRunner {
         val vm = viewModel(context, sessionId)
         val ready = withContext(Dispatchers.Default) {
             withTimeoutOrNull(5000L) {
+                vm.nmAwaitSessionReady() // nanoMuse: summaries must not observe unrestored history.
                 vm.activeEntryId.first { it != null }
             }
         }
-        if (ready == null) throw RPCException(-32000, "Session VM did not resolve a provider within 5s")
+        // nanoMuse: a failed restore wait must not launch a later background mutation.
+        if (ready == null) throw RPCException(-32000, if (vm.nmSessionReady)
+            "Session VM did not resolve a provider within 5s" else "session_not_ready_in_5s")
         vm.revertCompact()
     }
 
