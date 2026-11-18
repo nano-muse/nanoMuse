@@ -229,7 +229,10 @@ async def _run(
     if boxed:
         assert sandbox is not None
         argv = ["/bin/sh", "-c", cmd] if isinstance(cmd, str) else list(cmd)
-        cmd = sandbox.wrap(argv, network=network, cwd=cwd)
+        try:
+            cmd = sandbox.wrap(argv, network=network, cwd=cwd)
+        except (OSError, RuntimeError) as exc:
+            return ToolResult.fail(str(exc))
         shell = False
     # its own session on POSIX, so a timeout (or a cancelled turn) can stop the shell and
     # everything it started: `sleep 999 | tee`, a server put in the background

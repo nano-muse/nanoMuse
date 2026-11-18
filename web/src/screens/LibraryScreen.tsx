@@ -22,6 +22,7 @@ function isMedia(name: string): boolean {
  */
 export function LibraryScreen() {
   const { state, openFile } = useStore();
+  const space = state.threads.find((thread) => thread.id === state.activeThread)?.memory_space ?? "personal";
   const [files, setFiles] = useState<FileInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -33,7 +34,8 @@ export function LibraryScreen() {
   const version = Object.values(state.events).reduce((n, list) => n + list.length, 0);
   useEffect(() => {
     let alive = true;
-    api.files(500)
+    setFiles(null);
+    api.files(500, space)
       .then((d) => {
         if (!alive) return;
         setFiles(d);
@@ -43,7 +45,7 @@ export function LibraryScreen() {
     return () => {
       alive = false;
     };
-  }, [version, state.feedVersion, attempt]);
+  }, [version, state.feedVersion, attempt, space]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();

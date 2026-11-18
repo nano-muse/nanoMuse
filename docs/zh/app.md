@@ -52,7 +52,7 @@ nanomuse serve --port 9000 --no-qr
 
 **聊天。** 一个主要聊天，加上旁聊（左上角的圆形「对话」按钮打开列出它们的抽屉）。消息一边生成一边流进来。工具调用显示成小标签：点一下看参数和输出。智能体写的文件显示成构件卡片，在应用里就能打开。哨兵（Sentinel）需要你拿主意时出现一张审批卡片；智能体需要信息时出现一张提问卡片。智能体干活时输入框一直开着；你这时发的任何东西都会在下一次调用模型之前并进正在进行的这一轮。
 
-*附件。* 「+」按钮（或者粘贴）可以附上照片和文件，每条消息最多十个，每个 25 MB（`server.max_upload_mb`），来源是相机、相册或者手机里的文件。选中就开始上传，显示成缩略图和可以去掉的小标签，一条消息也可以只有附件。每个文件都落到工作区的 `attachments/<date>/` 下（所以资源库里有它，任何工具都能用它），消息里会给智能体列出这些文件和它们是什么。模型接得住的时候，图片以图像形式发给模型：`llm.vision = auto` 会发，如果端点拒绝（DeepSeek 和大多数纯文本模型都会拒绝），从那以后就只发文字，并告诉你一次（图片仍然作为文件留着，智能体知道它的文件名，会说自己看不见它，而不是瞎猜）；`off` 从不发图片，`on` 坚持发。手机照片在编码前会缩到 1568 px，所以一张 10 MB 的照片花的钱和一张小图一样。PDF、电子表格和文档智能体用 `files` 读；PDF 的文字按页提取（扫描版 PDF 会说它没有文字层）。在聊天里，点图片或文件小标签就能打开。
+*附件。* 「+」按钮（或者粘贴）可以附上照片和文件，每条消息最多十个，每个 25 MB（`server.max_upload_mb`），来源是相机、相册或者手机里的文件。选中就开始上传，显示成缩略图和可以去掉的小标签，一条消息也可以只有附件。每个文件都落到当前聊天所属空间工作区的 `attachments/<date>/` 下（所以资源库里有它，任何工具都能用它），消息里会给智能体列出这些文件和它们是什么。模型接得住的时候，图片以图像形式发给模型：`llm.vision = auto` 会发，如果端点拒绝（DeepSeek 和大多数纯文本模型都会拒绝），从那以后就只发文字，并告诉你一次（图片仍然作为文件留着，智能体知道它的文件名，会说自己看不见它，而不是瞎猜）；`off` 从不发图片，`on` 坚持发。手机照片在编码前会缩到 1568 px，所以一张 10 MB 的照片花的钱和一张小图一样。PDF、电子表格和文档智能体用 `files` 读；PDF 的文字按页提取（扫描版 PDF 会说它没有文字层）。在聊天里，点图片或文件小标签就能打开。
 
 *浏览器视图。* 智能体用浏览器工具时，会出现一张浏览器卡片，显示它正在看的东西：每做一个动作之后页面的一张图、页面标题、它在哪儿、刚做了什么（「打开了 example.com」「点击了『Sign in』」）。运行期间卡片是 LIVE 的，之后留在聊天里。点一下看完整视图；「接管」把控制权交到你手上（点图片就在那个位置点击，往聚焦的输入框里打字，按回车，打开一个 URL），「交还」把页面还给智能体，它会被告知你做了什么，然后从那里接着干。登录就是这么发生的：智能体停在表单那儿问你，你登录，它继续。你输入的密码直接去网站，从不经过模型。画面帧只在当前会话期间留在服务器内存里（每个聊天最近十几帧）；重启之后旧卡片显示一个占位图。需要浏览器工具（`pip install "nanomuse[browser]" && playwright install chromium`，或者 `-browser` 的 Docker 镜像），或者 Android 应用：只要它连着，它自己的 WebView 就是智能体的浏览器（卡片会说明是哪一种：`backend`）。在应用里，这种卡片上的「接管」滑上来的是真实页面的一层弹出面板，而不是页面的一张图；用手机的键盘和自动填充登录，点**完成**，智能体接着干。完整的故事，包括哪些东西没法在 WebView 里登录：[browser.md](browser.md)。
 
@@ -104,6 +104,50 @@ nanomuse serve --port 9000 --no-qr
 在「连接」里做的非密钥选择存在 `<data_dir>/app-settings.json`，每次启动时叠在 `config.toml` 之上（命令行也一样），所以只用手机的配置方式从来不需要改文件。密钥在那里永远只以 `{{vault:NAME}}` 的形式被引用。
 
 ### OpenViking 记忆 {#openviking-memories}
+
+在「查找副本并删除或更正」输入至少三个字的准确片段，检查当前空间中的副本。
+替换内容留空时删除命中的记录，填写替换内容则更正该片段。先检查全部预览，再确认。
+删除会移除命中的整条记录和整个远程文件，其中的其他事实也会被删除。更正会保留
+当前事实中的其他文字，同时移除命中的历史和有记录的远程归档会话。需要时先下载空间备份。
+
+检查范围包括画像的各个版本、本地笔记和撤销历史、可见的远程记忆文件、待同步和待学习
+内容，以及当前运行时记录过内容的采集会话。其他空间、聊天记录、审计日志和未记录的
+归档不受影响。匹配按准确片段进行，不区分大小写，无法自动找齐意思相同但措辞不同的
+所有记录。同一字段、同一适用范围的画像历史版本会一起列入预览；其他已知说法可以
+逐行填写，关联的停用规则共用事实 ID。数据变化后需要重新检查；操作前需等对话和远程提取结束。网络失败可能留下
+部分修改，请重新检查，已保存的停用规则仍会阻止旧片段进入记忆。
+结果按来源列出扫描、匹配和修改数量。重启后可点「查看上次操作结果」查看；未完成的操作
+需要先检查剩余副本，再重试。
+
+「已停用的内容」防止命中旧片段的记录被助手用于记忆，即使旧归档再次处理也会过滤。
+移除停用规则后允许再次召回，但不会恢复已经删除的数据。替换值会标记为用户确认的
+当前值，优先于冲突的历史记忆。规则按当前运行时和空间保存，并包含在空间备份里。
+它不会删除记忆之外的文件或当前聊天已有的文字，请新建对话验证。
+
+明确写入记忆的请求命中停用规则时，运行时会在首次拒绝后结束这轮任务，取消尚未执行的
+工具调用，并跳过这轮的自动记忆采集。回复会说明在哪里查看规则，不再换措辞或改用
+其他存储重试。重新测试时，请用尚未停用过的值。
+
+记忆关闭时，明确要求记住、召回或忘掉的请求由运行时直接答复，不调用模型和工具。
+执行层还会默认拦截存储和动作工具；只有当前用户请求明确提出文件、文档、命令或编程任务，
+才允许调用文件与代码工具，已有长期授权不能绕过检查。公开网页搜索和读取仍可使用。
+当前聊天记录和手动设置的应用风格仍然保留。
+
+个人是默认记忆空间，聊天页顶部和对话列表不显示个人空间标签，工作和自定义空间仍显示标签。
+打开「记忆」时，默认查看当前聊天的空间；
+新旁聊沿用当前空间，空记忆页的聊天入口也会在所选空间新建对话。选择空间来查看记忆，
+不会改变已有对话的归属。
+
+工作和项目空间也有独立的文件目录，上传和文件库跟随当前聊天。个人空间继续使用原工作区，
+已有共享文件留在个人空间，不自动迁移。文件和命令不能读取其他空间或运行时数据；命令
+需要 Linux Landlock ABI 3 或更新版本，不支持时会拒绝执行。从未启用额外记忆空间的运行时仍使用原有命令沙箱。外部连接器、浏览器与设备控制、
+技能、目标、联系人和日历暂时只提供给个人空间，公开网页搜索和读取可在各空间使用。
+
+每个空间都有「启用记忆」总开关。关闭后，助手不再读取本地记忆、远程记忆或画像，
+记忆工具的读写、自动采集和画像学习也会暂停。已有数据和排队任务保留，你仍可在此
+查看、编辑、导出或删除记忆。重新开启后恢复使用，并保留「自动保存对话」的独立设置。
+修改前需等待该空间的对话结束，或先停止对话。当前聊天里已经出现的内容仍在上下文中，
+验证停用效果时请新建对话。
 
 先在「记忆空间」选择「个人」「工作」或项目，再点「在此空间开始对话」，新线程会绑定
 这个选择；已有聊天继续使用个人空间。画像、本地笔记和远程记忆区域都按所选空间显示。
@@ -169,7 +213,7 @@ nanomuse serve --port 9000 --no-qr
 | GET | `/api/threads/{id}/events?limit=&before=` | 时间线事件 |
 | POST | `/api/threads/{id}/send` `{text, files?, language?, via?, capture_memory?}` | 把一条消息排进队列；立即返回。`files`：下面那个上传接口返回的工作区路径，最多十个；有文件时文字可以为空。`language`（1.0.0 起）：客户端界面语言的 BCP-47 标签（`en`、`zh-CN`）；除非「回复语言」固定了一种，回复就用这种语言写。不带它时照旧按消息的文字书写系统判断。`via: "cloud"` 是「这次改用 nanoMuse Cloud」：这一个回合用账号的 key 在账号推荐的聊天模型上跑，下一回合回到配置的模型，`[llm]` 不动；用户气泡、回复和这一回合的失败提示都带 `model_used`。没有登录账号时回 `401 signed_out`。`capture_memory: false` 跳过该任务的自动采集并禁止模型写入记忆，默认 true，转发给其他设备的会话不支持此限制 |
 | POST | `/api/threads/{id}/stop` | 停掉那个聊天里正在跑的一轮：队列丢弃，那里待处理的审批和提问卡片过期，对话照常能用。没有东西在跑时返回 `{ok: false}` |
-| POST | `/api/files/upload?name=` （请求体：文件字节） | 一个要附上的文件：落到 `attachments/<date>/` 下，文件名是 `name` 的安全版本；返回给 `files` 用的 `{path, name, size, kind, mime}`。超过 `server.max_upload_mb` 返回 413 |
+| POST | `/api/files/upload?name=&space=personal` （请求体：文件字节） | 一个要附上的文件：落到 `attachments/<date>/` 下，文件名是 `name` 的安全版本；返回给 `files` 用的 `{path, name, size, kind, mime}`。超过 `server.max_upload_mb` 返回 413 |
 | POST | `/api/approvals/{id}` `{approved, scope, reason}` | 回答一张卡片；`scope` 是这张卡片 `grant_options` 中的一个（`once`、`conversation`、`session`、`24h`、`always`；`task` 仍按 `conversation` 读） |
 | DELETE | `/api/approvals` | 忘掉所有已授予的权限 |
 | DELETE | `/api/approvals/grants/{key}` | 撤销一条权限（`key` 按 `/api/activity` 列出的来，比如 `shell:git`） |
@@ -188,6 +232,7 @@ nanomuse serve --port 9000 --no-qr
 | POST | `/api/memory/spaces/{space}/clear` `{revision}` | 检查版本和活动任务后清理导出状态，采集保持关闭 |
 | POST | `/api/memory/spaces/{space}/restore` `{data}` | 恢复相同所有者和空间的备份，不重放对话 |
 | POST | `/api/memory/openviking/profile/{id}` `{version, action, value?}` | 确认、更正或拒绝单条个人事实，更正需带 value，并发修改时返回 409 |
+| PUT | `/api/memory/spaces/{space}/enabled` `{enabled}` | 启用或暂停一个空间的助手记忆，不删除数据；空间忙碌时返回 409 |
 | GET | `/api/memory/openviking/entries?uri=&query=&offset=` | 浏览或搜索当前用户的记忆空间，每页 50 条 |
 | GET | `/api/memory/openviking/entry?uri=` | 读取可见正文及其 `revision` 版本标记 |
 | PUT / DELETE | `/api/memory/openviking/entry` `{uri, revision, content?}` | 修改或删除单个文件，修改需带正文，版本变化时返回 409 |
@@ -213,7 +258,7 @@ nanomuse serve --port 9000 --no-qr
 | GET / POST | `/api/triggers` | 触发器列表，并说明哪几种已经有了对应的连接器 / 创建 `{kind (mail · event · hook), text, match, lead_minutes, thread}`；hook 会连着它的 `url` 一起返回 |
 | POST / DELETE | `/api/triggers/{id}/fire`、`/api/triggers/{id}` | 用一个样例事件现在就跑一次 / 取消 |
 | POST | `/api/hooks/{id}?key=` | 触发器的 webhook：不要应用令牌，key 就是凭据（也接受 `X-Hook-Key` 头）；请求体（≤ 64 KB，JSON 会格式化）就是上下文。id 或 key 错了返回 404，已取消返回 409，投递太密返回 429 |
-| GET | `/api/files` · `/api/files/{path}?download=1` | 列出 / 读取工作区文件（HTML 和 SVG 带着 `Content-Security-Policy: sandbox` 返回） |
+| GET | `/api/files?space=personal` · `/api/files/{path}?download=1` | 列出 / 读取所选空间文件，非个人空间路径为 `@spaces/{space}/...`，签名也绑定此路径（HTML 和 SVG 带着 `Content-Security-Policy: sandbox` 返回） |
 | GET / PUT | `/api/settings` | 查看 / 修改 `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, show_thinking, language}`；查看时还包含 `onboarded` 和 `llm_ready` |
 | GET | `/api/connections` | 模型（`key_source`：vault · config · missing · none；是列表里的接口时带 `endpoint`）、服务商预设、`endpoints`（列表里的自定义 OpenAI 兼容接口，每个是 `{id, label, base_url, key_source, models, slots}`，从不带 key）、邮件、浏览器、MCP 服务器（`connected`、`tools`、`from_app`）、保险库里的名字、`onboarded` |
 | PUT | `/api/connections/llm` `{provider, model, base_url, tool_mode, api_key}` 或 `{endpoint, model, tool_mode}` | 换模型；`api_key` 给了 → 存进保险库，`""` → 不用 key，没给 → 不变。`endpoint` 指向列表里的一个接口，槽位借用它的地址和它自己的 key（按引用）。在每个会话里立即生效。地址里带 `user:pass@` 会被拒绝并返回 400（key 应写在 `api_key`）；`/api/llm/models`、`/api/connections/gui`、`/image`、`/video` 和接口列表同样如此 |

@@ -18,6 +18,7 @@ import re
 import sqlite3
 import uuid
 from array import array
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -100,6 +101,7 @@ def content_hash(text: str) -> str:
 class MemoryStore:
     def __init__(self, path: Path | str):
         self.path = str(path)
+        self.text_allowed: Callable[[str], bool] = lambda text: True
         # recall by meaning, when an embedding endpoint is set up (see embeddings.py)
         self.index: MemoryIndex | None = None
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
@@ -253,7 +255,7 @@ class MemoryStore:
         verbatim.
         """
         q_tokens = tokenize(query)
-        items = self.all()
+        items = [m for m in self.all() if self.text_allowed(m.content)]
         if not q_tokens:
             return items[:limit]
         tokens = {item.id: tokenize(item.content) for item in items}
@@ -276,7 +278,7 @@ class MemoryStore:
 
     def relevant(self, context: str, limit: int = 20) -> list[MemoryItem]:
         """Memories to inject into the system prompt: matches first, then most recent."""
-        items = self.all()
+        items = [m for m in self.all() if self.text_allowed(m.content)]
         if len(items) <= limit:
             return items
         return self._fill(self.search(context, limit=limit), items, limit)
@@ -295,16 +297,28 @@ class MemoryStore:
     async def search_async(self, query: str, limit: int = 10) -> list[MemoryItem]:
         """``search`` with the meaning-based ranking fused in when an index is set up."""
         if self.index is not None:
-            return await self.index.search(query, limit=limit)
+            return [
+                m
+                for m in await self.index.search(query, limit=limit)
+                if self.text_allowed(m.content)
+            ]
         return self.search(query, limit=limit)
 
     async def relevant_async(self, context: str, limit: int = 20) -> list[MemoryItem]:
         """``relevant`` with the meaning-based ranking fused in when an index is set up."""
-        items = self.all()
+        items = [m for m in self.all() if self.text_allowed(m.content)]
         if len(items) <= limit:
             return items
         if self.index is not None:
-            return self._fill(await self.index.search(context, limit=limit), items, limit)
+            return self._fill(
+                [
+                    m
+                    for m in await self.index.search(context, limit=limit)
+                    if self.text_allowed(m.content)
+                ],
+                items,
+                limit,
+            )
         return self._fill(self.search(context, limit=limit), items, limit)
 
     def similar(

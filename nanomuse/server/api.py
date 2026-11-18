@@ -78,6 +78,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
+from starlette.background import BackgroundTask
 
 from nanomuse.avatar.studio import StudioError
 from nanomuse.bridge.server import BridgeError
@@ -95,6 +96,7 @@ from nanomuse.server.events import MAIN_THREAD
 from nanomuse.server.openviking_api import install_openviking
 from nanomuse.server.service import MuseService, goal_to_dict
 from nanomuse.server.update import UpdateCheck
+from nanomuse.workspaces import open_file, split_path
 
 if TYPE_CHECKING:
     from starlette.types import Scope
@@ -909,6 +911,8 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.post("/api/memory", dependencies=dep)
     async def add_memory(body: MemoryBody, space: str = "personal") -> dict[str, Any]:
+        if svc.app.memory_hub.archiving:
+            raise HTTPException(409, "Memory management is in progress. Try again shortly.")
         store = memory_store(space)
         if store is None:
             raise HTTPException(400, "memory is disabled")
@@ -918,6 +922,8 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.delete("/api/memory/{memory_id}", dependencies=dep)
     async def forget_memory(memory_id: str, space: str = "personal") -> dict[str, Any]:
+        if svc.app.memory_hub.archiving:
+            raise HTTPException(409, "Memory management is in progress. Try again shortly.")
         store = memory_store(space)
         if store is None or not store.forget(memory_id):
             raise HTTPException(404, "no such memory")
@@ -944,6 +950,8 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.post("/api/memory/changes/{change_id}/restore", dependencies=dep)
     async def restore_memory_change(change_id: str, space: str = "personal") -> dict[str, Any]:
+        if svc.app.memory_hub.archiving:
+            raise HTTPException(409, "Memory management is in progress. Try again shortly.")
         store = memory_store(space)
         if store is None:
             raise HTTPException(400, "memory is disabled")
@@ -1920,12 +1928,19 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
         return svc.upcoming()
 
     @app.get("/api/files", dependencies=dep)
-    async def list_files(limit: int = Query(200, ge=1, le=2000)) -> list[dict[str, Any]]:
-        return svc.list_files(limit)
+    async def list_files(
+        limit: int = Query(200, ge=1, le=2000), space: str = "personal"
+    ) -> list[dict[str, Any]]:
+        try:
+            return svc.list_files(limit, space)
+        except (ValueError, PermissionError) as exc:
+            raise HTTPException(404, str(exc)) from exc
 
     @app.post("/api/files/upload", dependencies=dep)
     async def upload_file(
-        request: Request, name: str = Query(..., min_length=1, max_length=255)
+        request: Request,
+        name: str = Query(..., min_length=1, max_length=255),
+        space: str = "personal",
     ) -> dict[str, Any]:
         """A file to attach to a message: the bytes as the request body (no multipart),
         the file name in ``name``. Lands in ``attachments/<date>/`` in the workspace;
@@ -1948,7 +1963,9 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
         if total == 0:
             raise HTTPException(400, "empty file")
         try:
-            return svc.save_upload(name, b"".join(chunks)).model_dump()
+            return svc.save_upload(name, b"".join(chunks), space).model_dump()
+        except (PermissionError, OSError) as exc:
+            raise HTTPException(403, "Workspace upload path cannot be opened safely") from exc
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
@@ -1956,7 +1973,7 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     async def get_file(path: str, download: bool = False) -> Response:
         try:
             target = svc.resolve_workspace_path(path)
-        except PermissionError as exc:
+        except (PermissionError, ValueError) as exc:
             raise HTTPException(403, str(exc)) from exc
         if not target.is_file():
             raise HTTPException(404, "no such file")
@@ -1980,6 +1997,21 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
             headers["Content-Security-Policy"] = "sandbox allow-scripts allow-popups"
         # ``filename=`` lets Starlette write the Content-Disposition header itself, which
         # encodes a name that is not ASCII (报告.txt) instead of failing on it.
+        if Path("/proc/self/fd").is_dir():
+            space, _ = split_path(path)
+            context = open_file(svc.workspace(space), target, "rb")
+            try:
+                stream = context.__enter__()
+            except OSError as exc:
+                raise HTTPException(403, "Workspace file cannot be opened safely") from exc
+            return FileResponse(
+                Path("/proc/self/fd") / str(stream.fileno()),
+                stat_result=os.fstat(stream.fileno()),
+                media_type=media,
+                headers=headers,
+                filename=target.name if download else None,
+                background=BackgroundTask(context.__exit__, None, None, None),
+            )
         return FileResponse(
             target, media_type=media, headers=headers, filename=target.name if download else None
         )

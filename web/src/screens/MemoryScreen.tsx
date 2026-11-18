@@ -4,6 +4,7 @@ import { api } from "../api";
 import { PageBar } from "../components/BackBar";
 import { LoadError } from "../components/LoadError";
 import { MemorySpacesPanel } from "../components/MemorySpacesPanel";
+import { MemoryFactCopies } from "../components/MemoryFactCopies";
 import { OpenVikingMemoryPanel } from "../components/OpenVikingMemoryPanel";
 import { useT } from "../i18n";
 import { useStore } from "../store";
@@ -14,12 +15,15 @@ const CATEGORIES = ["profile", "preference", "people", "routine", "constraint", 
 
 /** "Your Memory files, which you can read and edit directly." */
 export function MemoryScreen() {
-  const [space, setSpace] = useState("personal");
+  const { state } = useStore();
+  const activeSpace = state.threads.find((thread) => thread.id === state.activeThread)?.memory_space ?? "personal";
+  const [space, setSpace] = useState(activeSpace);
+  useEffect(() => { setSpace(activeSpace); }, [activeSpace, state.activeThread]);
   return <MemoryContent key={space} space={space} onSpace={setSpace} />;
 }
 
 function MemoryContent({ space, onSpace }: { space: string; onSpace: (space: string) => void }) {
-  const { state, toast, openThread, setTab } = useStore();
+  const { state, toast, dispatch, openThread, setTab } = useStore();
   // null until the first answer: the empty state must not flash while the list is on its way
   const [items, setItems] = useState<MemoryItem[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -27,6 +31,7 @@ function MemoryContent({ space, onSpace }: { space: string; onSpace: (space: str
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("profile");
   const [adding, setAdding] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [tidying, setTidying] = useState(false);
   const name = state.profile?.name ?? "nanoMuse";
   const t = useT();
@@ -67,6 +72,20 @@ function MemoryContent({ space, onSpace }: { space: string; onSpace: (space: str
       setItems((prev) => prev?.filter((x) => x.id !== m.id) ?? prev);
     } catch (e) {
       toast((e as Error).message);
+    }
+  };
+
+  const startConversation = async () => {
+    setStarting(true);
+    try {
+      const thread = await api.createThread(t("New conversation"), space);
+      dispatch({ type: "ws", msg: { kind: "thread", thread } });
+      openThread(thread.id);
+      setTab("chat");
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -124,6 +143,7 @@ function MemoryContent({ space, onSpace }: { space: string; onSpace: (space: str
 
       <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
         <MemorySpacesPanel space={space} onSpace={onSpace} version={state.memoryVersion} onChange={() => void load()} />
+        <MemoryFactCopies key={space} space={space} version={state.memoryVersion} onChange={() => void load()} />
         <OpenVikingMemoryPanel key={space} version={state.memoryVersion} space={space} />
         <h2 className="px-1 text-sm font-semibold text-muted">{t("Local memories")}</h2>
         <div className="rounded-3xl bg-surface border border-border/70 shadow-sm p-3.5 space-y-2.5">
@@ -175,10 +195,8 @@ function MemoryContent({ space, onSpace }: { space: string; onSpace: (space: str
             </p>
             <button
               type="button"
-              onClick={() => {
-                openThread("main");
-                setTab("chat");
-              }}
+              disabled={starting}
+              onClick={() => void startConversation()}
               className="mt-3 rounded-full bg-accent px-4 py-2 text-[13.5px] font-semibold text-accent-fg"
             >
               {t("Tell {name} something to remember", { name })}

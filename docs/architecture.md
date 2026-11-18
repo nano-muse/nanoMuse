@@ -47,6 +47,8 @@ sequenceDiagram
 | External memory | `nanomuse/memory/openviking.py` | Optional OpenViking recall and completed-turn capture through the Sentinel, with an identity-scoped SQLite outbox; local explicit memory stays separate. See [configuration](configuration.md#memory-openviking). |
 | Personal profile | `nanomuse/memory/personal.py` | Runtime-local facts derived from eligible user quotes, candidate review, scopes, expiry and correction history; internal learning and retrieval pass through the Sentinel. See [configuration](configuration.md#memoryopenviking). |
 | Memory spaces | `nanomuse/memory/hub.py`, `learning.py`, `archive.py` | One runtime owner's stable identity, space-bound stores and tools, durable background learning and explicit version-checked export, clear and restore. Spaces do not provide hosted tenant isolation. See [configuration](configuration.md#memory-spaces). |
+| Reviewed facts | `nanomuse/memory/facts.py`, `rules.py`, `access.py` | Alias and profile-version linking, durable cleanup progress, retired-text exclusions and memory-off tool restrictions. |
+| Space files | `nanomuse/workspaces.py`, `workspace_runner.py` | Bound file paths, descriptor-based file opens and inherited Landlock command restrictions, with an optional outer bubblewrap layer. |
 | App server | `nanomuse/server/service.py`, `api.py`, `webui.py`, `events.py` | threads and workers, REST + WebSocket, `UI` implementation that turns callbacks into events, timeline persistence |
 | Front-end | `web/src/` | React + TypeScript + Tailwind; `store.tsx` (state, WebSocket), `screens/` (tabs), `components/` (cards, avatar, markdown) |
 | Terminal | `nanomuse/console.py`, `nanomuse/cli.py` | Rich console UI with inline approvals; Typer commands |
@@ -58,7 +60,7 @@ Anything that can show the agent to a person implements `nanomuse/ui.py::UI`: te
 
 ## Threads in the app
 
-`MuseService` keeps one `MuseAgent` per thread, each with its own conversation and worker task, all sharing the memory and goals stores, the vault and the audit log. The main thread is the long conversation; side chats are separate threads; background goal passes run in their own thread and post a summary to the main one. A `contextvar` tells `WebUI` which thread a callback belongs to.
+`MuseService` keeps one `MuseAgent` per thread, each with its own conversation and worker task, sharing the vault and audit log. Each thread binds its memory and workspace through `MemoryHub`; personal stores and connectors remain in Personal. The main thread is the long conversation; side chats are separate threads; background goal passes run in their own thread and post a summary to the main one. A `contextvar` tells `WebUI` which thread a callback belongs to.
 
 ## Extension points
 

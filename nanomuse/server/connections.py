@@ -495,6 +495,7 @@ class Connections:
         save_app_settings(self.svc.data_dir, self.data)
 
     def _publish(self) -> None:
+        self.svc.refresh_space_tools()
         self.svc.bus.publish({"kind": "connections", "connections": self.view()})
         self.svc.bus.publish({"kind": "settings", "settings": self.svc.settings_view()})
 

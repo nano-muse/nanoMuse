@@ -62,6 +62,7 @@ from nanomuse.tools.coding_tool import CodingAgents
 from nanomuse.tools.reminder_tools import Reminders
 from nanomuse.tools.trigger_tools import Triggers
 from nanomuse.triggers import MailWatcher, Trigger, matches
+from nanomuse.workspaces import file_path, open_file, split_path
 
 IDEAS_PROMPT = """You are {name}, the user's personal agent. Based on what you know about them, propose {n} concrete, genuinely useful things you could do for them right now. Prefer tasks you can actually complete with your tools (research, comparisons, planning, drafting, tracking, reminders, organising files, advancing their goals).
 
@@ -410,10 +411,12 @@ class MuseService:
         # The CLI bridge: `nanomuse-device` and friends, from inside a shell command. It
         # learns where the server listens in `serve()`; until then no token is minted.
         self.bridge = Bridge(self.app.tools, self.app.sentinel, self.ui)
+        self.bridge.enabled = lambda: self.app.memory_hub.is_enabled("personal")
         for name in ("shell", "python_execute"):
             tool = self.app.tools.get(name)
             if tool is not None:
                 tool.bridge = self.bridge  # type: ignore[attr-defined]
+        self.app.memory_hub.bind(self.app.agent, "personal")
         self.watch_browser()
         self._watch_reminders()
         self._mail_polled_at: float | None = None
@@ -460,7 +463,12 @@ class MuseService:
         return {**self.phone.status(), "gui_enabled": self.settings.gui.enabled}
 
     def publish_phone(self) -> None:
+        self.refresh_space_tools()
         self.bus.publish({"kind": "phone", "phone": self.phone_view()})
+
+    def refresh_space_tools(self) -> None:
+        for thread in getattr(self, "threads", {}).values():
+            self.app.memory_hub.bind(thread.agent, thread.memory_space)
 
     def hands_view(self) -> dict[str, Any]:
         return self.connections.hands_view()
@@ -487,6 +495,10 @@ class MuseService:
         await self._step("cloud account and hub", self.hub.start(), 30)
         self.sync.start()
         self.app.memory_hub.busy = lambda: any(t.busy for t in self.threads.values())
+        self.app.memory_hub.space_busy = lambda space: (
+            any(t.busy for t in self.threads.values() if t.memory_space == space)
+            or (space == "personal" and self._tidying)
+        )
         self.app.memory_hub.changed = lambda: self.bus.publish({"kind": "memory"})
         self._scheduler = asyncio.create_task(self._goal_scheduler(), name="goal-scheduler")
         self.starting = ""
@@ -1113,11 +1125,11 @@ class MuseService:
             raise ValueError("Memory backup or deletion is in progress. Try again shortly.")
         text = text.strip()
         language = language.strip()
-        attachments = [self.attachment(path) for path in files or []]
+        thread = self.threads.get(thread_id) or self._make_thread(thread_id, thread_id)
+        attachments = [self.attachment(path, thread.memory_space) for path in files or []]
         if not text and not attachments:
             raise ValueError("empty message")
         once = self.cloud_once() if via == "cloud" else None
-        thread = self.threads.get(thread_id) or self._make_thread(thread_id, thread_id)
         thread.updated_at = now_iso()
         if language:
             # remembered on the conversation: a chat addressed to another device passes it on
@@ -1234,12 +1246,15 @@ class MuseService:
         return create_llm(merged, data_dir=self.settings.data_dir), model
 
     # ------------------------------------------------------------------ attachments
-    def attachment(self, rel: str) -> Attachment:
+    def attachment(self, rel: str, space: str | None = None) -> Attachment:
         """An attachment record for a file in the workspace (the path as the app has it)."""
+        selected, relative = split_path(rel)
+        if space is not None and selected != space:
+            raise ValueError("Attachment belongs to another space")
         target = self.resolve_workspace_path(rel)
         if not target.is_file():
             raise ValueError(f"no such file: {rel}")
-        path = target.relative_to(self.workspace()).as_posix()
+        path = file_path(selected, target.relative_to(self.workspace(selected)).as_posix())
         return Attachment(
             path=path,
             name=target.name,
@@ -1248,7 +1263,7 @@ class MuseService:
             mime=mimetypes.guess_type(target.name)[0] or "",
         )
 
-    def save_upload(self, name: str, data: bytes) -> Attachment:
+    def save_upload(self, name: str, data: bytes, space: str = "personal") -> Attachment:
         """A file from the phone into ``attachments/<date>/`` in the workspace, under a
         safe version of its name (a second file with the same name gets a suffix)."""
         limit = self.settings.server.max_upload_mb * 1024 * 1024
@@ -1258,16 +1273,21 @@ class MuseService:
             r"[^\w.\- ()\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+", "_", Path(name).name
         ).strip(" ._")
         safe = safe[:120] or "file"
-        folder = self.workspace() / "attachments" / datetime.now().strftime("%Y-%m-%d")
-        folder.mkdir(parents=True, exist_ok=True)
+        folder = self.workspace(space) / "attachments" / datetime.now().strftime("%Y-%m-%d")
+        self.resolve_workspace_path(
+            file_path(space, folder.relative_to(self.workspace(space)).as_posix())
+        )
         target = folder / safe
         stem, suffix = target.stem, target.suffix
         n = 2
         while target.exists():
             target = folder / f"{stem} ({n}){suffix}"
             n += 1
-        target.write_bytes(data)
-        return self.attachment(target.relative_to(self.workspace()).as_posix())
+        with open_file(self.workspace(space), target, "wb") as stream:
+            stream.write(data)
+        return self.attachment(
+            file_path(space, target.relative_to(self.workspace(space)).as_posix()), space
+        )
 
     def _ensure_worker(self, thread: Thread) -> None:
         if thread.worker is None or thread.worker.done():
@@ -1279,7 +1299,6 @@ class MuseService:
             while not thread.inbox.empty():
                 item = thread.inbox.get_nowait()
                 incoming = item if isinstance(item, Incoming) else Incoming(item)
-                self.app.memory_hub.bind(thread.agent, thread.memory_space)
                 text = incoming.text
                 thread.busy = True
                 thread.agent.inbox = thread.inbox
@@ -1292,6 +1311,7 @@ class MuseService:
                 # itself ("On it: <the request>") in its language.
                 self.ui.set_status("working", "", thread.id)
                 try:
+                    self.app.memory_hub.bind(thread.agent, thread.memory_space)
                     purpose = thread.purposes.pop(text, None)
                     # the first conversation speaks to the person's turns in its own chat;
                     # a background run (a goal pass, a routine) never hears it
@@ -2077,7 +2097,7 @@ class MuseService:
         """A tidy-up is due when the store grew by a handful of lines since the last one,
         or a week went by — and never while one is running."""
         store = self.app.memory
-        if store is None or self._tidying:
+        if store is None or self._tidying or not self.app.memory_hub.is_enabled():
             return False
         count = store.count()
         if count < self.TIDY_MIN_LINES:
@@ -2099,6 +2119,8 @@ class MuseService:
         store = self.app.memory_hub.local(space)
         if store is None:
             raise ValueError("memory is disabled")
+        if self.app.memory_hub.archiving:
+            raise ValueError("Memory management is in progress. Try again shortly.")
         if self._tidying:
             raise ValueError("a tidy-up is already running")
         self._tidying = True
@@ -2152,8 +2174,11 @@ class MuseService:
 
     async def refresh_ideas(self, n: int = 5) -> dict[str, Any]:
         context_lines: list[str] = []
-        if self.app.memory is not None:
+        memory_enabled = self.app.memory_hub.is_enabled()
+        if memory_enabled and self.app.memory is not None:
             for m in self.app.memory.all(limit=30):
+                if not self.app.memory.text_allowed(m.content):
+                    continue
                 context_lines.append(f"- memory ({m.category}): {m.content}")
         for g in self.app.goals.list("active")[:8]:
             nxt = g.next_step
@@ -2163,11 +2188,13 @@ class MuseService:
                 + ")"
             )
         main = self.threads.get(MAIN_THREAD)
-        if main is not None:
+        if main is not None and memory_enabled:
             recent = [e for e in main.timeline.events if e.get("type") in ("user", "assistant")][
                 -8:
             ]
             for e in recent:
+                if not self.app.memory_hub.rules().allows(str(e.get("text", ""))):
+                    continue
                 context_lines.append(f"- recent {e['type']}: {str(e.get('text', ''))[:200]}")
         if self.settings.agent.user_profile.strip():
             context_lines.insert(0, f"- profile: {self.settings.agent.user_profile.strip()[:500]}")
@@ -2294,7 +2321,7 @@ class MuseService:
             or bool(self.app.goals.list("active"))
             or bool(self.connections.data.get("onboarded"))
         )
-        if not known and self.app.memory is not None:
+        if not known and self.app.memory is not None and self.app.memory_hub.is_enabled():
             known = self.app.memory.count() >= 5
         if not known:
             return False
@@ -2313,12 +2340,15 @@ class MuseService:
 
     def _feed_context(self) -> list[str]:
         lines: list[str] = []
+        memory_enabled = self.app.memory_hub.is_enabled()
         if self.settings.agent.user_profile.strip():
             lines.append(f"- profile: {self.settings.agent.user_profile.strip()[:500]}")
         if self.profile.user_name:
             lines.append(f"- the user's name: {self.profile.user_name}")
-        if self.app.memory is not None:
+        if memory_enabled and self.app.memory is not None:
             for m in self.app.memory.all(limit=40):
+                if not self.app.memory.text_allowed(m.content):
+                    continue
                 lines.append(f"- memory ({m.category}): {m.content}")
         for g in self.app.goals.list("active")[:8]:
             nxt = g.next_step
@@ -2333,11 +2363,13 @@ class MuseService:
             if agenda := cal.agenda(today)[:8]:
                 lines.append("- today on the calendar:\n" + cal.render(agenda, today))
         main = self.threads.get(MAIN_THREAD)
-        if main is not None:
+        if main is not None and memory_enabled:
             recent = [e for e in main.timeline.events if e.get("type") in ("user", "assistant")][
                 -6:
             ]
             for e in recent:
+                if not self.app.memory_hub.rules().allows(str(e.get("text", ""))):
+                    continue
                 lines.append(f"- recent {e['type']}: {str(e.get('text', ''))[:200]}")
         lines.append(f"- today's date: {datetime.now().strftime('%A %d %B %Y')}")
         return lines
@@ -2395,18 +2427,22 @@ class MuseService:
             self._writing_feed = False
 
     # ------------------------------------------------------------------ files / artifacts
-    def workspace(self) -> Path:
-        return self.settings.agent.workspace.resolve()
+    def workspace(self, space: str = "personal") -> Path:
+        return self.app.memory_hub.workspace(space)
 
     def resolve_workspace_path(self, rel: str) -> Path:
-        ws = self.workspace()
-        target = (ws / rel).resolve()
+        space, relative = split_path(rel)
+        ws = self.workspace(space)
+        target = (ws / relative).resolve()
         if target != ws and ws not in target.parents:
             raise PermissionError("path outside the workspace")
+        data = self.settings.data_dir.resolve()
+        if space == "personal" and data.is_relative_to(ws) and target.is_relative_to(data):
+            raise PermissionError("Runtime data is not available as workspace files")
         return target
 
-    def list_files(self, limit: int = 200) -> list[dict[str, Any]]:
-        ws = self.workspace()
+    def list_files(self, limit: int = 200, space: str = "personal") -> list[dict[str, Any]]:
+        ws = self.workspace(space)
         out: list[dict[str, Any]] = []
         if not ws.exists():
             return out
@@ -2414,12 +2450,13 @@ class MuseService:
             if not p.is_file() or any(part.startswith(".") for part in p.relative_to(ws).parts):
                 continue
             try:
+                self.resolve_workspace_path(file_path(space, p.relative_to(ws).as_posix()))
                 st = p.stat()
-            except OSError:
+            except (OSError, PermissionError):
                 continue
             out.append(
                 {
-                    "path": p.relative_to(ws).as_posix(),
+                    "path": file_path(space, p.relative_to(ws).as_posix()),
                     "name": p.name,
                     "size": st.st_size,
                     "modified": datetime.fromtimestamp(st.st_mtime, UTC).isoformat(

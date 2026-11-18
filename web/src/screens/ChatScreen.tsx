@@ -17,7 +17,7 @@ import { mentionSuggestions, mentionTarget } from "../mention";
 import { WORKING_TTL_MS } from "../presence";
 import { useStore, type Stream } from "../store";
 import type { AttachmentInfo, HubDevice, SkillInfo, ThreadMeta, TimelineEvent, UserEvent, WorkingPresence } from "../types";
-import { cx, timeDivider, timeShort } from "../util";
+import { cx, memorySpaceLabel, timeDivider, timeShort } from "../util";
 import { MuseSheet } from "./MuseSheet";
 import { countDay, countTask, StarNudgeOnce } from "../components/StarNudge";
 import { useShowSteps } from "../steps";
@@ -224,7 +224,7 @@ export function ChatScreen() {
           }
           trailing={<MoreMenu actions={[{ label: t("Coding agents"), onClick: () => setTab("coding") }]} />}
           under={
-            thread && thread.id !== "main" ? (
+            thread ? (
               thread.device ? (
                 <span className="flex max-w-full items-center gap-1 rounded-full bg-accent/12 px-2.5 py-0.5 text-[11.5px] font-medium text-accent">
                   {deviceOnline === false ? <span className="h-1.5 w-1.5 rounded-full bg-border" /> : <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
@@ -235,7 +235,7 @@ export function ChatScreen() {
                   <MonitorSmartphone size={11} /> <span className="truncate">{t("from {device}", { device: thread.remote_from.name })}</span>
                 </span>
               ) : (
-                <span className="truncate rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-fg/80">{thread.title}{thread.memory_space && thread.memory_space !== "personal" ? ` · ${t("Memory space")}: ${thread.memory_space}` : ""}</span>
+                <span className="truncate rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-fg/80">{thread.id === "main" ? t(thread.title) : thread.title}{thread.memory_space && thread.memory_space !== "personal" ? ` · ${t("Memory space")}: ${memorySpaceLabel(thread.memory_space)}` : ""}</span>
               )
             ) : undefined
           }
@@ -778,7 +778,7 @@ function Composer({
     }));
     setPending((cur) => [...cur, ...items]);
     for (const item of items) {
-      api.upload(item.file)
+      api.upload(item.file, state.threads.find((thread) => thread.id === state.activeThread)?.memory_space ?? "personal")
         .then((info) => setPending((cur) => cur.map((p) => (p.key === item.key ? { ...p, info } : p))))
         .catch((e: Error) => {
           const why = e.message ? localDetail(e.message) : t("Upload failed");
@@ -1022,6 +1022,7 @@ export function ThreadList({
   const [title, setTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const newInput = useRef<HTMLInputElement>(null);
+  const memorySpace = threads.find((th) => th.id === active)?.memory_space ?? "personal";
   // devices of yours on the hub that a chat can be addressed to
   const devices: HubDevice[] = (state.hub?.devices ?? []).filter((d) => !d.this && d.kind !== "web" && d.online);
   const kindOf = (id: string) => state.hub?.devices.find((d) => d.id === id)?.kind ?? "phone";
@@ -1039,7 +1040,7 @@ export function ThreadList({
   const create = async () => {
     setCreating(true);
     try {
-      const created = await api.createThread(title.trim() || t("Side chat"));
+      const created = await api.createThread(title.trim() || t("Side chat"), memorySpace);
       dispatch({ type: "ws", msg: { kind: "thread", thread: created } });
       setTitle("");
       onPick(created.id);
@@ -1084,7 +1085,7 @@ export function ThreadList({
                 {th.busy && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400 animate-pulse" />}
               </div>
               <div className={cx("text-muted", compact ? "text-[11.5px]" : "text-[12px]")}>
-                {t("{n} events", { n: th.events })}{th.queued ? ` · ${t("{n} queued", { n: th.queued })}` : ""} · {timeShort(th.updated_at)}
+                {th.memory_space && th.memory_space !== "personal" ? `${t("Memory space")}: ${memorySpaceLabel(th.memory_space)} · ` : ""}{t("{n} events", { n: th.events })}{th.queued ? ` · ${t("{n} queued", { n: th.queued })}` : ""} · {timeShort(th.updated_at)}
               </div>
             </button>
             <button type="button" aria-label={t("Clear")} onClick={() => void clear(th.id)} className={cx("p-2 text-muted hover:text-fg", compact && "opacity-0 group-hover:opacity-100 focus:opacity-100")}>
@@ -1146,6 +1147,7 @@ export function ThreadList({
           </div>
         </div>
       )}
+      {memorySpace !== "personal" && <p className="mt-3 px-1 text-[11.5px] text-muted">{t("New conversations use memory space: {space}", { space: memorySpaceLabel(memorySpace) })}</p>}
       <div className={cx("flex gap-2", compact ? "mt-3" : "mt-4")}>
         <input
           ref={newInput}

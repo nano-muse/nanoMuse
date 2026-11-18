@@ -10,10 +10,11 @@ import asyncio
 import fnmatch
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, cast
 
 from nanomuse.schema import RiskLevel, ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment, short_json
+from nanomuse.workspaces import open_file
 
 MAX_READ_CHARS = 60_000
 
@@ -31,13 +32,13 @@ def unescape_flat(content: str) -> tuple[str, bool]:
     return content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t"), True
 
 
-def pdf_text(path: Path, max_pages: int = 60) -> str:
+def pdf_text(path: Path | BinaryIO, max_pages: int = 60) -> str:
     """The text of a PDF, page by page — what the model reads when the user attaches one.
     Scanned PDFs have no text layer; the result says so instead of coming back empty."""
     from pypdf import PdfReader
 
     try:
-        reader = PdfReader(str(path))
+        reader = PdfReader(str(path) if isinstance(path, Path) else path)
         if reader.is_encrypted:
             try:
                 reader.decrypt("")
@@ -90,6 +91,7 @@ class Files(BaseTool):
 
     workspace: Path
     extra_roots: list[Path] = []
+    denied_roots: list[Path] = []
 
     # ------------------------------------------------------------------ helpers
     def _resolve(self, path: str | None, must_exist: bool = False) -> Path:
@@ -98,6 +100,8 @@ class Files(BaseTool):
         if not candidate.is_absolute():
             candidate = self.workspace / candidate
         resolved = candidate.resolve()
+        if any(resolved.is_relative_to(root.resolve()) for root in self.denied_roots):
+            raise PermissionError("This path is not available in the selected space")
         roots = [self.workspace.resolve(), *[r.resolve() for r in self.extra_roots]]
         if not any(resolved == r or r in resolved.parents for r in roots):
             raise PermissionError(
@@ -151,16 +155,27 @@ class Files(BaseTool):
                 target = self._resolve(path, must_exist=True)
                 if target.is_dir():
                     return await self.execute(action="list", path=path)
+                root = (
+                    self.workspace.resolve()
+                    if self._inside_workspace(target)
+                    else next(
+                        r.resolve() for r in self.extra_roots if target.is_relative_to(r.resolve())
+                    )
+                )
                 if target.suffix.lower() == ".pdf":
                     # pypdf on a long document takes seconds: off the event loop, so the
                     # web app and the hub keep answering meanwhile
-                    text = await asyncio.to_thread(pdf_text, target)
+                    def read_pdf() -> str:
+                        with open_file(root, target, "rb") as stream:
+                            return pdf_text(cast(BinaryIO, stream))
+
+                    text = await asyncio.to_thread(read_pdf)
                     if len(text) > MAX_READ_CHARS:
                         text = text[:MAX_READ_CHARS] + f"\n... [truncated, {len(text)} chars total]"
                     return ToolResult(output=text or "(empty file)")
                 # read what fits and one more character, not the whole file: a log of a few
                 # hundred MB is truncated either way, and need not be loaded for it
-                with target.open("r", encoding="utf-8", errors="replace") as fh:
+                with open_file(root, target, "r") as fh:
                     text = fh.read(MAX_READ_CHARS + 1)
                 if len(text) > MAX_READ_CHARS:
                     size = target.stat().st_size
@@ -171,8 +186,14 @@ class Files(BaseTool):
                     return ToolResult.fail("`content` is required")
                 content, fixed = unescape_flat(content)
                 target = self._resolve(path)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                with target.open("a" if action == "append" else "w", encoding="utf-8") as fh:
+                root = (
+                    self.workspace.resolve()
+                    if self._inside_workspace(target)
+                    else next(
+                        r.resolve() for r in self.extra_roots if target.is_relative_to(r.resolve())
+                    )
+                )
+                with open_file(root, target, "a" if action == "append" else "w") as fh:
                     fh.write(content)
                 rel = os.path.relpath(target, self.workspace)
                 note = " (the content had escaped newlines; written as lines)" if fixed else ""
@@ -185,6 +206,7 @@ class Files(BaseTool):
                 if target.is_file():
                     return ToolResult(output=f"{target.name} ({target.stat().st_size} bytes)")
                 entries = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+                entries = [p for p in entries if self._visible(p)]
                 lines = [f"{'[dir] ' if p.is_dir() else ''}{p.name}" for p in entries[:500]]
                 return ToolResult(output="\n".join(lines) or "(empty directory)")
             if action == "search":
@@ -203,7 +225,11 @@ class Files(BaseTool):
                     scanned = 0
                     for p in root.rglob("*"):
                         scanned += 1
-                        if p.is_file() and fnmatch.fnmatch(p.relative_to(root).as_posix(), glob):
+                        if (
+                            self._visible(p)
+                            and p.is_file()
+                            and fnmatch.fnmatch(p.relative_to(root).as_posix(), glob)
+                        ):
                             matches.append(p.relative_to(ws).as_posix() if in_ws else str(p))
                         if len(matches) >= 200:
                             break
@@ -219,6 +245,13 @@ class Files(BaseTool):
             return ToolResult.fail(f"unknown action '{action}'; use read/write/append/list/search")
         except (PermissionError, FileNotFoundError, IsADirectoryError, OSError) as exc:
             return ToolResult.fail(str(exc))
+
+    def _visible(self, path: Path) -> bool:
+        try:
+            self._resolve(str(path))
+            return True
+        except (OSError, PermissionError):
+            return False
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"Files({short_json({'workspace': str(self.workspace)})})"

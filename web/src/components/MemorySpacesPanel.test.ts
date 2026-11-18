@@ -4,8 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "../api";
 import { MemorySpacesPanel } from "./MemorySpacesPanel";
 
-const { openThread, setTab } = vi.hoisted(() => ({ openThread: vi.fn(), setTab: vi.fn() }));
-vi.mock("../store", () => ({ useStore: () => ({ openThread, setTab }) }));
+const { dispatch, openThread, setTab } = vi.hoisted(() => ({ dispatch: vi.fn(), openThread: vi.fn(), setTab: vi.fn() }));
+vi.mock("../store", () => ({ useStore: () => ({ dispatch, openThread, setTab }) }));
 let screen: ReactTestRenderer;
 const onSpace = vi.fn();
 const onChange = vi.fn();
@@ -22,11 +22,33 @@ function button(label: string) {
   return screen.root.findAllByType("button").find((node) => node.children.includes(label))!;
 }
 
+it("disables memory only for the selected space and keeps saved-data controls", async () => {
+  const enabled = vi.spyOn(api, "enableMemorySpace").mockResolvedValue({ enabled: false });
+  vi.mocked(api.memorySpaces).mockResolvedValue({ enabled: true, owner: "synthetic-owner", spaces: [{ id: "work", label: "Work" }], learning: { pending: 0, failed: 0 } });
+  await mount();
+  expect(screen.root.findByProps({ "aria-label": "Enable memory" }).props.checked).toBe(true);
+  vi.mocked(api.memorySpaces).mockResolvedValue({ enabled: false, owner: "synthetic-owner", spaces: [{ id: "work", label: "Work" }], learning: { pending: 0, failed: 0 } });
+  await act(async () => { screen.root.findByProps({ "aria-label": "Enable memory" }).props.onChange({ target: { checked: false } }); });
+  expect(enabled).toHaveBeenCalledWith(false, "work");
+  expect(screen.root.findByProps({ "aria-label": "Enable memory" }).props.checked).toBe(false);
+  expect(button("Download memory backup").props.disabled).toBe(false);
+  expect(onChange).toHaveBeenCalled();
+});
+
+it("keeps memory enabled and reports a busy-space rejection", async () => {
+  vi.spyOn(api, "enableMemorySpace").mockRejectedValue(new Error("Memory is busy. Finish or stop the conversation and try again."));
+  await mount();
+  await act(async () => { screen.root.findByProps({ "aria-label": "Enable memory" }).props.onChange({ target: { checked: false } }); });
+  expect(screen.root.findByProps({ "aria-label": "Enable memory" }).props.checked).toBe(true);
+  expect(screen.root.findByProps({ role: "alert" }).children.join("")).toContain("Memory is busy");
+});
+
 it("starts a new conversation bound to the selected memory space", async () => {
   vi.spyOn(api, "createThread").mockResolvedValue({ id: "work-chat" } as Awaited<ReturnType<typeof api.createThread>>);
   await mount();
   await act(async () => { button("Start a conversation in this space").props.onClick(); });
   expect(api.createThread).toHaveBeenCalledWith("New conversation", "work");
+  expect(dispatch).toHaveBeenCalledWith({ type: "ws", msg: { kind: "thread", thread: { id: "work-chat" } } });
   expect(openThread).toHaveBeenCalledWith("work-chat");
   expect(setTab).toHaveBeenCalledWith("chat");
 });

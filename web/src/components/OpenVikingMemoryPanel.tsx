@@ -95,7 +95,7 @@ export function OpenVikingMemoryPanel({ version, space = "personal" }: { version
         <>
           <label className="flex items-center justify-between gap-3 text-sm">
             {t("Automatically save conversations")}
-            <input type="checkbox" checked={status.capture} disabled={busy} onChange={(event) => {
+            <input type="checkbox" aria-label={t("Automatically save conversations")} checked={status.capture} disabled={busy || status.usage_enabled === false} onChange={(event) => {
               const enabled = event.target.checked;
               void action(async () => {
                 await api.openVikingCapture(enabled, space);
@@ -107,7 +107,7 @@ export function OpenVikingMemoryPanel({ version, space = "personal" }: { version
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-live="polite">
             <span>{t("Waiting to sync: {n}", { n: status.pending })}</span>
             <span>{t("Extracting: {n}", { n: extracting })}</span>
-            {status.pending > 0 && <button type="button" className={button} disabled={busy} onClick={() => void action(() => api.openVikingRetry(space))}>{t("Retry pending turns")}</button>}
+            {status.pending > 0 && <button type="button" className={button} disabled={busy || status.usage_enabled === false} onClick={() => void action(() => api.openVikingRetry(space))}>{t("Retry pending turns")}</button>}
           </div>
           {failures > 0 && <p className="text-xs text-rose-600">{t("Recent extraction failures: {n}. Check the tasks in OpenViking.", { n: failures })}</p>}
         </>

@@ -69,6 +69,42 @@ async def test_plain_answer_ends_turn(settings: Settings):
     assert len(llm.calls) == 1
 
 
+async def test_excluded_memory_stops_rephrasing_and_sibling_storage(settings: Settings) -> None:
+    from nanomuse.memory.rules import MemoryRules
+
+    agent, llm, _, memory, _ = make_agent(
+        settings,
+        [
+            LLMResponse(
+                tool_calls=[
+                    tc("remember", content="My project code is WILLOW-4826"),
+                    tc("remember", content="The project is named Willow"),
+                    tc("add", a=1, b=2),
+                ]
+            ),
+            LLMResponse(tool_calls=[tc("remember", content="Try another wording")]),
+        ],
+    )
+    rules = MemoryRules(memory._conn, "test-owner", "personal")
+    rules.add("4826")
+    memory.text_allowed = rules.allows
+    answer = await agent.run("Remember my project code WILLOW-4826")
+    assert "memory exclusion" in answer and "not saved" in answer
+    assert len(llm.calls) == 1
+    results = [m for m in agent.messages if m.role == Role.TOOL]
+    assert len(results) == 3
+    assert all("No further tools were run" in m.content for m in results[1:])
+    assert not memory.all()
+    assert rules.items() == [{"term": "4826", "replacement": ""}]
+    # The halt is turn-scoped; a fresh fact can still be saved without removing the rule.
+    llm.script = [
+        LLMResponse(tool_calls=[tc("remember", content="My project code is MAPLE-7530")]),
+        LLMResponse(content="Saved the new code."),
+    ]
+    assert await agent.run("Remember my project code MAPLE-7530") == "Saved the new code."
+    assert [item.content for item in memory.all()] == ["My project code is MAPLE-7530"]
+
+
 async def test_unknown_tool_reports_error(settings: Settings):
     script = [
         LLMResponse(tool_calls=[tc("does_not_exist", x=1)]),

@@ -22,6 +22,9 @@ class LearningQueue:
         self.db.commit()
 
     def enqueue(self, inputs: list[str], turn: str, conversation: str) -> None:
+        inputs = [text for text in inputs if self.store.text_allowed(text)]
+        if not inputs:
+            return
         namespace = self.store.namespace
         job = hashlib.sha256((namespace + turn).encode()).hexdigest()
         if self.db.execute("SELECT 1 FROM learning_jobs WHERE id = ?", (job,)).fetchone():

@@ -5,7 +5,7 @@ import { useStore } from "../store";
 
 export function MemorySpacesPanel({ space, onSpace, version, onChange }: { space: string; onSpace: (space: string) => void; version: number; onChange: () => void }) {
   const t = useT();
-  const { openThread, setTab } = useStore();
+  const { dispatch, openThread, setTab } = useStore();
   const [state, setState] = useState<Awaited<ReturnType<typeof api.memorySpaces>> | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,15 +29,29 @@ export function MemorySpacesPanel({ space, onSpace, version, onChange }: { space
     <section aria-label={t("Memory spaces")} className="rounded-2xl border border-border p-4 space-y-3">
       <h2 className="text-sm font-semibold">{t("Memory spaces")}</h2>
       <p className="text-xs text-muted">{t("Each new conversation uses one space. Profile facts, local notes and remote recall stay in that space. These are spaces for one runtime owner, not separate user accounts.")}</p>
+      <p className="text-xs text-muted">{t("Each space has its own files. Commands cannot read other workspaces or runtime data. External connectors and personal tools are available in Personal only.")}</p>
       <div className="flex flex-wrap gap-2">
         <select aria-label={t("Memory space")} value={space} disabled={busy} onChange={(e) => onSpace(e.target.value)} className="min-w-0 rounded-xl bg-surface-2 px-3 py-2 text-sm">
           {(state?.spaces ?? [{ id: "personal", label: "Personal" }]).map((item) => <option value={item.id} key={item.id}>{t(item.label)}</option>)}
         </select>
         <button className={button} disabled={busy || !state?.owner} onClick={() => void action(async () => {
           const thread = await api.createThread(t("New conversation"), space);
+          dispatch({ type: "ws", msg: { kind: "thread", thread } });
           openThread(thread.id); setTab("chat");
         })}>{t("Start a conversation in this space")}</button>
       </div>
+      <label className="flex items-center justify-between gap-3 text-sm">
+        {t("Enable memory")}
+        <input type="checkbox" aria-label={t("Enable memory")} checked={state?.enabled !== false} disabled={busy || !state || state.available === false} onChange={(event) => {
+          const enabled = event.target.checked;
+          void action(async () => {
+            const result = await api.enableMemorySpace(enabled, space);
+            setState((old) => old ? { ...old, enabled: result.enabled } : old);
+          });
+        }} />
+      </label>
+      <p className="text-xs text-muted">{t("When off, the assistant does not read or save memory in this space, and profile learning pauses. Saved data and chat history remain. You can still manage saved memories here.")}</p>
+      {state?.available === false && <p className="text-xs text-muted">{t("Memory is disabled in the runtime configuration")}</p>}
       {state?.owner && <>
         <div className="flex flex-wrap gap-2">
           <input aria-label={t("New space name")} placeholder={t("New space name")} value={label} maxLength={80} disabled={busy} onChange={(e) => setLabel(e.target.value)} className="min-w-0 flex-1 rounded-xl bg-surface-2 px-3 py-2 text-sm" />

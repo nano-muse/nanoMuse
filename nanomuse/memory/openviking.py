@@ -13,6 +13,7 @@ import json
 import re
 import sqlite3
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -40,6 +41,8 @@ class OpenVikingMemory:
         self.path, self.space = path, space
         self._api_key, self._transport = api_key, transport
         self.strict_scope = False
+        self.usage_allowed: Callable[[], bool] = lambda: True
+        self.text_allowed: Callable[[Any], bool] = lambda text: True
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         if settings.auth_mode == "trusted":
             if not settings.account or not settings.user:
@@ -326,6 +329,7 @@ class OpenVikingMemory:
             tasks.append({"state": state})
         return {
             "enabled": True,
+            "usage_enabled": self.usage_allowed(),
             "capture": self.capture_enabled,
             "pending": self.pending_count(),
             "tasks": tasks,
@@ -341,6 +345,8 @@ class OpenVikingMemory:
 
     async def recall(self, query: str) -> str:
         """Budgeted historical evidence, never instructions to execute."""
+        if not self.usage_allowed():
+            return ""
         if self.strict_scope:
             data = await self.request(
                 "POST",
@@ -359,7 +365,8 @@ class OpenVikingMemory:
                     await self.checked_uri(entry.get("uri", ""), file=True)
                 except ValueError:
                     continue
-                valid.append({"uri": entry["uri"], "text": entry.get("abstract", "")})
+                if self.text_allowed(entry):
+                    valid.append({"uri": entry["uri"], "text": entry.get("abstract", "")})
             return json.dumps(valid, ensure_ascii=False)[: self.settings.max_chars]
         payload: dict[str, Any] = {
             "query": query[: self.settings.max_chars],
@@ -386,7 +393,7 @@ class OpenVikingMemory:
         result = data.get("result") or {}
         rendered = result.get("rendered")
         if isinstance(rendered, str):
-            return rendered[: self.settings.max_chars]
+            return rendered[: self.settings.max_chars] if self.text_allowed(rendered) else ""
         entries = result.get("entries") or result.get("memories") or []
         lines = [
             {
@@ -394,11 +401,13 @@ class OpenVikingMemory:
                 "text": str(item.get("text") or item.get("abstract") or ""),
             }
             for item in entries
-            if isinstance(item, dict)
+            if isinstance(item, dict) and self.text_allowed(item)
         ]
         return json.dumps(lines, ensure_ascii=False)[: self.settings.max_chars] if lines else ""
 
     def enqueue(self, turn_id: str, messages: list[dict[str, str]]) -> None:
+        if not self.usage_allowed() or not self.text_allowed(messages):
+            return
         sid = "nm-" + hashlib.sha256(f"{self.namespace}:{turn_id}".encode()).hexdigest()[:40]
         with self.db:
             self.db.execute(
@@ -420,6 +429,8 @@ class OpenVikingMemory:
 
     async def flush(self) -> int:
         """Advance acknowledged writes; ambiguous network failures may repeat a message."""
+        if not self.usage_allowed():
+            return 0
         count = 0
         async with asyncio.timeout(self.settings.timeout), self.lock:
             rows = self.db.execute(
@@ -429,23 +440,56 @@ class OpenVikingMemory:
             ).fetchall()
             for sid, raw, stage in rows:
                 messages = json.loads(raw)
+                if not self.text_allowed(messages):
+                    # Restored queues can contain text retired by an existing review.
+                    # Remove it so a full batch cannot hold newer eligible turns back.
+                    with self.db:
+                        self.db.execute(
+                            "DELETE FROM pending WHERE namespace = ? AND id = ?",
+                            (self.namespace, sid),
+                        )
+                    continue
                 if stage < 0:
+                    peer = bool(self.settings.peer_id)
                     try:
                         await self.request(
                             "POST",
                             "/api/v1/sessions",
-                            json={"session_id": sid, "auto_commit_policy": None},
+                            json={
+                                "session_id": sid,
+                                "auto_commit_policy": None,
+                                "memory_policy": {
+                                    "self": {"enabled": not peer},
+                                    "peer": {"enabled": peer},
+                                },
+                            },
                         )
                     except httpx.HTTPStatusError as exc:
                         if exc.response.status_code != 409:
                             raise
+                if self.settings.peer_id:
+                    # Session routes deliberately ignore Actor-Peer headers. Require
+                    # peer-only extraction, including after a restart or a 409 from
+                    # an older session, before sending or committing any messages.
+                    session = await self.request("GET", f"/api/v1/sessions/{sid}")
+                    policy = session.get("result", {}).get("memory_policy")
+                    if (
+                        not isinstance(policy, dict)
+                        or policy.get("self") != {"enabled": False}
+                        or policy.get("peer") != {"enabled": True}
+                    ):
+                        raise ValueError("OpenViking session memory policy is not peer-only")
+                if stage < 0:
                     stage = 0
                     self._advance(sid, stage)
                 for idx in range(stage, len(messages)):
+                    message = {k: v for k, v in messages[idx].items() if k != "peer_id"}
+                    if self.settings.peer_id and message.get("role") == "user":
+                        message["peer_id"] = self.settings.peer_id
                     await self.request(
                         "POST",
                         f"/api/v1/sessions/{sid}/messages",
-                        json=messages[idx],
+                        json=message,
                     )
                     self._advance(sid, idx + 1)
                 # Commit archives synchronously; extraction continues asynchronously.
@@ -507,6 +551,8 @@ class OpenVikingRecall(OpenVikingTool):
     reads_private_data: bool = True
 
     async def execute(self, query: str = "", **_: Any) -> ToolResult:
+        if not self.bridge.usage_allowed():
+            return ToolResult.fail("Memory is disabled for this space")
         try:
             async with asyncio.timeout(self.bridge.settings.timeout):
                 return ToolResult(output=await self.bridge.recall(query))
@@ -521,6 +567,8 @@ class OpenVikingSync(OpenVikingTool):
     async def execute(
         self, turn_id: str = "", messages: list[dict[str, str]] | None = None, **_: Any
     ) -> ToolResult:
+        if not self.bridge.usage_allowed():
+            return ToolResult.fail("Memory is disabled for this space")
         if turn_id and messages:
             self.bridge.enqueue(turn_id, messages)
         try:
@@ -574,12 +622,16 @@ class OpenVikingManage(OpenVikingTool):
         capture: bool | None = None,
         **_: Any,
     ) -> ToolResult:
+        if not self.controls and not self.bridge.usage_allowed():
+            return ToolResult.fail("Memory is disabled for this space")
         try:
             async with asyncio.timeout(self.bridge.settings.timeout):
                 if content:
                     if self.vault is not None:
                         content = self.vault.redact(content)
                     content = PLACEHOLDER_RE.sub("[VAULT_REFERENCE]", content)
+                if not self.controls and content and not self.bridge.text_allowed(content):
+                    return ToolResult.fail("This text was retired by the owner")
                 if action == "list":
                     result = await self.bridge.browse(uri, query, max(0, min(int(offset), 100000)))
                 elif action == "read":
@@ -607,6 +659,13 @@ class OpenVikingManage(OpenVikingTool):
                     }
                 else:
                     raise ValueError("Unsupported OpenViking memory action")
+                if not self.controls:
+                    if action == "list":
+                        result["items"] = [
+                            item for item in result["items"] if self.bridge.text_allowed(item)
+                        ]
+                    elif action == "read" and not self.bridge.text_allowed(result):
+                        return ToolResult.fail("This record contains text retired by the owner")
                 return ToolResult(output=json.dumps(result, ensure_ascii=False))
         except httpx.HTTPStatusError as exc:
             code = exc.response.status_code

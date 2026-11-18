@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable
 from typing import Any
 
 from nanomuse.bridge.tokens import BRIDGE_TOKEN_ENV, BRIDGE_URL_ENV, BridgeGrant, BridgeTokens
@@ -51,13 +52,14 @@ class Bridge:
         self.ui = ui
         self.base_url = base_url.rstrip("/")
         self.tokens = BridgeTokens()
+        self.enabled: Callable[[], bool] = lambda: True
 
     # ------------------------------------------------------------------ the shell tool's side
     def env_for(
         self, call_id: str, tool: str, ttl: float
     ) -> tuple[dict[str, str], BridgeGrant] | None:
         """The two variables a command gets, and the grant to revoke when it is done."""
-        if not self.base_url:
+        if not self.base_url or not self.enabled():
             return None
         grant = self.tokens.mint(call_id, tool, ttl)
         return {BRIDGE_URL_ENV: self.base_url, BRIDGE_TOKEN_ENV: grant.token}, grant

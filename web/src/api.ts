@@ -59,6 +59,12 @@ import type {
 import { signedParams } from "./ticket";
 import { readStorage, writeStorage } from "./util";
 
+export interface MemoryCopyReport {
+  id: string; at: string; space: string; fact_id: string; state: string;
+  exclusions_active: boolean; error?: string; outside_scope: string[];
+  sources: Array<{ source: string; scanned: number; matched: number; changed: number; status: string }>;
+}
+
 function memoryPath(path: string, space: string): string {
   return space === "personal" ? path : `${path}${path.includes("?") ? "&" : "?"}space=${encodeURIComponent(space)}`;
 }
@@ -268,8 +274,8 @@ export const api = {
   send: (thread: string, text: string, files: string[] = [], language = "", via = "") =>
     request<{ event: TimelineEvent; thread: ThreadMeta }>(`/api/threads/${thread}/send`, json(via ? { text, files, language, via } : { text, files, language })),
   /** A file to attach: the bytes as the body, the name in the query. */
-  upload: (file: File) =>
-    request<AttachmentInfo>(`/api/files/upload?name=${encodeURIComponent(file.name || "photo.jpg")}`, {
+  upload: (file: File, space = "personal") =>
+    request<AttachmentInfo>(`/api/files/upload?name=${encodeURIComponent(file.name || "photo.jpg")}&space=${encodeURIComponent(space)}`, {
       method: "POST",
       headers: { "Content-Type": file.type || "application/octet-stream" },
       body: file,
@@ -313,7 +319,10 @@ export const api = {
   memoryChanges: (limit = 30, space = "personal") => request<MemoryChange[]>(memoryPath(`/api/memory/changes?limit=${limit}`, space)),
   restoreMemoryChange: (id: string, space = "personal") =>
     request<MemoryChange>(memoryPath(`/api/memory/changes/${id}/restore`, space), { method: "POST" }),
-  memorySpaces: (space = "personal") => request<{ owner: string; spaces: Array<{id: string; label: string}>; learning: {pending: number; failed: number} }>(memoryPath("/api/memory/spaces", space)),
+  memorySpaces: (space = "personal") => request<{ enabled?: boolean; available?: boolean; owner: string; spaces: Array<{id: string; label: string}>; learning: {pending: number; failed: number} }>(memoryPath("/api/memory/spaces", space)),
+  enableMemorySpace: (enabled: boolean, space = "personal") => request<{ enabled: boolean }>(`/api/memory/spaces/${encodeURIComponent(space)}/enabled`, { ...json({ enabled }), method: "PUT" }),
+  memoryFactCopies: (space: string, body: { action: "preview" | "apply" | "status" | "unblock"; term?: string; replacement?: string; revision?: string; aliases?: string[] }) =>
+    request<{ revision?: string; fact_id?: string; report?: MemoryCopyReport | null; matches?: Array<{ source: string; id: string; before: string; after: string; linked?: boolean }>; rules?: Array<{ term: string; replacement: string; fact_id?: string }>; changed?: number }>(`/api/memory/spaces/${encodeURIComponent(space)}/facts`, json(body)),
   createMemorySpace: (id: string, label: string) => request<{id: string}>("/api/memory/spaces", json({ id, label })),
   retryLearning: (space: string) => request<unknown>(`/api/memory/spaces/${encodeURIComponent(space)}/retry`, json({})),
   exportMemory: (space: string) => request<Record<string, unknown> & {revision: string}>(`/api/memory/spaces/${encodeURIComponent(space)}/export`),
@@ -339,7 +348,7 @@ export const api = {
     request<Trigger>("/api/triggers", { method: "POST", body: JSON.stringify(body) }),
   fireTrigger: (id: string) => request<Trigger>(`/api/triggers/${id}/fire`, { method: "POST" }),
   cancelTrigger: (id: string) => request<Trigger>(`/api/triggers/${id}`, { method: "DELETE" }),
-  files: (limit = 300) => request<FileInfo[]>(`/api/files?limit=${limit}`),
+  files: (limit = 300, space = "personal") => request<FileInfo[]>(`/api/files?limit=${limit}&space=${encodeURIComponent(space)}`),
   /** Raw contents of a workspace file, fetched with the token in a header (never in a URL). */
   fileText: async (path: string): Promise<string> => {
     const headers: Record<string, string> = {};

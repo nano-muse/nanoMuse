@@ -461,6 +461,7 @@ class NanoMuseApp:
         elif not enabled and present:
             for name in ("computer_screen", "computer_act", "computer_task"):
                 self.tools.remove(name)
+        self.memory_hub.bind(self.agent, "personal")
 
     def set_gui_enabled(self, enabled: bool) -> None:
         """Turn the phone tools on or off while running (the switch in the app)."""
@@ -473,6 +474,7 @@ class NanoMuseApp:
         elif not enabled and present:
             for name in ("phone_screen", "phone_act", "phone_task"):
                 self.tools.remove(name)
+        self.memory_hub.bind(self.agent, "personal")
 
     def trigger_kinds(self) -> dict[str, bool]:
         """Which trigger kinds have their connector: mail needs the mailbox, event the calendar."""
@@ -488,15 +490,17 @@ class NanoMuseApp:
         if self.mcp is not None:
             for tool in await self.mcp.connect():
                 self.tools.add(tool)
+        self.memory_hub.bind(self.agent, "personal")
         self.memory_hub.start()
         return self
 
     async def close(self) -> None:
-        await self.memory_hub.close()
         if self.openviking is not None:
             with contextlib.suppress(TimeoutError):
                 async with asyncio.timeout(self.settings.memory.openviking.timeout):
                     await self.agent.sync_openviking()
+        await self.memory_hub.close()
+        if self.openviking is not None:
             await self.openviking.close()
         await self.tools.cleanup()
         if self.mcp is not None:

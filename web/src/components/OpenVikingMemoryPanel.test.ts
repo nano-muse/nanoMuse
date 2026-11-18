@@ -27,6 +27,14 @@ async function mountAndOpen() {
   await act(async () => { screen.root.findByType("li").findByType("button").props.onClick(); });
 }
 
+it("pauses automatic capture and retry controls while keeping retained memories readable", async () => {
+  vi.mocked(api.openVikingStatus).mockResolvedValue({ enabled: true, usage_enabled: false, capture: true, pending: 1, tasks: [] });
+  await mountAndOpen();
+  expect(screen.root.findByProps({ "aria-label": "Automatically save conversations" }).props.disabled).toBe(true);
+  expect(screen.root.findAllByType("button").find((node) => node.children.includes("Retry pending turns"))!.props.disabled).toBe(true);
+  expect(screen.root.findByType("textarea").props.value).toBe("Original fact");
+});
+
 it("keeps the unsaved edit and its revision when a concurrent update conflicts", async () => {
   vi.spyOn(api, "openVikingUpdate").mockRejectedValue(new Error("Memory changed. Reload it before saving or deleting."));
   await mountAndOpen();

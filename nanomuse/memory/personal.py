@@ -98,6 +98,7 @@ def matches_scope(term: str, query: str) -> bool:
 class PersonalMemory:
     def __init__(self, db: sqlite3.Connection, namespace: str):
         self.db, self.namespace = db, namespace
+        self.text_allowed: Callable[[str], bool] = lambda text: True
         self.lock = asyncio.Lock()
         self.db.execute(
             "CREATE TABLE IF NOT EXISTS personal_facts ("
@@ -180,7 +181,7 @@ class PersonalMemory:
         # Evidence must be a verbatim span of a real current user message, not model
         # output, restored history, an attachment or a quote invented by extraction.
         sources = [text for text in inputs if proposal.quote in text]
-        if not sources:
+        if not sources or not self.text_allowed(proposal.value + "\n" + proposal.quote):
             return False
         if proposal.kind == "preference" and any(_ONE_OFF.search(text) for text in sources):
             return False
@@ -291,7 +292,7 @@ class PersonalMemory:
             reverse=True,
         )
         for item in items:
-            if item["status"] != "active":
+            if item["status"] != "active" or not self.text_allowed(item["value"]):
                 continue
             if item["scope"] and not any(matches_scope(term, query) for term in item["scope"]):
                 continue
@@ -299,6 +300,8 @@ class PersonalMemory:
                 k: item[k]
                 for k in ("id", "kind", "value", "scope", "confidence", "updated_at", "expires_at")
             }
+            if not all(self.text_allowed(term) for term in item["scope"]):
+                continue
             size = len(json.dumps(fact, ensure_ascii=False))
             if size > budget:
                 continue

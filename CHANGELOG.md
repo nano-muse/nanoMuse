@@ -10,6 +10,24 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Stopped retrying memory writes rejected by an owner exclusion.** The first rejection ended the turn with review instructions, cancelled remaining tool calls and skipped automatic capture without changing the exclusion.
+
+- **Bound each space to its own files and command working directory.** Uploads, attachments and the file library followed the chat space, Linux commands enforced filesystem restrictions, and personal connectors and stores stayed out of non-personal chats.
+
+- **Enforced tool restrictions while memory was off.** File and code tools required an explicit task in the current user request, and persistent approvals could not bypass the restriction.
+
+- **Linked reviewed fact wording and recorded partial cleanup results.** Matching profile revisions and owner-supplied aliases shared exclusions, and per-source progress survived failures and restarts for inspection before retrying.
+
+- **Kept chat status busy while binding its memory space.** Status checks no longer reported an idle thread during setup.
+
+- **Handled explicit memory requests directly while memory was off.** The runtime explained the disabled state without model or tool calls, so it did not search files or offer file storage for those requests.
+
+- **Added reviewed deletion and correction across memory copies.** Exact-fragment inspection covered profile revisions, local notes and undo history, remote files, queued evidence and recorded sessions. Persistent exclusions blocked retired text from recall, memory writes and profile learning, and owner-confirmed replacement values took precedence over historical evidence.
+
+- **Added a persistent memory switch for each space.** Turning it off blocked assistant recall and memory-tool access and paused capture, queued sync and profile learning, while keeping data available in authenticated memory controls.
+
+- **Kept captured work and project conversations in their own remote memory.** User messages carried the space's peer ID, extraction excluded shared self memory, and incompatible session policies left writes queued for review. Existing extracted files were kept for separate inspection.
+
 - **Added stable memory ownership, spaces and background profile learning.** Credential rotation kept personal profiles without retargeting pending conversations. New chats selected separate personal, work or project memory, and durable learning jobs retried in the background without delaying replies. Non-personal chats stayed off the legacy conversation sync path.
 
 - **Added a personal profile alongside OpenViking.** Eligible user turns supplied quoted facts, inferred preferences waited for confirmation, scoped and expired facts stayed out of unrelated answers, and explicit corrections retained history. Learning and retrieval passed through the Sentinel and respected capture exclusions.
@@ -21,6 +39,14 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Added optional OpenViking memory to the Python agent used by web and gateway-connected devices.** Completed user turns were queued for extraction, relevant history was recalled before replies, and unavailable services left pending writes on disk. Both operations passed through the Sentinel, while local explicit memories remained separate.
 
 ### Web
+
+- **Added wording aliases and cleanup result tables to memory controls.** Owners reviewed linked profile versions, checked per-source counts and loaded interrupted operations before retrying.
+
+- **Added a memory-copy inspection panel.** Owners previewed exact matches before applying version-checked deletion or replacement in the selected space, and could review or remove retired-text exclusions.
+
+- **Added Enable memory above the per-space memory controls.** The separate automatic-save preference was preserved when memory was paused and resumed.
+
+- **Kept memory-related chat entry points in the selected space.** Chat headers and lists showed work and custom space labels, with Personal as the default without a label. The memory page followed the active chat, and new side chats and empty-memory invitations preserved that space.
 
 - **Added memory space and backup controls.** The memory page created spaces and scoped conversations, retried profile learning, exported managed memory, cleared a checked snapshot and restored facts without replaying archived conversations. Other spaces, chat timelines and audit logs stayed separate.
 

@@ -209,7 +209,9 @@ class Sentinel:
         return bool(verdict.approved)
 
     # ------------------------------------------------------------------ main entry
-    async def guard(self, call: ToolCall, tool: BaseTool) -> ToolResult:
+    async def guard(
+        self, call: ToolCall, tool: BaseTool, *, restriction: str | None = None
+    ) -> ToolResult:
         args = call.arguments
         if "__raw__" in args:
             # The arguments never parsed (cut off in transit): there is nothing to assess,
@@ -230,6 +232,9 @@ class Sentinel:
         task = _current_task.get()
         result_policy = self.policy.evaluate(tool.name, args, assessment, tainted=self.tainted)
         decision, reasons = result_policy.decision, list(result_policy.reasons)
+        if restriction:
+            decision = Decision.DENY
+            reasons.append(restriction)
         approved: bool | None = None
         scope: str | None = None
 

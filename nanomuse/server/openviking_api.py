@@ -15,6 +15,8 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from nanomuse.memory.archive import MemoryArchive
+from nanomuse.memory.facts import MemoryFacts
+from nanomuse.memory.hub import MemoryUsage
 from nanomuse.memory.openviking import OpenVikingManage
 from nanomuse.memory.personal import PersonalControls
 from nanomuse.schema import Function, ToolCall
@@ -51,6 +53,14 @@ class ArchiveBody(BaseModel):
     data: dict[str, Any] | None = None
 
 
+class FactBody(BaseModel):
+    action: str = Field(pattern=r"^(preview|apply|unblock|status)$")
+    term: str = Field(default="", max_length=500)
+    replacement: str = Field(default="", max_length=500)
+    revision: str = Field(default="", max_length=64)
+    aliases: list[str] = Field(default_factory=list, max_length=20)
+
+
 class MemoryControlsUI(HeadlessUI):
     async def ask_approval(self, request: ApprovalRequest) -> ApprovalDecision:
         return ApprovalDecision(
@@ -65,13 +75,19 @@ def install_openviking(app: FastAPI, svc: MuseService, dependencies: list[Any]) 
         personal: bool = False,
         space: str = "personal",
         archive: bool = False,
+        facts: bool = False,
         **args: Any,
     ) -> dict[str, Any]:
+        if svc.app.memory_hub.archiving and action not in ("status", "list", "read"):
+            raise HTTPException(409, "Memory management is in progress. Try again shortly.")
         try:
             bridge = svc.app.memory_hub.bridge(space)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
-        if bridge is None or not svc.settings.memory.enabled:
+        if not facts and (
+            bridge is None
+            or (not svc.settings.memory.enabled and not (archive and action == "status"))
+        ):
             raise HTTPException(409, "OpenViking memory is not enabled")
         gate = Sentinel(
             svc.settings.sentinel, svc.app.audit, MemoryControlsUI(), vault=svc.app.vault
@@ -80,7 +96,9 @@ def install_openviking(app: FastAPI, svc: MuseService, dependencies: list[Any]) 
         try:
             call = ToolCall(
                 function=Function(
-                    name="memory_archive"
+                    name="memory_facts"
+                    if facts
+                    else "memory_archive"
                     if archive
                     else "personal_memory"
                     if personal
@@ -88,13 +106,17 @@ def install_openviking(app: FastAPI, svc: MuseService, dependencies: list[Any]) 
                     arguments=json.dumps({"action": action, **args}),
                 )
             )
-            if archive:
+            if facts:
+                result = await gate.guard(call, MemoryFacts(hub=svc.app.memory_hub, space=space))
+            elif archive:
                 result = await gate.guard(call, MemoryArchive(hub=svc.app.memory_hub, space=space))
             elif personal:
+                assert bridge is not None
                 result = await gate.guard(
                     call, PersonalControls(store=bridge.personal, vault=svc.app.vault)
                 )
             else:
+                assert bridge is not None
                 result = await gate.guard(
                     call, OpenVikingManage(bridge=bridge, vault=svc.app.vault, controls=True)
                 )
@@ -110,6 +132,10 @@ def install_openviking(app: FastAPI, svc: MuseService, dependencies: list[Any]) 
         if action in ("update", "delete", "capture", "retry", "confirm", "reject", "edit"):
             svc.bus.publish({"kind": "memory"})
         return json.loads(result.output)
+
+    @app.post("/api/memory/spaces/{space}/facts", dependencies=dependencies)
+    async def fact_copies(space: str, body: FactBody) -> dict[str, Any]:
+        return await operate(facts=True, space=space, **body.model_dump())
 
     @app.get("/api/memory/openviking/profile", dependencies=dependencies)
     async def profile(history: bool = False, space: str = "personal") -> dict[str, Any]:
@@ -162,13 +188,45 @@ def install_openviking(app: FastAPI, svc: MuseService, dependencies: list[Any]) 
 
     @app.get("/api/memory/spaces", dependencies=dependencies)
     async def spaces(space: str = "personal") -> dict[str, Any]:
+        if space not in {item["id"] for item in svc.app.memory_hub.spaces()}:
+            raise HTTPException(404, "Unknown memory space")
+        usage = {
+            "enabled": svc.app.memory_hub.is_enabled(space),
+            "available": svc.settings.memory.enabled,
+            "workspace": str(svc.app.memory_hub.workspace(space)),
+            "workspace_isolation": "files_and_commands"
+            if svc.app.openviking is not None or len(svc.app.memory_hub.spaces()) > 1
+            else "files_and_configured_sandbox",
+        }
         if svc.app.openviking is None:
             return {
+                **usage,
                 "owner": "",
                 "spaces": svc.app.memory_hub.spaces(),
                 "learning": {"pending": 0, "failed": 0},
             }
-        return await operate("status", archive=True, space=space)
+        return {**await operate("status", archive=True, space=space), **usage}
+
+    @app.put("/api/memory/spaces/{space}/enabled", dependencies=dependencies)
+    async def enable_space(space: str, body: CaptureBody) -> dict[str, Any]:
+        if space not in {item["id"] for item in svc.app.memory_hub.spaces()}:
+            raise HTTPException(404, "Unknown memory space")
+        gate = Sentinel(
+            svc.settings.sentinel, svc.app.audit, MemoryControlsUI(), vault=svc.app.vault
+        )
+        token = gate.begin_task("Change memory usage", conversation="memory-controls")
+        try:
+            result = await gate.guard(
+                ToolCall(function=Function(name="memory_usage", arguments=body.model_dump_json())),
+                MemoryUsage(hub=svc.app.memory_hub, space=space),
+            )
+        finally:
+            gate.end_task(token)
+        if not result.ok:
+            error = result.error or "Memory usage change failed"
+            code = 409 if error.startswith("409:") else 403
+            raise HTTPException(code, error.removeprefix("409: "))
+        return json.loads(result.output)
 
     @app.post("/api/memory/spaces", dependencies=dependencies)
     async def create_space(body: SpaceBody) -> dict[str, Any]:

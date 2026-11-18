@@ -159,6 +159,7 @@ class MemoryArchive(BaseTool):
             "learning": learning,
             "capture": bridge.capture_enabled,
             "generation": bridge.personal.generation(),
+            "rules": self.hub.rules(self.space).items(),
         }
         if len(json.dumps(result).encode()) > 10_000_000:
             raise ValueError("409: Memory backup exceeds 10 MB")
@@ -215,6 +216,7 @@ class MemoryArchive(BaseTool):
         local = self.hub.local(self.space)
         if local:
             local.erase()
+        self.hub.rules(self.space).replace_all([])
         return {
             "ok": True,
             "capture": False,
@@ -239,6 +241,18 @@ class MemoryArchive(BaseTool):
         ):
             raise ValueError("400: Invalid memory backup structure")
         facts = [SavedFact.model_validate(f) for f in data.get("facts", [])]
+        rules = data.get("rules", [])
+        if not isinstance(rules, list) or any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("term"), str)
+            or not 3 <= len(item["term"]) <= 500
+            or not isinstance(item.get("replacement", ""), str)
+            or len(item.get("replacement", "")) > 500
+            or not isinstance(item.get("fact_id", ""), str)
+            or len(item.get("fact_id", "")) > 64
+            for item in rules
+        ):
+            raise ValueError("400: Invalid memory exclusions in backup")
         for fact in facts:
             checked = Proposal(
                 key=fact.key,
@@ -355,6 +369,12 @@ class MemoryArchive(BaseTool):
         if local:
             for item in local_items:
                 local.add(item["content"], str(item.get("category", "general"))[:80], source="user")
+        current_rules = {item["term"].casefold() for item in self.hub.rules(self.space).items()}
+        for rule in rules:
+            if rule["term"].casefold() not in current_rules:
+                self.hub.rules(self.space).add(
+                    rule["term"], rule.get("replacement", ""), rule.get("fact_id", "")
+                )
         return {"ok": True, "remote_files": len(remote), "facts": len(facts)}
 
     async def execute(

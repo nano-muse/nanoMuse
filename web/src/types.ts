@@ -807,6 +807,7 @@ export interface PersonalProfile {
 
 export interface OpenVikingStatus {
   enabled: boolean;
+  usage_enabled?: boolean;
   capture: boolean;
   pending: number;
   tasks: { state: string }[];

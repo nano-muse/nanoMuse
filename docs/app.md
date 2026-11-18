@@ -54,7 +54,7 @@ Five tabs (Chat, Feed, Ideas, Goals, Library) and a menu behind the avatar. At p
 
 **Chat.** One main conversation plus side chats (the round *Chats* button top left opens the drawer that lists them). Messages stream in as they are generated. Tool calls appear as chips: tap one for the arguments and output. Files the agent writes show up as artifact cards that open in the app. When Sentinel needs a decision an approval card appears; when the agent needs information a question card appears. The composer stays open while the agent works; anything you send is folded into the running turn before the next model call.
 
-*Attachments.* The + button (or a paste) attaches photos and files, up to ten per message, 25 MB each (`server.max_upload_mb`), from the camera, the photo library or the phone's files. They upload as you pick them, show as thumbnails and chips you can remove, and a message may be attachments alone. Each file lands in the workspace under `attachments/<date>/` (so it is in the Library and any tool can use it) and the message lists them for the agent with what they are. Pictures go to the model as images when it takes them: `llm.vision = auto` sends them and, if the endpoint refuses (DeepSeek and most text-only models do), sends the text only from then on and tells you once (the picture stays as a file, the agent knows its name and says it cannot see it rather than guessing); `off` never sends pictures, `on` insists. Phone photos are scaled to 1568 px before they are encoded, so a 10 MB picture costs what a small one does. PDFs, spreadsheets and documents the agent reads with `files`; PDF text is extracted page by page (a scanned PDF says it has no text layer). In the chat, tap a picture or a file chip to open it.
+*Attachments.* The + button (or a paste) attaches photos and files, up to ten per message, 25 MB each (`server.max_upload_mb`), from the camera, the photo library or the phone's files. They upload as you pick them, show as thumbnails and chips you can remove, and a message may be attachments alone. Each file lands in the active chat’s workspace under `attachments/<date>/` (so it is in the Library and any tool can use it) and the message lists them for the agent with what they are. Pictures go to the model as images when it takes them: `llm.vision = auto` sends them and, if the endpoint refuses (DeepSeek and most text-only models do), sends the text only from then on and tells you once (the picture stays as a file, the agent knows its name and says it cannot see it rather than guessing); `off` never sends pictures, `on` insists. Phone photos are scaled to 1568 px before they are encoded, so a 10 MB picture costs what a small one does. PDFs, spreadsheets and documents the agent reads with `files`; PDF text is extracted page by page (a scanned PDF says it has no text layer). In the chat, tap a picture or a file chip to open it.
 
 *Browser view.* When the agent uses the browser tool, a browser card appears with what it is looking at: a picture of the page after every action, the page title, where it is, and what it just did ("Opened example.com", "Clicked 'Sign in'"). The card is LIVE while the run goes on and stays in the chat afterwards. Tap it for the full view; *Take over* puts you at the controls (tap the picture to click there, type into the focused field, press Enter, open a URL) and *Hand back* returns the page to the agent, which is told what you did and continues from there. That is how a login happens: the agent stops at the form and asks, you sign in, it carries on. Passwords you type go to the website, never through the model. Frames are kept in memory on the server for the current session only (the last dozen per chat); after a restart old cards show a placeholder. Needs the browser tool (`pip install "nanomuse[browser]" && playwright install chromium`, or the `-browser` Docker image), or the Android app, whose own WebView is the agent's browser whenever the app is connected (the card says which: `backend`). In the app, *Take over* on such a card slides the real page up as a sheet rather than a picture of it; sign in with the phone's keyboard and autofill, tap **Done**, and the agent carries on. The whole story, including what cannot log in inside a WebView: [browser.md](browser.md).
 
@@ -107,9 +107,71 @@ Non-secret choices made in Connections are stored in `<data_dir>/app-settings.js
 
 ### OpenViking memories
 
+Use **Find and reconcile memory copies** to inspect an exact fragment of at least three
+characters in the selected space. Leave the replacement empty to delete matching records,
+or supply replacement text to correct the fragment. Inspect all displayed records before
+confirming. Deletion removes entire matching records and remote files, including other
+facts inside them. Corrections preserve other text in current facts, while matching
+history and recorded remote sessions are removed. Download a space backup first if needed.
+
+The operation covers managed profile revisions, local notes and undo history, visible
+remote memory files, queued sync and learning evidence, and captured sessions whose
+content this runtime recorded. It leaves other spaces, chat timelines, audit logs and
+untracked archives alone. Matching is literal and case-insensitive, not a semantic search
+for every paraphrase. Profile revisions with the same field and scope are linked
+in the preview. Add other known wording, one per line, to inspect those copies together.
+Linked exclusions share a fact ID. Changed data requires a new inspection; active conversations and
+remote extraction must finish first. A network failure can leave partial changes, so
+inspect again. A saved exclusion continues to block the old fragment even after failure.
+The result lists scanned, matched and changed records for each source. Load the last
+operation result after a restart. Incomplete operations require inspecting remaining
+copies before retrying.
+
+**Retired text exclusions** prevents matching records from being used through memory,
+even if an old archive is processed again. Removing an exclusion permits recall again
+without restoring deleted records. Replacement values are marked as owner-confirmed
+current values, above conflicting historical memory. Exclusions are local to this runtime
+and space and accompany its memory backups. They do not erase files outside memory or
+text already present in an open chat. Verify with a new conversation.
+
+If an explicit memory write matches an exclusion, the runtime stops the turn after the
+first rejection, cancels any remaining tool calls and skips automatic memory capture for
+that turn. It explains where to review the exclusion instead of retrying with different
+wording or another store. For a fresh test, use a value that has not already been retired.
+
+When memory is off, explicit requests to remember, recall or forget receive a direct
+runtime response without a model or tool call. The execution layer also blocks storage
+and action tools by default. File and code tools require an explicit file, document,
+command or coding task in the current user request; persistent approvals cannot bypass
+this check. Public web search and reading remain available. The switch does not erase
+current chat history or manually configured app style.
+
+Personal is the default memory space and has no space label in the chat header
+or conversation list. Work and custom spaces show their space labels. Opening
+Memory initially selects the active chat's space. New side chats inherit that
+space, and the empty-memory invitation starts a chat in the selected space too.
+Selecting a space to browse does not move an existing conversation.
+
+Each space has an *Enable memory* switch. Turning it off stops the assistant's
+local and remote recall, memory-tool reads and writes, automatic conversation
+capture and profile learning in that space. Existing data and queued work stay
+saved. You can still inspect, edit, export or delete saved memories on this page.
+Turning memory on restores access and keeps the separate *Automatically save
+conversations* choice. Finish or stop a running conversation before changing the
+switch. Chat history already in a conversation remains available; use a new chat
+to check replies without previously recalled facts.
+
 Use *Memory spaces* to select Personal, Work or a project. *Start a conversation in
 this space* opens a new thread bound to that choice; existing chats keep Personal.
-The selected space controls the profile, local notes and remote memory section.
+The selected space controls the profile, local notes, remote memory and workspace files.
+Personal keeps the configured workspace. Work and project spaces have separate directories;
+old shared files stay in Personal and are not automatically moved. Uploads and the file
+library follow the active chat. Files and commands cannot open another space's files or
+runtime data. Commands require Linux Landlock ABI 3 or newer and refuse to run when it
+is unavailable. A runtime that has never enabled additional memory spaces keeps its
+configured command sandbox. External connectors, browser and device control, skills, goals, contacts
+and calendar tools remain available in Personal only until they support space identity.
+Public web search and reading work in every space.
 Other devices connected to this runtime can use the same spaces; independently
 running desktop plugins retain their own configuration. Non-personal chats stay
 on this runtime because current conversation sync does not carry space identity.
@@ -184,7 +246,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | GET | `/api/threads/{id}/events?limit=&before=` | timeline events |
 | POST | `/api/threads/{id}/send` `{text, files?, language?, via?, capture_memory?}` | queue a message; returns immediately. `files`: workspace paths from the upload below, ten at most; text may be empty when there are files. `language` (since 1.0.0): the BCP-47 tag of the client's screens (`en`, `zh-CN`); the reply is written in that language unless *Reply language* fixes one. Without it the script of the message decides, as before. `via: "cloud"` is *Use nanoMuse Cloud this time*: this one turn runs on the account's recommended chat model under the account's key, the next is back on the configured model, and `[llm]` does not move; the user bubble, the reply and a failure of that turn carry `model_used`. `401 signed_out` when no account is signed in. `capture_memory: false` excludes the task from automatic memory capture and blocks model memory writes; defaults to true, rejected for forwarded device chats |
 | POST | `/api/threads/{id}/stop` | stop the run in that chat: the queue is dropped, pending approval and question cards there expire, the conversation stays usable. `{ok: false}` when nothing was running |
-| POST | `/api/files/upload?name=` (body: the bytes) | a file to attach: lands in `attachments/<date>/` under a safe version of `name`; returns `{path, name, size, kind, mime}` for `files`. 413 above `server.max_upload_mb` |
+| POST | `/api/files/upload?name=&space=personal` (body: the bytes) | a file to attach: lands in `attachments/<date>/` under a safe version of `name`; returns `{path, name, size, kind, mime}` for `files`. 413 above `server.max_upload_mb` |
 | POST | `/api/approvals/{id}` `{approved, scope, reason}` | answer a card; `scope` is one of the card's `grant_options` (`once`, `conversation`, `session`, `24h`, `always`; `task` is still read as `conversation`) |
 | DELETE | `/api/approvals` | forget every granted permission |
 | DELETE | `/api/approvals/grants/{key}` | revoke one permission (`key` as listed by `/api/activity`, e.g. `shell:git`) |
@@ -198,6 +260,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | GET | `/api/memory/openviking/status` | enabled, capture switch, pending queue count and latest extraction task states |
 | GET | `/api/memory/openviking/profile?history=false` | current personal facts and whether profile learning is enabled; history includes previous and expired facts |
 | GET / POST | `/api/memory/spaces` | owner ID, spaces and learning counts; POST `{id, label}` creates a space |
+| PUT | `/api/memory/spaces/{space}/enabled` `{enabled}` | enable or pause assistant memory use in one space without deleting data; returns 409 while that space is busy |
 | POST | `/api/memory/spaces/{space}/retry` | retry failed background profile learning |
 | GET | `/api/memory/spaces/{space}/export` | versioned backup of managed memories and recorded turn evidence |
 | POST | `/api/memory/spaces/{space}/clear` `{revision}` | clear the exported state after version and active-task checks; capture stays off |
@@ -228,7 +291,7 @@ space is persisted locally and cannot be switched while keeping its old context.
 | GET / POST | `/api/triggers` | triggers with which kinds have their connector / create `{kind (mail · event · hook), text, match, lead_minutes, thread}`; a hook comes back with its `url` |
 | POST / DELETE | `/api/triggers/{id}/fire`, `/api/triggers/{id}` | run it now with a sample occurrence / cancel |
 | POST | `/api/hooks/{id}?key=` | a trigger's webhook: no app token, the key is the credential (also accepted as `X-Hook-Key`); the body (≤ 64 KB, JSON pretty-printed) is the context. 404 for a wrong id or key, 409 once cancelled, 429 when deliveries come too close |
-| GET | `/api/files` · `/api/files/{path}?download=1` | list / read workspace files (HTML and SVG are served with `Content-Security-Policy: sandbox`) |
+| GET | `/api/files?space=personal` · `/api/files/{path}?download=1` | list / read files in the selected workspace; non-personal paths use `@spaces/{space}/...`, including signed URLs (HTML and SVG are served with `Content-Security-Policy: sandbox`) |
 | GET / PUT | `/api/settings` | view / change `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, show_thinking, language}`; the view includes `onboarded` and `llm_ready` |
 | GET | `/api/connections` | model (`key_source`: vault · config · missing · none; `endpoint` when it is one of the list), provider presets, `endpoints` (the custom OpenAI-compatible endpoints of the list, each `{id, label, base_url, key_source, models, slots}`, never a key), email, browser, MCP servers (`connected`, `tools`, `from_app`), vault names, `onboarded` |
 | PUT | `/api/connections/llm` `{provider, model, base_url, tool_mode, api_key}` or `{endpoint, model, tool_mode}` | change the model; `api_key` set → stored in the vault, `""` → no key, omitted → unchanged. `endpoint` names one of the list, which lends the slot its address and its own key by reference. Takes effect immediately in every thread. An address with `user:pass@` in it is refused with 400 (a key goes in `api_key`); the same holds for `/api/llm/models`, `/api/connections/gui`, `/image`, `/video` and the endpoint list |

@@ -1,5 +1,11 @@
 import { intlLocale, t } from "./i18n";
 
+export function memorySpaceLabel(space = "personal"): string {
+  if (space === "personal") return t("Personal");
+  if (space === "work") return t("Work");
+  return space;
+}
+
 export function timeShort(ts: string | undefined): string {
   if (!ts) return "";
   const d = new Date(ts);

@@ -21,6 +21,7 @@ from typing import Any
 
 from nanomuse.logger import logger
 from nanomuse.schema import Message, Role
+from nanomuse.workspaces import open_file
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 MAX_SIDE = 1568
@@ -73,7 +74,14 @@ def model_takes_images(model: str) -> bool | None:
 @lru_cache(maxsize=64)
 def _encoded(path: str, mtime_ns: int, size: int) -> tuple[str, str] | None:
     """(media type, base64) for the image at ``path``, scaled down — cached by file state."""
-    data = Path(path).read_bytes()
+    target = Path(path).absolute()
+    try:
+        if target.resolve() != target:
+            return None
+        with open_file(Path(target.anchor), target, "rb") as stream:
+            data = stream.read()
+    except OSError:
+        return None
     media = mimetypes.guess_type(path)[0] or "image/jpeg"
     try:
         from PIL import Image, ImageOps

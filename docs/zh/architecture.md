@@ -47,6 +47,8 @@ sequenceDiagram
 | 外部记忆 | `nanomuse/memory/openviking.py` | 可选的 OpenViking HTTP 接入，读写经过哨兵，完成的对话轮次保存在按身份隔离的待同步队列中。见[配置](configuration.md#memory-openviking) |
 | 个人画像 | `nanomuse/memory/personal.py` | 从符合采集条件的用户原话中提取事实，支持候选项确认、适用范围、到期和更正历史，保存在当前运行时；内部学习和读取经过哨兵。见[配置](configuration.md#memory-openviking) |
 | 记忆空间 | `nanomuse/memory/hub.py`、`learning.py`、`archive.py` | 同一运行时所有者的稳定身份，按空间绑定存储和工具，后台持久化学习，以及带版本检查的显式导出、清理和恢复；空间不提供托管租户隔离。见[配置](configuration.md#memory-spaces) |
+| 事实副本 | `nanomuse/memory/facts.py`、`rules.py`、`access.py` | 已知说法与画像版本关联、清理进度持久化、旧内容停用规则，以及记忆关闭时的工具限制。 |
+| 空间文件 | `nanomuse/workspaces.py`、`workspace_runner.py` | 按空间绑定路径，通过目录描述符打开文件，并为命令设置可继承的 Landlock 限制，可保留外层 bubblewrap。 |
 | App 服务器 | `nanomuse/server/service.py`、`api.py`、`webui.py`、`events.py` | 线程和工作任务、REST + WebSocket、把回调变成事件的 `UI` 实现、时间线持久化 |
 | 前端 | `web/src/` | React + TypeScript + Tailwind；`store.tsx`（状态、WebSocket）、`screens/`（各个标签页）、`components/`（卡片、形象、Markdown） |
 | 终端 | `nanomuse/console.py`、`nanomuse/cli.py` | 基于 Rich 的控制台界面，审批就在行内；Typer 命令 |
@@ -58,7 +60,7 @@ sequenceDiagram
 
 ## App 里的线程 {#threads-in-the-app}
 
-`MuseService` 为每个线程保留一个 `MuseAgent`，各有自己的对话和工作任务，共用记忆和目标的存储、保险库和审计日志。主线程是那条长对话；旁聊是各自独立的线程；后台的目标检查在自己的线程里跑，把摘要发到主线程。一个 `contextvar` 告诉 `WebUI` 某个回调属于哪个线程。
+`MuseService` 为每个线程保留一个 `MuseAgent`，各有自己的对话和工作任务，共用保险库和审计日志。每个线程通过 `MemoryHub` 绑定自己的记忆和文件目录，个人资料和连接器保留在个人空间。主线程是那条长对话；旁聊是各自独立的线程；后台的目标检查在自己的线程里跑，把摘要发到主线程。一个 `contextvar` 告诉 `WebUI` 某个回调属于哪个线程。
 
 ## 扩展点 {#extension-points}
 

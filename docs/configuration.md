@@ -395,6 +395,47 @@ existing conversations and old clients keep `personal`. Spaces separately bind
 profile facts, explicit local memory tools and remote retrieval. They do not
 inherit another space's personal preferences. Non-personal spaces use a derived
 OpenViking peer ID, while Personal keeps the configured peer and existing data.
+
+Peer-scoped capture tags user messages with that peer ID and creates sessions
+with peer extraction enabled and self extraction disabled. Session routes do
+not use the actor-peer request header for extraction. The runtime checks the
+stored policy before writing or committing, including on retries; incompatible
+sessions stay queued instead of being committed to shared memory. Servers that
+cannot report this policy cannot accept peer-scoped capture. Previously extracted
+files are not moved or deleted by this fix and require separate review.
+Each space also binds its files, uploads, library and Shell/Python working directory.
+Personal keeps `agent.workspace`; other spaces use
+`<data_dir>/space-workspaces/<owner-hash>/<space>`. Existing shared files are not moved.
+Disabling OpenViking preserves these directories and their owner binding. File tools reject
+paths and symbolic links escaping their root. Chat commands use inherited Linux
+[Landlock filesystem restrictions](https://docs.kernel.org/userspace-api/landlock.html),
+with read-only system libraries and writes limited to the selected workspace. They require
+ABI 3 or newer and refuse execution when unavailable, including unsupported platforms.
+Runtime data must be outside readable workspace and system roots. Working bubblewrap
+network isolation is retained as an outer layer; Landlock itself does not isolate the
+network. `sandbox.mode = off` does not disable the space filesystem boundary.
+Configured extra roots and shared login directories are not granted to space-bound commands.
+A runtime with OpenViking off and no saved additional spaces retains its configured command
+sandbox, including on macOS and Windows. Existing saved spaces keep the stricter boundary
+when OpenViking is turned off.
+
+External connectors, coding agents, browser/device control, skills, goals, contacts and
+calendar have no space identity and are exposed only in Personal. Non-personal prompts
+also omit personal goals, calendar, contacts and skills. Public web search and fetch are
+available in every space. This does not turn a single-owner runtime into a hosted tenant
+sandbox; authenticated management still belongs to its owner.
+
+The web page's **Enable memory** switch is persisted per owner and space, defaults
+to on, and controls assistant use independently of automatic capture. Off pauses
+local and remote recall, model memory tools, capture, queued sync and profile
+learning. Personal memory also stays out of newly generated ideas and feed posts,
+and automatic memory tidy-up pauses. It preserves saved data, queued work and the capture preference across
+restarts. Authenticated memory controls remain usable for inspection and removal.
+The global `memory.enabled = false` setting takes precedence. Already submitted
+remote extraction can finish, but its results are not recalled while the space
+is off. Current chat history and manually configured app style remain available;
+the switch does not erase those sources. File boundaries are enforced independently.
+
 Remote retrieval uses `find` within the selected memory root and validates hit
 URIs. Turning OpenViking off leaves scoped conversations readable, with their
 memory tools unavailable until the integration returns.
@@ -406,6 +447,52 @@ to this runtime share its spaces. The standalone desktop DSH plugin retains its
 separate memory configuration and does not load these local profiles. Current
 conversation sync does not carry space identity, so non-personal conversations
 stay on this runtime rather than being synced as personal chats to older clients.
+
+
+#### Reviewed fact copies
+
+`POST /api/memory/spaces/{space}/facts` accepts `action` (`preview`, `apply`,
+`status`, `unblock`), `term`, optional `replacement` and `aliases`, and the preview `revision` for
+`apply`. This authenticated control passes through the Sentinel as `memory_facts`;
+explicit deny rules still win. It is available with memory off and without OpenViking
+for local notes. A fragment contains 3 to 500 characters; replacements at most 500.
+Preview binds the revision to the space, current managed state and exact requested
+change, including the aliases. At most 20 aliases of 3 to 500 characters are accepted.
+Profile versions sharing a field, kind and scope are linked automatically after a text
+match; previews label linked versions. Other wording requires explicit aliases and owner
+review. Applied exclusions share a `fact_id`, preserved in backups. Scans fail rather than truncate above the backup limits, 1,000 local notes
+or 1,000 undo entries. They do not search ordinary workspace files.
+
+Owner-reviewed exclusions and replacement values live in `memory-usage.db`, scoped
+by owner and space. Local recall, remote recall and model browsing/reading, memory
+writes, capture and profile learning filter records containing retired fragments.
+Authenticated controls can still inspect them. Unrelated text in a filtered record
+is also unavailable to the assistant until the file is corrected. Literal matching
+does not detect arbitrary paraphrases. Retired fragments remain in the exclusion
+list itself so returning records can be blocked. Backups include these rules; clear
+removes them, and restore keeps existing rules when the same fragment is present.
+
+Reconciliation removes matching profile revisions, local undo records, queued
+evidence and identifiable archived sessions. Replacement edits current facts and
+remote file text, deletes matching archived evidence, and records current values
+as owner-confirmed overrides. It invalidates queued profile learning so stale jobs
+cannot reverse a review. Other spaces and untracked legacy archives remain separate.
+Network changes across stores are not atomic; exclusions are saved before mutations
+and survive partial failures. A durable report in `memory-usage.db` records per-source
+scanned, matched and changed counts and completion status. `status` returns the most recent
+report; the last 20 operations per space are retained. Interrupted operations become
+incomplete on the next status read. Inspect remaining copies before retrying, rather than
+replaying an old preview. Reports omit fact text; chat timelines, audit logs, untracked
+archives and workspace files stay outside reconciliation.
+
+The memory-off fast path recognizes explicit Chinese and English requests to
+remember, recall or forget and answers without calling a model or tools. It does
+not classify every possible paraphrase. An execution restriction therefore defaults to
+blocking storage and action tools while memory is off. File, shell and Python tools require
+an explicit file, document, command or coding task in the current user request; an existing
+approval cannot override the restriction. Public web search, fetch and asking the user
+remain available. This conservative rule may require rephrasing a legitimate task to name
+the file or code work.
 
 #### Memory backups
 

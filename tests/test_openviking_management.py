@@ -185,6 +185,7 @@ async def test_status_distinguishes_queue_from_async_extraction(
         assert await memory.flush() == 1
         assert (await memory.status()) == {
             "enabled": True,
+            "usage_enabled": True,
             "capture": True,
             "pending": 0,
             "tasks": [{"state": "running"}],
