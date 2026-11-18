@@ -5,6 +5,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction // nanoMuse: consistent paged session restore.
 import androidx.room.RawQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
@@ -172,6 +173,16 @@ interface ChatDao {
     suspend fun clearFolderForSessions(folderId: String)
 
     // Messages
+    // nanoMuse: compaction validates IDs without materializing message bodies.
+    @Query("SELECT id FROM messages WHERE session_id = :sessionId")
+    suspend fun messageIdsForSession(sessionId: String): List<String>
+
+    // nanoMuse: two-pass restore reads the same snapshot, even if sync writes between pages.
+    @Transaction
+    suspend fun withMessageReadTransaction(read: suspend () -> Unit) {
+        read()
+    }
+
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     suspend fun loadMessages(sessionId: String): List<MessageEntity>
 
