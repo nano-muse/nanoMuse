@@ -264,15 +264,16 @@ the key in `hello` instead).
 → hello    {device:{id,name,kind,os,version,actions[],llm?}}   kind: phone | computer | web
            llm (relay 0.28, optional): {provider, model}, the ids the device runs its model under ("cloud",
            "openrouter", a model id); plain ids only, never a key or a URL; kept on the device row for the operator
-← welcome  {device_id, devices:[…], server:{version,frame_limit,time,features?}}   features (relay 0.31): ["event_push"]
+← welcome  {device_id, devices:[…], server:{version,frame_limit,time,features?}}   features (relay 0.31): ["event_push", "result_replay"]
 ← devices  {devices:[{id,name,kind,os,version,actions[],online,last_seen,controllable,ip}]}
 
-→ call     {id, to, action, args}
+→ call     {id, to, action, args, retry?}   retry: this is a re-send of a call whose answer was lost; a kept answer replays (below)
 ← call     {id, from:{id,name,kind}, action, args}          (delivered to the target)
 → event    {id, body}          ← event  {id, from, body}    progress, approvals, images
 → event    {to, body}          ← event  {from, body}        no id: a push to a device or "*" (relay 0.31, below)
 → result   {id, ok, body | error, message}                  ← result (to the caller)
 ← error    {code, message, id?}   device_offline · not_controllable · self_call · duplicate_call · unknown_call · timeout
+                                  retry_mismatch · result_unavailable
                                   too_large · rate_limited · bad_frame · device_online · bad_key · bad_device
 
 → devices  {}        → rename {name}        → forget {device_id}        → ping  ← pong
@@ -339,6 +340,41 @@ answers within 15 minutes fails with `timeout` to its caller (the relay checks
 when a call or a `ping` arrives, so a caller that pings hears it within a
 minute of the deadline); `forget` of a device that is connected right now is
 refused with `device_online`.
+
+A finished call is remembered, briefly, so a retry never runs it twice.
+When a `result` reaches the relay, the relay keeps it for five minutes (at
+most 256 finished calls across the relay) keyed by the account, the call id
+and the device that made the call, together with a fingerprint of the
+request itself (its target, action and arguments). A caller that lost the
+connection after the answer reached the relay re-sends the `call` with the
+same id and `"retry": true` and gets the kept result back; the target
+never sees the call again, and the replay comes from the relay's own
+record, so it works even while the target is offline. The same holds when
+the caller left before the answer arrived: the relay remembers the
+dropped call briefly, and a late answer from its target is kept for
+replay. A retry is recovery only, and it is bound to the original
+request: a re-send whose target, action or arguments differ from the
+original, or that comes from another device, is refused with
+`retry_mismatch` and the kept result is not handed out. When the relay
+has no kept answer for a retry, because the call is still running, its
+caller dropped mid-flight, or the relay never saw it, the retry fails
+with `result_unavailable` and nothing is dispatched: the outcome is
+uncertain, and running the call again could carry the action out twice.
+The flag matters: a plain re-send is a new call with a recycled id, as
+before, and it discards the kept answer. A different device reusing the
+id with a plain re-send gets a fresh execution, and a call still waiting
+answers `duplicate_call` as before. The boundary is honest: an answer
+that never reached the relay cannot be replayed, so a caller whose
+answer was lost on the way to the relay hears `result_unavailable` and
+must decide for itself whether to ask again under a fresh id. The
+runtime's client retries a dropped call with the same id only when asked
+(`retries` on `HubClient.call`); by default a dropped call fails at once.
+`welcome.server.features` lists `result_replay` on a relay that keeps
+finished answers; an older relay forwards the re-sent call to the target,
+so a client that retries against one accepts that risk. A relay without
+this binding (one that predates it) still replays by id alone; the
+fingerprint is computed by the relay from the call frame itself, so no
+client change is needed for the binding to apply.
 
 Device ids are per installation (`phone-…`, `pc-…`); names are for people and
 can be changed on the device. A `web` device is never a target and is not

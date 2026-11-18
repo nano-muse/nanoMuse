@@ -30,6 +30,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- **A finished Hub call is remembered briefly so a dropped caller never runs it twice.** The relay kept only calls still waiting: a caller whose connection died after the answer reached the relay re-sent the call and the target ran it again. Finished results are kept for five minutes (at most 256 across the relay), keyed by account, call id and calling device, and a re-sent call with the same id marked as a retry gets the kept result back; a plain re-send is still a new call with a recycled id, and a different device reusing the id still gets a fresh execution. An answer that never reached the relay cannot be replayed, and the docs say so.
+- Bound Hub call recovery to the original request, and made recovery-only retries fail closed. A kept answer is now stored with a fingerprint of its request (target, action and arguments) and replays only for a retry that asks for exactly the same thing, served from the relay's own record even while the target is offline; a retry that reuses the id for a different request is refused with `retry_mismatch`, and a retry with no kept answer, because the call is still running or its outcome is otherwise uncertain, is refused with `result_unavailable` instead of being dispatched to the target a second time.
+
 - Stopped scheduled relay backups before copying when free disk space was insufficient, and prevented overlapping backup runs. For #858.
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
