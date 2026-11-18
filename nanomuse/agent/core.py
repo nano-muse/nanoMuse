@@ -100,9 +100,13 @@ class MuseAgent:
         # The tool bridge's view of the collection, when [tool_bridge] turns
         # it on: the model's list is the view (a direct core plus find_tools
         # and use_tool), while self.tools stays the full collection every
-        # internal probe reads. Built once, here, so the list on every call
-        # of the conversation is the same bytes. None when off, and off is
-        # the default: nothing about the list or the dispatch changes.
+        # internal probe reads. The bridge object is built once, here, and
+        # follows the collection as it stands, so tools that join after
+        # this point (the MCP tools of the app's start step) are reachable
+        # through it and tools that leave are not; while the collection
+        # does not change, the list on every call of the conversation is
+        # the same bytes. None when off, and off is the default: nothing
+        # about the list or the dispatch changes.
         self._bridge: ToolBridge | None = build_tool_bridge(tools, sentinel, settings)
         self.memory = memory
         self.goals = goals

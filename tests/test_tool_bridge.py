@@ -443,6 +443,72 @@ def test_the_ceiling_layer_refuses_a_bridged_call_above_it(settings: Settings) -
     assert not results[1].startswith("Error:")
 
 
+# ------------------------------------------------------- the live registry
+
+
+class LateLookup(BaseTool):
+    """A tool registered after the bridge was built, as an MCP tool is.
+
+    MCP tools join the collection in ``NanoMuseApp.start`` (and when a
+    server is added from the Connections page), which is after the
+    agent, and therefore after its bridge, was built.
+    """
+
+    name: str = "acme__late_lookup"
+    description: str = "Look up a late registered widget by its code."
+    parameters: dict[str, Any] = {
+        "type": "object",
+        "properties": {"code": {"type": "string"}},
+    }
+    purpose: str = "Look up a late registered widget."
+    keywords: list[str] = ["late", "widget", "lookup"]
+
+    async def execute(self, code: str = "", **_: Any) -> ToolResult:
+        return ToolResult(output=f"late widget {code}")
+
+
+def test_the_bridge_finds_and_runs_a_tool_added_after_it_was_built(
+    settings: Settings,
+) -> None:
+    coll = registry(settings)
+    guard = CountingGuard()
+    bridge = ToolBridge(coll, guard)
+    find = bridge.get("find_tools")
+    use = bridge.get("use_tool")
+    assert find is not None and use is not None
+    late = LateLookup()
+    coll.add(late)
+    found = asyncio_run(find.execute(query="late widget lookup"))
+    names = [m["name"] for m in json.loads(found.output)["matches"]]
+    assert "acme__late_lookup" in names
+    result = asyncio_run(use.execute(name="acme__late_lookup", arguments={"code": "w1"}))
+    assert result.ok, result.error
+    assert result.output == "late widget w1"
+    assert guard.tools[-1] is late
+
+
+def test_the_bridge_refuses_a_tool_removed_after_it_was_run(settings: Settings) -> None:
+    coll = registry(settings)
+    guard = CountingGuard()
+    bridge = ToolBridge(coll, guard)
+    find = bridge.get("find_tools")
+    use = bridge.get("use_tool")
+    assert find is not None and use is not None
+    first = asyncio_run(use.execute(name="remember", arguments={"content": "likes tea"}))
+    assert first.ok, first.error
+    assert [name for name, _args in guard.calls] == ["remember"]
+    coll.remove("remember")
+    second = asyncio_run(use.execute(name="remember", arguments={"content": "likes tea"}))
+    assert not second.ok
+    assert second.error and "remember" in second.error
+    assert "unknown tool" in second.error or "no such tool" in second.error
+    # the guard never saw the removed tool a second time
+    assert [name for name, _args in guard.calls] == ["remember"]
+    found = asyncio_run(find.execute(query="save a fact to memory"))
+    names = [m["name"] for m in json.loads(found.output)["matches"]]
+    assert "remember" not in names
+
+
 # --------------------------------------------------------------------- helpers
 
 

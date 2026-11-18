@@ -59,8 +59,16 @@ for.
 The switch is one function (:func:`bridge_active`) over the
 ``[tool_bridge]`` settings, and it is off by default: off, the
 agent's tool list is byte for byte what it has always been.  The
-bridge is built once, when the agent is built, so within one
-conversation the list on every call is the same bytes; turning the
+bridge object is built once, when the agent is built, but it reads
+the agent's tool collection as it stands at each discovery and
+each execution, because the collection is not finished when the
+agent is built: MCP tools join it afterwards, in the app's start
+step and when a server is added later, and tools leave it when a
+server or a surface is switched off.  A tool added after the
+bridge was built is therefore findable and runnable, and a tool
+removed from the collection is no longer runnable through the
+bridge, however often it ran before.  While the collection does
+not change, the list on every call is the same bytes; turning the
 setting over mid-conversation is not a thing that happens.
 
 Why the bridge exists, stated plainly so nobody oversells it later:
@@ -73,7 +81,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from enum import Enum
 from typing import Any, Protocol
 
@@ -274,12 +282,25 @@ class ToolIndex:
 
 
 class FindTools(BaseTool):
-    """``find_tools``: the index, as a tool the model can call."""
+    """``find_tools``: the index, as a tool the model can call.
+
+    With a ``live`` source the index and the reachable names are
+    read from it on every call, so the answer follows the tool
+    collection as it stands then, not as it stood when this tool
+    was built.  Without one, the index given at construction is
+    the whole story.
+    """
 
     _index: ToolIndex = PrivateAttr()
     _reachable: tuple[str, ...] = PrivateAttr()
+    _live: Callable[[], tuple[ToolIndex, tuple[str, ...]]] | None = PrivateAttr(default=None)
 
-    def __init__(self, index: ToolIndex, reachable: Iterable[str]) -> None:
+    def __init__(
+        self,
+        index: ToolIndex,
+        reachable: Iterable[str],
+        live: Callable[[], tuple[ToolIndex, tuple[str, ...]]] | None = None,
+    ) -> None:
         super().__init__(
             name="find_tools",
             description=(
@@ -304,16 +325,23 @@ class FindTools(BaseTool):
         )
         self._index = index
         self._reachable = tuple(reachable)
+        self._live = live
+
+    def _current(self) -> tuple[ToolIndex, tuple[str, ...]]:
+        if self._live is not None:
+            return self._live()
+        return self._index, self._reachable
 
     async def execute(self, query: str = "", **_: Any) -> ToolResult:
-        matches = self._index.search(str(query or ""))
+        index, reachable = self._current()
+        matches = index.search(str(query or ""))
         if not matches:
             payload: dict[str, Any] = {
                 "matches": [],
                 "note": (
                     f"No tool matches {query!r}. There is no such tool among the ones "
                     "reachable here; do not invent a name or guess one. Reachable "
-                    "through the bridge: " + ", ".join(self._reachable) + "."
+                    "through the bridge: " + ", ".join(reachable) + "."
                 ),
             }
             return ToolResult(output=json.dumps(payload, ensure_ascii=False))
@@ -342,17 +370,29 @@ class UseTool(BaseTool):
     able to tell a tool that does not exist from one that exists but
     may not be reached this way, and both from one outside this
     caller's surface.
+
+    With a ``live`` source the universe and the surface are read
+    from it on every call, so a tool is judged and run only while
+    it is in the collection as it stands then: a name that was
+    resolved, assessed or run before is resolved again here, and
+    a tool removed since then is refused as unknown.  Without a
+    ``live`` source, the universe given at construction is the
+    whole story.
     """
 
     _universe: dict[str, BaseTool] = PrivateAttr()
     _surface: frozenset[str] = PrivateAttr()
     _guard: GuardLike = PrivateAttr()
+    _live: Callable[[], tuple[dict[str, BaseTool], frozenset[str]]] | None = PrivateAttr(
+        default=None
+    )
 
     def __init__(
         self,
         universe: dict[str, BaseTool],
         surface: frozenset[str],
         guard: GuardLike,
+        live: Callable[[], tuple[dict[str, BaseTool], frozenset[str]]] | None = None,
     ) -> None:
         super().__init__(
             name="use_tool",
@@ -381,6 +421,17 @@ class UseTool(BaseTool):
         self._universe = universe
         self._surface = surface
         self._guard = guard
+        self._live = live
+
+    def _current_universe(self) -> dict[str, BaseTool]:
+        if self._live is not None:
+            return self._live()[0]
+        return self._universe
+
+    def _current_surface(self) -> frozenset[str]:
+        if self._live is not None:
+            return self._live()[1]
+        return self._surface
 
     # -- the outer guard sees the target call's own assessment, so a
     # -- wrapper that judges calls (a preset's gate, a ceiling) judges
@@ -401,13 +452,13 @@ class UseTool(BaseTool):
         name = str(args.get("name") or "")
         raw = args.get("arguments")
         inner: dict[str, Any] = raw if isinstance(raw, dict) else {}
-        return self._universe.get(name), inner
+        return self._current_universe().get(name), inner
 
     def family_risk(self, args: dict[str, Any]) -> RiskLevel:
         # The family this call belongs to is the named tool's: a
         # ceiling measuring a read measures the read, not the envelope.
         name = str(args.get("name") or "")
-        target = self._universe.get(name)
+        target = self._current_universe().get(name)
         return target.risk if target is not None else self.risk
 
     async def execute(self, name: str = "", arguments: Any = None, **_: Any) -> ToolResult:
@@ -424,13 +475,13 @@ class UseTool(BaseTool):
                 f"'{name}' never runs through the tool bridge ({reason}); "
                 "it is listed directly, so call it by its own name"
             )
-        tool = self._universe.get(name)
+        tool = self._current_universe().get(name)
         if tool is None:
             return ToolResult.fail(
                 f"unknown tool '{name}': this agent has no such tool. "
                 "Use find_tools to see what can be reached"
             )
-        if name not in self._surface:
+        if name not in self._current_surface():
             return ToolResult.fail(
                 f"'{name}' is outside the tool surface of this caller: "
                 "it is either listed directly or not offered here"
@@ -466,37 +517,91 @@ class UseTool(BaseTool):
 class ToolBridge:
     """One agent's bridged view of its tool collection.
 
-    Built once, when the agent is built: the view (direct and exempt
-    tools in their original order, then ``find_tools`` and
-    ``use_tool``) and its parameter list are fixed for the agent's
-    life, which is what keeps the list on every call of a
-    conversation byte for byte the same.
+    The bridge object is built once, when the agent is built, and
+    holds the collection itself, not a copy of its contents.  The
+    view (direct and exempt tools in their original order, then
+    ``find_tools`` and ``use_tool``), the index and the parameter
+    list are derived from the collection as it stands and cached
+    against a fingerprint of it (each tool's name and identity, in
+    order): while the collection does not change, the cached view
+    is returned as it is, which is what keeps the list on every
+    call of a conversation byte for byte the same, and as soon as
+    a tool is added, removed or replaced the cache is rebuilt from
+    the live collection.  Only static metadata is ever cached this
+    way (a tool's indexed words, its schema list); discovery and
+    execution go through the same refresh, so neither can act on
+    a stale entry.
     """
 
     def __init__(self, collection: ToolCollection, guard: GuardLike) -> None:
+        self._collection = collection
+        self._guard = guard
+        self._key: tuple[tuple[str, int], ...] | None = None
+        self._cached_bridged_names: tuple[str, ...] = ()
+        self._cached_index: ToolIndex | None = None
+        self._cached_universe: dict[str, BaseTool] = {}
+        self._cached_surface: frozenset[str] = frozenset()
+        self._cached_view: ToolCollection | None = None
+        self._cached_params: list[dict[str, Any]] | None = None
+        self._find = FindTools(ToolIndex([]), (), live=self._live_find)
+        self._use = UseTool({}, frozenset(), guard, live=self._live_use)
+        self._refresh()
+
+    # -- the live state, derived from the collection as it stands
+
+    def _refresh(self) -> None:
+        key = tuple((tool.name, id(tool)) for tool in self._collection)
+        if key == self._key and self._cached_view is not None:
+            return
         direct: list[BaseTool] = []
         bridged: list[BaseTool] = []
-        for tool in collection:
+        for tool in self._collection:
             if classify_tool(tool) is BridgeClass.BRIDGED:
                 bridged.append(tool)
             else:
                 direct.append(tool)
-        self.bridged_names: tuple[str, ...] = tuple(t.name for t in bridged)
-        self.index = ToolIndex(bridged)
-        find = FindTools(self.index, self.bridged_names)
-        use = UseTool(
-            universe={t.name: t for t in collection},
-            surface=frozenset(self.bridged_names),
-            guard=guard,
-        )
+        self._cached_bridged_names = tuple(t.name for t in bridged)
+        self._cached_index = ToolIndex(bridged)
+        self._cached_universe = {t.name: t for t in self._collection}
+        self._cached_surface = frozenset(self._cached_bridged_names)
         view = ToolCollection(*direct)
-        view.add(find, use)
-        self.view = view
-        self._params = view.to_params()
+        view.add(self._find, self._use)
+        self._cached_view = view
+        self._cached_params = view.to_params()
+        self._key = key
+
+    def _live_find(self) -> tuple[ToolIndex, tuple[str, ...]]:
+        self._refresh()
+        assert self._cached_index is not None  # set by _refresh
+        return self._cached_index, self._cached_bridged_names
+
+    def _live_use(self) -> tuple[dict[str, BaseTool], frozenset[str]]:
+        self._refresh()
+        return self._cached_universe, self._cached_surface
+
+    @property
+    def bridged_names(self) -> tuple[str, ...]:
+        self._refresh()
+        return self._cached_bridged_names
+
+    @property
+    def index(self) -> ToolIndex:
+        self._refresh()
+        assert self._cached_index is not None  # set by _refresh
+        return self._cached_index
+
+    @property
+    def view(self) -> ToolCollection:
+        self._refresh()
+        assert self._cached_view is not None  # set by _refresh
+        return self._cached_view
 
     def params(self) -> list[dict[str, Any]]:
-        """The tool list for the model: the same list, every call."""
-        return self._params
+        """The tool list for the model: the same list, every call,
+        while the collection stands as it is."""
+        self._refresh()
+        assert self._cached_params is not None  # set by _refresh
+        return self._cached_params
 
     def get(self, name: str) -> BaseTool | None:
         return self.view.get(name)
