@@ -108,6 +108,23 @@ input_usd_per_million = 0
 output_usd_per_million = 0
 
 # ------------------------------------------------------------------------------
+# Cost ledger: what real runs cost, and a monthly budget gate over them.
+# ------------------------------------------------------------------------------
+[cost]
+# Recording is on only when a monthly budget or at least one price below is
+# set; with neither, no ledger is kept and nothing changes.
+monthly_budget_usd = 0           # 0: no monthly budget
+mode = "off"                     # off: record only; warn: alert at the budget
+                                 # line; hard: refuse new tasks at the line
+# device_id = ""                 # empty: the ledger calls this device "this-device"
+
+# Per-million-token rates for one model, in USD. A model with no entry here
+# records zero rather than guessing.
+# [cost.prices."model-name"]
+# input_per_million = 0
+# output_per_million = 0
+
+# ------------------------------------------------------------------------------
 # Sentinel: the gatekeeper between the agent and the world.
 # ------------------------------------------------------------------------------
 [sentinel]
@@ -365,6 +382,29 @@ base_url = "https://cloud.nanomuse.cn"   # a relay you run yourself: its public 
 required = true          # the first run does not finish without an account; false for a runtime with no relay at all
 models = true            # the account's models as a source (the apps' "Use nanoMuse Cloud models" switch); false keeps the sign-in for sync and the devices only
 sync = true              # default for the account-wide Data controls → Sync switch (the person's choice, once made, counts)
+
+# ------------------------------------------------------------------------------
+# The fast decision layer (experimental): one small scored question at the
+# start of a run, logged and never acted on (docs/configuration.md)
+# ------------------------------------------------------------------------------
+[decider]
+enabled = false          # off by default; on costs one small model call per run
+mode = "shadow"          # the only mode: decisions are logged, never acted on
+threshold = 0.6          # uncalibrated; the score a shadow answer would need to escalate
+timeout_seconds = 1.5    # past this the run starts without a decision
+model = ""               # empty: the [llm] slot as configured; a name decides on that model instead
+
+# ------------------------------------------------------------------------------
+# The squad task ledger (experimental): dispatches a formed squad makes
+# are written to squad.db in the data directory (docs/configuration.md)
+# ------------------------------------------------------------------------------
+[squad]
+max_depth = 2            # how deep one task tree may go; a root is depth 0
+max_per_root = 0         # assignments per task tree; 0 means no cap at this level
+execute = false          # also run dispatches (needs a caller that forms a squad with a factory; the server and companion do not yet)
+cheap_model = ""         # model for the cheap tier (research, verify); empty means the [llm] slot as configured
+stall_after_errors = 3   # identical errors in a row, with no successful tool call yet, mark a subtask as stalled
+max_tool_calls = 0       # cap on one subtask's tool calls; 0 means no cap of the watch's own
 
 # ------------------------------------------------------------------------------
 # The hub: this computer as one of the account's devices (docs/hub.md)
