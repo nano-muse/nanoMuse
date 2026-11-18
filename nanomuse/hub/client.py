@@ -439,9 +439,15 @@ class HubClient:
         ``retries`` re-sends the call with the *same* id when the connection drops
         before an answer arrives: a relay that kept the finished answer replays it
         instead of running the action again (docs/hub.md), so a retried call does not
-        become a second side effect. The total wait is still ``timeout``; a call that
-        times out or is refused is never retried, since the relay may still be
-        carrying it. The default (no retries) keeps the old behaviour exactly.
+        become a second side effect. A re-send is recovery only: the relay binds it
+        to the original request (same target, action and arguments, which a re-send
+        from here always carries) and, when it has no kept answer, refuses it with
+        ``result_unavailable`` rather than running the call again; a re-send that
+        does not match the original is refused with ``retry_mismatch``. Both reach
+        the caller as :class:`HubError` at once and are never re-sent. The total
+        wait is still ``timeout``; a call that times out or is refused is never
+        retried, since the relay may still be carrying it. The default (no retries)
+        keeps the old behaviour exactly.
         """
         call_id = call_id or uuid.uuid4().hex[:16]
         loop = asyncio.get_running_loop()

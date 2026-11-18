@@ -609,6 +609,50 @@ def test_a_dropped_call_is_retried_with_the_same_id(relay: FakeRelay) -> None:
     assert flags == [False]
 
 
+def test_a_retry_with_no_kept_result_fails_closed_on_the_client(relay: FakeRelay) -> None:
+    """The relay answers a recovery re-send with `result_unavailable` (it has no
+    kept answer and will not run the call again): the client raises that error
+    at once, however many retries it was allowed, and sends nothing further."""
+
+    async def scenario() -> tuple[list[bool], HubError | None]:
+        flags: list[bool] = []
+
+        def handler(frame: dict[str, Any]) -> list[dict[str, Any]]:
+            flags.append(bool(frame.get("retry")))
+            if len(flags) == 1:
+                loop = asyncio.get_running_loop()
+                loop.create_task(relay.ws.close(1011, "chaos"))
+                return []
+            return [
+                {
+                    "type": "error",
+                    "id": frame["id"],
+                    "code": "result_unavailable",
+                    "message": "No kept result for that call; it was not run again",
+                }
+            ]
+
+        relay.phone_handler = handler
+        client = HubClient(
+            hub_url(relay.base_url), "test-key", "pc-1", "Desk", actions=["info", "shell"]
+        )
+        client.start()
+        await asyncio.wait_for(client.connected.wait(), 5)
+        try:
+            await client.call(
+                "phone-1", "shell", {"command": "ls"}, retries=3, call_id="fixed-id-2"
+            )
+            return flags, None
+        except HubError as exc:
+            return flags, exc
+        finally:
+            await client.stop()
+
+    flags, err = asyncio.run(scenario())
+    assert err is not None and err.code == "result_unavailable"
+    assert flags == [False, True]  # the first send and one recovery re-send, nothing more
+
+
 def test_client_refuses_to_hammer_on_bad_key(relay: FakeRelay) -> None:
     async def scenario() -> None:
         client = HubClient(hub_url(relay.base_url), "wrong", "pc-1", "Desk", actions=["info"])
