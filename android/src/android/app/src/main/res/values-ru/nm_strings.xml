@@ -1277,4 +1277,5 @@
     <string name="nm_device_chat_here">На этом устройстве</string>
     <string name="nm_device_chat_uncertain">Доставка не подтверждена. Проверяем результат на устройстве.</string>
     <string name="nm_device_chat_interrupted">Прервано. Устройство могло уже выполнить некоторые действия.</string>
+    <string name="nm_stream_interrupted">Соединение прервано до завершения ответа.</string>
 </resources>

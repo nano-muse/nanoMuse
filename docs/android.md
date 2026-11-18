@@ -371,6 +371,8 @@ milliseconds. Unit tests: `ProviderReachTest`, `OwnProviderProxyTest`.
 Leaving sign-in or the Network page ends its pending request, even if the server has
 started to answer but has not finished sending the response.
 
+A stream that ends before its terminal frame, even after text has arrived, is a transient failure. The chat retries the current model request within its existing bounded retry budget. Partial tool-call arguments are discarded before retry, and no tool runs until that model response completes. This restarts generation rather than resuming an SSE byte offset. If every attempt fails, the chat keeps the received reply and shows an error with recovery controls. Stopping the turn cancels retries. The current OpenAI-compatible socket read timeout is 600 seconds; a shorter timeout may also come from a proxy or an older installed build.
+
 ## Voice input
 
 You can choose voice input and voice output separately from the chat model, including

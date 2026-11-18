@@ -1249,4 +1249,5 @@
     <string name="nm_device_chat_here">On this device</string>
     <string name="nm_device_chat_uncertain">Delivery uncertain. Checking the device for the result.</string>
     <string name="nm_device_chat_interrupted">Interrupted. The device may have already performed some actions.</string>
+    <string name="nm_stream_interrupted">Connection ended before the response completed.</string>
 </resources>

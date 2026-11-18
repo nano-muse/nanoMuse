@@ -1265,4 +1265,5 @@
     <string name="nm_device_chat_here">Di perangkat ini</string>
     <string name="nm_device_chat_uncertain">Pengiriman belum pasti. Memeriksa hasil di perangkat.</string>
     <string name="nm_device_chat_interrupted">Terputus. Perangkat mungkin sudah melakukan beberapa tindakan.</string>
+    <string name="nm_stream_interrupted">Koneksi terputus sebelum jawaban selesai.</string>
 </resources>

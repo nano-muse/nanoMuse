@@ -1270,4 +1270,5 @@
     <string name="nm_device_chat_here">Neste equipamento</string>
     <string name="nm_device_chat_uncertain">Entrega incerta. Consultando o resultado no equipamento.</string>
     <string name="nm_device_chat_interrupted">Interrompido. O equipamento pode já ter executado algumas ações.</string>
+    <string name="nm_stream_interrupted">A conexão foi interrompida antes de a resposta terminar.</string>
 </resources>
