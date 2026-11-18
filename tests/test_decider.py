@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,6 +21,7 @@ from nanomuse.config import DeciderSettings, Settings, load_settings
 from nanomuse.cost import recording
 from nanomuse.cost.ledger import CostLedger, PriceEntry
 from nanomuse.cost.recording import TaskCostRecorder
+from nanomuse.llm import budget as task_budget
 from nanomuse.llm import decider as decider_module
 from nanomuse.llm.decider import (
     CheapestModelBackend,
@@ -32,7 +34,7 @@ from nanomuse.llm.decider import (
     state_hash,
 )
 from nanomuse.llm.mock import MockLLM
-from nanomuse.schema import LLMResponse
+from nanomuse.schema import AgentState, LLMResponse, Role
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.tools import Terminate, ToolCollection
 from nanomuse.ui import HeadlessUI
@@ -501,6 +503,85 @@ async def test_shadow_hook_backend_failure_still_runs_the_task(
     (line,) = log_lines(tmp_path)
     assert line["failure"] == "backend_error"
     assert line["would_choose"] is None
+
+
+async def test_concurrent_run_during_shadow_classification_is_refused_cleanly(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second run that arrives while the first run is awaited on the shadow
+    classification is refused at the door: it never reaches the classifier,
+    and it does not reset the first run's budget or request boundary
+    (``_task_start``) before being refused."""
+
+    class GatedBackend:
+        name = "gated"
+        model = "mock"
+
+        def __init__(self) -> None:
+            self.calls = 0
+            self.entered = [asyncio.Event(), asyncio.Event()]
+            self.release = [asyncio.Event(), asyncio.Event()]
+
+        async def ask_decision(self, request: DecideRequest) -> tuple[str, dict[str, int]]:
+            index = self.calls
+            self.calls += 1
+            self.entered[index].set()
+            await self.release[index].wait()
+            payload = {"answers": [{"probabilities": [1.0, 0.0, 0.0, 0.0, 0.0]}]}
+            return json.dumps(payload), {"input_tokens": 1, "output_tokens": 1}
+
+    class GatedLLM(MockLLM):
+        def __init__(self, script: list) -> None:
+            super().__init__(script)
+            self.entered = asyncio.Event()
+            self.release = asyncio.Event()
+            self.budget_seen: task_budget.TaskBudget | None = None
+
+        async def ask(self, *args: Any, **kwargs: Any) -> LLMResponse:
+            self.budget_seen = task_budget.current()
+            self.entered.set()
+            await self.release.wait()
+            return await super().ask(*args, **kwargs)
+
+    backend = GatedBackend()
+    decider = make_decider(tmp_path, backend, timeout=30)
+    enable_shadow(settings, monkeypatch, decider)
+    agent, _plain_llm = make_agent(settings, [])
+    llm = GatedLLM([LLMResponse(content="the main answer")])
+    agent.llm = llm
+
+    first = asyncio.create_task(agent.run("first task"))
+    second: asyncio.Task[str] | None = None
+    try:
+        await asyncio.wait_for(backend.entered[0].wait(), timeout=5)
+        second = asyncio.create_task(agent.run("second task"))
+        for _ in range(50):
+            await asyncio.sleep(0)
+            if second.done() or backend.entered[1].is_set():
+                break
+        assert second.done(), "the second run was not refused before the classifier"
+        assert isinstance(second.exception(), RuntimeError)
+        assert "already running" in str(second.exception())
+        assert backend.calls == 1
+
+        backend.release[0].set()
+        await asyncio.wait_for(llm.entered.wait(), timeout=5)
+        assert agent.state is AgentState.RUNNING
+        assert agent._task_start == 0
+        llm.release.set()
+        assert await first == "the main answer"
+        assert agent.state is AgentState.FINISHED
+        assert agent._task_start == 0
+        assert llm.budget_seen is not None and llm.budget_seen.calls == 1
+        assert agent.last_budget["calls"] == 1
+        assert len(llm.calls) == 1
+        assert [m.content for m in agent.messages if m.role == Role.USER] == ["first task"]
+    finally:
+        for event in backend.release:
+            event.set()
+        llm.release.set()
+        pending = [task for task in (first, second) if task is not None]
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 async def test_disabled_hook_builds_nothing_and_logs_nothing(

@@ -508,14 +508,26 @@ class MuseAgent:
     ) -> str:
         if self.state == AgentState.RUNNING:
             raise RuntimeError("agent is already running")
-        # The cost gate's hard mode refuses here, before any work or spend;
-        # a no-op unless this agent's recorder (or, for an agent built
-        # without one, the fallback recorder) has a hard gate.
-        if self.cost_recorder is not None:
-            self.cost_recorder.preflight()
-        else:
-            cost_recording.preflight()
-        await self._decider_shadow(user_input)
+        # Reserve the agent before the first await below (the shadow
+        # classification): a run that arrives while that call is awaited
+        # is refused by the check above, before it can reset this run's
+        # budget or request boundary. A failure before _run takes over
+        # hands the state back, so a refused or cancelled attempt leaves
+        # the agent as it was.
+        reserved_from = self.state
+        self.state = AgentState.RUNNING
+        try:
+            # The cost gate's hard mode refuses here, before any work or spend;
+            # a no-op unless this agent's recorder (or, for an agent built
+            # without one, the fallback recorder) has a hard gate.
+            if self.cost_recorder is not None:
+                self.cost_recorder.preflight()
+            else:
+                cost_recording.preflight()
+            await self._decider_shadow(user_input)
+        except BaseException:
+            self.state = reserved_from
+            raise
         token = task_budget.begin(self.settings.agent.budget, inherit=False)
         budget = task_budget.current()
         assert budget is not None
@@ -616,8 +628,9 @@ class MuseAgent:
         ``schedule``, ``feed``, ``goal``, ``hub`` for the runs nobody typed), told to the
         relay with every call of the turn. Task-scoped approvals end when this call returns.
         """
-        if self.state == AgentState.RUNNING:
-            raise RuntimeError("agent is already running")
+        # run() reserved the agent before its first await, so the state is
+        # already RUNNING when this call is handed the run; the assignment
+        # is this run taking ownership, not a second check.
         self.state = AgentState.RUNNING
         self.turns += 1
         if language:
