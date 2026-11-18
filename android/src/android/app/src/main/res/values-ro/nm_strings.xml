@@ -1273,4 +1273,5 @@
     <string name="nm_device_chat_here">Pe acest dispozitiv</string>
     <string name="nm_device_chat_uncertain">Livrare incertă. Se verifică rezultatul pe dispozitiv.</string>
     <string name="nm_device_chat_interrupted">Întrerupt. Dispozitivul poate să fi executat deja unele acțiuni.</string>
+    <string name="nm_stream_interrupted">Conexiunea s-a întrerupt înainte ca răspunsul să fie complet.</string>
 </resources>

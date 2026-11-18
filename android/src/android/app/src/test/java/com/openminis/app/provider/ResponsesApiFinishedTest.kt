@@ -1,5 +1,6 @@
 package com.openminis.app.provider
 
+import com.openminis.app.data.model.LLMError // nanoMuse: partial EOF enters bounded retry.
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
@@ -39,7 +40,9 @@ class ResponsesApiFinishedTest {
     @After fun tearDown() { server.shutdown() }
 
     /** Streams against a provider configured for /v1/responses. */
-    private fun responsesChunks(body: String): List<LLMStreamChunk> {
+    private fun responsesChunks(
+        body: String, received: MutableList<LLMStreamChunk> = mutableListOf(), // nanoMuse: preserve pre-error deltas.
+    ): List<LLMStreamChunk> {
         server.enqueue(
             MockResponse()
                 .setHeader("Content-Type", "text/event-stream")
@@ -60,7 +63,7 @@ class ResponsesApiFinishedTest {
                 imageParts = emptyList(),
                 tools = emptyList(),
                 thinkingLevel = ThinkingLevel.OFF,
-            ).toList()
+            ).toList(received)
         }
     }
 
@@ -132,8 +135,7 @@ class ResponsesApiFinishedTest {
     @Test
     fun `truncated responses stream still reports no finish reason`() {
         // Deltas then silence — a genuine drop, with no response.completed.
-        // This must keep producing a null stopReason, because that null is the
-        // only signal the interrupted-reply UI has.
+        // nanoMuse: keep received content but make the interruption retryable.
         val body = """
             data: {"type":"response.output_text.delta","delta":"partial reply "}
 
@@ -141,7 +143,9 @@ class ResponsesApiFinishedTest {
 
         """.trimIndent() + "\n"
 
-        val chunks = responsesChunks(body)
+        val chunks = mutableListOf<LLMStreamChunk>()
+        val error = runCatching { responsesChunks(body, chunks) }.exceptionOrNull()
+        assertTrue("partial EOF must be retryable: $error", error is LLMError.TransientError)
 
         val text = chunks.filterIsInstance<LLMStreamChunk.Text>().joinToString("") { it.text }
         assertTrue("content should have arrived, got '$text'", text.isNotEmpty())

@@ -50,6 +50,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 import com.openminis.app.provider.failOnSilentEmptyCompletion
+import io.github.nanomuse.chat.failOnIncompleteCompletion // nanoMuse: a partial EOF must enter bounded retry.
 
 class OpenAIProvider private constructor(
     private val apiKey: String?,
@@ -637,7 +638,7 @@ class OpenAIProvider private constructor(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = rawStreamMessage(
         messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-    ).failOnSilentEmptyCompletion(name)
+    ).failOnSilentEmptyCompletion(name).failOnIncompleteCompletion() // nanoMuse: include partial stream drops.
 
     private fun rawStreamMessage(
         messages: List<LLMMessage>,
@@ -1486,6 +1487,9 @@ class OpenAIProvider private constructor(
                 )
             }
         } catch (e: Exception) {
+            // nanoMuse: a real user cancellation stays cancellation; transport failures
+            // close the channel with an LLMError so retry/error UI can observe them.
+            if (e is CancellationException) throw e
             // T321: never silently swallow — log message + top-3 stack frames.
             val frames = e.stackTrace.take(3).joinToString(" | ") { "${it.className}.${it.methodName}:${it.lineNumber}" }
             com.openminis.app.logging.AppLogger.error(
@@ -1493,10 +1497,11 @@ class OpenAIProvider private constructor(
                 "[T321] stream parse exception: ${e.javaClass.simpleName}: ${e.message} @ $frames " +
                     "(events=$sseEventCount contentLen=$contentLen reasoningLen=$reasoningLen)"
             )
-            cancel("Stream error", mapError(e))
+            channel.close(mapError(e)) // nanoMuse: do not disguise network failure as cancellation.
         } finally {
-            reader.close()
-            response.close()
+            // nanoMuse: cleanup cannot replace the transport error with a raw close error.
+            runCatching { reader.close() }
+            runCatching { response.close() }
         }
         channel.close()
         // T171: when the coroutine is cancelled (user tapped stop), the
