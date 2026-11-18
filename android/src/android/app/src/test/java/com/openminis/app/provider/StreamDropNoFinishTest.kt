@@ -1,6 +1,7 @@
 package com.openminis.app.provider
 
 import com.openminis.app.data.model.LLMMessage
+import com.openminis.app.data.model.LLMError // nanoMuse: partial EOF now enters bounded retry.
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.ThinkingLevel
@@ -57,6 +58,7 @@ class StreamDropNoFinishTest {
     }
 
     @Test
+    // nanoMuse: retain the received text but classify the missing terminal frame as retryable.
     fun `stream truncated before DONE yields content but no Finished chunk`() {
         // Content arrives, then the stream just ends — no finish_reason, no [DONE].
         val body = """
@@ -66,7 +68,23 @@ class StreamDropNoFinishTest {
 
         """.trimIndent() + "\n"
 
-        val chunks = streamChunks(body)
+        val chunks = mutableListOf<LLMStreamChunk>()
+        server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(body))
+        val provider = OpenAIProvider(
+            apiKey = "test-key",
+            model = LLMModel.gpt4oMini,
+            basePath = server.url("/v1").toString().trimEnd('/'),
+        )
+        val error = runCatching {
+            runBlocking {
+                provider.streamMessage(
+                    messages = listOf(LLMMessage(LLMMessage.Role.USER, "hi")),
+                    systemPrompt = null,
+                    maxTokens = 256,
+                ).toList(chunks)
+            }
+        }.exceptionOrNull()
+        assertTrue("missing terminal reason must be retryable: $error", error is LLMError.TransientError)
         val text = chunks.filterIsInstance<LLMStreamChunk.Text>().joinToString("") { it.text }
         assertTrue("content should have arrived, got '$text'", text.isNotEmpty())
 
