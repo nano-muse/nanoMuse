@@ -67,6 +67,17 @@ For each call, the first of steps 1 to 4 that matches sets the decision; steps 5
 5. **Taint**: the conversation is tainted **and** the call has egress to a host not in `egress_allowlist` (or to an unknown destination) → ask, whatever steps 1–4 said (the mode, `always_allow_tools`, `always_ask_tools` or a rule). The approval card shows the destination when it is known.
 6. **Warnings**: a call that carries a warning (`rm -rf`, `sudo`, `curl | sh`, code that reads the environment or deletes files) is never waved through by the mode or by `always_allow_tools`; it asks. Only an explicit `allow` rule can override this.
 
+An identical sensitive call that already succeeded in this conversation carries a warning.
+It asks even in `auto` mode, and a standing grant cannot cover it. An explicit `allow`
+rule can still override the warning. The check lasts while the runtime holds the conversation.
+Concurrent identical sensitive calls wait for the first execution to finish before this
+check runs. Cancellation after execution starts leaves an unknown outcome, so a retry
+also asks rather than assuming the action did not happen. A reported failure does not
+count as a successful action; this is an approval safeguard, not an exactly-once guarantee.
+Repeated-call fingerprints and cancelled outcomes are held in memory and reset when the
+runtime restarts. Saved successful-result markers can rebuild the model's action note
+after loading a conversation, but do not restore these approval fingerprints.
+
 `auto` still honours `deny_tools`, deny rules, step 5 and step 6. The taint rule holds in every mode: once a conversation has read mail, a calendar, contacts or another private source, a call that would send data to a host outside `egress_allowlist` asks, and `auto` does not turn that question into an allow. It is what `nanomuse daemon`, `--auto` and the app's "Hands-off" setting use, and background goal passes too, which is why a dangerous command or a tainted send in an unattended run turns into a card in the Feed instead of just running. `nanomuse daemon` has nobody at the keyboard: a step that still asks there is declined with a note, and the model goes on with what it can.
 
 ## Approvals
