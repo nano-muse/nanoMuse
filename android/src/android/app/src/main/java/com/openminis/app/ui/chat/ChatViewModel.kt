@@ -879,6 +879,12 @@ class ChatViewModel(
      *  this, opening a session that previously fell back mid-run flashes the
      *  default model name for one frame before the persisted binding settles. */
     private val sessionLoaded = MutableStateFlow(false)
+    val nmSessionReady: Boolean get() = sessionLoaded.value // nanoMuse: guard UI clears before a send.
+
+    // nanoMuse: automated callers must wait for history, not merely the selected provider.
+    internal suspend fun nmAwaitSessionReady() {
+        sessionLoaded.first { it }
+    }
 
     private val _sessionTitle = MutableStateFlow("New Chat")
     val sessionTitle: StateFlow<String> = _sessionTitle.asStateFlow()
@@ -2099,6 +2105,7 @@ class ChatViewModel(
         noinline onFinished: ((Boolean) -> Unit)?,
         markStarted: () -> Unit,
     ) {
+        if (!sessionLoaded.value) return // nanoMuse: compaction cannot cancel the only initial restore.
         AppLogger.info(TAG, "[Compact] compactAll() invoked streaming=${_isStreaming.value} compacting=${_isCompacting.value} historySize=${agentHistory.size} anchorOverride=$anchorIdxOverride inLoop=$allowDuringProcessing")
         if (_isStreaming.value && !allowDuringProcessing) {
             AppLogger.info(TAG, "[Compact] aborted: stream in progress")
@@ -2223,6 +2230,7 @@ class ChatViewModel(
             "[Compact] starting: ${toCompact.size} entries, ${transcriptChars} transcript chars, " +
                 "timeout=${timeoutMs / 1000}s, callBudget=$MAX_COMPACT_LLM_CALLS",
         )
+        nmInvalidateSessionRestore() // nanoMuse: a committed checkpoint supersedes an idle restore.
         compactJob = viewModelScope.launch(Dispatchers.IO) {
             // [T-android-compact-queued-drain] Only a SUCCESSFUL compact kicks
             // the queued-prompt drain below; failure/cancel/empty-summary paths
@@ -2279,7 +2287,7 @@ class ChatViewModel(
                 // both non-empty AND present in rawDbIds.
                 // nanoMuse: verify the checkpoint anchor against durable messages. A failed
                 // read aborts this summary instead of committing an unverified replacement.
-                val rawDbIds = chatRepository.dao.loadMessages(sid).map { it.id }.toSet()
+                val rawDbIds = chatRepository.dao.messageIdsForSession(sid).toSet()
                 var verifiedAnchorIdx = anchorIdx
                 while (verifiedAnchorIdx >= 0) {
                     val id = history[verifiedAnchorIdx].dbMessageId
@@ -3455,6 +3463,20 @@ class ChatViewModel(
         _nmFocusComposer.tryEmit(Unit)
     }
 
+    // nanoMuse: a newer reload supersedes an older read before either publishes history.
+    private var sessionLoadJob: Job? = null
+
+    // nanoMuse: synchronous mutation claims invalidate even a restore whose IO already ended.
+    private fun nmInvalidateSessionRestore() {
+        sessionLoadJob?.cancel()
+        sessionLoadJob = null
+    }
+
+    private fun nmStartStreaming() {
+        nmInvalidateSessionRestore()
+        _isStreaming.value = true
+    }
+
     init {
         loadSession()
         // nanoMuse: rows synced from the account's other devices land in this chat while it is
@@ -3911,6 +3933,7 @@ class ChatViewModel(
     }.getOrDefault(false)
 
     private fun loadSession() {
+        if (_isStreaming.value) return // nanoMuse: never replace a live turn with a disk snapshot.
         _nmContinueAsk.value = null // nanoMuse: the "continue?" card belongs to the session that hit the ceiling
         // T-android-crash-detected-halt: when CrashFrequencyDetector
         // tripped (#459, ≥3 crashes in last hour), skip the heavy
@@ -3932,7 +3955,8 @@ class ChatViewModel(
             )
             return
         }
-        viewModelScope.launch {
+        sessionLoadJob?.cancel() // nanoMuse: discard stale restores after sync or a retry.
+        sessionLoadJob = viewModelScope.launch {
             // [T-HANG-DIAG] timing markers to localise where session entry
             // stalls. Sentinel-tagged so a single grep -v can strip them
             // when this diagnostic is removed. Declared OUTSIDE the try
@@ -4048,8 +4072,11 @@ class ChatViewModel(
             // row is large. Stays inside the existing safe-mode guard above
             // (#466/#470) — we only move work, not gating.
             val tHangDiagBeforeLoad = System.currentTimeMillis()
+            // nanoMuse: retain only parsed model/UI state and small row headers. Raw JSON
+            // belongs to the current page, not a third whole-session collection or logger job.
             data class LoadedSessionData(
-                val messages: List<com.openminis.app.data.db.MessageEntity>,
+                val marker: com.openminis.app.data.db.CompactMarkerEntity?,
+                val headers: List<io.github.nanomuse.chat.RestoredMessageHeader>,
                 val ordered: List<ChatMessage>,
                 val llmHistory: List<LLMMessage>,
                 val loadMs: Long,
@@ -4057,149 +4084,64 @@ class ChatViewModel(
             )
             com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "db.query.begin")
             val loaded = withContext(Dispatchers.IO) {
-                val tIoBeforeLoad = System.currentTimeMillis()
-                val rows = chatRepository.loadMessages(sessionId)
-                val tIoAfterLoad = System.currentTimeMillis()
-                com.openminis.app.diagnostics.PerfLongCtx.step(
-                    sessionId,
-                    "db.query.end",
-                    "count=${rows.size}",
-                )
-                val chatUi = rows.toChatMessages()
-                val tIoAfterTransform = System.currentTimeMillis()
-                com.openminis.app.diagnostics.PerfLongCtx.step(
-                    sessionId,
-                    "toChatMessages.end",
-                    "count=${chatUi.size}",
-                )
-                // Pre-build the LLM history list off-Main too — toLLMMessage
-                // re-parses partsJson for every row, which is the second
-                // contributor to the GC storm. Build into a local list and
-                // bulk-append to `agentHistory` on Main below; loadSession
-                // runs once at init before any other writer touches
-                // agentHistory, so a bulk addAll is race-free.
-                val llm = ArrayList<LLMMessage>(rows.size)
-                var totalPartsChars = 0L
-                for (entity in rows) {
-                    totalPartsChars += entity.partsJson.length
-                    llm.add(entity.toLLMMessage())
-                }
-                com.openminis.app.diagnostics.PerfLongCtx.step(
-                    sessionId,
-                    "toLLMMessage.end",
-                    "count=${llm.size} totalPartsChars=$totalPartsChars",
-                )
-                LoadedSessionData(
-                    messages = rows,
-                    ordered = chatUi,
-                    llmHistory = llm,
-                    loadMs = tIoAfterLoad - tIoBeforeLoad,
-                    transformMs = tIoAfterTransform - tIoAfterLoad,
-                )
-            }
-            val messages = loaded.messages
-            val ordered = loaded.ordered
-            val tHangDiagAfterLoad = tHangDiagBeforeLoad + loaded.loadMs
-            val tHangDiagAfterTransform = tHangDiagAfterLoad + loaded.transformMs
-            println(
-                "[T-HANG-DIAG] loadMessages session=$sessionId count=${messages.size} " +
-                    "tookMs=${loaded.loadMs}",
-            )
-            println(
-                "[T-HANG-DIAG] toChatMessages session=$sessionId tookMs=${loaded.transformMs}",
-            )
-            // Per-message size sketch + oversize-row scan. Pure diagnostics —
-            // does a full second pass over partsJson with several substring
-            // searches per row, so on a 405-row session with 1MB total it
-            // adds material main-thread time. Fire-and-forget on the IO
-            // dispatcher so it can't contribute to the GC-storm hang the
-            // rest of this task is trying to fix.
-            viewModelScope.launch(Dispatchers.IO) {
-                var totalChars = 0L
-                var maxChars = 0
-                var withTools = 0
-                var withAttachments = 0
-                for (m in messages) {
-                    val len = m.partsJson.length
-                    totalChars += len
-                    if (len > maxChars) maxChars = len
-                    // ContentPart serialises its discriminator in camelCase
-                    // ("toolUse" / "toolResult" — see ContentPart.PartType), so
-                    // the snake_case probe this used to run matched NOTHING and
-                    // reported toolMessages=0 on every session, including ones
-                    // whose history is almost entirely tool traffic. That is
-                    // the opposite of the signal this diagnostic exists to give
-                    // — it is here to finger oversized tool_result inlines as
-                    // the GC-storm culprit, and it was reporting them absent.
-                    if (m.partsJson.contains("\"toolUse\"") || m.partsJson.contains("\"toolResult\"")) {
-                        withTools++
+                // nanoMuse: a sync write cannot split the LLM and UI halves of this restore.
+                var snapshot: LoadedSessionData? = null
+                chatRepository.dao.withMessageReadTransaction {
+                    val tIoBeforeLoad = System.currentTimeMillis()
+                    val headers = ArrayList<io.github.nanomuse.chat.RestoredMessageHeader>()
+                    val llm = ArrayList<LLMMessage>()
+                    val toolResults = mutableMapOf<String, ToolResultData>()
+                    var totalPartsChars = 0L
+                    var maxChars = 0
+                    chatRepository.visitMessagePages(sessionId) { page ->
+                        ensureActive()
+                        for (entity in page) {
+                            headers.add(io.github.nanomuse.chat.RestoredMessageHeader(
+                                entity.id, entity.createdAt,
+                            ))
+                            totalPartsChars += entity.partsJson.length
+                            maxChars = maxOf(maxChars, entity.partsJson.length)
+                            val modelMessage = entity.toLLMMessage()
+                            llm.add(modelMessage)
+                            // nanoMuse: reuse parsed result strings instead of parsing and retaining
+                            // another full copy of every tool output just for the UI previews.
+                            for (part in modelMessage.contentParts) {
+                                if (part is AgentContentPart.ToolResult && part.id.isNotEmpty()) {
+                                    toolResults[part.id] = ToolResultData(part.content, !part.isError)
+                                }
+                            }
+                        }
                     }
-                    // Same casing trap: attachments serialise as "mediaRef",
-                    // never as "image"/"attachment".
-                    if (m.partsJson.contains("\"mediaRef\"")) {
-                        withAttachments++
+                    val tIoAfterLoad = System.currentTimeMillis()
+                    val chatUi = ArrayList<ChatMessage>()
+                    chatRepository.visitMessagePages(sessionId) { page ->
+                        ensureActive()
+                        chatUi.addAll(page.toChatMessages(toolResults))
                     }
-                }
-                println(
-                    "[T-HANG-DIAG] messages-shape session=$sessionId total=${messages.size} " +
-                        "totalChars=$totalChars maxChars=$maxChars toolMessages=$withTools " +
-                        "attachmentMessages=$withAttachments",
-                )
-
-                // [T-HANG-DIAG] for any message ≥ 50_000 chars, log size /
-                // role / createdAt / structural type markers only — NEVER
-                // the partsJson content (or any prefix/suffix of it). Earlier
-                // versions echoed head500/tail500 to localise the culprit;
-                // now that the cause is known (oversized tool_result inlines)
-                // and FileReadTool / AIChatViewModel.executeFileRead enforce
-                // an 80 KB hard cap upstream, only metadata is needed for
-                // future audits.
-                val OVERSIZE_THRESHOLD = 50_000
-                val oversized = messages.filter { it.partsJson.length >= OVERSIZE_THRESHOLD }
-                if (oversized.isNotEmpty()) {
-                    println(
-                        "[T-HANG-DIAG] oversized-messages session=$sessionId " +
-                            "count=${oversized.size} threshold=${OVERSIZE_THRESHOLD}",
+                    val ordered = mergeAssistantMessages(chatUi)
+                    println("[T-HANG-DIAG] messages-shape session=$sessionId total=${headers.size} " +
+                        "totalChars=$totalPartsChars maxChars=$maxChars")
+                    snapshot = LoadedSessionData(
+                        marker = chatRepository.dao.latestCompactMarker(sessionId),
+                        headers = headers,
+                        ordered = ordered,
+                        llmHistory = llm,
+                        loadMs = tIoAfterLoad - tIoBeforeLoad,
+                        transformMs = System.currentTimeMillis() - tIoAfterLoad,
                     )
-                    for (m in oversized) {
-                        val raw = m.partsJson
-                        val len = raw.length
-                        val hasToolUse = raw.contains("\"toolUse\"")
-                        val hasToolResult = raw.contains("\"toolResult\"")
-                        val hasImage = raw.contains("\"image\"") || raw.contains("\"image_url\"")
-                        val hasBase64 = raw.contains("data:image") || raw.contains(";base64,")
-                        println(
-                            "[T-HANG-DIAG] oversized id=${m.id} role=${m.role} " +
-                                "createdAt=${m.createdAt} len=$len " +
-                                "hasToolUse=$hasToolUse hasToolResult=$hasToolResult " +
-                                "hasImage=$hasImage hasBase64=$hasBase64 " +
-                                "streamInterrupts=${m.streamInterruptCount}",
-                        )
-                    }
                 }
+                checkNotNull(snapshot)
             }
-
-            // Rebuild agentHistory from persisted messages.
-            // Pre-built off-Main inside the withContext(Dispatchers.IO) block
-            // above to avoid re-parsing partsJson on the UI thread. Safe to
-            // bulk-addAll here because loadSession runs once at init before
-            // any sender writes into agentHistory.
-            agentHistory.addAll(loaded.llmHistory)
-            val tHangDiagAfterAgentHistory = System.currentTimeMillis()
-            println(
-                "[T-HANG-DIAG] agentHistory rebuilt session=$sessionId tookMs=${tHangDiagAfterAgentHistory - tHangDiagAfterTransform}",
-            )
+            if (_isStreaming.value) return@launch // nanoMuse: a send may have started during IO.
+            val ordered = loaded.ordered
 
             // Restore the most-recent compact summary, if any, so the first
             // outgoing turn after reopening a compacted session still sees
             // the folded-away context via [effectiveAgentHistory]. Also gray
             // out every UI message that falls before the marker's boundary —
             // mirrors iOS Phase 2.5 restore (AIChatViewModel.swift:3360+).
-            val marker = runCatching { chatRepository.dao.latestCompactMarker(sessionId) }
-                .onFailure { Log.w(TAG, "latestCompactMarker failed: ${it.message}") }
-                .getOrNull()
-            _compactSummary.value = marker?.summary
-            _cachedLatestMarker = marker
+            val marker = loaded.marker
+            var restoredMarker = marker // nanoMuse: publish a self-healed marker with its matching history.
 
             com.openminis.app.diagnostics.PerfLongCtx.step(
                 sessionId,
@@ -4211,8 +4153,7 @@ class ChatViewModel(
             // this a freshly opened session would inherit the previous
             // session's enlarged cap (set via loadOlderMessages), defeating
             // the windowing intent on the first paint of every new session.
-            _visibleMessageCap.value = INITIAL_VISIBLE_MESSAGE_CAP
-            _messages.value = if (marker == null) {
+            val restoredMessages = if (marker == null) {
                 ordered
             } else {
                 // Phase 2.5: build the historyDbIds set used by the
@@ -4224,8 +4165,20 @@ class ChatViewModel(
                         m.dbMessageId?.takeIf { it.isNotEmpty() }?.let { add(it) }
                     }
                 }
-                applyCompactMarkerGraying(ordered, marker, loaded.messages, historyDbIds)
+                applyCompactMarkerGraying(ordered, marker, loaded.headers, historyDbIds) { restoredMarker = it }
             }
+            // nanoMuse: publish without suspending after the last IO operation. A live
+            // turn or superseding reload must not be replaced by this older snapshot.
+            ensureActive()
+            if (_isStreaming.value) return@launch
+            agentHistory.clear()
+            agentHistory.addAll(loaded.llmHistory)
+            _compactSummary.value = marker?.summary
+            _cachedLatestMarker = restoredMarker
+            _visibleMessageCap.value = INITIAL_VISIBLE_MESSAGE_CAP
+            _messages.value = restoredMessages
+            println("[T-HANG-DIAG] agentHistory restored session=$sessionId count=${agentHistory.size} " +
+                "loadMs=${loaded.loadMs} transformMs=${loaded.transformMs}")
             nmSeedFirstConversation() // nanoMuse: re-seat the virtual opening in the session it belongs to
 
             // Cold-start interrupt detection: an agent loop that was killed by
@@ -4342,7 +4295,7 @@ class ChatViewModel(
                 // T201: open the gate even on early `return@launch` (draft path,
                 // missing-session path) and on exception, so the init-time
                 // config.collect can never deadlock waiting for us.
-                sessionLoaded.value = true
+                if (isActive) sessionLoaded.value = true // nanoMuse: stale reloads cannot open the gate.
                 // [T-HANG-DIAG] total time spent in loadSession from ENTER to
                 // either successful completion or early return. tHangDiagStart
                 // was captured just inside `try` so this covers the whole
@@ -4405,8 +4358,9 @@ class ChatViewModel(
     private suspend fun applyCompactMarkerGraying(
         messages: List<ChatMessage>,
         marker: com.openminis.app.data.db.CompactMarkerEntity,
-        rawMessages: List<com.openminis.app.data.db.MessageEntity>,
+        rawMessages: List<io.github.nanomuse.chat.RestoredMessageHeader>,
         historyDbIds: Set<String>,
+        onHealed: (com.openminis.app.data.db.CompactMarkerEntity) -> Unit, // nanoMuse: defer state publication.
     ): List<ChatMessage> {
         // Some legacy rows have empty-string boundaries instead of NULL —
         // treat both as "no boundary" so the compactAll path below kicks in.
@@ -4511,12 +4465,8 @@ class ChatViewModel(
         if (healedMarker != null) {
             runCatching { chatRepository.dao.updateCompactMarker(healedMarker) }
                 .onFailure { Log.w(TAG, "updateCompactMarker (self-heal) failed: ${it.message}") }
-            // Refresh in-memory cache so effectiveAgentHistory and the
-            // next compact pass see the upgraded marker. The caller
-            // (loadSession) sets _cachedLatestMarker = marker BEFORE
-            // calling us, so overwrite with the healed one now.
-            _cachedLatestMarker = healedMarker
-            _compactSummary.value = healedMarker.summary
+            // nanoMuse: the caller publishes this with the matching restored history.
+            onHealed(healedMarker)
         }
 
         // ─── Apply graying ────────────────────────────────────────────
@@ -4570,11 +4520,12 @@ class ChatViewModel(
      *
      * Mirrors iOS AIChatViewModel+Compaction.swift:125.
      */
+    // nanoMuse: checkpoint recovery needs row headers, never raw JSON bodies.
     private fun anchorByCreatedAt(
-        rawMessages: List<com.openminis.app.data.db.MessageEntity>,
+        rawMessages: List<io.github.nanomuse.chat.RestoredMessageHeader>,
         markerCreatedAt: Long,
         historyDbIds: Set<String>,
-    ): com.openminis.app.data.db.MessageEntity? {
+    ): io.github.nanomuse.chat.RestoredMessageHeader? {
         return rawMessages.lastOrNull { raw ->
             raw.createdAt < markerCreatedAt &&
                 (historyDbIds.isEmpty() || raw.id in historyDbIds)
@@ -4590,10 +4541,11 @@ class ChatViewModel(
      *
      * Mirrors iOS AIChatViewModel+Compaction.swift:150.
      */
+    // nanoMuse: the healed pointer uses the same lightweight persisted row headers.
     private fun rewriteMarkerForHeal(
         original: com.openminis.app.data.db.CompactMarkerEntity,
-        newAnchor: com.openminis.app.data.db.MessageEntity,
-        lastRaw: com.openminis.app.data.db.MessageEntity?,
+        newAnchor: io.github.nanomuse.chat.RestoredMessageHeader,
+        lastRaw: io.github.nanomuse.chat.RestoredMessageHeader?,
     ): com.openminis.app.data.db.CompactMarkerEntity {
         // Legacy sort-order fallback writes a past-end sentinel so any
         // hypothetical v1 reader sees "everything compacted, nothing
@@ -4974,6 +4926,8 @@ class ChatViewModel(
      * Cancels any in-flight stream first so the UI doesn't race the wipe.
      */
     fun clearChat() {
+        if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
+        nmInvalidateSessionRestore() // nanoMuse: Clear must also cancel an idle snapshot read.
         if (_isStreaming.value) cancelStream()
         val sid = activeSessionId
         io.github.nanomuse.guard.Grants.clearSession(sid) // nanoMuse: "allow for this chat" ends with the chat
@@ -5126,7 +5080,7 @@ class ChatViewModel(
      * of truth.
      */
     fun rerunFromToolBlock(assistantMessageId: String, blockId: String): Boolean {
-        if (_isStreaming.value) return false
+        if (!sessionLoaded.value || _isStreaming.value) return false // nanoMuse: wait for initial history.
         val messages = _messages.value
         val asstIdx = messages.indexOfFirst { it.id == assistantMessageId }
         if (asstIdx < 0) return false
@@ -5195,7 +5149,7 @@ class ChatViewModel(
         // Claim the streaming flag synchronously so a rapid second tap is
         // rejected by the entry guard (same rationale as retryFromMessage T145).
         AppLogger.info(TAG_STREAM, "rerunFromToolBlock _isStreaming=true (sync, sid=$activeSessionId)")
-        _isStreaming.value = true
+        nmStartStreaming() // nanoMuse: a live turn supersedes a disk reload.
 
         viewModelScope.launch {
             var streamLaunched = false
@@ -5326,6 +5280,7 @@ class ChatViewModel(
      * Mirrors iOS's edit/retry behavior — no duplicate user messages.
      */
     fun retryFromMessage(messageId: String) {
+        if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
         if (_isStreaming.value) return
         _canResume.value = false
         _nmContinueAsk.value = null // nanoMuse
@@ -5383,7 +5338,7 @@ class ChatViewModel(
         // The orphaned first job's `_isStreaming = false` at completion would
         // then flip the UI to "stopped" while the second job was still running.
         AppLogger.info(TAG_STREAM, "retry _isStreaming=true (sync, sid=$activeSessionId)")
-        _isStreaming.value = true
+        nmStartStreaming() // nanoMuse: a live turn supersedes a disk reload.
 
         viewModelScope.launch {
             // If setup throws before the inner streamJob is launched, the
@@ -5475,6 +5430,7 @@ class ChatViewModel(
      * [agentHistory] describing messages that no longer exist.
      */
     fun deleteFromMessage(messageId: String) {
+        if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
         if (_isStreaming.value) return
         _canResume.value = false
         _nmContinueAsk.value = null // nanoMuse
@@ -5485,6 +5441,7 @@ class ChatViewModel(
         // Snapshot what's about to go so any memory_write tool blocks inside
         // can be revoked — otherwise the on-disk daily log keeps entries from
         // messages the user just deleted.
+        nmInvalidateSessionRestore() // nanoMuse: deleted history cannot return from an older reload.
         val deletedMessages = messages.subList(index, messages.size).toList()
 
         // Truncate the UI to everything BEFORE the target message, and drop
@@ -5720,6 +5677,7 @@ class ChatViewModel(
      * Mirrors iOS AIChatViewModel.editMessage(_:) (L2468).
      */
     fun editMessage(messageId: String): String? {
+        if (!sessionLoaded.value) return null // nanoMuse: keep drafts/history intact until initial restore completes.
         if (_isStreaming.value) return null
         val msg = _messages.value.firstOrNull { it.id == messageId } ?: return null
         if (msg.role != "user") return null
@@ -6297,7 +6255,7 @@ class ChatViewModel(
 
     // nanoMuse: persistent remote turns must start now and own their saved user row.
     internal fun nmSendHeadless(text: String, receipt: io.github.nanomuse.hub.HeadlessTurn.Receipt) {
-        if (_isStreaming.value || _isCompacting.value || nmHeadlessReceipt?.pending == true || text.isBlank()) return
+        if (!sessionLoaded.value || _isStreaming.value || _isCompacting.value || nmHeadlessReceipt?.pending == true || text.isBlank()) return
         if (checkContextBeforeSend() == PreSendContextAction.ASK_USER) return
         // Auto-compaction still runs in the normal outgoing-request guard. Do not
         // enqueue or leave a prompt for a later dialog after reporting refusal.
@@ -6314,6 +6272,7 @@ class ChatViewModel(
         io.github.nanomuse.hub.HeadlessTurn.stop(nmHeadlessReceipt, turnId) { cancelStream() }
 
     fun sendMessage(text: String) {
+        if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
         // nanoMuse: explicit device work is routed before any local model or avatar action.
         if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
                 _attachments.value.isNotEmpty() || _pastedTexts.value.isNotEmpty(), _isCompacting.value)) return
@@ -6326,7 +6285,9 @@ class ChatViewModel(
     private val nmRemoteBridge: io.github.nanomuse.sync.RemoteChatBridge by lazy {
         val host = object : io.github.nanomuse.sync.RemoteChatBridge.Host {
             override val busy: Boolean get() = _isStreaming.value
-            override fun setBusy(value: Boolean) { _isStreaming.value = value }
+            override fun setBusy(value: Boolean) {
+                if (value) nmStartStreaming() else _isStreaming.value = false // nanoMuse: invalidate stale restores.
+            }
             override fun error(issue: io.github.nanomuse.sync.RemoteChatBridge.Issue, device: String) {
                 val resource = when (issue) {
                     io.github.nanomuse.sync.RemoteChatBridge.Issue.AMBIGUOUS -> R.string.nm_remote_ambiguous
@@ -6808,6 +6769,7 @@ class ChatViewModel(
         // The buffer is cleared where the mediaRefs are actually written, not
         // here — clearing at this point would strip the content out from under
         // a send that then bails on the context-check paths below.
+        if (!sessionLoaded.value) return // nanoMuse: do not consume attachments before restoring history.
         val trimmed = text.trim()
         // While streaming, enqueue instead of silently dropping (iOS: send vs enqueuePrompt).
         if (_isStreaming.value) {
@@ -6877,7 +6839,7 @@ class ChatViewModel(
         // T145: claim _isStreaming synchronously so a rapid second tap can't
         // slip past the entry guard during DB/OAuth setup. See retryFromMessage.
         AppLogger.info(TAG_STREAM, "send _isStreaming=true (sync, sid=$activeSessionId)")
-        _isStreaming.value = true
+        nmStartStreaming() // nanoMuse: a live turn supersedes a disk reload.
         nmHeadlessReceipt = headless // nanoMuse: a local turn replaces the previous receipt.
         headless?.start() // nanoMuse: record acceptance before asynchronous setup can finish.
 
@@ -7303,6 +7265,7 @@ class ChatViewModel(
     }
 
     fun retryLast() {
+        if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
         if (_isStreaming.value) return
         // T-streaming-side-channel: belt-and-suspenders flush in case any
         // delta survived an earlier abnormal exit; retryLast is gated on
@@ -7372,7 +7335,7 @@ class ChatViewModel(
 
         // T145: claim _isStreaming synchronously — see retryFromMessage for rationale.
         AppLogger.info(TAG_STREAM, "retryLast _isStreaming=true (sync, sid=$activeSessionId)")
-        _isStreaming.value = true
+        nmStartStreaming() // nanoMuse: a live turn supersedes a disk reload.
 
         viewModelScope.launch {
             var streamLaunched = false
@@ -11857,7 +11820,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             // the streamJob so a concurrent send/retry tap is rejected by the
             // entry guard. Mirrors sendMessage discipline.
             AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel _isStreaming=true (sync, sid=$activeSessionId)")
-            _isStreaming.value = true
+            nmStartStreaming() // nanoMuse: a live turn supersedes a disk reload.
             _canResume.value = false
             _error.value = null
 
@@ -12091,6 +12054,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
      * Clears [_canResume] on entry so repeated taps don't stack.
      */
     fun resume() {
+        if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
         if (_isStreaming.value || !_canResume.value) return
         val provider = currentProvider ?: run {
             _error.value = context.getString(R.string.nm_chat_no_model) // nanoMuse: where to fix it, in the person's language
@@ -12145,7 +12109,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                 } else baseSystemPrompt
 
             AppLogger.info(TAG_STREAM, "resume _isStreaming=true (sid=$activeSessionId)")
-            _isStreaming.value = true
+            nmStartStreaming() // nanoMuse: a live turn supersedes a disk reload.
             streamJob = launch(Dispatchers.IO) {
                 AppLogger.info(TAG_STREAM, "resume streamJob ENTER sid=$activeSessionId")
                 try {
@@ -12331,27 +12295,32 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }
     }
 
-    private fun List<MessageEntity>.toChatMessages(): List<ChatMessage> {
-        // First pass: extract all toolResult data keyed by toolUseId
-        val toolResultMap = mutableMapOf<String, ToolResultData>()
-        for (entity in this) {
-            if (entity.role != "user") continue
-            try {
-                val array = org.json.JSONArray(entity.partsJson)
-                for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
-                    if (obj.optString("type") == "toolResult") {
-                        val value = obj.getJSONObject("value")
-                        val toolUseId = value.optString("toolUseId", "")
-                        if (toolUseId.isNotEmpty()) {
-                            toolResultMap[toolUseId] = ToolResultData(
-                                output = value.optString("output", ""),
-                                success = value.optBoolean("success", true),
-                            )
-                        }
+    // nanoMuse: tool-result previews are collected once and reused across page boundaries.
+    private fun collectToolResults(entity: MessageEntity, toolResultMap: MutableMap<String, ToolResultData>) {
+        if (entity.role != "user") return
+        try {
+            val array = org.json.JSONArray(entity.partsJson)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                if (obj.optString("type") == "toolResult") {
+                    val value = obj.getJSONObject("value")
+                    val toolUseId = value.optString("toolUseId", "")
+                    if (toolUseId.isNotEmpty()) {
+                        toolResultMap[toolUseId] = ToolResultData(
+                            output = value.optString("output", ""),
+                            success = value.optBoolean("success", true),
+                        )
                     }
                 }
-            } catch (_: Exception) { /* skip malformed */ }
+            }
+        } catch (_: Exception) { /* skip malformed */ }
+    }
+
+    private fun List<MessageEntity>.toChatMessages(
+        restoredToolResults: Map<String, ToolResultData>? = null, // nanoMuse: shared by all restore pages.
+    ): List<ChatMessage> {
+        val toolResultMap = restoredToolResults ?: mutableMapOf<String, ToolResultData>().also { results ->
+            for (entity in this) collectToolResults(entity, results)
         }
 
         // Second pass: convert messages, merging tool results into blocks
@@ -12542,50 +12511,53 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                 // legacy/other-writer "" row.
                 error = entity.errorInfo?.takeIf { it.isNotBlank() },
             )
-        }.let { messages ->
-            // Merge consecutive assistant messages into one:
-            // agent loop persists each turn separately, but UI should show them as a single message.
-            val merged = mutableListOf<ChatMessage>()
-            for (msg in messages) {
-                val prev = merged.lastOrNull()
-                if (msg.role == "assistant" && prev?.role == "assistant") {
-                    // Merge: combine tool blocks, append text, keep the last id.
-                    // Deduplicate by block.id — the agent loop may persist the same tool
-                    // use in multiple consecutive turns (as it carries tool state across),
-                    // and duplicated ids would crash LazyColumn's key uniqueness check.
-                    // Keep the LAST occurrence so the most recent status (e.g. SUCCESS with
-                    // output) wins over an earlier STREAMING placeholder.
-                    val seen = mutableSetOf<String>()
-                    val combinedBlocks = (prev.toolBlocks + msg.toolBlocks)
-                        .asReversed()
-                        .filter { seen.add(it.id) }
-                        .asReversed()
-                    val combinedText = when {
-                        prev.content.isBlank() -> msg.content
-                        msg.content.isBlank() -> prev.content
-                        else -> prev.content + "\n\n" + msg.content
-                    }
-                    merged[merged.lastIndex] = prev.copy(
-                        id = msg.id,
-                        content = combinedText,
-                        toolBlocks = combinedBlocks,
-                        // T126-marker: keep every source dbId so Phase 2.5
-                        // can resolve markers that point at any of the
-                        // pre-merge rows (lastCompactedMessageId is often
-                        // an assistant row that gets folded into a later
-                        // assistant turn).
-                        sourceDbIds = prev.sourceDbIds + msg.sourceDbIds,
-                        // [T-error-persist-android] The error sticker is written
-                        // to the LAST assistant row of the turn, so the later row
-                        // (`msg`) wins; fall back to `prev` if only it carried one.
-                        error = msg.error ?: prev.error,
-                    )
-                } else {
-                    merged.add(msg)
+        }.let(::mergeAssistantMessages)
+    }
+
+    // nanoMuse: final merging also joins assistant rows that straddle raw database pages.
+    private fun mergeAssistantMessages(messages: List<ChatMessage>): List<ChatMessage> {
+        // Merge consecutive assistant messages into one:
+        // agent loop persists each turn separately, but UI should show them as a single message.
+        val merged = mutableListOf<ChatMessage>()
+        for (msg in messages) {
+            val prev = merged.lastOrNull()
+            if (msg.role == "assistant" && prev?.role == "assistant") {
+                // Merge: combine tool blocks, append text, keep the last id.
+                // Deduplicate by block.id — the agent loop may persist the same tool
+                // use in multiple consecutive turns (as it carries tool state across),
+                // and duplicated ids would crash LazyColumn's key uniqueness check.
+                // Keep the LAST occurrence so the most recent status (e.g. SUCCESS with
+                // output) wins over an earlier STREAMING placeholder.
+                val seen = mutableSetOf<String>()
+                val combinedBlocks = (prev.toolBlocks + msg.toolBlocks)
+                    .asReversed()
+                    .filter { seen.add(it.id) }
+                    .asReversed()
+                val combinedText = when {
+                    prev.content.isBlank() -> msg.content
+                    msg.content.isBlank() -> prev.content
+                    else -> prev.content + "\n\n" + msg.content
                 }
+                merged[merged.lastIndex] = prev.copy(
+                    id = msg.id,
+                    content = combinedText,
+                    toolBlocks = combinedBlocks,
+                    // T126-marker: keep every source dbId so Phase 2.5
+                    // can resolve markers that point at any of the
+                    // pre-merge rows (lastCompactedMessageId is often
+                    // an assistant row that gets folded into a later
+                    // assistant turn).
+                    sourceDbIds = prev.sourceDbIds + msg.sourceDbIds,
+                    // [T-error-persist-android] The error sticker is written
+                    // to the LAST assistant row of the turn, so the later row
+                    // (`msg`) wins; fall back to `prev` if only it carried one.
+                    error = msg.error ?: prev.error,
+                )
+            } else {
+                merged.add(msg)
             }
-            merged
         }
+        return merged
     }
 
     private data class ToolResultData(val output: String, val success: Boolean)

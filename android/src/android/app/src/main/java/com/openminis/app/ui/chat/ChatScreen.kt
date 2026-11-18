@@ -1738,6 +1738,7 @@ fun ChatScreen(
     }
 
     val performSendOrEnqueue: (String) -> Unit = handler@{ rawText ->
+        if (!viewModel.nmSessionReady) return@handler // nanoMuse: keep the draft while its history loads.
         if (viewModel.tryExecuteInputAsSlashCommand(rawText)) {
             viewModel.setInputText("")
             releaseComposerAfterSend()
@@ -5749,6 +5750,7 @@ fun ChatScreen(
                         // truth for what "press Enter to send" means.
                         val performEnterSend: () -> Boolean = handler@{
                             if (inputText.isBlank() && attachments.isEmpty()) return@handler false
+                            if (!viewModel.nmSessionReady) return@handler true // nanoMuse: do not clear an unsent draft.
                             // Intercept slash commands so "/compact" et al.
                             // run locally instead of being sent as a chat
                             // turn. Mirrors iOS performSend().
@@ -6921,9 +6923,12 @@ fun ChatScreen(
                     confirmText = stringResource(R.string.chat_clear_dialog_confirm),
                     isDestructive = true,
                     onConfirm = {
-                        viewModel.clearChat()
-                        viewModel.setInputText("")
-                        showClearChatDialog = false
+                        // nanoMuse: match the ViewModel readiness guard before clearing the draft.
+                        if (viewModel.nmSessionReady) {
+                            viewModel.clearChat()
+                            viewModel.setInputText("")
+                            showClearChatDialog = false
+                        }
                     },
                 )
             }

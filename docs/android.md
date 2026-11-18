@@ -178,6 +178,8 @@ decides whether it can be sent. Structured follow-ups and attachments also carry
 Notices follow the app language. This Android loop is independent of the Python runtime's
 task budgets.
 
+Reopening or refreshing a conversation replaces its restored model history instead of appending another copy. Restoration converts raw database rows in bounded pages under one read transaction and keeps only small row headers for checkpoint recovery; tool output strings are shared with the parsed model history. Compaction validates persisted anchors with an ID-only query. The saved transcript remains intact. Automated chat actions wait for restored history within their existing five-second readiness budget and refuse before attaching files or dispatching if it is not ready. Home ideas and goals use the existing not-ready notice without starting their flow. The UI and unsummarized model history still grow with a conversation; loading older UI content directly from disk is separate work. These changes reduce duplicate memory use but do not establish the cause of a device freeze or reboot.
+
 `PromptDiet` shortens the `browser_use` schema descriptions while keeping every action and
 parameter, and condenses the `minis-*` paragraphs in the Android tools section. Each CLI's
 `--help` provides its full usage instructions.

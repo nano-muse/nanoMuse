@@ -212,6 +212,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Replaced Android chat history on reload instead of appending duplicates, converted persisted messages in bounded raw pages, and read only message IDs when verifying a compaction anchor. Saved messages and unsummarized model context were preserved. For #921.
+
 - Retried interrupted OpenAI-compatible streams within the existing bounded model-request budget, including partial EOF, and surfaced socket failures as recoverable errors instead of cancellation. For #934.
 
 - Disclosed every enabled skill with up to 1024 Unicode description characters, preserved imported SKILL.md metadata, parsed quoted and nested frontmatter correctly, and accepted non-ASCII skill names. For #912.
