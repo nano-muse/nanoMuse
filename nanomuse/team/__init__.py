@@ -3,11 +3,13 @@
 from nanomuse.team.presets import (
     PRESETS,
     RolePreset,
+    assessed_risk,
     effective_preset,
     envelope_note,
     is_read_only_call,
     preset_for,
     read_only_face,
+    tighter,
 )
 from nanomuse.team.squad import (
     AUTHORITIES,
@@ -29,6 +31,7 @@ from nanomuse.team.store import (
     InvalidTransition,
     ReconcileReport,
     SquadStore,
+    compose_level,
     ledger_evidence,
     reconcile_on_startup,
 )
@@ -53,6 +56,8 @@ __all__ = [
     "SquadFrame",
     "SquadRefusal",
     "SquadStore",
+    "assessed_risk",
+    "compose_level",
     "effective_preset",
     "envelope_note",
     "is_read_only_call",
@@ -60,4 +65,5 @@ __all__ = [
     "preset_for",
     "read_only_face",
     "reconcile_on_startup",
+    "tighter",
 ]

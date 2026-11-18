@@ -51,6 +51,17 @@ there as everywhere.  Two tightenings ride along:
   subtask inherits that conversation's taint. A subtask that receives
   a private brief is judged by the Sentinel like the conversation
   that handed it out, not like a fresh conversation.
+- every assignment is frozen at enqueue with a risk ceiling: the
+  tighter of its parent's ceiling and its role preset's (research
+  and verify cap at safe; execute caps at sensitive, the top of the
+  scale, so by default the ceiling layer refuses nothing and the
+  Sentinel's own judgements are the only ones).  A squad's root
+  takes the ceiling the squad was formed with, which its caller
+  names (``sensitive`` unless a tighter one is given).  The runner
+  enforces the frozen ceiling in front of the Sentinel for every
+  role; no approval inside an assignment can lift it, because the
+  ceiling bounds the whole assignment where an approval settles one
+  action.
 
 Execution is off unless all three pieces are present (store, factory,
 ``execute``), and neither the server nor the companion forms an
@@ -68,6 +79,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from nanomuse.logger import logger
+from nanomuse.schema import RiskLevel
 from nanomuse.sentinel.gate import current_task
 from nanomuse.team.presets import effective_preset, preset_for
 from nanomuse.team.store import (
@@ -295,7 +307,10 @@ class Squad:
     ``origin`` names where the squad's work comes from in that ledger.
     ``execute`` and ``factory`` together switch dispatch from
     recording to running: both are needed, with a store, before any
-    assignment is run.
+    assignment is run.  ``ceiling`` is the risk ceiling the squad's
+    root assignment is frozen with, named by the caller forming the
+    squad; None means the top of the scale (``sensitive``), no extra
+    limit at this layer.
     """
 
     ROLES = ("research", "execute", "verify")
@@ -309,6 +324,7 @@ class Squad:
         execute: bool = False,
         factory: AgentFactory | None = None,
         parent_conversation: str = "",
+        ceiling: RiskLevel | str | None = None,
     ) -> None:
         self.formed = formed
         self.bus = SquadBus()
@@ -323,6 +339,7 @@ class Squad:
         # names it up front. A dispatch made inside a run captures that
         # run's conversation instead, at dispatch time.
         self.parent_conversation = parent_conversation
+        self.ceiling: RiskLevel | None = RiskLevel(ceiling) if ceiling is not None else None
         self._root_id: str | None = None
         self._pending: set[asyncio.Task[None]] = set()
         if formed:
@@ -340,6 +357,7 @@ class Squad:
         execute: bool = False,
         factory: AgentFactory | None = None,
         parent_conversation: str = "",
+        ceiling: RiskLevel | str | None = None,
     ) -> Squad:
         return cls(
             formed=False,
@@ -347,6 +365,7 @@ class Squad:
             execute=execute,
             factory=factory,
             parent_conversation=parent_conversation,
+            ceiling=ceiling,
         )
 
     @classmethod
@@ -358,6 +377,7 @@ class Squad:
         execute: bool = False,
         factory: AgentFactory | None = None,
         parent_conversation: str = "",
+        ceiling: RiskLevel | str | None = None,
     ) -> Squad:
         return cls(
             formed=True,
@@ -366,6 +386,7 @@ class Squad:
             execute=execute,
             factory=factory,
             parent_conversation=parent_conversation,
+            ceiling=ceiling,
         )
 
     @property
@@ -390,21 +411,24 @@ class Squad:
         store = self.store
         assert store is not None
         try:
+            mode = body.get("mode")
+            mode = mode if mode in MODES else "consult"
             if self._root_id is None:
                 root = store.create_root(
                     origin=self.origin,
                     mode="work",
                     role=ApprovalGate.STEWARD,
                     brief="squad session",
+                    level=(self.ceiling or RiskLevel.SENSITIVE).value,
                 )
                 self._root_id = root.id
-            mode = body.get("mode")
             return store.enqueue(
                 parent_id=self._root_id,
                 origin=self.origin,
-                mode=mode if mode in MODES else "consult",
+                mode=mode,
                 role=role,
                 brief=action,
+                level=effective_preset(preset_for(role), mode).ceiling.value,
             )
         except EnqueueRefused:
             return None

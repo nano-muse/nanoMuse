@@ -405,6 +405,8 @@ execute = false          # also run dispatches (needs a caller that forms a squa
 cheap_model = ""         # model for the cheap tier (research, verify); empty means the [llm] slot as configured
 stall_after_errors = 3   # identical errors in a row, with no successful tool call yet, mark a subtask as stalled
 max_tool_calls = 0       # cap on one subtask's tool calls; 0 means no cap of the watch's own
+# a squad's root risk ceiling is named by the caller forming the squad, not by a key
+# here; it defaults to sensitive, no extra limit (docs/configuration.md, [squad])
 
 # ------------------------------------------------------------------------------
 # The hub: this computer as one of the account's devices (docs/hub.md)
