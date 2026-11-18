@@ -22,7 +22,7 @@ extension Notification.Name {
 /// What the Muse header's ••• menu can ask of the chat under it (the entries
 /// Android's ChatScreen menu has; the shell's own rows stay in the shell).
 enum NanoMuseChatAction: String {
-    case newChat, model, clearChat, terminal, browser, files, tokenUsage
+    case newChat, model, thinking, clearChat, terminal, browser, files, tokenUsage
 
     static func post(_ action: NanoMuseChatAction, session: String) {
         NotificationCenter.default.post(name: .nanoMuseChatAction, object: session, userInfo: ["action": action.rawValue])
