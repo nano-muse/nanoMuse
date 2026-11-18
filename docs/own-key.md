@@ -69,6 +69,8 @@ short videos.
 | AtmoRouter | ● | | | | outside mainland China | [atmorouter.dev](https://atmorouter.dev/dashboard/keys) |
 | UberLLM | ● | | | | outside mainland China | [uberllm.dev](https://uberllm.dev/signup) |
 | TrustedRouter | ● | | | | outside mainland China | [trustedrouter.com](https://trustedrouter.com/console/api-keys) |
+
+| Synap | ● | | | | outside mainland China | [synap402.com](https://synap402.com/account.html#keys) |
 | Ollama / LM Studio / vLLM (on your machine) | ● | | | | both | no key |
 
 Only Bailian has a dot under *Clips* because nanoMuse's clip generation speaks
@@ -109,6 +111,8 @@ or paste it into a chat.**
 - **AtmoRouter.** A key from [atmorouter.dev/dashboard/keys](https://atmorouter.dev/dashboard/keys); pay as you go, and one key reaches models from several labs. Base URL `https://atmorouter.dev/v1`. Model ids carry a route prefix, as `https://atmorouter.dev/v1/models` lists them; the default model is `cc/claude-sonnet-4-6`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
 - **UberLLM.** A key from [uberllm.dev/signup](https://uberllm.dev/signup); prepaid and pay as you go from $5, no monthly fee, and one key reaches models from several labs, usually below list price ([current prices](https://uberllm.dev/models)). Base URL `https://api.uberllm.dev/v1`. Model ids carry the vendor's name, as `https://api.uberllm.dev/v1/models` lists them; the default model is `openai/gpt-5.4-mini`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
 - **TrustedRouter.** A key from [trustedrouter.com/console/api-keys](https://trustedrouter.com/console/api-keys); pay as you go, and one key reaches models from several labs ([docs](https://trustedrouter.com/docs)). Base URL `https://api.trustedrouter.com/v1`. Model ids carry the vendor's name, as `https://api.trustedrouter.com/v1/models` lists them (public, no key needed); the default model is `deepseek/deepseek-v4-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
+
+- **Synap.** A key from [synap402.com/account.html#keys](https://synap402.com/account.html#keys); pay as you go, for open-weight models (Qwen3 Coder, Qwen3.5, GLM, DeepSeek V4, gpt-oss, Gemma and others), with per-token prices in the public `https://synap402.com/v1/models` list ([current prices](https://synap402.com/pricing.html)). Base URL `https://synap402.com/v1`. The default model is `qwen3-coder-30b`; any id from that list can be set instead. Chat only here, on the OpenAI shape.
 
 **Paste it into nanoMuse.**
 
