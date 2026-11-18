@@ -9,10 +9,12 @@ tests block the keychain import and the environment variable explicitly.
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import stat
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -291,6 +293,75 @@ def test_an_injected_signer_touches_no_key_file(tmp_path: Path) -> None:
     log.record("tool_call", tool="shell")
     assert not (tmp_path / "audit.key").exists()
     assert log.verify().ok
+
+
+def test_two_instances_interleaved_appends_verify(tmp_path: Path) -> None:
+    # Regression test for the forked chain: two AuditLog objects over one file
+    # each cached the chain tail on first use, so the second append from either
+    # one chained onto a stale tail and the interleaved file failed verify.
+    # The writers share nothing but the file and the key, the way two
+    # processes would, so this also pins the cross-process contract at the
+    # instance level.
+    path = tmp_path / "audit.jsonl"
+    first = AuditLog(path, signer=HmacSigner(KEY))
+    second = AuditLog(path, signer=HmacSigner(KEY))
+    writers = [first, second]
+    for round_ in range(10):
+        for writer in writers:
+            writer.record("tool_call", tool="shell", summary=f"round {round_}")
+    report = AuditLog(path, signer=HmacSigner(KEY)).verify()
+    assert report.ok, report.broken
+    assert report.checked == 20
+    assert report.last_seq == 20
+    seqs = [json.loads(line)["seq"] for line in _lines(path)]
+    assert seqs == list(range(1, 21))
+
+
+def _process_writer(path: str, label: str, count: int, barrier: Any) -> None:
+    # A separate process has no shared memory with its sibling: the AuditLog
+    # here is built fresh from the path and the key, and the only coordination
+    # available to it is through the file itself. Each writer primes the chain
+    # with one entry, meets at the barrier, then appends the rest, so both
+    # writers hold chain state from before the interleaving on broken code.
+    log = AuditLog(Path(path), signer=HmacSigner(KEY))
+    log.record("tool_call", tool="shell", summary=f"{label} prime")
+    barrier.wait(timeout=60)
+    for i in range(count):
+        log.record("tool_call", tool="shell", summary=f"{label} {i}")
+
+
+def test_two_processes_interleaved_appends_verify(tmp_path: Path) -> None:
+    # The process-level half of the fork regression: two real processes
+    # appending to one file. Multiprocessing is used rather than two
+    # instances in threads because threads still share the interpreter, and
+    # a lock that only worked in-process (a module-level threading lock, say)
+    # would pass a thread test and still fork the chain across processes.
+    path = tmp_path / "audit.jsonl"
+    methods = multiprocessing.get_all_start_methods()
+    context = multiprocessing.get_context("fork" if "fork" in methods else "spawn")
+    barrier = context.Barrier(2)
+    per_writer = 15
+    processes = [
+        context.Process(target=_process_writer, args=(str(path), label, per_writer, barrier))
+        for label in ("one", "two")
+    ]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=120)
+    try:
+        assert all(process.exitcode == 0 for process in processes)
+        report = AuditLog(path, signer=HmacSigner(KEY)).verify()
+        total = 2 * (per_writer + 1)
+        assert report.ok, report.broken
+        assert report.checked == total
+        assert report.last_seq == total
+        seqs = [json.loads(line)["seq"] for line in _lines(path)]
+        assert seqs == list(range(1, total + 1))
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
 
 
 def test_the_verify_command_reports_ok_and_broken(
