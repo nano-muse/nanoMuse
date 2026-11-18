@@ -48,6 +48,13 @@ class StreamCompletionTest {
         assertSame(cancellation, error)
     }
 
+    @Test fun `interruption detail is localized inside final and retry messages`() {
+        assertEquals("Transient error: localized, retrying", StreamFailure.userText(
+            "Transient error: ${StreamFailure.INCOMPLETE}, retrying", "localized",
+        ))
+        assertEquals("different failure", StreamFailure.userText("different failure", "localized"))
+    }
+
     @Test fun `socket abort after text is an ordinary network error and the caller stays active`() = runBlocking {
         val server = MockWebServer()
         server.start()

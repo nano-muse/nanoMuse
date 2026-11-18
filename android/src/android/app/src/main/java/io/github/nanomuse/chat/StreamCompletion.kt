@@ -18,6 +18,14 @@ fun Flow<LLMStreamChunk>.failOnIncompleteCompletion(): Flow<LLMStreamChunk> = fl
     // This runs only after normal EOF. Cancellation and transport errors retain their
     // original cause. The agent retries this model request before executing any tools.
     if (!finished) {
-        throw LLMError.TransientError("Connection ended before the response completed")
+        throw LLMError.TransientError(StreamFailure.INCOMPLETE)
     }
+}
+
+/** Match the provider detail at the UI boundary, without requiring Context in a stream. */
+object StreamFailure {
+    const val INCOMPLETE = "Connection ended before the response completed"
+
+    fun userText(error: String, interruptedText: String): String =
+        error.replace(INCOMPLETE, interruptedText)
 }

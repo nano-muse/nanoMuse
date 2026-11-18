@@ -1235,4 +1235,5 @@
     <string name="nm_device_chat_here">在此裝置上</string>
     <string name="nm_device_chat_uncertain">送達狀態未知，正在查詢裝置上的結果。</string>
     <string name="nm_device_chat_interrupted">任務已中斷，裝置可能已經執行了部分操作。</string>
+    <string name="nm_stream_interrupted">回覆尚未完成，連線已中斷。</string>
 </resources>
