@@ -37,6 +37,7 @@ inside `body`, under the frame limit.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -225,12 +226,21 @@ class Connection:
             log.debug("close %s: %s", self.device_id[:12], e)
 
 
+def _request_fingerprint(to: str, action: str, args: dict) -> str:
+    """A stable hash of what a call asks for: its target, its action and its
+    arguments. A kept answer is bound to the request that produced it, so a
+    retry replays only when it asks for exactly the same thing."""
+    raw = json.dumps({"to": to, "action": action, "args": args}, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 @dataclass
 class Pending:
     call_id: str
     caller: str
     target: str
     account_id: str
+    fingerprint: str = ""
     started: int = field(default_factory=now)
 
 
@@ -244,7 +254,20 @@ class Answered:
     caller: str
     account_id: str
     frame: dict
+    fingerprint: str = ""
     stored: int = field(default_factory=now)
+
+
+@dataclass
+class Dropped:
+    """A call whose caller left while it was still running: who made it, who is
+    carrying it out, and the fingerprint of what was asked, so its late answer
+    is kept for the same recovery a finished call gets."""
+
+    caller: str
+    target: str
+    fingerprint: str = ""
+    dropped_at: int = field(default_factory=now)
 
 
 class Hub:
@@ -257,10 +280,10 @@ class Hub:
         self.pending: dict[tuple[str, str], Pending] = {}
         # finished calls, for replay: the same key, plus the caller device that made it
         self.answered: dict[tuple[str, str], Answered] = {}
-        # calls whose caller left before the answer: (account, call id) to the
-        # caller, the target and when it was dropped, so a late answer from that
-        # target is still kept for replay instead of refused as unknown
-        self.dropped: dict[tuple[str, str], tuple[str, str, int]] = {}
+        # calls whose caller left before the answer: (account, call id) to a
+        # Dropped record, so a late answer from that target is still kept for
+        # replay instead of refused as unknown
+        self.dropped: dict[tuple[str, str], Dropped] = {}
         # for the operator's self-check: frames dropped and sockets closed for flooding, ever
         self.dropped_total = 0
         self.flood_closes = 0
@@ -622,9 +645,9 @@ class Hub:
                 del self.pending[key]
                 # The target may still answer: remember the call briefly so its
                 # late result is kept for the caller when it comes back.
-                self.dropped[key] = (p.caller, p.target, now())
+                self.dropped[key] = Dropped(caller=p.caller, target=p.target, fingerprint=p.fingerprint)
                 while len(self.dropped) > ANSWER_CACHE_MAX:
-                    oldest = min(self.dropped.items(), key=lambda kv: kv[1][2])[0]
+                    oldest = min(self.dropped.items(), key=lambda kv: kv[1].dropped_at)[0]
                     del self.dropped[oldest]
 
     @staticmethod
@@ -685,6 +708,15 @@ class Hub:
         if not call_id or not to or not action:
             await conn.send({"type": "error", "id": call_id, "code": "bad_frame", "message": "call needs id, to and action"})
             return
+        raw_args = frame.get("args")
+        args: dict = raw_args if isinstance(raw_args, dict) else {}
+        fingerprint = _request_fingerprint(to, action, args)
+        if frame.get("retry"):
+            # A retry is recovery only, never a fresh dispatch: it is bound to
+            # the original request and answered from the relay's own records,
+            # so it neither needs the target online nor can run anything again.
+            await self._recover(conn, call_id, fingerprint)
+            return
         target = self.online.get(conn.account_id, {}).get(to)
         if target is None or target.closed:
             await conn.send({"type": "error", "id": call_id, "code": "device_offline", "message": "That device is not connected"})
@@ -701,14 +733,7 @@ class Hub:
         # A new call with this id supersedes the dropped one: a late answer to
         # the old call must not be kept as this call's result.
         self.dropped.pop((conn.account_id, call_id), None)
-        answered = self.answered.get((conn.account_id, call_id))
-        if answered is not None:
-            if frame.get("retry") and answered.caller == conn.device_id and now() - answered.stored < ANSWER_CACHE_TTL_S:
-                # The caller says this is a retry of the call it lost: the answer
-                # already reached the relay, so replay the kept result and the
-                # target never sees the call a second time.
-                await conn.send(dict(answered.frame))
-                return
+        if (conn.account_id, call_id) in self.answered:
             # A plain re-send is a new call with a recycled id (the old contract:
             # an answered id is free again), and it supersedes the kept answer.
             del self.answered[(conn.account_id, call_id)]
@@ -718,9 +743,64 @@ class Hub:
             # unique; this one is refused and the first call goes on.
             await conn.send({"type": "error", "id": call_id, "code": "duplicate_call", "message": "A call with that id is still waiting"})
             return
-        self.pending[(conn.account_id, call_id)] = Pending(call_id=call_id, caller=conn.device_id, target=to, account_id=conn.account_id)
-        args = frame.get("args") if isinstance(frame.get("args"), dict) else {}
+        self.pending[(conn.account_id, call_id)] = Pending(
+            call_id=call_id, caller=conn.device_id, target=to, account_id=conn.account_id, fingerprint=fingerprint
+        )
         await target.send({"type": "call", "id": call_id, "from": conn.brief(), "action": action, "args": args})
+
+    async def _recover(self, conn: Connection, call_id: str, fingerprint: str) -> None:
+        """Answer a re-sent call marked `retry` from the relay's own records.
+
+        Recovery is bound to the original request: the kept answer replays only
+        for the device that made the call and only when the retry asks for
+        exactly the same thing (same target, action and arguments, by
+        fingerprint). A retry that names a different request is refused with
+        `retry_mismatch`. When no finished answer is kept, because the call is
+        still running, its caller dropped mid-flight, or the relay never saw
+        it, the retry fails closed with `result_unavailable`: the outcome is
+        uncertain, and running the call again could carry the action out twice.
+        Nothing here is ever dispatched to a target, so a kept answer replays
+        even while its target is offline."""
+        key = (conn.account_id, call_id)
+        answered = self.answered.get(key)
+        if answered is not None and now() - answered.stored >= ANSWER_CACHE_TTL_S:
+            del self.answered[key]
+            answered = None
+        if answered is not None:
+            if answered.caller != conn.device_id or answered.fingerprint != fingerprint:
+                await conn.send(
+                    {
+                        "type": "error",
+                        "id": call_id,
+                        "code": "retry_mismatch",
+                        "message": "That call id belongs to a different request; its kept result was not replayed",
+                    }
+                )
+                return
+            await conn.send(dict(answered.frame))
+            return
+        known = self.pending.get(key)
+        dropped = self.dropped.get(key)
+        caller = known.caller if known is not None else (dropped.caller if dropped is not None else None)
+        original = known.fingerprint if known is not None else (dropped.fingerprint if dropped is not None else None)
+        if caller is not None and (caller != conn.device_id or original != fingerprint):
+            await conn.send(
+                {
+                    "type": "error",
+                    "id": call_id,
+                    "code": "retry_mismatch",
+                    "message": "That call id belongs to a different request; nothing was run again",
+                }
+            )
+            return
+        await conn.send(
+            {
+                "type": "error",
+                "id": call_id,
+                "code": "result_unavailable",
+                "message": "No kept result for that call; it may still be running, so it was not run again",
+            }
+        )
 
     async def _answer(self, conn: Connection, frame: dict) -> None:
         call_id = str(frame.get("id") or "")
@@ -730,13 +810,19 @@ class Hub:
             if (
                 dropped is not None
                 and frame.get("type") == "result"
-                and dropped[1] == conn.device_id
-                and now() - dropped[2] < ANSWER_CACHE_TTL_S
+                and dropped.target == conn.device_id
+                and now() - dropped.dropped_at < ANSWER_CACHE_TTL_S
             ):
                 # The caller left before this answer arrived: keep it, so the
                 # caller reconnecting and retrying the id gets it replayed.
                 del self.dropped[(conn.account_id, call_id)]
-                ghost = Pending(call_id=call_id, caller=dropped[0], target=dropped[1], account_id=conn.account_id)
+                ghost = Pending(
+                    call_id=call_id,
+                    caller=dropped.caller,
+                    target=dropped.target,
+                    account_id=conn.account_id,
+                    fingerprint=dropped.fingerprint,
+                )
                 out = {k: v for k, v in frame.items() if k in ("type", "id", "ok", "body", "error", "message")}
                 out["from"] = conn.brief()
                 self._remember_answer(ghost, out)
@@ -773,6 +859,7 @@ class Hub:
             caller=pending.caller,
             account_id=pending.account_id,
             frame=dict(frame),
+            fingerprint=pending.fingerprint,
         )
         cutoff = now() - ANSWER_CACHE_TTL_S
         for old_key, old in list(self.answered.items()):
@@ -827,8 +914,8 @@ class Hub:
         for key, answered in list(self.answered.items()):
             if answered.stored < answer_cutoff:
                 del self.answered[key]
-        for key, (_, _, dropped_at) in list(self.dropped.items()):
-            if dropped_at < answer_cutoff:
+        for key, dropped in list(self.dropped.items()):
+            if dropped.dropped_at < answer_cutoff:
                 del self.dropped[key]
 
 

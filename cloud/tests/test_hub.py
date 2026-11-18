@@ -1047,6 +1047,118 @@ def test_a_finished_call_replays_instead_of_running_again(client):
         pc.__exit__(None, None, None)
 
 
+def test_a_kept_answer_replays_while_the_target_is_offline(client):
+    """A kept answer is served from the relay's own record: the target going
+    offline after answering must not make the replay fail with device_offline."""
+    phone, pc = _pair(client)
+    try:
+        first = _call_and_answer(phone, pc, "c1")
+        pc.__exit__(None, None, None)
+        pc = None
+        # wait until the relay has seen the target leave (its broadcast says so)
+        for _ in range(50):
+            frame = phone.receive_json()
+            if frame["type"] == "devices" and not {d["id"]: d["online"] for d in frame["devices"]}.get("pc-1", True):
+                break
+        else:
+            raise AssertionError("the relay never saw the target leave")
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True})
+        replay = _skip_devices(phone)
+        assert replay["type"] == "result" and replay["body"] == first["body"]
+    finally:
+        phone.__exit__(None, None, None)
+        if pc is not None:
+            pc.__exit__(None, None, None)
+
+
+def test_a_retry_with_different_args_is_refused_not_replayed(client):
+    """Recovery is bound to the original request: the same id re-sent as a retry
+    with different arguments must be refused, never answered with the old result,
+    and the refusal must not spend the kept answer."""
+    phone, pc = _pair(client)
+    try:
+        first = _call_and_answer(phone, pc, "c1")
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "reboot"}, "retry": True})
+        err = phone.receive_json()
+        assert err["type"] == "error" and err["code"] == "retry_mismatch"
+        # the target never saw the mismatched retry
+        pc.send_json({"type": "ping"})
+        assert _skip_devices(pc)["type"] == "pong"
+        # a faithful retry still replays afterwards
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True})
+        replay = phone.receive_json()
+        assert replay["type"] == "result" and replay["body"] == first["body"]
+    finally:
+        phone.__exit__(None, None, None)
+        pc.__exit__(None, None, None)
+
+
+def test_a_retry_while_the_first_call_is_still_running_fails_closed(client):
+    """An in-flight call has no result to recover yet: a retry of it gets a clear
+    failure, not a second dispatch, and the first call still answers normally."""
+    phone, pc = _pair(client)
+    try:
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}})
+        assert pc.receive_json()["type"] == "call"
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True})
+        err = phone.receive_json()
+        assert err["type"] == "error" and err["code"] == "result_unavailable"
+        pc.send_json({"type": "ping"})
+        assert _skip_devices(pc)["type"] == "pong"  # no second call reached the target
+        pc.send_json({"type": "result", "id": "c1", "ok": True, "body": {"stdout": "Linux\n"}})
+        assert phone.receive_json()["type"] == "result"
+    finally:
+        phone.__exit__(None, None, None)
+        pc.__exit__(None, None, None)
+
+
+def test_a_retry_after_the_caller_dropped_mid_call_does_not_run_it_again(client):
+    """The caller drops while the target is still working, reconnects and retries
+    before any answer exists: the retry fails closed and dispatches nothing. The
+    late answer is still kept, and a later faithful retry replays it."""
+    phone_key = sign_up(client, "13800138000")
+    pc_key = sign_up(client, "13800138000")
+    phone = connect(client, phone_key)
+    pc = connect(client, pc_key)
+    phone.__enter__()
+    pc.__enter__()
+    try:
+        phone.send_json(hello("phone", "phone-1", "Pixel"))
+        _skip_devices(phone)
+        pc.send_json(hello("computer", "pc-1", "desk", actions=("info", "shell", "screen")))
+        _skip_devices(pc)
+        for ws in (phone, pc):
+            ws.send_json({"type": "ping"})
+            assert _skip_devices(ws)["type"] == "pong"
+
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}})
+        assert pc.receive_json()["type"] == "call"  # the one and only execution starts
+        phone.__exit__(None, None, None)  # the caller drops mid-flight
+
+        phone = connect(client, phone_key)
+        phone.__enter__()
+        phone.send_json(hello("phone", "phone-1", "Pixel"))
+        _skip_devices(phone)
+        phone.send_json({"type": "ping"})
+        assert _skip_devices(phone)["type"] == "pong"
+
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True})
+        time.sleep(0.5)  # let the relay route the retry before probing the target
+        pc.send_json({"type": "ping"})
+        assert _skip_devices(pc)["type"] == "pong"  # no second call reached the target
+        err = _skip_devices(phone)
+        assert err["type"] == "error" and err["code"] == "result_unavailable"
+
+        # the original call's late answer is kept, and a faithful retry replays it
+        pc.send_json({"type": "result", "id": "c1", "ok": True, "body": {"n": 1}})
+        phone.send_json({"type": "call", "id": "c1", "to": "pc-1", "action": "shell", "args": {"command": "uname"}, "retry": True})
+        replay = _skip_devices(phone)
+        assert replay["type"] == "result" and replay["body"] == {"n": 1}
+    finally:
+        phone.__exit__(None, None, None)
+        pc.__exit__(None, None, None)
+
+
 def test_a_replayed_call_belongs_to_its_caller(client):
     phone, pc = _pair(client)
     try:
