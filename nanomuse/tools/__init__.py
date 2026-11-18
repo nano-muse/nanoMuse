@@ -1,4 +1,13 @@
 from nanomuse.tools.base import BaseTool, CallAssessment, ToolCollection, safe_execute
+from nanomuse.tools.bridge import (
+    BridgeClass,
+    FindTools,
+    ToolBridge,
+    UseTool,
+    build_tool_bridge,
+    classify_name,
+    classify_tool,
+)
 from nanomuse.tools.browser import Browser, playwright_available
 from nanomuse.tools.calendar_tool import Calendar
 from nanomuse.tools.contacts_tool import Contacts
@@ -17,11 +26,13 @@ from nanomuse.tools.web import WebFetch, WebSearch
 __all__ = [
     "AskUser",
     "BaseTool",
+    "BridgeClass",
     "Browser",
     "Calendar",
     "CallAssessment",
     "Contacts",
     "Files",
+    "FindTools",
     "Forget",
     "Goals",
     "MCPManager",
@@ -31,14 +42,19 @@ __all__ = [
     "Recall",
     "Remember",
     "Reminders",
+    "ToolBridge",
     "Triggers",
     "SendEmail",
     "Shell",
     "Skills",
     "Terminate",
     "ToolCollection",
+    "UseTool",
     "WebFetch",
     "WebSearch",
+    "build_tool_bridge",
+    "classify_name",
+    "classify_tool",
     "playwright_available",
     "safe_execute",
 ]
