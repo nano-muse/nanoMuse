@@ -12,6 +12,8 @@ from nanomuse.tools.base import BaseTool, CallAssessment
 
 class Skills(BaseTool):
     name: str = "skills"
+    purpose: str = "Read a skill's full instructions, and list or manage the skill library."
+    keywords: list[str] = ["skill", "instructions", "how to"]
     description: str = (
         "Skills are written-down ways of doing a job (a weekly review, a trip plan, an inbox "
         "triage …); the system prompt lists the ones available. Actions: `use`, the full "

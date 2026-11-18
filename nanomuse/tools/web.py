@@ -132,6 +132,8 @@ class WebSearch(BaseTool):
     none is), with DuckDuckGo as the fallback when that one fails."""
 
     name: str = "web_search"
+    purpose: str = "Search the web; returns titles, links and snippets."
+    keywords: list[str] = ["search", "web", "internet", "look up"]
     description: str = (
         "Search the web. Returns titles, URLs and snippets. Use `web_fetch` to read a result in "
         "full."
@@ -183,6 +185,8 @@ class WebSearch(BaseTool):
 
 class WebFetch(BaseTool):
     name: str = "web_fetch"
+    purpose: str = "Fetch a web page or API over HTTP GET and return its content."
+    keywords: list[str] = ["fetch", "page", "url", "http", "website"]
     description: str = (
         "Fetch a public web page or API (HTTP GET only) and return its readable content as "
         "markdown/text (HTML is converted, JSON is pretty-printed). Use for reading articles, docs, "

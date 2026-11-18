@@ -16,6 +16,8 @@ def _short(value: Any, limit: int = 80) -> str:
 
 class Remember(BaseTool):
     name: str = "remember"
+    purpose: str = "Save a durable fact about the user to long-term memory."
+    keywords: list[str] = ["memory", "remember", "save", "fact"]
     description: str = (
         "Save a durable fact about the user or their preferences for future sessions "
         "(e.g. 'prefers window seats', 'partner is vegetarian', 'works at Acme, timezone UTC+8'). "
@@ -97,6 +99,8 @@ class Remember(BaseTool):
 
 class Recall(BaseTool):
     name: str = "recall"
+    purpose: str = "Search long-term memory for facts about the user."
+    keywords: list[str] = ["memory", "recall", "remember"]
     description: str = "Search long-term memory for facts about the user relevant to `query`."
     parameters: dict[str, Any] = {
         "type": "object",
@@ -121,6 +125,8 @@ class Recall(BaseTool):
 
 class Forget(BaseTool):
     name: str = "forget"
+    purpose: str = "Delete entries from long-term memory."
+    keywords: list[str] = ["memory", "forget", "delete"]
     description: str = (
         "Delete memories. Provide `memory_id` (e.g. m_1a2b3c4d) to delete one, or `query` to delete "
         "every memory containing that text. Use when the user asks you to forget something."

@@ -709,6 +709,122 @@ class ServerSettings(BaseModel):
     start_grace: float = 4.0
 
 
+class PriceSettings(BaseModel):
+    """Per-million-token rates for one model, in USD (the cost ledger's table)."""
+
+    input_per_million: float = Field(default=0, ge=0, allow_inf_nan=False)
+    output_per_million: float = Field(default=0, ge=0, allow_inf_nan=False)
+
+
+class CostSettings(BaseModel):
+    """The cost ledger over real runs, and the monthly budget gate.
+
+    Recording is on only when a monthly budget or at least one price is
+    set; with neither, no ledger is kept and nothing changes.  ``mode``
+    is the gate: ``off`` records only, ``warn`` raises the ledger's
+    alert at the budget line, ``hard`` refuses new tasks once the
+    month's recorded spend reaches the budget (one approved task at a
+    time can be let past it).
+    """
+
+    monthly_budget_usd: float = Field(default=0, ge=0, allow_inf_nan=False)
+    mode: Literal["off", "warn", "hard"] = "off"
+    device_id: str = ""  # empty: the ledger calls this device "this-device"
+    prices: dict[str, PriceSettings] = Field(default_factory=dict)
+
+
+class DeciderSettings(BaseModel):
+    """The fast decision layer (experimental; shadow mode only).
+
+    Off by default, and off means no call and no log.  When on, one
+    small call at the start of a run asks the model slot to score the
+    task's difficulty; the answer is validated, recorded in the cost
+    ledger under its own model, and written to the decision log beside
+    the ledger.  ``mode`` has one value for now: ``shadow``, log only,
+    never acted on, so ``threshold`` is only the line the log names
+    when it says which tier a score would have picked.  ``model``
+    empty decides on the ``[llm]`` slot as configured (the deployment's
+    cheap tier); a name decides on the same slot with that model.
+    The layer never approves or refuses anything; that stays with the
+    Sentinel.
+    """
+
+    enabled: bool = False
+    mode: Literal["shadow"] = "shadow"
+    threshold: float = Field(default=0.6, ge=0, le=1)
+    timeout_seconds: float = Field(default=1.5, gt=0)
+    model: str = ""
+
+
+class SquadSettings(BaseModel):
+    """The squad task ledger and its execution switch (experimental).
+
+    When a squad is formed with a store, its dispatches are written
+    to ``squad.db`` in the data directory as assignments, past the
+    ledger's enqueue guards.  ``max_depth`` caps how deep one task
+    tree may go (a root is depth 0).  ``max_per_root`` caps how many
+    assignments one root's tree may hold; 0 means no cap at this
+    level.  The cap counts assignments only: real spend stays with
+    the cost ledger and its monthly budget gate, which is the second
+    of the two levels and the one that refuses on money.
+
+    ``execute`` is the second step's switch: a squad formed with a
+    store, an agent factory and this on also runs its dispatches, one
+    fresh agent per assignment, under the role presets
+    (``nanomuse.team.presets``).  It defaults off, and nothing in the
+    server forms an executing squad yet, so the setting alone changes
+    nothing until a caller wires one up with
+    ``nanomuse.team.runner.build_factory``.  ``cheap_model`` names
+    the model the cheap tier (research, verify) runs on; empty means
+    the ``[llm]`` slot as configured, the decider's rule for its
+    cheap slot.  ``stall_after_errors`` is how many identical errors
+    in a row, with no successful tool call yet, mark a subtask as
+    stalled; ``max_tool_calls`` caps a subtask's tool calls (0 means
+    no cap of the watch's own; the agent's own step limit still
+    applies).
+    """
+
+    max_depth: int = Field(default=2, ge=0)
+    max_per_root: int = Field(default=0, ge=0)
+    execute: bool = False
+    cheap_model: str = ""
+    stall_after_errors: int = Field(default=3, ge=1)
+    max_tool_calls: int = Field(default=0, ge=0)
+
+
+class ToolBridgeSettings(BaseModel):
+    """The tool bridge (experimental): fewer tools per call, the rest by name.
+
+    Off by default, and off means the model's tool list is exactly
+    what it was: every tool, in full.  With it on, the list the model
+    is given each call keeps a small direct core (the conversation
+    controls and the everyday workspace, command and web tools) plus
+    two meta tools, ``find_tools`` and ``use_tool``; the remaining
+    tools are reached through them.  A call made through ``use_tool``
+    goes through the same Sentinel guard as a direct call, so
+    approvals, grants and the audit record work exactly as before.
+    Sending tools (mail, notifications, a task handed to another
+    device) and anything named like the approval machinery itself
+    never travel the bridge: they stay direct, always.  The point is
+    room in the context window for small or cheap models, not money:
+    a bridged call costs the same as a direct one, plus one short
+    listing of a schema when the model looks a tool up first.
+
+    ``auto`` is the second way on: the bridge turns itself on when
+    the chosen model's context window is known and below
+    ``window_threshold``.  Nothing in the repository today records a
+    model's window (the provider catalogue carries capabilities, not
+    windows), so the window is always unknown, auto never engages,
+    and the bridge stays off until either ``enabled`` is set or a
+    window source exists.  That is deliberate: a guessed window
+    would switch the bridge on and off on a fiction.
+    """
+
+    enabled: bool = False
+    auto: bool = False
+    window_threshold: int = Field(default=0, ge=0)
+
+
 class Settings(BaseModel):
     data_dir: Path = DEFAULT_DATA_DIR
     log_level: str = "INFO"
@@ -730,6 +846,10 @@ class Settings(BaseModel):
     hub: HubSettings = Field(default_factory=HubSettings)
     mcp: MCPSettings = Field(default_factory=MCPSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
+    cost: CostSettings = Field(default_factory=CostSettings)
+    decider: DeciderSettings = Field(default_factory=DeciderSettings)
+    squad: SquadSettings = Field(default_factory=SquadSettings)
+    tool_bridge: ToolBridgeSettings = Field(default_factory=ToolBridgeSettings)
     # Where the settings came from (informational).
     source: str | None = None
 
@@ -752,6 +872,18 @@ class Settings(BaseModel):
     @property
     def goals_db(self) -> Path:
         return self.data_dir / "goals.db"
+
+    @property
+    def cost_ledger_file(self) -> Path:
+        return self.data_dir / "cost_ledger.jsonl"
+
+    @property
+    def decider_log_file(self) -> Path:
+        return self.data_dir / "decider-log.jsonl"
+
+    @property
+    def squad_db(self) -> Path:
+        return self.data_dir / "squad.db"
 
     @property
     def reminders_db(self) -> Path:
