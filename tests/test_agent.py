@@ -316,6 +316,38 @@ class TestTaskLedger:
         agent.messages.extend(Message.assistant("working") for _ in range(5))
         assert not self.notes(agent._request_context("system", None))
 
+    def test_token_only_trimming_keeps_completed_actions(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        settings.agent.max_context_messages = 100
+        settings.agent.max_context_tokens = 500
+        sent = tc("send_email", subject="already sent", body="large body " * 1000)
+        result = Message.tool("sent", sent.id, sent.name)
+        result.meta["tool_ok"] = True
+        agent.messages.extend(
+            [Message.assistant(tool_calls=[sent]), result, Message.user("Continue.")]
+        )
+        assert len(agent.context_messages()) == len(agent.messages)
+        request = agent._request_context("system", None)
+        assert not any(message.tool_calls for message in request)
+        assert "already sent" in (self.notes(request)[0].content or "")
+        assert not self.notes(agent.messages)
+
+    def test_ledger_accounts_for_actions_its_own_tokens_evict(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        settings.agent.max_context_tokens = 200
+        for subject in ("first", "second"):
+            sent = tc("send_email", subject=subject, body="x" * 100)
+            result = Message.tool("sent", sent.id, sent.name)
+            result.meta["tool_ok"] = True
+            agent.messages.extend([Message.assistant(tool_calls=[sent]), result])
+        agent.messages.extend([Message.assistant("working"), Message.user("Continue.")])
+        assert any(message.tool_calls for message in agent.context_messages())
+        request = agent._request_context("system", None)
+        assert not any(message.tool_calls for message in request)
+        note = self.notes(request)[0].content or ""
+        assert "first" in note and "second" in note
+        assert not self.notes(agent.messages)
+
 
 async def test_long_turn_keeps_the_request_and_its_work_in_view(settings: Settings):
     # the defaults leave max_context_tokens at 0: the request must stay in view anyway

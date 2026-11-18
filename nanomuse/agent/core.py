@@ -507,7 +507,6 @@ class MuseAgent:
         tail: Message | None = None,
     ) -> list[Message]:
         window = self.context_messages()
-        ledger = self._task_ledger(len(self.messages) - len(window))
         protected = self._previous_requests() + [
             m for m in self.messages[self._task_start :] if m.meta.get("user_request")
         ]
@@ -516,23 +515,39 @@ class MuseAgent:
         # and so do the previous turn's.
         present = {m.meta.get("request_id") for m in window}
         window = [m for m in protected if m.meta.get("request_id") not in present] + window
-        if ledger:
-            window.append(ledger)
-            protected.append(ledger)
         if tail:
             window.append(tail)
         # pinned requests may carry pictures: the cap counts them too
         window = keep_newest_images(window, self.settings.agent.max_context_images)
-        return fit_context(
+        window = fit_context(
             [Message.system(system_prompt), *window],
             tools,
             self.settings.agent.max_context_tokens,
             protected,
         )
+        while True:
+            visible = {call.id for message in window for call in message.tool_calls or []}
+            ledger = self._task_ledger(visible)
+            if ledger is None:
+                return window
+            # The note can evict another exchange. Recompute from the retained window
+            # until the action IDs stop changing; removed messages never reenter.
+            position = len(window) - 1 if tail is not None and window[-1] is tail else len(window)
+            candidate = window[:position] + [ledger] + window[position:]
+            fitted = fit_context(
+                candidate,
+                tools,
+                self.settings.agent.max_context_tokens,
+                protected + [ledger],
+            )
+            remaining = {call.id for message in fitted for call in message.tool_calls or []}
+            if remaining == visible:
+                return fitted
+            window = [message for message in fitted if message is not ledger]
 
-    def _task_ledger(self, cutoff: int) -> Message | None:
-        """The sensitive actions and file writes the conversation made before ``cutoff``, the
-        first message in view. Out of the window, the model sends the same mail again. Files
+    def _task_ledger(self, visible: set[str]) -> Message | None:
+        """The sensitive actions and file writes whose calls are no longer in view.
+        Out of the window, the model sends the same mail again. Files
         read are left out: listing their names did not cut rereads."""
         pending: dict[str, tuple[int, Any]] = {}
         succeeded: list[tuple[int, Any]] = []
@@ -542,7 +557,7 @@ class MuseAgent:
                     pending[call.id] = (index, call)
             elif message.role == Role.TOOL and message.tool_call_id in pending:
                 entry = pending.pop(message.tool_call_id)
-                if message.meta.get("tool_ok") is True and entry[0] < cutoff:
+                if message.meta.get("tool_ok") is True and message.tool_call_id not in visible:
                     succeeded.append(entry)
 
         done: list[str] = []

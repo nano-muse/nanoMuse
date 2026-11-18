@@ -213,3 +213,128 @@ async def test_explicit_allow_rule_keeps_existing_warning_exception(tmp_path: Pa
     assert (await gate.guard(call(tool, body="one"), tool)).ok
     assert not ui.requests
     assert "the same call already ran" in gate.audit.tail()[-1]["reasons"][-1]
+
+
+@pytest.mark.parametrize("first_outcome", ["success", "failure", "cancel"])
+async def test_identical_calls_wait_for_execution_outcome(
+    tmp_path: Path, first_outcome: str
+) -> None:
+    started = asyncio.Event()
+    finish = asyncio.Event()
+    twin_assessed = asyncio.Event()
+    executions: list[str] = []
+
+    class DelayedTool(ExampleTool):
+        assessments: ClassVar[int] = 0
+
+        def assess(self, args: dict[str, Any]) -> CallAssessment:
+            type(self).assessments += 1
+            if self.assessments == 2:
+                twin_assessed.set()
+            return super().assess(args)
+
+        async def execute(self, **kwargs: Any) -> ToolResult:
+            executions.append(kwargs["body"])
+            if len(executions) == 1:
+                started.set()
+                await finish.wait()
+                if first_outcome == "failure":
+                    return ToolResult.fail("did not execute")
+            return ToolResult(output="sent")
+
+    ui = RecordingUI()
+    ui.approve = False
+    gate = Sentinel(SentinelSettings(mode="auto"), AuditLog(tmp_path / "audit.jsonl"), ui)
+    tool = DelayedTool()
+    token = gate.begin_task(conversation="chat")
+    try:
+        first = asyncio.create_task(gate.guard(call(tool, body="same"), tool))
+        await asyncio.wait_for(started.wait(), 1)
+        twin = asyncio.create_task(gate.guard(call(tool, body="same"), tool))
+        await asyncio.wait_for(twin_assessed.wait(), 1)
+        assert executions == ["same"]
+        assert not ui.requests
+        if first_outcome == "cancel":
+            first.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await first
+        else:
+            finish.set()
+            assert (await asyncio.wait_for(first, 1)).ok == (first_outcome == "success")
+        result = await asyncio.wait_for(twin, 1)
+        if first_outcome == "failure":
+            assert result.ok
+            assert executions == ["same", "same"]
+            assert not ui.requests
+        else:
+            assert not result.ok
+            assert executions == ["same"]
+            assert len(ui.requests) == 1
+            assert ui.requests[0].grant_options == ["once"]
+            warning = ui.requests[0].warnings[0]
+            assert ("outcome is unknown" in warning) == (first_outcome == "cancel")
+    finally:
+        gate.end_task(token)
+
+
+async def test_different_sensitive_calls_do_not_wait_for_execution(tmp_path: Path) -> None:
+    started = asyncio.Event()
+    finish = asyncio.Event()
+
+    class DelayedTool(ExampleTool):
+        async def execute(self, **kwargs: Any) -> ToolResult:
+            if kwargs["body"] == "first":
+                started.set()
+                await finish.wait()
+            return await super().execute(**kwargs)
+
+    ui = RecordingUI()
+    gate = Sentinel(SentinelSettings(mode="auto"), AuditLog(tmp_path / "audit.jsonl"), ui)
+    tool = DelayedTool()
+    first = asyncio.create_task(gate.guard(call(tool, body="first"), tool))
+    try:
+        await asyncio.wait_for(started.wait(), 1)
+        assert (await asyncio.wait_for(gate.guard(call(tool, body="other"), tool), 1)).ok
+        assert not ui.requests
+    finally:
+        finish.set()
+        await asyncio.wait_for(first, 1)
+
+
+async def test_cancelling_a_queued_twin_does_not_mark_an_unknown_execution(tmp_path: Path) -> None:
+    started = asyncio.Event()
+    finish = asyncio.Event()
+    twin_assessed = asyncio.Event()
+
+    class DelayedTool(ExampleTool):
+        assessments: ClassVar[int] = 0
+
+        def assess(self, args: dict[str, Any]) -> CallAssessment:
+            type(self).assessments += 1
+            if self.assessments == 2:
+                twin_assessed.set()
+            return super().assess(args)
+
+        async def execute(self, **kwargs: Any) -> ToolResult:
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                started.set()
+                await finish.wait()
+                return ToolResult.fail("did not execute")
+            return ToolResult(output="sent")
+
+    ui = RecordingUI()
+    gate = Sentinel(SentinelSettings(mode="auto"), AuditLog(tmp_path / "audit.jsonl"), ui)
+    tool = DelayedTool()
+    first = asyncio.create_task(gate.guard(call(tool, body="same"), tool))
+    await asyncio.wait_for(started.wait(), 1)
+    twin = asyncio.create_task(gate.guard(call(tool, body="same"), tool))
+    await asyncio.wait_for(twin_assessed.wait(), 1)
+    twin.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await twin
+    finish.set()
+    assert not (await asyncio.wait_for(first, 1)).ok
+    assert (await gate.guard(call(tool, body="same"), tool)).ok
+    assert len(tool.calls) == 2
+    assert not ui.requests

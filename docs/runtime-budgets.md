@@ -41,6 +41,8 @@ the tool output, so a missing detail can be traced in the runtime log.
 
 When earlier tool calls leave the message window, the runtime adds a note to the model's
 request with the successful sensitive actions and file writes from this conversation.
+This includes calls removed by the token budget even when the message count is below
+its limit. The note is recomputed if adding it removes another exchange.
 It keeps the newest 60 actions and says how many older ones were left out. Files read are
 not listed.
 The note is not saved in the conversation. Only calls whose result is marked as a success

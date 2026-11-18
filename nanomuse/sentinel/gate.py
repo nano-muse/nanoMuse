@@ -99,6 +99,12 @@ class Sentinel:
         # what another conversation read
         self._tainted: set[str] = set()
         self._sensitive_calls: dict[str, set[str]] = {}
+        self._sensitive_unknown_calls: dict[str, set[str]] = {}
+        # Identical sensitive calls stay serialized through execution. Other calls
+        # may execute independently once their existing approval lock is released.
+        self._sensitive_locks: WeakValueDictionary[tuple[str, str], asyncio.Lock] = (
+            WeakValueDictionary()
+        )
         self.grants = GrantStore(persistent_approvals_file)
         self.reviewer: SentinelReviewer | None = None
         # Wait only for this conversation's approval for a tool, then reassess policy
@@ -164,6 +170,7 @@ class Sentinel:
         if ctx is not None and not ctx.conversation:
             self.grants.end_conversation(ctx.id)
             self._sensitive_calls.pop(ctx.id, None)
+            self._sensitive_unknown_calls.pop(ctx.id, None)
         _current_task.reset(token)
 
     def end_conversation(self, conversation_id: str) -> None:
@@ -172,6 +179,7 @@ class Sentinel:
         self.grants.end_conversation(conversation_id)
         self._tainted.discard(conversation_id or "")
         self._sensitive_calls.pop(conversation_id or "", None)
+        self._sensitive_unknown_calls.pop(conversation_id or "", None)
 
     # ------------------------------------------------------------------ grants
     def forget_approvals(self) -> None:
@@ -283,8 +291,6 @@ class Sentinel:
             return ToolResult.fail(
                 f"bad arguments for {tool.name}: {type(exc).__name__}: {str(exc)[:200]}"
             )
-        target = assessment.target if assessment.target is not None else assessment.egress_target
-        key = grant_key(tool.name, target)
         task = _current_task.get()
         conversation = task.conversation_id if task else None
         conversation_key = conversation or ""
@@ -297,11 +303,34 @@ class Sentinel:
                 clean_args, sort_keys=True, ensure_ascii=False, default=str
             )
             call_hash = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+            async with self._sensitive_locks.setdefault(
+                (conversation_key, call_hash), asyncio.Lock()
+            ):
+                return await self._guard_assessed(tool, args, assessment, call_hash)
+        return await self._guard_assessed(tool, args, assessment, None)
+
+    async def _guard_assessed(
+        self,
+        tool: BaseTool,
+        args: dict[str, Any],
+        assessment: CallAssessment,
+        call_hash: str | None,
+    ) -> ToolResult:
+        target = assessment.target if assessment.target is not None else assessment.egress_target
+        key = grant_key(tool.name, target)
+        task = _current_task.get()
+        conversation = task.conversation_id if task else None
+        conversation_key = conversation or ""
         async with self._approval_locks.setdefault((tool.name, conversation), asyncio.Lock()):
             # checked once the lock is held: a call that waited may find its twin has run
             if call_hash in self._sensitive_calls.get(conversation_key, set()):
                 assessment.warnings.append(
                     f"the same call already ran in this conversation: {assessment.summary}"
+                )
+            elif call_hash in self._sensitive_unknown_calls.get(conversation_key, set()):
+                assessment.warnings.append(
+                    "the same call may already have run in this conversation, "
+                    f"its outcome is unknown: {assessment.summary}"
                 )
             result_policy = self.policy.evaluate(tool.name, args, assessment, tainted=self.tainted)
             decision, reasons = result_policy.decision, list(result_policy.reasons)
@@ -482,11 +511,19 @@ class Sentinel:
                 return result
 
         started = time.perf_counter()
-        result = await safe_execute(tool, exec_args)
+        try:
+            result = await safe_execute(tool, exec_args)
+        except asyncio.CancelledError:
+            # A cancelled outward action may already have happened. Its waiting twin
+            # must ask before attempting the same action, without claiming success.
+            if call_hash is not None:
+                self._sensitive_unknown_calls.setdefault(conversation_key, set()).add(call_hash)
+            raise
         duration_ms = int((time.perf_counter() - started) * 1000)
 
         if call_hash is not None and result.ok:
             self._sensitive_calls.setdefault(conversation_key, set()).add(call_hash)
+            self._sensitive_unknown_calls.get(conversation_key, set()).discard(call_hash)
 
         if self.vault is not None:
             result.output = self.vault.redact(result.output)
