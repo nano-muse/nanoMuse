@@ -152,7 +152,7 @@ export const CATALOGUE: CatalogueEntry[] = [
   { id: 'canva', name: 'Canva', category: 'design', url: 'https://mcp.canva.com/mcp', auth: { kind: 'oauth' }, docs: 'https://www.canva.dev/docs/connect/canva-mcp-server-setup/', color: '#00C4CC',
     about: { en: 'Create, search and export designs.', zh: '创建、搜索和导出设计。' } },
   { id: 'levea', name: 'Levea', category: 'design', url: 'https://api.livecore.ai/api/v1/misc/mcp', auth: { kind: 'oauth' }, docs: 'https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/mcp-server/README.md', color: '#7C3AED',
-    about: { en: 'Edit and export videos from plain-language prompts: viral clips, captions, 9:16 reframe, B-roll and MP4 renders.', zh: '用自然语言指令剪辑并导出视频：高光切片、字幕、9:16 竖屏重构、B-roll 与 MP4 渲染。' } },
+    about: { en: 'Edit videos, add captions and export MP4 files.', zh: '剪辑视频、添加字幕并导出 MP4 文件。' } },
   { id: 'webflow', name: 'Webflow', category: 'design', url: 'https://mcp.webflow.com/mcp', auth: { kind: 'oauth' }, docs: 'https://developers.webflow.com/data/docs/ai-tools', icon: 'webflow', color: '#146EF5',
     about: { en: 'Sites, pages and CMS collections.', zh: '站点、页面与 CMS 集合。' } },
   { id: 'wix', name: 'Wix', category: 'design', url: 'https://mcp.wix.com/mcp', auth: { kind: 'oauth' }, docs: 'https://www.wix.com/studio/developers/mcp-server', icon: 'wix', color: '#0C6EFC',

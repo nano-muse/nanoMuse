@@ -821,8 +821,8 @@
       "docs": "https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/mcp-server/README.md",
       "color": "#7C3AED",
       "about": {
-        "en": "Edit and export videos from plain-language prompts: viral clips, captions, 9:16 reframe, B-roll and MP4 renders.",
-        "zh": "用自然语言指令剪辑并导出视频：高光切片、字幕、9:16 竖屏重构、B-roll 与 MP4 渲染。"
+        "en": "Edit videos, add captions and export MP4 files.",
+        "zh": "剪辑视频、添加字幕并导出 MP4 文件。"
       }
     },
     {
