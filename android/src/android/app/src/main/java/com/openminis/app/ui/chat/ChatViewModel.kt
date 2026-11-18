@@ -879,6 +879,7 @@ class ChatViewModel(
      *  this, opening a session that previously fell back mid-run flashes the
      *  default model name for one frame before the persisted binding settles. */
     private val sessionLoaded = MutableStateFlow(false)
+    val nmSessionReady: Boolean get() = sessionLoaded.value // nanoMuse: guard UI clears before a send.
 
     private val _sessionTitle = MutableStateFlow("New Chat")
     val sessionTitle: StateFlow<String> = _sessionTitle.asStateFlow()

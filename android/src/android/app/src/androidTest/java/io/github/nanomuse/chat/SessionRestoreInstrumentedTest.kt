@@ -145,6 +145,7 @@ class SessionRestoreInstrumentedTest {
             val vm = newModel(sid, repo, store)
             assertTrue(entered.await(5, TimeUnit.SECONDS))
             instrumentation.runOnMainSync {
+                assertFalse(vm.nmSessionReady)
                 // A usable provider makes the readiness check, rather than missing credentials,
                 // the reason this send is refused. No request is issued.
                 ChatViewModel::class.java.getDeclaredField("currentProvider").apply { isAccessible = true }
@@ -156,6 +157,7 @@ class SessionRestoreInstrumentedTest {
             }
             release.countDown()
             awaitRestore(vm)
+            assertTrue(vm.nmSessionReady)
             assertEquals(listOf("original"), history(vm).map { it.dbMessageId })
             assertEquals("original instruction", history(vm).single().content)
             assertEquals("new draft", vm.inputText.value)
