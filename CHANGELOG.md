@@ -5,6 +5,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ## [Unreleased]
 
 - Made squad ledger terminal states atomic and kept uncertain work from restarting automatically. Settling an assignment is now one conditional update, so two connections cannot both settle it or write conflicting terminal events, and the startup reconcile now settles work that had already started without a finished cost record as failed with the outcome uncertain, instead of sparing it for a retry; only work that never started is spared one restart.
+- Carried the parent conversation's Sentinel taint into squad subtasks, so an outbound call that would have needed approval in the parent conversation also needs approval in a subtask that received private work from it.
 
 - Prevented failed coding runs from retrying in a new conversation after a tool had already started or returned a result.
 

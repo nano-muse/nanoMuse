@@ -59,17 +59,43 @@ def _settled_by(verdict: Any) -> str:
 class TaskContext:
     """The agent run a tool call belongs to: gives approvals a purpose, and the
     conversation the run is part of gives them their middle scope. A run outside any
-    conversation (``nanomuse run``, a scheduled job) stands in for one itself."""
+    conversation (``nanomuse run``, a scheduled job) stands in for one itself.
+
+    ``parent_conversation`` names the conversation a subtask was handed out
+    from, when it has one. It is a taint link only: the Sentinel consults the
+    parent conversation's taint when it judges the subtask's calls, so a
+    subtask cannot be cleaner than the conversation that handed it private
+    work. Grants are not inherited through it: an approval given for the
+    parent conversation does not cover the subtask, which asks on its own."""
 
     id: str
     purpose: str = ""
     conversation: str = ""
     purpose_truncated: bool = False
     execution_llm: BaseLLM | None = field(default=None, repr=False, compare=False)
+    parent_conversation: str = ""
 
     @property
     def conversation_id(self) -> str:
         return self.conversation or self.id
+
+
+@dataclass(frozen=True)
+class SentinelContext:
+    """A snapshot of one conversation's Sentinel context, taken so a subtask
+    can carry it: the conversation it was taken from and the set of
+    conversations tainted at that moment. A subtask built with this snapshot
+    inherits the taint of the conversation named here (see
+    :meth:`Sentinel.inherit_context` and :meth:`Sentinel.begin_task`)."""
+
+    conversation: str = ""
+    tainted_conversations: frozenset[str] = frozenset()
+
+    @property
+    def tainted(self) -> bool:
+        """Whether the conversation this snapshot was taken from had read
+        private data when the snapshot was taken."""
+        return self.conversation in self.tainted_conversations
 
 
 _current_task: ContextVar[TaskContext | None] = ContextVar("nanomuse_task", default=None)
@@ -116,11 +142,54 @@ class Sentinel:
 
     @property
     def tainted(self) -> bool:
-        """Whether private data was read in the conversation of the call being assessed."""
-        return self.tainted_for(self._taint_key())
+        """Whether private data was read in the conversation of the call being assessed.
+
+        A subtask run also counts its parent conversation: if the
+        conversation that handed the subtask out is tainted, the subtask's
+        calls are judged tainted too, for as long as either is."""
+        if self.tainted_for(self._taint_key()):
+            return True
+        task = _current_task.get()
+        return bool(
+            task is not None
+            and task.parent_conversation
+            and self.tainted_for(task.parent_conversation)
+        )
 
     def tainted_for(self, conversation: str | None) -> bool:
         return (conversation or "") in self._tainted
+
+    def snapshot_context(self, conversation: str | None = None) -> SentinelContext:
+        """Capture the Sentinel context of one conversation for a subtask.
+
+        Without an argument the conversation is the running task's, as in
+        :meth:`_taint_key`. The snapshot freezes the tainted set, so a
+        subtask that receives private work keeps the parent conversation's
+        taint even if that conversation is later cleared."""
+        if conversation is None:
+            conversation = self._taint_key()
+        return SentinelContext(
+            conversation=conversation or "",
+            tainted_conversations=frozenset(self._tainted),
+        )
+
+    def inherit_context(
+        self, context: SentinelContext | None, child_conversation: str | None
+    ) -> bool:
+        """Taint ``child_conversation`` when the snapshot's conversation is tainted.
+
+        The parent conversation is consulted both as the snapshot recorded
+        it and as it stands now, so taint the parent picked up between the
+        snapshot and this call is carried too. Returns True when the child
+        was tainted. Nothing is ever untainted here: inheritance only ever
+        adds taint, never removes it."""
+        if context is None or not child_conversation:
+            return False
+        parent = context.conversation
+        if not (context.tainted or (parent and self.tainted_for(parent))):
+            return False
+        self.taint(child_conversation)
+        return True
 
     def tainted_any(self) -> bool:
         """For a status view that is not answering for one conversation."""
@@ -143,16 +212,33 @@ class Sentinel:
         conversation: str | None = None,
         *,
         execution_llm: BaseLLM | None = None,
+        parent_conversation: str | None = None,
+        inherited_context: SentinelContext | None = None,
     ) -> Any:
         """Mark the start of an agent run, within ``conversation`` when it has one.
-        Returns a token for :meth:`end_task`."""
+        Returns a token for :meth:`end_task`.
+
+        A subtask run names where it was handed out from, either as
+        ``parent_conversation`` or as a whole ``inherited_context`` snapshot
+        (see :meth:`snapshot_context`). When that parent conversation is
+        tainted, this run's own conversation is tainted from the start, and
+        the parent link stays on the task so taint the parent picks up
+        while the subtask runs counts too."""
+        parent = (parent_conversation or "").strip()
+        if inherited_context is not None and not parent:
+            parent = inherited_context.conversation
         ctx = TaskContext(
             id=task_id or uuid.uuid4().hex[:10],
             purpose=purpose.strip()[:200],
             conversation=(conversation or "").strip(),
             purpose_truncated=len(purpose.strip()) > 200,
             execution_llm=execution_llm,
+            parent_conversation=parent,
         )
+        if inherited_context is not None:
+            self.inherit_context(inherited_context, ctx.conversation_id)
+        elif parent and self.tainted_for(parent):
+            self.taint(ctx.conversation_id)
         return _current_task.set(ctx)
 
     def end_task(self, token: Any) -> None:
@@ -509,4 +595,4 @@ class Sentinel:
             return text
 
 
-__all__ = ["Sentinel", "TaskContext", "current_task"]
+__all__ = ["Sentinel", "SentinelContext", "TaskContext", "current_task"]

@@ -45,6 +45,12 @@ there as everywhere.  Two tightenings ride along:
 - ``notify`` assignments are recorded and never run by the squad:
   there is no notification executor here, and the ledger says so by
   leaving them queued.
+- a run carries the parent conversation's Sentinel context: the
+  conversation a dispatch happens in (or the one the squad was formed
+  with) is captured at dispatch and handed to the factory, so the
+  subtask inherits that conversation's taint. A subtask that receives
+  a private brief is judged by the Sentinel like the conversation
+  that handed it out, not like a fresh conversation.
 
 Execution is off unless all three pieces are present (store, factory,
 ``execute``), and neither the server nor the companion forms an
@@ -54,6 +60,7 @@ executing squad yet: the wiring exists for callers that build one.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import secrets
 import time
@@ -61,6 +68,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from nanomuse.logger import logger
+from nanomuse.sentinel.gate import current_task
 from nanomuse.team.presets import effective_preset, preset_for
 from nanomuse.team.store import (
     MODES,
@@ -300,6 +308,7 @@ class Squad:
         origin: str = "user",
         execute: bool = False,
         factory: AgentFactory | None = None,
+        parent_conversation: str = "",
     ) -> None:
         self.formed = formed
         self.bus = SquadBus()
@@ -310,6 +319,10 @@ class Squad:
         self.origin = origin
         self.execute = execute
         self.factory = factory
+        # The conversation subtasks are handed out from, when the caller
+        # names it up front. A dispatch made inside a run captures that
+        # run's conversation instead, at dispatch time.
+        self.parent_conversation = parent_conversation
         self._root_id: str | None = None
         self._pending: set[asyncio.Task[None]] = set()
         if formed:
@@ -326,8 +339,15 @@ class Squad:
         store: SquadStore | None = None,
         execute: bool = False,
         factory: AgentFactory | None = None,
+        parent_conversation: str = "",
     ) -> Squad:
-        return cls(formed=False, store=store, execute=execute, factory=factory)
+        return cls(
+            formed=False,
+            store=store,
+            execute=execute,
+            factory=factory,
+            parent_conversation=parent_conversation,
+        )
 
     @classmethod
     def form(
@@ -337,8 +357,16 @@ class Squad:
         origin: str = "user",
         execute: bool = False,
         factory: AgentFactory | None = None,
+        parent_conversation: str = "",
     ) -> Squad:
-        return cls(formed=True, store=store, origin=origin, execute=execute, factory=factory)
+        return cls(
+            formed=True,
+            store=store,
+            origin=origin,
+            execute=execute,
+            factory=factory,
+            parent_conversation=parent_conversation,
+        )
 
     @property
     def root_assignment_id(self) -> str | None:
@@ -412,12 +440,28 @@ class Squad:
             )
         )
         if sent and assignment is not None and assignment.mode != "notify":
-            self._schedule_execution(assignment, role, action, body)
+            self._schedule_execution(assignment, role, action, body, self._parent_conversation())
         return sent
+
+    def _parent_conversation(self) -> str:
+        """The conversation this dispatch is handed out from, captured now:
+        the one the squad was formed with, else the running task's, which
+        is the parent run whenever a dispatch happens inside one. Captured
+        at dispatch because the run itself is scheduled, and the task
+        context it is scheduled from may be gone by the time it runs."""
+        if self.parent_conversation:
+            return self.parent_conversation
+        task = current_task()
+        return task.conversation_id if task is not None else ""
 
     # -------------------------------------------------------------- execution
     def _schedule_execution(
-        self, assignment: Assignment, role: str, action: str, body: dict[str, Any]
+        self,
+        assignment: Assignment,
+        role: str,
+        action: str,
+        body: dict[str, Any],
+        parent_conversation: str = "",
     ) -> None:
         if not self.execute:
             return
@@ -427,7 +471,7 @@ class Squad:
                 " assignments will only be recorded"
             )
             return
-        coro = self._run_assignment(assignment, role, action, body)
+        coro = self._run_assignment(assignment, role, action, body, parent_conversation)
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -442,8 +486,39 @@ class Squad:
         while self._pending:
             await asyncio.gather(*list(self._pending), return_exceptions=True)
 
+    def _build_run(
+        self, preset: Any, assignment: Assignment, parent_conversation: str
+    ) -> SubtaskRun:
+        """Build one run through the factory, carrying the parent context.
+
+        A factory that accepts a ``parent_conversation`` (the production
+        factory does) gets the conversation captured at dispatch, and
+        snapshots that conversation's taint from the shared Sentinel
+        itself. A factory without that parameter, the shape tests inject,
+        is called exactly as before and resolves the parent from the
+        running task's context if it can."""
+        factory = self.factory
+        assert factory is not None
+        accepts_parent = False
+        if parent_conversation:
+            try:
+                parameters = inspect.signature(factory).parameters
+                accepts_parent = "parent_conversation" in parameters or any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in parameters.values()
+                )
+            except (TypeError, ValueError):  # pragma: no cover, a factory that hides its shape
+                accepts_parent = False
+        if accepts_parent:
+            return factory(preset, assignment, parent_conversation=parent_conversation)  # type: ignore[call-arg]
+        return factory(preset, assignment)
+
     async def _run_assignment(
-        self, assignment: Assignment, role: str, action: str, body: dict[str, Any]
+        self,
+        assignment: Assignment,
+        role: str,
+        action: str,
+        body: dict[str, Any],
+        parent_conversation: str = "",
     ) -> None:
         store = self.store
         factory = self.factory
@@ -462,7 +537,7 @@ class Squad:
         handle: SubtaskRun | None = None
         final = ""
         try:
-            handle = factory(preset, assignment)
+            handle = self._build_run(preset, assignment, parent_conversation)
             final = await handle.run(_task_text(action, body))
         except Exception as exc:  # noqa: BLE001 - a failed run is a settled assignment
             logger.warning("squad subtask {} failed: {}", assignment.id, exc)

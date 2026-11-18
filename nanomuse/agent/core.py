@@ -35,7 +35,7 @@ from nanomuse.logger import logger
 from nanomuse.memory import MemoryItem, MemoryStore
 from nanomuse.runtime import device
 from nanomuse.schema import AgentState, Attachment, Message, Role, ToolResult, new_id
-from nanomuse.sentinel import AuditLog, Sentinel
+from nanomuse.sentinel import AuditLog, Sentinel, SentinelContext
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
 from nanomuse.ui import UI
@@ -87,6 +87,8 @@ class MuseAgent:
         session_file: Path | None = None,
         conversation_id: str | None = None,
         cost_recorder: TaskCostRecorder | None = None,
+        parent_conversation_id: str | None = None,
+        inherited_sentinel_context: SentinelContext | None = None,
     ):
         self.settings = settings
         self.llm = llm
@@ -108,6 +110,13 @@ class MuseAgent:
         # The conversation (thread) this agent is; approvals "for this conversation" are
         # bound to it and last as long as it does. Without one, each run stands alone.
         self.conversation_id = conversation_id
+        # A subtask's link back to the conversation that handed it out, with the
+        # Sentinel context snapshot taken there. Both go to the Sentinel at
+        # begin_task, so the subtask is judged with the parent conversation's
+        # taint, not as a fresh, clean conversation. Empty and None for an
+        # ordinary agent, which is every agent except a squad subtask.
+        self.parent_conversation_id = parent_conversation_id
+        self.inherited_sentinel_context = inherited_sentinel_context
         # The id model calls carry for a vendor that wants one per conversation (OpenCode Go):
         # the thread's, else one of this agent's own for as long as it lives.
         self.session_id = conversation_id or llm_session.new_fallback()
@@ -645,7 +654,11 @@ class MuseAgent:
         step = 0
         empty_replies = 0
         task_token = self.sentinel.begin_task(
-            purpose or user_input, conversation=self.conversation_id, execution_llm=self.llm
+            purpose or user_input,
+            conversation=self.conversation_id,
+            execution_llm=self.llm,
+            parent_conversation=self.parent_conversation_id,
+            inherited_context=self.inherited_sentinel_context,
         )
         session_token = llm_session.enter(self.session_id)
         turn_token = llm_session.begin_turn(run, self.turns)
