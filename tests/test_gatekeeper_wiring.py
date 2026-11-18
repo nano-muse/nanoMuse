@@ -14,12 +14,17 @@ import pytest
 from nanomuse.config import SentinelRule, SentinelSettings, Settings
 from nanomuse.schema import RiskLevel
 from nanomuse.sentinel import AuditLog, Sentinel
-from nanomuse.sentinel.gatekeeper import GatekeeperClient, GatekeeperSupervisor
+from nanomuse.sentinel.gatekeeper import (
+    GatekeeperClient,
+    GatekeeperDecision,
+    GatekeeperSupervisor,
+)
 from nanomuse.sentinel.grants import GrantStore
+from nanomuse.sentinel.policy import Decision
 from nanomuse.tools.base import CallAssessment
 from nanomuse.ui import ApprovalDecision, ApprovalRequest, HeadlessUI
 from tests.test_gatekeeper import _drop_spawn_key, _spawn_key
-from tests.test_sentinel import Echo, call
+from tests.test_sentinel import Echo, Reader, Sender, call
 
 _SUPPORTED = sys.platform in ("linux", "darwin", "win32")
 pytestmark = pytest.mark.skipif(not _SUPPORTED, reason="the gatekeeper serves Linux and macOS only")
@@ -123,6 +128,84 @@ async def test_gatekeeper_permission_settles_a_local_ask(tmp_path: Path):
     finally:
         await sup.stop()
         _drop_spawn_key()
+
+
+class WarningEcho(Echo):
+    def assess(self, args):  # type: ignore[override]
+        return CallAssessment(
+            risk=RiskLevel.SENSITIVE, summary="risky echo", warnings=["looks dangerous"]
+        )
+
+
+class StubGatekeeper:
+    """A gatekeeper client that always answers with one fixed decision."""
+
+    def __init__(self, decision: GatekeeperDecision):
+        self._decision = decision
+
+    def decide(self, *args, **kwargs):  # noqa: ARG002
+        return self._decision
+
+
+async def test_gatekeeper_permission_does_not_settle_a_call_with_warnings(tmp_path: Path):
+    GrantStore(tmp_path / "approvals.json").add("echo", None, "always", None)
+    sup = await _started(tmp_path, SentinelSettings())
+    try:
+        ui = ScopedUI(approve=False)
+        gate = _gate(tmp_path, sup, SentinelSettings(), ui)
+        result = await gate.guard(call("echo", text="hi"), WarningEcho())
+        assert not result.ok, "a warning still asks, gatekeeper grant or not"
+        assert [e for e in ui.events if e[0] == "approval"], "the person was asked"
+    finally:
+        await sup.stop()
+        _drop_spawn_key()
+
+
+async def test_gatekeeper_permission_does_not_settle_a_tainted_call(tmp_path: Path):
+    GrantStore(tmp_path / "approvals.json").add("sender", "evil.com", "always", None)
+    sup = await _started(tmp_path, SentinelSettings())
+    try:
+        ui = ScopedUI(approve=False)
+        gate = _gate(tmp_path, sup, SentinelSettings(), ui)
+        await gate.guard(call("reader"), Reader())
+        result = await gate.guard(call("sender", host="evil.com"), Sender())
+        assert not result.ok, "a tainted send still asks, gatekeeper grant or not"
+        assert [e for e in ui.events if e[0] == "approval"], "the person was asked"
+    finally:
+        await sup.stop()
+        _drop_spawn_key()
+
+
+async def test_a_gatekeeper_grant_allow_does_not_bypass_a_local_warning(tmp_path: Path):
+    stub = StubGatekeeper(
+        GatekeeperDecision(
+            decision=Decision.ALLOW,
+            reasons=["covered by your 'always' permission for echo"],
+            grant_scope="always",
+        )
+    )
+    ui = ScopedUI(approve=False)
+    gate = Sentinel(SentinelSettings(), AuditLog(tmp_path / "audit.jsonl"), ui, gatekeeper=stub)  # type: ignore[arg-type]
+    result = await gate.guard(call("echo", text="hi"), WarningEcho())
+    assert not result.ok, "the local warning check runs even when the gatekeeper allows"
+    assert [e for e in ui.events if e[0] == "approval"], "the person was asked"
+
+
+async def test_a_gatekeeper_grant_allow_does_not_bypass_local_taint(tmp_path: Path):
+    stub = StubGatekeeper(
+        GatekeeperDecision(
+            decision=Decision.ALLOW,
+            reasons=["covered by your 'always' permission for sender:evil.com"],
+            grant_scope="always",
+            tainted_ask=True,
+        )
+    )
+    ui = ScopedUI(approve=False)
+    gate = Sentinel(SentinelSettings(), AuditLog(tmp_path / "audit.jsonl"), ui, gatekeeper=stub)  # type: ignore[arg-type]
+    await gate.guard(call("reader"), Reader())
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert not result.ok, "the local taint check runs even when the gatekeeper allows"
+    assert [e for e in ui.events if e[0] == "approval"], "the person was asked"
 
 
 async def test_approval_is_mirrored_to_the_gatekeeper(tmp_path: Path):

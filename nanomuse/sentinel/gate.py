@@ -372,11 +372,13 @@ class Sentinel:
         """Ask the gatekeeper process about this call and fold its answer in.
 
         Its deny is final: no local permission or prompt settles it. A standing
-        permission it holds settles a call the policy would have asked about.
-        Its ask makes the call ask even where the policy would not (the local
-        flow in guard() then runs, prompt included). It never loosens a local
-        deny, and a bare agreement from its own policy copy does not settle a
-        local ask: only its permissions do. A gatekeeper that cannot be reached
+        permission it holds settles a call the policy would have asked about,
+        unless the call carries a warning or the taint rule marked it: those
+        still ask locally, whatever the gatekeeper's permission says. Its ask
+        makes the call ask even where the policy would not (the local flow in
+        guard() then runs, prompt included). It never loosens a local deny,
+        and a bare agreement from its own policy copy does not settle a local
+        ask: only its permissions do. A gatekeeper that cannot be reached
         refuses the call outright: with the separation switched on, falling back
         to the local policy would hand the decision back to the very process it
         exists to keep honest, silently."""
@@ -422,7 +424,14 @@ class Sentinel:
             return result
         if gk.decision == Decision.DENY:
             return (Decision.DENY, list(gk.reasons), scope, "gatekeeper")
-        if gk.decision == Decision.ALLOW and gk.grant_scope and decision == Decision.ASK:
+        if (
+            gk.decision == Decision.ALLOW
+            and gk.grant_scope
+            and decision == Decision.ASK
+            and not assessment.warnings
+            and not result_policy.tainted_ask
+            and not gk.tainted_ask
+        ):
             return (Decision.ALLOW, list(gk.reasons), gk.grant_scope, "gatekeeper")
         if gk.decision == Decision.ASK and decision == Decision.ALLOW:
             merged = list(reasons) + [r for r in gk.reasons if r not in reasons]
@@ -482,9 +491,11 @@ class Sentinel:
                 decision, reasons, scope, settled_by = consulted
 
             if decision == Decision.ASK:
+                # A standing permission settles only a plain ASK: a call with a
+                # warning, or one the taint rule marked, is approved every time.
                 grant = (
                     None
-                    if assessment.warnings
+                    if assessment.warnings or result_policy.tainted_ask
                     else self.grants.match(key, task.conversation_id if task else None)
                 )
                 # auto mode skips the question, except for a call that carries a warning or

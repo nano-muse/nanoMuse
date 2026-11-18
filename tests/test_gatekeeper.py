@@ -430,6 +430,48 @@ def test_the_peer_credential_check_refuses_without_a_platform_api(tmp_path: Path
         other.close()
 
 
+def test_gatekeeper_grant_does_not_settle_a_call_with_warnings(supervisor, client):
+    assert client.grant("send_email", "boss@example.com", "always") is True
+    plain = CallAssessment(
+        risk=RiskLevel.SENSITIVE,
+        summary="send mail",
+        egress=True,
+        egress_target="boss@example.com",
+        egress_configured=True,
+    )
+    settled = client.decide("send_email", {"to": "boss@example.com"}, plain)
+    assert settled.decision == Decision.ALLOW
+    assert settled.grant_scope == "always"
+    warned = CallAssessment(
+        risk=RiskLevel.SENSITIVE,
+        summary="send mail",
+        egress=True,
+        egress_target="boss@example.com",
+        egress_configured=True,
+        warnings=["looks dangerous"],
+    )
+    decision = client.decide("send_email", {"to": "boss@example.com"}, warned)
+    assert decision.decision == Decision.ASK
+    assert decision.grant_scope is None
+
+
+def test_gatekeeper_grant_does_not_settle_a_tainted_call(supervisor, client):
+    assert client.grant("send_email", "stranger@example.com", "always") is True
+    plain = CallAssessment(
+        risk=RiskLevel.SENSITIVE,
+        summary="send mail",
+        egress=True,
+        egress_target="stranger@example.com",
+    )
+    settled = client.decide("send_email", {"to": "stranger@example.com"}, plain, tainted=False)
+    assert settled.decision == Decision.ALLOW
+    assert settled.grant_scope == "always"
+    decision = client.decide("send_email", {"to": "stranger@example.com"}, plain, tainted=True)
+    assert decision.decision == Decision.ASK
+    assert decision.tainted_ask is True
+    assert decision.grant_scope is None
+
+
 @pytest.mark.skipif(not _UNIX, reason="the Windows client fails closed on the pipe instead")
 def test_the_client_fails_closed_without_unix_sockets(tmp_path: Path, monkeypatch):
     def _no_unix_family() -> int:

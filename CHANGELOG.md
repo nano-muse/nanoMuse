@@ -6,6 +6,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Made squad ledger terminal states atomic and kept uncertain work from restarting automatically. Settling an assignment is now one conditional update, so two connections cannot both settle it or write conflicting terminal events, and the startup reconcile now settles work that had already started without a finished cost record as failed with the outcome uncertain, instead of sparing it for a retry; only work that never started is spared one restart.
 - Carried the parent conversation's Sentinel taint into squad subtasks, so an outbound call that would have needed approval in the parent conversation also needs approval in a subtask that received private work from it.
+- Fixed a standing permission held by the gatekeeper settling a call that carried a warning or that the taint rule had marked: those calls ask for approval again, in the gatekeeper, in the local grant check, and when the gatekeeper's answer is folded into the local decision. A standing permission now settles only a plain ask, with no warning and no taint mark.
 - Fixed the signed audit chain forking when two instances or processes appended to the same log: appends now take an exclusive lock on a sidecar lock file and re-read the chain tail under it, so interleaved writers produce one chain that verifies.
 
 - Prevented failed coding runs from retrying in a new conversation after a tool had already started or returned a result.

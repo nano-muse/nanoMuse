@@ -689,7 +689,10 @@ class GatekeeperServer:
         result = self.policy.evaluate(tool, args, assessment, tainted=tainted)
         decision, reasons = result.decision, list(result.reasons)
         scope: str | None = None
-        if decision == Decision.ASK:
+        # A standing permission settles only a plain ASK. A call that carries a
+        # warning, or one the taint rule marked, still asks: warnings and taint
+        # require approval on every call, as in the local Sentinel.
+        if decision == Decision.ASK and not assessment.warnings and not result.tainted_ask:
             key = grant_key(tool, assessment.target or assessment.egress_target)
             grant = self.grants.match(key, conversation)
             if grant is not None:

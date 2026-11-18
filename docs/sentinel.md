@@ -82,7 +82,7 @@ When the decision is *ask*, the UI (console, or an approval card in the app) sho
 | For 24 hours | persisted in `<data_dir>/approvals.json` with an expiry |
 | Always | persisted until you revoke it |
 
-An approval is a capability, not a mood. It is bound to a **grant key**: the tool plus what the call touches: `web_fetch:example.com`, `send_email:alice@example.com`, `shell:git`, `browser:booking.com`. Allowing `git` commands for the session says nothing about `curl`; a pipeline such as `git status | head` needs every program covered (approving it grants each program separately), and an email to two people needs both recipients. The one deliberate exception is *for this conversation* on `shell`: a job that needs `git` now will need `ls` and `wc` a moment later, so that answer covers the shell for the rest of the conversation, while destinations (recipients, hosts) stay bound even within it. Tools without a meaningful target (`python_execute`, an MCP tool) are granted as a whole, and the Sentinel only offers *once* and *for this conversation* for arbitrary code with network access. A call that carries a warning (`rm -rf`, `sudo`, `curl | sh`) is approved one at a time; standing permissions never cover it.
+An approval is a capability, not a mood. It is bound to a **grant key**: the tool plus what the call touches: `web_fetch:example.com`, `send_email:alice@example.com`, `shell:git`, `browser:booking.com`. Allowing `git` commands for the session says nothing about `curl`; a pipeline such as `git status | head` needs every program covered (approving it grants each program separately), and an email to two people needs both recipients. The one deliberate exception is *for this conversation* on `shell`: a job that needs `git` now will need `ls` and `wc` a moment later, so that answer covers the shell for the rest of the conversation, while destinations (recipients, hosts) stay bound even within it. Tools without a meaningful target (`python_execute`, an MCP tool) are granted as a whole, and the Sentinel only offers *once* and *for this conversation* for arbitrary code with network access. A call that carries a warning (`rm -rf`, `sudo`, `curl | sh`) is approved one at a time; standing permissions never cover it. A call the taint rule marked, because the conversation read private data and the call can send data to a destination outside the allowlist, is approved the same way: standing permissions do not cover it either.
 
 Everything you granted is listed under the avatar in the app (Permissions), each with its own revoke button; `DELETE /api/approvals/grants/{key}` and `DELETE /api/approvals` do the same from the API, and `nanomuse chat`'s `/forget-approvals` clears them in the console.
 
@@ -221,9 +221,11 @@ conservatively:
 
 - Its deny is final. No local permission or prompt settles it.
 - A standing permission it holds settles a call the local policy would have
-  asked about. Both sides read the same approvals file, and when the person
-  gives a standing permission at the prompt, the Sentinel mirrors it to the
-  gatekeeper (a new `grant` request) so its store can settle the next call.
+  asked about, unless the call carries a warning or the taint rule marked
+  it: those ask again, on both sides. Both sides read the same approvals
+  file, and when the person gives a standing permission at the prompt, the
+  Sentinel mirrors it to the gatekeeper (a new `grant` request) so its store
+  can settle the next call.
 - Its ask makes the call ask even where the local policy would not; the
   local flow then runs, prompt included.
 - It never loosens a local deny, and a bare agreement from its own policy
