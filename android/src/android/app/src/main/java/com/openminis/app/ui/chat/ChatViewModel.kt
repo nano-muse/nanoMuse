@@ -881,6 +881,11 @@ class ChatViewModel(
     private val sessionLoaded = MutableStateFlow(false)
     val nmSessionReady: Boolean get() = sessionLoaded.value // nanoMuse: guard UI clears before a send.
 
+    // nanoMuse: automated callers must wait for history, not merely the selected provider.
+    internal suspend fun nmAwaitSessionReady() {
+        sessionLoaded.first { it }
+    }
+
     private val _sessionTitle = MutableStateFlow("New Chat")
     val sessionTitle: StateFlow<String> = _sessionTitle.asStateFlow()
 

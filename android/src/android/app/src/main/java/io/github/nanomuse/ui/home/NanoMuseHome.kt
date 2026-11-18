@@ -289,17 +289,24 @@ fun NanoMuseHome(
     val soul by SoulStore.cachedMetadata.collectAsState()
     val agentName = soul.name.trim().ifEmpty { stringResource(R.string.app_name) }
 
-    fun sendToMainChat(text: String) {
-        val vm = mainVm ?: run {
+    fun readyMainChat(): com.openminis.app.ui.chat.ChatViewModel? {
+        val vm = mainVm
+        if (vm == null || !vm.nmSessionReady) {
             Toast.makeText(context, R.string.nm_home_not_ready, Toast.LENGTH_SHORT).show()
-            return
+            return null
         }
+        return vm
+    }
+
+    fun sendToMainChat(text: String) {
+        val vm = readyMainChat() ?: return
         showMain()
         vm.nmMarkPersonTurn() // an idea or goal card the person tapped: a task for StarPrompt's count
         vm.sendMessage(text)
     }
 
     fun startGoal(category: GoalCategory, seed: String? = null) {
+        if (readyMainChat() == null) return
         val id = mainSessionId ?: return
         val opener = GoalFlow.startCreation(context, id, category)
         sendToMainChat(if (seed.isNullOrBlank()) opener else "$opener $seed")

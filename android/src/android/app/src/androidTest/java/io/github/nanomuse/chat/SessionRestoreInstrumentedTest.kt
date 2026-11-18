@@ -18,6 +18,10 @@ import com.openminis.app.ui.chat.ChatViewModel
 import com.openminis.app.provider.openai.OpenAIProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -144,8 +148,12 @@ class SessionRestoreInstrumentedTest {
             }
             val vm = newModel(sid, repo, store)
             assertTrue(entered.await(5, TimeUnit.SECONDS))
+            val automationWait = CoroutineScope(Dispatchers.Default).async {
+                withTimeout(5_000) { vm.nmAwaitSessionReady() }
+            }
             instrumentation.runOnMainSync {
                 assertFalse(vm.nmSessionReady)
+                assertFalse(automationWait.isCompleted)
                 // A usable provider makes the readiness check, rather than missing credentials,
                 // the reason this send is refused. No request is issued.
                 ChatViewModel::class.java.getDeclaredField("currentProvider").apply { isAccessible = true }
@@ -157,6 +165,7 @@ class SessionRestoreInstrumentedTest {
             }
             release.countDown()
             awaitRestore(vm)
+            runBlocking { automationWait.await() }
             assertTrue(vm.nmSessionReady)
             assertEquals(listOf("original"), history(vm).map { it.dbMessageId })
             assertEquals("original instruction", history(vm).single().content)

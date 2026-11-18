@@ -203,13 +203,15 @@ internal object HeadlessChatRunner {
         // the thinkingLevel wait above).
         val ready = withContext(Dispatchers.Default) {
             withTimeoutOrNull(5000L) {
+                vm.nmAwaitSessionReady() // nanoMuse: a provider can resolve before its saved history.
                 vm.activeEntryId.first { it != null }
             }
         }
         if (ready == null) {
             return@withContext PromptResult(
                 status = "Error",
-                responseText = "no_provider_resolved_in_5s",
+                responseText = if (vm.nmSessionReady) "no_provider_resolved_in_5s"
+                    else "session_not_ready_in_5s", // nanoMuse: never report an old reply as this turn's result.
                 timedOut = false,
             )
         }
@@ -290,13 +292,15 @@ internal object HeadlessChatRunner {
         // currentProvider-null early-return if invoked before resolve.
         val ready = withContext(Dispatchers.Default) {
             withTimeoutOrNull(5000L) {
+                vm.nmAwaitSessionReady() // nanoMuse: retry cannot rewind an unrestored conversation.
                 vm.activeEntryId.first { it != null }
             }
         }
         if (ready == null) {
             return@withContext PromptResult(
                 status = "Error",
-                responseText = "no_provider_resolved_in_5s",
+                responseText = if (vm.nmSessionReady) "no_provider_resolved_in_5s"
+                    else "session_not_ready_in_5s", // nanoMuse: a bounded restore refusal precedes mutation.
                 timedOut = false,
                 deletedMessageCount = deletedCount,
                 retriedMessageId = targetMsgId,
