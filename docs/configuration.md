@@ -229,6 +229,8 @@ taint_tracking     = true
 egress_allowlist   = ["duckduckgo.com", "*.duckduckgo.com", "wikipedia.org", "*.wikipedia.org",
                       "github.com", "*.github.com", "*.githubusercontent.com", "pypi.org", "*.pypi.org"]
 audit_file         = ""              # default <data_dir>/audit.jsonl
+gatekeeper         = false           # consult the gatekeeper process on every call (Linux, macOS, Windows)
+gatekeeper_socket  = ""              # default <data_dir>/gatekeeper.sock; macOS paths stay under ~100 chars
 
 [[sentinel.rules]]                   # first match wins; values are glob patterns matched against str(arg)
 tool   = "shell"
@@ -456,6 +458,84 @@ A command that needs a key takes it through `env`, and the key itself lives in t
 A server that does not answer is logged and skipped, and the agent starts without its tools; the line in the log names the server and the transport's error with every URL query value masked (`?key=***`) and the vault's secrets redacted, so a refused key does not end up in `logs/`.
 
 Three Chinese services the built-in skills know come as MCP servers, and `config/config.example.toml` has the block for each: 高德地图 (hosted, `AMAP_KEY` in the vault), 12306 (`npx -y 12306-mcp`, no key; trains, query only) and 快递100 (hosted, `KUAIDI100_KEY`; parcels, paid per tracking number). Which of them have actually been run inside the phone's root file system, and what else is out there: [services.md](services.md).
+
+## `[cost]`
+
+```toml
+[cost]
+monthly_budget_usd = 0     # 0: no monthly budget set
+mode               = "off" # off | warn | hard
+device_id          = ""    # empty: this device is recorded as "this-device"
+
+[cost.prices."model-name"]
+input_per_million  = 0
+output_per_million = 0
+```
+
+The cost ledger over real runs. Each finished task's metered usage (the agent loop already
+meters every call for `[agent.budget]`) lands in a ledger persisted as `cost_ledger.jsonl`
+in the data directory, priced by this section's own per-million-token table; a model with
+no price entry records zero rather than guessing. Three views sum the same entries by
+task, by device and by model, and a monthly budget raises one alert record per month when
+spending reaches it. Recording is on only when a monthly budget or at least one price is
+set; with neither, no ledger is kept and nothing changes.
+
+`mode` is the budget gate. `off` records only. `warn` raises the alert and work continues.
+`hard` refuses a new task before it starts once the month's recorded spend reaches the
+budget; one approved task at a time can be let past it. The gate reads only recorded
+spend, so with no monthly budget set there is nothing to gate on in any mode.
+
+## `[decider]`
+
+```toml
+[decider]
+enabled         = false    # one small scored question at the start of a run, logged only
+mode            = "shadow" # the only mode: decisions are logged, never acted on
+threshold       = 0.6      # uncalibrated; the score a shadow answer would need to escalate
+timeout_seconds = 1.5      # past this the run starts without a decision
+model           = ""       # empty: the [llm] slot as configured
+```
+
+An experimental fast decision layer. With it on, each run first asks the configured model slot (at temperature 0) to score the task's difficulty; the answer's probability distribution is validated, the call is recorded in the cost ledger under its own model, and one line lands in `decider-log.jsonl` in the data directory: the score, the top probability and its margin, the latency, and a hash of the message, never the message itself. The score changes nothing about the run: shadow mode only observes, so the threshold is a line in the log (which tier the score would have picked), not a switch. Any failure (no key, a timeout, an answer that does not validate) is logged as its kind and the run proceeds exactly as before. The layer never approves or refuses anything; that stays with the Sentinel.
+
+## `[squad]`
+
+```toml
+[squad]
+max_depth          = 2     # how deep one task tree may go; a root is depth 0
+max_per_root       = 0     # assignments per task tree; 0 means no cap at this level
+execute            = false # also run dispatches, when a caller forms a squad with an agent factory
+cheap_model        = ""    # model for the cheap tier (research, verify); empty means the [llm] slot
+stall_after_errors = 3     # identical errors in a row, with no successful tool call yet, stall a subtask
+max_tool_calls     = 0     # cap on one subtask's tool calls; 0 means no cap of the watch's own
+```
+
+The squad's task ledger, `squad.db` in the data directory. When a squad is formed with a store, each dispatch is written down as an assignment under a root for the squad, past four enqueue guards: the parent must still be open, work never flows back to an ancestor, an open brief is never handed out twice under the same parent, and depth stays within `max_depth`. `max_per_root` caps the size of one task tree and counts assignments only; money stays with the `[cost]` ledger and its monthly budget gate, the second of the two levels. Assignments carry a seven-state lifecycle and a terminal state is written once, by settling, never revised. When the server starts with a ledger on disk it reconciles it once: an assignment the cost ledger shows already spent on a model call is settled as interrupted and never handed out again, and one with no such record is spared exactly one restart. Forming a squad, recording a dispatch, and the reconcile are all that exist so far; nothing runs a recorded assignment yet.
+
+With `execute` on, a dispatch also runs, provided the caller that formed the squad handed it an agent factory (`nanomuse.team.runner.build_factory`) beside the store: a fresh agent is built for the role's preset, the assignment moves to running, and the answer settles it, with a result frame back to the steward carrying the assignment id and a short summary. The server does not form an executing squad yet, so the switch alone changes nothing until that wiring exists. The presets give research and verify a read-only tool face on the cheap model tier, and execute the full face on the default tier; read-only is judged per call from the tools' own risk assessments, and a read-only subtask's calls pass a gate in front of the Sentinel that only adds refusals. A dispatch that names no mode is a consult: it runs read-only whatever role it was given, and only an explicit `mode = "work"` in the dispatch body lets the execute preset act. Notify dispatches are recorded and never run. A subtask whose tool calls make no progress (the same error `stall_after_errors` times with no successful call yet, or past `max_tool_calls` when set) is stopped and settled as stalled, with the counts in its events. A subtask's model calls are recorded in the cost ledger under its assignment id, so the reconcile's evidence check sees them; sends and file writes a subtask makes still leave no line there.
+
+Every assignment is also frozen at enqueue with a risk ceiling (the assignment's `level` in the ledger): the highest tool risk its calls may touch. A child's ceiling is the tighter of its parent's ceiling and its role preset's, so a ceiling only ever narrows down a tree and never widens; research and verify cap at `safe`, a consult assignment caps at `safe` whatever its role, and execute caps at `sensitive`, the top of the scale. The root takes the ceiling the caller forming the squad names (there is no `[squad]` key for it), which defaults to `sensitive`: no extra limit, so the layer refuses nothing and the Sentinel's own judgements are the only ones. The frozen ceiling is read from the ledger row when the assignment runs, so changing a preset or a setting afterwards does not move it. At run time the ceiling sits in front of the Sentinel, beside the read-only gate: a call assessed above the ceiling is refused on the spot, before the Sentinel is consulted, and the refusal is written to the assignment's events as `ceiling_refused`. Because the Sentinel is never reached, no approval, standing permission or approval token inside the assignment can lift the ceiling: a token settles one sensitive action, the ceiling bounds the whole assignment. A call at or under the ceiling goes to the Sentinel unchanged, approvals and all. Assignments recorded before ceilings existed carry no level and get no ceiling layer. The decider takes no part in any of this; it never sets or reads a ceiling.
+
+## `[tool_bridge]`
+
+```toml
+[tool_bridge]
+enabled          = false # on: the tool list shrinks to a direct core plus find_tools and use_tool
+auto             = false # engage by context window instead of by hand (never engages today, see below)
+window_threshold = 0     # a known context window below this many tokens engages auto
+```
+
+The tool bridge, experimental and off by default. A run carries the whole tool list on every model call, and with the full tool set that list is long; a model with a small context window spends a real share of it just reading the tools. With the bridge on, the list the model sees keeps a direct core (`terminate`, `ask_user`, `files`, `shell`, `python_execute`, `web_search`, `web_fetch`) plus two meta tools, `find_tools` and `use_tool`, and everything else is reached by name: `find_tools(query)` searches a word index over the bridged tools' names, one-line purposes and keywords and returns the full schema of the best three matches, or says plainly that nothing matches, since there is no near miss it would rather invent; and `use_tool(name, arguments)` runs one of them. The list is built once when the agent is built, so every call in a conversation sends the same bytes.
+
+`use_tool` is not a second way to run a tool. It hands the named call to the same Sentinel guard a direct call goes through, with the named tool's own assessment in front of it, so policy, approvals, grants, the audit log and the cost ledger see the call exactly as they would have directly. One difference stays, and it is in the safe direction: a bridged call passes the guard twice, once as `use_tool` and once as the tool itself, so it may be asked about twice and never zero times. `find_tools` and `use_tool` make no model calls of their own, and a bridged execution is charged like the direct call it is.
+
+Two kinds of tool never go through the bridge and stay listed directly beside the core, called by their own names only. Sending tools: `send_email`, `device_notify` and `delegate` are named in the bridge's exempt list, and any tool whose name carries a sending word (`send`, `notify`, `publish`) is exempt by that word, including tools that arrive later from an MCP server, so the decision to send is always made with the sending tool in front of the model. The approval machinery is the second kind: no tool is offered for it today, and a name carrying `sentinel`, `gatekeeper`, `grant` or `approval` is refused by `use_tool` on sight. The classification is one function over three named sets in `nanomuse/tools/bridge.py`, and a test walks every tool the runtime ships and fails if one is in no set, so a new tool cannot drift in unclassified. Tools that arrive at run time with generated names (MCP tools, device tools) are classified by the same rules: exempt by word when a word matches, bridged otherwise.
+
+Inside a squad preset the bridge reaches only the tools the preset's face holds, because the bridge is built over the collection the agent was given, and the named call still passes the preset's read-only gate and risk ceiling in front of the Sentinel. The envelope presents the named call's own assessment and family risk, so those layers judge the call the model named, not the envelope around it.
+
+The switch is one function. `enabled` on is on. Otherwise `auto` engages the bridge only when the selected model's context window is known and below `window_threshold`, and no window is known today: the provider catalogue records capabilities, not context windows, so `auto` never engages until a window source exists. That is deliberate; a guessed window would switch the bridge on a fiction.
+
+The bridge buys context headroom for small-window and cheaper models. It does not save money: a bridged call costs what the direct call costs, and a find first is one short schema listing more. It exists so a model with little room can still reach the whole tool set.
 
 ## `[server]`
 

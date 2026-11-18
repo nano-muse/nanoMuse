@@ -324,6 +324,8 @@ _NO_NETWORK = re.compile(
 
 class Shell(BaseTool):
     name: str = "shell"
+    purpose: str = "Run a shell command in the workspace."
+    keywords: list[str] = ["command", "bash", "terminal", "git", "run"]
     description: str = (
         "Run a shell command in the workspace directory (bash). Use for git, package managers, "
         "file conversions, quick data processing. Long-running or interactive commands are not "
@@ -401,6 +403,8 @@ class Shell(BaseTool):
 
 class PythonExecute(BaseTool):
     name: str = "python_execute"
+    purpose: str = "Run a Python script and return its output."
+    keywords: list[str] = ["python", "script", "code", "calculate"]
     description: str = (
         "Execute a Python script in a subprocess (cwd = workspace) and return stdout/stderr. "
         "Use print() to output results. Good for calculations, data wrangling, and small automations."

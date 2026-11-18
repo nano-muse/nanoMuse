@@ -5,6 +5,10 @@ the model sees, a tool declares *how dangerous it is* so the Sentinel can decide
 whether to run it, ask the user, or refuse:
 
 * ``risk`` – static default risk level (see :class:`~nanomuse.schema.RiskLevel`)
+* ``purpose`` / ``keywords`` – one line saying what the tool is for, and the words
+  a person would use for it. The tool bridge's index searches these (and the
+  description) when the full tool list is not on the call; a tool without a
+  ``purpose`` is indexed by the first line of its description.
 * ``reads_private_data`` – executing it exposes the user's private data to the
   model (emails, files, memories). Once that happened the session is *tainted*.
 * ``egress`` – it can send data out of the machine (network, email...).
@@ -101,6 +105,11 @@ class BaseTool(ABC, BaseModel):
     description: str
     parameters: dict[str, Any] = Field(default_factory=lambda: {"type": "object", "properties": {}})
 
+    # The searchable face of the tool, for the tool bridge's index: one line
+    # saying what the tool is for, and the words a person would use for it.
+    purpose: str = ""
+    keywords: list[str] = Field(default_factory=list)
+
     risk: RiskLevel = RiskLevel.SAFE
     reads_private_data: bool = False
     egress: bool = False
@@ -130,6 +139,19 @@ class BaseTool(ABC, BaseModel):
             egress=self.egress,
             summary=f"{self.name}({short_json(args)})",
         )
+
+    def family_risk(self, args: dict[str, Any]) -> RiskLevel:
+        """The declared risk of the family this call belongs to.
+
+        The squad ceiling measures a call it counts as a read at this
+        level rather than at the call's own assessment (see
+        ``nanomuse.team.presets.assessed_risk``). Every tool's family
+        is itself; an envelope tool, the tool bridge's ``use_tool``,
+        speaks for the tool it names and answers with that tool's
+        level instead, so the ceiling measures the named call and
+        not the envelope around it.
+        """
+        return self.risk
 
     async def cleanup(self) -> None:  # pragma: no cover - default no-op
         return None

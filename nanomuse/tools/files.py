@@ -182,6 +182,8 @@ def shown_path(path: Path, workspace: Path) -> str:
 
 class Files(BaseTool):
     name: str = "files"
+    purpose: str = "Read, write, list and search files in the workspace."
+    keywords: list[str] = ["file", "read", "write", "edit", "folder", "document"]
     description: str = (
         "Work with files in the workspace. Actions: "
         "`read` (path; PDFs come back as text, page by page), `write` (path, content; overwrites), `append` (path, content), "
