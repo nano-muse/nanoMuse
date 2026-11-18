@@ -326,12 +326,21 @@ struct NanoMuseChatHooks: ViewModifier {
     /// button's path), for a voice prompt the Action Button asked for.
     let voice: VoiceInputViewModel
     let enterVoice: () -> Void
+    @State private var showThinking = false
 
     func body(content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .nanoMuseChatAction)) { note in
                 guard let action = NanoMuseChatAction.from(note, for: vm.nmSessionKey) else { return }
-                perform(action)
+                if action == .thinking {
+                    if !readOnly { showThinking = true }
+                } else {
+                    perform(action)
+                }
+            }
+            .sheet(isPresented: $showThinking) {
+                NanoMuseThinkingSheet(vm: vm) { showThinking = false }
+                    .presentationDetents([.medium])
             }
             .onReceive(NanoMuseVoicePrompt.shared.$pending) { _ in
                 // A request for this chat, or for the chat that is open when the Muse shell is

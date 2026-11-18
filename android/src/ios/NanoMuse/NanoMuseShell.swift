@@ -787,6 +787,7 @@ struct NanoMuseHomeView: View {
             if !NanoMuseAppearance.shared.headerModel {
                 Button { chatAction(.model) } label: { Label(AppLocalized("Model"), systemImage: "cpu") }
             }
+            Button { chatAction(.thinking) } label: { Label(AppLocalized("Thinking Intensity"), systemImage: "lightbulb") }
             Button(role: .destructive) { chatAction(.clearChat) } label: { Label(AppLocalized("Clear Chat"), systemImage: "trash") }
             Divider()
             Button { chatAction(.terminal) } label: { Label(AppLocalized("Open Terminal"), systemImage: "terminal") }
