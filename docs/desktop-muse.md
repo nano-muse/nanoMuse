@@ -483,7 +483,7 @@ page it opened, named for the page you came from; a pick in the sidebar starts f
     credentials live), followed by the steps (`nanomuse vault set …`, the `config.toml`
     lines, restart) with copy buttons; there is no sign-in button on purpose, the
     credentials stay in your own vault.
-  - **Services**: the catalogue (`src/connectors-catalogue.ts`, seventy-five remote
+  - **Services**: the catalogue (`src/connectors-catalogue.ts`, seventy-six remote
     MCP servers: Notion, Linear, Atlassian, Asana, GitHub, GitLab, Sentry, Vercel,
     Cloudflare, Supabase, Stripe, PayPal, QuickBooks, Figma, Miro, Canva, Dropbox, Box,
     Hugging Face, DeepWiki…), each
