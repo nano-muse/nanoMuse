@@ -1269,4 +1269,5 @@
     <string name="nm_device_chat_here">Auf diesem Gerät</string>
     <string name="nm_device_chat_uncertain">Zustellung unklar. Das Ergebnis wird auf dem Gerät abgefragt.</string>
     <string name="nm_device_chat_interrupted">Unterbrochen. Das Gerät hat möglicherweise bereits Aktionen ausgeführt.</string>
+    <string name="nm_stream_interrupted">Die Verbindung wurde unterbrochen, bevor die Antwort vollständig war.</string>
 </resources>

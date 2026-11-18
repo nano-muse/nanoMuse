@@ -1912,6 +1912,7 @@ struct AIChatView: View {
         switch action { // nanoMuse:
         case .newChat: requestNewChatFromMenu() // nanoMuse:
         case .model: showModelPicker = true // nanoMuse:
+        case .thinking: break // nanoMuse: NanoMuseChatHooks presents the session picker
         case .clearChat: showClearChatConfirm = true // nanoMuse:
         case .terminal: showTerminal = true // nanoMuse:
         case .browser: showBrowserSheet = true // nanoMuse:

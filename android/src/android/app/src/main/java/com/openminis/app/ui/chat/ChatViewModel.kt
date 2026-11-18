@@ -7166,8 +7166,12 @@ class ChatViewModel(
         // realistic source. Coalesce to a generic non-empty message.
         // nanoMuse: a turn refused for a spent allowance gets the plain sentence and the ways-on card;
         // a Claude sign-in on a build without its identifier gets its sentence in the person's language (#373).
+        // nanoMuse: show interrupted-response details in the app's selected language.
+        val streamError = io.github.nanomuse.chat.StreamFailure.userText(
+            errorText, context.getString(R.string.nm_stream_interrupted),
+        )
         val safeError = nmAllowanceErrorText(
-            io.github.nanomuse.cloud.ClaudeSignIn.userText(context, errorText).ifBlank { context.getString(R.string.error_empty_response_generic) },
+            io.github.nanomuse.cloud.ClaudeSignIn.userText(context, streamError).ifBlank { context.getString(R.string.error_empty_response_generic) },
         )
         // T-streaming-side-channel: before mutating the canonical message,
         // drain any in-flight streaming delta so the error frame carries
@@ -7214,7 +7218,10 @@ class ChatViewModel(
         val lastAssistantIdx = msgs.indexOfLast { it.role == "assistant" }
         if (lastAssistantIdx < 0) return
         val msg = msgs[lastAssistantIdx]
-        msgs[lastAssistantIdx] = msg.copy(error = errorText)
+        // nanoMuse: the retry countdown uses the same translated failure as the final card.
+        msgs[lastAssistantIdx] = msg.copy(error = io.github.nanomuse.chat.StreamFailure.userText(
+            errorText, context.getString(R.string.nm_stream_interrupted),
+        ))
         _messages.value = msgs
     }
 

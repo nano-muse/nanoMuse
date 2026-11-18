@@ -35,6 +35,9 @@ Python runtime and the web app in an Electron shell of their own (`desktop/app`)
 harness build shipped beside them as *nanoMuse Harness*; from 0.1.30 there is the one
 desktop, and it installs over the old one (same application id).
 
+
+Levea is listed under **Design** in Connectors. Connect with its OAuth sign-in to edit videos, add captions and export MP4 files. Its tools follow the same approval rules as other MCP connectors.
+
 ## Updating on Windows
 
 The Windows x64 app checks for a newer stable release after starting and every six

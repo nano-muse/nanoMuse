@@ -1265,4 +1265,5 @@
     <string name="nm_device_chat_here">บนอุปกรณ์นี้</string>
     <string name="nm_device_chat_uncertain">ยังไม่แน่ใจว่าส่งถึงแล้ว กำลังตรวจสอบผลบนอุปกรณ์</string>
     <string name="nm_device_chat_interrupted">ถูกขัดจังหวะ อุปกรณ์อาจดำเนินการบางอย่างไปแล้ว</string>
+    <string name="nm_stream_interrupted">การเชื่อมต่อถูกตัดก่อนที่คำตอบจะเสร็จสมบูรณ์</string>
 </resources>

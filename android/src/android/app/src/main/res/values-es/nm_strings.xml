@@ -1269,4 +1269,5 @@
     <string name="nm_device_chat_here">En este dispositivo</string>
     <string name="nm_device_chat_uncertain">Entrega incierta. Consultando el resultado en el dispositivo.</string>
     <string name="nm_device_chat_interrupted">Interrumpido. El dispositivo puede haber realizado algunas acciones.</string>
+    <string name="nm_stream_interrupted">La conexión se interrumpió antes de completar la respuesta.</string>
 </resources>

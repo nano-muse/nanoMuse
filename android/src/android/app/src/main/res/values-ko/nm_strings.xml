@@ -1265,4 +1265,5 @@
     <string name="nm_device_chat_here">이 기기에서</string>
     <string name="nm_device_chat_uncertain">전송 여부가 불확실합니다. 기기에서 결과를 확인 중입니다.</string>
     <string name="nm_device_chat_interrupted">중단되었습니다. 기기가 일부 작업을 이미 실행했을 수 있습니다.</string>
+    <string name="nm_stream_interrupted">응답이 완료되기 전에 연결이 끊어졌습니다.</string>
 </resources>

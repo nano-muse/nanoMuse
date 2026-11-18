@@ -6451,14 +6451,10 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// Returns `true` if a user-chosen level was written, so the caller can
     /// keep the group-default seeding (createInitialBinding) from clobbering it.
     ///
-    /// [T-first-msg-thinking-level-clobber] Note the `pending != .off` guard:
-    /// `.off` is indistinguishable from "unset" in SessionInferenceConfig, so a
-    /// user who explicitly picks Off before the first send still inherits the
-    /// group default. That pre-existing limitation is unchanged here — this fix
-    /// only stops a real (enabled) override from being overwritten.
+    // nanoMuse: nil means no choice; an explicit Off must also survive the group-default seed.
     @discardableResult
     func flushPendingThinkingLevel() -> Bool {
-        guard let pending = pendingThinkingLevel, pending != .off, let sid = sessionId else { return false }
+        guard let pending = pendingThinkingLevel, let sid = sessionId else { return false }
         var cfg = ProviderConfigStore.shared.inferenceConfig(for: sid) ?? SessionInferenceConfig()
         cfg.thinkingLevel = pending
         ProviderConfigStore.shared.setInferenceConfig(cfg, for: sid)

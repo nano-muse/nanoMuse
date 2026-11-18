@@ -18,6 +18,9 @@ nanoMuse 桌面版将智能体放进一个独立窗口，基于 [DeepSeek Harnes
 
 0.1.29 及之前，同名安装包使用 `desktop/app` 的 Electron 外壳运行 Python 运行时和网页应用，harness 实现另以 *nanoMuse Harness* 名称同时发布。从 0.1.30 起只保留新的桌面版，并沿用应用 id，可以直接覆盖安装旧版。
 
+
+连接器的**设计**分类提供 Levea。通过 OAuth 登录后，可剪辑视频、添加字幕并导出 MP4 文件。它的工具沿用其他 MCP 连接器的审批规则。
+
 ## Windows 软件内更新 {#updating-on-windows}
 
 Windows x64 应用在启动后及每六小时检查一次较新的正式稳定版。设置页显示当前运行版本，与左下角菜单使用同一更新状态。点击「再查一次」可立即检查。

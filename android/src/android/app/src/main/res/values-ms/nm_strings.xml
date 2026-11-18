@@ -1265,4 +1265,5 @@
     <string name="nm_device_chat_here">Pada peranti ini</string>
     <string name="nm_device_chat_uncertain">Penghantaran belum pasti. Menyemak hasil pada peranti.</string>
     <string name="nm_device_chat_interrupted">Terganggu. Peranti mungkin sudah menjalankan beberapa tindakan.</string>
+    <string name="nm_stream_interrupted">Sambungan terputus sebelum jawapan selesai.</string>
 </resources>

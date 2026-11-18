@@ -6,6 +6,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Kept completed sensitive actions and file writes in view after message or token limits removed their tool exchanges, helping long tasks avoid repeats. For #938.
 - Asked before repeating an identical sensitive action in the same conversation, including concurrent calls and retries after cancellation left an unknown outcome. For #938.
+- Added the Levea video editor to the connector catalogue for desktop and phones, with OAuth sign-in.
 
 - Kept the person's request in view during long turns with the default settings, so a task with many tool calls no longer forgets what it was asked, and the wrap-up at the step limit sees the turn's work.
 
@@ -62,6 +63,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Added optional observation-only permission reviews to the Python runtime, using the active chat model or a separately configured model, with bounded requests and redacted audit records. For #724.
 
 - Preserved each conversation's tool permissions and reused them after concurrent approval waits, reducing repeated cards while keeping one-time approvals and warning checks separate. For #724.
+
+- Added TrustedRouter to the own-key catalogue: an OpenAI-compatible gateway at `https://api.trustedrouter.com/v1`, a key from [trustedrouter.com/console/api-keys](https://trustedrouter.com/console/api-keys), pay as you go; one key reaches models from several labs. Model ids carry the vendor's name as its public `/v1/models` list names them; the default model is `deepseek/deepseek-v4-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
+
+- Added Synap to the own-key catalogue: an OpenAI-compatible API for open-weight models at `https://synap402.com/v1`, a key from [synap402.com/account.html#keys](https://synap402.com/account.html#keys), pay as you go. Its public `/v1/models` list names the models that can be called now, with per-token prices; the default model is `qwen3-coder-30b`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
 
 - Added UberLLM to the own-key catalogue: an OpenAI-compatible gateway at `https://api.uberllm.dev/v1`, a key from [uberllm.dev/signup](https://uberllm.dev/signup), prepaid and pay as you go; one key reaches models from several labs. Model ids carry the vendor's name as its `/v1/models` list names them; the default model is `openai/gpt-5.4-mini`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
 
@@ -131,6 +136,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **Showed an unlisted gateway under its own host.** A vendor on a domain of its own (`openrouter.ai`, `atmorouter.dev`) stood for every host under the same top-level domain, so `gateway.example.ai` read as OpenRouter in the runtime and the console. Such a vendor now stands only for its own subdomains; regional siblings such as `dashscope-intl.aliyuncs.com` still find Bailian.
 - **Kept Daily, setup and avatar views on the newest refresh.** Overlapping loads no longer replace newer information or report old errors after leaving. Avatar refreshes preserve drafts and the current candidate choice, while a different drawing session requires a new choice.
 - **Kept skill suggestions through failed refreshes.** The chat slash menu retained its loaded skills when a reload failed and ignored superseded answers. Turning skills off also hid cached suggestions and disabled their keyboard completion.
 - **Kept the newest skills list when saves overlap.** Older responses no longer hide newly saved skills, failed refreshes keep the loaded list, and pending reads do not report errors after leaving the page.
@@ -206,6 +212,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Retried interrupted OpenAI-compatible streams within the existing bounded model-request budget, including partial EOF, and surfaced socket failures as recoverable errors instead of cancellation. For #934.
+
 - Disclosed every enabled skill with up to 1024 Unicode description characters, preserved imported SKILL.md metadata, parsed quoted and nested frontmatter correctly, and accepted non-ASCII skill names. For #912.
 - Kept device-chat drafts edited while another turn was running, and made long device and bound-conversation lists scrollable. For #815.
 - Paused automatic following as soon as a person scrolled towards older messages, and kept new reply chunks, tool cards and keyboard layout changes from resuming it. For #898.
@@ -251,6 +259,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Made Android summaries preserve the current task separately from completed work.** Summaries without an active task no longer describe historical requests as work to resume. Summary streams now stop after 120 seconds without activity, within a 900-second overall deadline; stopping the turn cancels the request. Qwen3.8-Max summary requests explicitly disable thinking under the default rules, and context notices follow the app language. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 
 ### iOS
+
+- Added Thinking Intensity to the iPhone Muse chat menu, with per-chat choices and a clear message for unsupported models. For #904.
+- Kept an explicit Thinking Off choice from an iPhone draft when creating its chat, instead of replacing it with the model-group default. For #904.
 
 - Added device chats to New Chat, including Command-N, and the Computers list on iPhone. Follow-ups use the selected device, and reopening a chat after a disconnect checks the original turn. For #815.
 
