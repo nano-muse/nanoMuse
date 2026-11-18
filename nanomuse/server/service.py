@@ -531,10 +531,15 @@ class MuseService:
         self._recover_deliveries()
         if self.squad_store is not None and self.squad_reconcile is None:
             self.squad_reconcile = reconcile_on_startup(self.squad_store, self.squad_evidence)
-            if self.squad_reconcile.interrupted or self.squad_reconcile.retry_marked:
+            if (
+                self.squad_reconcile.interrupted
+                or self.squad_reconcile.retry_marked
+                or self.squad_reconcile.uncertain
+            ):
                 logger.info(
-                    "squad ledger reconciled: {} interrupted, {} spared one restart",
+                    "squad ledger reconciled: {} interrupted, {} uncertain, {} spared one restart",
                     len(self.squad_reconcile.interrupted),
+                    len(self.squad_reconcile.uncertain),
                     len(self.squad_reconcile.retry_marked),
                 )
         await self._step("cloud account and hub", self.hub.start(), 30)

@@ -10,6 +10,7 @@ never re-runs an assignment that already acted on the outside world.
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -290,6 +291,93 @@ def test_ledger_evidence_reads_the_cost_ledger_by_assignment_id(tmp_path: Path) 
     assert evidence(quiet) is False
     missing = ledger_evidence(tmp_path / "no_such_file.jsonl")
     assert missing(acted) is False
+
+
+def test_two_connections_cannot_both_settle_one_assignment(tmp_path: Path) -> None:
+    setup = make_store(tmp_path)
+    root = make_root(setup, brief="settle me once")
+    setup.close()
+
+    barrier = threading.Barrier(2)
+
+    class SyncedStore(SquadStore):
+        """A store whose first read in a settle rendezvous with the other
+        connection, so both connections have seen the assignment as open
+        before either one writes: the interleaving the race needs."""
+
+        def __init__(self, path: Path) -> None:
+            super().__init__(path)
+            self._synced = False
+
+        def get(self, assignment_id: str):  # type: ignore[override]
+            found = super().get(assignment_id)
+            if not self._synced:
+                self._synced = True
+                barrier.wait(timeout=10)
+            return found
+
+    attempts: dict[str, tuple[str, str]] = {}
+
+    def attempt(label: str, status: str, outcome: str) -> None:
+        store = SyncedStore(tmp_path / "squad.db")
+        try:
+            settled = store.settle(root.id, status, outcome=outcome)
+            attempts[label] = ("settled", settled.status)
+        except AlreadySettled:
+            attempts[label] = ("refused", "")
+        finally:
+            store.close()
+
+    threads = [
+        threading.Thread(target=attempt, args=("first", "completed", "won by first")),
+        threading.Thread(target=attempt, args=("second", "failed", "won by second")),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert not any(thread.is_alive() for thread in threads)
+
+    settled = [label for label, (kind, _) in attempts.items() if kind == "settled"]
+    refused = [label for label, (kind, _) in attempts.items() if kind == "refused"]
+    assert len(settled) == 1 and len(refused) == 1
+
+    check = make_store(tmp_path)
+    kept = check.get(root.id)
+    assert kept is not None and kept.terminal
+    assert attempts[settled[0]][1] == kept.status
+    settled_events = [e for e in check.events(root.id) if e.kind == "settled"]
+    assert len(settled_events) == 1
+    assert settled_events[0].detail.startswith(f"{kept.status}:")
+    check.close()
+
+
+def test_reconcile_never_retries_work_that_started_without_a_finished_cost_record(
+    tmp_path: Path,
+) -> None:
+    store = make_store(tmp_path)
+    root = make_root(store, brief="already ran, cost record never finished")
+    store.transition(root.id, "running")
+    # No finished cost record exists for it: the evidence check, which
+    # reads finished cost records only, can only say it found none.
+    report = reconcile_on_startup(store, evidence=lambda a: False)
+    assert report.retry_marked == []
+    assert report.uncertain == [root.id]
+    assert report.interrupted == []
+    kept = store.get(root.id)
+    assert kept is not None
+    assert kept.status == "failed" and kept.outcome == "uncertain"
+    assert kept.terminal and kept.settled_at != ""
+    assert store.retry_marks(root.id) == 0
+    settled_events = [e for e in store.events(root.id) if e.kind == "settled"]
+    assert len(settled_events) == 1
+
+    # A later startup leaves the uncertain assignment alone: it is
+    # terminal, never offered for execution again.
+    second = reconcile_on_startup(store, evidence=lambda a: False)
+    assert second.interrupted == [] and second.retry_marked == [] and second.uncertain == []
+    kept = store.get(root.id)
+    assert kept is not None and kept.status == "failed" and kept.outcome == "uncertain"
 
 
 # ---------------------------------------------------------------------- squad wiring

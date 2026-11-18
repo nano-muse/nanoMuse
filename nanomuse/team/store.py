@@ -36,7 +36,10 @@ The lifecycle is seven states: ``queued``, ``running``, ``waiting``,
 ``needs_input`` and the three terminal states ``completed``,
 ``failed``, ``cancelled``.  A terminal state is written once, by
 ``settle``; a second settle is refused, so a result can never be
-rewritten after the fact.  ``result`` is a summary, capped at
+rewritten after the fact.  The write itself is one conditional
+update that only matches a still open assignment, so two connections
+settling the same assignment cannot both win: the loser's update
+matches no row and it is refused instead.  ``result`` is a summary, capped at
 ``RESULT_LIMIT`` characters with the cut marked; the full text of a
 piece of work lives wherever the work itself put it, not in this
 ledger.
@@ -49,7 +52,7 @@ import json
 import sqlite3
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -166,6 +169,10 @@ class ReconcileReport:
 
     interrupted: list[str]
     retry_marked: list[str]
+    # Assignments that had already started when the previous run
+    # stopped, with no finished cost record to show what they did:
+    # settled ``failed`` with the outcome ``uncertain``, never retried.
+    uncertain: list[str] = field(default_factory=list)
 
 
 # An evidence check: did this assignment already act on the outside
@@ -197,8 +204,12 @@ class SquadStore:
         self.max_depth = max_depth
         self.max_per_root = max_per_root
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.path, check_same_thread=False)
+        self._conn = sqlite3.connect(self.path, check_same_thread=False, timeout=5.0)
         self._conn.row_factory = sqlite3.Row
+        # A second connection settling the same assignment waits for
+        # the first writer instead of failing on the lock, so the
+        # conditional update in settle() is what decides the race.
+        self._conn.execute("PRAGMA busy_timeout = 5000")
         self._conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS assignments (
@@ -508,9 +519,20 @@ class SquadStore:
             raise ValueError(f"status must be one of {STATUSES}")
         if new_status not in TRANSITIONS[current.status]:
             raise InvalidTransition(f"{current.status} may not become {new_status}")
-        self._conn.execute(
-            "UPDATE assignments SET status = ? WHERE id = ?", (new_status, assignment_id)
+        # One conditional update on the status just read: if another
+        # connection moved (or settled) the assignment in between, the
+        # update matches no row and this move is refused rather than
+        # overwriting the state that won.
+        cursor = self._conn.execute(
+            "UPDATE assignments SET status = ? WHERE id = ? AND status = ?",
+            (new_status, assignment_id, current.status),
         )
+        if cursor.rowcount == 0:
+            self._conn.rollback()
+            fresh = self.get(assignment_id)
+            if fresh is None:
+                raise AssignmentNotFound(assignment_id)
+            raise InvalidTransition(f"{fresh.status} may not become {new_status}")
         self._append_event(assignment_id, "status", f"{current.status} to {new_status}")
         self._conn.commit()
         return self._require(assignment_id)
@@ -531,17 +553,36 @@ class SquadStore:
         """
         if status not in TERMINAL_STATUSES:
             raise ValueError(f"settle needs a terminal status, one of {sorted(TERMINAL_STATUSES)}")
-        current = self._require(assignment_id)
-        if current.terminal:
+        # The terminal write is a single conditional update: it only
+        # matches while the assignment is still open, and the settled
+        # event is appended in the same transaction, so the state and
+        # its event land together or not at all.  Two connections can
+        # both attempt the settle, but only the first update matches a
+        # row; the second matches none, however the reads interleaved,
+        # and is refused below instead of writing a conflicting
+        # terminal state and a second settled event.
+        marks = ", ".join("?" for _ in TERMINAL_STATUSES)
+        cursor = self._conn.execute(
+            "UPDATE assignments SET status = ?, outcome = ?, result = ?, settled_at = ?"
+            f" WHERE id = ? AND status NOT IN ({marks})",
+            (
+                status,
+                outcome,
+                _truncate_result(result),
+                _now(),
+                assignment_id,
+                *sorted(TERMINAL_STATUSES),
+            ),
+        )
+        if cursor.rowcount == 0:
+            self._conn.rollback()
+            current = self.get(assignment_id)
+            if current is None:
+                raise AssignmentNotFound(assignment_id)
             raise AlreadySettled(
                 f"{assignment_id} already settled as {current.status};"
                 " a terminal state is written once"
             )
-        self._conn.execute(
-            "UPDATE assignments SET status = ?, outcome = ?, result = ?, settled_at = ?"
-            " WHERE id = ?",
-            (status, outcome, _truncate_result(result), _now(), assignment_id),
-        )
         self._append_event(assignment_id, "settled", f"{status}: {outcome}" if outcome else status)
         self._conn.commit()
         return self._require(assignment_id)
@@ -554,6 +595,23 @@ class SquadStore:
         ).fetchone()
         return int(row["n"])
 
+    def _has_started(self, assignment: Assignment) -> bool:
+        """Whether the assignment ever entered ``running``.
+
+        The lifecycle never returns to ``queued``, so a queued
+        assignment with no move to ``running`` in its events has
+        provably not started.  Anything else (a status past queued,
+        or a recorded move into ``running``) may already have acted.
+        """
+        if assignment.status != "queued":
+            return True
+        row = self._conn.execute(
+            "SELECT 1 FROM events WHERE assignment_id = ? AND kind = 'status'"
+            " AND detail LIKE '% to running' LIMIT 1",
+            (assignment.id,),
+        ).fetchone()
+        return row is not None
+
 
 def reconcile_on_startup(store: SquadStore, evidence: EvidenceFn | None = None) -> ReconcileReport:
     """Settle the ledger's open assignments after a restart, on the record.
@@ -562,43 +620,72 @@ def reconcile_on_startup(store: SquadStore, evidence: EvidenceFn | None = None) 
     injected evidence check says so, from a ledger or an audit file,
     never from the task's own account) is settled ``failed`` with the
     outcome ``interrupted`` and is never run again: repeating it could
-    repeat the action.  An assignment with no such evidence is spared
+    repeat the action.
+
+    An assignment that had already started (it left ``queued``) but
+    has no finished cost record is uncertain, not safe: cost records
+    are written for finished tasks, so a missing record cannot show
+    that a started assignment did nothing.  It is settled ``failed``
+    with the outcome ``uncertain`` and listed under ``uncertain`` in
+    the report, so a person can look at it; it is never marked for
+    retry and never run again automatically.
+
+    Only an assignment that provably never started (still ``queued``,
+    never moved to ``running``) with no evidence against it is spared
     exactly once, by a retry mark in its events; a later startup that
-    still finds it open settles it the same way.  Reconcile only
+    still finds it open settles it as interrupted.  Reconcile only
     writes verdicts in the ledger: it resumes nothing itself.
 
     With no evidence check supplied, every assignment counts as
     having no evidence.  That is the honest default until a caller
-    wires a real one (see :func:`ledger_evidence`).
+    wires a real one (see :func:`ledger_evidence`): it changes
+    nothing for started work, which stays uncertain either way.
     """
     check = evidence if evidence is not None else _no_evidence
     interrupted: list[str] = []
     retry_marked: list[str] = []
+    uncertain: list[str] = []
     for assignment in store.open_assignments():
-        if check(assignment):
-            store.settle(assignment.id, "failed", outcome="interrupted")
-            store.append_event(
-                assignment.id,
-                "reconcile",
-                "interrupted: external action on record, never re-run",
-            )
-            interrupted.append(assignment.id)
-        elif store.retry_marks(assignment.id) >= 1:
-            store.settle(assignment.id, "failed", outcome="interrupted")
-            store.append_event(
-                assignment.id,
-                "reconcile",
-                "interrupted: already spared one restart, still open",
-            )
-            interrupted.append(assignment.id)
-        else:
-            store.append_event(
-                assignment.id,
-                RETRY_EVENT,
-                "no external action on record; may be run once more",
-            )
-            retry_marked.append(assignment.id)
-    return ReconcileReport(interrupted=interrupted, retry_marked=retry_marked)
+        try:
+            if check(assignment):
+                store.settle(assignment.id, "failed", outcome="interrupted")
+                store.append_event(
+                    assignment.id,
+                    "reconcile",
+                    "interrupted: external action on record, never re-run",
+                )
+                interrupted.append(assignment.id)
+            elif store._has_started(assignment):
+                store.settle(assignment.id, "failed", outcome="uncertain")
+                store.append_event(
+                    assignment.id,
+                    "reconcile",
+                    "uncertain: started, no finished cost record;"
+                    " may have acted, never re-run automatically",
+                )
+                uncertain.append(assignment.id)
+            elif store.retry_marks(assignment.id) >= 1:
+                store.settle(assignment.id, "failed", outcome="interrupted")
+                store.append_event(
+                    assignment.id,
+                    "reconcile",
+                    "interrupted: already spared one restart, still open",
+                )
+                interrupted.append(assignment.id)
+            else:
+                store.append_event(
+                    assignment.id,
+                    RETRY_EVENT,
+                    "never started, no external action on record; may be run once more",
+                )
+                retry_marked.append(assignment.id)
+        except AlreadySettled:
+            # Another connection settled this assignment first (its
+            # own settle, or a reconcile racing this one).  The
+            # terminal state that won stands; this reconcile writes
+            # no verdict of its own for it.
+            continue
+    return ReconcileReport(interrupted=interrupted, retry_marked=retry_marked, uncertain=uncertain)
 
 
 def ledger_evidence(path: Path | str) -> EvidenceFn:
@@ -612,7 +699,10 @@ def ledger_evidence(path: Path | str) -> EvidenceFn:
     Callers recording squad work must record it under the assignment
     id for this check to see it.  A missing file means no evidence,
     and a line that does not parse is skipped, the posture the cost
-    store itself takes.
+    store itself takes.  No evidence is not proof that nothing
+    happened: records are written for finished tasks, so reconcile
+    treats started work with no record as uncertain on its own,
+    without asking this check to clear it.
     """
     ledger_path = Path(path)
     acted: set[str] | None = None
