@@ -87,6 +87,30 @@ def test_update_keeps_provenance_unless_told_otherwise(tmp_path: Path) -> None:
     store.close()
 
 
+def test_a_rewrite_without_confidence_does_not_inherit_the_old_score(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "mem.db")
+    old = store.add("lives in Berlin", model="qwen3.6-27b", confidence=0.9)
+    change = store.replace([old.id], "lives in Hamburg", action="rewrite", model="gpt-6")
+    assert change is not None and change.after is not None
+    # a rewrite is a new statement by its own writer: no confidence was given,
+    # so the new line's confidence is unknown, not the replaced line's 0.9
+    assert change.after.model == "gpt-6" and change.after.confidence is None
+    again = store.replace([change.after.id], "lives in Munich", action="rewrite")
+    assert again is not None and again.after is not None
+    # and no writer was named either: the old writer's name is not inherited
+    assert again.after.model == "" and again.after.confidence is None
+    store.close()
+
+
+def test_unknown_confidence_neither_wins_nor_loses() -> None:
+    known = _item(confidence=0.4)
+    unknown = _item(id="m_2", confidence=None)
+    winner, reason = resolve_conflict(known, unknown)
+    assert reason == "keep-both" and winner is known
+    winner, reason = resolve_conflict(unknown, known)
+    assert reason == "keep-both" and winner is unknown
+
+
 def test_a_merge_inherits_provenance(tmp_path: Path) -> None:
     store = MemoryStore(tmp_path / "mem.db")
     first = store.add("likes window seats", model="qwen3.6-27b", confidence=0.7)
