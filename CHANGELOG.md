@@ -250,6 +250,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### iOS
 
 - Added Thinking Intensity to the iPhone Muse chat menu, with per-chat choices and a clear message for unsupported models. For #904.
+- Kept an explicit Thinking Off choice from an iPhone draft when creating its chat, instead of replacing it with the model-group default. For #904.
 
 - Added device chats to New Chat, including Command-N, and the Computers list on iPhone. Follow-ups use the selected device, and reopening a chat after a disconnect checks the original turn. For #815.
 

@@ -43,7 +43,7 @@ and rebranding is the script, never a hand edit.
 
 ## Thinking intensity
 
-In a local chat in the Muse layout, open **More → Thinking Intensity** to turn reasoning off or select a level supported by the current model. The choice applies to this chat and is saved with it; an unsent draft keeps the choice until its session is created. Models that do not support reasoning show an explanation. Model-group defaults remain under **Settings → Model groups → Session Defaults**.
+In a local chat in the Muse layout, open **More → Thinking Intensity** to turn reasoning off or select a level supported by the current model. The choice applies to this chat and is saved with it; an unsent draft keeps the choice, including Off, when its session is created. Without an explicit choice, the new chat inherits the model group's default. Models that do not support reasoning show an explanation. Model-group defaults remain under **Settings → Model groups → Session Defaults**.
 
 ## Device chats
 
