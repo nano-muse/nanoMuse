@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from nanomuse.llm.base import model_id
 from nanomuse.memory import MemoryItem, MemoryStore, resolve_conflict
 from nanomuse.schema import RiskLevel, ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment, int_arg
@@ -56,9 +57,21 @@ class Remember(BaseTool):
     }
     risk: RiskLevel = RiskLevel.SAFE
     store: MemoryStore
-    # The model id the runtime is running as (from settings); "" means unknown and
-    # the line keeps whatever provenance it already had. Never a key or an address.
+    # The configured model id (from settings), used only when a call names no
+    # execution model of its own; "" means unknown. Never a key or an address.
     model: str = ""
+
+    def _writer(self) -> str:
+        """The model writing in this run: the execution model of the task the call
+        belongs to, which is the client the turn actually runs on (a per-run
+        override included), not the configured default this tool was built with.
+        Outside a task, the configured model stands."""
+        from nanomuse.sentinel.gate import current_task
+
+        task = current_task()
+        if task is not None and task.execution_llm is not None:
+            return model_id(task.execution_llm)
+        return self.model
 
     def assess(self, args: dict[str, Any]) -> CallAssessment:
         a = super().assess(args)
@@ -76,6 +89,7 @@ class Remember(BaseTool):
         confidence: float | None = None,
         **_: Any,
     ) -> ToolResult:
+        writer = self._writer()
         try:
             if replaces:
                 old = self.store.get(replaces)
@@ -86,7 +100,7 @@ class Remember(BaseTool):
                     content,
                     category=category or old.category,
                     action="rewrite",
-                    model=self.model or None,
+                    model=writer,
                     confidence=confidence,
                 )
                 if change is None or change.after is None:
@@ -94,9 +108,11 @@ class Remember(BaseTool):
                 return ToolResult(
                     output=f"Updated {replaces} → {change.after.id}: {change.after.content}"
                 )
-            # The same fact in other words: update that line rather than keep two,
-            # unless the existing line wins on principle: a line the person wrote,
-            # or an explicit correction, is never silently rewritten by the model.
+            # The same fact in other words: the stated rule decides, and its answer
+            # is honoured as given. When the existing line wins, on any ground, it
+            # is kept as it is; when nothing separates the two, both are kept and
+            # the new wording is stored as a line of its own below; only when the
+            # new wording wins does it replace the existing line.
             for _score, twin in self.store.similar(content, threshold=0.8, limit=1):
                 if twin.content.strip() == content.strip():
                     break  # an exact repeat: add() hands back the existing line
@@ -104,13 +120,19 @@ class Remember(BaseTool):
                     id="",
                     content=content,
                     category=category or twin.category,
-                    created_at=datetime.now(UTC).isoformat(timespec="seconds"),
+                    # full precision: the candidate is the statement being made
+                    # now, so it is newer than the stored line it is compared
+                    # with (stored lines carry second precision, and a tie at
+                    # that precision would misread the two as simultaneous)
+                    created_at=datetime.now(UTC).isoformat(),
                     source="agent",
-                    model=self.model,
+                    model=writer,
                     confidence=confidence,
                 )
                 winner, reason = resolve_conflict(candidate, twin)
-                if winner is twin and reason in ("user-overrides", "negation"):
+                if reason == "keep-both":
+                    break  # nothing separates them: both lines stay, see add() below
+                if winner is twin:
                     return ToolResult(
                         output=(
                             f"Kept {twin.id}: {twin.content} (the existing memory wins: {reason})"
@@ -121,7 +143,7 @@ class Remember(BaseTool):
                     content,
                     category=category or twin.category,
                     action="rewrite",
-                    model=self.model or None,
+                    model=writer,
                     confidence=confidence,
                 )
                 if change is not None and change.after is not None:
@@ -132,7 +154,7 @@ class Remember(BaseTool):
             item = self.store.add(
                 content,
                 category=category or "general",
-                model=self.model,
+                model=writer,
                 confidence=confidence,
             )
         except ValueError as exc:

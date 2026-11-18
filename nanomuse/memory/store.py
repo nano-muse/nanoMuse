@@ -487,14 +487,25 @@ class MemoryStore:
         """Put one memory in the place of ``ids`` and log the change.
 
         The new memory is added by the user if any of the old ones was; its age is the
-        oldest of them, so a merged fact does not look freshly learned. Provenance is
-        inherited from the first replaced line unless the caller says otherwise, so a
-        merge does not silently launder where a fact came from.
+        oldest of them, so a merged fact does not look freshly learned. What provenance
+        the new line carries depends on the action. A merge (the tidy-up putting
+        existing lines together) inherits it from the first replaced line unless the
+        caller says otherwise, so a merge does not silently launder where a fact came
+        from. A rewrite is a new statement by its own writer, so its provenance is the
+        caller's alone: a model the caller did not name stays unknown, and a
+        confidence the caller did not give stays unknown instead of inheriting the
+        replaced line's score.
         """
         before = [m for m in (self.get(i) for i in ids) if m is not None]
         if not before or not content.strip():
             return None
         _check_confidence(confidence)
+        if action == "rewrite":
+            new_model = model or ""
+            new_confidence = confidence
+        else:
+            new_model = model if model is not None else before[0].model
+            new_confidence = confidence if confidence is not None else before[0].confidence
         after = MemoryItem(
             id="m_" + uuid.uuid4().hex[:8],
             content=content.strip(),
@@ -502,8 +513,8 @@ class MemoryStore:
             created_at=min(m.created_at for m in before),
             source="user" if any(m.source == "user" for m in before) else "agent",
             updated_at=_now(),
-            model=model if model is not None else before[0].model,
-            confidence=confidence if confidence is not None else before[0].confidence,
+            model=new_model,
+            confidence=new_confidence,
         )
         for m in before:
             self._conn.execute("DELETE FROM memories WHERE id = ?", (m.id,))
