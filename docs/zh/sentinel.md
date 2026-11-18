@@ -76,6 +76,8 @@ sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 5. **污染检查**：当前对话已经读取私密数据，且调用会向 `egress_allowlist` 之外或无法确定的目的地发送数据时，需要询问。前面的模式、`always_allow_tools`、`always_ask_tools` 或规则都不能免除这项检查。目的地已知时，审批卡片会显示它。
 6. **警告检查**：包含 `rm -rf`、`sudo`、`curl | sh`，或读取环境变量、删除文件等代码的调用，不会仅因模式或 `always_allow_tools` 而放行，仍需询问。只有明确的 `allow` 规则能覆盖警告。
 
+同一对话中，完全相同的敏感调用已成功执行过，再次调用时会带上警告。即使使用 `auto` 模式也会询问，长期授权不能跳过；明确的 `allow` 规则仍可覆盖警告。这个检查在运行时保留该对话期间有效。
+
 `auto` 仍遵守 `deny_tools`、拒绝规则以及第 5、6 步。污染规则在所有模式下都生效：对话读取邮件、日历、联系人等私密来源后，向 `egress_allowlist` 外发送数据必须询问，`auto` 也不例外。`nanomuse daemon`、`--auto`、App 的「放手」设置和后台目标检查使用此模式，因此无人值守任务遇到危险命令或涉及私密数据的外发时，会在「动态」中生成审批卡片。`nanomuse daemon` 没有用户界面可供当场回答，仍需审批的步骤会被拒绝并附上说明，模型则继续处理其他可做的部分。
 
 ## 审批 {#approvals}

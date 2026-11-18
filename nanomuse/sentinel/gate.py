@@ -12,6 +12,7 @@ program) with a lifetime — see :mod:`nanomuse.sentinel.grants`.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import time
 import uuid
@@ -24,7 +25,7 @@ from weakref import WeakValueDictionary
 
 from nanomuse.config import SentinelSettings
 from nanomuse.logger import logger
-from nanomuse.schema import RiskLevel, ToolCall, ToolResult
+from nanomuse.schema import STEP_KEY, RiskLevel, ToolCall, ToolResult
 from nanomuse.sentinel.audit import AuditLog, channel_of
 from nanomuse.sentinel.grants import Grant, GrantStore, grant_key, normalize_scope
 from nanomuse.sentinel.policy import Decision, Policy
@@ -97,6 +98,7 @@ class Sentinel:
         # loop per thread shares this Sentinel and clearing a side chat must not forget
         # what another conversation read
         self._tainted: set[str] = set()
+        self._sensitive_calls: dict[str, set[str]] = {}
         self.grants = GrantStore(persistent_approvals_file)
         self.reviewer: SentinelReviewer | None = None
         # Wait only for this conversation's approval for a tool, then reassess policy
@@ -161,6 +163,7 @@ class Sentinel:
         ctx = _current_task.get()
         if ctx is not None and not ctx.conversation:
             self.grants.end_conversation(ctx.id)
+            self._sensitive_calls.pop(ctx.id, None)
         _current_task.reset(token)
 
     def end_conversation(self, conversation_id: str) -> None:
@@ -168,6 +171,7 @@ class Sentinel:
         and so does the memory that it read private data."""
         self.grants.end_conversation(conversation_id)
         self._tainted.discard(conversation_id or "")
+        self._sensitive_calls.pop(conversation_id or "", None)
 
     # ------------------------------------------------------------------ grants
     def forget_approvals(self) -> None:
@@ -283,7 +287,22 @@ class Sentinel:
         key = grant_key(tool.name, target)
         task = _current_task.get()
         conversation = task.conversation_id if task else None
+        conversation_key = conversation or ""
+        call_hash = None
+        if assessment.risk == RiskLevel.SENSITIVE:
+            # the full arguments, not the audit log's shortened strings: the same recipient
+            # and subject with another body is another call, a real follow-up
+            clean_args = {name: value for name, value in args.items() if name != STEP_KEY}
+            identity = tool.name + json.dumps(
+                clean_args, sort_keys=True, ensure_ascii=False, default=str
+            )
+            call_hash = hashlib.sha256(identity.encode("utf-8")).hexdigest()
         async with self._approval_locks.setdefault((tool.name, conversation), asyncio.Lock()):
+            # checked once the lock is held: a call that waited may find its twin has run
+            if call_hash in self._sensitive_calls.get(conversation_key, set()):
+                assessment.warnings.append(
+                    f"the same call already ran in this conversation: {assessment.summary}"
+                )
             result_policy = self.policy.evaluate(tool.name, args, assessment, tainted=self.tainted)
             decision, reasons = result_policy.decision, list(result_policy.reasons)
             approved: bool | None = None
@@ -465,6 +484,9 @@ class Sentinel:
         started = time.perf_counter()
         result = await safe_execute(tool, exec_args)
         duration_ms = int((time.perf_counter() - started) * 1000)
+
+        if call_hash is not None and result.ok:
+            self._sensitive_calls.setdefault(conversation_key, set()).add(call_hash)
 
         if self.vault is not None:
             result.output = self.vault.redact(result.output)

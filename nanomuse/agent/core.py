@@ -24,7 +24,7 @@ from nanomuse.llm.vision import keep_newest_images
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryItem, MemoryStore
 from nanomuse.runtime import device
-from nanomuse.schema import AgentState, Attachment, Message, Role, ToolResult, new_id
+from nanomuse.schema import AgentState, Attachment, Message, RiskLevel, Role, ToolResult, new_id
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
@@ -506,7 +506,8 @@ class MuseAgent:
         tools: list[dict[str, Any]] | None,
         tail: Message | None = None,
     ) -> list[Message]:
-        window = self.context_messages() + ([tail] if tail else [])
+        window = self.context_messages()
+        ledger = self._task_ledger(len(self.messages) - len(window))
         protected = self._previous_requests() + [
             m for m in self.messages[self._task_start :] if m.meta.get("user_request")
         ]
@@ -515,6 +516,11 @@ class MuseAgent:
         # and so do the previous turn's.
         present = {m.meta.get("request_id") for m in window}
         window = [m for m in protected if m.meta.get("request_id") not in present] + window
+        if ledger:
+            window.append(ledger)
+            protected.append(ledger)
+        if tail:
+            window.append(tail)
         # pinned requests may carry pictures: the cap counts them too
         window = keep_newest_images(window, self.settings.agent.max_context_images)
         return fit_context(
@@ -523,6 +529,45 @@ class MuseAgent:
             self.settings.agent.max_context_tokens,
             protected,
         )
+
+    def _task_ledger(self, cutoff: int) -> Message | None:
+        """The sensitive actions and file writes the conversation made before ``cutoff``, the
+        first message in view. Out of the window, the model sends the same mail again. Files
+        read are left out: listing their names did not cut rereads."""
+        pending: dict[str, tuple[int, Any]] = {}
+        succeeded: list[tuple[int, Any]] = []
+        for index, message in enumerate(self.messages):
+            if message.role == Role.ASSISTANT:
+                for call in message.tool_calls or []:
+                    pending[call.id] = (index, call)
+            elif message.role == Role.TOOL and message.tool_call_id in pending:
+                entry = pending.pop(message.tool_call_id)
+                if message.meta.get("tool_ok") is True and entry[0] < cutoff:
+                    succeeded.append(entry)
+
+        done: list[str] = []
+        for _, call in sorted(succeeded, key=lambda entry: entry[0]):
+            tool = self.tools.get(call.name)
+            if tool is None:
+                continue
+            args = call.arguments
+            action = args.get("action") if call.name == "files" else None
+            try:
+                assessment = tool.assess(args)
+                risk, summary = assessment.risk, assessment.summary
+            except Exception:  # noqa: BLE001
+                risk, summary = tool.risk, tool.name
+            if risk == RiskLevel.SENSITIVE or action in ("write", "append"):
+                done.append(summary)
+        if not done:
+            return None
+        lines = ["[Runtime note, not from the user] Earlier in this conversation, out of view now:"]
+        lines.append("Done:")
+        if len(done) > 60:
+            lines.append(f"({len(done) - 60} older actions omitted)")
+        lines.extend(f"- {summary}" for summary in done[-60:])
+        lines.append("Do not repeat an action listed as done unless the user asks for it again.")
+        return Message.user("\n".join(lines))
 
     async def _run(
         self,
@@ -659,7 +704,9 @@ class MuseAgent:
                     else:
                         result = await self.sentinel.guard(call, tool)
                     self.ui.on_tool_result(call, result)
-                    self.messages.append(Message.tool(result.for_model(), call.id, call.name))
+                    tool_message = Message.tool(result.for_model(), call.id, call.name)
+                    tool_message.meta["tool_ok"] = result.ok  # read by the task ledger
+                    self.messages.append(tool_message)
                     if result.images:
                         pictures.extend(result.images)
                     if result.stop:

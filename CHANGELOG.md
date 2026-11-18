@@ -4,6 +4,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Kept sent mail, messages and file writes in view as long conversations moved past the context window, so they are not sent or written again.
+- Asked before repeating an identical sensitive action in the same conversation.
+
 - Kept the person's request in view during long turns with the default settings, so a task with many tool calls no longer forgets what it was asked, and the wrap-up at the step limit sees the turn's work.
 
 - Kept the previous request and the newest work in view in the turn after a long one, so "carry on" or "send that report" no longer arrives with no context.

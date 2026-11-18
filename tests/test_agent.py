@@ -11,7 +11,7 @@ from nanomuse.config import Settings
 from nanomuse.goals import GoalStore
 from nanomuse.llm import MockLLM
 from nanomuse.memory import MemoryStore
-from nanomuse.schema import Function, LLMResponse, Message, Role, ToolCall, ToolResult
+from nanomuse.schema import Function, LLMResponse, Message, RiskLevel, Role, ToolCall, ToolResult
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.tools import Goals, Remember, Terminate, ToolCollection
 from nanomuse.tools.base import BaseTool
@@ -28,6 +28,23 @@ class Adder(BaseTool):
 
     async def execute(self, a: float = 0, b: float = 0, **_: Any) -> ToolResult:
         return ToolResult(output=str(a + b))
+
+
+class LedgerFiles(BaseTool):
+    name: str = "files"
+    description: str = "files for ledger tests"
+
+    async def execute(self, action: str = "", path: str = "", **_: Any) -> ToolResult:
+        return ToolResult.fail("failed") if path == "failed" else ToolResult(output="ok")
+
+
+class LedgerSend(BaseTool):
+    name: str = "send_email"
+    description: str = "send for ledger tests"
+    risk: RiskLevel = RiskLevel.SENSITIVE
+
+    async def execute(self, **_: Any) -> ToolResult:
+        return ToolResult(output="sent")
 
 
 def tc(name: str, **args: Any) -> ToolCall:
@@ -192,6 +209,112 @@ async def test_sentinel_denial_reaches_model(settings: Settings):
     assert final == "Understood, blocked."
     tool_msg = [m for m in llm.calls[1]["messages"] if m.role == Role.TOOL][0]
     assert "Sentinel blocked" in tool_msg.content
+
+
+class TestTaskLedger:
+    @staticmethod
+    def notes(messages: list[Message]) -> list[Message]:
+        return [m for m in messages if (m.content or "").startswith("[Runtime note,")]
+
+    @staticmethod
+    def setup_agent(settings: Settings, script: list) -> tuple[MuseAgent, MockLLM]:
+        settings.agent.max_context_messages = 4
+        agent, llm, *_ = make_agent(settings, script, extra_tools=[LedgerFiles(), LedgerSend()])
+        return agent, llm
+
+    @staticmethod
+    def first_step() -> LLMResponse:
+        return LLMResponse(
+            tool_calls=[
+                tc("send_email", subject="report"),
+                tc("files", action="read", path="report.txt"),
+                tc("files", action="write", path="draft.txt"),
+                tc("files", action="read", path="failed"),
+            ]
+        )
+
+    def check_note(self, messages: list[Message]) -> None:
+        notes = self.notes(messages)
+        assert len(notes) == 1
+        text = notes[0].content or ""
+        assert "send_email" in text and "report" in text
+        assert "draft.txt" in text
+        assert "report.txt" not in text and "failed" not in text
+
+    async def test_long_turn_and_carry_on(self, settings: Settings):
+        script = [self.first_step()]
+        script.extend(LLMResponse(tool_calls=[tc("add", a=i)]) for i in range(3))
+        script.extend([LLMResponse(content="Paused."), LLMResponse(content="Finished.")])
+        agent, llm = self.setup_agent(settings, script)
+        await agent.run("Send and read.")
+        assert not self.notes(llm.calls[1]["messages"])
+        self.check_note(llm.calls[3]["messages"])
+        await agent.run("Carry on.")
+        self.check_note(llm.calls[-1]["messages"])
+        assert not self.notes(agent.messages)
+
+    async def test_wrap_up(self, settings: Settings):
+        settings.agent.max_steps = 3
+        script = [self.first_step()]
+        script.extend(LLMResponse(tool_calls=[tc("add", a=i)]) for i in range(2))
+        script.append(LLMResponse(content="Summary."))
+        agent, llm = self.setup_agent(settings, script)
+        await agent.run("Send and read.")
+        self.check_note(llm.calls[-1]["messages"])
+        assert llm.calls[-1]["messages"][-1].content == prompts.MAX_STEPS_PROMPT
+        assert not self.notes(agent.messages)
+
+    def test_caps_and_unknown_results(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        for index in range(205):
+            calls = [tc("files", action="read", path=f"file-{index:03}")]
+            if index < 65:
+                calls.append(tc("send_email", subject=f"mail-{index:03}"))
+            agent.messages.append(Message.assistant(tool_calls=calls))
+            for call in calls:
+                result = Message.tool("ok", call.id, call.name)
+                result.meta["tool_ok"] = True
+                agent.messages.append(result)
+        unknown = tc("send_email", subject="unknown-result")
+        agent.messages.extend(
+            [Message.assistant(tool_calls=[unknown]), Message.tool("ok", unknown.id)]
+        )
+        agent.messages.append(Message.user("continue"))
+        agent.messages.extend(Message.assistant("working") for _ in range(4))
+        note = self.notes(agent._request_context("system", None))[0].content or ""
+        assert "5 older actions omitted" in note
+        assert "mail-004" not in note and "mail-005" in note and "mail-064" in note
+        assert "file-" not in note
+        assert "unknown-result" not in note
+        assert not self.notes(agent.messages)
+
+    def test_reads_missing_tools_and_token_budget(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        calls = [
+            tc("files", action="read", path="same.txt"),
+            tc("files", action="read", path="same.txt"),
+            tc("send_email", subject="important"),
+            tc("missing"),
+        ]
+        agent.messages.append(Message.assistant(tool_calls=calls))
+        for call in calls:
+            result = Message.tool("ok", call.id, call.name)
+            result.meta["tool_ok"] = True
+            agent.messages.append(result)
+        agent.messages.extend(Message.assistant("old " * 300) for _ in range(5))
+        settings.agent.max_context_tokens = 500
+        note = self.notes(agent._request_context("system", None))[0].content or ""
+        assert "same.txt" not in note
+        assert "important" in note and "missing" not in note
+
+    def test_reads_alone_add_no_note(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        read = tc("files", action="read", path="notes.txt")
+        result = Message.tool("ok", read.id, read.name)
+        result.meta["tool_ok"] = True
+        agent.messages.extend([Message.assistant(tool_calls=[read]), result])
+        agent.messages.extend(Message.assistant("working") for _ in range(5))
+        assert not self.notes(agent._request_context("system", None))
 
 
 async def test_long_turn_keeps_the_request_and_its_work_in_view(settings: Settings):
