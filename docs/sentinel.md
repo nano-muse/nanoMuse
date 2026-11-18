@@ -176,6 +176,13 @@ and a file open to a broad group is refused). The chain is
 tamper-evident, not unforgeable: anyone who holds the device and the key
 can re-sign a whole chain, and this page says so out loud.
 
+Appends are coordinated when more than one instance or process writes to
+the same log: each append takes an exclusive lock on a sidecar lock file
+(`audit.jsonl.lock`, `flock` on POSIX and the C runtime's `locking` on
+Windows) and re-reads the chain tail under the lock before signing, so
+interleaved writers produce one chain that verifies instead of forking
+onto a stale tail.
+
 The app's activity sheet (tap the avatar) reads the same file.
 
 ## What this does and does not protect against

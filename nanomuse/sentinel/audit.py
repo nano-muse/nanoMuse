@@ -9,6 +9,11 @@ key file: it is injected, read from the OS keychain, or kept in its own ``audit.
 file next to the log, and the design (``docs/sentinel.md``) says this boundary out
 loud. Lines written before signing existed carry no hash fields and verify as
 ``unsigned``; they are still readable by :meth:`AuditLog.tail`.
+
+Appends are coordinated across instances and processes: each append takes an
+exclusive lock on a sidecar lock file and re-reads the chain tail under it, so
+two writers interleaving appends to one file produce a single chain that
+verifies, instead of two forks chained onto the same stale tail.
 """
 
 from __future__ import annotations
@@ -21,15 +26,19 @@ import os
 import stat
 import sys
 import threading
+import time
 from collections import deque
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import IO, Any, Protocol
 
 from nanomuse.private import keep_private
 
 _ZERO_HASH = "0" * 64
+_LOCK_WAIT_S = 30.0
 _AUDIT_KEY_ENV = "NANOMUSE_AUDIT_KEY"
 _KEYRING_SERVICE = "nanoMuse"
 _KEYRING_ACCOUNT = "audit-signing-key"
@@ -174,6 +183,41 @@ def _windows_key_file_is_private(key_file: Path) -> bool:
     finally:
         if descriptor:
             kernel32.LocalFree(descriptor)
+
+
+def _lock_windows(fh: IO[str]) -> None:
+    """An exclusive lock on the file's first byte, through the C runtime's ``locking``.
+
+    Windows has no ``flock``. ``LK_NBLCK`` asks once and raises instead of
+    retrying the way ``LK_LOCK`` does, which leaves the waiting here, where it
+    can end in an error instead of a hang. This mirrors the token store's lock
+    in ``nanomuse.llm.chatgpt``.
+    """
+    import msvcrt
+
+    fh.seek(0)
+    deadline = time.monotonic() + _LOCK_WAIT_S
+    while True:
+        try:
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)  # type: ignore[attr-defined]
+            return
+        except OSError as exc:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"another process held the audit log lock for {_LOCK_WAIT_S:.0f}s"
+                ) from exc
+            time.sleep(0.05)
+
+
+def _unlock_windows(fh: IO[str]) -> None:
+    """The release half of :func:`_lock_windows`; closing the file releases it as well."""
+    import msvcrt
+
+    try:
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
+    except OSError:
+        pass
 
 
 def _key_file_is_private(key_file: Path) -> bool:
@@ -382,10 +426,15 @@ class AuditLog:
 
     # ------------------------------------------------------------------ chain state
     def _scan_chain(self) -> tuple[int, str]:
-        """The last signed entry's (seq, hash), from the file, read once per process.
-        Unsigned lines do not move the chain: the sequence counts signed entries."""
-        if self._chain is not None:
-            return self._chain
+        """The last signed entry's (seq, hash), read from the file on every call.
+
+        The tail is never trusted from this instance's cache: another instance
+        or process may have appended since the cache was taken, and chaining
+        onto a stale tail forks the chain, so the file in its current state is
+        the only source. A caller that means to append to the tail it read
+        must hold :meth:`_append_lock` across the read and the write, or the
+        tail can still move between the two. Unsigned lines do not move the
+        chain: the sequence counts signed entries."""
         seq, prev = 0, _ZERO_HASH
         if self.path.exists():
             with self.path.open("r", encoding="utf-8") as fh:
@@ -403,6 +452,57 @@ class AuditLog:
         self._chain = (seq, prev)
         return self._chain
 
+    # ------------------------------------------------------------------ append lock
+    def _lock_file_path(self) -> Path:
+        return self.path.with_name(self.path.name + ".lock")
+
+    @contextmanager
+    def _append_lock(self) -> Iterator[None]:
+        """An exclusive lock on the log's sidecar lock file, held across one append.
+
+        The lock file sits beside the log (``audit.jsonl.lock``) and is never
+        written to: it exists so instances and processes that share nothing
+        but the file system can take turns appending, the way the token store
+        in ``nanomuse.llm.chatgpt`` locks ``chatgpt.lock`` beside its data
+        file. The mechanism is picked by what the platform provides:
+        ``flock`` where ``fcntl`` exists (POSIX), the C runtime's ``locking``
+        where it does not (Windows). Picking by capability rather than by
+        the platform name also keeps the lock working in the key-file tests
+        that simulate Windows on a POSIX host by patching ``sys.platform``.
+        The audit data file itself is not locked, so readers (``tail``,
+        ``verify``) are not blocked by a writer.
+        """
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fh = self._lock_file_path().open("a+", encoding="utf-8")
+        try:
+            self._lock_file(fh)
+            yield
+        finally:
+            self._unlock_file(fh)
+
+    @staticmethod
+    def _lock_file(fh: IO[str]) -> None:
+        try:
+            import fcntl
+        except ImportError:  # Windows has no fcntl
+            _lock_windows(fh)
+        else:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+
+    @staticmethod
+    def _unlock_file(fh: IO[str]) -> None:
+        try:
+            try:
+                import fcntl
+            except ImportError:  # Windows has no fcntl
+                _unlock_windows(fh)
+            else:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass  # closing the file releases the lock either way
+        finally:
+            fh.close()
+
     # ------------------------------------------------------------------ write / read
     def record(self, event: str, **fields: Any) -> dict[str, Any]:
         entry: dict[str, Any] = {
@@ -412,16 +512,21 @@ class AuditLog:
         if self.session_id:
             entry["session"] = self.session_id
         entry.update(_truncate(fields))
-        with self._lock:
-            seq, prev = self._scan_chain()
+        # The threading lock orders threads sharing this one instance; the
+        # file lock orders instances and processes sharing the file. The
+        # signer is resolved and the chain tail is re-read inside the file
+        # lock, so an entry always chains onto the tail that is current when
+        # it is written, and a key file created by a sibling writer is the
+        # key this writer reads rather than a second key minted in the race.
+        with self._lock, self._append_lock():
             signer = self._resolve_signer(create=True)
             assert signer is not None  # create=True always resolves or raises
+            seq, prev = self._scan_chain()
             entry["seq"] = seq + 1
             entry["prev"] = prev
             entry["key_id"] = self.key_id
             entry["entry_hash"] = signer.sign(_canonical(entry))
             line = json.dumps(entry, ensure_ascii=False, default=str)
-            self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as fh:
                 fh.write(line + "\n")
             self._chain = (entry["seq"], entry["entry_hash"])
