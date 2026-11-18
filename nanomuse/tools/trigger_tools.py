@@ -12,6 +12,8 @@ from nanomuse.triggers.store import TriggerStore
 
 class Triggers(BaseTool):
     name: str = "triggers"
+    purpose: str = "Do something whenever an event happens, on the user's behalf."
+    keywords: list[str] = ["trigger", "event", "whenever", "automation"]
     description: str = (
         "Do something whenever an event happens, on the user's behalf, the other half of "
         "`reminders`, which fire at a time. Kinds: kind=`mail`, a new mail whose sender or "

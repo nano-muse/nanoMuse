@@ -12,6 +12,8 @@ from nanomuse.tools.base import BaseTool, CallAssessment
 
 class Reminders(BaseTool):
     name: str = "reminders"
+    purpose: str = "Schedule reminders and timed messages for later."
+    keywords: list[str] = ["remind", "schedule", "later", "alarm"]
     description: str = (
         "Schedule something for later, on the user's behalf. Two kinds: kind=`remind`, at that "
         'time you simply tell the user the text ("call mum", "the parking runs out"); '
