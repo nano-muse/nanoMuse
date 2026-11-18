@@ -476,7 +476,11 @@ in the data directory, priced by this section's own per-million-token table; a m
 no price entry records zero rather than guessing. Three views sum the same entries by
 task, by device and by model, and a monthly budget raises one alert record per month when
 spending reaches it. Recording is on only when a monthly budget or at least one price is
-set; with neither, no ledger is kept and nothing changes.
+set; with neither, no ledger is kept and nothing changes. The recorder and its gate belong
+to the app that created them: two apps running in one process keep separate ledgers, and
+one app's spend does not count against another app's budget. A task whose calls ran on
+more than one model (a nested call on the hands model, for example) is recorded as one
+entry per model, each priced by the model that made those calls.
 
 `mode` is the budget gate. `off` records only. `warn` raises the alert and work continues.
 `hard` refuses a new task before it starts once the month's recorded spend reaches the

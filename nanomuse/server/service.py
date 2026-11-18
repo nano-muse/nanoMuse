@@ -900,6 +900,9 @@ class MuseService:
             skills=self.app.skills,
             session_file=session_file,
             conversation_id=thread_id,
+            # A thread agent belongs to this service's one app, so it
+            # feeds that app's cost recorder and no other app's.
+            cost_recorder=self.app.cost_recorder,
         )
         if session_file.exists():
             try:
