@@ -34,10 +34,11 @@ export const zh = {
   } as Record<string, string>,
   lock: {
     title: "管理口令",
-    hint: "这是 nanoMuse Cloud 的管理控制台。输入 ADMIN_TOKEN 进入；口令只保存在这个标签页里。",
-    placeholder: "ADMIN_TOKEN",
+    hint: "这是 nanoMuse Cloud 的管理控制台。输入 CLOUD_ADMIN_TOKEN 进入；口令只保存在这个标签页里。",
+    placeholder: "CLOUD_ADMIN_TOKEN",
     enter: "进入",
-    bad: "口令不对，或者服务没有响应。",
+    bad: "口令不正确，请检查后重试。",
+    unavailable: "服务暂时不可用，请稍后重试。已保留输入的口令。",
     expired: "会话失效了，请重新输入口令。",
   },
   top: {
@@ -1179,10 +1180,11 @@ export const en: Strings = {
   },
   lock: {
     title: "Admin token",
-    hint: "This is the nanoMuse Cloud console. Enter ADMIN_TOKEN; it stays in this tab only.",
-    placeholder: "ADMIN_TOKEN",
+    hint: "This is the nanoMuse Cloud console. Enter CLOUD_ADMIN_TOKEN; it stays in this tab only.",
+    placeholder: "CLOUD_ADMIN_TOKEN",
     enter: "Enter",
-    bad: "Wrong token, or the service did not answer.",
+    bad: "Incorrect admin token. Check it and try again.",
+    unavailable: "The service is unavailable. Try again shortly; your input has been kept.",
     expired: "The session ended; enter the token again.",
   },
   top: {
