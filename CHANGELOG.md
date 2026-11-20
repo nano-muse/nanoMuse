@@ -58,6 +58,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **A memory line says who wrote it and how sure they were.** Each stored fact now carries the model that wrote it and a confidence between 0 and 1 (unknown for older lines and lines written by hand), kept through merges, drops and restores; conflicting lines are resolved by a stated rule (a line the person wrote wins, then an explicit correction, then the newer fact, then the higher confidence) instead of a silent merge. Old databases upgrade in place.
+- **A remembered fact says who wrote it when it is read back.** The remember tool now records the model running at the time and an optional confidence, and recall shows both; when a new wording matches a line the person wrote, or an explicit correction of it, the existing line is kept instead of silently rewritten.
+- **A memory's provenance names the writer of the run that wrote it.** A turn that ran on a one-time model override was recorded under the configured default model, because the tool kept the model it was built with; it now records the run's own execution model. A rewrite that gave no confidence inherited the replaced line's score; an ungiven confidence now stays unknown, in a rewrite's record and in the conflict rule alike. The conflict rule's answer is now honoured on every ground: an existing line the rule picks is kept, and when the rule separates nothing both lines are kept, instead of the new wording replacing the existing line anyway.
+
 - Fixed browser-enabled Docker builds failing because the Playwright driver could not load `libatomic.so.1`, and added a Chromium startup check alongside the standard image build in CI.
 
 - Refused local-file and custom-scheme pages before browser tool reads, screenshots and actions, limited blank-page aliases to `about:blank` and `about:srcdoc`, and kept browser fetch redirects on HTTP(S). In-memory data and blob resources and the user's take-over view remained available. For #339.

@@ -109,6 +109,20 @@ class BaseLLM(ABC):
         return None
 
 
+def model_id(llm: BaseLLM | None) -> str:
+    """The id of the model a client runs as, as a plain label: an adapter is
+    unwrapped to the provider it wraps, whose settings name the model (a client
+    without settings names it on itself). "" when no client or no model is known.
+    Never a key or an address."""
+    current = llm
+    while isinstance(inner := getattr(current, "inner", None), BaseLLM):
+        current = inner
+    if current is None:
+        return ""
+    settings = getattr(current, "settings", None)
+    return str(getattr(settings, "model", None) or getattr(current, "model", "") or "")
+
+
 def split_think(content: str | None) -> tuple[str | None, str | None]:
     """Extract ``<think>...</think>`` blocks from non-streamed content.
 
@@ -321,6 +335,7 @@ __all__ = [
     "ToolsUnsupported",
     "begin_call",
     "end_call",
+    "model_id",
     "provider_id",
     "proxied_http",
     "says_no_tools",

@@ -417,7 +417,9 @@ class NanoMuseApp:
         )
         if self.memory is not None:
             tools.add(
-                Remember(store=self.memory), Recall(store=self.memory), Forget(store=self.memory)
+                Remember(store=self.memory, model=s.llm.model),
+                Recall(store=self.memory),
+                Forget(store=self.memory),
             )
         if s.connectors.email.enabled:
             tools.add(

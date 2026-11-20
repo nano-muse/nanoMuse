@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
-from nanomuse.memory import MemoryStore
+from nanomuse.llm.base import model_id
+from nanomuse.memory import MemoryItem, MemoryStore, resolve_conflict
 from nanomuse.schema import RiskLevel, ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment, int_arg
 
@@ -12,6 +14,15 @@ from nanomuse.tools.base import BaseTool, CallAssessment, int_arg
 def _short(value: Any, limit: int = 80) -> str:
     text = str(value or "").strip().replace("\n", " ")
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _provenance(item: MemoryItem) -> str:
+    bits = []
+    if item.model:
+        bits.append(f"written by {item.model}")
+    if item.confidence is not None:
+        bits.append(f"confidence {item.confidence:.2f}")
+    return f" ({'; '.join(bits)})" if bits else ""
 
 
 class Remember(BaseTool):
@@ -35,11 +46,32 @@ class Remember(BaseTool):
                 "type": "string",
                 "description": "id (m_xxxxxxxx) of an existing memory this one updates",
             },
+            "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "how sure the writer is that this is a durable fact, 0.0 to 1.0; omit when unknown",
+            },
         },
         "required": ["content"],
     }
     risk: RiskLevel = RiskLevel.SAFE
     store: MemoryStore
+    # The configured model id (from settings), used only when a call names no
+    # execution model of its own; "" means unknown. Never a key or an address.
+    model: str = ""
+
+    def _writer(self) -> str:
+        """The model writing in this run: the execution model of the task the call
+        belongs to, which is the client the turn actually runs on (a per-run
+        override included), not the configured default this tool was built with.
+        Outside a task, the configured model stands."""
+        from nanomuse.sentinel.gate import current_task
+
+        task = current_task()
+        if task is not None and task.execution_llm is not None:
+            return model_id(task.execution_llm)
+        return self.model
 
     def assess(self, args: dict[str, Any]) -> CallAssessment:
         a = super().assess(args)
@@ -50,34 +82,81 @@ class Remember(BaseTool):
         return a
 
     async def execute(
-        self, content: str = "", category: str = "general", replaces: str = "", **_: Any
+        self,
+        content: str = "",
+        category: str = "general",
+        replaces: str = "",
+        confidence: float | None = None,
+        **_: Any,
     ) -> ToolResult:
+        writer = self._writer()
         try:
             if replaces:
                 old = self.store.get(replaces)
                 if old is None:
                     return ToolResult.fail(f"no memory with id {replaces}")
                 change = self.store.replace(
-                    [replaces], content, category=category or old.category, action="rewrite"
+                    [replaces],
+                    content,
+                    category=category or old.category,
+                    action="rewrite",
+                    model=writer,
+                    confidence=confidence,
                 )
                 if change is None or change.after is None:
                     return ToolResult.fail("memory content is empty")
                 return ToolResult(
                     output=f"Updated {replaces} → {change.after.id}: {change.after.content}"
                 )
-            # The same fact in other words: update that line rather than keep two.
+            # The same fact in other words: the stated rule decides, and its answer
+            # is honoured as given. When the existing line wins, on any ground, it
+            # is kept as it is; when nothing separates the two, both are kept and
+            # the new wording is stored as a line of its own below; only when the
+            # new wording wins does it replace the existing line.
             for _score, twin in self.store.similar(content, threshold=0.8, limit=1):
                 if twin.content.strip() == content.strip():
                     break  # an exact repeat: add() hands back the existing line
+                candidate = MemoryItem(
+                    id="",
+                    content=content,
+                    category=category or twin.category,
+                    # full precision: the candidate is the statement being made
+                    # now, so it is newer than the stored line it is compared
+                    # with (stored lines carry second precision, and a tie at
+                    # that precision would misread the two as simultaneous)
+                    created_at=datetime.now(UTC).isoformat(),
+                    source="agent",
+                    model=writer,
+                    confidence=confidence,
+                )
+                winner, reason = resolve_conflict(candidate, twin)
+                if reason == "keep-both":
+                    break  # nothing separates them: both lines stay, see add() below
+                if winner is twin:
+                    return ToolResult(
+                        output=(
+                            f"Kept {twin.id}: {twin.content} (the existing memory wins: {reason})"
+                        )
+                    )
                 change = self.store.replace(
-                    [twin.id], content, category=category or twin.category, action="rewrite"
+                    [twin.id],
+                    content,
+                    category=category or twin.category,
+                    action="rewrite",
+                    model=writer,
+                    confidence=confidence,
                 )
                 if change is not None and change.after is not None:
                     return ToolResult(
                         output=f"Updated {twin.id} → {change.after.id}: {change.after.content} "
                         f"(was: {twin.content})"
                     )
-            item = self.store.add(content, category=category or "general")
+            item = self.store.add(
+                content,
+                category=category or "general",
+                model=writer,
+                confidence=confidence,
+            )
         except ValueError as exc:
             return ToolResult.fail(str(exc))
         note = ""
@@ -116,7 +195,7 @@ class Recall(BaseTool):
         items = await self.store.search_async(query, limit=int_arg(limit, 10, 1, 50))
         if not items:
             return ToolResult(output="No matching memories.")
-        return ToolResult(output="\n".join(i.render() for i in items))
+        return ToolResult(output="\n".join(i.render() + _provenance(i) for i in items))
 
 
 class Forget(BaseTool):
