@@ -1,5 +1,7 @@
 # nanoMuse Cloud
 
+The admin console distinguishes an invalid token from a service failure. Only a 401 rejects the token; network and server errors keep the entered token for retry, and a late rejection from an older request cannot lock a newer sign-in.
+
 Daily analytics labels and tooltips use the site's configured timezone offset, including UTC, regardless of the operator's browser timezone.
 Unchanged settings polls preserve unsaved allowance, invite bonus and nudge-policy edits. A changed server value still refreshes the corresponding editor.
 Switching accounts in the admin drawer clears the samples list and ignores pending sample responses and errors from the previous account.

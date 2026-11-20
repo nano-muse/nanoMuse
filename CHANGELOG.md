@@ -30,6 +30,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Distinguished admin-token rejection from temporary service failures, preserved entered tokens during outages, and kept late rejections from locking newer sign-ins.
+
 - Stopped scheduled relay backups before copying when free disk space was insufficient, and prevented overlapping backup runs. For #858.
 
 - Restored the default for invalid numeric preferences saved by the admin console, including blank values.
