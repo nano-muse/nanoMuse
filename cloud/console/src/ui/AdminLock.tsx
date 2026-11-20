@@ -67,4 +67,3 @@ export function AdminLock({ onEnter, expired }: { onEnter: () => void; expired: 
     </div>
   );
 }
-
