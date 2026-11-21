@@ -38,6 +38,8 @@ desktop, and it installs over the old one (same application id).
 
 Levea is listed under **Design** in Connectors. Connect with its OAuth sign-in to edit videos, add captions and export MP4 files. Its tools follow the same approval rules as other MCP connectors.
 
+On Linux and macOS, **Settings → General → About** shows the installed version and the latest published release. A local test build can be newer than the published release.
+
 ## Updating on Windows
 
 The Windows x64 app checks for a newer stable release after starting and every six
