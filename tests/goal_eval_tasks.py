@@ -686,6 +686,8 @@ def observations(world: World, before: dict[str, Any], answer: str) -> dict[str,
                     "total",
                 }
                 if out["EXP-C1"]:
+                    # Note: EXP-C2 compares all three category subtotals and the grand total;
+                    # if any subtotal is wrong, EXP-C2 is not_met and (as tier 1) contradicts the goal.
                     out["EXP-C2"] = dict(parsed) == {
                         "交通": 80,
                         "办公": 160,
@@ -768,6 +770,7 @@ def assess(case: dict[str, Any], observed: dict[str, Any]) -> dict[str, Any]:
             "scalar",
             ("fixture",),
             invariant=d.get("invariant", False),
+            tier=1 if d["id"] in ("EXP-C2", "EXP-C4", "TKT-C1", "ARC-C5") else 2,
         )
         for d in definitions
     )
@@ -844,7 +847,7 @@ async def run_case(case: dict[str, Any], llm: BaseLLM, path: Path) -> dict[str, 
     answer = await agent.run(DATA["families"][case["family"]]["instruction"])
     observed = observations(world, before, answer)
     result = assess(case, observed)
-    return {
+    summary: dict[str, Any] = {
         "id": case["id"],
         "verdict": result["status"],
         "expected_verdict": case["expected_verdict"],
@@ -852,6 +855,9 @@ async def run_case(case: dict[str, Any], llm: BaseLLM, path: Path) -> dict[str, 
         "expected_criteria": {k: v["expected_result"] for k, v in case["criteria"].items()},
         "observations": observed,
     }
+    if "tier1_failed" in result:
+        summary["tier1_failed"] = result["tier1_failed"]
+    return summary
 
 
 async def run_cases(

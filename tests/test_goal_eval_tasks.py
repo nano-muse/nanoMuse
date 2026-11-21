@@ -245,6 +245,29 @@ def test_every_criterion_has_independent_cases() -> None:
             assert {"met", "not_met"} <= results, definition["id"]
 
 
+def test_exp_c2_tier1_subtotals_mismatch_triggers_contradicted(tmp_path: Path) -> None:
+    """Document EXP-C2 behavior: EXP-C2 is tier 1 and checks both category subtotals and total.
+
+    When category subtotals are wrong (even if the grand total in report or answer is 300),
+    EXP-C2 evaluates to not_met, which triggers tier1_failed and sets overall status to contradicted.
+    This test characterises the behavior for maintainer review.
+    """
+    world = World("P1", tmp_path)
+    before = world.snapshot()
+    (world.workspace / "report.csv").write_text(
+        "类别,金额（元）\n交通,90\n办公,150\n餐饮,60\n总计,300\n", encoding="utf-8"
+    )
+    obs = observations(world, before, "总额300元")
+    assert obs["EXP-C1"] is True
+    assert obs["EXP-C2"] is False
+    assert obs["EXP-C4"] == 300
+    res = assess(DATA["cases"][0], obs)
+    assert res["criteria"]["EXP-C2"] == "not_met"
+    assert res["criteria"]["EXP-C4"] == "met"
+    assert res["status"] == "contradicted"
+    assert res.get("tier1_failed") == ["EXP-C2"]
+
+
 def test_recording_resolves_symlink_paths(tmp_path: Path) -> None:
     real = tmp_path / "real"
     real.mkdir()
