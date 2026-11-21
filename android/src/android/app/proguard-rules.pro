@@ -26,3 +26,11 @@
 # NOTE FOR VERIFICATION: debug builds don't minify, so this bug is invisible
 # there. Any change here must be checked against an assembleRelease APK.
 -keep class io.codeconcept.realtimecutvadlibrary.** { *; }
+
+# nanoMuse: SnakeYAML uses field access on Android. Its optional desktop
+# JavaBeans introspection path references these classes from java.desktop.
+-dontwarn java.beans.BeanInfo
+-dontwarn java.beans.FeatureDescriptor
+-dontwarn java.beans.IntrospectionException
+-dontwarn java.beans.Introspector
+-dontwarn java.beans.PropertyDescriptor
