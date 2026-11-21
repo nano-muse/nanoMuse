@@ -148,6 +148,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Clarified the latest published version on the desktop About page when testing a newer local build.
+- Fixed the desktop setup returning signed-out users to the first task when they chose to skip model configuration.
+
 - Let the agent list accessible scheduled tasks across chats and request approval to delete one, with guidance to check existing tasks before creating another. For #905.
 
 - Documented launching the Linux AppImage with a separate self-hosted relay profile. For #895.

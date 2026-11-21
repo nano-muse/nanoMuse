@@ -92,11 +92,9 @@ state in `$DSH_HOME/nanomuse/firstrun.json` (`src/firstrun.ts`): *done* once Sta
 pressed, the permissions page seen, which source answers. The pages are therefore never
 skipped on a fresh install and never shown twice:
 
-1. **Welcome**: the app's mark (the avatar comes with the conversation, on the Meet page),
-   *Welcome to nanoMuse*, the three feature rows (chat, hands, reach), the community notice,
-   one blue *Sign in* pill and *Use your own API key instead*, which goes to the models page
-   with no account (the sign-in can come later; *Skip for now* there with no key saved is
-   Welcome again). Sign-in
+1. **Choose task**. Pick a suggested task and select *Do this task* to open model setup.
+   You can sign in, add your own key, or select *Skip for now* to finish setup and explore
+   the app. Connect a model before sending the task. Sign-in
    is the phone's: *Phone number or e-mail* with the line that a mainland China number
    gets an SMS and anything else an e-mail, the code boxes that verify themselves on the
    sixth digit, *Try another way* for a password (`/v1/auth/code`, `/v1/auth/verify`,
