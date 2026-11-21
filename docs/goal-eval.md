@@ -34,6 +34,13 @@ The rules can miss paraphrases or misunderstand text, and these ten tasks do not
 performance on other tasks. The live test checks that the runner completes, not that the
 model succeeds.
 
+Each criterion carries a tier (`1` or `2`, default `2`). When a tier-1 outcome criterion fails
+with valid evidence (`not_met`), the run verdict becomes `contradicted` rather than `partial`:
+tier-1 outcome failures not in `lost` (including consecutive failures) are recorded in
+`tier1_failed`, while regressions from a prior `met` state are recorded in `lost`. Missing,
+expired or rejected evidence stays `unknown` and conflicting evidence stays `conflict`. In the
+ten tasks, `EXP-C2`, `EXP-C4`, `TKT-C1` and `ARC-C5` are tier 1.
+
 Expense totals keep their sign and fractional part. Conflicting totals or numbers that
 cannot be represented without losing precision remain unknown rather than passing.
 
