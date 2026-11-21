@@ -776,10 +776,11 @@ warning in the iOS app fails its build: the helper is nanoMuse code.
 - **The AppImage needs FUSE.** It mounts itself at start; when the machine has no
   `libfuse2`, or `fusermount` is not permitted (containers, some corporate images; the log
   says `fusermount: mount failed: Operation not permitted` / `Cannot mount AppImage, please
-  check your FUSE setup`), run it unpacked instead:
-  `./nanoMuse-Desktop-<version>-linux-x64.AppImage --appimage-extract-and-run`, or take the
-  **`.tar.gz`**, the same app as a plain folder: unpack it anywhere and run
-  `./nanomuse-desktop` from it (no FUSE, no root).
+  check your FUSE setup`), place the AppImage in a folder for this version. In that folder,
+  run `./nanoMuse-Desktop-<version>-linux-x64.AppImage --appimage-extract` once. Launch
+  `./squashfs-root/AppRun` each time and keep the folder while the app is open. A second
+  launch in temporary extraction mode can remove files still in use by the first window.
+  You can also unpack the **`.tar.gz`** and run `./nanomuse-desktop` from its folder.
 - **The icon does nothing.** The app allows one instance at a time: a click on the launcher
   while a copy is already running tells *that* copy to show its window. Up to 0.1.36 a copy
   whose window had been closed stayed alive for the tray and did not answer; the click
