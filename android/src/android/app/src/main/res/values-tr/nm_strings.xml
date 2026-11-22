@@ -1270,4 +1270,12 @@
     <string name="nm_device_chat_uncertain">Teslim belirsiz. Sonuç cihazda kontrol ediliyor.</string>
     <string name="nm_device_chat_interrupted">Kesintiye uğradı. Cihaz bazı işlemleri zaten yapmış olabilir.</string>
     <string name="nm_stream_interrupted">Yanıt tamamlanmadan bağlantı kesildi.</string>
+    <string name="nm_access_settings_title">Uygulama ve konuşma kilidi</string>
+    <string name="nm_lock_app_after_background">Uygulamadan ayrıldıktan sonra kilitle</string>
+    <string name="nm_lock_app_hint">nanoMuse kilidini açmak için cihazınızın ekran kilidini kullanın.</string>
+    <string name="nm_lock_chat_group">Korumalı konuşmalar</string>
+    <string name="nm_lock_chat_relock">Tekrar kilitle</string>
+    <string name="nm_lock_chat_hint">Konuşma menüsünden “%1$s” seçeneğini seçin. Bir süre belirlerseniz süre, o konuşmanın kilidini açtığınızda başlar.</string>
+    <string name="nm_lock_chat_on_leave">Konuşmadan ayrılınca</string>
+    <string name="nm_lock_one_hour">1 saat</string>
 </resources>

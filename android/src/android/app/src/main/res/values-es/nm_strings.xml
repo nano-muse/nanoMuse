@@ -1270,4 +1270,12 @@
     <string name="nm_device_chat_uncertain">Entrega incierta. Consultando el resultado en el dispositivo.</string>
     <string name="nm_device_chat_interrupted">Interrumpido. El dispositivo puede haber realizado algunas acciones.</string>
     <string name="nm_stream_interrupted">La conexión se interrumpió antes de completar la respuesta.</string>
+    <string name="nm_access_settings_title">Bloqueo de la aplicación y los chats</string>
+    <string name="nm_lock_app_after_background">Bloquear tras salir de la aplicación</string>
+    <string name="nm_lock_app_hint">Usa el bloqueo de pantalla del dispositivo para desbloquear nanoMuse.</string>
+    <string name="nm_lock_chat_group">Conversaciones protegidas</string>
+    <string name="nm_lock_chat_relock">Volver a bloquear</string>
+    <string name="nm_lock_chat_hint">Elige «%1$s» en el menú del chat. Si eliges un plazo, se cuenta desde que desbloqueas esa conversación.</string>
+    <string name="nm_lock_chat_on_leave">Al salir de la conversación</string>
+    <string name="nm_lock_one_hour">1 hora</string>
 </resources>

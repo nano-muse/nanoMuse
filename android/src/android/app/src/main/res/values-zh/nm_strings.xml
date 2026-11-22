@@ -1243,4 +1243,12 @@
     <string name="nm_device_chat_uncertain">送达状态未知，正在查询设备上的结果。</string>
     <string name="nm_device_chat_interrupted">任务已中断，设备可能已经执行了部分操作。</string>
     <string name="nm_stream_interrupted">回复尚未完成，连接已断开。</string>
+    <string name="nm_access_settings_title">应用与对话锁</string>
+    <string name="nm_lock_app_after_background">切到后台后锁定</string>
+    <string name="nm_lock_app_hint">开启后，使用本机的锁屏方式解锁 nanoMuse。</string>
+    <string name="nm_lock_chat_group">受保护的对话</string>
+    <string name="nm_lock_chat_relock">重新锁定</string>
+    <string name="nm_lock_chat_hint">在聊天菜单中选择「%1$s」。如果设置了时长，从解锁这条对话时开始计时。</string>
+    <string name="nm_lock_chat_on_leave">离开对话时</string>
+    <string name="nm_lock_one_hour">1 小时</string>
 </resources>

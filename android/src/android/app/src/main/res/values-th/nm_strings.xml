@@ -1266,4 +1266,12 @@
     <string name="nm_device_chat_uncertain">ยังไม่แน่ใจว่าส่งถึงแล้ว กำลังตรวจสอบผลบนอุปกรณ์</string>
     <string name="nm_device_chat_interrupted">ถูกขัดจังหวะ อุปกรณ์อาจดำเนินการบางอย่างไปแล้ว</string>
     <string name="nm_stream_interrupted">การเชื่อมต่อถูกตัดก่อนที่คำตอบจะเสร็จสมบูรณ์</string>
+    <string name="nm_access_settings_title">การล็อกแอปและการสนทนา</string>
+    <string name="nm_lock_app_after_background">ล็อกหลังจากออกจากแอป</string>
+    <string name="nm_lock_app_hint">ใช้วิธีปลดล็อกหน้าจอของอุปกรณ์เพื่อปลดล็อก nanoMuse</string>
+    <string name="nm_lock_chat_group">การสนทนาที่ได้รับการป้องกัน</string>
+    <string name="nm_lock_chat_relock">ล็อกอีกครั้ง</string>
+    <string name="nm_lock_chat_hint">เลือก “%1$s” ในเมนูการสนทนา หากกำหนดระยะเวลา ระบบจะเริ่มนับเมื่อคุณปลดล็อกการสนทนานั้น</string>
+    <string name="nm_lock_chat_on_leave">เมื่อออกจากการสนทนา</string>
+    <string name="nm_lock_one_hour">1 ชั่วโมง</string>
 </resources>

@@ -1266,4 +1266,12 @@
     <string name="nm_device_chat_uncertain">전송 여부가 불확실합니다. 기기에서 결과를 확인 중입니다.</string>
     <string name="nm_device_chat_interrupted">중단되었습니다. 기기가 일부 작업을 이미 실행했을 수 있습니다.</string>
     <string name="nm_stream_interrupted">응답이 완료되기 전에 연결이 끊어졌습니다.</string>
+    <string name="nm_access_settings_title">앱 및 대화 잠금</string>
+    <string name="nm_lock_app_after_background">백그라운드 전환 후 잠금</string>
+    <string name="nm_lock_app_hint">기기의 화면 잠금 방식으로 nanoMuse 잠금을 해제합니다.</string>
+    <string name="nm_lock_chat_group">보호된 대화</string>
+    <string name="nm_lock_chat_relock">다시 잠금</string>
+    <string name="nm_lock_chat_hint">대화 메뉴에서 ‘%1$s’를 선택하세요. 시간을 지정하면 해당 대화의 잠금을 해제한 시점부터 계산합니다.</string>
+    <string name="nm_lock_chat_on_leave">대화에서 나갈 때</string>
+    <string name="nm_lock_one_hour">1시간</string>
 </resources>

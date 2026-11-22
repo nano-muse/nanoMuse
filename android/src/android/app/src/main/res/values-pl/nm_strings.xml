@@ -1278,4 +1278,12 @@
     <string name="nm_device_chat_uncertain">Niepewne dostarczenie. Sprawdzanie wyniku na urządzeniu.</string>
     <string name="nm_device_chat_interrupted">Przerwano. Urządzenie mogło już wykonać niektóre działania.</string>
     <string name="nm_stream_interrupted">Połączenie zostało przerwane przed zakończeniem odpowiedzi.</string>
+    <string name="nm_access_settings_title">Blokada aplikacji i rozmów</string>
+    <string name="nm_lock_app_after_background">Zablokuj po przejściu do tła</string>
+    <string name="nm_lock_app_hint">Odblokuj nanoMuse za pomocą blokady ekranu urządzenia.</string>
+    <string name="nm_lock_chat_group">Chronione rozmowy</string>
+    <string name="nm_lock_chat_relock">Zablokuj ponownie</string>
+    <string name="nm_lock_chat_hint">Wybierz „%1$s” w menu rozmowy. Jeśli ustawisz opóźnienie, czas będzie liczony od chwili odblokowania tej rozmowy.</string>
+    <string name="nm_lock_chat_on_leave">Po opuszczeniu rozmowy</string>
+    <string name="nm_lock_one_hour">1 godzina</string>
 </resources>

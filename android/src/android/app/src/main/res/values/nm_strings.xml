@@ -1250,4 +1250,12 @@
     <string name="nm_device_chat_uncertain">Delivery uncertain. Checking the device for the result.</string>
     <string name="nm_device_chat_interrupted">Interrupted. The device may have already performed some actions.</string>
     <string name="nm_stream_interrupted">Connection ended before the response completed.</string>
+    <string name="nm_access_settings_title">App and chat locks</string>
+    <string name="nm_lock_app_after_background">Lock after leaving the app</string>
+    <string name="nm_lock_app_hint">Use your device’s screen lock to unlock nanoMuse.</string>
+    <string name="nm_lock_chat_group">Protected conversations</string>
+    <string name="nm_lock_chat_relock">Lock again</string>
+    <string name="nm_lock_chat_hint">Choose “%1$s” in the chat menu. If you set a delay, it starts when you unlock that conversation.</string>
+    <string name="nm_lock_chat_on_leave">When leaving the conversation</string>
+    <string name="nm_lock_one_hour">1 hour</string>
 </resources>

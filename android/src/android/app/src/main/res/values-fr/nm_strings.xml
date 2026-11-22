@@ -1271,4 +1271,12 @@
     <string name="nm_device_chat_uncertain">Envoi incertain. Recherche du résultat sur cet appareil.</string>
     <string name="nm_device_chat_interrupted">Interrompu. Certaines actions ont peut-être déjà été effectuées.</string>
     <string name="nm_stream_interrupted">La connexion a été interrompue avant la fin de la réponse.</string>
+    <string name="nm_access_settings_title">Verrouillage de l’appli et des discussions</string>
+    <string name="nm_lock_app_after_background">Verrouiller après la mise en arrière-plan</string>
+    <string name="nm_lock_app_hint">Déverrouillez nanoMuse avec le verrouillage d’écran de votre appareil.</string>
+    <string name="nm_lock_chat_group">Conversations protégées</string>
+    <string name="nm_lock_chat_relock">Verrouiller à nouveau</string>
+    <string name="nm_lock_chat_hint">Choisissez « %1$s » dans le menu de la conversation. Si vous fixez un délai, il commence lorsque vous déverrouillez cette conversation.</string>
+    <string name="nm_lock_chat_on_leave">En quittant la conversation</string>
+    <string name="nm_lock_one_hour">1 heure</string>
 </resources>

@@ -217,6 +217,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Grouped the app lock and protected chat settings on one page and clarified when each lock timer starts.
+
 - Replaced Android chat history on reload instead of appending duplicates, converted persisted messages in bounded raw pages, and read only message IDs when verifying a compaction anchor. Saved messages and unsummarized model context were preserved. For #921.
 
 - Retried interrupted OpenAI-compatible streams within the existing bounded model-request budget, including partial EOF, and surfaced socket failures as recoverable errors instead of cancellation. For #934.

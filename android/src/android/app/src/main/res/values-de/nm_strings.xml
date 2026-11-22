@@ -1270,4 +1270,12 @@
     <string name="nm_device_chat_uncertain">Zustellung unklar. Das Ergebnis wird auf dem Gerät abgefragt.</string>
     <string name="nm_device_chat_interrupted">Unterbrochen. Das Gerät hat möglicherweise bereits Aktionen ausgeführt.</string>
     <string name="nm_stream_interrupted">Die Verbindung wurde unterbrochen, bevor die Antwort vollständig war.</string>
+    <string name="nm_access_settings_title">App- und Chatsperre</string>
+    <string name="nm_lock_app_after_background">Nach Verlassen der App sperren</string>
+    <string name="nm_lock_app_hint">Entsperre nanoMuse mit der Displaysperre deines Geräts.</string>
+    <string name="nm_lock_chat_group">Geschützte Unterhaltungen</string>
+    <string name="nm_lock_chat_relock">Erneut sperren</string>
+    <string name="nm_lock_chat_hint">Wähle im Chatmenü „%1$s“. Wenn du eine Wartezeit einstellst, beginnt sie beim Entsperren der jeweiligen Unterhaltung.</string>
+    <string name="nm_lock_chat_on_leave">Beim Verlassen der Unterhaltung</string>
+    <string name="nm_lock_one_hour">1 Stunde</string>
 </resources>

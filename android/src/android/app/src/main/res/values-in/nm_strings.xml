@@ -1266,4 +1266,12 @@
     <string name="nm_device_chat_uncertain">Pengiriman belum pasti. Memeriksa hasil di perangkat.</string>
     <string name="nm_device_chat_interrupted">Terputus. Perangkat mungkin sudah melakukan beberapa tindakan.</string>
     <string name="nm_stream_interrupted">Koneksi terputus sebelum jawaban selesai.</string>
+    <string name="nm_access_settings_title">Kunci aplikasi dan percakapan</string>
+    <string name="nm_lock_app_after_background">Kunci setelah meninggalkan aplikasi</string>
+    <string name="nm_lock_app_hint">Gunakan kunci layar perangkat untuk membuka kunci nanoMuse.</string>
+    <string name="nm_lock_chat_group">Percakapan terlindungi</string>
+    <string name="nm_lock_chat_relock">Kunci kembali</string>
+    <string name="nm_lock_chat_hint">Pilih “%1$s” di menu percakapan. Jika Anda memilih durasi, waktu dihitung sejak Anda membuka kunci percakapan tersebut.</string>
+    <string name="nm_lock_chat_on_leave">Saat meninggalkan percakapan</string>
+    <string name="nm_lock_one_hour">1 jam</string>
 </resources>

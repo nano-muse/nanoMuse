@@ -1270,4 +1270,12 @@
     <string name="nm_device_chat_uncertain">Hindi tiyak ang paghahatid. Sinusuri ang resulta sa device.</string>
     <string name="nm_device_chat_interrupted">Naantala. Maaaring may mga nagawa na ang device.</string>
     <string name="nm_stream_interrupted">Naputol ang koneksyon bago matapos ang sagot.</string>
+    <string name="nm_access_settings_title">Lock ng app at mga chat</string>
+    <string name="nm_lock_app_after_background">I-lock pagkalipat sa ibang app</string>
+    <string name="nm_lock_app_hint">Gamitin ang screen lock ng device para i-unlock ang nanoMuse.</string>
+    <string name="nm_lock_chat_group">Mga protektadong pag-uusap</string>
+    <string name="nm_lock_chat_relock">I-lock muli</string>
+    <string name="nm_lock_chat_hint">Piliin ang “%1$s” sa menu ng chat. Kung nagtakda ka ng tagal, magsisimula ito kapag na-unlock mo ang pag-uusap na iyon.</string>
+    <string name="nm_lock_chat_on_leave">Pag-alis sa pag-uusap</string>
+    <string name="nm_lock_one_hour">1 oras</string>
 </resources>

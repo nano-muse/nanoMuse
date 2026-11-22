@@ -1274,4 +1274,12 @@
     <string name="nm_device_chat_uncertain">Livrare incertă. Se verifică rezultatul pe dispozitiv.</string>
     <string name="nm_device_chat_interrupted">Întrerupt. Dispozitivul poate să fi executat deja unele acțiuni.</string>
     <string name="nm_stream_interrupted">Conexiunea s-a întrerupt înainte ca răspunsul să fie complet.</string>
+    <string name="nm_access_settings_title">Blocarea aplicației și a conversațiilor</string>
+    <string name="nm_lock_app_after_background">Blochează după ieșirea din aplicație</string>
+    <string name="nm_lock_app_hint">Deblochează nanoMuse folosind metoda de deblocare a ecranului dispozitivului.</string>
+    <string name="nm_lock_chat_group">Conversații protejate</string>
+    <string name="nm_lock_chat_relock">Blochează din nou</string>
+    <string name="nm_lock_chat_hint">Alege „%1$s” din meniul conversației. Dacă alegi un interval, acesta începe când deblochezi conversația respectivă.</string>
+    <string name="nm_lock_chat_on_leave">La părăsirea conversației</string>
+    <string name="nm_lock_one_hour">1 oră</string>
 </resources>

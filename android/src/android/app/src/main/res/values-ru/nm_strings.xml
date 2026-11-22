@@ -1278,4 +1278,12 @@
     <string name="nm_device_chat_uncertain">Доставка не подтверждена. Проверяем результат на устройстве.</string>
     <string name="nm_device_chat_interrupted">Прервано. Устройство могло уже выполнить некоторые действия.</string>
     <string name="nm_stream_interrupted">Соединение прервано до завершения ответа.</string>
+    <string name="nm_access_settings_title">Блокировка приложения и чатов</string>
+    <string name="nm_lock_app_after_background">Блокировать после сворачивания</string>
+    <string name="nm_lock_app_hint">Для разблокировки nanoMuse используйте способ разблокировки экрана устройства.</string>
+    <string name="nm_lock_chat_group">Защищённые разговоры</string>
+    <string name="nm_lock_chat_relock">Блокировать снова</string>
+    <string name="nm_lock_chat_hint">Выберите «%1$s» в меню разговора. Если задан интервал, отсчёт начинается с момента разблокировки этого разговора.</string>
+    <string name="nm_lock_chat_on_leave">При выходе из разговора</string>
+    <string name="nm_lock_one_hour">1 час</string>
 </resources>

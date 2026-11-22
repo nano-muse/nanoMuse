@@ -675,7 +675,9 @@ Drawn faces and personal clips retain their existing priority. Renaming the agen
 
 ## App lock
 
-Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts, incoming shares and safe-mode diagnostics use the same gate. Native diagnostic windows close if the app re-locks, and returning from the export file picker requires access again before any diagnostic data is written. This protects access in the app, not encryption of stored data. Background tasks continue.
+Open **Settings → App and chat locks** and turn on **App lock** to require the device screen lock when opening nanoMuse. Once enabled, you can choose how long nanoMuse can stay in the background before you need to unlock it again. Confirm changes with your device screen lock.
+
+Unlocks last only in this process. Both layouts, incoming shares and safe-mode diagnostics use the same gate. Native diagnostic windows close if the app re-locks, and returning from the export file picker requires access again before any diagnostic data is written. This protects access in the app, not encryption of stored data. Background tasks continue.
 
 A pending diagnostic export requires its activity to be resumed and the app to be unlocked at the same time. Unlocking another window while the export window is paused does not release that export.
 
@@ -683,12 +685,11 @@ Native provider-import and permission-repair dialogs also close when app access 
 
 ## Protected conversations {#session-lock}
 
-The conversation menu can protect an individual chat with the device screen lock. Authentication is required to protect it, remove protection, export or duplicate a locked chat, or regenerate its title from message content. A duplicate inherits protection and must be unlocked separately. Protecting a new conversation saves it first; cancelling authentication leaves the draft unchanged. Settings controls the re-lock interval, including locking when leaving the chat. Both layouts, notifications and deep links use the gate. Protected previews and body-search matches are hidden.
+Choose **Protect conversation** in a chat's menu to protect just that chat. This works even when App lock is off. Under **Settings → App and chat locks**, choose how long protected chats stay unlocked. For example, five minutes means five minutes from the time you unlocked that chat. You can also have it lock as soon as you leave. Switching to another Muse tab counts as leaving.
+
+Authentication is required to protect a chat, remove protection, export or duplicate a locked chat, or regenerate its title from message content. A duplicate inherits protection and must be unlocked separately. Protecting a new conversation saves it first; cancelling authentication leaves the draft unchanged. Both layouts, notifications and deep links use the gate. Protected previews and body-search matches are hidden.
 
 Interactive backups ask for confirmation when they include locked conversations. This approval applies only to the backup and does not unlock every chat. Scheduled backups, sync and background work keep their existing behavior. Protection metadata survives restarts locally, while unlocks do not; neither is shared through conversation sync or backups. This does not encrypt chat storage.
-
-Selecting another Muse tab counts as leaving the protected conversation for the On exit setting, even while the chat remains retained in the background.
-
 
 ## Connector OAuth sign-in {#connector-oauth}
 

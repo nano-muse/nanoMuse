@@ -1266,4 +1266,12 @@
     <string name="nm_device_chat_uncertain">配信状況が不明です。デバイスに結果を問い合わせています。</string>
     <string name="nm_device_chat_interrupted">中断されました。デバイスがすでに一部の操作を実行した可能性があります。</string>
     <string name="nm_stream_interrupted">応答が完了する前に接続が切れました。</string>
+    <string name="nm_access_settings_title">アプリと会話のロック</string>
+    <string name="nm_lock_app_after_background">バックグラウンドに移った後にロック</string>
+    <string name="nm_lock_app_hint">端末の画面ロックを使って nanoMuse のロックを解除します。</string>
+    <string name="nm_lock_chat_group">保護された会話</string>
+    <string name="nm_lock_chat_relock">再ロック</string>
+    <string name="nm_lock_chat_hint">会話のメニューで「%1$s」を選びます。時間を指定すると、その会話のロックを解除した時点から計測します。</string>
+    <string name="nm_lock_chat_on_leave">会話を離れたとき</string>
+    <string name="nm_lock_one_hour">1 時間</string>
 </resources>
