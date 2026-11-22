@@ -1283,4 +1283,14 @@
     <string name="nm_lock_chat_hint">Wähle im Chatmenü „%1$s“. Wenn du eine Wartezeit einstellst, beginnt sie beim Entsperren der jeweiligen Unterhaltung.</string>
     <string name="nm_lock_chat_on_leave">Beim Verlassen der Unterhaltung</string>
     <string name="nm_lock_one_hour">1 Stunde</string>
+    <string name="nm_deadline_date">Fälligkeitsdatum</string>
+    <string name="nm_deadline_clear">Datum entfernen</string>
+    <string name="nm_deadline_today">Heute fällig</string>
+    <string name="nm_deadline_tomorrow">Morgen fällig</string>
+    <string name="nm_deadline_overdue">Überfällig · %1$s</string>
+    <string name="nm_deadline_snooze">Morgen erinnern</string>
+    <string name="nm_deadline_hide">Ausblenden</string>
+    <string name="nm_deadline_cards">Zieltermine im Feed anzeigen</string>
+    <string name="nm_deadline_alerts">Benachrichtigungen zu Zielterminen</string>
+    <string name="nm_deadline_notice">Öffne den Feed für deinen nächsten Schritt.</string>
 </resources>

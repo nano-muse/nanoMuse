@@ -508,6 +508,16 @@
             android:name=".offload.ScheduledNotificationReceiver"
             android:exported="false" />
 
+        <!-- nanoMuse: reschedule the optional local deadline notice after clock changes or a restart. -->
+        <receiver android:name="io.github.nanomuse.goals.GoalFollowUps$GoalDeadlineReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <!-- [T-android-scheduled-tasks-design] AlarmManager target for
              user-defined scheduled tasks (Settings → home top-right
              schedule icon). The receiver dispatches to ScheduledAgentRunner

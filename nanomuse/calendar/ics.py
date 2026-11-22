@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta, tzinfo
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil.rrule import rruleset, rrulestr
@@ -59,6 +59,9 @@ class Event:
     recurrence_id: datetime | None = None  # this VEVENT replaces one occurrence of ``uid``
     calendar: str = ""
     cancelled: bool = False
+    transparent: bool = False
+    sequence: int = 0
+    revision_time: datetime | None = None
 
     @property
     def duration(self) -> timedelta:
@@ -77,6 +80,7 @@ class Occurrence:
     description: str = field(default="", compare=False)
     calendar: str = field(default="", compare=False)
     uid: str = field(default="", compare=False)
+    transparent: bool = field(default=False, compare=False)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -180,11 +184,23 @@ def parse_ics(text: str, default_tz: tzinfo, calendar: str = "") -> list[Event]:
     events: list[Event] = []
     props: list[tuple[str, dict[str, str], str]] | None = None
     depth = 0  # nesting inside a VEVENT (VALARM is a child component we ignore)
+    components: list[list[tuple[str, dict[str, str], str]]] = []
+    cancellation = False
+
+    def finish_calendar() -> None:
+        for component in components:
+            ev = _event(component, default_tz, calendar, cancellation)
+            if ev is not None:
+                events.append(ev)
+        components.clear()
+
     for line in unfold(text):
         m = _LINE_RE.match(line)
         if not m:
             continue
         name, params, value = m.group("name").upper(), _params(m.group("params")), m.group("value")
+        if name == "METHOD" and props is None:
+            cancellation = value.upper().strip() == "CANCEL"
         if name == "BEGIN":
             if value.upper() == "VEVENT" and props is None:
                 props = []
@@ -195,17 +211,21 @@ def parse_ics(text: str, default_tz: tzinfo, calendar: str = "") -> list[Event]:
             if props is not None and depth:
                 depth -= 1
             elif value.upper() == "VEVENT" and props is not None:
-                ev = _event(props, default_tz, calendar)
-                if ev is not None:
-                    events.append(ev)
+                components.append(props)
                 props = None
+            elif value.upper() == "VCALENDAR":
+                finish_calendar()
+                cancellation = False
             continue
         if props is not None and not depth:
             props.append((name, params, value))
+    finish_calendar()
     return events
 
 
-def _event(props: list[tuple[str, dict[str, str], str]], tz: tzinfo, calendar: str) -> Event | None:
+def _event(
+    props: list[tuple[str, dict[str, str], str]], tz: tzinfo, calendar: str, cancellation: bool
+) -> Event | None:
     fields: dict[str, tuple[dict[str, str], str]] = {}
     exdates: list[datetime] = []
     rdates: list[datetime] = []
@@ -225,10 +245,16 @@ def _event(props: list[tuple[str, dict[str, str], str]], tz: tzinfo, calendar: s
                     continue
         else:
             fields.setdefault(name, (params, value))
-    if "DTSTART" not in fields:
-        return None
+    cancelled = cancellation or fields.get("STATUS", ({}, ""))[1].strip().upper() == "CANCELLED"
+    origin = fields.get("DTSTART")
+    if origin is None:
+        if not cancelled or "UID" not in fields:
+            return None
+        # Cancellation messages need only identify the series and, for an exception,
+        # the original recurrence. A cancelled master has no display time.
+        origin = fields.get("RECURRENCE-ID", ({}, "19700101T000000Z"))
     try:
-        start, all_day = parse_dt(fields["DTSTART"][1], fields["DTSTART"][0], tz)
+        start, all_day = parse_dt(origin[1], origin[0], tz)
         if "DTEND" in fields:
             end, _ = parse_dt(fields["DTEND"][1], fields["DTEND"][0], tz)
         elif "DURATION" in fields:
@@ -240,8 +266,19 @@ def _event(props: list[tuple[str, dict[str, str], str]], tz: tzinfo, calendar: s
         rec_id = None
         if "RECURRENCE-ID" in fields:
             rec_id = parse_dt(fields["RECURRENCE-ID"][1], fields["RECURRENCE-ID"][0], tz)[0]
-    except ValueError:
+    except (ValueError, OverflowError):
         return None
+    try:
+        sequence = max(int(fields.get("SEQUENCE", ({}, "0"))[1]), 0)
+    except ValueError:
+        sequence = 0
+    revision_time = None
+    stamp = fields.get("LAST-MODIFIED") or fields.get("DTSTAMP")
+    if stamp:
+        try:
+            revision_time = parse_dt(stamp[1], stamp[0], tz)[0].astimezone(UTC)
+        except ValueError:
+            pass
     text = lambda key: unescape(fields[key][1]).strip() if key in fields else ""  # noqa: E731
     return Event(
         uid=text("UID") or f"{start.isoformat()}-{text('SUMMARY')}",
@@ -256,41 +293,48 @@ def _event(props: list[tuple[str, dict[str, str], str]], tz: tzinfo, calendar: s
         rdates=rdates,
         recurrence_id=rec_id,
         calendar=calendar,
-        cancelled=text("STATUS").upper() == "CANCELLED",
+        cancelled=cancelled,
+        sequence=sequence,
+        revision_time=revision_time,
+        transparent=text("TRANSP").upper() == "TRANSPARENT",
     )
 
 
 # ---------------------------------------------------------------------------- expansion
-def _same_moment(a: datetime, b: datetime, all_day: bool) -> bool:
-    if all_day:
-        return a.date() == b.date()
-    return abs((a - b).total_seconds()) < 60
-
-
 def expand(events: list[Event], start: datetime, end: datetime) -> list[Occurrence]:
-    """Every occurrence that overlaps [start, end), recurring rules unrolled, overrides
-    applied, cancelled ones left out — sorted by start."""
-    overrides: dict[str, list[Event]] = {}
+    """Every occurrence that overlaps [start, end), with revisions and exceptions applied."""
+    # An exception identifies the exact original start, in its own subscription. A
+    # cancellation and the component it replaces need not be adjacent or in order.
+    components: dict[tuple[str, str, datetime | None], Event] = {}
+    oldest = datetime.min.replace(tzinfo=UTC)
+
+    def revision(ev: Event) -> tuple[int, datetime, bool]:
+        return ev.sequence, ev.revision_time or oldest, ev.cancelled
+
     for ev in events:
-        if ev.recurrence_id is not None:
-            overrides.setdefault(ev.uid, []).append(ev)
+        original = ev.recurrence_id.astimezone(UTC) if ev.recurrence_id else None
+        key = (ev.calendar, ev.uid, original)
+        previous = components.get(key)
+        if previous is None or revision(ev) >= revision(previous):
+            components[key] = ev
+
     out: list[Occurrence] = []
-    for ev in events:
-        if ev.recurrence_id is not None:
-            if not ev.cancelled and ev.start < end and ev.end > start:
-                out.append(_occurrence(ev, ev.start, ev.end))
-            continue
+    for (calendar, uid, original), ev in components.items():
         if ev.cancelled:
             continue
-        replaced = overrides.get(ev.uid, [])
-        for occ_start in _starts(ev, start, end):
-            if any(
-                _same_moment(o.recurrence_id, occ_start, ev.all_day)
-                for o in replaced
-                if o.recurrence_id
-            ):
+        if original is not None:
+            master = components.get((calendar, uid, None))
+            if master and master.cancelled:
                 continue
-            occ_end = occ_start + ev.duration
+            if ev.start < end and ev.end > start:
+                out.append(_occurrence(ev, ev.start, ev.end))
+            continue
+        for occ_start in _starts(ev, start, end):
+            if (calendar, uid, occ_start.astimezone(UTC)) in components:
+                continue
+            # The explicit end is authoritative, e.g. a flight across time zones
+            # on a clock-change date. Re-adding a UTC duration in wall time can drift.
+            occ_end = ev.end if occ_start == ev.start else occ_start + ev.duration
             if occ_start < end and occ_end > start:
                 out.append(_occurrence(ev, occ_start, occ_end))
     out.sort()
@@ -307,19 +351,21 @@ def _occurrence(ev: Event, start: datetime, end: datetime) -> Occurrence:
         description=ev.description,
         calendar=ev.calendar,
         uid=ev.uid,
+        transparent=ev.transparent,
     )
 
 
 def _starts(ev: Event, start: datetime, end: datetime) -> list[datetime]:
     if not ev.rrule and not ev.rdates:
-        return [ev.start]
+        return [] if ev.start in ev.exdates else [ev.start]
     # Occurrences that begin before the window but run into it still count.
-    lookback = max(ev.duration, timedelta(0))
+    earliest = start - max(ev.duration, timedelta(0))
     rules = rruleset()
     if ev.rrule:
         try:
-            rule = rrulestr(_rrule_for(ev), dtstart=ev.start)
-        except (ValueError, TypeError):
+            text, anchor = _window_rule(_rrule_for(ev), ev.start, earliest)
+            rule = rrulestr(text, dtstart=anchor)
+        except (ValueError, TypeError, OverflowError):
             # A rule we cannot read still leaves the event itself on the calendar.
             rules.rdate(ev.start)
         else:
@@ -332,11 +378,30 @@ def _starts(ev: Event, start: datetime, end: datetime) -> list[datetime]:
     for ex in ev.exdates:
         rules.exdate(ex if not ev.all_day else ex.replace(tzinfo=ev.start.tzinfo))
     try:
-        starts = rules.between(start - lookback, end, inc=True)
-    except (ValueError, TypeError):
-        return sorted({ev.start, *ev.rdates})
+        starts = rules.between(earliest, end, inc=True)
+    except (ValueError, TypeError, OverflowError):
+        return sorted({ev.start, *ev.rdates} - set(ev.exdates))
     # An RDATE may land on an occurrence the rule already made: once, not twice.
     return sorted(set(starts))
+
+
+def _window_rule(text: str, anchor: datetime, earliest: datetime) -> tuple[str, datetime]:
+    """Fast-forward a plain fixed interval without replaying years of past appointments."""
+    parts = dict(part.split("=", 1) for part in text.upper().removeprefix("RRULE:").split(";"))
+    interval = int(parts.get("INTERVAL", "1"))
+    if interval < 1:
+        raise ValueError("RRULE INTERVAL must be positive")
+    seconds = {"SECONDLY": 1, "MINUTELY": 60, "HOURLY": 3600}.get(parts.get("FREQ", ""))
+    if seconds is None or parts.keys() - {"FREQ", "INTERVAL", "COUNT", "UNTIL"}:
+        return text, anchor
+    # dateutil advances these rules on the event's local clock, including over DST.
+    stride = timedelta(seconds=interval * seconds)
+    skipped = (earliest.astimezone(anchor.tzinfo) - anchor) // stride
+    if skipped <= 0:
+        return text, anchor
+    if "COUNT" in parts:
+        parts["COUNT"] = str(max(0, int(parts["COUNT"]) - skipped))
+    return "RRULE:" + ";".join(f"{k}={v}" for k, v in parts.items()), anchor + skipped * stride
 
 
 def _rrule_for(ev: Event) -> str:

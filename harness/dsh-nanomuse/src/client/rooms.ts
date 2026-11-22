@@ -16,6 +16,8 @@ export interface FeedPost {
   image: string
   prompt: string
   liked: boolean
+  goalId?: string
+  goalExpiresAt?: number
   sessionId?: string
 }
 
@@ -72,6 +74,9 @@ export interface Goal {
   /** 0–100 as the agent last reported, -1 or absent when it never said. */
   progress?: number
   attention?: boolean
+  due?: string
+  nextStep?: string
+  feedMuted?: boolean
 }
 
 export type LibraryKind = 'document' | 'web' | 'image' | 'video' | 'audio' | 'file'

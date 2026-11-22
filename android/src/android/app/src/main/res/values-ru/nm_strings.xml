@@ -1291,4 +1291,14 @@
     <string name="nm_lock_chat_hint">Выберите «%1$s» в меню разговора. Если задан интервал, отсчёт начинается с момента разблокировки этого разговора.</string>
     <string name="nm_lock_chat_on_leave">При выходе из разговора</string>
     <string name="nm_lock_one_hour">1 час</string>
+    <string name="nm_deadline_date">Срок</string>
+    <string name="nm_deadline_clear">Удалить дату</string>
+    <string name="nm_deadline_today">Срок сегодня</string>
+    <string name="nm_deadline_tomorrow">Срок завтра</string>
+    <string name="nm_deadline_overdue">Просрочено · %1$s</string>
+    <string name="nm_deadline_snooze">Напомнить завтра</string>
+    <string name="nm_deadline_hide">Скрыть</string>
+    <string name="nm_deadline_cards">Показывать сроки целей в ленте</string>
+    <string name="nm_deadline_alerts">Уведомления о сроках целей</string>
+    <string name="nm_deadline_notice">Откройте ленту, чтобы увидеть следующий шаг.</string>
 </resources>

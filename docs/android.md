@@ -117,6 +117,8 @@ usage, the model menu) goes to that address.
 
 ## What the phone does
 
+Give a goal a deadline when creating it, or edit the date in Goals. The Feed shows one approaching or recently missed deadline with its next unchecked step. Mark the step done, open the goal, bring the card back tomorrow or dismiss that deadline. These cards work offline. Feed settings also offer a separate local notification, off by default. With notifications allowed, it can point you back to the Feed during the day without putting the goal title on the lock screen. Android controls alarm delivery.
+
 Shell progress updates preserve text beyond a shorter rewrite. Terminal color and title codes are removed before those updates, so they cannot leave escape fragments in the output.
 
 The agent's system prompt keeps its safety, tool and phone-operation instructions in a stable

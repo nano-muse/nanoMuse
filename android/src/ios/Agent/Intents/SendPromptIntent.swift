@@ -439,7 +439,11 @@ final class ShortcutNotificationDelegate: NSObject, UNUserNotificationCenterDele
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let sessionId = userInfo["sessionId"] as? String {
+        // nanoMuse: account-bound deadline reminders open the Feed after the app unlocks.
+        if response.notification.request.identifier == NanoMuseDeadlineNotifications.identifier,
+           let info = userInfo as? [String: String] {
+            DispatchQueue.main.async { NanoMuseDeadlineNotifications.shared.tapped(info) }
+        } else if let sessionId = userInfo["sessionId"] as? String {
             DispatchQueue.main.async {
                 // Buffer first (cold-launch consumer), then post (warm-path
                 // consumer). Whichever runs marks the other's copy dead.
@@ -460,6 +464,12 @@ final class ShortcutNotificationDelegate: NSObject, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound])
+        // nanoMuse: a deadline already has a live Feed card while the app is on screen.
+        if notification.request.identifier == NanoMuseDeadlineNotifications.identifier {
+            DispatchQueue.main.async { NanoMuseDeadlineNotifications.shared.refresh() }
+            completionHandler([])
+        } else {
+            completionHandler([.banner, .sound])
+        }
     }
 }

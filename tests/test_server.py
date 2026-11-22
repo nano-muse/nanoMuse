@@ -3364,3 +3364,173 @@ def test_data_export_keeps_pending_scheduled_delivery_rows(server):
             ).fetchone() == ("pending", "delivery fixture")
         finally:
             check.close()
+
+
+def test_feed_followups_are_grounded_ranked_and_remember_choices(server):
+    client, service, llm = server
+    today = datetime.now().astimezone().date()
+
+    def add(title, days, steps):
+        return client.post(
+            "/api/goals",
+            json={
+                "title": title,
+                "due": (today + timedelta(days=days)).isoformat(),
+                "steps": steps,
+            },
+        ).json()["id"]
+
+    def cards():
+        return client.get("/api/upcoming").json()["followups"]
+
+    tomorrow = add("Book a room", 1, [])
+    add("Old plan", -8, [])
+    late = add("Reply to the invitation", -2, [])
+    goal = add("Finish draft", 0, ["Outline", "Proofread"])
+    (first,) = cards()
+    assert first["goal_id"] == goal and first["next_step"] == "Outline"
+    client.patch(f"/api/goals/{goal}", json={"step_index": 1, "step_status": "done"})
+    assert cards() == [{**first, "next_step": "Proofread"}]
+    target = f"/api/feed/followups/{first['id']}"
+    assert client.put(target + "?choice=tomorrow").json() == {"ok": True}
+    assert client.put(target + "?choice=tomorrow").status_code == 200
+    assert cards()[0]["goal_id"] == late
+    # Snooze survives a reload and expires on the next local calendar day.
+    next_day = datetime.now().astimezone() + timedelta(days=1)
+    assert service.feed_posts()["followups_hidden"][first["id"]] == next_day.date().isoformat()
+    late_key = cards()[0]["id"]
+    assert client.put(f"/api/feed/followups/{late_key}?choice=dismiss").status_code == 200
+    assert cards()[0]["goal_id"] == tomorrow
+    assert service.followups(next_day)[0]["goal_id"] == tomorrow  # now due today
+    client.patch(f"/api/goals/{tomorrow}", json={"status": "done"})
+    assert service.followups(next_day)[0]["goal_id"] == goal
+    client.patch(f"/api/goals/{late}", json={"due": today.isoformat()})
+    assert cards()[0]["id"] != late_key and cards()[0]["goal_id"] == late
+    client.put("/api/feed/instructions", json={"followups": False})
+    assert cards() == []
+    client.put("/api/feed/instructions", json={"followups": True})
+    assert cards()[0]["goal_id"] == late
+    client.put("/api/settings", json={"profile": {"proactivity": "off"}})
+    assert cards() == []
+    assert llm.calls == []
+
+
+def test_feed_push_uses_local_time_persisted_budget_and_no_private_titles(server, monkeypatch):
+    _, service, _ = server
+    now = datetime.now().astimezone().replace(hour=10, minute=0)
+    due = now.date().isoformat()
+    g = service.app.goals.create("Private appointment", due=due)
+    sent = []
+    monkeypatch.setattr(type(service.push), "enabled", property(lambda _: True))
+    monkeypatch.setattr(service.push, "subscriptions", [{"endpoint": "test-device"}])
+    monkeypatch.setattr(service.push, "notify", lambda *args, **kwargs: sent.append((args, kwargs)))
+    service._notify_due_followup(now)
+    assert sent == []  # explicit opt-in
+    service.set_feed_instructions(followup_push=True)
+    service._notify_due_followup(now.replace(hour=21))
+    service.profile.quiet_hours = "09:00-11:00"
+    service._notify_due_followup(now)
+    service.profile.quiet_hours = ""
+    service.app.goals.update(g.id, check_in="daily 12:00")
+    service._notify_due_followup(now)
+    assert sent == []  # no duplicate alert for an explicit routine
+    service.app.goals.update(g.id, check_in="")
+    service._notify_due_followup(now)
+    service._notify_due_followup(now)
+    service._notify_feed(service.feed_posts(), now)  # scheduled posts share the Feed alert
+    service._notify_due_followup(now + timedelta(days=1))
+    assert len(sent) == 1 and "Private appointment" not in str(sent)
+    assert service.feed_posts()["feed_notified_on"] == due
+    service.app.goals.update(g.id, due=(now.date() + timedelta(days=1)).isoformat())
+    service._notify_due_followup(now + timedelta(days=1))
+    assert len(sent) == 2
+
+
+def test_automatic_feed_can_stay_silent_and_deduplicates_repeated_titles(server):
+    client, service, llm = server
+    llm.script.append(LLMResponse(content="[]"))
+    assert client.post("/api/feed/posts/refresh").json()["posts"] == []
+    assert service.feed_posts()["generated_at"] and not service.first_feed_day()
+    # A repeated recommendation within a batch or in a subsequent batch is shown once.
+    reply = (
+        '[{"title":"Proofread today","body":"Review the draft."},'
+        '{"title":"PROOFREAD TODAY","body":"Same observation."}]'
+    )
+    for _ in range(2):
+        llm.script.append(LLMResponse(content=reply))
+        posts = client.post("/api/feed/posts/refresh").json()["posts"]
+        assert [p["title"] for p in posts] == ["Proofread today"]
+
+
+def test_feed_hide_still_applies_if_another_goal_takes_priority(server):
+    client, service, _ = server
+    today = datetime.now().astimezone().date()
+    original = service.app.goals.create("Book table", due=(today + timedelta(days=1)).isoformat())
+    key = service.followups()[0]["id"]
+    first = service.app.goals.create("Confirm booking", due=today.isoformat())
+    assert service.followups()[0]["goal_id"] == first.id
+    assert client.put(f"/api/feed/followups/{key}?choice=dismiss").status_code == 200
+    service.app.goals.set_status(first.id, "done")
+    assert service.followups() == []
+    assert service.app.goals.get(original.id).status == "active"
+
+
+def test_scheduled_feed_rechecks_preferences_and_retries_malformed_replies(server, monkeypatch):
+    _, service, llm = server
+    real_ask = service.app.llm.ask_complete
+    service.set_feed_instructions(daily=True)
+    llm.script.append(LLMResponse(content="service temporarily unavailable"))
+    with pytest.raises(ValueError, match="post list"):
+        asyncio.run(service.write_feed_posts(scheduled=True))
+    assert service.feed_posts()["generated_at"] is None
+
+    async def change_settings(*args, **kwargs):
+        service.set_feed_instructions(daily=False)
+        return await real_ask(*args, **kwargs)
+
+    monkeypatch.setattr(service.app.llm, "ask_complete", change_settings)
+    llm.script.append(
+        LLMResponse(content='[{"title":"Unexpected", "body":"Disabled while generating"}]')
+    )
+    result = asyncio.run(service.write_feed_posts(scheduled=True))
+    assert not result["daily"] and not result["posts"] and result["generated_at"] is None
+
+
+def test_feed_shows_specific_obstacles_and_pending_decisions_without_a_deadline(server):
+    client, service, llm = server
+    goal = service.app.goals.create("Prepare slides", steps=["Check figures"])
+    client.patch(
+        f"/api/goals/{goal.id}",
+        json={"step_index": 1, "step_status": "blocked", "step_note": "Waiting for totals"},
+    )
+    (blocked,) = service.followups()
+    assert (blocked["reason"], blocked["detail"], blocked["note"]) == (
+        "blocked",
+        "Check figures",
+        "Waiting for totals",
+    )
+    service.app.goals.propose(goal.id, "Use the available figures", ["Label preliminary totals"])
+    (proposal,) = service.followups()
+    assert proposal["reason"] == "proposal" and proposal["detail"] == "Use the available figures"
+    client.put(f"/api/feed/followups/{proposal['id']}?choice=dismiss")
+    assert service.app.goals.get(
+        goal.id
+    ).proposal  # dismissing the card does not decide the proposal
+    assert service.followups() == [blocked]
+    client.patch(f"/api/goals/{goal.id}", json={"step_index": 1, "step_status": "pending"})
+    assert service.followups() == []
+    assert llm.calls == []
+
+
+def test_duplicate_generated_during_deletion_cannot_resurrect_the_post(server, monkeypatch):
+    client, service, llm = server
+    reply = LLMResponse(content='[{"title":"Pack the slides","body":"There is a talk tomorrow."}]')
+    llm.script.append(reply)
+    post = client.post("/api/feed/posts/refresh").json()["posts"][0]
+
+    async def regenerate(*args, **kwargs):
+        assert service.delete_feed_post(post["id"])
+        return reply
+
+    monkeypatch.setattr(service.app.llm, "ask_complete", regenerate)
+    assert asyncio.run(service.write_feed_posts())["posts"] == []

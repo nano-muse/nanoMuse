@@ -1283,4 +1283,14 @@
     <string name="nm_lock_chat_hint">Konuşma menüsünden “%1$s” seçeneğini seçin. Bir süre belirlerseniz süre, o konuşmanın kilidini açtığınızda başlar.</string>
     <string name="nm_lock_chat_on_leave">Konuşmadan ayrılınca</string>
     <string name="nm_lock_one_hour">1 saat</string>
+    <string name="nm_deadline_date">Bitiş tarihi</string>
+    <string name="nm_deadline_clear">Tarihi kaldır</string>
+    <string name="nm_deadline_today">Bugün doluyor</string>
+    <string name="nm_deadline_tomorrow">Yarın doluyor</string>
+    <string name="nm_deadline_overdue">Süresi geçti · %1$s</string>
+    <string name="nm_deadline_snooze">Yarın hatırlat</string>
+    <string name="nm_deadline_hide">Gizle</string>
+    <string name="nm_deadline_cards">Akışta hedeflerin bitiş tarihlerini göster</string>
+    <string name="nm_deadline_alerts">Hedef bitiş tarihi bildirimleri</string>
+    <string name="nm_deadline_notice">Sonraki adımı görmek için akışı açın.</string>
 </resources>

@@ -1291,4 +1291,14 @@
     <string name="nm_lock_chat_hint">Wybierz „%1$s” w menu rozmowy. Jeśli ustawisz opóźnienie, czas będzie liczony od chwili odblokowania tej rozmowy.</string>
     <string name="nm_lock_chat_on_leave">Po opuszczeniu rozmowy</string>
     <string name="nm_lock_one_hour">1 godzina</string>
+    <string name="nm_deadline_date">Termin</string>
+    <string name="nm_deadline_clear">Usuń datę</string>
+    <string name="nm_deadline_today">Termin dzisiaj</string>
+    <string name="nm_deadline_tomorrow">Termin jutro</string>
+    <string name="nm_deadline_overdue">Po terminie · %1$s</string>
+    <string name="nm_deadline_snooze">Przypomnij jutro</string>
+    <string name="nm_deadline_hide">Ukryj</string>
+    <string name="nm_deadline_cards">Pokaż terminy celów w aktualnościach</string>
+    <string name="nm_deadline_alerts">Powiadomienia o terminach celów</string>
+    <string name="nm_deadline_notice">Otwórz aktualności, aby zobaczyć kolejny krok.</string>
 </resources>

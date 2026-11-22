@@ -1279,4 +1279,14 @@
     <string name="nm_lock_chat_hint">Pilih “%1$s” dalam menu perbualan. Jika anda menetapkan tempoh, kiraan bermula apabila anda membuka kunci perbualan itu.</string>
     <string name="nm_lock_chat_on_leave">Apabila meninggalkan perbualan</string>
     <string name="nm_lock_one_hour">1 jam</string>
+    <string name="nm_deadline_date">Tarikh akhir</string>
+    <string name="nm_deadline_clear">Buang tarikh</string>
+    <string name="nm_deadline_today">Tamat hari ini</string>
+    <string name="nm_deadline_tomorrow">Tamat esok</string>
+    <string name="nm_deadline_overdue">Tertunggak · %1$s</string>
+    <string name="nm_deadline_snooze">Ingatkan esok</string>
+    <string name="nm_deadline_hide">Abaikan</string>
+    <string name="nm_deadline_cards">Paparkan tarikh akhir matlamat dalam Suapan</string>
+    <string name="nm_deadline_alerts">Pemberitahuan tarikh akhir matlamat</string>
+    <string name="nm_deadline_notice">Buka Suapan untuk melihat langkah seterusnya.</string>
 </resources>

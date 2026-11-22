@@ -584,6 +584,8 @@ rather than a messenger.
 
 ## The rail's other rooms: Feed, Ideas, Goals, Library
 
+Set the optional due date in Goals. While the desktop app is running and the Feed routine is enabled, it can add one local follow-up per day after the scheduled time. The card explains which deadline or recent goal check brought it up, includes a planned step when available, and opens the original conversation. You can mute an individual goal. This follow-up works without a model.
+
 The four rooms are on the rail (Chats, Search,
 Feed, Ideas, Goals, Library, Devices), each one `main` panel of the harness's layout,
 so the chat column stays where it is and a room opens in its place. One host service

@@ -64,6 +64,8 @@ See [the Hub protocol](hub.md#persistent-device-conversations).
 
 ## What is nanoMuse here
 
+A goal can have a local deadline chosen at creation or in Goals. The Feed shows one approaching or recently missed deadline with its next unfinished step. Mark the step done there, open the goal, show it again tomorrow, or hide that deadline. The card works offline when you open the Feed. Feed settings also offer an optional on-device deadline notification. Allow notifications and turn off regular check-ins for any goal you want to use it for. iPhone schedules just the next eligible local 09:00 alert on the due date (or the day you snoozed it to). The lock screen only says to check the Feed. Completing or changing the goal updates the pending alert when the app runs. If the app stays suspended, iOS can deliver the one already scheduled.
+
 Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pull):
 
 - **Identity.** Bundle ids `io.github.nanomuse.app` (+ `.ShareExtension`, `.AgentWidget`,

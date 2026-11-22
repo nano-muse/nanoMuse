@@ -1284,4 +1284,14 @@
     <string name="nm_lock_chat_hint">Choisissez « %1$s » dans le menu de la conversation. Si vous fixez un délai, il commence lorsque vous déverrouillez cette conversation.</string>
     <string name="nm_lock_chat_on_leave">En quittant la conversation</string>
     <string name="nm_lock_one_hour">1 heure</string>
+    <string name="nm_deadline_date">Échéance</string>
+    <string name="nm_deadline_clear">Supprimer la date</string>
+    <string name="nm_deadline_today">Échéance aujourd’hui</string>
+    <string name="nm_deadline_tomorrow">Échéance demain</string>
+    <string name="nm_deadline_overdue">En retard · %1$s</string>
+    <string name="nm_deadline_snooze">Rappeler demain</string>
+    <string name="nm_deadline_hide">Ignorer</string>
+    <string name="nm_deadline_cards">Afficher les échéances des objectifs dans le fil</string>
+    <string name="nm_deadline_alerts">Notifications des échéances des objectifs</string>
+    <string name="nm_deadline_notice">Ouvrez le fil pour voir la prochaine étape.</string>
 </resources>

@@ -149,6 +149,10 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 ## 后台工作 {#background-work}
 
+打开动态，顶部最多显示一个值得跟进的目标，以及未来 24 小时内的一组日程冲突。目标按今天到期、最近七天逾期、明天到期排序。没有需要跟进的截止日时，动态会显示最近七天内待你决定的计划调整，或者被标为受阻的步骤和具体原因。这两类情况只在动态里提示。点「查看目标」可打开原目标，点「讨论时间冲突」会在主要聊天中准备一条可编辑的草稿，由你决定是否发送。「明天再提醒」和「关闭」针对当前截止日或这两场活动的时间生效。修改日期后会重新判断。
+
+这些卡片直接读取已保存的目标和最近成功更新的日历，可在未配置模型时使用。全天、已取消和标为空闲的活动不参与冲突判断。在动态设置中可以关闭卡片，也可以选择接收通知。服务器运行期间，目标跟进或两小时内的日程冲突可以触发通知，发送时段为服务器当地时间 09:00 至 20:00，并遵守免打扰设置。动态通知每天合计最多一条，锁屏只显示有更新。已设定期检查的目标沿用原来的提醒。关闭主动服务会隐藏卡片并停止对应通知。每日动态没有新依据时也可以留空。
+
 设置中的「主动性」决定智能体主动推进任务和通知你的频率：
 
 | 档位 | 执行频率 | 何时通知 |
@@ -195,11 +199,12 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | GET | `/api/ideas?refresh=1` | 获取已有建议，或按参数重新生成。 |
 | GET | `/api/activity` | 返回最新审计记录、已授予的 `grants[]`，各项含 `key`、`tool`、`target`、`scope`、`expires_at`，以及对话污染标记。 |
 | GET | `/api/feed?limit=` | 按最新在前返回「你离开期间」：`{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}`。 |
-| GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, generated_at, posts[{id, ts, title, body, area, prompt}], error?}`。 |
-| PUT | `/api/feed/instructions` `{instructions?, daily?, time?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
+| GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, followups_enabled?, followup_push?, generated_at, posts[{id, ts, title, body, area, prompt}], error?}`。 |
+| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
+| PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | 明天再次显示当前跟进卡片，或隐藏该项。 |
 | POST | `/api/feed/posts/refresh` | 立即生成新文章；模型拒绝时通过 `error` 说明。 |
 | DELETE | `/api/feed/posts/{id}` | 删除指定文章。 |
-| GET | `/api/upcoming` | 返回 `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`。`next_wake_at` 为提醒、目标检查或后台任务中最近的待执行时间，供能够设置系统闹钟的宿主使用，见 [local-runtime.md](local-runtime.md#waking-up)。 |
+| GET | `/api/upcoming` | 返回 `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`。`next_wake_at` 为提醒、目标检查或后台任务中最近的待执行时间，供能够设置系统闹钟的宿主使用，见 [local-runtime.md](local-runtime.md#waking-up)。 |
 | POST | `/api/tick` | 立即唤醒调度器，检查并执行已到期工作，返回 `{ok, next_wake_at}`。Android 的系统闹钟触发后调用此接口。 |
 | GET / POST | `/api/reminders[?all=1]` | 获取活跃提醒，带参数时获取最近全部提醒；或创建 `{text, at ("YYYY-MM-DD HH:MM") or repeat ("daily 08:00", …), kind (remind · task), thread}`。 |
 | POST / DELETE | `/api/reminders/{id}/fire`、`/api/reminders/{id}` | 立即在原聊天发送提醒；或取消该提醒。 |

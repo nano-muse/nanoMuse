@@ -298,7 +298,9 @@ export const api = {
   feed: (limit = 60) => request<FeedItem[]>(`/api/feed?limit=${limit}`),
   feedPosts: () => request<FeedPostsData>("/api/feed/posts"),
   /** The feed's preferences; only the fields given change (`daily`/`time` are the 08:00 routine). */
-  setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string }) =>
+  hideFeedFollowup: (id: string, choice: "tomorrow" | "dismiss") =>
+    request<{ ok: boolean }>(`/api/feed/followups/${encodeURIComponent(id)}?choice=${choice}`, { method: "PUT" }),
+  setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean }) =>
     request<FeedPostsData>("/api/feed/instructions", { method: "PUT", body: JSON.stringify(body) }),
   refreshFeedPosts: () => request<FeedPostsData>("/api/feed/posts/refresh", { method: "POST" }),
   deleteFeedPost: (id: string) => request<{ ok: boolean }>(`/api/feed/posts/${id}`, { method: "DELETE" }),

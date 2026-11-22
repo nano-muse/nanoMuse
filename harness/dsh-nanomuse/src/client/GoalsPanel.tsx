@@ -154,6 +154,7 @@ function GoalCard({ t, goal, automations, lang, onClose, onCheckIn, onChat, onDo
             h('span', { className: 'nm-goal-pct' }, `${Math.min(100, goal.progress)}%`, goal.attention ? ` · ${t('goalAttention')}` : ''))
         : null,
       goal.summary ? h('p', { className: 'nm-goal-summary' }, goal.summary) : null,
+      h(GoalFeedSettings, { key: goal.id, t, goal }),
       h('div', { className: 'nm-auto-card' },
         h('div', { className: 'nm-auto-head' }, t('goalRunning')),
         automations.length === 0
@@ -176,9 +177,38 @@ function GoalCard({ t, goal, automations, lang, onClose, onCheckIn, onChat, onDo
                 entry.text ? h('div', { className: 'nm-act-text' }, entry.text) : null)))))))
 }
 
+function GoalFeedSettings({ t, goal }: { t: Translate; goal: Goal }): ReactNode {
+  const [due, setDue] = useState<string>()
+  const [muted, setMuted] = useState<boolean>()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string>()
+  const date = due ?? goal.due ?? ''
+  const enabled = !(muted ?? goal.feedMuted)
+  const changedDate = date !== (goal.due ?? '')
+  const changedMute = !enabled !== Boolean(goal.feedMuted)
+  const save = (event: FormEvent) => {
+    event.preventDefault()
+    if (saving || !(changedDate || changedMute)) return
+    setSaving(true)
+    setError(undefined)
+    roomsCall('goals/update', { id: goal.id, ...(changedDate ? { due: date } : {}), ...(changedMute ? { feedMuted: !enabled } : {}) })
+      .then(() => { setDue(undefined); setMuted(undefined) })
+      .catch((err: unknown) => setError(failureText(t, err)))
+      .finally(() => setSaving(false))
+  }
+  return h('details', { className: 'nm-auto-card' },
+    h('summary', { className: 'nm-auto-head' }, t('goalFeedSettings')),
+    h('form', { className: 'nm-sheet-form', onSubmit: save },
+      h('label', null, t('goalDueDate'), ' ', h('input', { className: 'nm-field', type: 'date', value: date, disabled: saving, onChange: (e: FormEvent<HTMLInputElement>) => setDue(e.currentTarget.value) })),
+      h('label', { className: 'nm-feed-routine' }, h('input', { type: 'checkbox', checked: enabled, disabled: saving, onChange: (e: FormEvent<HTMLInputElement>) => setMuted(!e.currentTarget.checked) }), t('goalFeedEnabled')),
+      error ? h('p', { className: 'nm-room-error' }, error) : null,
+      h('button', { type: 'submit', className: 'nm-pill nm-pill-sm', disabled: saving || !(changedDate || changedMute) }, t('save'))))
+}
+
 function CreateGoal({ t, category, onClose, onCreated }: { t: Translate; category: Category; onClose(): void; onCreated(goal: Goal): void }): ReactNode {
   const meta = CATEGORIES.find((c) => c.id === category) ?? CATEGORIES[0]!
   const [text, setText] = useState('')
+  const [due, setDue] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const submit = (event: FormEvent) => {
@@ -186,7 +216,7 @@ function CreateGoal({ t, category, onClose, onCreated }: { t: Translate; categor
     if (!text.trim()) return
     setBusy(true)
     setError(undefined)
-    roomsCall<Goal>('goals/create', { category, text: text.trim() }).then(onCreated).catch((err: unknown) => setError(failureText(t, err))).finally(() => setBusy(false))
+    roomsCall<Goal>('goals/create', { category, text: text.trim(), ...(due ? { due } : {}) }).then(onCreated).catch((err: unknown) => setError(failureText(t, err))).finally(() => setBusy(false))
   }
   return h(Sheet, { title: `${t('goalsCreate')} · ${t(meta.label)}`, closeLabel: t('close'), onClose,
     footer: h('div', { className: 'nm-sheet-actions' },
@@ -196,6 +226,7 @@ function CreateGoal({ t, category, onClose, onCreated }: { t: Translate; categor
     h('form', { id: 'nm-goal-create', className: 'nm-sheet-form', onSubmit: submit },
       h('p', { className: 'nm-sheet-lead' }, t('goalCreateLead')),
       h('textarea', { className: 'nm-textarea', rows: 4, value: text, placeholder: t('goalPlaceholder'), maxLength: 2000, onChange: (e: FormEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value), 'data-modal-autofocus': true }),
+      h('label', null, t('goalDueDate'), ' ', h('input', { className: 'nm-field', type: 'date', value: due, onChange: (e: FormEvent<HTMLInputElement>) => setDue(e.currentTarget.value) })),
       h('div', { className: 'nm-chips' }, meta.examples.map((key) => h('button', { key, type: 'button', className: 'nm-chip', onClick: () => setText(t(key)) }, t(key)))),
       error ? h('div', { className: 'nm-room-error' }, error) : null))
 }

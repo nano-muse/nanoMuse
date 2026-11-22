@@ -20,8 +20,19 @@ export function makeFeedPanel(t: Translate) {
     const prefs = usePrefs()
     const [settings, setSettings] = useState(false)
     const [error, setError] = useState<string | undefined>()
-    const posts = rooms.feed.posts
+    // An open window drops date-sensitive cards at the host's local midnight, even offline.
+    const [, setExpiryTick] = useState(0)
+    const now = Date.now()
+    const posts = rooms.feed.posts.filter((post) => !post.goalId || (post.goalExpiresAt ?? 0) > now)
     const newest = posts[0]?.at ?? 0
+    const reminder = posts.find((post) => post.goalId)
+    const expiry = reminder?.goalExpiresAt
+    useEffect(() => {
+      if (!expiry) return
+      const timer = window.setTimeout(() => setExpiryTick((n) => n + 1), Math.max(0, expiry - Date.now()))
+      return () => window.clearTimeout(timer)
+    }, [expiry])
+    const displayPosts = reminder ? [reminder, ...posts.filter((post) => post.id !== reminder.id)] : posts
     useEffect(() => { if (newest) markFeedSeen() }, [newest])
     // opening the Feed makes sure the daily routine exists (C5: 08:00, once, on the host)
     useEffect(() => { roomsCall('feed/open', {}).catch(() => undefined) }, [])
@@ -57,14 +68,14 @@ export function makeFeedPanel(t: Translate) {
             : null,
           posts.length === 0
             ? h(Empty, { icon: h(IconFeed, { size: 28 }), text: rooms.busy.feed ? t('feedWriting') : t('feedEmptyTitle') },
-                h('p', { className: 'nm-empty-sub' }, rooms.ready ? t('feedEmptyBody', { time: routine.time }) : t('feedRoutineNeedsModel')),
+                h('p', { className: 'nm-empty-sub' }, !routine.on ? t('feedPaused') : rooms.ready ? t('feedEmptyBody', { time: routine.time }) : t('feedRoutineNeedsModel')),
                 rooms.ready
                   ? h('div', { className: 'nm-feed-how' },
                       h('div', { className: 'nm-feed-how-title' }, t('feedEmptyHowTitle')),
                       h('p', null, t('feedEmptyHowBody')))
                   : null,
                 rooms.ready && !rooms.busy.feed ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: refresh }, t('feedWriteNow')) : null)
-            : posts.map((post) => h(PostCard, { key: post.id, t, post, lang: rooms.lang, onDiscuss: () => discuss(post), onFail: fail })))),
+            : displayPosts.map((post) => h(PostCard, { key: post.id, t, post, lang: rooms.lang, onDiscuss: () => discuss(post), onFail: fail })))),
       settings ? h(FeedSettings, { t, instructions: rooms.feed.instructions, routine, busy: rooms.busy.feed, ready: rooms.ready, onClose: () => setSettings(false), onRefresh: refresh }) : null)
   }
 }
@@ -73,6 +84,7 @@ function PostCard({ t, post, lang, onDiscuss, onFail }: { t: Translate; post: Fe
   const [hideImage, setHideImage] = useState(false)
   const like = () => { roomsCall('feed/like', { id: post.id, on: !post.liked }).catch(onFail) }
   const remove = () => { roomsCall('feed/delete', { id: post.id }).catch(onFail) }
+  const discussLabel = t(post.goalId ? 'goalOpenChat' : 'feedDiscuss')
   const follow = () => { onDiscuss() }
   return h('article', { className: 'nm-post' },
     h('div', { className: 'nm-post-mark', 'aria-hidden': true }, post.emoji || '✦'),
@@ -81,18 +93,21 @@ function PostCard({ t, post, lang, onDiscuss, onFail }: { t: Translate; post: Fe
         h('h3', { className: 'nm-post-title' }, post.title),
         h('span', { className: 'nm-post-when' }, ago(t, post.at)),
         h(MoreButton, { label: t('more'), quiet: true, size: 26, items: [
-          { id: 'discuss', label: t('feedDiscuss'), onSelect: follow },
+          { id: 'discuss', label: discussLabel, onSelect: follow },
           ...(post.prompt ? [{ id: 'follow', label: t('feedFollowUp'), onSelect: follow }] : []),
           'sep',
+          ...(post.goalId ? [{ id: 'mute', label: t('goalFeedMute'), onSelect: () => { roomsCall('goals/update', { id: post.goalId, feedMuted: true }).catch(onFail) } }] : []),
           { id: 'delete', label: t('feedRemove'), danger: true, onSelect: remove },
         ] })),
-      h(Markdown, { text: post.body, className: 'nm-post-body' }),
+      post.goalId
+        ? h('div', { className: 'nm-post-body' }, post.body.split('\n\n').map((line, i) => h('p', { key: i }, line)))
+        : h(Markdown, { text: post.body, className: 'nm-post-body' }),
       post.image && !hideImage
         ? h('div', { className: 'nm-post-images' }, h('img', { src: post.image, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer', onError: () => setHideImage(true) }))
         : null,
       h('div', { className: 'nm-post-actions' },
         h('button', { type: 'button', className: `nm-post-action${post.liked ? ' nm-liked' : ''}`, 'aria-pressed': post.liked, 'aria-label': t('feedLike'), title: t('feedLike'), onClick: like }, h(IconHeart, { size: 18, filled: post.liked })),
-        h('button', { type: 'button', className: 'nm-post-action', onClick: onDiscuss }, h(IconComment, { size: 18 }), h('span', null, t('feedDiscuss'))),
+        h('button', { type: 'button', className: 'nm-post-action', onClick: onDiscuss }, h(IconComment, { size: 18 }), h('span', null, discussLabel)),
         h('span', { className: 'nm-post-time-full' }, new Date(post.at).toLocaleString(lang || undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })))))
 }
 

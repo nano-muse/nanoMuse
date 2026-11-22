@@ -516,6 +516,7 @@ fun NanoMuseHome(
                                 HomeTab.FEED -> FeedTab(
                                     header = header,
                                     onDiscuss = { discussPost(it) },
+                                    onOpenGoal = { goal -> goal.sessionId?.let { showSession(it) } ?: run { tab = HomeTab.GOALS } },
                                     onEditRoutine = { navController.safeNavigate(Routes.scheduledTaskEdit(it)) },
                                     bottomInset = bottom,
                                 )

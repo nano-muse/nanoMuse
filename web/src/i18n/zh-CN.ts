@@ -5,6 +5,20 @@
  */
 const zhCN: Record<string, string> = {
   // ── Shell, tabs, connection ───────────────────────────────────────────────────────
+  "Goal and calendar follow-ups": "目标和日历跟进",
+  "Help me plan around the overlap between {first} and {second}.": "帮我看看「{first}」和「{second}」时间重叠了，该怎么安排。",
+  "Calendar overlap": "日程时间重叠",
+  "Next step: {step}": "下一步：{step}",
+  "Review goal": "查看目标",
+  "Discuss overlap": "讨论时间冲突",
+  "Remind me tomorrow": "明天再提醒",
+  "Notify me about time-sensitive follow-ups": "有需要及时跟进的事时通知我",
+  "On devices with notifications enabled, once a day at most between 09:00 and 20:00 server time.": "按服务器当地时间，在 09:00 至 20:00 之间向已开启通知的设备发送，每天最多一次。",
+  "When something in your goals, calendar or recent conversations is worth following up, a post can appear here.": "如果目标、日历或最近的对话里有值得跟进的事，会在这里看到动态。",
+  "No new posts yet": "暂时没有新动态",
+  "{start} to {end}": "{start} 至 {end}",
+  "Plan change to review": "有目标计划调整待确认",
+  "A goal step is blocked": "有一步遇到了阻碍",
   Chat: "聊天",
   Feed: "动态",
   Ideas: "点子",

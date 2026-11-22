@@ -202,6 +202,8 @@ final class NanoMuseScheduler: ObservableObject {
         save()
     }
 
+    var checkedGoalIDs: Set<String> { Set(routines.compactMap { $0.enabled ? $0.goalId : nil }) }
+
     /// Routines that belong to a goal.
     func forGoal(_ goalId: String) -> [NanoMuseRoutine] { routines.filter { $0.goalId == goalId } }
 
@@ -370,6 +372,7 @@ final class NanoMuseScheduler: ObservableObject {
         Task {
             let center = UNUserNotificationCenter.current()
             let settings = await center.notificationSettings()
+            defer { NanoMuseDeadlineNotifications.shared.refresh() }
             guard settings.authorizationStatus == .notDetermined else { return }
             _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
         }

@@ -1279,4 +1279,14 @@
     <string name="nm_lock_chat_hint">대화 메뉴에서 ‘%1$s’를 선택하세요. 시간을 지정하면 해당 대화의 잠금을 해제한 시점부터 계산합니다.</string>
     <string name="nm_lock_chat_on_leave">대화에서 나갈 때</string>
     <string name="nm_lock_one_hour">1시간</string>
+    <string name="nm_deadline_date">마감일</string>
+    <string name="nm_deadline_clear">날짜 삭제</string>
+    <string name="nm_deadline_today">오늘 마감</string>
+    <string name="nm_deadline_tomorrow">내일 마감</string>
+    <string name="nm_deadline_overdue">기한 지남 · %1$s</string>
+    <string name="nm_deadline_snooze">내일 다시 보기</string>
+    <string name="nm_deadline_hide">숨기기</string>
+    <string name="nm_deadline_cards">피드에 목표 마감일 표시</string>
+    <string name="nm_deadline_alerts">목표 마감 알림</string>
+    <string name="nm_deadline_notice">피드를 열어 다음 단계를 확인하세요.</string>
 </resources>

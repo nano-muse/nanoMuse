@@ -1249,4 +1249,14 @@
     <string name="nm_lock_chat_hint">在對話選單中選擇「%1$s」。若有設定時限，會從解鎖該對話時開始計時。</string>
     <string name="nm_lock_chat_on_leave">離開對話時</string>
     <string name="nm_lock_one_hour">1 小時</string>
+    <string name="nm_deadline_date">截止日期</string>
+    <string name="nm_deadline_clear">清除日期</string>
+    <string name="nm_deadline_today">今天到期</string>
+    <string name="nm_deadline_tomorrow">明天到期</string>
+    <string name="nm_deadline_overdue">已逾期 · %1$s</string>
+    <string name="nm_deadline_snooze">明天再看</string>
+    <string name="nm_deadline_hide">略過</string>
+    <string name="nm_deadline_cards">在動態顯示目標期限</string>
+    <string name="nm_deadline_alerts">目標到期通知</string>
+    <string name="nm_deadline_notice">開啟動態，查看下一步。</string>
 </resources>

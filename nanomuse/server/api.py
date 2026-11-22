@@ -139,6 +139,8 @@ class FeedInstructionsBody(BaseModel):
     daily routine, see ``MuseService.feed_posts``)."""
 
     instructions: str | None = None
+    followups: bool | None = None
+    followup_push: bool | None = None
     daily: bool | None = None
     time: str | None = None
 
@@ -1917,9 +1919,20 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     @app.put("/api/feed/instructions", dependencies=dep)
     async def feed_instructions(body: FeedInstructionsBody) -> dict[str, Any]:
         try:
-            return svc.set_feed_instructions(body.instructions, daily=body.daily, time=body.time)
+            return svc.set_feed_instructions(
+                body.instructions,
+                daily=body.daily,
+                time=body.time,
+                followups=body.followups,
+                followup_push=body.followup_push,
+            )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @app.put("/api/feed/followups/{key}", dependencies=dep)
+    async def hide_followup(key: str, choice: Literal["tomorrow", "dismiss"]) -> dict[str, bool]:
+        svc.hide_followup(key, choice == "tomorrow")
+        return {"ok": True}
 
     @app.post("/api/feed/posts/refresh", dependencies=dep)
     async def feed_refresh() -> dict[str, Any]:

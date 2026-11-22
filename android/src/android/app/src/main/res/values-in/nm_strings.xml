@@ -1279,4 +1279,14 @@
     <string name="nm_lock_chat_hint">Pilih “%1$s” di menu percakapan. Jika Anda memilih durasi, waktu dihitung sejak Anda membuka kunci percakapan tersebut.</string>
     <string name="nm_lock_chat_on_leave">Saat meninggalkan percakapan</string>
     <string name="nm_lock_one_hour">1 jam</string>
+    <string name="nm_deadline_date">Tenggat</string>
+    <string name="nm_deadline_clear">Hapus tanggal</string>
+    <string name="nm_deadline_today">Jatuh tempo hari ini</string>
+    <string name="nm_deadline_tomorrow">Jatuh tempo besok</string>
+    <string name="nm_deadline_overdue">Terlambat · %1$s</string>
+    <string name="nm_deadline_snooze">Ingatkan besok</string>
+    <string name="nm_deadline_hide">Abaikan</string>
+    <string name="nm_deadline_cards">Tampilkan tenggat tujuan di Feed</string>
+    <string name="nm_deadline_alerts">Notifikasi tenggat tujuan</string>
+    <string name="nm_deadline_notice">Buka Feed untuk melihat langkah berikutnya.</string>
 </resources>

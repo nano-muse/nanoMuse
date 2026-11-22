@@ -341,11 +341,12 @@ test('memory dates follow fixed local calendar boundaries east and west of UTC',
 test('cleared chat records are removed and cannot be read or recreated by late events', async () => {
   let saved
   const ctx = { nanomuseCloud: { isClearedSession: id => id === 'old' } }
-  const self = { ctx, store: { activity: [{ sessionId: 'old', request: 'old words' }, { sessionId: 'kept', request: 'kept words' }] }, save: async function () { saved = structuredClone(this.store) } }
+  const self = { ctx, store: { goals: [{ id: 'lost-goal', sessionId: 'old' }], feed: { posts: [{ goalId: 'lost-goal' }, { id: 'keep' }] }, activity: [{ sessionId: 'old', request: 'old words' }, { sessionId: 'kept', request: 'kept words' }] }, save: async function () { saved = structuredClone(this.store) } }
   assert.equal(Rooms.prototype.activityOf.call(self, 'old'), undefined)
   assert.equal(Rooms.prototype.activityOf.call(self, 'kept').request, 'kept words')
   await Rooms.prototype.clearActivity.call(self, ['old'])
   Rooms.prototype.trackActivity.call(self, { id: 'old' }, { type: 'turn/start' })
+  assert.deepEqual(saved.feed.posts, [{ id: 'keep' }])
   assert.deepEqual(saved.activity.map(row => row.sessionId), ['kept'])
   assert.deepEqual(self.store.activity.map(row => row.sessionId), ['kept'])
 })

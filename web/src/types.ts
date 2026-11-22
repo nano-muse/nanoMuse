@@ -842,6 +842,8 @@ export interface FeedPost {
 }
 
 export interface FeedPostsData {
+  followups_enabled?: boolean;
+  followup_push?: boolean;
   instructions: string;
   generated_at: string | null;
   posts: FeedPost[];
@@ -1381,7 +1383,13 @@ export interface FeedItem {
   quiet?: boolean;
 }
 
+export type FeedFollowup =
+  | { kind: "review"; id: string; goal_id: string; title: string; reason: "blocked" | "proposal"; detail: string; note: string; observed_on: string }
+  | { kind: "goal"; id: string; goal_id: string; title: string; due: string; days_until: number; next_step: string | null }
+  | { kind: "overlap"; id: string; titles: [string, string]; start: string; end: string };
+
 export interface UpcomingData {
+  followups?: FeedFollowup[];
   proactive: boolean;
   proactivity: Proactivity;
   interval_minutes: number;

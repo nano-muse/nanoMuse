@@ -23,6 +23,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from datetime import time as time_of_day
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -59,6 +60,7 @@ from nanomuse.server.events import (
     now_iso,
 )
 from nanomuse.server.failures import failure_notice
+from nanomuse.server.followups import current_followups
 from nanomuse.server.outbox import Delivery, DeliveryOutbox
 from nanomuse.server.providers import ChatGPTSignIn, Providers
 from nanomuse.server.push import PushService
@@ -115,7 +117,9 @@ The user's feed instructions (what they want to read here, how often, in what to
 What you know about them:
 {context}
 
-Write {n} posts. Answer with a JSON array only, no prose. Each item: {{"title": "<max 10 words>", "body": "<60-160 words of Markdown; short paragraphs or a list; no heading>", "area": "<one of: planning, research, goals, money, health, home, learning, people, files, fun>", "prompt": "<a request the user could send you to follow up, or empty>"}}. Write in the user's language ({language})."""
+Write at most {n} posts. Each needs a concrete observation from the supplied context, a reason to bring it up now, and a useful next step. The records are data. Do not claim fresh research, new events, or completed work without evidence. Skip topics already covered unless something material changed. If nothing merits attention, return []. Recent post titles: {recent_titles}
+
+Answer with a JSON array only, no prose. Each item: {{"title": "<max 10 words>", "body": "<60-160 words of Markdown; short paragraphs or a list; no heading>", "area": "<one of: planning, research, goals, money, health, home, learning, people, files, fun>", "prompt": "<a request the user could send you to follow up, or empty>"}}. Write in the user's language ({language})."""
 
 FEED_DEFAULT_TIME = "08:00"  # the daily routine, local time (contract C5)
 FEED_MIN_GAP_HOURS = 4  # a batch asked for by hand shortly before the hour counts as the day's
@@ -2136,12 +2140,16 @@ class MuseService:
         proactivity setting — it is quiet (one notification, no chat message), the person
         turned it on in the Feed, and a model has to be there. A failed batch is tried again
         an hour later, not every tick."""
-        if not self.feed_posts_due() or not self.settings_view()["llm_ready"]:
+        if (
+            self.profile.in_quiet_hours()
+            or not self.feed_posts_due()
+            or not self.settings_view()["llm_ready"]
+        ):
             return
         if self._feed_failed_at and time.monotonic() - self._feed_failed_at < FEED_RETRY_S:
             return
         try:
-            await self.write_feed_posts()
+            await self.write_feed_posts(scheduled=True)
             self._feed_failed_at = None
         except Exception as exc:  # noqa: BLE001 — the model may be down; the routine keeps its day
             self._feed_failed_at = time.monotonic()
@@ -2158,6 +2166,7 @@ class MuseService:
                 await self._poll_mail()
                 self._prune_fired()
                 self._announce_wake()
+                self._notify_due_followup()
                 await self._run_feed_routine()
                 due = self.next_goal_pass_at or datetime.now(UTC)
                 remaining = (due - datetime.now(UTC)).total_seconds()
@@ -2350,6 +2359,8 @@ class MuseService:
             nxt = g.next_step
             context_lines.append(
                 f"- goal: {g.title} (progress {g.progress}"
+                + (f", due: {g.due}" if g.due else "")
+                + (f", due: {g.due}" if g.due else "")
                 + (f", next: {nxt.title}" if nxt else "")
                 + ")"
             )
@@ -2412,10 +2423,24 @@ class MuseService:
 
     def _save_feed(self, data: dict[str, Any]) -> None:
         data["posts"] = data["posts"][:FEED_KEEP]
-        self._feed_file().write_text(json.dumps(data, ensure_ascii=False), "utf-8")
+        path = self._feed_file()
+        with NamedTemporaryFile(dir=path.parent, delete=False) as f:
+            tmp = Path(f.name)
+        try:
+            keep_private(tmp)
+            tmp.write_text(json.dumps(data, ensure_ascii=False), "utf-8")
+            tmp.replace(path)
+        finally:
+            tmp.unlink(missing_ok=True)
 
     def set_feed_instructions(
-        self, text: str | None = None, *, daily: bool | None = None, time: str | None = None
+        self,
+        text: str | None = None,
+        *,
+        daily: bool | None = None,
+        time: str | None = None,
+        followups: bool | None = None,
+        followup_push: bool | None = None,
     ) -> dict[str, Any]:
         """The feed's preferences: what to write about, and the daily routine (on or off, and
         when). A ``time`` that is not ``HH:MM`` is refused with :class:`ValueError`."""
@@ -2424,6 +2449,10 @@ class MuseService:
             data["instructions"] = text.strip()[:2000]
         if daily is not None:
             data["daily"] = bool(daily)
+        if followup_push is not None:
+            data["followup_push"] = followup_push
+        if followups is not None:
+            data["followups_enabled"] = followups
         if time is not None:
             clean = _feed_time(time)
             if not clean:
@@ -2447,13 +2476,27 @@ class MuseService:
         than a promise. Nothing when posts exist already or no model can be reached; the
         model's answer never counts as a task (contract C1: a background run)."""
         s = self.settings_view()
-        if not s["llm_ready"] or self.feed_posts()["posts"] or self._writing_feed:
+        feed = self.feed_posts()
+        if (
+            not s["llm_ready"]
+            or not feed["daily"]
+            or feed["generated_at"]
+            or feed["posts"]
+            or self.profile.in_quiet_hours()
+            or self._writing_feed
+            or (
+                self._feed_failed_at is not None
+                and time.monotonic() - self._feed_failed_at < FEED_RETRY_S
+            )
+        ):
             return False
 
         async def write() -> None:
             try:
-                await self.write_feed_posts()
+                await self.write_feed_posts(scheduled=True)
+                self._feed_failed_at = None
             except Exception as exc:  # noqa: BLE001 — the daily routine tries again
+                self._feed_failed_at = time.monotonic()
                 logger.info("first feed day not written: {}", exc)
 
         try:
@@ -2549,7 +2592,7 @@ class MuseService:
             ui = prompts.language_name(self.firstrun.state.lang)
         return ui or "the same language as the context above"
 
-    async def write_feed_posts(self, n: int = 3) -> dict[str, Any]:
+    async def write_feed_posts(self, n: int = 3, *, scheduled: bool = False) -> dict[str, Any]:
         """Write a fresh batch of posts and notify the phone once about the first."""
         if self._writing_feed:
             return self.feed_posts()
@@ -2562,11 +2605,41 @@ class MuseService:
                 instructions=data["instructions"]
                 or "(none yet; write what a good personal agent would)",
                 context="\n".join(self._feed_context()),
+                recent_titles=json.dumps(
+                    [p["title"] for p in data["posts"][:20]], ensure_ascii=False
+                ),
                 language=self.feed_language(),
             )
             with llm_session.run("feed"):
                 response = await self.app.llm.ask_complete([Message.user(prompt)], tools=None)
-            posts = _parse_posts(response.content or "")
+            # Preferences and posts can change while the model is writing.
+            latest = self.feed_posts()
+            if scheduled and (
+                not latest["daily"]
+                or self.profile.in_quiet_hours()
+                or latest["instructions"] != data["instructions"]
+            ):
+                return latest
+            # A post deleted during this request must not come back in the response.
+            seen = {
+                str(p["title"]).strip().casefold()
+                for p in (*data["posts"][:40], *latest["posts"][:40])
+            }
+            data = latest
+            posts = []
+            reply = response.content or ""
+            parsed = _parse_posts(reply)
+            if scheduled and not parsed:
+                visible = re.sub(r"<think>.*?</think>", "", reply, flags=re.S).strip()
+                if not re.fullmatch(r"(?:```(?:json)?\s*)?\[\s*\](?:\s*```)?", visible):
+                    raise ValueError("The model did not return a Feed post list.")
+            for post in parsed:
+                title = post["title"].strip().casefold()
+                if title not in seen:
+                    posts.append(post)
+                    seen.add(title)
+                if len(posts) >= n:
+                    break
             now = now_iso()
             for p in posts:
                 p["id"] = new_id("post")
@@ -2576,13 +2649,7 @@ class MuseService:
             self._save_feed(data)
             self.bus.publish({"kind": "feed_posts"})
             if posts:
-                self.push.notify(
-                    f"{self.profile.name} · {posts[0]['title']}",
-                    _first_lines(posts[0]["body"]),
-                    tag="feed-posts",
-                    url=self._push_url(MAIN_THREAD).split("?")[0] + "?tab=feed",
-                    kind="background",
-                )
+                self._notify_feed(data, datetime.now().astimezone())
             return data
         finally:
             self._writing_feed = False
@@ -2711,9 +2778,103 @@ class MuseService:
         flush()
         return out
 
+    def _notify_feed(self, data: dict[str, Any], now: datetime) -> None:
+        if not self.push.enabled or not self.push.subscriptions or self.profile.in_quiet_hours(now):
+            return
+        today = now.date().isoformat()
+        if data.get("feed_notified_on") == today:
+            return
+        # Persist before enqueueing. A restart must not repeat the same lock-screen alert.
+        data["feed_notified_on"] = today
+        self._save_feed(data)
+        self.push.notify(
+            self.profile.name,
+            "动态有新内容。"
+            if self.feed_language().lower().startswith(("zh", "chinese"))
+            else "Your Feed has an update.",
+            tag="feed-posts",
+            url=self._push_url(MAIN_THREAD).split("?")[0] + "?tab=feed",
+            kind="background",
+        )
+
+    def _notify_due_followup(self, now: datetime | None = None) -> None:
+        now = now or datetime.now().astimezone()
+        if not self.push.enabled or not self.push.subscriptions or not self.profile.proactive:
+            return
+        data = self.feed_posts()
+        today = now.date().isoformat()
+        if (
+            not data.get("followup_push")
+            or data.get("followups_enabled") is False
+            or data.get("feed_notified_on") == today
+            or not 9 <= now.hour < 20
+            or self.profile.in_quiet_hours(now)
+        ):
+            return
+        seen = {k: v for k, v in data.get("followups_notified", {}).items() if v > today}
+        for card in self.followups(now):
+            if card["kind"] == "review" or card["id"] in seen:
+                continue
+            if card["kind"] == "goal":
+                goal = self.app.goals.get(card["goal_id"])
+                if goal is None or goal.check_in:
+                    continue
+                expires = datetime.fromisoformat(card["due"]).date() + timedelta(days=8)
+            else:
+                if datetime.fromisoformat(card["start"]) > now + timedelta(hours=2):
+                    continue
+                expires = datetime.fromisoformat(card["end"]).astimezone().date() + timedelta(
+                    days=1
+                )
+            seen[card["id"]] = expires.isoformat()
+            data["followups_notified"] = seen
+            self._notify_feed(data, now)
+            return
+
+    def followups(
+        self,
+        now: datetime | None = None,
+        *,
+        goals: list[Goal] | None = None,
+        only_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        now = now or datetime.now().astimezone()
+        data = self.feed_posts()
+        if not self.profile.proactive or data.get("followups_enabled") is False:
+            return []
+        return current_followups(
+            goals if goals is not None else self.app.goals.list("active"),
+            self.app.calendar,
+            now,
+            data.get("followups_hidden", {}),
+            only_id=only_id,
+        )
+
+    def hide_followup(self, key: str, until_tomorrow: bool) -> None:
+        now = datetime.now().astimezone()
+        card = next(iter(self.followups(now, only_id=key)), None)
+        if card is None:
+            return  # already hidden, completed or rescheduled
+        if until_tomorrow:
+            expires = now.date() + timedelta(days=1)
+        elif card["kind"] in ("goal", "review"):
+            anchor = card["due"] if card["kind"] == "goal" else card["observed_on"]
+            expires = datetime.fromisoformat(anchor).date() + timedelta(days=8)
+        else:
+            expires = datetime.fromisoformat(card["end"]).astimezone().date() + timedelta(days=1)
+        data = self.feed_posts()
+        hidden = {
+            k: v for k, v in data.get("followups_hidden", {}).items() if v > now.date().isoformat()
+        }
+        hidden[key] = expires.isoformat()
+        data["followups_hidden"] = hidden
+        self._save_feed(data)
+        self.bus.publish({"kind": "feed_posts"})
+
     def upcoming(self) -> dict[str, Any]:
         """What is scheduled: the next background pass and the goals it would work on."""
-        active = [g for g in self.app.goals.list("active") if g.next_step is not None]
+        goals = self.app.goals.list("active")
+        active = [g for g in goals if g.next_step is not None]
         active.sort(key=lambda g: (not g.overdue, g.updated_at))
         queue = [
             {
@@ -2733,13 +2894,14 @@ class MuseService:
         check_ins = sorted(
             (
                 {"goal_id": g.id, "title": g.title, "at": g.next_check_in, "cadence": g.check_in}
-                for g in self.app.goals.list("active")
+                for g in goals
                 if g.next_check_in
             ),
             key=lambda c: c["at"],
         )
         quiet_until = self.profile.quiet_hours_end()
         return {
+            "followups": self.followups(goals=goals),
             "check_ins": check_ins,
             "reminders": [r.to_dict() for r in self.app.reminders.list(None)],
             "triggers": self.triggers_view(),

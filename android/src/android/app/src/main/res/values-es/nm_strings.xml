@@ -1283,4 +1283,14 @@
     <string name="nm_lock_chat_hint">Elige «%1$s» en el menú del chat. Si eliges un plazo, se cuenta desde que desbloqueas esa conversación.</string>
     <string name="nm_lock_chat_on_leave">Al salir de la conversación</string>
     <string name="nm_lock_one_hour">1 hora</string>
+    <string name="nm_deadline_date">Fecha límite</string>
+    <string name="nm_deadline_clear">Quitar fecha</string>
+    <string name="nm_deadline_today">Vence hoy</string>
+    <string name="nm_deadline_tomorrow">Vence mañana</string>
+    <string name="nm_deadline_overdue">Vencido · %1$s</string>
+    <string name="nm_deadline_snooze">Recordar mañana</string>
+    <string name="nm_deadline_hide">Descartar</string>
+    <string name="nm_deadline_cards">Mostrar fechas límite de objetivos en el feed</string>
+    <string name="nm_deadline_alerts">Notificaciones de objetivos por vencer</string>
+    <string name="nm_deadline_notice">Abre el feed para ver tu próximo paso.</string>
 </resources>

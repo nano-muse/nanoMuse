@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added deadline follow-ups to the Feed on Android, iPhone, desktop and web. The web Feed also surfaced blocked steps, pending plan changes and calendar overlaps. Android, iPhone and the web offered optional notifications with private details kept in the Feed.
+
 - Kept completed sensitive actions and file writes in view after message or token limits removed their tool exchanges, helping long tasks avoid repeats. For #938.
 - Asked before repeating an identical sensitive action in the same conversation, including concurrent calls and retries after cancellation left an unknown outcome. For #938.
 - Added the Levea video editor to the connector catalogue for desktop and phones, with OAuth sign-in.

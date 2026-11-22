@@ -1287,4 +1287,14 @@
     <string name="nm_lock_chat_hint">Alege „%1$s” din meniul conversației. Dacă alegi un interval, acesta începe când deblochezi conversația respectivă.</string>
     <string name="nm_lock_chat_on_leave">La părăsirea conversației</string>
     <string name="nm_lock_one_hour">1 oră</string>
+    <string name="nm_deadline_date">Termen limită</string>
+    <string name="nm_deadline_clear">Elimină data</string>
+    <string name="nm_deadline_today">Scadent azi</string>
+    <string name="nm_deadline_tomorrow">Scadent mâine</string>
+    <string name="nm_deadline_overdue">Depășit · %1$s</string>
+    <string name="nm_deadline_snooze">Amintește-mi mâine</string>
+    <string name="nm_deadline_hide">Ascunde</string>
+    <string name="nm_deadline_cards">Afișează termenele obiectivelor în flux</string>
+    <string name="nm_deadline_alerts">Notificări pentru termenele obiectivelor</string>
+    <string name="nm_deadline_notice">Deschide fluxul pentru a vedea pasul următor.</string>
 </resources>

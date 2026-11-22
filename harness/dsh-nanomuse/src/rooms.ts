@@ -29,6 +29,7 @@ import { avatarFence, avatarMemoryLine } from './avatar-flow.ts'
 import { FENCE_FEED, FENCE_GOAL, FENCE_GOAL_UPDATE, findFences, goalCategory, goalCheckPrompt, goalCreationNote, goalHomeNote, goalOpener, parseFeedDraft, parseGoalBlock, parseGoalUpdate, parseIdeas, type GoalBlock, type GoalUpdateBlock, type IdeaKind, type StaticIdea } from './fences.ts'
 import { afterTurn, boundTo, currentSuggestions, dismissChooser, FIRST_RUN_EMPTY, pickName, promptAddendum, readFirstRun, startConversation, type FirstRunState } from './firstrun.ts'
 import { DEFAULT_NUDGES, dueAsk, LEDGER_EMPTY, NUDGES_EVERY_MS, NUDGES_ORIGIN, NUDGES_TIMEOUT_MS, readLedger, readNudges, recordAsk, recordDay, recordStarred, recordTask, type Ask, type Moment, type NudgeLedger, type NudgesPolicy, type NudgesView } from './nudges.ts'
+import { followUpText, localDateKey, nextGoalFollowUp, validGoalDate, type GoalFollowUpReason } from './goal-follow-up.ts'
 import { homeDir, homeWorkspace } from './home.ts'
 import { packageAssetsDir } from './profile.ts'
 import { describeCall, ownWords, parseArgs } from './steps.ts'
@@ -169,6 +170,10 @@ export interface FeedPost {
   /** A follow-up the person could send, or empty. */
   prompt: string
   liked: boolean
+  /** A local follow-up opens the existing goal conversation without starting a turn. */
+  goalId?: string
+  goalReason?: GoalFollowUpReason
+  goalExpiresAt?: number
   /** The chat opened to discuss it, once there is one. */
   sessionId?: string
 }
@@ -234,6 +239,10 @@ export interface Goal {
   progress: number
   /** The agent's last update said the goal needs the person's attention. */
   attention: boolean
+  due?: string
+  nextStep?: string
+  feedMuted?: boolean
+  followUpSeen?: { due?: string; stage?: number; attention?: boolean }
 }
 
 export interface LibraryItem {
@@ -304,7 +313,7 @@ export interface FeedRoutine {
 
 interface Store {
   lang: string
-  feed: { instructions: string; generatedAt: number; lastTry: number; posts: FeedPost[]; routine: FeedRoutine }
+  feed: { instructions: string; generatedAt: number; lastTry: number; posts: FeedPost[]; routine: FeedRoutine; lastGoalFollowUpDay?: string }
   /** `marks` is what the person did with each idea of the static list; `items` is the list as the browser sees it. */
   ideas: { generatedAt: number; lastTry: number; items: Idea[]; marks: Record<string, { started?: string; dismissed?: boolean }> }
   goals: Goal[]
@@ -471,6 +480,7 @@ export default class NanomuseRooms extends Service {
   private ready = false
   private studio = { description: '', style: 'muse', at: 0 }
   private writing: Promise<void> = Promise.resolve()
+  private followUpNeedsSave = false
   private timer: NodeJS.Timeout | undefined
   /** A broadcast is due: coalesced, so a burst of tool calls is one frame. */
   private pendingFrame: NodeJS.Timeout | undefined
@@ -528,8 +538,14 @@ export default class NanomuseRooms extends Service {
   view(): RoomsView {
     // the records travel without their steps' texts; `/activity?session=` has one in full
     const activity = this.store.activity.filter((r) => !this.ctx.nanomuseCloud.isClearedSession(r.sessionId)).map((r) => ({ ...r, steps: r.steps.map((s) => ({ ...s, detail: '', result: '' })) }))
+    const goals = this.goals
+    const accessibleGoals = new Set(goals.map((goal) => goal.id))
+    const now = Date.now()
+    const posts = this.store.feed.posts.filter((post) => !post.goalId || ((post.goalExpiresAt ?? 0) > now && accessibleGoals.has(post.goalId)))
     return {
       ...this.store,
+      goals,
+      feed: { ...this.store.feed, posts },
       ideas: { ...this.store.ideas, items: this.ideaItems() },
       activity,
       busy: { ...this.busy },
@@ -647,7 +663,7 @@ export default class NanomuseRooms extends Service {
 
   /** The first conversation reached its end: the feed's first day is written in the background, once. */
   private onFirstConversationOver(): void {
-    if (this.store.feed.posts.length || this.busy.feed) return
+    if (!this.store.feed.routine.on || this.store.feed.posts.length || this.busy.feed) return
     if (!this.ready) return
     void this.refreshFeed().catch((error: unknown) => this.warn('first feed', error))
   }
@@ -783,6 +799,8 @@ export default class NanomuseRooms extends Service {
   async clearActivity(ids: string[]): Promise<void> {
     const cleared = new Set(ids)
     this.store.activity = this.store.activity.filter((record) => !cleared.has(record.sessionId))
+    const removedGoals = new Set(this.store.goals.filter((goal) => cleared.has(goal.sessionId)).map((goal) => goal.id))
+    this.store.feed.posts = this.store.feed.posts.filter((post) => !post.goalId || !removedGoals.has(post.goalId))
     await this.save()
   }
 
@@ -968,8 +986,8 @@ export default class NanomuseRooms extends Service {
   }
 
   /** The goals, for the agent's prompt context. */
-  get goals(): readonly Goal[] {
-    return this.store.goals
+  get goals(): Goal[] {
+    return this.store.goals.filter((goal) => !this.ctx.nanomuseCloud.isClearedSession(goal.sessionId))
   }
 
   /** The agent asks the window to open the avatar studio with these words (the person draws from there). */
@@ -1194,6 +1212,11 @@ export default class NanomuseRooms extends Service {
   async discuss(id: string): Promise<string> {
     const post = this.store.feed.posts.find((p) => p.id === id)
     if (!post) throw new RelayError(404, 'not_found', 'No such post')
+    if (post.goalId) {
+      const goal = this.store.goals.find((g) => g.id === post.goalId)
+      if (!goal || goal.feedMuted || goal.status !== 'tracking' || (post.goalExpiresAt ?? 0) <= Date.now() || this.ctx.nanomuseCloud.isClearedSession(goal.sessionId)) throw new RelayError(404, 'not_found', 'This goal is unavailable')
+      return goal.sessionId
+    }
     if (post.sessionId && (await this.alive(post.sessionId))) return post.sessionId
     const zh = this.lang.startsWith('zh')
     const framing = zh
@@ -1301,8 +1324,9 @@ export default class NanomuseRooms extends Service {
 
   // ---- goals -----------------------------------------------------------------------
 
-  async createGoal(input: { title?: string | undefined; category?: string | undefined; text: string }): Promise<Goal> {
+  async createGoal(input: { title?: string | undefined; category?: string | undefined; text: string; due?: string | undefined }): Promise<Goal> {
     const text = input.text.trim()
+    if (input.due && !validGoalDate(input.due)) throw new RelayError(400, 'invalid_due', 'Use a valid date for the deadline')
     if (!text) throw new RelayError(400, 'usage', 'Say what the goal is')
     const category = (CATEGORIES as readonly string[]).includes(input.category ?? '') ? (input.category as Category) : 'other'
     const title = (input.title ?? '').trim().slice(0, 80) || goalTitle(text)
@@ -1313,7 +1337,7 @@ export default class NanomuseRooms extends Service {
       : `[A goal the person set in their Goals room (category: ${categoryLabel(category, false)}, id ${id}). This chat is the goal's home: say in a few sentences how you will help and what you need from them; when a recurring check helps (a daily price check, a weekly review), set it up here with schedule_create; in this first turn call goals_room_update (goal_id "${id}") with a short title (eight words at most) and a one-line summary; and whenever something worth noting happens later, call goals_room_update again with an activity entry. Keep replies short.]`
     const sessionId = await this.open(title, `${framing}\n\n${text}`, { notice: zh ? `新目标 · ${title}` : `New goal · ${title}` })
     const now = Date.now()
-    const goal: Goal = { id, title, description: text.slice(0, 2000), category, status: 'tracking', sessionId, createdAt: now, updatedAt: now, summary: '', activity: [], steps: [], progress: -1, attention: false }
+    const goal: Goal = { id, title, description: text.slice(0, 2000), category, ...(input.due ? { due: input.due } : {}), status: 'tracking', sessionId, createdAt: now, updatedAt: now, summary: '', activity: [], steps: [], progress: -1, attention: false }
     this.store.goals = [goal, ...this.store.goals]
     this.goalBySession.set(sessionId, id)
     await this.save()
@@ -1321,9 +1345,17 @@ export default class NanomuseRooms extends Service {
   }
 
   /** From the room (status, title) or from the agent (`goals_room_update`: summary, activity). */
-  async updateGoal(ref: string, patch: { title?: string; description?: string; status?: string; summary?: string; activity?: { title: string; text?: string } }): Promise<Goal> {
+  async updateGoal(ref: string, patch: { title?: string; description?: string; status?: string; summary?: string; due?: string; nextStep?: string; feedMuted?: boolean; activity?: { title: string; text?: string } }): Promise<Goal> {
     const goal = this.findGoal(ref)
     if (!goal) throw new RelayError(404, 'not_found', `No goal "${ref}"`)
+    if (patch.due !== undefined && patch.due !== '' && !validGoalDate(patch.due)) throw new RelayError(400, 'invalid_due', 'Use a valid date for the deadline')
+    const dateChanged = typeof patch.due === 'string' && patch.due !== (goal.due ?? '')
+    if (typeof patch.due === 'string') {
+      if (patch.due) goal.due = patch.due
+      else delete goal.due
+    }
+    if (typeof patch.nextStep === 'string') goal.nextStep = patch.nextStep.trim().slice(0, 240)
+    if (typeof patch.feedMuted === 'boolean') goal.feedMuted = patch.feedMuted
     if (typeof patch.title === 'string' && patch.title.trim()) goal.title = patch.title.trim().slice(0, 80)
     if (typeof patch.description === 'string') goal.description = patch.description.trim().slice(0, 2000)
     const wasDone = goal.status === 'done'
@@ -1334,6 +1366,7 @@ export default class NanomuseRooms extends Service {
       goal.activity = [{ at: Date.now(), title: patch.activity.title.trim().slice(0, 120), text: (patch.activity.text ?? '').trim().slice(0, 600) }, ...goal.activity].slice(0, ACTIVITY_KEEP)
     }
     goal.updatedAt = Date.now()
+    this.refreshGoalPost(goal, dateChanged)
     await this.save()
     return goal
   }
@@ -1344,6 +1377,7 @@ export default class NanomuseRooms extends Service {
     this.store.goals = this.store.goals.filter((g) => g.id !== id)
     this.goalBySession.delete(goal.sessionId)
     delete this.automations[id]
+    this.store.feed.posts = this.store.feed.posts.filter((post) => post.goalId !== id)
     await this.save()
     // Its automations stop with it; the chat stays in the archive.
     const schedule = this.ctx.get('schedule') as ScheduleLike | undefined
@@ -1630,7 +1664,7 @@ export default class NanomuseRooms extends Service {
       : sessionId
     const now = Date.now()
     const description = [block.why, ...block.steps.map((step) => `- ${step}`)].filter(Boolean).join('\n')
-    const goal: Goal = { id, title: block.title, description: description.slice(0, 2000), category: block.category, status: 'tracking', sessionId: home, createdAt: now, updatedAt: now, summary: block.why.slice(0, 240), activity: [], steps: block.steps, progress: -1, attention: false }
+    const goal: Goal = { id, title: block.title, description: description.slice(0, 2000), category: block.category, ...(block.due ? { due: block.due } : {}), ...(block.steps[0] ? { nextStep: block.steps[0].slice(0, 240) } : {}), status: 'tracking', sessionId: home, createdAt: now, updatedAt: now, summary: block.why.slice(0, 240), activity: [], steps: block.steps, progress: -1, attention: false }
     this.store.goals = [goal, ...this.store.goals]
     this.goalBySession.set(home, id)
     await this.save()
@@ -1653,8 +1687,11 @@ export default class NanomuseRooms extends Service {
   private async applyGoalUpdate(update: GoalUpdateBlock, sessionId: string): Promise<void> {
     const goal = (update.goalId ? this.findGoal(update.goalId) : undefined) ?? this.store.goals.find((g) => g.id === this.goalBySession.get(sessionId))
     if (!goal) return
+    if (update.nextStep !== undefined) goal.nextStep = update.nextStep
+    else if (update.progress >= 0 && update.progress !== goal.progress) delete goal.nextStep
     if (update.progress >= 0) goal.progress = update.progress
     goal.attention = update.status === 'attention'
+    if (!goal.attention && goal.followUpSeen) delete goal.followUpSeen.attention
     if (update.status === 'done') {
       if (goal.status !== 'done') void this.askNudge('goal_done').catch((error: unknown) => this.warn('nudges', error))
       goal.status = 'done'
@@ -1668,6 +1705,7 @@ export default class NanomuseRooms extends Service {
       }
     }
     goal.updatedAt = Date.now()
+    this.refreshGoalPost(goal)
     await this.save()
   }
 
@@ -1843,14 +1881,58 @@ export default class NanomuseRooms extends Service {
     return ready
   }
 
+  /** A goal card reflects the current plan. Re-dating it invalidates its original reminder. */
+  private refreshGoalPost(goal: Goal, dateChanged = false): void {
+    this.store.feed.posts = this.store.feed.posts.flatMap((post) => {
+      if (post.goalId !== goal.id) return [post]
+      if (dateChanged || goal.feedMuted || goal.status !== 'tracking' || !post.goalReason ||
+          (post.goalExpiresAt ?? 0) <= Date.now() || (post.goalReason === 'attention' && !goal.attention)) return []
+      return [{ ...post, title: goal.title, body: followUpText(goal, post.goalReason, this.lang) }]
+    })
+  }
+
+  private async writeGoalFollowUp(now: number): Promise<void> {
+    const feed = this.store.feed
+    const day = localDateKey(now)
+    const previousCount = feed.posts.length
+    feed.posts = feed.posts.filter((post) => !post.goalId || (feed.routine.on && (post.goalExpiresAt ?? 0) > now))
+    const due = feed.routine.on && (!feed.lastGoalFollowUpDay || feed.lastGoalFollowUpDay < day) && routineDue(feed.routine.time, 0, now)
+    const candidate = due ? nextGoalFollowUp(this.goals, day, now) : undefined
+    if (candidate) {
+      const { goal, stage, reason } = candidate
+      goal.followUpSeen ??= {}
+      if (stage && goal.due) Object.assign(goal.followUpSeen, { due: goal.due, stage })
+      if (goal.attention) goal.followUpSeen.attention = true
+      feed.lastGoalFollowUpDay = day
+      const tomorrow = new Date(now)
+      tomorrow.setHours(24, 0, 0, 0)
+      const post: FeedPost = {
+        id: newId('post'), at: now, title: goal.title, body: followUpText(goal, reason, this.lang),
+        area: 'goals', emoji: '📅', image: '', prompt: '', liked: false, goalId: goal.id,
+        goalReason: reason, goalExpiresAt: tomorrow.getTime(),
+      }
+      feed.posts = [post, ...feed.posts].slice(0, FEED_KEEP)
+    }
+    if (!candidate && previousCount === feed.posts.length && !this.followUpNeedsSave) return
+    // The card and both delivery markers reach disk together before the browser receives them.
+    try {
+      await this.save(true, true)
+      this.followUpNeedsSave = false
+    } catch (error) {
+      this.followUpNeedsSave = true
+      throw error
+    }
+  }
+
   private async tick(): Promise<void> {
+    await this.writeGoalFollowUp(Date.now())
     const ready = await this.syncReady()
     if (!ready) return
     const now = Date.now()
     const feed = this.store.feed
-    if (this.busy.feed || now - feed.lastTry < RETRY_AFTER_MS) return
+    if (!feed.routine.on || this.busy.feed || now - feed.lastTry < RETRY_AFTER_MS) return
     // the daily routine (C5): once the Feed was opened, a batch every day at its hour
-    if (feed.routine.ensuredAt && feed.routine.on) {
+    if (feed.routine.ensuredAt) {
       if (routineDue(feed.routine.time, feed.generatedAt, now)) await this.refreshFeed().catch((error: unknown) => this.warn('feed', error))
       return
     }
@@ -1866,6 +1948,7 @@ export default class NanomuseRooms extends Service {
       this.store.feed.routine = { ...this.store.feed.routine, ensuredAt: Date.now() }
       await this.save()
     }
+    await this.writeGoalFollowUp(Date.now())
     return this.store.feed.routine
   }
 
@@ -1876,6 +1959,7 @@ export default class NanomuseRooms extends Service {
     if (typeof patch.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.time)) routine.time = patch.time
     this.store.feed.routine = routine
     await this.save()
+    await this.writeGoalFollowUp(Date.now())
     return routine
   }
 
@@ -1892,7 +1976,7 @@ export default class NanomuseRooms extends Service {
     const lines: string[] = []
     lines.push(`- the agent's name, as the person chose it: ${profile.name}`)
     if (profile.description) lines.push(`- the agent's look, as the person drew it: ${profile.description.slice(0, 200)}`)
-    for (const goal of this.store.goals.slice(0, 10)) {
+    for (const goal of this.goals.filter((goal) => !goal.feedMuted).slice(0, 10)) {
       lines.push(`- goal (${goal.status}, ${goal.category}): ${goal.title}${goal.summary ? ` — ${goal.summary}` : ''}`)
     }
     const ideas = this.ideaItems()
@@ -1955,7 +2039,7 @@ export default class NanomuseRooms extends Service {
   }
 
   /** Serialised atomic writes; every save reaches the browser. */
-  private save(propagateErrors = false): Promise<void> {
+  private save(propagateErrors = false, publishAfterWrite = false): Promise<void> {
     const snapshot = JSON.stringify(this.store, null, 2) + '\n'
     const writing = this.writing.then(async () => {
       const path = this.path
@@ -1965,6 +2049,7 @@ export default class NanomuseRooms extends Service {
       await rename(tmp, path)
     })
     this.writing = writing.catch((error: unknown) => this.warn('save', error))
+    if (publishAfterWrite) return writing.then(() => this.broadcast())
     this.broadcast()
     return propagateErrors ? writing : this.writing
   }
@@ -2041,7 +2126,7 @@ export default class NanomuseRooms extends Service {
           await this.dismissIdea(String(body.id ?? ''))
           return send(res, 204)
         case '/goals/create':
-          return send(res, 200, await this.createGoal({ title: typeof body.title === 'string' ? body.title : undefined, category: typeof body.category === 'string' ? body.category : undefined, text: String(body.text ?? '') }))
+          return send(res, 200, await this.createGoal({ title: typeof body.title === 'string' ? body.title : undefined, category: typeof body.category === 'string' ? body.category : undefined, text: String(body.text ?? ''), due: typeof body.due === 'string' ? body.due : undefined }))
         case '/goals/begin':
           return send(res, 200, await this.beginGoal(goalCategory(body.category), typeof body.seed === 'string' ? body.seed : undefined, typeof body.sessionId === 'string' ? body.sessionId : undefined))
         case '/goals/update':

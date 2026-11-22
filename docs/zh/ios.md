@@ -37,6 +37,8 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 
 ## 这里哪些是 nanoMuse 的 {#what-is-nanomuse-here}
 
+创建目标或编辑目标时可以设置截止日。打开动态后，会看到一项临近截止或最近逾期的目标，以及下一项未完成的步骤。可以直接勾选完成、打开目标、明天再看或隐藏这次截止日。卡片离线可用。动态设置中还可以单独开启本机截止通知，默认关闭。允许系统通知，并在想接收截止通知的目标菜单中关闭定期跟进后，iPhone 会为最近的一项目标安排截止日当地时间 09:00 的通知。点过稍后提醒的目标可安排到推迟后的那天。锁屏只提示查看动态。完成或改期会更新待发通知。如果应用一直挂起，系统仍可投递已安排的那一条。
+
 `python scripts/rebrand.py` 应用以下调整。脚本可重复执行且结果一致，每次更新上游后都应运行：
 
 - **应用标识**。 Bundle id 改为 `io.github.nanomuse.app` 及 `.ShareExtension`、`.AgentWidget`、`.FileProvider` 扩展，App Group 为 `group.io.github.nanomuse.app`，iCloud 容器为 `iCloud.io.github.nanomuse.app`。包含 bundle id 的后台任务、UTType 和 URL scheme 标识也一起修改。iOS 没有 Android 的源码包名限制，因此整组标识可统一调整。系统注册的链接前缀为 `nanomuse` 和 `nanomuse-mcp`，分享扩展使用 `nanomuse://share`，避免与同机 OpenMinis 冲突。App 内部继续采用上游 `minis://…`，兼容沙箱、系统提示词和模型；系统传入的 `nanomuse://` 由 `NanoMuse/NanoMuseOwnScheme.swift` 转为对应 `minis://`。聊天以外的自有按钮通过 App 深链接路由打开，不交给系统。

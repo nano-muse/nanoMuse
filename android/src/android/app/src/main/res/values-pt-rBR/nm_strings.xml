@@ -1284,4 +1284,14 @@
     <string name="nm_lock_chat_hint">Selecione “%1$s” no menu da conversa. Se você definir um intervalo, ele começa quando você desbloqueia essa conversa.</string>
     <string name="nm_lock_chat_on_leave">Ao sair da conversa</string>
     <string name="nm_lock_one_hour">1 hora</string>
+    <string name="nm_deadline_date">Prazo</string>
+    <string name="nm_deadline_clear">Remover data</string>
+    <string name="nm_deadline_today">Vence hoje</string>
+    <string name="nm_deadline_tomorrow">Vence amanhã</string>
+    <string name="nm_deadline_overdue">Em atraso · %1$s</string>
+    <string name="nm_deadline_snooze">Lembrar amanhã</string>
+    <string name="nm_deadline_hide">Dispensar</string>
+    <string name="nm_deadline_cards">Mostrar prazos das metas no feed</string>
+    <string name="nm_deadline_alerts">Notificações de prazo das metas</string>
+    <string name="nm_deadline_notice">Abra o feed para ver o próximo passo.</string>
 </resources>

@@ -6,6 +6,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -100,6 +102,7 @@ private val likeRed = Color(0xFFE0245E)
 fun FeedTab(
     header: @Composable () -> Unit,
     onDiscuss: (FeedPost) -> Unit,
+    onOpenGoal: (io.github.nanomuse.goals.Goal) -> Unit,
     onEditRoutine: (String) -> Unit,
     bottomInset: Dp = 0.dp,
 ) {
@@ -114,6 +117,7 @@ fun FeedTab(
     // The routine needs a model; retry quietly whenever the tab shows.
     LaunchedEffect(Unit) { runCatching { FeedFlow.ensureRoutine(context) } }
 
+    val deadline = currentGoalDeadline()
     val days = remember(posts) { posts.groupBy { it.day }.toList() }
 
     LazyColumn(
@@ -122,11 +126,12 @@ fun FeedTab(
         contentPadding = PaddingValues(bottom = 28.dp + bottomInset),
     ) {
         item(key = "header") { header() }
+        deadline?.let { item(key = "deadline") { GoalDeadlineCard(it, onOpenGoal) } }
 
         if (days.isEmpty()) {
             item(key = "today-title") { DayTitle(dayLabel(todayKey(), System.currentTimeMillis())) }
             if (!introAck) item(key = "intro") { IntroCard(onEdit = { editPrefs = true }, onAck = { FeedFlow.acknowledgeIntro(context) }) }
-            item(key = "empty") { EmptyState(generating = generating, onWriteNow = { FeedFlow.generateNow(context) }) }
+            if (deadline == null) item(key = "empty") { EmptyState(generating = generating, onWriteNow = { FeedFlow.generateNow(context) }) }
         } else {
             days.forEachIndexed { i, (day, dayPosts) ->
                 item(key = "day-$day") { DayTitle(dayLabel(day, dayPosts.first().createdAt)) }
@@ -201,7 +206,7 @@ private fun DayTitle(text: String) {
 
 /** White card frame shared by every card on the page. */
 @Composable
-private fun FeedCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun FeedCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = MuseTones.surface,
@@ -434,7 +439,7 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
     val generating by FeedFlow.generating.collectAsState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ChatColors.background) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text(stringResource(R.string.nm_feed_settings_title), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.nm_feed_intro_desc), fontSize = 13.sp, lineHeight = 18.sp, color = ChatColors.secondaryText)
@@ -469,6 +474,8 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
                         }
                         Switch(checked = task?.enabled == true, enabled = task != null, onCheckedChange = { FeedFlow.setEnabled(context, it) })
                     }
+                    HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
+                    GoalDeadlineSettings()
                     HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
                     Row(
                         Modifier

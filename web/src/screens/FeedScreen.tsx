@@ -25,7 +25,7 @@ import { Sheet } from "../components/Sheet";
 import { TabHeader } from "../components/TabHeader";
 import { intlLocale, localLabel, t, useLocale, useT } from "../i18n";
 import { useStore } from "../store";
-import type { CalendarData, CalendarEvent, FeedItem, FeedPost, FeedPostsData, UpcomingData } from "../types";
+import type { CalendarData, CalendarEvent, FeedFollowup, FeedItem, FeedPost, FeedPostsData, UpcomingData } from "../types";
 import { Toggle } from "../components/Form";
 import { cx, readStorage, relativeTime, timeShort, writeStorage } from "../util";
 
@@ -60,11 +60,20 @@ function FeedRequestError({ label, request }: { label: string; request: { error:
  * from background passes, files it made, cards still waiting for you.
  */
 export function FeedScreen() {
-  const { state, send, openThread, openFile, markFeedSeen, setTab, toast } = useStore();
+  const { state, send, draft, openGoal, openThread, openFile, markFeedSeen, setTab, toast } = useStore();
   const feedVersion = `${state.feedVersion}:${state.remindersVersion}`;
   const activityRequest = useFeedRequest(readActivity, feedVersion);
   const postsRequest = useFeedRequest(api.feedPosts, feedVersion);
-  const upcomingRequest = useFeedRequest(api.upcoming, feedVersion);
+  const [clock, setClock] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const refresh = () => { if (!document.hidden) setClock((n) => n + 1); };
+    const timer = window.setInterval(refresh, 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, []);
+  const upcomingRequest = useFeedRequest(api.upcoming,
+    `${feedVersion}:${state.goalsVersion}:${state.calendarVersion}:${state.connectionsVersion}:${state.profile?.proactive}:${postsRequest.data?.followups_enabled}:${clock}`);
   const calendarRequest = useFeedRequest(api.calendar, `${state.calendarVersion}:${state.connectionsVersion}`);
   const items = activityRequest.data;
   const { data: posts, setData: setPosts } = postsRequest;
@@ -108,6 +117,21 @@ export function FeedScreen() {
     openThread("main");
   };
   const postDays = useMemo(() => groupPostsByDay(posts?.posts ?? []), [posts]);
+  const followups = state.profile?.proactive === false || posts?.followups_enabled === false ? [] : upcoming?.followups ?? [];
+  const review = (item: FeedFollowup) => {
+    if (item.kind !== "overlap") openGoal(item.goal_id);
+    else {
+      openThread("main");
+      draft(t("Help me plan around the overlap between {first} and {second}.", { first: item.titles[0], second: item.titles[1] }));
+    }
+  };
+  const hide = async (id: string, choice: "tomorrow" | "dismiss") => {
+    try {
+      await api.hideFeedFollowup(id, choice);
+      upcomingRequest.setData((old) => old && { ...old, followups: old.followups?.filter((x) => x.id !== id) });
+      upcomingRequest.retry();
+    } catch (e) { toast((e as Error).message); }
+  };
   const noPosts = posts !== null && posts.posts.length === 0;
 
   return (
@@ -123,6 +147,7 @@ export function FeedScreen() {
 
       <div className="flex-1 overflow-y-auto px-3.5 pb-7">
         <FeedRequestError label={t("Feed")} request={postsRequest} />
+        {followups.map((item) => <FollowupCard key={item.id} item={item} onReview={() => review(item)} onHide={(choice) => hide(item.id, choice)} />)}
         {/* Muse's feed: a day heading, white cards; the first card explains what drives it */}
         {postDays.length === 0 && (
           <>
@@ -132,10 +157,8 @@ export function FeedScreen() {
               <>
                 <StaticCard
                   emoji="🖼️"
-                  title={t("Nothing in the feed yet")}
-                  body={t("As we get to know each other, new posts will show up here. Every day at {time} I read what I remember about you (your memory files, the last week of diary, your goals) and write a few short posts.", {
-                    time: posts?.time ?? "08:00",
-                  })}
+                  title={t("No new posts yet")}
+                  body={t("When something in your goals, calendar or recent conversations is worth following up, a post can appear here.")}
                 />
                 <StaticCard emoji="📝" title={t("Steer it with one sentence")} body={t("Tap the sliders at the top right to tell me what you want more of, switch the daily routine off, or have me write the first day now.")} />
                 {state.settings && !state.settings.llm_ready && (
@@ -186,7 +209,7 @@ export function FeedScreen() {
         {calendar?.configured && <TodayBlock data={calendar} onAsk={() => openThread("main")} />}
         <FeedRequestError label={t("While you were away")} request={activityRequest} />
 
-        {items && items.length === 0 && posts !== null && posts.posts.length === 0 && (
+        {items && items.length === 0 && followups.length === 0 && posts !== null && posts.posts.length === 0 && (
           <div className="py-10 text-center text-muted text-[14px] px-6">
             <Moon size={28} className="mx-auto mb-2 opacity-60" />
             {t("Nothing yet. Once {name} works on a goal in the background or needs your approval, it shows up here.", { name })}
@@ -449,7 +472,7 @@ function FeedSettingsSheet({
     }
   };
   // the daily routine is saved as it is switched or moved — a setting, not part of the sentence
-  const routine = async (body: { daily?: boolean; time?: string }) => {
+  const routine = async (body: { daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean }) => {
     try {
       onChange(await api.setFeedInstructions(body));
     } catch (e) {
@@ -471,6 +494,13 @@ function FeedSettingsSheet({
           className="w-full resize-none rounded-2xl bg-surface-2 px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:ring-2 focus:ring-accent/40"
         />
         <div className="space-y-2 rounded-2xl bg-surface-2 px-3.5 py-2.5">
+          <Toggle label={t("Goal and calendar follow-ups")} checked={data?.followups_enabled !== false}
+            onChange={(v) => void routine({ followups: v })} disabled={!data} />
+          {data?.followups_enabled !== false &&
+            <Toggle label={t("Notify me about time-sensitive follow-ups")}
+              hint={t("On devices with notifications enabled, once a day at most between 09:00 and 20:00 server time.")}
+              checked={data?.followup_push === true} disabled={!data}
+              onChange={(v) => void routine({ followup_push: v })} />}
           <Toggle
             label={t("Write it every day")}
             hint={data?.daily === false ? undefined : t("Daily at {time}", { time: data?.time ?? "08:00" })}
@@ -505,6 +535,55 @@ function FeedSettingsSheet({
         </button>
       </div>
     </Sheet>
+  );
+}
+
+function FollowupCard({ item, onReview, onHide }: {
+  item: FeedFollowup;
+  onReview: () => void;
+  onHide: (choice: "tomorrow" | "dismiss") => Promise<void>;
+}) {
+  const t = useT();
+  const [saving, setSaving] = useState(false);
+  const hide = async (choice: "tomorrow" | "dismiss") => {
+    setSaving(true);
+    try { await onHide(choice); } finally { setSaving(false); }
+  };
+  let heading: string;
+  let title: string;
+  let detail: string | null;
+  switch (item.kind) {
+    case "overlap":
+      heading = t("Calendar overlap");
+      title = item.titles.join(" · ");
+      detail = t("{start} to {end}", { start: timeShort(item.start), end: timeShort(item.end) });
+      break;
+    case "review":
+      heading = item.reason === "proposal" ? t("Plan change to review") : t("A goal step is blocked");
+      title = item.title;
+      detail = item.detail;
+      break;
+    case "goal":
+      heading = item.days_until === 0 ? t("Due today") : item.days_until === 1
+        ? t("Due tomorrow") : t("Was due {date}", { date: item.due });
+      title = item.title;
+      detail = item.next_step && t("Next step: {step}", { step: item.next_step });
+      break;
+  }
+  return (
+    <FeedCard>
+      <article aria-label={heading} className="space-y-2 p-4">
+        <div className="flex items-center gap-2 text-sm text-muted"><CalendarClock size={16} />{heading}</div>
+        <h3 className="font-semibold">{title}</h3>
+        {detail && <p className="text-sm">{detail}</p>}
+        {item.kind === "review" && item.note && <p className="text-sm text-muted">{item.note}</p>}
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <button type="button" onClick={onReview} className="font-medium text-accent">{item.kind !== "overlap" ? t("Review goal") : t("Discuss overlap")}</button>
+          <button type="button" disabled={saving} onClick={() => void hide("tomorrow")}>{t("Remind me tomorrow")}</button>
+          <button type="button" disabled={saving} onClick={() => void hide("dismiss")}>{t("Dismiss")}</button>
+        </div>
+      </article>
+    </FeedCard>
   );
 }
 

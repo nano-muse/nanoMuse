@@ -130,7 +130,7 @@ object ScheduledAgentRunner {
             ScheduledTaskManager(app).markFired(
                 task.id, sessionId, preview, ok = ok, scheduledForMs = firedTriggerAtMs,
             )
-            postCompletionNotification(app, task, sessionId, preview)
+            postCompletionNotification(app, task, sessionId, preview, ok, result.responseText) // nanoMuse: explicit quiet feed results
             return sessionId
         }
 
@@ -148,7 +148,7 @@ object ScheduledAgentRunner {
             ScheduledTaskManager(app).markFired(
                 task.id, sessionId, preview, ok = ok, scheduledForMs = firedTriggerAtMs,
             )
-            postCompletionNotification(app, task, sessionId, preview)
+            postCompletionNotification(app, task, sessionId, preview, ok, result.responseText) // nanoMuse: explicit quiet feed results
         }
         return sessionId
     }
@@ -311,9 +311,13 @@ object ScheduledAgentRunner {
         task: ScheduledTask,
         sessionId: String,
         preview: String,
+        success: Boolean, // nanoMuse: keep failed tasks visible
+        response: String?, // nanoMuse: match quiet results before preview truncation
     ) {
+        // nanoMuse: protected goals, including those created in a protected conversation, stay out of notices.
+        if (io.github.nanomuse.goals.GoalFlow.isProtectedSession(context, sessionId, task.goalId)) return
         // nanoMuse: the feed's routine tells of its posts itself (and opens the Feed, not a chat).
-        if (io.github.nanomuse.feed.FeedFlow.notifyIfFeed(context, task)) return
+        if (io.github.nanomuse.feed.FeedFlow.notifyIfFeed(context, task, success, response)) return
         val deepLink = Uri.parse("minis://session/$sessionId")
         // nanoMuse: to MainActivity by name; the manifest no longer registers the `minis` scheme
         val openIntent: Intent = io.github.nanomuse.deeplink.OwnScheme.intent(context, deepLink, flags = 0)

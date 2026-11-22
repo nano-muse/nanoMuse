@@ -1256,4 +1256,14 @@
     <string name="nm_lock_chat_hint">在聊天菜单中选择「%1$s」。如果设置了时长，从解锁这条对话时开始计时。</string>
     <string name="nm_lock_chat_on_leave">离开对话时</string>
     <string name="nm_lock_one_hour">1 小时</string>
+    <string name="nm_deadline_date">截止日期</string>
+    <string name="nm_deadline_clear">清除日期</string>
+    <string name="nm_deadline_today">今天到期</string>
+    <string name="nm_deadline_tomorrow">明天到期</string>
+    <string name="nm_deadline_overdue">已过期 · %1$s</string>
+    <string name="nm_deadline_snooze">明天再看</string>
+    <string name="nm_deadline_hide">忽略</string>
+    <string name="nm_deadline_cards">在动态中显示目标截止日期</string>
+    <string name="nm_deadline_alerts">目标到期通知</string>
+    <string name="nm_deadline_notice">打开动态，查看下一步。</string>
 </resources>

@@ -1263,4 +1263,14 @@
     <string name="nm_lock_chat_hint">Choose “%1$s” in the chat menu. If you set a delay, it starts when you unlock that conversation.</string>
     <string name="nm_lock_chat_on_leave">When leaving the conversation</string>
     <string name="nm_lock_one_hour">1 hour</string>
+    <string name="nm_deadline_date">Due date</string>
+    <string name="nm_deadline_clear">Remove date</string>
+    <string name="nm_deadline_today">Due today</string>
+    <string name="nm_deadline_tomorrow">Due tomorrow</string>
+    <string name="nm_deadline_overdue">Past due · %1$s</string>
+    <string name="nm_deadline_snooze">Remind me tomorrow</string>
+    <string name="nm_deadline_hide">Dismiss</string>
+    <string name="nm_deadline_cards">Show goal deadlines in Feed</string>
+    <string name="nm_deadline_alerts">Goal deadline notifications</string>
+    <string name="nm_deadline_notice">Open Feed to review your next step.</string>
 </resources>

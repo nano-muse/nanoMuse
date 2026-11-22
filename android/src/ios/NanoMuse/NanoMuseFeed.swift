@@ -13,6 +13,7 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 // MARK: - Post (pure parse/serialize, tested)
 
@@ -404,7 +405,8 @@ enum NanoMuseFeedFlow {
             let name = NanoMuseDay.key(date) + ".md"
             add("Diary \(name)", memory.appendingPathComponent(name), limit: i == 0 ? 1500 : 600)
         }
-        let goals = NanoMuseGoalStore.shared.goals
+        let protectedSessions = SessionLockStore.shared.lockedSessionIds
+        let goals = NanoMuseGoalStore.shared.goals.filter { !$0.usesProtectedSession(in: protectedSessions) }
         if !goals.isEmpty {
             sb += "### Goals\n"
             for g in goals {
@@ -429,6 +431,7 @@ struct NanoMuseFeedRoom: View {
 
     @ObservedObject private var store = NanoMuseFeedStore.shared
     @ObservedObject private var scheduler = NanoMuseScheduler.shared
+    @AppStorage(NanoMuseGoalDeadline.preference) private var showDeadlines = true
     @State private var showSettings = false
     @State private var introShown = !NanoMuseFeedFlow.introAcknowledged
     @State private var detail: NanoMusePost?
@@ -457,6 +460,9 @@ struct NanoMuseFeedRoom: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
+                    if showDeadlines {
+                        NanoMuseDeadlineCard(onOpenSession: onOpenSession)
+                    }
                     if introShown {
                         introCard
                     }
@@ -704,12 +710,40 @@ struct NanoMuseFeedSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var time = Date()
+    @ObservedObject private var deadlineAlerts = NanoMuseDeadlineNotifications.shared
+    @Environment(\.openURL) private var openURL
+    @AppStorage(NanoMuseGoalDeadline.notifyPreference) private var notifyDeadlines = false
+    @AppStorage(NanoMuseGoalDeadline.preference) private var showDeadlines = true
 
     private var routine: NanoMuseRoutine? { NanoMuseFeedFlow.routine }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Toggle(AppLocalized("Show goal deadlines"), isOn: Binding(
+                        get: { showDeadlines }, set: { showDeadlines = $0; deadlineAlerts.refresh() }
+                    )).tint(NanoMuseTones.action)
+                    if showDeadlines {
+                        Toggle(AppLocalized("Notify me on goal deadlines"), isOn: Binding(
+                            get: { notifyDeadlines },
+                            set: { enabled in
+                                notifyDeadlines = enabled
+                                if enabled { NanoMuseScheduler.shared.requestNotificationPermission() }
+                                deadlineAlerts.refresh()
+                            }
+                        )).tint(NanoMuseTones.action)
+                        if notifyDeadlines && deadlineAlerts.denied {
+                            Button(AppLocalized("Open Settings")) {
+                                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                            }
+                        }
+                    }
+                } footer: {
+                    if showDeadlines {
+                        Text(AppLocalized("At 09:00 on the due date for goals without scheduled check-ins."))
+                    }
+                }
                 Section {
                     TextEditor(text: $text).frame(minHeight: 90)
                 } header: {

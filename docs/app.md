@@ -161,6 +161,10 @@ The page takes a few query parameters, which the Android app uses and a bookmark
 
 ## Background work
 
+The top of the Feed can show two things to look at now: one saved goal and one pair of timed calendar events that overlap in the next 24 hours. Goals due today come first, then those overdue by up to seven days, then tomorrow's. When no deadline needs attention, a plan change awaiting your decision or a step marked blocked in the last seven days can appear with its recorded reason. These two signals stay in the Feed. Open a goal to see its next step. For a conflict, *Discuss overlap* prepares a question in the main chat for you to edit and send. *Remind me tomorrow* and *Dismiss* apply to that deadline or those event times. Changing the date or moving an event gives the new timing its own card.
+
+These cards work without a model. They use saved goals and fresh connected calendars, and skip cancelled, all-day and free events. Under Feed settings you can turn the cards off or opt into a generic notification on devices subscribed to web push. While the server runs, it can notify you about a goal or a conflict starting within two hours, between 09:00 and 20:00 server time and outside your quiet hours. Feed notifications share a limit of one per day. A goal with a scheduled check-in keeps its own reminder. Turning proactivity off hides the cards and stops their alerts. Separately, the daily writer can leave the Feed quiet when it finds no new observation.
+
 The agent does things on its own, but not too many. The *Proactivity* dial in Settings sets how much:
 
 | Level | Passes | Reaches out |
@@ -207,11 +211,12 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | GET | `/api/ideas?refresh=1` | cached or regenerated suggestions |
 | GET | `/api/activity` | audit tail, granted permissions (`grants[]` with `key`, `tool`, `target`, `scope`, `expires_at`), taint flag |
 | GET | `/api/feed?limit=` | *While you were away*: `{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}` newest first |
-| GET | `/api/feed/posts` | the posts written for you: `{instructions, daily, time, generated_at, posts[{id, ts, title, body, area, prompt}], error?}` |
-| PUT | `/api/feed/instructions` `{instructions?, daily?, time?}` | what the posts should be about (≤ 2000 characters), and the daily routine: on or off, and when (`HH:MM`, 08:00 at first) |
+| GET | `/api/feed/posts` | the posts written for you: `{instructions, daily, time, followups_enabled?, followup_push?, generated_at, posts[{id, ts, title, body, area, prompt}], error?}` |
+| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?}` | what the posts should be about (≤ 2000 characters), and the daily routine: on or off, and when (`HH:MM`, 08:00 at first) |
+| PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | show the same follow-up tomorrow or dismiss it |
 | POST | `/api/feed/posts/refresh` | write new posts now; `error` says why not when the model refused |
 | DELETE | `/api/feed/posts/{id}` | remove one post |
-| GET | `/api/upcoming` | `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`: `next_wake_at` is the earliest moment anything scheduled is due (a reminder, a check-in, the next pass), for a host that can set an alarm ([local-runtime.md](local-runtime.md#waking-up)) |
+| GET | `/api/upcoming` | `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`: `next_wake_at` is the earliest moment anything scheduled is due (a reminder, a check-in, the next pass), for a host that can set an alarm ([local-runtime.md](local-runtime.md#waking-up)) |
 | POST | `/api/tick` | wake the scheduler now: it looks at what is due and runs it; `{ok, next_wake_at}`. The Android app calls it when its alarm fires |
 | GET / POST | `/api/reminders[?all=1]` | active (or all recent) reminders / create `{text, at ("YYYY-MM-DD HH:MM") or repeat ("daily 08:00", …), kind (remind · task), thread}` |
 | POST / DELETE | `/api/reminders/{id}/fire`, `/api/reminders/{id}` | deliver it now in its chat / cancel |

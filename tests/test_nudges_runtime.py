@@ -302,7 +302,7 @@ def test_feed_routine_backs_off_after_a_failed_batch(server, monkeypatch):
     assert service.feed_posts_due()
     attempts = 0
 
-    async def boom(n: int = 3) -> dict:
+    async def boom(n: int = 3, *, scheduled: bool = False) -> dict:
         nonlocal attempts
         attempts += 1
         raise RuntimeError("model down")

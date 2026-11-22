@@ -1279,4 +1279,14 @@
     <string name="nm_lock_chat_hint">会話のメニューで「%1$s」を選びます。時間を指定すると、その会話のロックを解除した時点から計測します。</string>
     <string name="nm_lock_chat_on_leave">会話を離れたとき</string>
     <string name="nm_lock_one_hour">1 時間</string>
+    <string name="nm_deadline_date">期限</string>
+    <string name="nm_deadline_clear">日付を削除</string>
+    <string name="nm_deadline_today">今日が期限</string>
+    <string name="nm_deadline_tomorrow">明日が期限</string>
+    <string name="nm_deadline_overdue">期限超過 · %1$s</string>
+    <string name="nm_deadline_snooze">明日また表示</string>
+    <string name="nm_deadline_hide">閉じる</string>
+    <string name="nm_deadline_cards">目標の期限をフィードに表示</string>
+    <string name="nm_deadline_alerts">目標の期限通知</string>
+    <string name="nm_deadline_notice">フィードで次のステップを確認できます。</string>
 </resources>
