@@ -527,6 +527,11 @@
     <string name="nm_hands_intro">สำหรับแอปที่ไม่มี API มันจะใช้โทรศัพท์แบบเดียวกับคุณ: ถ่ายภาพหน้าจอ แล้วแตะ พิมพ์ และปัด ทักษะ คำสั่ง และเบราว์เซอร์มาก่อน หน้าจอเป็นทางเลือกสุดท้าย ปิดอยู่จนกว่าคุณจะเปิด</string>
     <string name="nm_hands_switch">ให้เอเจนต์ใช้หน้าจอ</string>
     <string name="nm_hands_switch_footer">ระหว่างทำงาน แคปซูลที่ด้านบนของหน้าจอจะแสดงแต่ละขั้นตอนและปุ่มหยุด การล็อกอิน รหัสผ่าน และรหัสยืนยันเป็นหน้าที่ของคุณเสมอ</string>
+    <string name="nm_hands_background_screen">หน้าจอเบื้องหลัง</string>
+    <string name="nm_hands_background_detail">ให้ผู้ช่วยใช้งานแอปที่รองรับหนึ่งแอปบนหน้าจอแยกขณะที่คุณใช้โทรศัพท์ต่อได้ งานจะหยุดเมื่อคุณต้องเข้ามาควบคุมเอง</string>
+    <string name="nm_hands_background_unsupported">ต้องใช้ Android 14 ขึ้นไป และโทรศัพท์ที่เปิดแอปบนหน้าจอรองได้</string>
+    <string name="nm_hands_background_protected">หน้าจอนี้ต้องให้คุณดำเนินการเอง โปรดเปิดแอปด้วยตัวเอง</string>
+    <string name="nm_hands_background_secret">โปรดเปิดแอปและกรอกข้อมูลส่วนตัวด้วยตัวเอง</string>
     <string name="nm_hands_status_off">ปิด เอเจนต์จะบอกเมื่องานต้องใช้หน้าจอ</string>
     <string name="nm_hands_status_ready">พร้อม</string>
     <string name="nm_hands_status_missing">เปิดอยู่ แต่ยังขาดบางอย่างด้านล่าง</string>

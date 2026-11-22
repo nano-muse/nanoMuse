@@ -2,7 +2,6 @@ package io.github.nanomuse.hands
 
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
-import com.openminis.app.accessibility.MinisAccessibilityService
 
 /**
  * What the accessibility tree says is under a point: the text and description of the
@@ -14,10 +13,10 @@ import com.openminis.app.accessibility.MinisAccessibilityService
 object ScreenWords {
     private const val MAX_UP = 3
 
-    fun at(svc: MinisAccessibilityService, x: Int, y: Int): String? {
+    fun at(roots: List<AccessibilityNodeInfo>, x: Int, y: Int): String? {
         val words = LinkedHashSet<String>()
         try {
-            for (root in svc.rootNodes()) {
+            for (root in roots) {
                 val leaf = deepestAt(root, x, y, 0) ?: continue
                 var node: AccessibilityNodeInfo? = leaf
                 var up = 0

@@ -536,6 +536,11 @@
     <string name="nm_hands_intro">W aplikacjach bez API używa telefonu tak jak ty: zrzut ekranu, potem dotknięcia, pisanie i przesunięcia. Najpierw umiejętności, polecenia i przeglądarka; ekran jest ostatecznością. Wyłączone, dopóki tego nie włączysz.</string>
     <string name="nm_hands_switch">Pozwól agentowi używać ekranu</string>
     <string name="nm_hands_switch_footer">Podczas pracy kapsuła u góry ekranu pokazuje każdy krok i przycisk Stop. Logowania, hasła i kody zawsze zostają tobie.</string>
+    <string name="nm_hands_background_screen">Ekran w tle</string>
+    <string name="nm_hands_background_detail">Asystent obsługuje jedną zgodną aplikację na osobnym ekranie, a Ty możesz nadal korzystać z telefonu. Zadanie kończy się, gdy musisz przejąć sterowanie.</string>
+    <string name="nm_hands_background_unsupported">Wymaga systemu Android 14 lub nowszego oraz telefonu obsługującego aplikacje na dodatkowym ekranie.</string>
+    <string name="nm_hands_background_protected">Ten ekran wymaga Twojej uwagi. Otwórz aplikację samodzielnie.</string>
+    <string name="nm_hands_background_secret">Otwórz aplikację i samodzielnie wpisz poufne dane.</string>
     <string name="nm_hands_status_off">Wyłączone; agent powie o tym, gdy zadanie będzie wymagać ekranu</string>
     <string name="nm_hands_status_ready">Gotowe</string>
     <string name="nm_hands_status_missing">Włączone, ale czegoś poniżej wciąż brakuje</string>

@@ -521,6 +521,11 @@
     <string name="nm_hands_intro">For apps with no API it uses the phone the way you do: a screenshot, then taps, typing and swipes. Skills, commands and the browser come first; the screen is the last resort. Off until you switch it on.</string>
     <string name="nm_hands_switch">Let the agent use the screen</string>
     <string name="nm_hands_switch_footer">While it works, a capsule at the top of the screen shows each step and a Stop button. Logins, passwords and codes are always left to you.</string>
+    <string name="nm_hands_background_screen">Background screen</string>
+    <string name="nm_hands_background_detail">Use one compatible app on a separate screen while you use your phone. The task stops if you need to take over.</string>
+    <string name="nm_hands_background_unsupported">Requires Android 14 or later and a phone that can open apps on a secondary display.</string>
+    <string name="nm_hands_background_protected">This screen needs your attention. Open the app yourself.</string>
+    <string name="nm_hands_background_secret">Open the app and enter the private information yourself.</string>
     <string name="nm_hands_status_off">Off; the agent will say so when a task needs the screen</string>
     <string name="nm_hands_status_ready">Ready</string>
     <string name="nm_hands_status_missing">On, but something below is still missing</string>

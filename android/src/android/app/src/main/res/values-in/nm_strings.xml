@@ -527,6 +527,11 @@
     <string name="nm_hands_intro">Untuk aplikasi tanpa API, ia memakai ponsel seperti kamu: tangkapan layar, lalu ketukan, ketikan dan usapan. Skill, perintah dan browser didahulukan; layar adalah pilihan terakhir. Mati sampai kamu menyalakannya.</string>
     <string name="nm_hands_switch">Izinkan agen memakai layar</string>
     <string name="nm_hands_switch_footer">Saat bekerja, kapsul di bagian atas layar menampilkan setiap langkah dan tombol Berhenti. Login, kata sandi dan kode selalu diserahkan padamu.</string>
+    <string name="nm_hands_background_screen">Layar latar belakang</string>
+    <string name="nm_hands_background_detail">Asisten menggunakan satu aplikasi yang kompatibel di layar terpisah sementara Anda tetap menggunakan ponsel. Tugas berhenti jika Anda perlu mengambil alih.</string>
+    <string name="nm_hands_background_unsupported">Memerlukan Android 14 atau yang lebih baru dan ponsel yang dapat membuka aplikasi di layar sekunder.</string>
+    <string name="nm_hands_background_protected">Layar ini memerlukan perhatian Anda. Buka aplikasinya sendiri.</string>
+    <string name="nm_hands_background_secret">Buka aplikasi dan masukkan sendiri informasi pribadi Anda.</string>
     <string name="nm_hands_status_off">Mati; agen akan menyampaikannya saat tugas memerlukan layar</string>
     <string name="nm_hands_status_ready">Siap</string>
     <string name="nm_hands_status_missing">Nyala, tetapi ada yang masih kurang di bawah</string>

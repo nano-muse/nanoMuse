@@ -531,6 +531,11 @@
     <string name="nm_hands_intro">Para apps sem API, ele usa o celular como você: uma captura de tela, depois toques, digitação e deslizes. Skills, comandos e o navegador vêm primeiro; a tela é o último recurso. Desligado até você ligar.</string>
     <string name="nm_hands_switch">Deixar o agente usar a tela</string>
     <string name="nm_hands_switch_footer">Enquanto trabalha, uma cápsula no topo da tela mostra cada passo e um botão Parar. Logins, senhas e códigos ficam sempre com você.</string>
+    <string name="nm_hands_background_screen">Tela em segundo plano</string>
+    <string name="nm_hands_background_detail">O assistente usa um aplicativo compatível em uma tela separada enquanto você continua usando o celular. A tarefa termina se você precisar assumir o controle.</string>
+    <string name="nm_hands_background_unsupported">Requer Android 14 ou posterior e um celular que abra aplicativos em uma tela secundária.</string>
+    <string name="nm_hands_background_protected">Esta tela precisa da sua atenção. Abra o aplicativo.</string>
+    <string name="nm_hands_background_secret">Abra o aplicativo e insira os dados confidenciais por conta própria.</string>
     <string name="nm_hands_status_off">Desligado; o agente avisará quando uma tarefa precisar da tela</string>
     <string name="nm_hands_status_ready">Pronto</string>
     <string name="nm_hands_status_missing">Ligado, mas ainda falta algo abaixo</string>

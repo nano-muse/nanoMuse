@@ -727,6 +727,7 @@ fun AppNavigation(
             io.github.nanomuse.ui.hands.HandsScreen(
                 onBack = { navController.safePopBackStack() },
                 onOpenProviders = { navController.safeNavigate(Routes.PROVIDER_LIST) },
+                onOpenShizuku = { navController.safeNavigate(Routes.SHIZUKU) }, // nanoMuse: background screen setup
                 onOpenHandsModel = { navController.safeNavigate(io.github.nanomuse.ui.models.modelPickRoute(io.github.nanomuse.models.ModelSlots.Slot.HANDS)) },
             )
         }

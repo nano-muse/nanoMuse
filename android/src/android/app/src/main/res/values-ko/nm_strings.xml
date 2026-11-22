@@ -527,6 +527,11 @@
     <string name="nm_hands_intro">API가 없는 앱에서는 사람처럼 휴대전화를 씁니다. 스크린샷을 찍고, 탭하고, 입력하고, 스와이프합니다. 스킬, 명령, 브라우저가 먼저이고 화면은 마지막 수단입니다. 켜기 전까지는 꺼져 있습니다.</string>
     <string name="nm_hands_switch">에이전트가 화면을 쓰게 허용</string>
     <string name="nm_hands_switch_footer">작업하는 동안 화면 위쪽의 캡슐이 각 단계와 중지 버튼을 보여 줍니다. 로그인, 비밀번호, 인증 코드는 항상 직접 입력합니다.</string>
+    <string name="nm_hands_background_screen">백그라운드 화면</string>
+    <string name="nm_hands_background_detail">휴대폰을 사용하는 동안 어시스턴트가 별도 화면에서 호환 앱 하나를 조작합니다. 직접 조작해야 하면 작업이 종료됩니다.</string>
+    <string name="nm_hands_background_unsupported">Android 14 이상과 보조 디스플레이에서 앱을 열 수 있는 기기가 필요합니다.</string>
+    <string name="nm_hands_background_protected">이 화면은 직접 확인해야 합니다. 앱을 열어 주세요.</string>
+    <string name="nm_hands_background_secret">앱을 열고 민감한 정보는 직접 입력해 주세요.</string>
     <string name="nm_hands_status_off">끔. 작업에 화면이 필요하면 에이전트가 알려 줍니다</string>
     <string name="nm_hands_status_ready">준비됨</string>
     <string name="nm_hands_status_missing">켬, 하지만 아래에 아직 빠진 것이 있습니다</string>

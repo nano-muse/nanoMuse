@@ -530,6 +530,11 @@
     <string name="nm_hands_intro">Para sa mga app na walang API, ginagamit nito ang telepono tulad ng ginagawa mo: isang screenshot, saka mga tap, pag-type at pag-swipe. Nauuna ang mga skill, command at ang browser; ang screen ang huling paraan. Naka-off hanggang i-on mo.</string>
     <string name="nm_hands_switch">Hayaang gamitin ng agent ang screen</string>
     <string name="nm_hands_switch_footer">Habang gumagawa ito, ipinapakita ng isang capsule sa itaas ng screen ang bawat hakbang at isang button na Itigil. Laging sa iyo ang mga login, password at code.</string>
+    <string name="nm_hands_background_screen">Screen sa background</string>
+    <string name="nm_hands_background_detail">Gumagamit ang assistant ng isang katugmang app sa hiwalay na screen habang ginagamit mo ang telepono. Hihinto ang gawain kapag kailangan mong pumalit.</string>
+    <string name="nm_hands_background_unsupported">Kailangan ng Android 14 o mas bago at teleponong kayang magbukas ng mga app sa pangalawang screen.</string>
+    <string name="nm_hands_background_protected">Kailangan mong asikasuhin ang screen na ito. Buksan mo ang app.</string>
+    <string name="nm_hands_background_secret">Buksan ang app at ikaw mismo ang maglagay ng pribadong impormasyon.</string>
     <string name="nm_hands_status_off">Naka-off; sasabihin ng agent kapag kailangan ng gawain ang screen</string>
     <string name="nm_hands_status_ready">Handa na</string>
     <string name="nm_hands_status_missing">Naka-on, pero may kulang pa sa ibaba</string>

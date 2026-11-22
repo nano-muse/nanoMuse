@@ -54,7 +54,7 @@ import java.util.concurrent.TimeUnit
  * The [stage] — the glow along the edges and the ring at the point about to be tapped — is a
  * second, full-screen window that never takes a touch, added first so the capsule stays on top.
  */
-class HandsCapsule(private val context: Context) {
+class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     private val main = Handler(Looper.getMainLooper())
     private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var root: LinearLayout? = null
@@ -69,7 +69,7 @@ class HandsCapsule(private val context: Context) {
     private var bars: BarsView? = null
 
     /** What the hands draw on the screen while they work. */
-    val stage = HandsStage(context)
+    val stage = if (showStage) HandsStage(context) else null
 
     var onStop: (() -> Unit)? = null
     var onContinue: (() -> Unit)? = null
@@ -80,10 +80,20 @@ class HandsCapsule(private val context: Context) {
 
     private fun dp(v: Int): Int = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), context.resources.displayMetrics).toInt()
 
+    /** A background task must expose Stop before it launches its app. */
+    fun showBeforeBackgroundRun(): Boolean {
+        val shown = java.util.concurrent.FutureTask {
+            working(0, context.getString(R.string.nm_hands_looking))
+            root?.parent != null
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) shown.run() else main.post(shown)
+        return runCatching { shown.get(3, TimeUnit.SECONDS) }.getOrDefault(false)
+    }
+
     /** Shows (or updates) the working state. */
     fun working(step: Int, detail: String) = onMain {
         ensure()
-        stage.mood(HandsStage.Mood.WORKING)
+        stage?.mood(HandsStage.Mood.WORKING)
         ring?.turning(true)
         bars?.visibility = View.VISIBLE
         titleView?.text = context.getString(R.string.nm_hands_step, step)
@@ -97,8 +107,8 @@ class HandsCapsule(private val context: Context) {
     /** The hands wait for the user to do something on the phone. */
     fun takeOver(reason: String) = onMain {
         ensure()
-        stage.mood(HandsStage.Mood.WAITING)
-        stage.clear()
+        stage?.mood(HandsStage.Mood.WAITING)
+        stage?.clear()
         ring?.turning(false)
         bars?.visibility = View.GONE
         titleView?.text = context.getString(R.string.nm_hands_your_turn)
@@ -116,7 +126,7 @@ class HandsCapsule(private val context: Context) {
      */
     fun approval(what: String, decidable: Boolean = false) = onMain {
         ensure()
-        stage.mood(HandsStage.Mood.WAITING)
+        stage?.mood(HandsStage.Mood.WAITING)
         ring?.turning(false)
         bars?.visibility = View.GONE
         titleView?.text = context.getString(R.string.nm_hands_approval_title)
@@ -138,7 +148,7 @@ class HandsCapsule(private val context: Context) {
                 .setDuration(200L).setInterpolator(DecelerateInterpolator())
                 .withEndAction { runCatching { wm.removeView(v) } }.start()
         }
-        stage.hide()
+        stage?.hide()
     }
 
     /** Hides the capsule and the stage for a screenshot and waits until the frame is gone; [restore] brings them back. */
@@ -146,7 +156,7 @@ class HandsCapsule(private val context: Context) {
         val latch = CountDownLatch(1)
         main.post {
             root?.visibility = View.INVISIBLE
-            stage.setVisible(false)
+            stage?.setVisible(false)
             latch.countDown()
         }
         latch.await(300, TimeUnit.MILLISECONDS)
@@ -156,7 +166,7 @@ class HandsCapsule(private val context: Context) {
 
     fun restore() = onMain {
         root?.visibility = View.VISIBLE
-        stage.setVisible(true)
+        stage?.setVisible(true)
     }
 
     /**
@@ -238,7 +248,7 @@ class HandsCapsule(private val context: Context) {
 
     private fun ensure() {
         if (root != null) return
-        stage.show() // first, so the capsule's window sits above it
+        stage?.show() // first, so the capsule's window sits above it
         val radius = dp(26).toFloat()
         val pill = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL

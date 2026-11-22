@@ -533,6 +533,11 @@
     <string name="nm_hands_intro">Pentru aplicațiile fără API, folosește telefonul așa cum o faci tu: o captură de ecran, apoi atingeri, tastare și glisări. Abilitățile, comenzile și browserul vin primele; ecranul e ultima soluție. Oprit până îl pornești.</string>
     <string name="nm_hands_switch">Lasă agentul să folosească ecranul</string>
     <string name="nm_hands_switch_footer">Cât lucrează, o capsulă în partea de sus a ecranului arată fiecare pas și un buton Stop. Autentificările, parolele și codurile îți rămân întotdeauna ție.</string>
+    <string name="nm_hands_background_screen">Ecran în fundal</string>
+    <string name="nm_hands_background_detail">Asistentul folosește o aplicație compatibilă pe un ecran separat, iar tu poți folosi în continuare telefonul. Sarcina se oprește dacă trebuie să preiei controlul.</string>
+    <string name="nm_hands_background_unsupported">Necesită Android 14 sau o versiune ulterioară și un telefon care poate deschide aplicații pe un ecran secundar.</string>
+    <string name="nm_hands_background_protected">Acest ecran necesită intervenția ta. Deschide aplicația.</string>
+    <string name="nm_hands_background_secret">Deschide aplicația și introdu personal informațiile confidențiale.</string>
     <string name="nm_hands_status_off">Oprit; agentul îți va spune când o sarcină are nevoie de ecran</string>
     <string name="nm_hands_status_ready">Gata</string>
     <string name="nm_hands_status_missing">Pornit, dar ceva de mai jos lipsește încă</string>

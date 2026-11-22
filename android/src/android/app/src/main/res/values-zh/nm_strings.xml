@@ -517,6 +517,11 @@
     <string name="nm_hands_intro">对于没有接口的 App，它像你一样用手机：看一眼截图，然后点、输、滑。技能、命令行、浏览器能办的先用，屏幕是最后一步。默认关闭。</string>
     <string name="nm_hands_switch">允许操作屏幕</string>
     <string name="nm_hands_switch_footer">操作时屏幕顶部会有一个胶囊，显示每一步和「停止」按钮。登录、密码、验证码永远留给你自己输。</string>
+    <string name="nm_hands_background_screen">后台独立屏幕</string>
+    <string name="nm_hands_background_detail">让助手在独立屏幕上操作一个兼容的应用，你可以继续使用手机。需要你接手时，任务会停止。</string>
+    <string name="nm_hands_background_unsupported">需要 Android 14 或更高版本，且手机支持在副屏打开应用。</string>
+    <string name="nm_hands_background_protected">这个界面需要你接手，请自行打开应用。</string>
+    <string name="nm_hands_background_secret">请自行打开应用，在里面填写私密信息。</string>
     <string name="nm_hands_status_off">已关闭；任务需要用到屏幕时它会告诉你</string>
     <string name="nm_hands_status_ready">就绪</string>
     <string name="nm_hands_status_missing">已开启，但下面还有没准备好的</string>

@@ -527,6 +527,11 @@
     <string name="nm_hands_intro">Untuk aplikasi tanpa API, ia menggunakan telefon seperti anda: tangkapan skrin, kemudian ketikan, taipan dan leretan. Kemahiran, perintah dan pelayar didahulukan; skrin ialah pilihan terakhir. Mati sehingga anda menghidupkannya.</string>
     <string name="nm_hands_switch">Benarkan ejen menggunakan skrin</string>
     <string name="nm_hands_switch_footer">Semasa ia bekerja, satu kapsul di bahagian atas skrin menunjukkan setiap langkah dan butang Berhenti. Log masuk, kata laluan dan kod sentiasa diserahkan kepada anda.</string>
+    <string name="nm_hands_background_screen">Skrin latar belakang</string>
+    <string name="nm_hands_background_detail">Pembantu menggunakan satu aplikasi yang serasi pada skrin berasingan semasa anda terus menggunakan telefon. Tugas berhenti jika anda perlu mengambil alih.</string>
+    <string name="nm_hands_background_unsupported">Memerlukan Android 14 atau lebih baharu dan telefon yang boleh membuka aplikasi pada skrin kedua.</string>
+    <string name="nm_hands_background_protected">Skrin ini memerlukan perhatian anda. Buka aplikasi itu sendiri.</string>
+    <string name="nm_hands_background_secret">Buka aplikasi dan masukkan maklumat sulit sendiri.</string>
     <string name="nm_hands_status_off">Mati; ejen akan memberitahu apabila sesuatu tugas memerlukan skrin</string>
     <string name="nm_hands_status_ready">Sedia</string>
     <string name="nm_hands_status_missing">Hidup, tetapi ada yang masih belum lengkap di bawah</string>

@@ -218,6 +218,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Added an optional background screen on compatible Android 14 and newer phones with authorized Shizuku, so Hands can operate one app while your keyboard and the Stop control stay on the main screen.
+
 - Grouped the app lock and protected chat settings on one page and clarified when each lock timer starts.
 
 - Replaced Android chat history on reload instead of appending duplicates, converted persisted messages in bounded raw pages, and read only message IDs when verifying a compaction anchor. Saved messages and unsummarized model context were preserved. For #921.

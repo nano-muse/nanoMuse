@@ -512,6 +512,11 @@
     <string name="nm_hands_intro">對於沒有介面的 App，它像你一樣用手機：看一眼截圖，然後點、輸、滑。技能、命令列、瀏覽器能辦的先用，螢幕是最後一步。預設關閉。</string>
     <string name="nm_hands_switch">允許操作螢幕</string>
     <string name="nm_hands_switch_footer">操作時螢幕頂部會有一個膠囊，顯示每一步和「停止」按鈕。登入、密碼、驗證碼永遠留給你自己輸。</string>
+    <string name="nm_hands_background_screen">背景獨立螢幕</string>
+    <string name="nm_hands_background_detail">讓助理在獨立螢幕上操作一個相容的應用程式，你可以繼續使用手機。需要你接手時，任務會停止。</string>
+    <string name="nm_hands_background_unsupported">需要 Android 14 以上版本，且手機支援在副螢幕開啟應用程式。</string>
+    <string name="nm_hands_background_protected">這個畫面需要你接手，請自行開啟應用程式。</string>
+    <string name="nm_hands_background_secret">請自行開啟應用程式，並在裡面填寫私密資訊。</string>
     <string name="nm_hands_status_off">已關閉；任務需要用到螢幕時它會告訴你</string>
     <string name="nm_hands_status_ready">就緒</string>
     <string name="nm_hands_status_missing">已開啟，但下面還有沒準備好的</string>

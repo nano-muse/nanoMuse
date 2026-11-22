@@ -531,6 +531,11 @@
     <string name="nm_hands_intro">Pour les apps sans API, il utilise le téléphone comme vous : une capture d’écran, puis des touchers, de la saisie et des balayages. Les compétences, les commandes et le navigateur passent d’abord ; l’écran est le dernier recours. Désactivé tant que vous ne l’activez pas.</string>
     <string name="nm_hands_switch">Laisser l’agent utiliser l’écran</string>
     <string name="nm_hands_switch_footer">Pendant qu’il travaille, une capsule en haut de l’écran montre chaque étape et un bouton Stop. Les connexions, mots de passe et codes vous sont toujours laissés.</string>
+    <string name="nm_hands_background_screen">Écran en arrière-plan</string>
+    <string name="nm_hands_background_detail">L’assistant utilise une application compatible sur un écran séparé pendant que vous utilisez votre téléphone. La tâche s’arrête si vous devez intervenir.</string>
+    <string name="nm_hands_background_unsupported">Nécessite Android 14 ou une version ultérieure et un téléphone capable d’ouvrir des applications sur un écran secondaire.</string>
+    <string name="nm_hands_background_protected">Cet écran nécessite votre intervention. Ouvrez vous-même l’application.</string>
+    <string name="nm_hands_background_secret">Ouvrez l’application et saisissez vous-même les informations confidentielles.</string>
     <string name="nm_hands_status_off">Désactivé ; l’agent le dira quand une tâche a besoin de l’écran</string>
     <string name="nm_hands_status_ready">Prêt</string>
     <string name="nm_hands_status_missing">Activé, mais il manque encore quelque chose ci-dessous</string>

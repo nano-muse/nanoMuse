@@ -527,6 +527,11 @@
     <string name="nm_hands_intro">API のないアプリでは、あなたと同じようにスマートフォンを使います: スクリーンショットを撮り、タップ、入力、スワイプをします。スキル、コマンド、ブラウザーが先で、画面は最後の手段です。オンにするまではオフです。</string>
     <string name="nm_hands_switch">エージェントに画面を使わせる</string>
     <string name="nm_hands_switch_footer">作業中は画面上部のカプセルに各ステップと停止ボタンが表示されます。ログイン、パスワード、コードは常にあなたに任されます。</string>
+    <string name="nm_hands_background_screen">バックグラウンド画面</string>
+    <string name="nm_hands_background_detail">スマートフォンを使いながら、別の画面でアシスタントに対応アプリを1つ操作させます。ご自身の操作が必要になるとタスクを終了します。</string>
+    <string name="nm_hands_background_unsupported">Android 14 以降で、セカンダリディスプレイにアプリを開ける端末が必要です。</string>
+    <string name="nm_hands_background_protected">この画面はご自身での操作が必要です。アプリを開いてください。</string>
+    <string name="nm_hands_background_secret">アプリを開き、機密情報はご自身で入力してください。</string>
     <string name="nm_hands_status_off">オフ。タスクに画面が必要なときはエージェントがそう伝えます</string>
     <string name="nm_hands_status_ready">準備完了</string>
     <string name="nm_hands_status_missing">オンですが、下の項目がまだ足りません</string>

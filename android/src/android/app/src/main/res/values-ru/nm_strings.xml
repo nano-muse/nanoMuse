@@ -536,6 +536,11 @@
     <string name="nm_hands_intro">Для приложений без API он пользуется телефоном так же, как вы: снимок экрана, затем нажатия, ввод и свайпы. Сначала навыки, команды и браузер; экран остаётся последним средством. Выключено, пока вы не включите.</string>
     <string name="nm_hands_switch">Разрешить агенту пользоваться экраном</string>
     <string name="nm_hands_switch_footer">Пока он работает, капсула вверху экрана показывает каждый шаг и кнопку «Стоп». Входы, пароли и коды всегда остаются за вами.</string>
+    <string name="nm_hands_background_screen">Фоновый экран</string>
+    <string name="nm_hands_background_detail">Помощник работает с одним совместимым приложением на отдельном экране, пока вы пользуетесь телефоном. Если потребуется ваше участие, задача завершится.</string>
+    <string name="nm_hands_background_unsupported">Требуется Android 14 или новее и телефон, который может открывать приложения на дополнительном экране.</string>
+    <string name="nm_hands_background_protected">На этом экране требуется ваше участие. Откройте приложение самостоятельно.</string>
+    <string name="nm_hands_background_secret">Откройте приложение и введите конфиденциальные данные самостоятельно.</string>
     <string name="nm_hands_status_off">Выкл.; агент скажет, когда задаче понадобится экран</string>
     <string name="nm_hands_status_ready">Готово</string>
     <string name="nm_hands_status_missing">Вкл., но чего-то ниже ещё не хватает</string>

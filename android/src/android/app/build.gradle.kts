@@ -113,6 +113,7 @@ android {
     }
 
     buildFeatures {
+        aidl = true // nanoMuse: a display-only binder for the authorized Shizuku service.
         compose = true
         buildConfig = true
     }

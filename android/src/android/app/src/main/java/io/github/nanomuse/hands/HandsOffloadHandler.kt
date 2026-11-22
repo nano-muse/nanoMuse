@@ -42,6 +42,12 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
         return JSONObject()
             .put("enabled", Hands.enabled(context))
             .put("ready", r.ready)
+            .put("screen_mode", if (r.backgroundScreen) "background" else "foreground")
+            .put("requires_app", r.backgroundScreen)
+            .put("android_14_or_newer", r.backgroundAndroidOk)
+            .put("secondary_displays", r.secondaryDisplays)
+            .put("shizuku_ready", r.shizukuReady)
+            .put("missing", JSONArray(r.missing()))
             .put("android_11_or_newer", r.androidOk)
             .put("accessibility_service", r.serviceOn)
             .put("draw_over_apps", r.overlayOk)
@@ -61,31 +67,35 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
         val task = args.get("task")?.trim().orEmpty()
         if (task.isEmpty()) return NativeOffloadResult(2, "nanomuse-hands run: --task is required\n")
         if (!Hands.enabled(context)) return refused("off", "Operating the screen is switched off in Settings → Hands.")
+        // Keep the selected display fixed through validation, execution and cleanup.
+        if (!Hands.claim()) return refused("busy", "The hands are already working on something; wait for it to finish or stop it.")
+        return try {
+            runClaimed(task, args, sessionId)
+        } finally {
+            Hands.setActive(false)
+        }
+    }
+
+    private fun runClaimed(task: String, args: MediaOffloadHandler.Args, sessionId: String?): NativeOffloadResult {
         val r = Hands.readiness(context)
-        if (!r.ready) {
-            val missing = buildList {
-                if (!r.androidOk) add("Android 11 or newer is needed for screenshots")
-                if (!r.serviceOn) add("the accessibility service is off")
-                if (!r.overlayOk) add("nanoMuse may not draw over other apps")
-                if (r.model == null) add("no model that can see pictures is configured")
-            }
-            return refused("not_ready", missing.joinToString("; ") + ".")
+        if (!r.ready) return refused("not_ready", r.missing().joinToString("; ") + ".")
+        val appHint = args.get("app")?.trim()?.takeIf { it.isNotEmpty() }
+        if (r.backgroundScreen && appHint == null) {
+            return NativeOffloadResult(2, "nanomuse-hands run: --app is required for a background screen task\n")
         }
         // No cap unless the caller asks for one: the run ends when the task is done, the person
         // stops it, or the time limit is hit.
         val maxSteps = args.get("max-steps")?.toIntOrNull()?.coerceAtLeast(0) ?: HandsOperator.DEFAULT_MAX_STEPS
         val opts = HandsOperator.Options(
             task = task,
-            appHint = args.get("app")?.trim()?.takeIf { it.isNotEmpty() },
+            appHint = appHint,
             maxSteps = maxSteps,
             sessionId = sessionId,
             agentName = NanoMuseIdentity.name(context),
             language = Locale.getDefault().getDisplayLanguage(Locale.ENGLISH).ifBlank { "the user's language" },
         )
-        // Taken atomically, so two runs arriving together cannot both start; given back when the run ends.
-        if (!Hands.claim()) return refused("busy", "The hands are already working on something; wait for it to finish or stop it.")
         AppLogger.info(TAG, "run: ${task.take(80)} app=${opts.appHint} maxSteps=$maxSteps")
-        val result = try { HandsOperator(context).run(opts) } finally { Hands.setActive(false) }
+        val result = HandsOperator(context).run(opts)
         val body = JSONObject()
             .put("ok", result.outcome is HandsOperator.Outcome.Done)
             .put("outcome", result.outcome.code)
@@ -102,7 +112,9 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
             is HandsOperator.Outcome.Stopped -> body.put("message", o.message)
                 .put("tell_user", "The user stopped it. Say so in one line and do not start it again.")
             is HandsOperator.Outcome.NeedsUser -> body.put("question", o.question)
-                .put("tell_user", "Ask the user this question in their language and wait; then run again with the answer in the task.")
+                .put("tell_user", if (r.backgroundScreen) {
+                    "The background run ended. Explain what needs their attention. Never ask for credentials or restart without their direction."
+                } else "Ask the user this question in their language and wait; then run again with the answer in the task.")
             is HandsOperator.Outcome.Failed -> body.put("message", o.message)
                 .put("tell_user", "Tell the user what went wrong in their language; the settings are at ${Hands.DEEP_LINK}.")
         }
@@ -133,7 +145,9 @@ Usage:
   nanomuse-hands run --task "<one clear task, with every detail the hands need>" [--app "<app name>"] [--max-steps N]
   nanomuse-hands stop
 
-The screen model sees screenshots only. It never types passwords or codes (the user takes over), and taps that
+With Background screen selected, --app requires an exact package name or a unique installed app label from
+nanomuse-hands apps. Stay in one app, do not go Home, and end the run for user handover.
+The screen model sees screenshots only. It never types passwords or codes, and taps that
 pay, send, post or delete wait for the same approval card as the shell and the browser. Off by default:
 Settings → Hands. Exit codes: 0 done · 1 failed · 2 usage · 3 off or not ready · 4 stopped, infeasible or needs the user.
 """

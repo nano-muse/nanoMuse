@@ -195,6 +195,7 @@ nanoMuse는 다른 사람들이 만든 것 위에 세워졌습니다. 조건은 
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): 휴대폰 앱의 바탕이 된 온디바이스 에이전트. 샌드박스는 [proot](https://github.com/nano-muse/proot)와 [Alpine Linux](https://alpinelinux.org/).
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): 데스크톱 앱이 플러그인으로 올라가 있는 에이전트 하네스.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): 데스크톱 손의 오퍼레이터는 이것을 포팅한 것이고, 스테이지의 마커는 ScreenMarker를 따릅니다.
+- Android 앱을 별도의 가상 화면에서 조작하는 방식은 wangzan101의 [Mika](https://github.com/wangzan101/Mika)에서 아이디어를 얻었습니다.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): 휴대폰 오퍼레이터, 트레이스, 제품 아이디어.
 
 ## 고지
