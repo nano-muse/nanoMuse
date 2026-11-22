@@ -3,6 +3,7 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeviceConversation } from '../device-conversations.ts'
 import { call, failureText, type Translate } from './api.ts'
 import type { LiveDevice } from './live.ts'
+import { Markdown } from './ui.tsx'
 import { canStartBoundDeviceChat, deviceChatAccent, deviceChatLabel } from '../device-chat.ts'
 import { DeviceChatDrafts } from '../device-chat-drafts.ts'
 
@@ -134,8 +135,8 @@ export function DeviceConversationPanel({ t, devices }: { t: Translate; devices:
       h('p', null, t(!target?.online ? 'deviceOffline' : canStartBoundDeviceChat(target) ? 'deviceOnline' : 'deviceNotReachable')),
       ...chat.turns.map((turn) => h('div', { key: turn.id },
         turn.destination ? h('small', null, label(turn.destination.id, turn.destination.name)) : null,
-        h('p', null, turn.text),
-        h('p', { style: { whiteSpace: 'pre-wrap' } }, turn.answer ?? stateText(turn.state)),
+        h('p', { style: { whiteSpace: 'pre-wrap' } }, turn.text),
+        turn.answer != null ? h(Markdown, { text: turn.answer }) : h('p', null, stateText(turn.state)),
         turn.error ? h('small', null, turn.error) : null)),
       ...(pending ? events.map((event, index) => event.stage === 'approval'
         ? h('div', { key: String(event.approval_id) }, String(event.preview ?? ''),

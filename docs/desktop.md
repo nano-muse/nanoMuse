@@ -374,6 +374,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+When you open a chat synced from your phone or another device, assistant replies display Markdown headings, lists, tables and code blocks. Completed replies in device-bound chats use the same formatting. Your own messages appear as typed. Replies already on this computer show the formatting when you reopen the chat, without syncing again.
+
 Conversation sync pauses before sign-in or sign-out changes the account credentials. Responses from the previous account cannot update the new account's conversations, main chat or sync position, or add context to its model. A local chat created by an earlier sync request remains assigned to that request's account, even if creation finishes during an account switch. Requests already sent to the relay may still finish there.
 
 If sign-in or sign-out stops partway through, sync stays paused after a restart. Sign in again successfully to resume it.

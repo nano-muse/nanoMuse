@@ -240,9 +240,12 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-col-top { height: 
 .nm-remote { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
 .nm-remote-user { align-items: flex-end; }
 .nm-remote-assistant { align-items: flex-start; }
-.nm-remote-bubble { max-width: 100%; padding: 10px 16px; border-radius: var(--dsw-radius-xl, 16px); font-size: var(--dsh-content-font-size, 14px); line-height: calc(22px + var(--dsh-content-font-delta, 0px)); white-space: pre-wrap; word-break: break-word; color: var(--dsw-alias-label-primary); }
-.nm-remote-user .nm-remote-bubble { background: var(--dsw-specific-bubble, var(--nm-hover)); }
-.nm-remote-assistant .nm-remote-bubble { padding-left: 0; padding-right: 0; }
+.nm-remote-bubble { max-width: 100%; padding: 10px 16px; border-radius: var(--dsw-radius-xl, 16px); font-size: var(--dsh-content-font-size, 14px); line-height: calc(22px + var(--dsh-content-font-delta, 0px)); word-break: break-word; color: var(--dsw-alias-label-primary); }
+.nm-remote-user .nm-remote-bubble { white-space: pre-wrap; background: var(--dsw-specific-bubble, var(--nm-hover)); }
+.nm-remote-assistant .nm-remote-bubble { padding-left: 0; padding-right: 0; overflow-x: auto; }
+.nm-remote-bubble > .nm-md { font-size: inherit; line-height: inherit; }
+.nm-remote-bubble > .nm-md > :first-child { margin-top: 0; }
+.nm-remote-bubble > .nm-md > :last-child { margin-bottom: 0; }
 .nm-remote-from { font-size: 11px; color: var(--dsw-alias-label-tertiary); padding: 0 4px; }
 /* the other device is working on its last prompt (C9): a quiet line with a slow dot */
 .nm-remote-working { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dsw-alias-label-tertiary); padding: 0 4px; }

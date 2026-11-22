@@ -1,10 +1,8 @@
 /**
  * The turns of a conversation written on the account's other devices, in the chat here
- * (contract C8, one thread). The host appends each such turn to the session's log as a
- * `user/message` whose source is `nanomuse-sync` (see `sync.ts`), so the model reads it with
- * the rest of the conversation; the harness renders a message of that source as a collapsed
- * context row. This module dresses that row: it is hidden, and in its place stands a bubble —
- * the person's on the right, the Muse's on the left — with "From Pixel 8" under it. A turn
+ * (contract C8, one thread). The host keeps the remote turns in its sync store (see
+ * `sync.ts`). Show the person's prompt on the right and the Muse's formatted reply
+ * on the left, with the source device under each. Hide a matching legacy context row. A turn
  * older than a prompt typed here before it arrived is shown before that prompt (the host
  * says which: `before`), so the thread reads in time order whatever order the log has.
  *
@@ -18,8 +16,11 @@
  * alone (a long transcript streaming a reply mutates many times a second), mutations made
  * by the bubbles themselves are ignored, and the rest are coalesced over 100 ms.
  */
+import { createElement as h } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import { call, type Translate } from './api.ts'
 import { subscribeLive } from './live.ts'
+import { Markdown } from './ui.tsx'
 
 const DONE = 'data-nm-remote'
 const KEY = 'data-nm-remote-key'
@@ -70,11 +71,18 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   return node
 }
 
-function bubble(t: Translate, row: RemoteRow): HTMLElement {
+function bubble(t: Translate, row: RemoteRow, markdownRoots: Map<HTMLElement, Root>): HTMLElement {
   const root = el('div', `nm-remote nm-remote-${row.role}`)
   root.setAttribute(KEY, nodeKey(row.id))
   root.setAttribute('data-nm-remote-mid', row.mid)
-  const body = el('div', 'nm-remote-bubble', row.text)
+  const body = el('div', 'nm-remote-bubble')
+  if (row.role === 'assistant') {
+    const markdown = createRoot(body)
+    markdownRoots.set(body, markdown)
+    markdown.render(h(Markdown, { text: row.text }))
+  } else {
+    body.textContent = row.text
+  }
   root.append(body)
   const from = el('div', 'nm-remote-from', t('chFrom', { device: row.deviceName || row.device || '?' }))
   if (row.at > 0) from.title = new Date(row.at).toLocaleString()
@@ -107,6 +115,8 @@ function placeAfter(target: HTMLElement, node: HTMLElement): void {
 /** Watch the document for the other devices' turns and show them as bubbles; returns the stop function. */
 export function renderRemoteBubbles(t: Translate): () => void {
   const cache = new Map<string, Remote>()
+  const markdownRoots = new Map<HTMLElement, Root>()
+  const dressed = new WeakSet<HTMLElement>()
   const inflight = new Set<string>()
   const refreshNeeded = new Set<string>()
   let scheduled: ReturnType<typeof setTimeout> | undefined
@@ -181,7 +191,7 @@ export function renderRemoteBubbles(t: Translate): () => void {
         row.style.display = 'none'
       }
       let shown = bubbles.get(key)
-      if (!shown) shown = bubble(t, line)
+      if (!shown) shown = bubble(t, line, markdownRoots)
       let anchor = line.before ? rows.get(line.before) : undefined
       if (!anchor && line.before && remote.prompts) {
         const idx = remote.prompts.indexOf(line.before)
@@ -257,8 +267,21 @@ export function renderRemoteBubbles(t: Translate): () => void {
         continue
       }
       // nothing from elsewhere in this chat: its rows are not read at all
-      if (remote.lines.length === 0) continue
+      if (remote.lines.length === 0) {
+        if (dressed.delete(content)) {
+          for (const node of content.querySelectorAll('.nm-remote')) node.remove()
+        }
+        continue
+      }
       dress(sessionId, content, remote)
+      dressed.add(content)
+    }
+    // The host can remove a whole conversation without removing its bubbles individually.
+    for (const [body, root] of markdownRoots) {
+      if (!body.isConnected) {
+        root.unmount()
+        markdownRoots.delete(body)
+      }
     }
   }
   const schedule = () => {
@@ -303,6 +326,8 @@ export function renderRemoteBubbles(t: Translate): () => void {
     document.removeEventListener('visibilitychange', pullOnFocus)
     if (scheduled) clearTimeout(scheduled)
     if (expiry) clearTimeout(expiry)
+    for (const root of markdownRoots.values()) root.unmount()
+    markdownRoots.clear()
     for (const node of document.querySelectorAll('.nm-remote')) node.remove()
     for (const row of document.querySelectorAll<HTMLElement>(`[${DONE}]`)) {
       row.removeAttribute(DONE)

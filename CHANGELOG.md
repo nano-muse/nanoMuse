@@ -148,6 +148,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Rendered Markdown in assistant replies synced from other devices and in completed replies in device-bound chats.
 - Clarified the latest published version on the desktop About page when testing a newer local build.
 - Fixed the desktop setup returning signed-out users to the first task when they chose to skip model configuration.
 
