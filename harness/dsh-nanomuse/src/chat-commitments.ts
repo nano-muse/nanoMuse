@@ -21,6 +21,26 @@ export interface ChatCommitments {
   focus?: string
 }
 
+/** Keep a dated task through its local deadline, for at most three weeks since
+ * the person's last change. Undated conversation evidence ages out after a week. */
+export function datedExpiry(item: ChatCommitment): number | undefined {
+  if (!validGoalDate(item.due)) return
+  const end = new Date(item.due + 'T00:00:00')
+  end.setDate(end.getDate() + 1)
+  return Math.min(end.getTime(), item.changedAt + 21 * DAY)
+}
+
+export function retainCommitment(item: ChatCommitment, now: number): boolean {
+  return item.changedAt <= now && (now < item.changedAt + 7 * DAY || now < (datedExpiry(item) ?? 0))
+}
+
+export function dueSoon(item: ChatCommitment, now: number): boolean {
+  if (!item.due || !validGoalDate(item.due) || now >= (datedExpiry(item) ?? 0)) return false
+  const last = new Date(now)
+  last.setDate(last.getDate() + 7)
+  return item.due >= localDateKey(now) && item.due <= localDateKey(last.getTime())
+}
+
 const undertaking = /\b(?:i(?:['’]ll| will| need to| have to| must| promised to| agreed to)|we(?:['’]ll| will| need to| promised to)|remind me to|help me (?:draft|prepare|write)|(?:please )?(?:draft|write|prepare) (?:an? |the |my ))\b|我(?:答应|答應|承诺|承諾|打算|得|要|会|會)|(?:明[早天晚]|后天|後天|下周.|周[一二三四五六日天])[^。！？]{0,12}(?:要|得|联系|聯絡|发|發|写|寫|参观|參觀|开会|開會)|(?:帮我|幫我|请帮|請幫)(?:起草|写|寫|整理|联系|聯絡)/iu
 const negated = /\b(?:if|whether|hypothetically|not (?:yet |already )?(?:sent|done|cancelled|canceled|finished)|do(?:es)?n['’]t|haven['’]t|isn['’]t|wasn['’]t)\b|如果|假如|是否|还没|還沒|没有取消|沒有取消|尚未|未取消|并未|並未/iu
 const closed = /^(?:please )?cancel\b|\b(?:cancelled|canceled|called (?:it |that )?off|already (?:sent|done|finished|handled|booked)|(?:i|we)(?:['’]ve| have)? (?:just |already )?(?:sent|finished|booked|handled|completed)|(?:is|was|all) (?:done|settled|off)|no (?:longer )?need to)\b|^(?:done|sent|handled|sorted|finished)[.!\s]*$|(?:已(?:经|經)?|刚|剛)(?:经|經)?(?:办完|辦完|处理|處理|发出|發出|发了|發了|发送|發送|完成|取消|搞定)|取消了?|办(?:好|完)了|辦(?:好|完)了|发完了|發完了|发过了|發過了|搞定了|不用(?:再)?(?:发|發|准备|準備|联系|聯絡|跟进|跟進)/iu
@@ -51,10 +71,9 @@ function targetDay(text: string, at: number): string | undefined {
   let days = 0
   if (weekday >= 0) {
     days = (weekday - ref.getDay() + 7) % 7
-    if (/^下/.test(token) || /\bnext week\b/iu.test(relevant)) {
+    if (/^下|^next /u.test(token) || /\bnext week\b/iu.test(relevant)) {
       days = 7 - (ref.getDay() + 6) % 7 + (weekday + 6) % 7
     }
-    else if (!days && token.startsWith('next ')) days = 7
   } else if (/tomorrow|^明/.test(token)) days = 1
   else if (/^[后後]天/.test(token)) days = 2
   else if (token === 'yesterday') days = -1
@@ -95,7 +114,7 @@ export function statusUpdate(text: string): boolean {
 /** Fold one human turn into the commitments of this chat. An unqualified "done" has a
  * target only immediately after discussion of a single known item. */
 export function noteCommitment(state: ChatCommitments, text: string, at: number, goal?: { id: string; title: string }): void {
-  state.items = state.items.filter(i => at - i.changedAt <= 7 * DAY)
+  state.items = state.items.filter(i => retainCommitment(i, at))
   const oldFocus = state.items.find(i => i.request === state.focus)
   delete state.focus
   const update = statusUpdate(text)

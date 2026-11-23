@@ -82,7 +82,7 @@ object FeedChatEvidence {
         if (refs.isEmpty()) return emptyList()
         val owned = SyncDatabase.get(app).dao().ownedCandidates(AccountData.key(app), refs.map { it.session }.distinct()).toHashSet()
         val eligible = refs.filter { it.session in owned && !SessionAccess.isProtected(it.session) }
-        val cutoff = today.minusDays(6).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val cutoff = today.minusDays(ChatCommitments.HISTORY_DAYS - 1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val label = app.getString(R.string.nm_tab_chat)
         return buildList {
             for ((session, markers) in eligible.groupBy { it.session }.entries.take(8)) {

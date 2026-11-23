@@ -10,6 +10,9 @@ import java.time.temporal.TemporalAdjusters
 /** Local, consented composer text can nominate a commitment. Replies can retire it but
  * never become model input. We deliberately skip ambiguous corrections and old relative dates. */
 internal object ChatCommitments {
+    // Look far enough back to keep an explicit next-week commitment on its due day.
+    // Only the coming seven days can produce a card, and undated work expires after two.
+    const val HISTORY_DAYS = 21L
     data class Line(val session: String, val id: String, val person: Boolean, val assistant: Boolean, val text: String, val at: Long)
     private val personal = Regex("""\bI(?:'ll|’ll| will| need to| have to| promised| agreed| owe| must| am going to)|\bwe (?:promised|agreed|need to|have to|will)\b|我(?:们|們)?(?:.{0,8})(?:答应|答應|约好|約好|要|得|打算|计划|計劃|承诺|承諾)|(?:明天|后天|後天|下周).{0,5}我""", RegexOption.IGNORE_CASE)
     private val action = Regex("""\b(?:send|write|ask|contact|call|visit|book|email|deliver|present|bring|meet|submit|confirm|follow up)\b|联系|聯繫|发给|發給|发送|發送|询问|詢問|预约|預約|参观|參觀|拜访|拜訪|汇报|彙報|开场|開場|邮件|郵件|复盘|復盤|提交|确认|確認|交稿|带上|帶上""", RegexOption.IGNORE_CASE)
@@ -25,6 +28,7 @@ internal object ChatCommitments {
     private val today = Regex("""\b(?:today|tonight)\b|今[天晚]""", RegexOption.IGNORE_CASE)
     private val weekday = Regex("""(?:\bon |\bnext |\bby )?(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b|(?:下?[周週]|星期|礼拜|禮拜)([一二三四五六日天])""", RegexOption.IGNORE_CASE)
 
+    private val nextWeek = Regex("""\bnext week\b""", RegexOption.IGNORE_CASE)
     private val uncertainTime = Regex("""\b(?:or|either|undecided|not sure when)\b|或者|还是|還是|或|没定|沒定|待定""", RegexOption.IGNORE_CASE)
     private val newTime = Regex("""\b(?:to|until|for)\s+|改(?:到|为|為)|挪到|推[迟遲]到|延[后後]到""", RegexOption.IGNORE_CASE)
 
@@ -40,7 +44,10 @@ internal object ChatCommitments {
         weekday.findAll(text).lastOrNull()?.let { match ->
             val d = match.groupValues[1].takeIf { it.isNotEmpty() }?.let { DayOfWeek.valueOf(it.uppercase(java.util.Locale.ROOT)) }
                 ?: DayOfWeek.of(("一二三四五六日天".indexOf(match.groupValues[2]) + 1).coerceAtMost(7))
-            if (match.value.startsWith("下周") || match.value.startsWith("下週")) return written.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(1).plusDays(d.value - 1L)
+            if (match.value.startsWith("下周") || match.value.startsWith("下週") ||
+                match.value.startsWith("next ", ignoreCase = true) || nextWeek.containsMatchIn(text)) {
+                return written.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(1).plusDays(d.value - 1L)
+            }
             return written.with(TemporalAdjusters.nextOrSame(d))
         }
         return when {
@@ -98,7 +105,8 @@ internal object ChatCommitments {
             val written = date(line, zone)
             val specified = latestDay(line.text.substringAfterLast('\n'), written)
             val due = specified ?: written.plusDays(2)
-            if (uncertainTime.containsMatchIn(line.text.substringAfterLast('\n')) || written > now || due < now || due > now.plusDays(7)) null else FeedPreparation.Fact(
+            if (uncertainTime.containsMatchIn(line.text.substringAfterLast('\n')) ||
+                written < now.minusDays(HISTORY_DAYS - 1) || written > now || due < now || due > now.plusDays(7)) null else FeedPreparation.Fact(
                 FeedPreparation.Kind.CHAT, "chat/${line.session}/${line.id}", label, line.text,
                 setOf(FeedPreparation.hash(line.session)), priority = if (due <= now.plusDays(1)) 12 else 8, chatDay = written.toString(), dueOn = specified?.toString().orEmpty(),
             )

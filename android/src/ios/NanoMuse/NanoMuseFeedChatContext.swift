@@ -10,6 +10,16 @@ enum NanoMuseFeedChatContext {
         let at: Date
     }
 
+    static let maxReferences = 40
+    static let textLength = 2...420
+
+    // A promise made this Tuesday for next Friday needs its original row on day ten.
+    // Its source can outlive the seven-day presentation window without reading old chat history.
+    static func retained(_ refs: [Reference], now: Date, calendar: Calendar = .current) -> [Reference] {
+        guard let cutoff = calendar.date(byAdding: .day, value: -21, to: now) else { return [] }
+        return refs.suffix(maxReferences).filter { cutoff <= $0.at && $0.at <= now }
+    }
+
     struct Turn {
         let ref: Reference
         let text: String
@@ -39,9 +49,9 @@ enum NanoMuseFeedChatContext {
     private static let action = #"\b(send|email|contact|call|ask|confirm|book|submit|bring|present|deliver|draft|write|return|visit|meet)\b|发(?:送|给|邮件|一封|询)|發(?:送|給|郵件|一封)|联系|聯絡|写|寫|预约|預約|询问|詢問|提交|参观|參觀|汇报|匯報|复盘|復盤|评审|評審|送|带|帶|回信|回复|回覆|确认|確認"#
     private static let intent = #"\bI(?:['’]ll| will| promised| agreed| owe| have to| need to| must| plan to| am going to|'m going to)\b|(?:我|我们|我們).{0,24}(?:答应|答應|承诺|承諾|约好|約好|得|要|打算|必须|必須|会|會|负责|負責)|我.{0,4}(?:明天|后天|後天|今天|周[一二三四五六日天]|週[一二三四五六日天]).{0,25}"#
     private static let uncertain = #"\b(if|maybe|might|hypothetical|example|suppose|perhaps)\b|如果|假如|也许|也許|举例|舉例|可能|别人说|別人說"#
-    private static let closed = #"\b(cancelled|canceled|called off|already (?:sent|done|finished|submitted|booked|contacted)|I (?:sent|did|finished|submitted|contacted|booked)|no longer need)\b|取消|我.{0,20}(?:发过了|發過了|已经发|已經發|发完了|發完了|发了|發了|办完|辦完|联系过|聯絡過|已联系|已聯絡|提交了)|(?:已[经經]?|都)(?:完成|处理|處理|办妥|辦妥)|不用(?:再|发|發|跟进|跟進)|办好了|辦好了"#
+    private static let closed = #"\b(cancelled|canceled|called off|already (?:sent|done|finished|submitted|booked|contacted)|I (?:sent|did|finished|submitted|contacted|booked)|no longer need)\b|取消|我.{0,20}(?:发过了|發過了|已经发|已經發|发完了|發完了|发了|發了|办完|辦完|联系过|聯絡過|已联系|已聯絡|提交了)|(?:已[经經]?|都)(?:完成|处理|處理|办妥|辦妥)|不用(?:再|发|發|跟进|跟進)|办好了|辦好了|^(?:done|sent|finished|(?:已)?(?:发了|發了|搞定了?|完成了))[。.!！]?$"#
     private static let moved = #"\b(?:reschedule[d]?|move[d]?|postpone[d]?|push(?:ed)? it back|instead)\b|改(?:到|为|為|成|期)|推到|推迟|推遲|延到|延期|挪到"#
-    private static let unqualified = #"^(?:I (?:already )?(?:sent|finished|did|submitted|booked) (?:it|that)|(?:it(?:'s| is)? |that's )?(?:already )?(?:done|finished|cancelled|canceled)|(?:move(?:d)?|push(?:ed)?|postpone(?:d)?|reschedule(?:d)?) (?:it |that )?(?:to|until) .+|(?:我|这件事|這件事|那件事)?(?:已經|已经|已|都)?(?:发了|發了|完成了?|办好了|辦好了|提交了|取消了?|不用跟进了|不用跟進了)|(?:就|那就)?(?:改到|推到|推迟到|推遲到|挪到).+)[。.!！]?$"#
+    private static let unqualified = #"^(?:I (?:already )?(?:sent|finished|did|submitted|booked) (?:it|that)|(?:it(?:'s| is)? |that's )?(?:already )?(?:done|sent|finished|cancelled|canceled)|(?:move(?:d)?|push(?:ed)?|postpone(?:d)?|reschedule(?:d)?) (?:it |that )?(?:to|until) .+|(?:我|这件事|這件事|那件事)?(?:已經|已经|已|都)?(?:发了|發了|搞定了?|完成了?|办好了|辦好了|提交了|取消了?|改期|延期|不用跟进了|不用跟進了)|(?:就|那就)?(?:改到|推到|推迟到|推遲到|挪到).+)[。.!！]?$"#
 
     private static func date(in text: String, at: Date, calendar: Calendar) -> Date? {
         let start = calendar.startOfDay(for: at)
@@ -152,13 +162,13 @@ enum NanoMuseFeedChatContext {
         """
         guard sqlite3_prepare_v2(db, sql, -1, &msg, nil) == SQLITE_OK,
               sqlite3_prepare_v2(db, nextSQL, -1, &next, nil) == SQLITE_OK else { return [] }
-        return references.prefix(40).compactMap { ref -> Turn? in
+        return references.suffix(maxReferences).compactMap { ref -> Turn? in
             sqlite3_reset(msg); sqlite3_reset(next)
             sqlite3_bind_text(msg, 1, (ref.message as NSString).utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_text(msg, 2, (ref.session as NSString).utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             guard sqlite3_step(msg) == SQLITE_ROW, let raw = sqlite3_column_text(msg, 0),
                   let parts = try? JSONDecoder().decode([ContentPart].self, from: Data(String(cString: raw).utf8)),
-                  parts.count == 1, case .text(let text) = parts[0], (4...420).contains(text.count),
+                  parts.count == 1, case .text(let text) = parts[0], textLength.contains(text.count),
                   !text.contains("{{vault:"), !text.contains("<system"), !text.contains("```") else { return nil }
             sqlite3_bind_text(next, 1, (ref.session as NSString).utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             sqlite3_bind_int64(next, 2, sqlite3_column_int64(msg, 2))
@@ -231,7 +241,7 @@ enum NanoMuseFeedChatIndex {
         guard enabled, !SessionLockStore.shared.appIsLocked,
               let data = UserDefaults.standard.data(forKey: index),
               let refs = try? JSONDecoder().decode([NanoMuseFeedChatContext.Reference].self, from: data) else { return [] }
-        return refs.suffix(40).filter { (0...7*86_400).contains(now.timeIntervalSince($0.at)) && allows($0.session) }
+        return NanoMuseFeedChatContext.retained(refs, now: now).filter { allows($0.session) }
     }
 
     static func record(_ ticket: Ticket, session: String, message: String) {
@@ -239,7 +249,7 @@ enum NanoMuseFeedChatIndex {
         let now = Date()
         var refs = references(now: now).filter { $0.message != message }
         refs.append(.init(session: session, message: message, at: now))
-        if let data = try? JSONEncoder().encode(Array(refs.suffix(40))) {
+        if let data = try? JSONEncoder().encode(Array(refs.suffix(NanoMuseFeedChatContext.maxReferences))) {
             UserDefaults.standard.set(data, forKey: index)
             NanoMuseFeedStore.shared.invalidateChatCards()
             NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil)

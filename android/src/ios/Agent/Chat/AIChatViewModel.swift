@@ -2234,7 +2234,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         let pendingAttachments = attachments
         // nanoMuse: only accept a send explicitly made from the local chat composer.
-        let feedTicket = fromFeedComposer && pendingAttachments.isEmpty && sessionSource == nil && (4...420).contains(text.count)
+        let feedTicket = fromFeedComposer && pendingAttachments.isEmpty && sessionSource == nil && NanoMuseFeedChatContext.textLength.contains(text.count)
             ? NanoMuseFeedChatIndex.ticket(session: sessionId, memory: memoryEnabled) : nil
         #if DEBUG
         logger.info("🔑DRAFT [vm=\(self.vmInstanceId)] send() text=\(text.count)ch attachments=\(pendingAttachments.count) isProcessing=\(self.isProcessing) sessionId=\(self.sessionId ?? "nil") draftId=\(self.draftId ?? "nil") inputText='\(String(self.inputText.prefix(30)))'")

@@ -63,6 +63,38 @@ final class NanoMuseFeedChatTests: XCTestCase {
         XCTAssertEqual(Context.outstanding([request, status], now: day, calendar: calendar).count, 1)
     }
 
+    func testCrossWeekPromiseRemainsThroughDueDayAndTracksLaterChanges() throws {
+        let tuesday = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 24)))
+        func date(_ offset: Int) -> Date { calendar.date(byAdding: .day, value: offset, to: tuesday)! }
+        func message(_ text: String, on offset: Int) -> Context.Turn {
+            .init(ref: .init(session: "local", message: "m-\(offset)", at: date(offset)), text: text, reply: "OK")
+        }
+        func active(_ turns: [Context.Turn], on offset: Int) -> [Context.Open] {
+            let now = date(offset)
+            let refs = Context.retained(turns.map(\.ref), now: now, calendar: calendar)
+            return Context.outstanding(turns.filter { refs.contains($0.ref) }, now: now, calendar: calendar)
+        }
+        let promise = message("我答应下周五提交 Atlas 清单。", on: 0)
+        XCTAssertTrue(active([promise], on: 2).isEmpty)
+        for offset in 3...10 {
+            XCTAssertEqual(active([promise], on: offset).first?.due, date(10))
+        }
+        XCTAssertTrue(active([promise], on: 11).isEmpty)
+        let move = message("Atlas 清单改到下周一。", on: 9)
+        XCTAssertEqual(active([promise, move], on: 13).first?.due, date(13))
+        XCTAssertTrue(active([promise, move], on: 14).isEmpty)
+        let done = message("Atlas 清单已经完成。", on: 11)
+        XCTAssertTrue(active([promise, move, done], on: 12).isEmpty)
+        let cancel = message("Atlas 清单取消了。", on: 9)
+        XCTAssertTrue(active([promise, cancel], on: 10).isEmpty)
+        for status in ["取消", "已完成", "发了", "改期"] {
+            XCTAssertTrue(active([promise, message(status, on: 9)], on: 10).isEmpty, status)
+        }
+        XCTAssertTrue(Context.retained([promise.ref], now: date(22), calendar: calendar).isEmpty)
+        let refs = (0..<41).map { Context.Reference(session: "chat", message: "m-\($0)", at: tuesday) }
+        XCTAssertEqual(Context.retained(refs, now: tuesday, calendar: calendar), Array(refs.dropFirst()))
+    }
+
     func testReadsOriginalRowsAndChecksCurrentMemoryAndOrigin() throws {
         var db: OpaquePointer?
         XCTAssertEqual(sqlite3_open(":memory:", &db), SQLITE_OK)
@@ -84,7 +116,10 @@ final class NanoMuseFeedChatTests: XCTestCase {
         XCTAssertTrue(Context.read([ref], db: db).isEmpty)
         execute("UPDATE sessions SET remote_origin_device_id=NULL, source='shortcut'")
         XCTAssertTrue(Context.read([ref], db: db).isEmpty)
-        execute("UPDATE sessions SET source=NULL; DELETE FROM messages WHERE id='turn-1'")
+        execute("UPDATE sessions SET source=NULL; DELETE FROM messages WHERE role='assistant'")
+        execute(#"UPDATE messages SET parts_json='[{"type":"text","value":"取消"}]' WHERE id='turn-1'"#)
+        XCTAssertEqual(Context.read([ref], db: db).first?.text, "取消")
+        execute("DELETE FROM messages WHERE id='turn-1'")
         XCTAssertTrue(Context.read([ref], db: db).isEmpty)
     }
 }

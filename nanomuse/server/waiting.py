@@ -13,7 +13,7 @@ from nanomuse.memory.store import tokenize
 _WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 _DATE = re.compile(
     r"\b(?:the day after tomorrow|tomorrow|today|tonight|"
-    rf"(?:(?:next|this) )?(?:{'|'.join(_WEEKDAYS)}))\b|(?<!\d)\d{{4}}-\d{{2}}-\d{{2}}(?!\d)"
+    rf"(?:(?:next week(?: on)?|next|this) )?(?:{'|'.join(_WEEKDAYS)})(?: next week)?)\b|(?<!\d)\d{{4}}-\d{{2}}-\d{{2}}(?!\d)"
     r"|大后天|后天|明[天早晚]|今[天晚]|(?:下|本|这)?(?:周|星期)(?:[一二三四五六日天])",
     re.I,
 )
@@ -134,12 +134,18 @@ def _due(text: str, observed: date) -> date | None:
     matches = list(_DATE.finditer(text))
     if len(matches) != 1:
         return None  # "Friday or Monday" does not give us an agreed date
-    word = matches[0][0].lower()
+    match = matches[0]
+    if re.search(r"\b(?:last|previous)\s*$|上(?:个|個)?$", text[: match.start()], re.I):
+        return None
+    word = match[0].lower()
     if word[0].isdigit():
         try:
             return date.fromisoformat(word)
         except ValueError:
             return None
+    if "next week" in word:
+        weekday = next(day for day in _WEEKDAYS if day in word)
+        word = "next " + weekday
     if word.endswith(_WEEKDAYS):
         index = _WEEKDAYS.index(word.split()[-1])
     elif "周" in word or "星期" in word:
@@ -249,7 +255,7 @@ def waiting_for(timeline: list[dict[str, Any]], now: datetime) -> tuple[list[Wai
         except (KeyError, TypeError, ValueError):
             continue
         when = (stamp if stamp.tzinfo else stamp.replace(tzinfo=UTC)).astimezone(now.tzinfo)
-        if not timedelta(0) <= now - when <= timedelta(days=21) or _UNCERTAIN.search(text):
+        if not timedelta(0) <= now - when <= timedelta(days=28) or _UNCERTAIN.search(text):
             continue
         if _WAIT.match(text):
             # A later sentence about a different day is not a deadline. Keep the

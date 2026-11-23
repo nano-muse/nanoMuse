@@ -18,7 +18,8 @@ function result(records) {
     sources: [{ id: g.id, quote: 'museum booking request' }, { id: m.id, quote: 'step-free entrance' }] }
 }
 async function fixture(t) {
-  t.mock.method(Date, 'now', () => now)
+  let clock = now
+  t.mock.method(Date, 'now', () => clock)
   const root = await mkdtemp(join(tmpdir(), 'nm-prep-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = root
@@ -50,7 +51,7 @@ async function fixture(t) {
   const rooms = host()
   Object.assign(rooms.store, { lang: 'en', goals: [structuredClone(goal)], memory: [structuredClone(memory)] })
   rooms.store.feed.routine.time = '00:00'
-  return { rooms, cloud, restart: async () => { const r = host(); r.store = await r.read(); return r } }
+  return { rooms, cloud, setClock: at => { clock = at }, restart: async () => { const r = host(); r.store = await r.read(); return r } }
 }
 
 test('scheduled preparation produces usable text with host-resolved sources and never reruns the published evidence pair', async t => {
@@ -424,12 +425,71 @@ test('alternative dates await a decision; next week is absolute and an unfocused
   assert.equal(records().length, 1)
   assert.match(records()[0].text, /美术馆/)
   turn(rooms, '就定在下周五')
-  assert.equal(records().length, 2)
-  assert.match(records().find(s => s.text.includes('博物馆')).timing, /2026-12-04/)
+  assert.equal(records().length, 1)
+  const due = () => rooms.store.activity[0].commitments.items.find(s => s.request.includes('博物馆')).due
+  assert.equal(due(), '2026-12-04')
   turn(rooms, 'Move it to next week on Friday instead.')
-  assert.match(records().find(s => s.text.includes('博物馆')).timing, /2026-12-04/)
+  assert.equal(due(), '2026-12-04')
+  assert.equal(records().length, 1)
   turn(rooms, 'Move it to Friday or Saturday.')
   assert.equal(records().length, 1)
   turn(rooms, 'Move it from Saturday to Sunday.')
   assert.match(records().find(s => s.text.includes('博物馆')).timing, /2026-11-29/)
+})
+
+test('a promise from last Tuesday becomes eligible near next Friday, survives restart and midnight, and ends after the deadline', async t => {
+  const { rooms, cloud, setClock, restart } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  draftMuseum(cloud)
+  const day = n => new Date(2026, 10, n, 12).getTime()
+  setClock(day(24))
+  turn(rooms, 'I promised to send the museum a booking inquiry next week on Friday.')
+  assert.equal(await rooms.prepareFeed(), 'quiet')
+  assert.equal(cloud.inputs.length, 0)
+  await rooms.save()
+  const restored = await restart()
+  restored.activityChanged = () => {}
+  setClock(day(32)) // Dec 2: eight days since the person made the promise.
+  turn(restored, 'Where is the nearest bakery?')
+  assert.equal(await restored.prepareFeed(), 'prepared')
+  assert.match(cloud.inputs[0].records.find(r => r.kind === 'conversation').timing, /2026-12-04/)
+  const card = restored.view().feed.posts[0]
+  setClock(day(34))
+  assert.equal(restored.view().feed.posts[0].id, card.id)
+  assert.equal(await restored.prepareFeed(), 'quiet')
+  assert.equal(cloud.inputs.length, 1)
+  setClock(day(35))
+  assert.deepEqual(restored.view().feed.posts, [])
+  await assert.rejects(restored.discuss(card.id))
+})
+
+test('distant and undated promises expire at their own limits without a new chat turn', async t => {
+  const { rooms, setClock } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  const day = n => new Date(2026, 10, n, 12).getTime()
+  setClock(day(23))
+  turn(rooms, 'I promised to send the museum a booking inquiry on 2026-12-19.')
+  turn(rooms, 'I promised to draft a report for the garden committee.')
+  const read = at => rooms.prepSources(at).filter(s => s.kind === 'conversation')
+  assert.deepEqual(read(day(29)).map(s => s.text), ['I promised to draft a report for the garden committee.'])
+  assert.equal(read(day(31)).length, 0)
+  assert.match(read(day(43))[0].text, /museum/)
+  assert.equal(read(day(44)).length, 0) // 21 days, while the deadline is still in the future.
+  setClock(day(44))
+  turn(rooms, 'What do people eat there?')
+  assert.deepEqual(rooms.store.activity[0].commitments.items, [])
+})
+
+test('next Friday always means the next calendar week in every supported English word order', async t => {
+  const { rooms, setClock } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  setClock(new Date(2026, 10, 24, 12).getTime()) // Tuesday
+  for (const date of ['Friday', 'next Friday', 'next week on Friday', 'Friday next week', '下周五']) {
+    turn(rooms, 'I promised to send the museum a booking inquiry '+date+'.', '', 'date-'+date)
+    const item = rooms.store.activity.find(a => a.sessionId === 'date-'+date).commitments.items[0]
+    assert.equal(item.due, date === 'Friday' ? '2026-11-27' : '2026-12-04', date)
+  }
 })

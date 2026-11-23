@@ -26,6 +26,9 @@ def line(text: str, ident: str = "a", days: int = 0, **fields: Any) -> dict[str,
         ("我在等星桥的发票，周五给。", 2, "星桥的发票"),
         ("I am waiting for the approval by 2026-11-30.", 5, "the approval"),
         ("我在等星桥的回复，后天给。", 2, "星桥的回复"),
+        ("I'm waiting for the Atlas quote by next Friday.", 9, "the Atlas quote"),
+        ("I'm waiting for the Atlas quote by Friday next week.", 9, "the Atlas quote"),
+        ("I'm waiting for the Atlas quote by next week on Friday.", 9, "the Atlas quote"),
     ],
 )
 def test_waits_resolve_the_date_from_the_persons_original_turn(text: str, day: int, subject: str):
@@ -38,6 +41,8 @@ def test_waits_resolve_the_date_from_the_persons_original_turn(text: str, day: i
     "event",
     [
         line("I'm waiting for the train tomorrow."),
+        line("I'm waiting for the report from last Friday."),
+        line("我在等供应商上周五发的报价。"),
         line("I'm waiting for feedback tomorrow or Friday."),
         line("I'm waiting for the quote. Tomorrow is a holiday."),
         line("I'm waiting for feedback from Nia. Tomorrow is a holiday."),
@@ -158,3 +163,11 @@ def test_a_quote_from_a_different_person_remains_outstanding():
         [first, second, line("I received the quote from Alex.", "c")], NOW
     )
     assert remaining.quote == first["text"]
+
+
+def test_a_wait_agreed_three_weeks_ahead_still_appears_in_its_grace_period():
+    due = NOW.date() - timedelta(days=3)
+    opening = line(f"I'm waiting for the Atlas quote by {due.isoformat()}.", days=-24)
+    (item,), _ = waiting_for([opening], NOW)
+    assert item.due == due and item.ready(NOW)
+    assert not item.ready(NOW + timedelta(days=1))

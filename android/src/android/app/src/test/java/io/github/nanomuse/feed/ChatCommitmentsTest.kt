@@ -114,12 +114,31 @@ class ChatCommitmentsTest {
 
     @Test fun explicitNextWeekAndAmbiguousOrUnfinishedUpdates() {
         val tuesday = LocalDate.of(2026, 11, 24)
-        assertEquals(tuesday.plusDays(10), ChatCommitments.latestDay("下周五提交论文", tuesday))
+        for (text in listOf("下周五提交论文", "next Friday", "Friday next week", "next week on Friday")) {
+            assertEquals(text, tuesday.plusDays(10), ChatCommitments.latestDay(text, tuesday))
+        }
+        assertEquals(tuesday.plusDays(3), ChatCommitments.latestDay("Friday", tuesday))
         assertNull(ChatCommitments.latestDay("周三或周五提交论文", tuesday))
         assertTrue(facts(line("我答应周三或周五联系博物馆。")).isEmpty())
         assertTrue(facts(english, line("I have not yet sent the museum request.", "pending")).isNotEmpty())
         assertTrue(facts(chinese, line("博物馆的说明我还没提交，也还没发。", "pending")).isNotEmpty())
         assertTrue(facts(line("我不想联系博物馆。")).isEmpty())
+    }
+
+    @Test fun aNextWeekCommitmentSurvivesOnItsDueDayWhileUndatedAndExpiredWorkStaysQuiet() {
+        val tuesday = LocalDate.of(2026, 11, 24)
+        val day = tuesday.plusDays(10)
+        val museum = line("我答应下周五联系博物馆预约参观。", days = 1)
+        fun read(row: ChatCommitments.Line, asOf: LocalDate) = ChatCommitments.facts(listOf(row), asOf, "Chat", ZoneOffset.UTC)
+        assertTrue(read(museum, tuesday).isEmpty())
+        assertEquals(day.toString(), read(museum, day.minusDays(7)).single().dueOn)
+        assertEquals(day.toString(), read(museum, day).single().dueOn)
+        assertTrue(read(museum, day.plusDays(1)).isEmpty())
+        val undated = museum.copy(text = "我答应联系博物馆预约参观。")
+        assertEquals(1, read(undated, tuesday.plusDays(2)).size)
+        assertTrue(read(undated, tuesday.plusDays(3)).isEmpty())
+        val outsideHistory = museum.copy(text = "我答应在2026-12-15联系博物馆。")
+        assertTrue(read(outsideHistory, tuesday.plusDays(ChatCommitments.HISTORY_DAYS)).isEmpty())
     }
 
     @Test fun skipAttachmentsPastedDocumentsAndToolResults() {
