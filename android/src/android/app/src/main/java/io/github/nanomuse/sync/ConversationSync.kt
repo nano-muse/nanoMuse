@@ -164,7 +164,16 @@ object ConversationSync {
      */
     suspend fun <T> exclusive(block: suspend () -> T): T {
         pushJob?.cancel()
-        return lock.withLock { block() }
+        return withStableChats(block)
+    }
+
+    /** Keep the current account and its chats stable without cancelling a queued push. */
+    internal suspend fun <T> withStableChats(block: suspend () -> T): T = lock.withLock { block() }
+
+    /** An assistant message was added by the local reminder while a chat could be open. */
+    internal fun localAssistantAppended(session: String) {
+        _pulled.tryEmit(setOf(session))
+        changed()
     }
 
     /** Every chat has an owner and the hidden set is current (C12); after a sign-in, a sign-out, a restore. */

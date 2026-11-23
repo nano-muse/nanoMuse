@@ -1297,4 +1297,6 @@
     <string name="nm_deadline_notice">Ouvrez le fil pour voir la prochaine étape.</string>
     <string name="nm_feed_use_recent_chats">Utiliser les discussions récentes pour le fil</string>
     <string name="nm_feed_recent_chats_hint">Seuls les messages saisis ici après activation sont utilisés. Les discussions protégées sont exclues.</string>
+    <string name="nm_chat_checkin_setting">Me contacter le jour prévu pour un engagement pris dans le chat</string>
+    <string name="nm_chat_checkin_body">Tu avais prévu ceci pour aujourd’hui :\n« %1$s »\n\nOù en es-tu ? Veux-tu de l’aide pour préparer quelque chose ?</string>
 </resources>

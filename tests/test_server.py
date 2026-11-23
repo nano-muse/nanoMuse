@@ -3738,3 +3738,89 @@ def test_last_day_wait_can_be_snoozed_until_tomorrow(server):
     assert service.waiting_followup(now) is None
     assert service.waiting_followup(now + timedelta(days=1)) == card
     assert service.waiting_followup(now + timedelta(days=2)) is None
+
+
+def test_due_reply_starts_a_real_chat_and_a_short_answer_settles_only_that_wait(
+    server, monkeypatch
+):
+    client, service, llm = server
+    main = service.threads["main"]
+    now = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=14, minute=0)
+    earlier = (now - timedelta(hours=1)).isoformat()
+    for item in ("星桥", "海湾"):
+        main.timeline.add(
+            {"type": "user", "text": f"我在等供应商今天发来{item}报价。", "ts": earlier}
+        )
+    service.settings.agent.language = "zh"
+    monkeypatch.setattr(type(service.push), "enabled", property(lambda _: True))
+    service.push.subscriptions = [{"endpoint": "test-device"}]
+    pushes = []
+    monkeypatch.setattr(
+        service.push, "notify", lambda *args, **kwargs: pushes.append((args, kwargs))
+    )
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 2
+    assert client.put(
+        "/api/feed/instructions", json={"chat_followups": True, "followup_push": True}
+    ).json()["chat_followups"]
+    main.busy = True
+    service._send_chat_followup(now)
+    main.busy = False
+    service.profile.quiet_hours = "13:00-16:00"
+    service._send_chat_followup(now)
+    service.profile.quiet_hours = ""
+    service._send_chat_followup(now.replace(hour=22))
+    service._send_chat_followup(now - timedelta(minutes=55))
+    assert len(main.timeline.events) == 2
+    service._send_chat_followup(now)
+    msg = main.timeline.events[-1]
+    assert msg["type"] == "assistant" and msg["final"] and msg["source"] == "chat_followup"
+    assert "星桥报价" in msg["text"] and "收到了吗" in msg["text"] and not llm.calls
+    assert len(pushes) == 1 and "星桥" not in str(pushes) and pushes[0][1]["url"] == "/?thread=main"
+    service._send_chat_followup(now + timedelta(days=1))  # still unanswered
+    assert main.timeline.events[-1] == msg
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 3
+    # Restore the model context from the durable timeline if the process stopped between writes.
+    main.agent.messages.clear()
+    llm.script.append(LLMResponse(content="记下了。"))
+    client.post("/api/threads/main/send", json={"text": "收到了"}).raise_for_status()
+    wait_idle(service, "main")
+    assert any(
+        m.role.value == "assistant" and m.content == msg["text"] for m in llm.calls[-1]["messages"]
+    )
+    # The real reply can arrive before or after the clock used to exercise the scheduler.
+    main.timeline.update(
+        next(e["id"] for e in reversed(main.timeline.events) if e["type"] == "user"),
+        ts=now.isoformat(),
+    )
+    later = now + timedelta(hours=1)
+    assert service.waiting_followup(later)["subject"] == "海湾报价"
+    service._send_chat_followup(later)
+    assert sum(e.get("source") == "chat_followup" for e in main.timeline.events) == 1
+    persisted = Timeline("main", main.timeline.path)
+    assert persisted.get(msg["id"])["text"] == msg["text"]
+
+
+def test_chat_followup_skips_another_account_and_dismissed_or_settled_wait(server):
+    client, service, _ = server
+    main = service.threads["main"]
+    now = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=15)
+    svc_time = (now - timedelta(hours=1)).isoformat()
+    main.timeline.add(
+        {"type": "user", "text": "I'm waiting for the Atlas quote by today.", "ts": svc_time}
+    )
+    service.set_feed_instructions(chat_followups=True)
+    service.sync.state["owners"]["main"] = "other"
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 1
+    service.sync.state["owners"].pop("main")
+    key = service.waiting_followup(now)["id"]
+    prefs = service.feed_posts()
+    prefs["followups_hidden"] = {key: (now + timedelta(days=4)).date().isoformat()}
+    service._save_feed(prefs)
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 1
+    main.timeline.add({"type": "user", "text": "I received the Atlas quote.", "ts": svc_time})
+    assert service.waiting_followup(now) is None
+    assert "chat_outreach" not in client.get("/api/feed/posts").json()

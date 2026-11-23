@@ -57,15 +57,24 @@ internal object ChatCommitments {
         }
     }
 
-    fun relevant(text: String): Boolean = closed.containsMatchIn(text) || shifted.containsMatchIn(text) ||
+    private val shortDone = Regex("""(?:办完了|辦完了|取消了?|已发了|已發了|发了|發了|做完了|已完成|完成了|搞定了|提交了|不用了|done|already sent|I sent it)[。.!！]?""", RegexOption.IGNORE_CASE)
+    private val shortMove = Regex("""(?:改到|挪到|推迟到|推遲到|move it to |moved to |rescheduled to )[\p{L}\d\-:： ]{1,24}[。.！!]?""", RegexOption.IGNORE_CASE)
+
+    fun relevant(text: String): Boolean = shortDone.matches(text) || shortMove.matches(text) || closed.containsMatchIn(text) || shifted.containsMatchIn(text) ||
         asksForDraft.containsMatchIn(text) || personal.containsMatchIn(text) && action.containsMatchIn(text)
 
     fun facts(lines: List<Line>, now: LocalDate, label: String, zone: ZoneId = ZoneId.systemDefault()): List<FeedPreparation.Fact> {
         val open = mutableListOf<Line>()
         var previous: Line? = null
+        var asked: Line? = null
         for (line in lines) {
             val text = line.text
             if (line.assistant) {
+                asked = if (ChatCheckIns.isMessage(line.id)) open.firstOrNull {
+                    it.session == line.session && line.id.substringAfterLast('-') == FeedPreparation.hash("chat/${it.session}/${it.id}", it.text)
+                } else null
+                // Our own reminder quotes the task. It has not delivered the requested work.
+                if (asked != null) continue
                 val prior = previous
                 if (prior != null && prior.session == line.session && (text.isBlank() ||
                         text.length >= 32 && artifact.containsMatchIn(text) && FeedPreparation.sameSubject(prior.text, text))) open.remove(prior)
@@ -73,15 +82,20 @@ internal object ChatCommitments {
             }
             val preceding = previous
             previous = null
+            val replyTo = asked
+            asked = null
             if (!line.person || text.isBlank() || hypothetical.containsMatchIn(text)) continue
-            val closing = closed.containsMatchIn(text) && !negated.containsMatchIn(text)
-            val moving = shifted.containsMatchIn(text)
+            val closing = (shortDone.matches(text) || closed.containsMatchIn(text)) && !negated.containsMatchIn(text)
+            val moving = shifted.containsMatchIn(text) || shortMove.matches(text)
             val inChat = open.filter { it.session == line.session }
             if (closing || moving) {
                 val matching = inChat.filter { FeedPreparation.sameSubject(it.text, text) }
-                val affected = if (matching.isEmpty() && inChat.size == 1 && text.length <= 26 &&
-                    (text.matches(Regex("""(?:办完了|辦完了|取消了|已发了|已發了|完成了|搞定了|提交了|不用了|done|already sent)[。.!！]?""", RegexOption.IGNORE_CASE)) ||
-                        moving && text.matches(Regex("""(?:改到|挪到|推迟到|推遲到|moved to |rescheduled to )[\p{L}\d\-:： ]{1,16}[。.！!]?""", RegexOption.IGNORE_CASE)))) inChat else matching
+                val affected = when {
+                    (shortDone.matches(text) || shortMove.matches(text)) && replyTo in inChat -> listOfNotNull(replyTo)
+                    matching.isNotEmpty() -> matching
+                    inChat.size == 1 && (shortDone.matches(text) || shortMove.matches(text)) -> inChat
+                    else -> emptyList()
+                }
                 open.removeAll(affected.toSet())
                 if (moving && affected.size == 1 && latestDay(text, date(line, zone)) != null) {
                     val prior = affected.single()
@@ -108,7 +122,7 @@ internal object ChatCommitments {
             if (uncertainTime.containsMatchIn(line.text.substringAfterLast('\n')) ||
                 written < now.minusDays(HISTORY_DAYS - 1) || written > now || due < now || due > now.plusDays(7)) null else FeedPreparation.Fact(
                 FeedPreparation.Kind.CHAT, "chat/${line.session}/${line.id}", label, line.text,
-                setOf(FeedPreparation.hash(line.session)), priority = if (due <= now.plusDays(1)) 12 else 8, chatDay = written.toString(), dueOn = specified?.toString().orEmpty(),
+                setOf(FeedPreparation.hash(line.session)), chatSession = line.session, writtenAt = line.at, priority = if (due <= now.plusDays(1)) 12 else 8, chatDay = written.toString(), dueOn = specified?.toString().orEmpty(),
             )
         }
     }

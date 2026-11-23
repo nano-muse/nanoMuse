@@ -841,6 +841,7 @@ struct NanoMuseFeedSettingsSheet: View {
     @ObservedObject private var store = NanoMuseFeedStore.shared
     @ObservedObject private var scheduler = NanoMuseScheduler.shared
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(NanoMuseChatOutreach.preference) private var chatOutreach = false
     @AppStorage(NanoMuseFeedChatIndex.setting) private var useChat = false
     @State private var text = ""
     @State private var time = Date()
@@ -877,6 +878,13 @@ struct NanoMuseFeedSettingsSheet: View {
                     if showDeadlines {
                         Text(AppLocalized("At 09:00 on the due date for goals without scheduled check-ins."))
                     }
+                }
+                Section {
+                    Toggle(AppLocalized("Message me in my main chat"), isOn: Binding(
+                        get: { chatOutreach }, set: { NanoMuseChatOutreach.shared.setEnabled($0) }
+                    )).tint(NanoMuseTones.action)
+                } footer: {
+                    Text(AppLocalized("Between 09:00 and 20:00, nanoMuse can check in once a day about a goal due today or a commitment from your main chat if chat preparation is on."))
                 }
                 Section {
                     Toggle(AppLocalized("Prepare from my chats"), isOn: Binding(get: { useChat }, set: { NanoMuseFeedChatIndex.setEnabled($0) }))

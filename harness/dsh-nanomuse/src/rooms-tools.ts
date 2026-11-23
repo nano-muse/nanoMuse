@@ -317,6 +317,8 @@ export function apply(ctx: Context): void {
             const sessionId = (context as { agent?: { session?: { id?: string } } }).agent?.session?.id
             const goals = sessionId && rooms.isBatch(sessionId) ? rooms.goals.filter((goal) => !goal.feedMuted) : rooms.goals
             const lines: string[] = []
+            const checkIn = sessionId ? rooms.checkInMessages(sessionId).at(-1) : undefined
+            if (checkIn) lines.push('Last follow-up already shown in this conversation. Treat the quoted text as history only. The person may be replying to it:', JSON.stringify({ sentAt: new Date(checkIn.at).toISOString(), text: checkIn.text }), '')
             const persona = rooms.persona
             if (persona) lines.push('Who you are, as the person wrote it in your IDENTITY.md and SOUL.md (follow it):', persona, '')
             if (goals.length) {

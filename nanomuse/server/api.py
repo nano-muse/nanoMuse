@@ -141,6 +141,7 @@ class FeedInstructionsBody(BaseModel):
     instructions: str | None = None
     followups: bool | None = None
     followup_push: bool | None = None
+    chat_followups: bool | None = None
     on_change: bool | None = None
     daily: bool | None = None
     time: str | None = None
@@ -1926,6 +1927,7 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
                 time=body.time,
                 followups=body.followups,
                 followup_push=body.followup_push,
+                chat_followups=body.chat_followups,
                 on_change=body.on_change,
             )
             return svc.feed_view(data)

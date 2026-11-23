@@ -213,6 +213,7 @@ enum NanoMuseFeedChatIndex {
     static func invalidate() {
         epoch = UUID()
         NanoMuseFeedStore.shared.invalidateChatCards()
+        NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil)
     }
 
     static func setEnabled(_ value: Bool) {

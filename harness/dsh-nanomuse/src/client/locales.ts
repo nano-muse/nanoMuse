@@ -127,6 +127,7 @@ export const en = {
   syncSideWhy: "Off: side chats stay on this device. On: this device's side chats go to the account and the other devices' side chats come here.",
   // under a turn written on another device of the account (C8)
   chFrom: 'From {device}',
+  chatCheckIn: 'Follow-up from nanoMuse',
   // under the other device's last prompt while it works (C9)
   chWorking: '{device} is working…',
   chWorkingStep: '{device} is working: {detail}',
@@ -1515,6 +1516,7 @@ export const en = {
   feedEmptyBody: 'After {time}, your agent looks for something it can prepare from your recent work. When there is nothing useful to add, the feed stays quiet.',
   feedEmptyHowTitle: 'Steer it with one sentence',
   feedEmptyHowBody: 'Open feed settings to choose a time, change topics or schedule research posts.',
+  feedChatCheckIns: 'Message me in the original chat when a commitment is due, at most once a day between 09:00 and 20:00.',
   feedRoutineSwitch: 'Check for useful preparation daily',
   feedRoutineTime: 'Daily at {time}',
   feedRoutineNeedsModel: 'Goal reminders work locally. Add a model for personalized posts from your agent.',
@@ -1784,6 +1786,7 @@ export const zh: typeof en = {
   syncSide: '同时同步旁聊',
   syncSideWhy: '关：旁聊只留在本机。开：本机的旁聊上传到账号，其他设备的旁聊也会同步过来。',
   chFrom: '来自 {device}',
+  chatCheckIn: 'nanoMuse 主动跟进',
   chWorking: '{device} 正在处理…',
   chWorkingStep: '{device} 正在处理：{detail}',
   chWorkingWait: '{device} 在等你确认',
@@ -3162,6 +3165,7 @@ export const zh: typeof en = {
   feedEmptyBody: '每天 {time} 后，助理会看看近期的事情有没有可以提前准备的。没有值得补充的内容时，动态会保持安静。',
   feedEmptyHowTitle: '一句话就能调整',
   feedEmptyHowBody: '点右上角的设置可以调整时间和关注的话题，也可以单独开启定时搜集资料。',
+  feedChatCheckIns: '约好的事到期时，在原对话里问我进展。每天 9 点到 20 点之间最多发一次。',
   feedRoutineSwitch: '每天检查有没有值得准备的事',
   feedRoutineTime: '每天 {time}',
   feedRoutineNeedsModel: '目标提醒可以在本机生成。添加模型后，智能体还可以为你撰写个性化动态。',

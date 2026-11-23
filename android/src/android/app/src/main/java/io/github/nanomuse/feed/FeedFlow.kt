@@ -82,6 +82,7 @@ object FeedFlow {
     fun init(context: Context) {
         FeedStore.init(context)
         io.github.nanomuse.goals.GoalFollowUps.start(context)
+        ChatCheckIns.schedule(context)
         _introAcknowledged.value = prefs(context).getBoolean(KEY_INTRO_ACK, false)
         publishSession(prefs(context).getString(KEY_SESSION, null))
         scope.launch { runCatching { ensureRoutine(context) }.onFailure { AppLogger.warning(TAG, "ensure failed: ${it.message}") } }
@@ -91,6 +92,7 @@ object FeedFlow {
         FeedChatEvidence.accountChange(leaving = true)
         FeedPreparationRunner.accountChange(leaving = true)
         io.github.nanomuse.goals.GoalFollowUps.leave(context)
+        ChatCheckIns.cancel(context)
         lastWritten = emptyList()
         lastDroppedByLimit = 0
         context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
@@ -101,6 +103,7 @@ object FeedFlow {
         FeedChatEvidence.accountChange(leaving = false)
         FeedPreparationRunner.accountChange(leaving = false)
         io.github.nanomuse.goals.GoalFollowUps.start(context)
+        ChatCheckIns.schedule(context)
         lastWritten = emptyList()
         lastDroppedByLimit = 0
         _introAcknowledged.value = prefs(context).getBoolean(KEY_INTRO_ACK, false)

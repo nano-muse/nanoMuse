@@ -9,6 +9,8 @@ const zhCN: Record<string, string> = {
   "Goal and calendar follow-ups": "目标和日历跟进",
   "Help me plan around the overlap between {first} and {second}.": "帮我看看「{first}」和「{second}」时间重叠了，该怎么安排。",
   "This follow-up has changed.": "这件事有了新进展。",
+  "Ask me in the main chat when a reply is due": "到了约定时间，在主要聊天里问我",
+  "If you mentioned waiting for something, nanoMuse can check in once a day during daytime. You can reply in the chat.": "如果你说过在等谁的回复，nanoMuse 会在白天来问进展。每天最多一次，你可以直接在聊天里回答。",
   "You were waiting for a reply": "你在等的回复",
   "Expected from {sender} by {date}": "原定 {sender} 在 {date} 前回复",
   "Expected by {date}": "原定回复日期为 {date}",

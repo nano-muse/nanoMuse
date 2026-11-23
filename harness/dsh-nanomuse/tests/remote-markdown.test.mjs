@@ -23,15 +23,33 @@ function mount({ h, createRoot, renderRemoteBubbles, DeviceConversationPanel, op
     id: String(i), mid: 'm' + i, role, text: i ? answer : prompt, device: 'phone',
     deviceName: '测试手机', at: 1 + i, before: null,
   }))
+  lines.push({ mid: 'check', id: 'check', role: 'assistant', device: '', deviceName: '', at: 3,
+    before: null, localCheckIn: true, text: 'Would you like help with <b>the museum</b>?' })
   const chat = { id: 'bound', device: 'phone', name: '测试手机', draft: '', turns: [
     { id: 'a', text: prompt, state: 'completed', answer },
   ] }
   window.fetch = async (url) => Response.json(String(url).includes('sync/remote') ? { lines, hidden: [] } : [chat])
-  window.EventSource = undefined
+  let roomsStream
+  window.EventSource = class {
+    constructor(url) { if (String(url).includes('/rooms/events')) roomsStream = this }
+    close() {}
+  }
+  let notification
+  window.Notification = class {
+    static permission = 'granted'
+    constructor(title, options) { notification = { title, body: options.body } }
+    close() {}
+  }
+  document.hasFocus = () => false
   // Headless Chromium does not paint between ticks of its virtual clock.
   window.requestAnimationFrame = (fn) => setTimeout(fn, 0)
   const t = (key, values) => key === 'chFrom' ? '来自 ' + values.device : key
   const stop = renderRemoteBubbles(t)
+  function emit(checkIns) {
+    roomsStream.onmessage({ data: JSON.stringify({ feed: { routine: { on: true, checkInScope: 'local-fixture' } }, checkIns }) })
+  }
+  emit([])
+  emit([{ id: 'check', sessionId: 'main', at: Date.now(), unread: true }])
   openDeviceConversation(chat.id)
   createRoot(document.getElementById('devices')).render(h(DeviceConversationPanel, { t, devices: [] }))
 
@@ -48,6 +66,9 @@ function mount({ h, createRoot, renderRemoteBubbles, DeviceConversationPanel, op
       synced: elements(assistant?.querySelector('.nm-remote-bubble')),
       bound: elements(bound?.querySelector(':scope > div')),
       source: assistant?.querySelector('.nm-remote-from')?.textContent,
+      notification,
+      local: document.querySelector('[data-nm-checkin] .nm-remote-bubble')?.textContent,
+      localLabel: document.querySelector('[data-nm-checkin] .nm-remote-from')?.textContent,
       literalPrompt: user?.textContent === prompt && !user.querySelector('strong'),
     }
     stop()
@@ -87,7 +108,10 @@ test('phone replies render Markdown in synced and device-bound chats, while a ty
   ], { encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'] })
   const captured = /data-test-result="([^"]+)"/.exec(output)
   assert.ok(captured, 'the browser fixture did not finish')
-  const { synced, bound, source, literalPrompt, cleanedUp } = JSON.parse(decodeURIComponent(captured[1]))
+  const { synced, bound, source, literalPrompt, cleanedUp, local, localLabel, notification } = JSON.parse(decodeURIComponent(captured[1]))
+  assert.equal(local, 'Would you like help with <b>the museum</b>?')
+  assert.equal(localLabel, 'chatCheckIn')
+  assert.deepEqual(notification, { title: 'nanoMuse', body: 'chatCheckIn' }, 'desktop alerts never contain the private commitment')
   assert.equal(source, '来自 测试手机')
   assert.equal(literalPrompt, true)
   const formatted = ['研究领域', '统计学', '优化', '## literal', true, false]

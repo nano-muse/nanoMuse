@@ -1300,4 +1300,6 @@
     <string name="nm_deadline_notice">Deschide fluxul pentru a vedea pasul următor.</string>
     <string name="nm_feed_use_recent_chats">Folosește conversațiile recente în flux</string>
     <string name="nm_feed_recent_chats_hint">Sunt folosite doar mesajele scrise aici după activare. Conversațiile protejate sunt excluse.</string>
+    <string name="nm_chat_checkin_setting">Trimite-mi un mesaj în ziua stabilită în conversație</string>
+    <string name="nm_chat_checkin_body">Ai menționat acest plan pentru astăzi:\n„%1$s”\n\nCum merge? Te pot ajuta să pregătești ceva?</string>
 </resources>

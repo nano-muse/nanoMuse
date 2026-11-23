@@ -1204,6 +1204,19 @@ class MuseService:
             self.hub.run_remote(thread, text)
             return event
         if source in ("user", "device"):
+            # A crash can land between saving an unsolicited question to the timeline
+            # and adding it to the model's history. Restore the turn before its answer.
+            if source == "user" and thread_id == MAIN_THREAD:
+                last = next(
+                    (
+                        e
+                        for e in reversed(thread.timeline.events)
+                        if e.get("type") in ("assistant", "user")
+                    ),
+                    None,
+                )
+                if last and last.get("source") == "chat_followup":
+                    self._remember_chat_followup(thread, last)
             event_data: dict[str, Any] = {"type": "user", "text": text, "thread": thread_id}
             if attachments:
                 event_data["files"] = [a.model_dump() for a in attachments]
@@ -2182,6 +2195,7 @@ class MuseService:
                 await self._poll_mail()
                 self._prune_fired()
                 self._announce_wake()
+                self._send_chat_followup()
                 self._notify_due_followup()
                 await self._run_feed_routine()
                 due = self.next_goal_pass_at or datetime.now(UTC)
@@ -2454,6 +2468,9 @@ class MuseService:
             )
             if k in data
         }
+        chat_settings = self._chat_followup_settings(data)
+        if "enabled" in chat_settings:
+            view["chat_followups"] = chat_settings["enabled"] is True
         current: dict[str, bool] = {}
         if any("source_revisions" in post for post in data["posts"]):
             current = {s.revision: s.anchor for s in self._preparation_sources(data).values()}
@@ -2489,6 +2506,7 @@ class MuseService:
         time: str | None = None,
         followups: bool | None = None,
         followup_push: bool | None = None,
+        chat_followups: bool | None = None,
         on_change: bool | None = None,
     ) -> dict[str, Any]:
         """The feed's preferences: what to write about, and the daily routine (on or off, and
@@ -2501,6 +2519,12 @@ class MuseService:
         if on_change is not None:
             data["on_change"] = on_change
             self._next_context_check = 0.0
+        if chat_followups is not None:
+            scope = self._chat_followup_scope()
+            if not scope:
+                raise ValueError("The current chat account is still changing.")
+            data.setdefault("chat_outreach", {}).setdefault(scope, {})["enabled"] = chat_followups
+            self.wake()
         if followup_push is not None:
             data["followup_push"] = followup_push
         if followups is not None:
@@ -2997,6 +3021,127 @@ class MuseService:
             kind="background",
         )
 
+    def _chat_followup_scope(self) -> str:
+        if not self.hub.signed_in:
+            return "local"
+        return f"account:{self.sync.account_id}" if self.sync.account_id else ""
+
+    def _chat_followup_settings(self, data: dict[str, Any]) -> dict[str, Any]:
+        return dict(data.get("chat_outreach", {}).get(self._chat_followup_scope(), {}))
+
+    def _send_chat_followup(self, now: datetime | None = None) -> None:
+        """Start a real conversation only when the person was waiting for a dated reply."""
+        now = now or datetime.now().astimezone()
+        if not self.profile.proactive or not 9 <= now.hour < 20 or self.profile.in_quiet_hours(now):
+            return
+        data = self.feed_posts()
+        prefs = self._chat_followup_settings(data)
+        today = now.date().isoformat()
+        main = self.threads.get(MAIN_THREAD)
+        owner = self.sync.owner_of(MAIN_THREAD)
+        if (
+            prefs.get("enabled") is not True
+            or data.get("followups_enabled") is False
+            or prefs.get("last_day") == today
+            or main is None
+            or main.device
+            or main.remote_from
+            or main.busy
+            or not main.inbox.empty()
+            or not self.sync.visible(main)
+            or (owner and (not self.hub.signed_in or owner != self.sync.account_id))
+        ):
+            return
+        last = next(
+            (e for e in reversed(main.timeline.events) if e.get("type") in ("assistant", "user")),
+            None,
+        )
+        if not last or last.get("source") == "chat_followup":
+            return  # Give the person a chance to answer before asking another question.
+        stamp = _parse_when(last.get("ts"))
+        if stamp is None or now - stamp < timedelta(minutes=10):
+            return
+        seen = {key: end for key, end in prefs.get("sent", {}).items() if end >= today}
+        card = self.waiting_followup(now, excluded=set(seen))
+        if not card:
+            return
+        key = card["id"]
+        event_id = "fo_" + key.removeprefix("wait_")[:32]
+        if main.timeline.get(event_id):
+            return
+        # Record the budget on disk before the optional notification. Keep the chat as
+        # the authority during recovery if saving the budget was interrupted.
+        if any(
+            e.get("source") == "chat_followup" and e.get("outreach_day") == today
+            for e in main.timeline.events
+        ):
+            return
+        language = self.feed_language().lower()
+        chinese = language.startswith(("zh", "chinese", "中文")) or (
+            language == "the same language as the context above"
+            and re.search(r"[一-鿿]", card["quote"])
+        )
+        subject = card["subject"]
+        sender = card["sender"]
+        if chinese:
+            text = (
+                f"你之前在等{sender}发来的「{subject}」。现在收到了吗？"
+                if sender
+                else f"你之前在等「{subject}」。现在收到了吗？"
+            )
+        else:
+            origin = f" from {sender}" if sender else ""
+            text = f"You were waiting for {subject}{origin}. Did it come through?"
+        event = self.ui.emit(
+            {
+                "type": "assistant",
+                "thread": MAIN_THREAD,
+                "id": event_id,
+                "text": text,
+                "ts": now.isoformat(),
+                "source": "chat_followup",
+                "waiting_id": key,
+                "outreach_day": today,
+                "final": True,
+            }
+        )
+        main.timeline.flush()
+        self._remember_chat_followup(main, event)
+        main.updated_at = event["ts"]
+        self.bus.publish({"kind": "thread", "thread": main.meta()})
+        self.sync.push_soon()
+        seen[key] = (now.date() + timedelta(days=28)).isoformat()
+        prefs.update(last_day=today, sent=seen)
+        data["chat_outreach"][self._chat_followup_scope()] = prefs
+        notify = (
+            data.get("followup_push") is True
+            and self.push.enabled
+            and self.push.subscriptions
+            and data.get("feed_notified_on") != today
+        )
+        if notify:
+            data["feed_notified_on"] = today
+        self._save_feed(data)
+        if notify:
+            self.push.notify(
+                self.profile.name,
+                "主要聊天有一条新消息。"
+                if chinese
+                else "You have a new message in your main chat.",
+                tag="chat-followup",
+                url="/?thread=main",
+                kind="background",
+            )
+
+    @staticmethod
+    def _remember_chat_followup(thread: Thread, event: dict[str, Any]) -> None:
+        if any(m.meta.get("outreach_event") == event["id"] for m in thread.agent.messages):
+            return
+        question = Message.assistant(event["text"])
+        question.meta["outreach_event"] = event["id"]
+        thread.agent.messages.append(question)
+        thread.agent._save_session()
+
     def _notify_due_followup(self, now: datetime | None = None) -> None:
         now = now or datetime.now().astimezone()
         if not self.push.enabled or not self.push.subscriptions or not self.profile.proactive:
@@ -3050,7 +3195,9 @@ class MuseService:
             only_id=only_id,
         )
 
-    def waiting_followup(self, now: datetime, only_id: str | None = None) -> dict[str, str] | None:
+    def waiting_followup(
+        self, now: datetime, only_id: str | None = None, *, excluded: set[str] | None = None
+    ) -> dict[str, str] | None:
         data = self.feed_posts()
         main = self.threads.get(MAIN_THREAD)
         if not self.profile.proactive or data.get("followups_enabled") is False or not main:
@@ -3066,6 +3213,7 @@ class MuseService:
                 or data.get("waiting_snoozed", {}).get(item.key) == today.isoformat()
             )
             and (only_id is None or item.key == only_id)
+            and (not excluded or item.key not in excluded)
             and hidden.get(item.key, "") <= today.isoformat()
         )
         item = min(

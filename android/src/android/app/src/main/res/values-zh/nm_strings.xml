@@ -1269,4 +1269,6 @@
     <string name="nm_deadline_notice">打开动态，查看下一步。</string>
     <string name="nm_feed_use_recent_chats">用近期聊天准备动态</string>
     <string name="nm_feed_recent_chats_hint">仅使用开启后你在此设备输入的消息。加锁的对话会跳过。</string>
+    <string name="nm_chat_checkin_setting">聊天里的待办到期时，主动给我发消息</string>
+    <string name="nm_chat_checkin_body">你之前提过这件事，约定的日期是今天：\n「%1$s」\n\n现在进展怎么样？有什么需要我帮你准备的？</string>
 </resources>

@@ -517,7 +517,7 @@ function FeedSettingsSheet({
     }
   };
   // the daily routine is saved as it is switched or moved — a setting, not part of the sentence
-  const routine = async (body: { daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; on_change?: boolean }) => {
+  const routine = async (body: { daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; chat_followups?: boolean; on_change?: boolean }) => {
     try {
       onChange(await api.setFeedInstructions(body));
     } catch (e) {
@@ -541,6 +541,11 @@ function FeedSettingsSheet({
         <div className="space-y-2 rounded-2xl bg-surface-2 px-3.5 py-2.5">
           <Toggle label={t("Follow up on goals, calendar conflicts and expected replies")} checked={data?.followups_enabled !== false}
             onChange={(v) => void routine({ followups: v })} disabled={!data} />
+          {data?.followups_enabled !== false &&
+            <Toggle label={t("Ask me in the main chat when a reply is due")}
+              hint={t("If you mentioned waiting for something, nanoMuse can check in once a day during daytime. You can reply in the chat.")}
+              checked={data?.chat_followups === true} disabled={!data}
+              onChange={(v) => void routine({ chat_followups: v })} />}
           {data?.followups_enabled !== false &&
             <Toggle label={t("Notify me about time-sensitive follow-ups")}
               hint={t("On devices with notifications enabled, once a day at most between 09:00 and 20:00 server time.")}

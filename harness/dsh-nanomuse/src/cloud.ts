@@ -2830,6 +2830,11 @@ export default class NanomuseCloud extends Service {
     return this.kept?.linesOf(sessionId).length ?? 0
   }
 
+  /** A later message from another device may have cancelled or moved a local commitment. */
+  hasRemoteReplySince(sessionId: string, at: number): boolean {
+    return this.kept?.linesOf(sessionId).some(line => line.role === 'user' && (line.keptAt ?? line.at) >= at) ?? false
+  }
+
   /** The main chat named by the host (the first conversation): the session it ends up in. */
   async setSyncMain(sessionId: string): Promise<string> {
     return this.sync ? this.sync.setMain(sessionId) : sessionId
@@ -4142,8 +4147,12 @@ export default class NanomuseCloud extends Service {
   private async remoteLines(
     ctx: Context,
     sessionId: string,
+    includeRemote = true,
   ): Promise<{ lines: Array<RemoteLine & { id: string; before: string | null }>; prompts: string[] }> {
-    const lines = this.kept?.linesOf(sessionId) ?? []
+    const notes = ctx.get('nanomuseRooms')?.checkInMessages(sessionId) ?? []
+    const lines = [...(includeRemote ? this.kept?.linesOf(sessionId) ?? [] : []), ...notes.map(n => ({
+      mid: n.id, text: n.text, at: n.at, keptAt: n.at, role: 'assistant' as const, device: '', deviceName: '', localCheckIn: true,
+    }))].sort((a, b) => a.at - b.at)
     if (lines.length === 0) return { lines: [], prompts: [] }
     const entry = this.cached(sessionId)
     let prompts = entry.prompts
@@ -4534,7 +4543,9 @@ export default class NanomuseCloud extends Service {
         if (req.method === 'GET' && route === '/sync/remote') {
           const sessionId = url.searchParams.get('session') ?? ''
           // another account's chat shows no bubbles and no working line (C10)
-          const remote = sessionId && sync.owns(sessionId) ? await this.remoteLines(this.ctx, sessionId) : { lines: [], prompts: [] }
+          const access = this.scheduleSessionAccess('nanomuse-feed')
+          const remote = sessionId && access(sessionId) ? await this.remoteLines(this.ctx, sessionId, sync.owns(sessionId)) : { lines: [], prompts: [] }
+          if (!access(sessionId)) return send(res, 200, { lines: [], prompts: [], hidden: [], working: null })
           return send(res, 200, { lines: remote.lines, prompts: remote.prompts, hidden: sync.view().hidden, working: sync.workingOf(sessionId) })
         }
         if (req.method === 'POST' && route === '/sync/archived') {

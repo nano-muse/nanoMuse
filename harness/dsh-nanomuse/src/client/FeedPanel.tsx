@@ -84,7 +84,7 @@ export function makeFeedPanel(t: Translate) {
                   : null,
                 rooms.ready && !rooms.busy.feed ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: prepare }, t('feedPrepare')) : null)
             : displayPosts.map((post) => h(PostCard, { key: post.id, t, post, lang: rooms.lang, onDiscuss: () => discuss(post), onFail: fail })))),
-      settings ? h(FeedSettings, { t, instructions: rooms.feed.instructions, routine, busy: rooms.busy.feed, ready: rooms.ready, onClose: () => setSettings(false), onRefresh: refresh }) : null)
+      settings ? h(FeedSettings, { key: routine.checkInScope, t, instructions: rooms.feed.instructions, routine, busy: rooms.busy.feed, ready: rooms.ready, onClose: () => setSettings(false), onRefresh: refresh }) : null)
   }
 }
 
@@ -135,16 +135,21 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
   const [text, setText] = useState(instructions)
   const [on, setOn] = useState(routine.on)
   const [reading, setReading] = useState(routine.reading === true)
+  const [checkIns, setCheckIns] = useState(routine.chatCheckIns === true)
   const [time, setTime] = useState(routine.time)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const save = (event: FormEvent) => {
     event.preventDefault()
     setSaving(true)
-    const routineChanged = on !== routine.on || time !== routine.time || reading !== (routine.reading === true)
+    const checksChanged = checkIns !== (routine.chatCheckIns === true)
+    if (checksChanged && checkIns && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      void Notification.requestPermission().catch(() => undefined)
+    }
+    const routineChanged = checksChanged || on !== routine.on || time !== routine.time || reading !== (routine.reading === true)
     Promise.all([
       roomsCall('feed/instructions', { text }),
-      routineChanged ? roomsCall('feed/routine', { on, time, reading }) : Promise.resolve(undefined),
+      routineChanged ? roomsCall('feed/routine', { on, time, reading, ...(checksChanged ? { chatCheckIns: checkIns, checkInScope: routine.checkInScope } : {}) }) : Promise.resolve(undefined),
     ]).then(onClose).catch((err: unknown) => setError(failureText(t, err))).finally(() => setSaving(false))
   }
   return h(Sheet, { title: t('feedSettingsTitle'), closeLabel: t('close'), onClose,
@@ -166,6 +171,9 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
       h('label', { className: 'nm-feed-routine' },
         h('input', { type: 'checkbox', checked: reading, disabled: !on, onChange: (e: FormEvent<HTMLInputElement>) => setReading(e.currentTarget.checked) }),
         h('span', null, t('feedReading'))),
+      h('label', { className: 'nm-feed-routine' },
+        h('input', { type: 'checkbox', checked: checkIns, disabled: !on || !routine.checkInScope, onChange: (e: FormEvent<HTMLInputElement>) => setCheckIns(e.currentTarget.checked) }),
+        h('span', null, t('feedChatCheckIns'))),
       !ready ? h('p', { className: 'nm-sheet-fine' }, t('feedRoutineNeedsModel')) : null,
       error ? h('div', { className: 'nm-room-error' }, error) : null))
 }

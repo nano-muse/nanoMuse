@@ -15,7 +15,7 @@ internal object FeedPreparation {
     data class Fact(
         val kind: Kind, val location: String, val label: String, val text: String,
         val sourceSessions: Set<String> = emptySet(), val priority: Int = 0, val timely: Boolean = true, val goalId: String = "",
-        val chatDay: String = "", val dueOn: String = "",
+        val chatDay: String = "", val dueOn: String = "", val chatSession: String = "", val writtenAt: Long = 0L,
     ) {
         val id = hash(location, text)
         val anchors = anchors(text)

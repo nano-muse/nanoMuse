@@ -232,12 +232,22 @@ def waiting_for(timeline: list[dict[str, Any]], now: datetime) -> tuple[list[Wai
     focus: str | None = None
     last_focus_time: datetime | None = None
     assistant_spoke = False
+    asked_about: str | None = None
     for event in timeline[-300:]:
+        if event.get("type") in ("question", "approval"):
+            # A short reply to a tool or approval card does not answer our earlier check-in.
+            asked_about, focus, assistant_spoke = None, None, True
         if event.get("type") == "assistant" and event.get("text"):
             # "Got it" after an assistant's own answer can just acknowledge that answer.
             assistant_spoke = True
+            asked_about = None
+            if event.get("source") == "chat_followup" and not event.get("synced"):
+                asked_about = next(
+                    (k for k, item in pending.items() if item.key == event.get("waiting_id")), None
+                )
         if event.get("type") != "user":
             continue
+        addressed, asked_about = asked_about, None
         previous, focus = focus, None
         after_reply, assistant_spoke = assistant_spoke, False
         if not personal_message(event) or event.get("files"):
@@ -298,12 +308,18 @@ def waiting_for(timeline: list[dict[str, Any]], now: datetime) -> tuple[list[Wai
                 consumed.add(key)
                 last_focus_time = when
             continue
+        if addressed and re.fullmatch(
+            r"(?:收到了?|已经收到|到了|yes|yeah|it did|yes[, ]+it did)[。.!！]?", text, re.I
+        ):
+            del pending[addressed]
+            consumed.add(key)
+            continue
         closing, moving = _CLOSE.search(text), _MOVE.search(text)
         if not (closing or moving) or re.search(r"still waiting|还在等|仍在等", text, re.I):
             continue
         bare = _without_schedule(text).strip(" ,，。.!！")
         if _BARE.fullmatch(bare):
-            target = (
+            target = addressed or (
                 previous
                 if len(pending) == 1
                 and (moving or not after_reply)

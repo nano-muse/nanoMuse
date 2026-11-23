@@ -1276,4 +1276,6 @@
     <string name="nm_deadline_notice">Open Feed to review your next step.</string>
     <string name="nm_feed_use_recent_chats">Use recent chats for Feed</string>
     <string name="nm_feed_recent_chats_hint">Use messages you type after turning this on. Protected chats are excluded.</string>
+    <string name="nm_chat_checkin_setting">Message me when a chat commitment is due</string>
+    <string name="nm_chat_checkin_body">You mentioned this plan for today:\n“%1$s”\n\nHow is it going? Is there anything I can help you prepare?</string>
 </resources>

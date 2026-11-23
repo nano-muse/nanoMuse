@@ -103646,6 +103646,419 @@
         }
       }
     },
+    "Message me in my main chat" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Hauptchat nachfragen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message me in my main chat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escríbeme en el chat principal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "M’écrire dans la discussion principale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メインチャットで声をかける"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본 채팅에서 먼저 메시지 보내기"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Писать мне в основном чате"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在主要聊天中主动联系我"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在主要聊天中主動聯絡我"
+          }
+        }
+      }
+    },
+    "Between 09:00 and 20:00, nanoMuse can check in once a day about a goal due today or a commitment from your main chat if chat preparation is on." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwischen 09:00 und 20:00 kann nanoMuse einmal täglich nach einem heute fälligen Ziel fragen. Bei aktivierter Chatvorbereitung zählen auch Zusagen im Hauptchat."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Between 09:00 and 20:00, nanoMuse can check in once a day about a goal due today or a commitment from your main chat if chat preparation is on."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre las 09:00 y las 20:00, nanoMuse puede escribirte una vez al día sobre un objetivo que vence hoy o un compromiso del chat principal si activaste la preparación desde los chats."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre 09:00 et 20:00, nanoMuse peut vous écrire une fois par jour au sujet d’un objectif à échéance aujourd’hui ou, si la préparation depuis les discussions est activée, d’un engagement pris dans la discussion principale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "09:00から20:00までに、今日が期限の目標について1日1回まで連絡します。チャットからの準備がオンなら、メインチャットで話した今日の予定も対象です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "09:00부터 20:00 사이에 오늘 마감인 목표에 관해 하루 한 번까지 연락합니다. 채팅 준비를 켜면 기본 채팅에서 약속한 일도 포함됩니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "С 09:00 до 20:00 nanoMuse может раз в день написать о цели со сроком на сегодня или, если включена подготовка по чатам, о вашем обещании в основном чате."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当地时间 09:00 至 20:00，nanoMuse 每天最多发来一条消息，跟进今天到期的目标。开启「根据聊天提前准备」后，也能跟进你在主要聊天提过的当日待办。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當地時間 09:00 至 20:00，nanoMuse 每天最多傳來一則訊息，跟進今天到期的目標。開啟「根據聊天提前準備」後，也能跟進你在主要聊天提過的當日待辦。"
+          }
+        }
+      }
+    },
+    "I left you a message in our chat." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich habe dir im Chat geschrieben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I left you a message in our chat."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Te dejé un mensaje en nuestro chat."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je vous ai laissé un message dans notre discussion."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットにメッセージを残しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채팅에 메시지를 남겼어요."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В нашем чате есть сообщение для вас."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我在聊天里给你留了条消息。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我在聊天裡留了一則訊息給你。"
+          }
+        }
+      }
+    },
+    "You mentioned “%@”. It is on your plan today. Can I help you get ready?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hattest „%@“ erwähnt. Das steht heute an. Kann ich dir bei der Vorbereitung helfen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You mentioned “%@”. It is on your plan today. Can I help you get ready?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mencionaste «%@». Lo tienes previsto para hoy. ¿Te ayudo a prepararlo?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous aviez mentionné « %@ ». C’est prévu aujourd’hui. Puis-je vous aider à vous préparer ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前「%@」と話していましたね。今日の予定ですが、何か準備しましょうか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전에 “%@”라고 하셨죠. 오늘 하기로 한 일인데, 준비를 도와드릴까요?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы говорили: «%@». Это запланировано на сегодня. Помочь подготовиться?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你之前提过「%@」，今天就到约定的日子了。要我帮你准备些什么吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你之前提過「%@」，今天就到約定的日子了。需要我幫你準備些什麼嗎？"
+          }
+        }
+      }
+    },
+    "You mentioned “%@” and later said “%@”. It is on your plan today. Can I help you get ready?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hattest „%1$@“ erwähnt und später gesagt: „%2$@“. Das steht heute an. Kann ich dir bei der Vorbereitung helfen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You mentioned “%@” and later said “%@”. It is on your plan today. Can I help you get ready?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mencionaste «%1$@» y después dijiste «%2$@». Lo tienes previsto para hoy. ¿Te ayudo a prepararlo?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous aviez mentionné « %1$@ », puis précisé « %2$@ ». C’est prévu aujourd’hui. Puis-je vous aider à vous préparer ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前「%1$@」、その後「%2$@」と話していましたね。今日の予定ですが、何か準備しましょうか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전에 “%1$@”라고 하셨고 나중에 “%2$@”라고 하셨어요. 오늘 하기로 한 일인데, 준비를 도와드릴까요?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы говорили: «%1$@», а позже уточнили: «%2$@». Это запланировано на сегодня. Помочь подготовиться?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你之前提过「%1$@」，后来改成「%2$@」。按新安排是今天，要我帮你准备些什么吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你之前提過「%1$@」，後來改成「%2$@」。依新安排是今天，需要我幫你準備些什麼嗎？"
+          }
+        }
+      }
+    },
+    "“%@” is due today. How is the next step, “%@”, going?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%1$@“ ist heute fällig. Wie läuft der nächste Schritt „%2$@“?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” is due today. How is the next step, “%@”, going?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%1$@» vence hoy. ¿Cómo va el siguiente paso, «%2$@»?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %1$@ » arrive à échéance aujourd’hui. Où en est la prochaine étape, « %2$@ » ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%1$@」の期限は今日です。次のステップ「%2$@」の進み具合はいかがですか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”의 마감이 오늘이에요. 다음 단계인 “%2$@”는 어떻게 되어 가나요?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сегодня срок по цели «%1$@». Как продвигается следующий шаг «%2$@»?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%1$@」今天到期。接下来要做的「%2$@」进展怎么样？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%1$@」今天到期。接下來要做的「%2$@」進展如何？"
+          }
+        }
+      }
+    },
+    "“%@” is due today. How is it going?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ ist heute fällig. Wie läuft es?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” is due today. How is it going?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» vence hoy. ¿Cómo va?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » arrive à échéance aujourd’hui. Où en êtes-vous ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の期限は今日です。進み具合はいかがですか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”의 마감이 오늘이에요. 어떻게 되어 가나요?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сегодня срок по цели «%@». Как продвигаются дела?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」今天到期。进展怎么样？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」今天到期。進展如何？"
+          }
+        }
+      }
+    },
     "Prepare from my chats" : {
       "extractionState" : "manual",
       "localizations" : {

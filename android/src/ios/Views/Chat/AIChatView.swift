@@ -1305,6 +1305,12 @@ struct AIChatView: View {
         .onChange(of: vm.sessionId) { _ in
             refreshTitlePillSession()
         }
+        // nanoMuse: refresh the visible history and model context when the assistant checks in.
+        .onReceive(NotificationCenter.default.publisher(for: .nmChatOutreachDelivered)) { note in
+            if let sid = note.object as? String, sid == vm.sessionId {
+                Task { @MainActor in await vm.reloadMessagesFromDB(reason: "assistantOutreach") }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { note in
             guard let sid = vm.sessionId,
                   let updatedId = note.object as? String,

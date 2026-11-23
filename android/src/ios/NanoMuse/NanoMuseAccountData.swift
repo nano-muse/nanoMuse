@@ -157,6 +157,7 @@ final class NanoMuseAccountData {
     /// gap as deletions and tombstones the account's chats on its other devices).
     func leave(account: String, keep: Bool) async {
         NanoMuseFeedWriter.accountChanging(true)
+        NanoMuseChatOutreach.shared.changeAccount(true)
         NanoMuseDeadlineNotifications.shared.accountChanging(true)
         NanoMuseDeviceConversations.shared.suspendForAccountChange()
         await reconcile(as: account)
@@ -209,6 +210,7 @@ final class NanoMuseAccountData {
         NanoMuseScheduler.shared.reload()
         reloadStores()
         NanoMuseFeedWriter.accountChanging(false)
+        NanoMuseChatOutreach.shared.changeAccount(false)
         NanoMuseDeadlineNotifications.shared.accountChanging(false)
         NanoMuseDeviceConversations.shared.resumeAfterAccountChange()
         NotificationCenter.default.post(name: .nanoMuseAccountSwitched, object: account)

@@ -18,6 +18,8 @@ export interface ChatCommitments {
   owner: string
   items: ChatCommitment[]
   turn?: number
+  /** A later uncertain change can make earlier dated tasks unsuitable for a direct message. */
+  checkInHeldAt?: number
   focus?: string
 }
 
@@ -104,7 +106,7 @@ function matchSubject(text: string, items: ChatCommitment[]): ChatCommitment | u
 function refersToFocus(text: string): boolean {
   const rest = text.toLowerCase().replace(/['’]ve\b/gu, '').replace(relative, ' ').replace(timePart, ' ')
     .replace(/(?:就定在|确定在|確定在|定在|改到|改期|改成|推迟|推遲|延到|延期|推到|取消|发了|發了|发完|發完|发过|發過|办完|辦完|办好|辦好|搞定|完成|处理|處理|恢复|恢復|重新安排|还是要|還是要|这个|這個|或是|或者|或|那个|那個|这件事|這件事|那件事|那封|这封|还是|還是|要发|要發|发|發|邮件|郵件|消息|已经|已經|刚刚|剛剛|现在|現在|了|我|就|吧|已)/gu, '')
-    .replace(/\b(?:i|we|it|that|this|the|one|or|either|from|next|week|that['’]s|is|was|to|on|until|at|just|have|already|all|been|instead|move[ds]?|reschedule[ds]?|postpone[ds]?|cancel(?:led|ed)?|done|completed|sent|finished|handled|sorted|booked|back|again|message|email)\b/gu, '')
+    .replace(/\b(?:i|we|it|that|this|the|one|or|either|from|next|week|that['’]s|is|was|to|on|until|at|just|have|already|all|been|instead|move[ds]?|reschedule[ds]?|postpone[ds]?|cancel(?:led|ed)?|called|off|done|completed|sent|finished|handled|sorted|booked|back|again|message|email)\b/gu, '')
   return !/[\p{L}\p{N}]/u.test(rest)
 }
 export function statusUpdate(text: string): boolean {
@@ -118,6 +120,7 @@ export function noteCommitment(state: ChatCommitments, text: string, at: number,
   const oldFocus = state.items.find(i => i.request === state.focus)
   delete state.focus
   const update = statusUpdate(text)
+  if (/\b(?:will not|won['’]t|can no longer|cannot|don['’]t remind|stop reminding)\b|不(?:再|打算|需要|用|会|會)|别(?:再)?提醒|別(?:再)?提醒/iu.test(text)) state.checkInHeldAt = at
   if (update && !negated.test(text) && !/[?？]\s*$/u.test(text)) {
     // A goal is eligible only in its own chat and when the words identify it.
     const other: ChatCommitment[] = goal && !state.items.some(i => i.goalId === goal.id)
@@ -136,7 +139,7 @@ export function noteCommitment(state: ChatCommitments, text: string, at: number,
         else delete item.due
       } else item.closed = true
       state.focus = item.request
-    }
+    } else state.checkInHeldAt = at
   } else if (!update && undertaking.test(text) && !negated.test(text)) {
     let item = state.items.find(i => i.request === text)
     if (!item) { item = { request: text, at, changedAt: at }; state.items.push(item) }
@@ -151,6 +154,12 @@ export function noteCommitment(state: ChatCommitments, text: string, at: number,
     if (mentioned) state.focus = mentioned.request
   }
   state.items = state.items.slice(-LIMIT)
+}
+
+/** A private chat message needs a firmer undertaking than a suggestion in the Feed. */
+export function canCheckIn(item: ChatCommitment): boolean {
+  const tentative = /[?？]|\b(?:not|never|unless|maybe|perhaps|possibly|might|unsure|example|imagine|suppose|supposing|won['’]t|can['’]t|cannot)\b|不(?:想|要|会|會|去|用|必|打算|准备|準備|需要|再)|别再|別再|不一定|也许|也許|比如|例如|假设|假設|说不定|說不定/iu
+  return !item.closed && !tentative.test(item.request) && !tentative.test(item.revision ?? '')
 }
 
 export function commitmentText(item: ChatCommitment): string {

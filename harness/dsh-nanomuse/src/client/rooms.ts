@@ -135,6 +135,8 @@ export interface DocText {
 
 /** The feed's daily routine (C5), as the host keeps it. */
 export interface FeedRoutine {
+  chatCheckIns?: boolean
+  checkInScope?: string
   reading?: boolean
   on: boolean
   time: string
@@ -188,6 +190,7 @@ export const NUDGES_INITIAL: Nudges = {
 }
 
 export interface Rooms {
+  checkIns: Array<{ id: string; sessionId: string; at: number; unread: boolean }>
   lang: string
   feed: { instructions: string; generatedAt: number; lastTry: number; posts: FeedPost[]; routine: FeedRoutine }
   ideas: { generatedAt: number; lastTry: number; items: Idea[] }
@@ -224,6 +227,7 @@ const INITIAL: Rooms = {
   activity: [],
   introducedAt: 0,
   busy: { feed: false, ideas: false },
+  checkIns: [],
   batches: [],
   automations: {},
   ready: false,
@@ -255,7 +259,7 @@ function open(): void {
     try {
       const data = JSON.parse(event.data) as Omit<Rooms, 'streaming'>
       // an older host sends no first run, nudges, routine or batches: the defaults stand in
-      publish({ ...snapshot, ...data, feed: { ...INITIAL.feed, ...data.feed, routine: data.feed?.routine ?? INITIAL.feed.routine }, firstRun: data.firstRun ?? FIRST_RUN_INITIAL, nudges: data.nudges ?? NUDGES_INITIAL, batches: data.batches ?? [], streaming: true })
+      publish({ ...snapshot, ...data, checkIns: data.checkIns ?? [], feed: { ...INITIAL.feed, ...data.feed, routine: data.feed?.routine ?? INITIAL.feed.routine }, firstRun: data.firstRun ?? FIRST_RUN_INITIAL, nudges: data.nudges ?? NUDGES_INITIAL, batches: data.batches ?? [], streaming: true })
       // The host writes the rooms in the person's language; tell it once which that is.
       if (!langSent && typeof navigator !== 'undefined' && navigator.language && data.lang !== navigator.language) {
         langSent = true
@@ -279,7 +283,7 @@ function open(): void {
   }
 }
 
-function subscribe(listener: () => void): () => void {
+export function subscribeRooms(listener: () => void): () => void {
   listeners.add(listener)
   open()
   return () => {
@@ -302,7 +306,7 @@ export function peekRooms(): Rooms {
 
 /** The rooms' state; the stream opens with the first subscriber. */
 export function useRooms(): Rooms {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return useSyncExternalStore(subscribeRooms, getSnapshot, getSnapshot)
 }
 
 /** The Feed is open: its posts count as seen. */

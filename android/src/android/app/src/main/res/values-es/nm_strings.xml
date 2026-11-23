@@ -1296,4 +1296,6 @@
     <string name="nm_deadline_notice">Abre el feed para ver tu próximo paso.</string>
     <string name="nm_feed_use_recent_chats">Usar chats recientes en el feed</string>
     <string name="nm_feed_recent_chats_hint">Solo se usan los mensajes que escribas aquí tras activar esta opción. Se excluyen los chats protegidos.</string>
+    <string name="nm_chat_checkin_setting">Escribirme cuando llegue la fecha de un compromiso del chat</string>
+    <string name="nm_chat_checkin_body">Mencionaste este plan para hoy:\n«%1$s»\n\n¿Cómo va? ¿Quieres que te ayude a preparar algo?</string>
 </resources>

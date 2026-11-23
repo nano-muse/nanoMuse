@@ -1,9 +1,9 @@
 import type { MenuItemConstructorOptions, ContextMenuParams, WebContents } from "electron";
 import { mediaPermissionAllowed, sameOrigin } from "./navigation";
 
-/** Clipboard writes belong to the app's main page, never embedded content or workers. */
-function clipboardWriteAllowed(permission: string, url: string | undefined, main: boolean, host: string | null): boolean {
-  return permission === "clipboard-sanitized-write" && main && sameOrigin(url ?? "", host);
+/** These browser permissions belong to the app's main page, never embedded content or workers. */
+function mainPagePermissionAllowed(permission: string, url: string | undefined, main: boolean, host: string | null): boolean {
+  return (permission === "clipboard-sanitized-write" || permission === "notifications") && main && sameOrigin(url ?? "", host);
 }
 
 /** Install both permission paths; clipboard reads remain unavailable to page scripts. */
@@ -12,14 +12,14 @@ export function installWindowPermissions(contents: WebContents, hostUrl: () => s
     const host = hostUrl();
     const media = details as Electron.MediaAccessPermissionRequest;
     callback(requester === contents && sameOrigin(contents.getURL(), host) && (
-      clipboardWriteAllowed(permission, details.requestingUrl, details.isMainFrame, host) ||
+      mainPagePermissionAllowed(permission, details.requestingUrl, details.isMainFrame, host) ||
       mediaPermissionAllowed(permission, details.requestingUrl, media.securityOrigin, media.mediaTypes, host)
     ));
   });
   contents.session.setPermissionCheckHandler((requester, permission, origin, details) => {
     const host = hostUrl();
     if (requester !== contents || !sameOrigin(contents.getURL(), host) || !sameOrigin(origin, host)) return false;
-    if (clipboardWriteAllowed(permission, details.requestingUrl, details.isMainFrame, host)) return true;
+    if (mainPagePermissionAllowed(permission, details.requestingUrl, details.isMainFrame, host)) return true;
     return mediaPermissionAllowed(permission, origin, details.embeddingOrigin, [details.mediaType ?? "unknown"], host) &&
       (!details.securityOrigin || sameOrigin(details.securityOrigin, host));
   });

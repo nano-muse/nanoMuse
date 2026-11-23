@@ -348,6 +348,7 @@ final class NanoMuseKeyboardWatcher: ObservableObject {
 // MARK: - Home
 
 struct NanoMuseHomeView: View {
+    @ObservedObject private var outreach = NanoMuseChatOutreach.shared
     @ObservedObject private var deadlineAlerts = NanoMuseDeadlineNotifications.shared
     @ObservedObject private var deadlineLocks = SessionLockStore.shared
     @StateObject private var main = NanoMuseMainChat()
@@ -395,6 +396,13 @@ struct NanoMuseHomeView: View {
     /// under the bar with no way back to typing.
     private var bottomBarHidden: Bool {
         keyboard.visible || (tab == .chat && voiceMode.isVoiceActive)
+    }
+
+    private var visibleMainChat: String? {
+        guard tab == .chat, chatPath.isEmpty, !drawerOpen, !showClassic, !showNanoMuseSettings,
+              !showCoding, !showRoutines, editingRoutine == nil, !showDevices, !chooseChatDestination,
+              !showSystemFiles, !showSharedFolders, !showChatFiles, !main.isDraft else { return nil }
+        return main.chatId
     }
 
     private var roomsAndDrawer: some View {
@@ -539,6 +547,13 @@ struct NanoMuseHomeView: View {
             if let id = NotificationNavigationStore.shared.takePending() { openSideChat(id) }
             openDeadlineFeedIfNeeded()
         }
+        .onAppear { outreach.showingMain(visibleMainChat) }
+        .onDisappear { outreach.showingMain(nil) }
+        .nmOnChange(of: visibleMainChat) { outreach.showingMain($0) }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            outreach.showingMain(visibleMainChat)
+        }
+        .nmOnChange(of: outreach.tapRevision) { _ in openDeadlineFeedIfNeeded() }
         .nmOnChange(of: deadlineAlerts.tapVersion) { _ in openDeadlineFeedIfNeeded() }
         .nmOnChange(of: deadlineLocks.appIsLocked) { _ in openDeadlineFeedIfNeeded() }
         .onReceive(NotificationCenter.default.publisher(for: .nanoMuseAccountSwitched)) { _ in
@@ -671,7 +686,21 @@ struct NanoMuseHomeView: View {
     }
 
     private func openDeadlineFeedIfNeeded() {
-        if deadlineAlerts.takeTap() {
+        if outreach.takeTap() {
+            showClassic = false
+            showNanoMuseSettings = false
+            showCoding = false
+            showRoutines = false
+            editingRoutine = nil
+            showDevices = false
+            chooseChatDestination = false
+            showSystemFiles = false
+            showSharedFolders = false
+            showChatFiles = false
+            chatPath.removeAll()
+            drawerOpen = false
+            tab = .chat
+        } else if deadlineAlerts.takeTap() {
             drawerOpen = false
             tab = .feed
         }

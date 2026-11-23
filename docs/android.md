@@ -123,6 +123,8 @@ The daily Feed can also prepare a draft, checklist, brief or question. An active
 
 In Feed settings, turn on *Use recent chats for Feed* to include commitments you type on this phone. For example, mention that you promised to send the museum a visit request on Friday and save a separate preference about step-free access. The Feed can use both to prepare an inquiry. If you change the date, cancel, or say you already sent it, it checks the updated chat before showing the card. The switch starts with new sends in chats where memory is enabled. Protected chats are excluded. A dated commitment can still surface in the week it is due when you mentioned it the previous week.
 
+To receive a message from nanoMuse about something you promised to do, also enable chat check-ins in Feed settings. On the day it is due, nanoMuse can ask how it is going and offer help in the chat where you made the commitment. You can answer there. It checks locally, after at least an hour since the commitment or its latest change. It can send one message per account on this phone per day between 09:00 and 20:00. If Android notifications are enabled, tapping the notification opens that chat. Battery restrictions can delay the background check.
+
 Shell progress updates preserve text beyond a shorter rewrite. Terminal color and title codes are removed before those updates, so they cannot leave escape fragments in the output.
 
 The agent's system prompt keeps its safety, tool and phone-operation instructions in a stable

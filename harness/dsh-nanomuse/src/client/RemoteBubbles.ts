@@ -20,6 +20,7 @@ import { createElement as h } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { call, type Translate } from './api.ts'
 import { subscribeLive } from './live.ts'
+import { nav, peekRooms, roomsCall, subscribeRooms } from './rooms.ts'
 import { Markdown } from './ui.tsx'
 
 const DONE = 'data-nm-remote'
@@ -34,6 +35,7 @@ interface RemoteRow {
   at: number
   device: string
   deviceName: string
+  localCheckIn?: boolean
   /** The node key of the local prompt this turn is older than, when it is. */
   before: string | null
 }
@@ -73,10 +75,11 @@ function el(tag: string, className: string, text?: string): HTMLElement {
 
 function bubble(t: Translate, row: RemoteRow, markdownRoots: Map<HTMLElement, Root>): HTMLElement {
   const root = el('div', `nm-remote nm-remote-${row.role}`)
+  if (row.localCheckIn) root.setAttribute('data-nm-checkin', '')
   root.setAttribute(KEY, nodeKey(row.id))
   root.setAttribute('data-nm-remote-mid', row.mid)
   const body = el('div', 'nm-remote-bubble')
-  if (row.role === 'assistant') {
+  if (row.role === 'assistant' && !row.localCheckIn) {
     const markdown = createRoot(body)
     markdownRoots.set(body, markdown)
     markdown.render(h(Markdown, { text: row.text }))
@@ -84,7 +87,7 @@ function bubble(t: Translate, row: RemoteRow, markdownRoots: Map<HTMLElement, Ro
     body.textContent = row.text
   }
   root.append(body)
-  const from = el('div', 'nm-remote-from', t('chFrom', { device: row.deviceName || row.device || '?' }))
+  const from = el('div', 'nm-remote-from', row.localCheckIn ? t('chatCheckIn') : t('chFrom', { device: row.deviceName || row.device || '?' }))
   if (row.at > 0) from.title = new Date(row.at).toLocaleString()
   root.append(from)
   return root
@@ -119,6 +122,8 @@ export function renderRemoteBubbles(t: Translate): () => void {
   const dressed = new WeakSet<HTMLElement>()
   const inflight = new Set<string>()
   const refreshNeeded = new Set<string>()
+  const acknowledging = new Set<string>()
+  let generation = 0
   let scheduled: ReturnType<typeof setTimeout> | undefined
   let expiry: ReturnType<typeof setTimeout> | undefined
   let lastFocusPull = 0
@@ -129,10 +134,11 @@ export function renderRemoteBubbles(t: Translate): () => void {
       refreshNeeded.add(sessionId)
       return
     }
+    const version = generation
     inflight.add(sessionId)
     call<Remote>(`sync/remote?session=${encodeURIComponent(sessionId)}`)
       .then((remote) => {
-        if (stopped) return
+        if (stopped || version !== generation) return
         cache.set(sessionId, {
           lines: remote.lines ?? [],
           prompts: remote.prompts ?? [],
@@ -236,6 +242,15 @@ export function renderRemoteBubbles(t: Translate): () => void {
       if (!row && !line.before) tail = shown
       bubbles.delete(key)
       shown.style.display = hidden.has(line.mid) ? 'none' : ''
+      if (line.localCheckIn && !document.hidden && document.hasFocus() &&
+          peekRooms().checkIns.some(m => m.id === line.id && m.unread) && !acknowledging.has(line.id)) {
+        const rect = shown.getBoundingClientRect()
+        const clip = content.getBoundingClientRect()
+        if (rect.height > 0 && rect.bottom > Math.max(clip.top, 0) && rect.top < Math.min(clip.bottom, window.innerHeight)) {
+          acknowledging.add(line.id)
+          void roomsCall('checkins/read', { sessionId, id: line.id }).catch(() => undefined).finally(() => acknowledging.delete(line.id))
+        }
+      }
       // the working line under the other device's last prompt (C9), and nowhere else; its
       // words follow the run's step (0.31)
       const working = shown.querySelector('.nm-remote-working')
@@ -305,16 +320,54 @@ export function renderRemoteBubbles(t: Translate): () => void {
     const next = live.sync?.rev ?? 0
     if (next === rev) return
     rev = next
+    generation++
+    cache.clear()
+    schedule()
+  })
+  let previousStamp = ''
+  let previousScope: string | undefined
+  let latestId: string | undefined
+  let notice: Notification | undefined
+  const offRooms = subscribeRooms(() => {
+    const { checkIns, feed } = peekRooms()
+    const scope = feed.routine.checkInScope
+    const latest = checkIns.at(-1)
+    const stamp = JSON.stringify([scope, checkIns])
+    if (stamp === previousStamp) return
+    previousStamp = stamp
+    if (scope !== previousScope) {
+      notice?.close()
+      for (const node of document.querySelectorAll('[data-nm-checkin]')) node.remove()
+    } else if (latest && latest.id !== latestId && latest.unread && Date.now() - latest.at < 120_000 &&
+        (!document.hasFocus() || document.hidden) && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      notice?.close()
+      try {
+        const n = new Notification('nanoMuse', { body: t('chatCheckIn'), tag: 'nanomuse-chat-checkin' })
+        n.onclick = () => {
+          if (peekRooms().feed.routine.checkInScope === scope && peekRooms().checkIns.some(m => m.id === latest.id)) {
+            window.focus()
+            nav.openSession(latest.sessionId)
+          }
+          n.close()
+        }
+        notice = n
+      } catch { /* The unread chat remains available when the OS declines notifications. */ }
+    }
+    previousScope = scope
+    latestId = latest?.id
+    generation++
     cache.clear()
     schedule()
   })
   const pullOnFocus = () => {
     if (stopped || document.visibilityState === 'hidden') return
+    schedule()
     const now = Date.now()
     if (now - lastFocusPull < FOCUS_PULL_MS) return
     lastFocusPull = now
     void call('sync/pull', {}).catch(() => undefined)
   }
+  document.addEventListener('scroll', schedule, true)
   window.addEventListener('focus', pullOnFocus)
   document.addEventListener('visibilitychange', pullOnFocus)
   schedule()
@@ -322,6 +375,9 @@ export function renderRemoteBubbles(t: Translate): () => void {
     stopped = true
     observer.disconnect()
     offLive()
+    offRooms()
+    notice?.close()
+    document.removeEventListener('scroll', schedule, true)
     window.removeEventListener('focus', pullOnFocus)
     document.removeEventListener('visibilitychange', pullOnFocus)
     if (scheduled) clearTimeout(scheduled)

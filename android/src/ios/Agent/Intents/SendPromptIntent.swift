@@ -440,7 +440,10 @@ final class ShortcutNotificationDelegate: NSObject, UNUserNotificationCenterDele
     ) {
         let userInfo = response.notification.request.content.userInfo
         // nanoMuse: account-bound deadline reminders open the Feed after the app unlocks.
-        if response.notification.request.identifier == NanoMuseDeadlineNotifications.identifier,
+        if response.notification.request.identifier == NanoMuseChatOutreach.notificationID, // nanoMuse: recheck the destination after unlock.
+           let info = userInfo as? [String: String] {
+            DispatchQueue.main.async { NanoMuseChatOutreach.shared.tapped(info) }
+        } else if response.notification.request.identifier == NanoMuseDeadlineNotifications.identifier,
            let info = userInfo as? [String: String] {
             DispatchQueue.main.async { NanoMuseDeadlineNotifications.shared.tapped(info) }
         } else if let sessionId = userInfo["sessionId"] as? String {

@@ -2428,6 +2428,41 @@ actor ChatStore {
         listFolders().first(where: { $0.id == id })
     }
 
+    // nanoMuse: persist assistant outreach and its daily receipt together, then refresh live chat consumers.
+    func nmDeliverOutreach(owner: String, session: String, day: String, now: Date, references: [NanoMuseFeedChatContext.Reference],
+                           goal: NanoMuseGoal?, permit: NanoMuseOutreachPermit, version: UInt) -> NanoMuseOutreachJournal.Result {
+        let result = permit.perform(version) {
+            let prefs = UserDefaults.standard
+            guard !Task.isCancelled, prefs.bool(forKey: NanoMuseChatOutreach.preference),
+                  (prefs.object(forKey: "nanomuse.shell.enabled") as? Bool ?? true),
+                  prefs.string(forKey: "nanomuse.main_chat.session") == session else { return .later }
+            return NanoMuseOutreachJournal.write(db: db, owner: owner, session: session, day: day, at: now, candidate: {
+                if !references.isEmpty && prefs.bool(forKey: NanoMuseFeedChatIndex.setting)
+                    && (prefs.object(forKey: "memory.global.enabled") as? Bool ?? true) {
+                    let turns = NanoMuseFeedChatContext.read(references, db: db)
+                    if let item = NanoMuseFeedChatContext.outstanding(turns, now: now).first(where: { Calendar.current.isDate($0.due, inSameDayAs: now) }) {
+                        let text = item.update.map { String(format: AppLocalized("You mentioned “%@” and later said “%@”. It is on your plan today. Can I help you get ready?"), item.request, $0) }
+                            ?? String(format: AppLocalized("You mentioned “%@”. It is on your plan today. Can I help you get ready?"), item.request)
+                        return .init(text: text, goalID: nil)
+                    }
+                }
+                guard let goal, prefs.object(forKey: NanoMuseGoalDeadline.preference) as? Bool ?? true else { return nil }
+                let text = goal.steps.first(where: { !$0.done }).map {
+                    String(format: AppLocalized("“%@” is due today. How is the next step, “%@”, going?"), goal.title, $0.text)
+                } ?? String(format: AppLocalized("“%@” is due today. How is it going?"), goal.title)
+                return .init(text: text, goalID: goal.id)
+            }, dirty: { id in
+                markDirty(recordType: "Message", recordId: id)
+                markDirty(recordType: "Session", recordId: session)
+            })
+        }
+        if case .delivered = result {
+            invalidateSessionListCache()
+            NotificationCenter.default.post(name: .sessionDidUpdate, object: session)
+        }
+        return result
+    }
+
     // nanoMuse: the Feed reads a bounded set of original local composer turns using this actor's database.
     func nmFeedTurns(_ references: [NanoMuseFeedChatContext.Reference]) -> [NanoMuseFeedChatContext.Turn] {
         NanoMuseFeedChatContext.read(references, db: db)

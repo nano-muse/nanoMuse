@@ -12532,7 +12532,10 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         val merged = mutableListOf<ChatMessage>()
         for (msg in messages) {
             val prev = merged.lastOrNull()
-            if (msg.role == "assistant" && prev?.role == "assistant") {
+            // nanoMuse: a local check-in or a synced final answer is a distinct incoming message.
+            if (msg.role == "assistant" && prev?.role == "assistant" &&
+                !io.github.nanomuse.feed.ChatCheckIns.isMessage(msg.id) && !io.github.nanomuse.feed.ChatCheckIns.isMessage(prev.id) &&
+                msg.id !in io.github.nanomuse.sync.ConversationSync.remoteRows.value && prev.id !in io.github.nanomuse.sync.ConversationSync.remoteRows.value) {
                 // Merge: combine tool blocks, append text, keep the last id.
                 // Deduplicate by block.id — the agent loop may persist the same tool
                 // use in multiple consecutive turns (as it carries tool state across),

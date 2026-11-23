@@ -1296,4 +1296,6 @@
     <string name="nm_deadline_notice">Öffne den Feed für deinen nächsten Schritt.</string>
     <string name="nm_feed_use_recent_chats">Aktuelle Chats für den Feed nutzen</string>
     <string name="nm_feed_recent_chats_hint">Nur Nachrichten, die du nach dem Aktivieren hier eingibst. Geschützte Chats sind ausgenommen.</string>
+    <string name="nm_chat_checkin_setting">Bei fälligen Vorhaben im Chat schreiben</string>
+    <string name="nm_chat_checkin_body">Du hattest das für heute geplant:\n„%1$s“\n\nWie läuft es? Kann ich dir bei der Vorbereitung helfen?</string>
 </resources>

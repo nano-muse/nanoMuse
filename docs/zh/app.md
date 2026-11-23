@@ -157,6 +157,8 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 在主要聊天里说「我在等供应商周五下午三点发来星桥报价」，到了周五三点，动态就可以提醒你问进展。日期和时间按运行服务的当地时间计算，过期后三天内仍可跟进。卡片可展开核对原话和改期记录，说「星桥报价收到了」或明确取消后会撤下。每次最多展示一件等回复的事，可以选「明天再提醒」、关闭，或把询问放进主要聊天的输入框自行编辑。这项判断直接读取聊天记录，无需调用模型或查询邮箱。
 
+想让 nanoMuse 主动来问，可以在动态设置打开「到了约定时间，在主要聊天里问我」。比如今天该收到供应商的报价了，它会在主要聊天里问「现在收到了吗？」直接回「收到了」就能结束这件事，其他还在等的报价会保留。只要运行时在线，关掉浏览器也能收到聊天留言。它会等聊天空闲十分钟，避开免打扰时段，每天当地时间 09:00 到 20:00 最多主动问一次。上一条还没有回应时，它会等你回。另行开启跟进通知并允许浏览器推送后，通知可以直接打开主要聊天，锁屏只提示有新消息。
+
 设置中的「主动性」决定智能体主动推进任务和通知你的频率：
 
 | 档位 | 执行频率 | 何时通知 |
@@ -204,7 +206,7 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | GET | `/api/activity` | 返回最新审计记录、已授予的 `grants[]`，各项含 `key`、`tool`、`target`、`scope`、`expires_at`，以及对话污染标记。 |
 | GET | `/api/feed?limit=` | 按最新在前返回「你离开期间」：`{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}`。 |
 | GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}`。 |
-| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, on_change?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
+| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, chat_followups?, on_change?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
 | PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | 明天再次显示当前跟进卡片，或隐藏该项。 |
 | PUT | `/api/feed/posts/{id}/handled` | 隐藏围绕当前事项版本的准备材料。 |
 | POST | `/api/feed/posts/refresh[?prepare_only=true]` | 传 `prepare_only=true` 时只根据已有材料准备，可返回空列表。旧版客户端仍可以手动请求阅读文章。 |

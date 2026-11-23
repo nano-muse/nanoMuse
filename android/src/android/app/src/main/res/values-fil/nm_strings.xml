@@ -1296,4 +1296,6 @@
     <string name="nm_deadline_notice">Buksan ang Feed para makita ang susunod na hakbang.</string>
     <string name="nm_feed_use_recent_chats">Gamitin ang mga bagong chat para sa Feed</string>
     <string name="nm_feed_recent_chats_hint">Mga mensaheng ita-type mo lang dito pagkatapos i-on ito. Hindi kasama ang mga protektadong chat.</string>
+    <string name="nm_chat_checkin_setting">Padalhan ako ng mensahe kapag araw na ng napag-usapan sa chat</string>
+    <string name="nm_chat_checkin_body">Nabanggit mo itong plano para sa araw na ito:\n“%1$s”\n\nKumusta na? May maitutulong ba ako sa paghahanda?</string>
 </resources>

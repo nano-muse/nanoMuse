@@ -46,6 +46,7 @@ object FeedChatEvidence {
         val edit = prefs(context).edit().remove(REFERENCES)
         if (value) edit.putString(SWITCH, UUID.randomUUID().toString()) else edit.remove(SWITCH)
         edit.apply()
+        if (!value) ChatCheckIns.configure(context, false)
         revision.update { it + 1 }
     }
 
@@ -73,6 +74,7 @@ object FeedChatEvidence {
         val arr = JSONArray()
         refs.distinct().take(MAX_ROWS).forEach { arr.put(JSONArray(listOf(it.session, it.id, it.textHash))) }
         prefs(context).edit().putString(REFERENCES, arr.toString()).apply()
+        ChatCheckIns.schedule(context)
         revision.update { it + 1 }
     }
 

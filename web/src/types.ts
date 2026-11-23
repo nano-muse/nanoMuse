@@ -848,6 +848,7 @@ export interface FeedPostsData {
   on_change?: boolean;
   followups_enabled?: boolean;
   followup_push?: boolean;
+  chat_followups?: boolean;
   instructions: string;
   generated_at: string | null;
   posts: FeedPost[];

@@ -243,28 +243,33 @@ final class NanoMuseScheduler: ObservableObject {
     }
 
     func scheduleBackgroundRefresh() {
-        guard let next = nextDue() else { return }
+        let now = Date()
+        guard let next = [nextDue(after: now)?.at, NanoMuseChatOutreach.shared.nextRefresh(after: now)].compactMap({ $0 }).min() else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskId)
-        request.earliestBeginDate = max(next.at, Date().addingTimeInterval(15 * 60))
+        request.earliestBeginDate = max(next, now.addingTimeInterval(15 * 60))
         try? BGTaskScheduler.shared.submit(request)
     }
 
     /// iOS woke us for a moment: there is no time for a model turn, so the
     /// routines that came due get a notification each, and the next refresh is asked for.
     private func handleBackgroundRefresh(_ task: BGAppRefreshTask) {
-        task.expirationHandler = { }
         let now = Date()
         for r in routines where r.isDue(at: now) && r.id != NanoMuseFeedFlow.routineId {
             postDueNotification(r, at: now)
         }
-        scheduleBackgroundRefresh()
-        task.setTaskCompleted(success: true)
+        let work = Task { @MainActor [self] in
+            await NanoMuseChatOutreach.shared.check(now: now)
+            scheduleBackgroundRefresh()
+            task.setTaskCompleted(success: !Task.isCancelled)
+        }
+        task.expirationHandler = { work.cancel() }
     }
 
     // MARK: Running
 
     /// Run every routine that is due, one after the other.
     func catchUp(reason: String) {
+        Task { await NanoMuseChatOutreach.shared.check() }
         guard catchUpTask == nil else { return }
         let now = Date()
         let due = routines.filter { $0.isDue(at: now) && !running.contains($0.id) }

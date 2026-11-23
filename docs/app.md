@@ -169,6 +169,8 @@ The preparation writer uses the configured model without tools. It considers act
 
 The Feed can also follow an expected reply mentioned in the main chat. If you write “I’m waiting for the supplier to send the Atlas quote by Friday at 3 PM”, it can show the quote from that time on Friday and for the next three days. Dates and times use the runtime’s local time. Expand the card to see your original words and any change of date. A clear receipt or cancellation retires it. The Feed shows one expected reply at a time. You can snooze it until tomorrow, dismiss it, or put an inquiry in the main chat to edit. This check reads the chat locally and uses no model or mailbox.
 
+In Feed settings, turn on *Ask me in the main chat when a reply is due* to let nanoMuse start the conversation. For example, if the supplier promised you a quote today, it can ask “Did it come through?” in the main chat. A direct “yes” settles that particular wait, even if another quote is still due. The runtime checks while it is running, including with the browser closed. It waits for ten minutes of quiet in the conversation, respects quiet hours, and sends at most one such message per day between 09:00 and 20:00 runtime time. It waits for an answer before asking about another item. With web push subscribed and follow-up notifications on, a private notification opens the main chat.
+
 The agent does things on its own, but not too many. The *Proactivity* dial in Settings sets how much:
 
 | Level | Passes | Reaches out |
@@ -216,7 +218,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | GET | `/api/activity` | audit tail, granted permissions (`grants[]` with `key`, `tool`, `target`, `scope`, `expires_at`), taint flag |
 | GET | `/api/feed?limit=` | *While you were away*: `{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}` newest first |
 | GET | `/api/feed/posts` | the posts written for you: `{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}` |
-| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, on_change?}` | what the posts should be about (≤ 2000 characters), and the daily routine: on or off, and when (`HH:MM`, 08:00 at first) |
+| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, chat_followups?, on_change?}` | what the posts should be about (≤ 2000 characters), and the daily routine: on or off, and when (`HH:MM`, 08:00 at first) |
 | PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | show the same follow-up tomorrow or dismiss it |
 | PUT | `/api/feed/posts/{id}/handled` | dismiss preparation for this version of its subject |
 | POST | `/api/feed/posts/refresh[?prepare_only=true]` | `prepare_only=true` requests grounded preparation and permits an empty result. Older clients can still explicitly request reading posts |

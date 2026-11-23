@@ -1,6 +1,12 @@
 package io.github.nanomuse.ui.feed
 
 import androidx.compose.animation.animateColorAsState
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
+import io.github.nanomuse.feed.ChatCheckIns
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -531,6 +537,19 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
                             Text(stringResource(R.string.nm_feed_recent_chats_hint), fontSize = 12.sp, color = ChatColors.secondaryText)
                         }
                         Switch(checked = chatEnabled, onCheckedChange = { FeedChatEvidence.enable(context, it) })
+                    }
+                    if (chatEnabled) {
+                        var checkIns by remember(context, chatRevision) { mutableStateOf(ChatCheckIns.enabled(context)) }
+                        val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.nm_chat_checkin_setting), fontSize = 15.sp, modifier = Modifier.weight(1f))
+                            Switch(checked = checkIns, onCheckedChange = { on ->
+                                ChatCheckIns.configure(context, on)
+                                checkIns = ChatCheckIns.enabled(context)
+                                if (checkIns && Build.VERSION.SDK_INT >= 33 && !NotificationManagerCompat.from(context).areNotificationsEnabled())
+                                    permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            })
+                        }
                     }
                     HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
                     GoalDeadlineSettings()

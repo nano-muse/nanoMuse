@@ -289,6 +289,7 @@ extension AIChatViewModel {
             if raw.role == .assistant {
                 // nanoMuse: C8 — a reply that came down from another device is its own bubble; it
                 // never folds into this phone's turn (nor the other way round), so the caption is honest.
+                if raw.id.hasPrefix(NanoMuseOutreachJournal.messagePrefix) { currentAssistant = nil } // nanoMuse: a proactive check-in starts its own bubble.
                 let nmOrigin = NanoMuseSync.shared.fromDevice(mid: raw.id) // nanoMuse:
                 if let assistant = currentAssistant, assistant.nmFromDevice == nmOrigin { // nanoMuse: was `if let assistant = currentAssistant`
                     // Continuation of an agent loop — append new blocks to

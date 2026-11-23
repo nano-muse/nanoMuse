@@ -1296,4 +1296,6 @@
     <string name="nm_deadline_notice">Sonraki adımı görmek için akışı açın.</string>
     <string name="nm_feed_use_recent_chats">Akış için son sohbetleri kullan</string>
     <string name="nm_feed_recent_chats_hint">Yalnızca bu seçeneği açtıktan sonra burada yazdığınız iletiler kullanılır. Korumalı sohbetler hariçtir.</string>
+    <string name="nm_chat_checkin_setting">Sohbette konuştuğumuz işin günü geldiğinde bana yaz</string>
+    <string name="nm_chat_checkin_body">Bugün için şu plandan söz etmiştin:\n“%1$s”\n\nNasıl gidiyor? Hazırlık için yardım edebileceğim bir şey var mı?</string>
 </resources>

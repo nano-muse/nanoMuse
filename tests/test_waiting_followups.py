@@ -171,3 +171,18 @@ def test_a_wait_agreed_three_weeks_ahead_still_appears_in_its_grace_period():
     (item,), _ = waiting_for([opening], NOW)
     assert item.due == due and item.ready(NOW)
     assert not item.ready(NOW + timedelta(days=1))
+
+
+def test_answer_to_a_tool_question_does_not_close_an_earlier_followup():
+    first = line("I'm waiting for the Atlas report by today.")
+    (waiting,), _ = waiting_for([first], NOW)
+    nudge = line(
+        "Did the report arrive?",
+        "b",
+        type="assistant",
+        source="chat_followup",
+        waiting_id=waiting.key,
+    )
+    assert not waiting_for([first, nudge, line("Yes", "c")], NOW)[0]
+    tool = line("Continue working?", "d", type="question")
+    assert waiting_for([first, nudge, tool, line("Yes", "e")], NOW)[0] == [waiting]

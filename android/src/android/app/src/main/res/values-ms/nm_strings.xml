@@ -1292,4 +1292,6 @@
     <string name="nm_deadline_notice">Buka Suapan untuk melihat langkah seterusnya.</string>
     <string name="nm_feed_use_recent_chats">Gunakan sembang terkini untuk suapan</string>
     <string name="nm_feed_recent_chats_hint">Hanya mesej yang anda taip di sini selepas ciri ini dihidupkan. Sembang yang dilindungi dikecualikan.</string>
+    <string name="nm_chat_checkin_setting">Hantar mesej pada tarikh yang dijanjikan dalam sembang</string>
+    <string name="nm_chat_checkin_body">Anda pernah menyebut rancangan ini untuk hari ini:\n“%1$s”\n\nBagaimana perkembangannya? Ada yang boleh saya bantu sediakan?</string>
 </resources>
