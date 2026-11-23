@@ -136,19 +136,47 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
   const [on, setOn] = useState(routine.on)
   const [reading, setReading] = useState(routine.reading === true)
   const [checkIns, setCheckIns] = useState(routine.chatCheckIns === true)
+  const saved = routine.contextResource
+  const [connection, setConnection] = useState(saved?.connection ?? '')
+  const [connections, setConnections] = useState<{ id: string; label: string; generation: number }[]>([])
+  const [resource, setResource] = useState(saved?.key ?? '')
+  const [watchEdited, setWatchEdited] = useState(false)
+  const [choices, setChoices] = useState<{ key: string; label: string }[]>(saved ? [saved] : [])
+  const selected = connections.find(c => c.id === connection)
+  const [loading, setLoading] = useState(false)
   const [time, setTime] = useState(routine.time)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  useEffect(() => {
+    let live = true
+    roomsCall<typeof connections>('feed/resource-connections', {}).then(rows => { if (live) setConnections(rows) })
+      .catch(() => { if (live) setError(t('feedContextUnavailable')) })
+    return () => { live = false }
+  }, [])
+  useEffect(() => {
+    let live = true
+    if (!selected) return
+    setLoading(true)
+    if (saved && selected.id === saved.connection && selected.generation !== saved.generation) setResource('')
+    roomsCall<typeof choices>('feed/resource-choices', { scope: routine.checkInScope, connection: selected.id, generation: selected.generation })
+      .then(rows => { if (live) { setChoices(rows); setResource(old => rows.some(r => r.key === old) ? old : '') } })
+      .catch(() => { if (live) setError(t('feedContextUnavailable')) })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [selected, routine.checkInScope])
+  const watchChanged = watchEdited && (connection !== (saved?.connection ?? '') || resource !== (saved?.key ?? '') ||
+    Boolean(selected && saved && selected.generation !== saved.generation))
   const save = (event: FormEvent) => {
     event.preventDefault()
     setSaving(true)
     const checksChanged = checkIns !== (routine.chatCheckIns === true)
-    if (checksChanged && checkIns && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    if (((checksChanged && checkIns) || (watchChanged && resource)) && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       void Notification.requestPermission().catch(() => undefined)
     }
     const routineChanged = checksChanged || on !== routine.on || time !== routine.time || reading !== (routine.reading === true)
     Promise.all([
       roomsCall('feed/instructions', { text }),
+      watchChanged ? roomsCall('feed/resource-watch', { scope: routine.checkInScope, connection, generation: selected?.generation ?? 0, key: resource }) : Promise.resolve(undefined),
       routineChanged ? roomsCall('feed/routine', { on, time, reading, ...(checksChanged ? { chatCheckIns: checkIns, checkInScope: routine.checkInScope } : {}) }) : Promise.resolve(undefined),
     ]).then(onClose).catch((err: unknown) => setError(failureText(t, err))).finally(() => setSaving(false))
   }
@@ -157,7 +185,7 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy || !ready, onClick: () => { onRefresh(); onClose() } }, h(IconRefresh, { size: 14 }), ' ', t('feedWriteNow')),
       h('span', { style: { flex: 1 } }),
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: onClose }, t('cancel')),
-      h('button', { type: 'submit', form: 'nm-feed-settings', className: 'nm-pill nm-pill-sm', disabled: saving }, t('save'))) },
+      h('button', { type: 'submit', form: 'nm-feed-settings', className: 'nm-pill nm-pill-sm', disabled: saving || Boolean(watchChanged && connection && (!resource || !selected || loading)) }, t('save'))) },
     h('form', { id: 'nm-feed-settings', onSubmit: save, className: 'nm-sheet-form' },
       h('p', { className: 'nm-sheet-lead' }, t('feedSettingsLead')),
       h('textarea', { className: 'nm-textarea', rows: 6, value: text, placeholder: t('feedSettingsPlaceholder'), maxLength: 2000, onChange: (e: FormEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value), 'data-modal-autofocus': true }),
@@ -174,6 +202,20 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
       h('label', { className: 'nm-feed-routine' },
         h('input', { type: 'checkbox', checked: checkIns, disabled: !on || !routine.checkInScope, onChange: (e: FormEvent<HTMLInputElement>) => setCheckIns(e.currentTarget.checked) }),
         h('span', null, t('feedChatCheckIns'))),
+      h('label', { className: 'nm-feed-routine' }, h('span', null, t('feedContextConnector')),
+        h('select', { className: 'nm-field', disabled: !routine.checkInScope, value: connection,
+          onChange: (e: FormEvent<HTMLSelectElement>) => { setWatchEdited(true); setConnection(e.currentTarget.value); setResource(''); setChoices([]); setLoading(false); setError(undefined) } },
+          h('option', { value: '' }, t('feedContextOff')),
+          saved && connection === saved.connection && !selected ? h('option', { value: saved.connection }, saved.label) : null,
+          ...connections.map(c => h('option', { key: c.id, value: c.id }, c.label)))),
+      connection ? h('label', { className: 'nm-feed-routine' }, h('span', null, t('feedContextResource')),
+        h('select', { className: 'nm-field', value: resource, disabled: loading || !selected, onChange: (e: FormEvent<HTMLSelectElement>) => { setWatchEdited(true); setResource(e.currentTarget.value) } },
+          h('option', { value: '' }, loading ? t('loading') : choices.length ? t('feedContextChoose') : t('feedContextNone')),
+          ...choices.map(r => h('option', { value: r.key, key: r.key }, r.label))))
+        : null,
+      saved && (!selected || saved.generation !== selected.generation) && connection === saved.connection && connections.length > 0
+        ? h('p', { className: 'nm-sheet-fine' }, t('feedContextReconnect')) : null,
+      h('p', { className: 'nm-sheet-fine' }, t('feedContextAbout')),
       !ready ? h('p', { className: 'nm-sheet-fine' }, t('feedRoutineNeedsModel')) : null,
       error ? h('div', { className: 'nm-room-error' }, error) : null))
 }

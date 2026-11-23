@@ -844,6 +844,24 @@ export interface FeedPost {
   prompt: string;
 }
 
+export interface ContextResource {
+  id: string;
+  label: string;
+}
+
+export interface ContextWatchSettings {
+  local_goals: boolean;
+  checked_at: string | null;
+  unavailable: boolean;
+  revision: string;
+  available_mail: boolean;
+  available_calendar: boolean;
+  mail: boolean;
+  calendar: boolean;
+  local_context: boolean;
+  resources: ContextResource[];
+}
+
 export interface FeedPostsData {
   on_change?: boolean;
   followups_enabled?: boolean;

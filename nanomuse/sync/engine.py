@@ -795,6 +795,10 @@ class ConversationSync:
             kind = ev.get("type")
             if kind not in ("user", "assistant") or ev.get("synced") or ev.get("quiet"):
                 continue
+            # Background source consent covers this runtime. Keep its excerpts and file
+            # metadata local on live pushes as well as full-history backfills.
+            if ev.get("source") == "connected_context":
+                continue
             if ev.get("via_device"):
                 # written on another device: shown here, never pushed as ours
                 continue

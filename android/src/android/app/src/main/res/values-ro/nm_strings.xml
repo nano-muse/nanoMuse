@@ -1300,6 +1300,9 @@
     <string name="nm_deadline_notice">Deschide fluxul pentru a vedea pasul următor.</string>
     <string name="nm_feed_use_recent_chats">Folosește conversațiile recente în flux</string>
     <string name="nm_feed_recent_chats_hint">Sunt folosite doar mesajele scrise aici după activare. Conversațiile protejate sunt excluse.</string>
+    <string name="nm_calendar_checkin_setting">Trimite-mi un mesaj când intervalele ocupate din calendarele vizibile pe telefon se schimbă sau se suprapun</string>
+    <string name="nm_calendar_moved">Un eveniment din calendar s-a mutat de la %1$s la %2$s. Vrei să îți revizuiești planurile?</string>
+    <string name="nm_calendar_overlap">Două evenimente din calendar se suprapun (%1$s și %2$s). Vrei să căutăm alternative?</string>
     <string name="nm_chat_checkin_setting">Trimite-mi un mesaj în ziua stabilită în conversație</string>
     <string name="nm_chat_checkin_body">Ai menționat acest plan pentru astăzi:\n„%1$s”\n\nCum merge? Te pot ajuta să pregătești ceva?</string>
 </resources>

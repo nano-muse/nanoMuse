@@ -13,6 +13,8 @@ import type {
   CodingRun,
   CodingSession,
   ConnectionsData,
+  ContextResource,
+  ContextWatchSettings,
   CustomEndpoint,
   Contact,
   FeedItem,
@@ -302,6 +304,10 @@ export const api = {
     request<{ ok: boolean }>(`/api/feed/followups/${encodeURIComponent(id)}?choice=${choice}`, { method: "PUT" }),
   setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; chat_followups?: boolean; on_change?: boolean }) =>
     request<FeedPostsData>("/api/feed/instructions", { method: "PUT", body: JSON.stringify(body) }),
+  contextWatch: () => request<ContextWatchSettings>("/api/feed/context"),
+  contextResources: () => request<ContextResource[]>("/api/feed/context/resources"),
+  setContextWatch: (body: Pick<ContextWatchSettings, "revision" | "mail" | "calendar" | "local_context"> & { resources: string[] }) =>
+    request<ContextWatchSettings>("/api/feed/context", { method: "PUT", body: JSON.stringify(body) }),
   refreshFeedPosts: () => request<FeedPostsData>("/api/feed/posts/refresh?prepare_only=true", { method: "POST" }),
   handlePreparation: (id: string) => request<{ ok: boolean }>(`/api/feed/posts/${encodeURIComponent(id)}/handled`, { method: "PUT" }),
   deleteFeedPost: (id: string) => request<{ ok: boolean }>(`/api/feed/posts/${id}`, { method: "DELETE" }),

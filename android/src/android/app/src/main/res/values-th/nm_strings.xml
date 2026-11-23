@@ -1292,6 +1292,9 @@
     <string name="nm_deadline_notice">เปิดฟีดเพื่อดูขั้นตอนถัดไป</string>
     <string name="nm_feed_use_recent_chats">ใช้แชตล่าสุดสำหรับฟีด</string>
     <string name="nm_feed_recent_chats_hint">ใช้เฉพาะข้อความที่คุณพิมพ์บนอุปกรณ์นี้หลังเปิดใช้ โดยข้ามแชตที่ป้องกันไว้</string>
+    <string name="nm_calendar_checkin_setting">ส่งข้อความเมื่อช่วงเวลาไม่ว่างในปฏิทินที่แสดงบนโทรศัพท์เปลี่ยนหรือทับซ้อนกัน</string>
+    <string name="nm_calendar_moved">กิจกรรมในปฏิทินเลื่อนจาก %1$s เป็น %2$s ต้องการทบทวนแผนด้วยกันไหม</string>
+    <string name="nm_calendar_overlap">กิจกรรมสองรายการในปฏิทินมีเวลาทับซ้อนกัน (%1$s และ %2$s) ต้องการดูทางเลือกอื่นไหม</string>
     <string name="nm_chat_checkin_setting">ส่งข้อความเมื่อถึงวันที่นัดหมายไว้ในแชต</string>
     <string name="nm_chat_checkin_body">คุณเคยบอกว่ามีแผนนี้วันนี้\n“%1$s”\n\nเป็นอย่างไรบ้าง มีอะไรให้ช่วยเตรียมไหม</string>
 </resources>

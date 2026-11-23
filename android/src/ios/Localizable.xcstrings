@@ -1,6 +1,419 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Calendar changes in chat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendar changes in chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在聊天中提醒日程变化"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在聊天中提醒行程變動"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kalenderänderungen im Chat"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambios del calendario en el chat"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changements de calendrier dans le chat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日程の変更をチャットで通知"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "채팅에서 일정 변경 알림"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменения календаря в чате"
+          }
+        }
+      }
+    },
+    "Choose calendars": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose calendars"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择日历"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇行事曆"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kalender auswählen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir calendarios"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir les calendriers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダーを選択"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "캘린더 선택"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбрать календари"
+          }
+        }
+      }
+    },
+    "No calendars available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No calendars available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可用的日历。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有可用的行事曆。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Kalender verfügbar."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay calendarios disponibles."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun calendrier disponible."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用できるカレンダーがありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사용할 수 있는 캘린더가 없습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нет доступных календарей."
+          }
+        }
+      }
+    },
+    "Stop watching calendars": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop watching calendars"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止查看日历"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止查看行事曆"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kalenderbeobachtung beenden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dejar de revisar calendarios"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter le suivi des calendriers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダーの確認を停止"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "캘린더 확인 중지"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прекратить проверку календарей"
+          }
+        }
+      }
+    },
+    "Choose which calendars nanoMuse can check on this iPhone. It compares busy times locally and can message your main chat about a new overlap or a time change.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose which calendars nanoMuse can check on this iPhone. It compares busy times locally and can message your main chat about a new overlap or a time change."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择允许 nanoMuse 在这台 iPhone 上查看的日历。它会在本机比对忙碌时段，发现新的时间冲突或改期时，可以在主要聊天里提醒你。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇允許 nanoMuse 在這部 iPhone 上查看的行事曆。它會在本機比對忙碌時段，遇到新的時間衝突或改期時，可在主要聊天中提醒你。"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle die Kalender, die nanoMuse auf diesem iPhone prüfen darf. Es vergleicht belegte Zeiten auf dem Gerät und kann dich im Hauptchat auf neue Überschneidungen oder Verschiebungen hinweisen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige qué calendarios puede revisar nanoMuse en este iPhone. Compara los periodos ocupados en el dispositivo y puede avisarte en el chat principal si se solapan o cambian de hora."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez les calendriers que nanoMuse peut consulter sur cet iPhone. Il compare les créneaux occupés sur l’appareil et peut vous signaler un nouveau chevauchement ou un changement d’horaire dans le chat principal."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このiPhoneでnanoMuseが確認できるカレンダーを選びます。予定の時間を端末内で比較し、新たな重複や時間の変更をメインチャットでお知らせします。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 iPhone에서 nanoMuse가 확인할 캘린더를 선택하세요. 기기에서 바쁜 시간대를 비교하고 일정이 새로 겹치거나 시간이 바뀌면 기본 채팅으로 알려줄 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите календари, которые nanoMuse может проверять на этом iPhone. Приложение сравнивает занятые интервалы на устройстве и может сообщить о новом пересечении или переносе в основном чате."
+          }
+        }
+      }
+    },
+    "Calendar shows a time change from %1$@ to %2$@. Shall we review what else needs to move?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendar shows a time change from %1$@ to %2$@. Shall we review what else needs to move?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日历里有个安排从 %1$@ 改到了 %2$@。要一起看看其他安排需不需要调整吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行事曆中有項安排從 %1$@ 改到了 %2$@。要一起看看其他安排是否需要調整嗎？"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Kalender wurde ein Termin von %1$@ auf %2$@ verschoben. Sollen wir schauen, was sich dadurch noch ändert?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un evento del calendario ha pasado de %1$@ a %2$@. ¿Revisamos si tienes que mover algo más?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un créneau de votre calendrier est passé de %1$@ à %2$@. Voulez-vous vérifier si d’autres horaires sont à ajuster ?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダーの予定が %1$@ から %2$@ に変わりました。他に調整が必要な予定を一緒に確認しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "캘린더 일정이 %1$@에서 %2$@(으)로 변경됐어요. 다른 일정도 조정해야 할지 함께 확인할까요?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В календаре встреча перенесена с %1$@ на %2$@. Проверим, какие ещё планы стоит сдвинуть?"
+          }
+        }
+      }
+    },
+    "Calendar shows a new overlap between %1$@ and %2$@. Would you like help adjusting your plans?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calendar shows a new overlap between %1$@ and %2$@. Would you like help adjusting your plans?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日历里有两个时段刚好冲突了，分别是 %1$@ 和 %2$@。要一起看看怎么调整吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行事曆中有兩個時段出現衝突，分別是 %1$@ 和 %2$@。要一起看看怎麼調整嗎？"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Kalender überschneiden sich jetzt %1$@ und %2$@. Soll ich dir helfen, deine Pläne anzupassen?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En el calendario ahora coinciden %1$@ y %2$@. ¿Te ayudo a ajustar tus planes?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les créneaux %1$@ et %2$@ se chevauchent désormais dans votre calendrier. Voulez-vous revoir votre planning ?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダーで %1$@ と %2$@ の予定が新たに重なりました。予定の調整をお手伝いしましょうか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "캘린더에서 %1$@ 일정과 %2$@ 일정이 새로 겹쳤어요. 일정 조정을 도와드릴까요?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В календаре появилось пересечение между %1$@ и %2$@. Помочь вам скорректировать планы?"
+          }
+        }
+      }
+    },
     "After %@, the Feed checks goals and notes while the app is active. When two records connect, it can prepare a draft, a checklist or a question. Open the card to see both sources.": {
       "extractionState": "manual",
       "localizations": {

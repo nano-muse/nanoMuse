@@ -147,6 +147,14 @@ class FeedInstructionsBody(BaseModel):
     time: str | None = None
 
 
+class ContextWatchBody(BaseModel):
+    revision: str
+    mail: bool
+    calendar: bool
+    resources: list[str] = Field(max_length=6)
+    local_context: bool
+
+
 class ApprovalBody(BaseModel):
     approved: bool
     scope: str = "once"
@@ -1917,6 +1925,21 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     @app.get("/api/feed/posts", dependencies=dep)
     async def feed_posts() -> dict[str, Any]:
         return svc.feed_view()
+
+    @app.get("/api/feed/context", dependencies=dep)
+    async def context_watch() -> dict[str, Any]:
+        return svc.context_watch.view()
+
+    @app.get("/api/feed/context/resources", dependencies=dep)
+    async def context_resources() -> list[dict[str, str]]:
+        return await svc.context_watch.resources()
+
+    @app.put("/api/feed/context", dependencies=dep)
+    async def set_context_watch(body: ContextWatchBody) -> dict[str, Any]:
+        try:
+            return svc.context_watch.configure(**body.model_dump())
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.put("/api/feed/instructions", dependencies=dep)
     async def feed_instructions(body: FeedInstructionsBody) -> dict[str, Any]:

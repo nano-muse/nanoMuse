@@ -1262,6 +1262,9 @@
     <string name="nm_deadline_notice">開啟動態，查看下一步。</string>
     <string name="nm_feed_use_recent_chats">用近期聊天準備動態</string>
     <string name="nm_feed_recent_chats_hint">只使用開啟後你在此裝置輸入的訊息。已鎖定的對話會略過。</string>
+    <string name="nm_calendar_checkin_setting">手機上可見行事曆的忙碌時段改期或重疊時，主動傳訊息給我</string>
+    <string name="nm_calendar_moved">手機行事曆有項安排從 %1$s 改到 %2$s。要一起看看哪些計畫需要調整嗎？</string>
+    <string name="nm_calendar_overlap">手機行事曆有兩項安排重疊（%1$s 和 %2$s）。要一起看看其他時段嗎？</string>
     <string name="nm_chat_checkin_setting">聊天中的待辦到期時，主動傳訊息給我</string>
     <string name="nm_chat_checkin_body">你之前提過這件事，約定的日期是今天：\n「%1$s」\n\n現在進展如何？有什麼需要我幫你準備的嗎？</string>
 </resources>

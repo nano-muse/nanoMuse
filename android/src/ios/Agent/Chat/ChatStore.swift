@@ -2430,13 +2430,18 @@ actor ChatStore {
 
     // nanoMuse: persist assistant outreach and its daily receipt together, then refresh live chat consumers.
     func nmDeliverOutreach(owner: String, session: String, day: String, now: Date, references: [NanoMuseFeedChatContext.Reference],
-                           goal: NanoMuseGoal?, permit: NanoMuseOutreachPermit, version: UInt) -> NanoMuseOutreachJournal.Result {
+                           goal: NanoMuseGoal?, permit: NanoMuseOutreachPermit, version: UInt,
+                           calendarItem: NanoMuseOutreachJournal.Candidate? = nil) -> NanoMuseOutreachJournal.Result {
         let result = permit.perform(version) {
             let prefs = UserDefaults.standard
-            guard !Task.isCancelled, prefs.bool(forKey: NanoMuseChatOutreach.preference),
+            let fromCalendar = calendarItem != nil && !NanoMuseCalendarWatch.selected.isEmpty && NanoMuseCalendarReader.readable
+            let fromChat = prefs.bool(forKey: NanoMuseChatOutreach.preference)
+            guard !Task.isCancelled, fromChat || fromCalendar,
                   (prefs.object(forKey: "nanomuse.shell.enabled") as? Bool ?? true),
                   prefs.string(forKey: "nanomuse.main_chat.session") == session else { return .later }
-            return NanoMuseOutreachJournal.write(db: db, owner: owner, session: session, day: day, at: now, candidate: {
+            return NanoMuseOutreachJournal.write(db: db, owner: owner, session: session, day: day, at: now, allowEmpty: fromCalendar, candidate: {
+                if fromCalendar { return calendarItem }
+                guard fromChat else { return nil }
                 if !references.isEmpty && prefs.bool(forKey: NanoMuseFeedChatIndex.setting)
                     && (prefs.object(forKey: "memory.global.enabled") as? Bool ?? true) {
                     let turns = NanoMuseFeedChatContext.read(references, db: db)

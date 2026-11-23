@@ -159,6 +159,13 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 想让 nanoMuse 主动来问，可以在动态设置打开「到了约定时间，在主要聊天里问我」。比如今天该收到供应商的报价了，它会在主要聊天里问「现在收到了吗？」直接回「收到了」就能结束这件事，其他还在等的报价会保留。只要运行时在线，关掉浏览器也能收到聊天留言。它会等聊天空闲十分钟，避开免打扰时段，每天当地时间 09:00 到 20:00 最多主动问一次。上一条还没有回应时，它会等你回。另行开启跟进通知并允许浏览器推送后，通知可以直接打开主要聊天，锁屏只提示有新消息。
 
+### 留意已接入的信息
+
+在动态设置里，选择允许当前模型查看的邮箱、日历或具体的 MCP 文本资源，也可以勾选参考你最近在主要聊天里说过的话。本地模式还可以参考这台设备上进行中的目标。首次检查只记下起点。比如印厂后来发邮件，说要等你确认封面才能开印，即使之前从没和 nanoMuse 提过这件事，它也可以在主要聊天里引用邮件，问要不要帮你起草回复。下一步由你决定。
+
+运行时在线时大约每十分钟检查一次，浏览器可以关闭。检查范围是新到邮件、未来 24 小时内占用时间的日程和所选资源的变化。模型只读有限的摘录，判断时不会调用工具。每天最多四次模型判断，与原有聊天跟进合计最多发一条主动消息，避开免打扰时段和正在进行的对话。更换邮箱、日历配置或 MCP 连接后，可能需要重新选择。自动引用来源的消息保存在当前运行时的聊天里，浏览器通知只提示有新消息。之后的普通对话沿用已有的同步设置。只有提供可读文本资源的 MCP 服务才会出现在选择列表。
+
+
 设置中的「主动性」决定智能体主动推进任务和通知你的频率：
 
 | 档位 | 执行频率 | 何时通知 |
@@ -206,6 +213,8 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | GET | `/api/activity` | 返回最新审计记录、已授予的 `grants[]`，各项含 `key`、`tool`、`target`、`scope`、`expires_at`，以及对话污染标记。 |
 | GET | `/api/feed?limit=` | 按最新在前返回「你离开期间」：`{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}`。 |
 | GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}`。 |
+| GET / PUT | `/api/feed/context` | 读取或更新当前账号选择的信息源，保存时带上读取到的 revision。 |
+| GET | `/api/feed/context/resources` | 为选择器列出已连接的 MCP 服务提供的具体文本资源。 |
 | PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, chat_followups?, on_change?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
 | PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | 明天再次显示当前跟进卡片，或隐藏该项。 |
 | PUT | `/api/feed/posts/{id}/handled` | 隐藏围绕当前事项版本的准备材料。 |

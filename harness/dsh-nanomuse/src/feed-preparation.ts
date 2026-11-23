@@ -10,7 +10,7 @@ const fingerprint = (parts: string[]) => createHash('sha256').update(JSON.string
 // actually mentions a cited detail. Intl.Segmenter also splits words in Chinese/Japanese.
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'word' })
 const ordinary = new Set('about after again also before could draft from have into more need next please should that the their them there these they this those what when which with would your 今天 准备 可以 已经 我们 需要 这个 这些 进行 确认 计划'.split(' '))
-function terms(text: string): Set<string> {
+export function terms(text: string): Set<string> {
   const result = new Set<string>()
   for (const part of segmenter.segment(text.normalize('NFKC').toLowerCase())) {
     if (!part.isWordLike || ordinary.has(part.segment)) continue

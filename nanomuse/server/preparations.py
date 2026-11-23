@@ -46,6 +46,7 @@ class Source:
     anchor: bool
     reply: str = ""
     recorded_at: str = ""
+    label: str = ""
 
     @property
     def revision(self) -> str:

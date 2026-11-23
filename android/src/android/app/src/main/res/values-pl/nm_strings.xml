@@ -1304,6 +1304,9 @@
     <string name="nm_deadline_notice">Otwórz aktualności, aby zobaczyć kolejny krok.</string>
     <string name="nm_feed_use_recent_chats">Używaj ostatnich rozmów w aktualnościach</string>
     <string name="nm_feed_recent_chats_hint">Tylko wiadomości wpisane tutaj po włączeniu opcji. Chronione rozmowy są pomijane.</string>
+    <string name="nm_calendar_checkin_setting">Pisz do mnie, gdy zajęte terminy w widocznych kalendarzach telefonu zmienią się lub nałożą</string>
+    <string name="nm_calendar_moved">Termin w kalendarzu zmienił się z %1$s na %2$s. Chcesz przejrzeć swoje plany?</string>
+    <string name="nm_calendar_overlap">Dwa terminy w kalendarzu nakładają się (%1$s i %2$s). Chcesz rozważyć inne możliwości?</string>
     <string name="nm_chat_checkin_setting">Napisz do mnie w dniu ustalonym na czacie</string>
     <string name="nm_chat_checkin_body">W rozmowie pojawił się ten plan na dziś:\n„%1$s”\n\nJak idzie? Czy mogę pomóc w przygotowaniach?</string>
 </resources>

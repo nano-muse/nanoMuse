@@ -4,6 +4,7 @@ import asyncio
 import imaplib
 import socket
 import threading
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -132,8 +133,9 @@ class _TinyImap(threading.Thread):
     """Just enough IMAP for the watcher: greeting, CAPABILITY, LOGIN, EXAMINE, UID SEARCH,
     UID FETCH (RFC822), LOGOUT. Messages are ``{uid: raw_bytes}``."""
 
-    def __init__(self, messages: dict[int, bytes]):
+    def __init__(self, messages: dict[int, bytes], *, validity: int = 1):
         super().__init__(daemon=True)
+        self.validity = validity
         self.messages = messages
         self.sock = socket.socket()
         self.sock.bind(("127.0.0.1", 0))
@@ -170,6 +172,8 @@ class _TinyImap(threading.Thread):
                 send(f"{tag} OK logged in" if "me@example.com" in rest else f"{tag} NO bad")
             elif cmd.startswith(("EXAMINE", "SELECT")):
                 send(f"* {len(self.messages)} EXISTS")
+                send(f"* OK [UIDNEXT {max(self.messages, default=0) + 1}] next")
+                send(f"* OK [UIDVALIDITY {self.validity}] generation")
                 send(f"{tag} OK [READ-ONLY] done")
             elif cmd.startswith("UID SEARCH"):
                 send("* SEARCH " + " ".join(str(u) for u in sorted(self.messages)))
@@ -177,9 +181,20 @@ class _TinyImap(threading.Thread):
             elif cmd.startswith("UID FETCH"):
                 uid = int(rest.split()[2])
                 body = self.messages[uid]
-                f.write(
-                    f"* 1 FETCH (UID {uid} RFC822 {{{len(body)}}}\r\n".encode() + body + b")\r\n"
-                )
+                if "BODY.PEEK[" in cmd:
+                    stamp = imaplib.Time2Internaldate(datetime.now(UTC))
+                    body = body[:65536]
+                    f.write(
+                        f"* 1 FETCH (BODY[]<0> {{{len(body)}}}\r\n".encode()
+                        + body
+                        + f" UID {uid} INTERNALDATE {stamp})\r\n".encode()
+                    )
+                else:
+                    f.write(
+                        f"* 1 FETCH (UID {uid} RFC822 {{{len(body)}}}\r\n".encode()
+                        + body
+                        + b")\r\n"
+                    )
                 f.flush()
                 send(f"{tag} OK done")
             elif cmd.startswith("LOGOUT"):
@@ -370,3 +385,65 @@ def test_arrivals_seeds_the_first_frame_then_fires_on_the_transition():
     # and an unchanged list brings nothing
     state, came = arrivals(state, [me, phone, tablet], "desk-1")
     assert came == []
+
+
+async def test_context_observes_new_mail_in_an_initially_empty_inbox(monkeypatch):
+    """Exercise the real IMAP parser including metadata following a bounded body literal."""
+    from nanomuse.config import EmailSettings
+    from nanomuse.server.context_sources import mail_samples
+    from nanomuse.triggers.mail import MailWatcher
+
+    watcher = MailWatcher(
+        EmailSettings(enabled=True, imap_host="127.0.0.1", address="me@example.com", password="pw")
+    )
+
+    async def poll(cursor, messages, validity=1):
+        server = _TinyImap(messages, validity=validity)
+        server.start()
+        # A new listening port per fixture connection represents the same persistent mailbox.
+        monkeypatch.setattr(
+            imaplib,
+            "IMAP4_SSL",
+            lambda _host, _port, timeout: imaplib.IMAP4("127.0.0.1", server.port, timeout=timeout),
+        )
+        try:
+            result = await mail_samples(watcher, cursor)
+        finally:
+            server.close()
+        assert any("EXAMINE INBOX" in c for c in server.commands)
+        assert all("BODY.PEEK[]<0.65536>" in c for c in server.commands if "FETCH" in c)
+        return result
+
+    records, cursor = await poll({}, {})
+    assert not records and cursor["uid"] == 0 and "me@" not in str(cursor)
+    ordinary = _mail(
+        "Exhibit office",
+        "Revised opening",
+        "Doors open at ten. https://example.invalid/token/private",
+    )
+    secret = _mail("Sign-in", "Verification code", "123456")
+    records, cursor = await poll(cursor, {2: ordinary, 3: secret})
+    assert cursor["uid"] == 3 and len(records) == 1
+    assert "Doors open at ten" in records[0].text and "private" not in records[0].text
+    assert datetime.now(UTC) - datetime.fromisoformat(records[0].recorded_at) < timedelta(minutes=1)
+    records, cursor = await poll(cursor, {4: ordinary}, validity=2)
+    assert not records and cursor["validity"] == 2 and cursor["uid"] == 4
+    burst = {uid: ordinary for uid in range(6, 18)}
+    first, cursor = await poll(cursor, burst, 2)
+    second, cursor = await poll(cursor, burst, 2)
+    assert len(first) == 8 and len(second) == 4 and cursor["uid"] == 17
+    assert len({s.key for s in first + second}) == 12
+    large = _mail(
+        "Exhibit office",
+        "Updated delivery",
+        "Deliver the poster. " + "x" * 100_000 + "PRIVATE_TAIL",
+    )
+    [preview], cursor = await poll(cursor, {18: large}, 2)
+    assert "Deliver the poster" in preview.text and len(preview.text) < 1500
+    assert "PRIVATE_TAIL" not in preview.text and cursor["uid"] == 18
+    watcher.settings.address = "rejected"
+    with pytest.raises(RuntimeError, match="cannot read the connected mailbox"):
+        await poll(cursor, {19: ordinary}, 2)
+    assert cursor["uid"] == 18
+    watcher.settings.enabled = False
+    assert await mail_samples(watcher, cursor) == ([], {})

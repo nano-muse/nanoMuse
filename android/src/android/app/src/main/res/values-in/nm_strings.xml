@@ -1292,6 +1292,9 @@
     <string name="nm_deadline_notice">Buka Feed untuk melihat langkah berikutnya.</string>
     <string name="nm_feed_use_recent_chats">Gunakan chat terbaru untuk Feed</string>
     <string name="nm_feed_recent_chats_hint">Hanya pesan yang Anda ketik di sini setelah diaktifkan. Chat yang dilindungi dikecualikan.</string>
+    <string name="nm_calendar_checkin_setting">Kirimi saya pesan jika jadwal sibuk di kalender ponsel yang terlihat berubah atau bertumpuk</string>
+    <string name="nm_calendar_moved">Acara di kalender Anda berpindah dari %1$s ke %2$s. Ingin meninjau rencana Anda?</string>
+    <string name="nm_calendar_overlap">Dua acara bertumpuk di kalender Anda (%1$s dan %2$s). Ingin melihat pilihan lain?</string>
     <string name="nm_chat_checkin_setting">Kirim pesan saat janji dalam obrolan jatuh tempo</string>
     <string name="nm_chat_checkin_body">Kamu menyebut rencana ini untuk hari ini:\n“%1$s”\n\nBagaimana perkembangannya? Ada yang bisa kubantu siapkan?</string>
 </resources>

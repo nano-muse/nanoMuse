@@ -1292,6 +1292,9 @@
     <string name="nm_deadline_notice">피드를 열어 다음 단계를 확인하세요.</string>
     <string name="nm_feed_use_recent_chats">최근 채팅을 피드에 사용</string>
     <string name="nm_feed_recent_chats_hint">이 설정을 켠 뒤 이 기기에서 입력한 메시지만 사용합니다. 보호된 채팅은 제외됩니다.</string>
+    <string name="nm_calendar_checkin_setting">휴대폰에 표시된 캘린더의 일정 시간이 바뀌거나 겹치면 메시지 받기</string>
+    <string name="nm_calendar_moved">캘린더 일정이 %1$s에서 %2$s로 변경됐어요. 계획을 함께 살펴볼까요?</string>
+    <string name="nm_calendar_overlap">캘린더 일정 두 개가 겹쳐요(%1$s, %2$s). 다른 시간을 찾아볼까요?</string>
     <string name="nm_chat_checkin_setting">채팅에서 정한 날짜에 메시지 받기</string>
     <string name="nm_chat_checkin_body">오늘로 정해 둔 계획이 있어요.\n“%1$s”\n\n어떻게 되어 가고 있나요? 제가 준비를 도와드릴까요?</string>
 </resources>

@@ -45,6 +45,8 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 
 在动态设置打开「在主要聊天中主动联系我」，nanoMuse 可以就今天到期的未完成目标来问你。一起打开「根据聊天提前准备」，它也能跟进你在主要聊天中说过的当日待办。消息会留在主要聊天里，直接回复就能接着聊。它会等聊天空闲，在当地时间 09:00 到 20:00 每天每账号每设备最多主动问一次。App 打开时会检查，退到后台后要等 iOS 给予刷新机会。允许通知后，后台写入消息时可以收到提示。
 
+在动态设置里打开「在聊天中提醒日程变化」，允许读取日历，再选择具体的日历。首次读取只记录当前安排。未来 24 小时内，两个忙碌时段有了新的冲突，或者某项活动的开始时间调整了至少 15 分钟，nanoMuse 就能主动把涉及的时间发到主要聊天。即使之前没有聊过这件事，也可以直接回复。iPhone 在应用运行或 iOS 允许后台刷新时检查有具体时间的忙碌日程，在本机比对时间和事件标识，与其他主动消息共用白天时段和每日额度。开启对话同步后，这条消息和其中的时间也会显示在你的其他设备上。取消选择或点「停止查看日历」会重置比对记录。
+
 `python scripts/rebrand.py` 应用以下调整。脚本可重复执行且结果一致，每次更新上游后都应运行：
 
 - **应用标识**。 Bundle id 改为 `io.github.nanomuse.app` 及 `.ShareExtension`、`.AgentWidget`、`.FileProvider` 扩展，App Group 为 `group.io.github.nanomuse.app`，iCloud 容器为 `iCloud.io.github.nanomuse.app`。包含 bundle id 的后台任务、UTType 和 URL scheme 标识也一起修改。iOS 没有 Android 的源码包名限制，因此整组标识可统一调整。系统注册的链接前缀为 `nanomuse` 和 `nanomuse-mcp`，分享扩展使用 `nanomuse://share`，避免与同机 OpenMinis 冲突。App 内部继续采用上游 `minis://…`，兼容沙箱、系统提示词和模型；系统传入的 `nanomuse://` 由 `NanoMuse/NanoMuseOwnScheme.swift` 转为对应 `minis://`。聊天以外的自有按钮通过 App 深链接路由打开，不交给系统。

@@ -1292,6 +1292,9 @@
     <string name="nm_deadline_notice">フィードで次のステップを確認できます。</string>
     <string name="nm_feed_use_recent_chats">最近のチャットをフィードに使う</string>
     <string name="nm_feed_recent_chats_hint">有効にした後、この端末で入力したメッセージを使います。保護されたチャットは対象外です。</string>
+    <string name="nm_calendar_checkin_setting">スマートフォンに表示中のカレンダーで予定の時間が変わったり重なったりしたら知らせる</string>
+    <string name="nm_calendar_moved">カレンダーの予定が %1$s から %2$s に変更されました。他の予定も確認しますか？</string>
+    <string name="nm_calendar_overlap">カレンダーの予定が重なっています（%1$s と %2$s）。別の時間を一緒に探しますか？</string>
     <string name="nm_chat_checkin_setting">チャットで話した予定の当日にメッセージを受け取る</string>
     <string name="nm_chat_checkin_body">以前話していた予定は今日ですね。\n「%1$s」\n\n進み具合はいかがですか？ 準備を手伝えることはありますか？</string>
 </resources>

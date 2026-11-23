@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added opt-in chat messages about changes in connected sources. The web runtime checked new email, nearby calendar events and selected MCP resources. Desktop checked a selected MCP resource. Android and iPhone compared busy times in selected calendars and offered to help with new overlaps or rescheduled events. These checks could start a conversation about something the person had never mentioned.
+
 - Fixed an Android crash when returning to the home screen immediately after opening a chat notification.
 
 - Added optional check-ins in the conversation itself. Android, iPhone and desktop could ask about a due commitment, and the web runtime could ask whether an expected reply arrived. People could answer directly in the chat.

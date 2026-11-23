@@ -1304,6 +1304,9 @@
     <string name="nm_deadline_notice">Откройте ленту, чтобы увидеть следующий шаг.</string>
     <string name="nm_feed_use_recent_chats">Учитывать недавние чаты в ленте</string>
     <string name="nm_feed_recent_chats_hint">Используются только сообщения, введённые здесь после включения. Защищённые чаты исключены.</string>
+    <string name="nm_calendar_checkin_setting">Сообщать, если время событий в видимых календарях телефона изменилось или совпало</string>
+    <string name="nm_calendar_moved">Событие в календаре перенесено с %1$s на %2$s. Хотите пересмотреть планы?</string>
+    <string name="nm_calendar_overlap">Два события в календаре пересекаются (%1$s и %2$s). Хотите подобрать другое время?</string>
     <string name="nm_chat_checkin_setting">Писать мне в день, о котором мы договорились в чате</string>
     <string name="nm_chat_checkin_body">На сегодня у тебя был такой план:\n«%1$s»\n\nКак дела? Помочь что-нибудь подготовить?</string>
 </resources>

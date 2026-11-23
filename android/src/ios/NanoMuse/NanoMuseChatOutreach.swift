@@ -9,9 +9,10 @@ enum NanoMuseOutreachJournal {
     struct Candidate {
         let text: String
         let goalID: String?
+        var calendarReceipt: String? = nil
     }
     enum Result {
-        case later, spent, delivered(String, Candidate)
+        case later, spent, seenCalendarChange, delivered(String, Candidate)
     }
 
     static func withinHours(_ at: Date, calendar: Calendar = .current) -> Bool {
@@ -19,7 +20,7 @@ enum NanoMuseOutreachJournal {
     }
 
     static func write(db: OpaquePointer?, owner: String, session: String, day: String, at: Date,
-                      candidate: () -> Candidate?, dirty: (String) -> Void) -> Result {
+                      allowEmpty: Bool = false, candidate: () -> Candidate?, dirty: (String) -> Void) -> Result {
         guard let db, sqlite3_exec(db, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK else { return .later }
         var committed = false
         defer { if !committed { sqlite3_exec(db, "ROLLBACK", nil, nil, nil) } }
@@ -44,13 +45,21 @@ enum NanoMuseOutreachJournal {
         // interleaving a prompt with a pending user/tool call would change its meaning.
         let ready = """
         SELECT 1 FROM sessions s WHERE s.id=? AND COALESCE(s.source,'')='' AND s.remote_origin_device_id IS NULL
-          AND EXISTS (SELECT 1 FROM (SELECT role, created_at, part_flags, error_info FROM messages WHERE session_id=?
-              ORDER BY sort_order DESC LIMIT 1) WHERE role='assistant' AND part_flags=1 AND error_info IS NULL AND created_at<=CAST(? AS REAL))
+          AND ((?='1' AND NOT EXISTS (SELECT 1 FROM messages WHERE session_id=?))
+            OR EXISTS (SELECT 1 FROM (SELECT role, created_at, part_flags, error_info FROM messages WHERE session_id=?
+              ORDER BY sort_order DESC LIMIT 1) WHERE role='assistant' AND part_flags=1 AND error_info IS NULL AND created_at<=CAST(? AS REAL)))
         """
         let stamp = String(at.timeIntervalSince1970)
-        guard step(ready, [session, session, String(at.addingTimeInterval(-15 * 60).timeIntervalSince1970)]) == SQLITE_ROW,
+        guard step(ready, [session, allowEmpty ? "1" : "0", session, session, String(at.addingTimeInterval(-15 * 60).timeIntervalSince1970)]) == SQLITE_ROW,
               let choice = candidate(), let data = try? JSONEncoder().encode([ContentPart.text(choice.text)]),
               let parts = String(data: data, encoding: .utf8) else { return .later }
+        if let receipt = choice.calendarReceipt {
+            guard sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS nm_outreach_calendar(owner TEXT PRIMARY KEY, receipt TEXT NOT NULL)", nil, nil, nil) == SQLITE_OK else { return .later }
+            let seen = step("SELECT 1 FROM nm_outreach_calendar WHERE owner=? AND receipt=?", [owner, receipt])
+            if seen == SQLITE_ROW { return .seenCalendarChange }
+            guard seen == SQLITE_DONE,
+                  step("INSERT OR REPLACE INTO nm_outreach_calendar(owner,receipt) VALUES(?,?)", [owner, receipt]) == SQLITE_DONE else { return .later }
+        }
         let id = messagePrefix + UUID().uuidString.lowercased()
         let sql = """
         INSERT INTO messages(id,session_id,role,parts_json,created_at,updated_at,sort_order,part_flags)

@@ -591,6 +591,8 @@ A chat can hold several unfinished commitments. You can discuss something else a
 
 Open Feed settings and enable the daily routine and chat check-ins if you want nanoMuse to message you first. While the desktop app is running, a dated commitment you mention after enabling the setting can prompt a message in its original chat on the agreed day. The chat is marked unread and keeps the question as context for your reply. Delivery is limited to one per day between 09:00 and 20:00. If desktop notifications are available, clicking the notification opens the chat.
 
+To hear about changes you have not mentioned in chat, open Feed settings, choose a connected service under *Follow updates from a connector*, and select one text resource it lists. The first read records a baseline. While the desktop is running, it checks about every thirty minutes during local daytime. Only new text and matching goal titles go to your current chat model for review. For example, if your project status changes to “The venue moved the rehearsal to a smaller room”, nanoMuse can quote the update in your main chat and offer to adjust the plan. Opening the chat lets you continue the conversation. Choose *Off* to stop monitoring. This setting works independently of the daily Feed. Resource messages and chat check-ins share the limit of one per local day between 09:00 and 20:00. This works with MCP services that publish text resources. A service offering tools alone has nothing to select.
+
 The four rooms are on the rail (Chats, Search,
 Feed, Ideas, Goals, Library, Devices), each one `main` panel of the harness's layout,
 so the chat column stays where it is and a room opens in its place. One host service

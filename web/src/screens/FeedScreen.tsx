@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api";
+import { ConnectedContextSettings } from "../components/ConnectedContextSettings";
 import { LoadError } from "../components/LoadError";
 import { Markdown } from "../components/Markdown";
 import { MuseRoundButton } from "../components/MuseHeader";
@@ -577,6 +578,7 @@ function FeedSettingsSheet({
           )}
           {!llmReady && <div className="text-[12.5px] text-muted">{t("Add a model first; the feed is written by your agent.")}</div>}
         </div>
+        {open && <ConnectedContextSettings key={state.hub?.account.account_id ?? state.hub?.account.hint ?? "local"} />}
         <button
           type="button"
           onClick={onWriteNow}

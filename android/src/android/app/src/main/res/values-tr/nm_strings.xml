@@ -1296,6 +1296,9 @@
     <string name="nm_deadline_notice">Sonraki adımı görmek için akışı açın.</string>
     <string name="nm_feed_use_recent_chats">Akış için son sohbetleri kullan</string>
     <string name="nm_feed_recent_chats_hint">Yalnızca bu seçeneği açtıktan sonra burada yazdığınız iletiler kullanılır. Korumalı sohbetler hariçtir.</string>
+    <string name="nm_calendar_checkin_setting">Telefonda görünen takvimlerimdeki dolu saatler değiştiğinde veya çakıştığında bana yaz</string>
+    <string name="nm_calendar_moved">Takvimindeki bir etkinliğin saati değişti. Önceki saat %1$s, yeni saat %2$s. Planlarını gözden geçirmek ister misin?</string>
+    <string name="nm_calendar_overlap">Takvimindeki iki etkinliğin saati çakışıyor (%1$s ve %2$s). Alternatiflere bakmak ister misin?</string>
     <string name="nm_chat_checkin_setting">Sohbette konuştuğumuz işin günü geldiğinde bana yaz</string>
     <string name="nm_chat_checkin_body">Bugün için şu plandan söz etmiştin:\n“%1$s”\n\nNasıl gidiyor? Hazırlık için yardım edebileceğim bir şey var mı?</string>
 </resources>

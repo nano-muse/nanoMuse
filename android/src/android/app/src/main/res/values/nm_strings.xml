@@ -1276,6 +1276,9 @@
     <string name="nm_deadline_notice">Open Feed to review your next step.</string>
     <string name="nm_feed_use_recent_chats">Use recent chats for Feed</string>
     <string name="nm_feed_recent_chats_hint">Use messages you type after turning this on. Protected chats are excluded.</string>
+    <string name="nm_calendar_checkin_setting">Message me when busy times in my visible phone calendars change or overlap</string>
+    <string name="nm_calendar_moved">Your calendar changed. An event previously at %1$s is now at %2$s. Would you like to review your plans?</string>
+    <string name="nm_calendar_overlap">Two calendar events overlap (%1$s and %2$s). Would you like to look at alternatives?</string>
     <string name="nm_chat_checkin_setting">Message me when a chat commitment is due</string>
     <string name="nm_chat_checkin_body">You mentioned this plan for today:\n“%1$s”\n\nHow is it going? Is there anything I can help you prepare?</string>
 </resources>

@@ -171,6 +171,13 @@ The Feed can also follow an expected reply mentioned in the main chat. If you wr
 
 In Feed settings, turn on *Ask me in the main chat when a reply is due* to let nanoMuse start the conversation. For example, if the supplier promised you a quote today, it can ask “Did it come through?” in the main chat. A direct “yes” settles that particular wait, even if another quote is still due. The runtime checks while it is running, including with the browser closed. It waits for ten minutes of quiet in the conversation, respects quiet hours, and sends at most one such message per day between 09:00 and 20:00 runtime time. It waits for an answer before asking about another item. With web push subscribed and follow-up notifications on, a private notification opens the main chat.
 
+### Updates from connected sources
+
+In Feed settings, select the inbox, calendar feeds or individual MCP text resources that nanoMuse may review with your configured model. Optionally include recent messages you wrote in your main chat. In local mode, you can also include this device’s active goals. The first check establishes a baseline. If a print shop later writes that it needs your approval to start a job, nanoMuse can quote the request in the main chat and offer to draft a reply, even if you never mentioned the job. You decide whether to take the next step.
+
+While the runtime is online it checks about every ten minutes, including with the browser closed. It compares new mail, the next 24 hours of busy calendar events, and changes to the selected resources. The model sees bounded excerpts and has no tools during the review. It can leave a change unmentioned. The runtime allows four model reviews per day and shares one daytime chat message with other automatic check-ins. Quiet hours and ongoing conversations take precedence. Changing the connected mailbox, calendar configuration or MCP endpoint can require choosing the source again. Automatic messages quoting connected sources stay in this runtime’s chat. Browser notifications show a generic notice. Ordinary replies follow the existing conversation sync settings. MCP servers must advertise concrete readable text resources to appear in the picker.
+
+
 The agent does things on its own, but not too many. The *Proactivity* dial in Settings sets how much:
 
 | Level | Passes | Reaches out |
@@ -218,6 +225,8 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | GET | `/api/activity` | audit tail, granted permissions (`grants[]` with `key`, `tool`, `target`, `scope`, `expires_at`), taint flag |
 | GET | `/api/feed?limit=` | *While you were away*: `{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}` newest first |
 | GET | `/api/feed/posts` | the posts written for you: `{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}` |
+| GET / PUT | `/api/feed/context` | Read or change the selected sources for this account. Updates include the revision returned by GET. |
+| GET | `/api/feed/context/resources` | List concrete text resources advertised by connected MCP servers for the picker. |
 | PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, chat_followups?, on_change?}` | what the posts should be about (≤ 2000 characters), and the daily routine: on or off, and when (`HH:MM`, 08:00 at first) |
 | PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | show the same follow-up tomorrow or dismiss it |
 | PUT | `/api/feed/posts/{id}/handled` | dismiss preparation for this version of its subject |

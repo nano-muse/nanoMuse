@@ -34,12 +34,13 @@ final class NanoMuseChatOutreachTests: XCTestCase {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, sqlite3_step(stmt) == SQLITE_ROW else { return -1 }
         return Int(sqlite3_column_int64(stmt, 0))
     }
-    private func deliver(owner: String = "owner", day: String = "2026-11-25", choice: Bool = true) -> String {
-        let result = NanoMuseOutreachJournal.write(db: db, owner: owner, session: "main", day: day, at: now, candidate: {
-            choice ? .init(text: "Do you want to prepare the museum inquiry?", goalID: nil) : nil
+    private func deliver(owner: String = "owner", day: String = "2026-11-25", choice: Bool = true, calendarReceipt: String? = nil) -> String {
+        let result = NanoMuseOutreachJournal.write(db: db, owner: owner, session: "main", day: day, at: now, allowEmpty: calendarReceipt != nil, candidate: {
+            choice ? .init(text: "Do you want to prepare the museum inquiry?", goalID: nil, calendarReceipt: calendarReceipt) : nil
         }, dirty: { _ in })
         switch result {
         case .spent: return "spent"
+        case .seenCalendarChange: return "seen"
         case .later: return "later"
         case .delivered(let id, _):
             XCTAssertTrue(id.hasPrefix(NanoMuseOutreachJournal.messagePrefix))
@@ -96,6 +97,21 @@ final class NanoMuseChatOutreachTests: XCTestCase {
         XCTAssertEqual(deliver(), "later")
         execute("UPDATE messages SET created_at=\(Int(now.timeIntervalSince1970) - 900)")
         XCTAssertEqual(deliver(), "sent")
+    }
+
+    func testCalendarCanStartAnEmptyMainChatAndItsReceiptSurvivesDeletion() {
+        execute("DELETE FROM messages")
+        XCTAssertEqual(deliver(), "later")
+        execute("UPDATE sessions SET remote_origin_device_id='peer'")
+        XCTAssertEqual(deliver(calendarReceipt: "changed"), "later")
+        execute("UPDATE sessions SET remote_origin_device_id=NULL")
+        execute("CREATE TRIGGER stop_write BEFORE UPDATE ON sessions BEGIN SELECT RAISE(ABORT,'fixture'); END;")
+        XCTAssertEqual(deliver(calendarReceipt: "changed"), "later")
+        execute("DROP TRIGGER stop_write")
+        XCTAssertEqual(deliver(calendarReceipt: "changed"), "sent")
+        execute("DELETE FROM messages")
+        XCTAssertEqual(deliver(day: "2026-11-26", calendarReceipt: "changed"), "seen")
+        XCTAssertEqual(deliver(day: "2026-11-26", calendarReceipt: "different"), "sent")
     }
 
     func testLocalHoursAndRevocation() {

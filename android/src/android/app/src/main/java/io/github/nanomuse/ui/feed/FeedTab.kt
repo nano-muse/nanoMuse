@@ -7,6 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import io.github.nanomuse.feed.ChatCheckIns
+import io.github.nanomuse.feed.CalendarChanges
+import com.openminis.app.offload.CalendarManager
+import io.github.nanomuse.account.AccountData
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -538,18 +541,47 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
                         }
                         Switch(checked = chatEnabled, onCheckedChange = { FeedChatEvidence.enable(context, it) })
                     }
+                    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+                    fun offerNotifications() {
+                        if (Build.VERSION.SDK_INT >= 33 && !NotificationManagerCompat.from(context).areNotificationsEnabled())
+                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
                     if (chatEnabled) {
                         var checkIns by remember(context, chatRevision) { mutableStateOf(ChatCheckIns.enabled(context)) }
-                        val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
                         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.nm_chat_checkin_setting), fontSize = 15.sp, modifier = Modifier.weight(1f))
                             Switch(checked = checkIns, onCheckedChange = { on ->
                                 ChatCheckIns.configure(context, on)
                                 checkIns = ChatCheckIns.enabled(context)
-                                if (checkIns && Build.VERSION.SDK_INT >= 33 && !NotificationManagerCompat.from(context).areNotificationsEnabled())
-                                    permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                if (checkIns) offerNotifications()
                             })
                         }
+                    }
+                    HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
+                    val owner = AccountData.key(context)
+                    var calendarOn by remember(owner, chatRevision) { mutableStateOf(CalendarChanges.scope(context) != null) }
+                    var requestedOwner by remember { mutableStateOf<String?>(null) }
+                    fun configureCalendar(on: Boolean) {
+                        CalendarChanges.configure(context, on)
+                        calendarOn = CalendarChanges.scope(context) != null
+                        if (calendarOn) offerNotifications()
+                    }
+                    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                        if (granted && requestedOwner == AccountData.key(context)) {
+                            configureCalendar(true)
+                        }
+                        requestedOwner = null
+                    }
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.nm_calendar_checkin_setting), fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Switch(checked = calendarOn, onCheckedChange = { on ->
+                            if (on && !CalendarManager.hasPermission(context)) {
+                                requestedOwner = owner
+                                calendarPermission.launch(Manifest.permission.READ_CALENDAR)
+                            } else {
+                                configureCalendar(on)
+                            }
+                        })
                     }
                     HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
                     GoalDeadlineSettings()

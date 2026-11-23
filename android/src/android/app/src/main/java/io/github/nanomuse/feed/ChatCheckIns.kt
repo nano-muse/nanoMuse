@@ -23,6 +23,9 @@ import com.openminis.app.service.SessionBadgeStore
 import io.github.nanomuse.account.AccountData
 import io.github.nanomuse.deeplink.OwnScheme
 import io.github.nanomuse.guard.AppAccess
+import io.github.nanomuse.guard.SessionAccess
+import io.github.nanomuse.home.MainChat
+import io.github.nanomuse.sync.SyncDatabase
 import io.github.nanomuse.sync.ConversationSync
 import io.github.nanomuse.sync.Transcript
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +39,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZonedDateTime
 
-/** A check-in lives in the conversation in which the person made the commitment. */
+/** Local chat and calendar follow-ups share the same account, delivery budget and alarm. */
 internal object ChatCheckIns {
     private const val ENABLED = "feed.chat.checkins"
     private const val LAST_DAY = "feed.chat.checkin_day"
@@ -49,7 +52,11 @@ internal object ChatCheckIns {
 
     fun configure(ctx: Context, on: Boolean) {
         prefs(ctx).edit().putBoolean(ENABLED, on && FeedChatEvidence.enabled(ctx)).apply()
-        if (enabled(ctx)) schedule(ctx) else cancel(ctx)
+        reschedule(ctx)
+    }
+
+    fun reschedule(ctx: Context) {
+        if (enabled(ctx) || CalendarChanges.enabled(ctx)) schedule(ctx) else cancel(ctx)
     }
 
     private fun pending(ctx: Context) = PendingIntent.getBroadcast(ctx, CODE,
@@ -62,8 +69,9 @@ internal object ChatCheckIns {
 
     /** Android can batch this wakeup. No exact-alarm permission or persistent service is needed. */
     fun schedule(ctx: Context, earliest: ZonedDateTime = ZonedDateTime.now().plusSeconds(2)) {
-        if (!enabled(ctx)) return
-        val whenDue = nextWindow(earliest, prefs(ctx).getString(LAST_DAY, null))
+        if (!enabled(ctx) && !CalendarChanges.enabled(ctx)) return
+        val whenDue = if (CalendarChanges.needsBaseline(ctx)) earliest
+            else nextWindow(earliest, prefs(ctx).getString(LAST_DAY, null))
         ctx.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP, whenDue.toInstant().toEpochMilli(), pending(ctx))
     }
@@ -89,61 +97,88 @@ internal object ChatCheckIns {
     internal fun prefix(owner: String, now: ZonedDateTime) = "nm-checkin-" +
         FeedPreparation.hash(owner, now.toLocalDate().toString()) + "-"
 
+    private data class Note(val session: String, val key: String, val body: String, val allowed: () -> Boolean)
+
     private suspend fun check(app: MinisApp): ZonedDateTime {
         val now = ZonedDateTime.now()
+        val day = now.toLocalDate().toString()
         val tomorrow = now.toLocalDate().plusDays(1).atTime(LocalTime.of(9, 0)).atZone(now.zone)
-        val retry = now.plusHours(1)
+        val retry = now.plusMinutes(30)
         val p = prefs(app)
-        val next = nextWindow(now, p.getString(LAST_DAY, null))
-        if (!enabled(app) || next != now) return next
+        val window = nextWindow(now, p.getString(LAST_DAY, null))
         if (!app.subsystemsReady() || AppAccess.locked.value) return retry
+        if (window != now && !CalendarChanges.needsBaseline(app)) return window
 
-        // Account sign-in/out uses this same mutex while moving chats and their preferences.
         return ConversationSync.withStableChats {
             val owner = AccountData.key(app)
-            val consent = FeedChatEvidence.scope(app, "", true) ?: return@withStableChats retry
-            fun current() = enabled(app) && FeedChatEvidence.scope(app, "", true) == consent &&
-                AccountData.key(app) == owner && ZonedDateTime.now().let { it.toLocalDate() == now.toLocalDate() && it.hour in 9..19 }
-            if (!current()) return@withStableChats retry
-            var session: String? = null
-            val outcome = app.database.withTransaction {
+            val consent = CalendarChanges.scope(app)
+            val main = MainChat.persisted(app)
+            fun mainAccessible() = main != null && main == MainChat.persisted(app) &&
+                main !in ConversationSync.hidden.value && !SessionAccess.isProtected(main) &&
+                !AppAccess.locked.value && AccountData.key(app) == owner
+            val ownedMain = main != null && mainAccessible() &&
+                SyncDatabase.get(app).dao().ownedCandidates(owner, listOf(main)).isNotEmpty()
+            val scan = if (consent != null && ownedMain) CalendarChanges.scan(app, consent, now.toInstant().toEpochMilli()) else null
+            if (scan != null && scan.change == null && mainAccessible()) CalendarChanges.accept(app, scan)
+            if (window != now) return@withStableChats window
+
+            var sent: Note? = null
+            val next = app.database.withTransaction {
                 val dayId = prefix(owner, now)
-                // The same transaction checks for an earlier delivery, rereads live evidence and inserts.
                 val delivered = app.database.openHelper.writableDatabase.query(
                     "SELECT 1 FROM messages WHERE id GLOB ? LIMIT 1", arrayOf<Any>("$dayId*")
                 ).use { it.moveToFirst() }
-                if (delivered || p.getString(LAST_DAY, null) == now.toLocalDate().toString()) return@withTransaction tomorrow
-                val facts = due(FeedChatEvidence.facts(app, now.toLocalDate()), now)
-                val fact = facts.firstOrNull { ready(it, now) && !SessionActivityTracker.isActive(it.chatSession) }
-                    ?: return@withTransaction if (facts.isEmpty()) tomorrow else retry
-                val target = fact.chatSession
-                val body = app.getString(R.string.nm_chat_checkin_body, fact.text)
-                val parts = Transcript.partsJson(body, emptyList())
-                val dao = app.chatRepository.dao
-                val row = MessageEntity(id = dayId + fact.id, sessionId = target, role = "assistant",
-                    partsJson = parts, createdAt = now.toInstant().toEpochMilli(), sortOrder = dao.nextSortOrder(target))
-                fun allowed() = current() && FeedChatEvidence.scope(app, target, true) == consent &&
-                    !SessionActivityTracker.isActive(target)
+                if (delivered || p.getString(LAST_DAY, null) == day) return@withTransaction tomorrow
+                val calNote = if (scan?.change != null && main != null && !SessionActivityTracker.isActive(main)) {
+                    val session = app.chatRepository.getSession(main)
+                    if (session != null && now.toInstant().toEpochMilli() - session.updatedAt >= Duration.ofMinutes(15).toMillis()) {
+                        Note(main, "calendar", CalendarChanges.message(app, scan.change)) {
+                            mainAccessible() && CalendarChanges.scope(app) == consent
+                        }
+                    } else null
+                } else null
+                val chatFacts = if (calNote == null && enabled(app)) due(FeedChatEvidence.facts(app, now.toLocalDate()), now) else emptyList()
+                val note = calNote ?: commitment(app, now, chatFacts) ?: return@withTransaction if (
+                    consent != null || chatFacts.isNotEmpty()) retry else tomorrow
+                fun allowed() = note.allowed() && AccountData.key(app) == owner &&
+                    !SessionActivityTracker.isActive(note.session) && !AppAccess.locked.value &&
+                    ZonedDateTime.now().let { it.toLocalDate() == now.toLocalDate() && it.hour in 9..19 }
                 if (!allowed()) return@withTransaction retry
+                val dao = app.chatRepository.dao
+                val parts = Transcript.partsJson(note.body, emptyList())
+                val row = MessageEntity(id = dayId + note.key, sessionId = note.session, role = "assistant",
+                    partsJson = parts, createdAt = now.toInstant().toEpochMilli(), sortOrder = dao.nextSortOrder(note.session))
                 dao.insertMessage(row)
-                dao.updateLastMessage(target, ChatRepository.extractTextPreview(parts), row.createdAt)
+                dao.updateLastMessage(note.session, ChatRepository.extractTextPreview(parts), row.createdAt)
                 if (!allowed()) throw Withdrawn()
-                session = target
+                sent = note
                 tomorrow
             }
-            session?.let { target ->
-                p.edit().putString(LAST_DAY, now.toLocalDate().toString()).commit()
-                ConversationSync.localAssistantAppended(target)
+            sent?.let { note ->
+                if (note.key == "calendar" && scan != null && note.allowed()) CalendarChanges.accept(app, scan)
+                p.edit().putString(LAST_DAY, day).commit()
+                ConversationSync.localAssistantAppended(note.session)
                 val viewing = withContext(Dispatchers.Main.immediate) {
                     ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
-                        target in SessionActivityTracker.presentSessions.value
+                        note.session in SessionActivityTracker.presentSessions.value
                 }
-                if (!viewing && current() && FeedChatEvidence.scope(app, target, true) == consent) {
-                    SessionBadgeStore.replies.received(target)
-                    notify(app, target)
+                if (!viewing && note.allowed() && AccountData.key(app) == owner && !AppAccess.locked.value) {
+                    SessionBadgeStore.replies.received(note.session)
+                    notify(app, note.session)
                 }
             }
-            outcome
+            next
+        }
+    }
+
+    private fun commitment(app: MinisApp, now: ZonedDateTime, facts: List<FeedPreparation.Fact>): Note? {
+        if (!enabled(app)) return null
+        val consent = FeedChatEvidence.scope(app, "", true) ?: return null
+        val fact = facts.firstOrNull {
+            ready(it, now) && !SessionActivityTracker.isActive(it.chatSession)
+        } ?: return null
+        return Note(fact.chatSession, fact.id, app.getString(R.string.nm_chat_checkin_body, fact.text)) {
+            enabled(app) && FeedChatEvidence.scope(app, fact.chatSession, true) == consent
         }
     }
 

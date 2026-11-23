@@ -72,6 +72,8 @@ Turn on *Prepare from my chats* in Feed settings to include new text you send on
 
 In Feed settings, *Message me in my main chat* lets nanoMuse ask about an unfinished goal due today. If chat preparation is enabled, it can also follow up on a dated commitment you made in the main chat. Answer in the main chat to continue. It waits for an idle conversation and checks between 09:00 and 20:00, at most once a day per account on this device. Checks run while the app is active and when iOS grants a background refresh. Notification permission lets the app alert you when it delivers a message in the background.
 
+In Feed settings, open *Calendar changes in chat*, allow calendar access and choose individual calendars. The first read is silent. A new overlap or a start time moved by at least 15 minutes in the next 24 hours can prompt a message with the affected times, even without a prior chat request. iPhone checks timed busy events while active or during a background refresh granted by iOS. It compares times and opaque event identifiers on the device and shares the same daytime and daily message limit as chat check-ins. With conversation sync enabled, the resulting message and its times can appear on your other devices. Remove a calendar or tap *Stop watching calendars* to reset the comparison.
+
 Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pull):
 
 - **Identity.** Bundle ids `io.github.nanomuse.app` (+ `.ShareExtension`, `.AgentWidget`,

@@ -32,6 +32,8 @@ import { DEFAULT_NUDGES, dueAsk, LEDGER_EMPTY, NUDGES_EVERY_MS, NUDGES_ORIGIN, N
 import { noteCommitment, draftDelivered, dueSoon, canCheckIn, commitmentText, type ChatCommitments } from './chat-commitments.ts'
 import { asksForDraft, canPrepare, currentFeedGoals, contextKey, parsePreparation, preparationRequest, preparationSources, type Preparation, type Source } from './feed-preparation.ts'
 import { followUpText, localDateKey, nextGoalFollowUp, validGoalDate, type GoalFollowUpReason } from './goal-follow-up.ts'
+import { changeMessage, changeRequest, matchingGoals, type ResourceChoice, type ResourceWatch } from './context-resource.ts'
+import type {} from './connectors.ts'
 import { homeDir, homeWorkspace } from './home.ts'
 import { packageAssetsDir } from './profile.ts'
 import { describeCall, ownWords, parseArgs } from './steps.ts'
@@ -321,13 +323,15 @@ export interface FeedRoutine {
   /** Scoped to the active account in the public view only. */
   chatCheckIns?: boolean
   checkInScope?: string
+  contextResource?: ResourceWatch
 }
 
 interface ChatCheckIn {
   id: string
   sessionId: string
   at: number
-  commitmentAt: number
+  commitmentAt?: number
+  external?: boolean
   text: string
   unread: boolean
 }
@@ -335,6 +339,7 @@ interface CheckInMailbox {
   enabledSince: number
   lastDay: string
   messages: ChatCheckIn[]
+  resource?: ResourceWatch & { seen: string[]; checkedAt: number }
 }
 
 interface Store {
@@ -513,6 +518,8 @@ export default class NanomuseRooms extends Service {
   private followUpNeedsSave = false
   private unpublishedCheckIn: string | undefined
   private publishingCheckIn: Promise<void> | undefined
+  private resourceAbort: AbortController | undefined
+  private resourceChoiceAbort: AbortController | undefined
   private prepAbort: AbortController | undefined
   private prepLastTry = 0
   private timer: NodeJS.Timeout | undefined
@@ -555,6 +562,8 @@ export default class NanomuseRooms extends Service {
       const owner = this.ctx.nanomuseCloud.feedOwner
       if (owner !== feedOwner) {
         feedOwner = owner
+        this.resourceAbort?.abort()
+        this.resourceChoiceAbort?.abort()
         this.prepAbort?.abort()
         this.broadcast()
       }
@@ -566,6 +575,8 @@ export default class NanomuseRooms extends Service {
     this.ctx.effect(() => () => {
       if (this.timer) clearInterval(this.timer)
       clearTimeout(first)
+      this.resourceAbort?.abort()
+      this.resourceChoiceAbort?.abort()
       if (this.pendingFrame) clearTimeout(this.pendingFrame)
       if (this.pendingSave) clearTimeout(this.pendingSave)
       for (const res of this.streams) res.end()
@@ -592,11 +603,13 @@ export default class NanomuseRooms extends Service {
     const posts = visible.filter(post => !post.goalId || (!preparedGoals.has(post.goalId) && (post.goalExpiresAt ?? 0) > now && accessibleGoals.has(post.goalId)))
     const { mailboxes: _private, ...publicStore } = this.store
     const box = this.checkInMailbox()
+    const watched = box?.resource
+    const contextResource = watched ? { connection: watched.connection, generation: watched.generation, key: watched.key, label: watched.label } : undefined
     return {
       ...publicStore,
       goals,
       checkIns: this.checkInMessages().map(({ id, sessionId, at, unread }) => ({ id, sessionId, at, unread })),
-      feed: { ...publicFeed, posts, routine: { ...publicFeed.routine, chatCheckIns: Boolean(box?.enabledSince), checkInScope: this.checkInScope() } },
+      feed: { ...publicFeed, posts, routine: { ...publicFeed.routine, chatCheckIns: Boolean(box?.enabledSince), ...(contextResource ? { contextResource } : {}), checkInScope: this.checkInScope() } },
       ideas: { ...this.store.ideas, items: this.ideaItems() },
       activity,
       busy: { ...this.busy },
@@ -2193,7 +2206,114 @@ You planned this for today. Would you like help preparing the next step?`
     }
   }
 
+  resourceConnections(): { id: string; label: string; generation: number }[] {
+    return this.ctx.get('nanomuseConnectors')?.resourceConnections() ?? []
+  }
+
+  async selectResource(scope: string, connection: string, generation: number, key: string, save: boolean): Promise<ResourceChoice[]> {
+    const owner = this.ctx.nanomuseCloud.feedOwner
+    if (!owner || scope !== this.checkInScope()) throw new RelayError(409, 'account_changed', 'Reopen Feed settings.')
+    const access = this.ctx.nanomuseCloud.scheduleSessionAccess('nanomuse-feed')
+    if (save) { this.resourceAbort?.abort(); this.resourceChoiceAbort?.abort() }
+    const abort = new AbortController()
+    if (save) this.resourceChoiceAbort = abort
+    const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(18_000)])
+    const current = () => !signal.aborted && scope === this.checkInScope() && access('nanomuse-feed')
+    try {
+      const connectors = this.ctx.get('nanomuseConnectors')
+      if (connection && !connectors) throw new RelayError(409, 'no_connector', 'Connector is unavailable.')
+      const result = connection ? await connectors!.inspectResource(connection, generation, signal, current, save ? key : undefined) : { choices: [] }
+      if (!current()) throw new RelayError(409, 'account_changed', 'Reopen Feed settings.')
+      if (!save) return result.choices
+      if (connection && (!result.sample || !result.choices[0])) throw new RelayError(409, 'no_resource', 'Choose a listed text resource.')
+      const box = this.store.mailboxes[owner] ??= { enabledSince: 0, lastDay: '', messages: [] }
+      const previous = box.resource
+      if (result.sample && result.choices[0]) {
+        box.resource = { connection, generation, ...result.choices[0], seen: result.sample.signatures, checkedAt: Date.now() }
+      } else delete box.resource
+      const next = box.resource
+      try {
+        await this.save(true, true)
+      } catch (error) {
+        if (next && box.resource === next) {
+          if (previous) box.resource = previous
+          else delete box.resource
+        }
+        throw error
+      }
+      return []
+    } finally {
+      if (this.resourceChoiceAbort === abort) this.resourceChoiceAbort = undefined
+    }
+  }
+
+  private async checkResource(now: number): Promise<void> {
+    const cloud = this.ctx.nanomuseCloud, box = this.checkInMailbox(), watch = box?.resource
+    if (!watch || !box || this.resourceAbort || this.resourceChoiceAbort || this.unpublishedCheckIn) return
+    const connectors = this.ctx.get('nanomuseConnectors')
+    const day = localDateKey(now)
+    const session = cloud.syncMainSession()
+    const access = cloud.scheduleSessionAccess('nanomuse-feed')
+    const awake = (at: number) => new Date(at).getHours() >= 9 && new Date(at).getHours() < 20
+    const eligible = (at: number) => {
+      const last = this.store.activity.find(r => r.sessionId === session)
+      const registry = this.ctx.get('workspaceRegistry') as RegistryLike | undefined
+      return awake(at) && localDateKey(at) === day && box.lastDay < day && cloud.syncMainSession() === session &&
+        Boolean(session && registry && !registry.archivedSessionIds.includes(session)) && access(session) &&
+        (!last || last.status !== 'running' && last.status !== 'waiting' && last.updatedAt <= at - 15 * 60_000) &&
+        !cloud.hasRemoteReplySince(session, at - 15 * 60_000) && !box.messages.some(m => m.sessionId === session && m.unread)
+    }
+    if (!connectors || !eligible(now) || now - watch.checkedAt < 15 * 60_000) return
+    const abort = new AbortController()
+    this.resourceAbort = abort
+    const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(75_000)])
+    const permitted = () => !signal.aborted && box === this.checkInMailbox() && watch === box.resource &&
+      access(session) && this.resourceConnections().some(c => c.id === watch.connection && c.generation === watch.generation)
+    const read = async () => (await connectors.inspectResource(watch.connection, watch.generation, signal, permitted, watch.key)).sample
+    try {
+      if (!permitted()) return
+      const sample = await read()
+      if (!sample || !permitted() || !eligible(Date.now())) return
+      const seen = new Set(watch.seen)
+      const freshLines = sample.lines.filter((_, i) => !seen.has(sample.signatures[i]!))
+      const changed = freshLines.slice(0, 24)
+      const goalsFor = () => matchingGoals(changed, this.prepSources(Date.now()).filter(s =>
+        s.kind === 'goal' && this.store.activity.some(a => a.sessionId === s.origin && a.requestOwner === cloud.feedOwner)))
+      let text: string | undefined
+      if (changed.length) {
+        const goals = goalsFor()
+        const lang = this.lang
+        const request = changeRequest(changed, goals, now)
+        const answer = await cloud.prepareFeed(request.system, request.input, signal)
+        if (!permitted() || !eligible(Date.now()) || lang !== this.lang || goals.map(g => g.id).join() !== goalsFor().map(g => g.id).join()) return
+        text = changeMessage(answer, watch.label, changed, goals, /^zh/i.test(lang))
+        if (text) {
+          // A project update can be withdrawn while the model reads it.
+          const fresh = await read()
+          if (!fresh || !permitted() || !eligible(Date.now()) || goals.map(g => g.id).join() !== goalsFor().map(g => g.id).join() ||
+              !changed.every(line => fresh.lines.includes(line))) return
+        }
+      }
+      const at = Date.now()
+      // Store fingerprints for a bounded history, including lines that disappeared and returned.
+      const processed = new Set(changed)
+      const remembered = sample.signatures.filter((hash, i) => seen.has(hash) || processed.has(sample.lines[i]!))
+      watch.seen = [...new Set([...remembered, ...watch.seen])].slice(0, 1800)
+      watch.checkedAt = at
+      if (text) {
+        const msg: ChatCheckIn = { id: newId('context'), sessionId: session, at, text, unread: true, external: true }
+        box.lastDay = day
+        box.messages.push(msg)
+        this.unpublishedCheckIn = msg.id
+        await this.persistChatCheckIn()
+      } else await this.save(true, true)
+    } finally {
+      if (this.resourceAbort === abort) this.resourceAbort = undefined
+    }
+  }
+
   private async tick(): Promise<void> {
+    await this.checkResource(Date.now()).catch(() => this.warn('connected resource', 'check deferred'))
     await this.writeChatCheckIn(Date.now())
     await this.writeGoalFollowUp(Date.now())
     const ready = await this.syncReady()
@@ -2378,6 +2498,12 @@ You planned this for today. Would you like help preparing the next step?`
       // Imports need room for UTF-8 and JSON escaping, including a full batch of memory lines.
       const body = await json(req, route === '/library/import' ? IMPORT_MAX_BYTES * 2 + 4096 : route === '/memory/import' ? 512 * 1024 : undefined)
       switch (route) {
+        case '/feed/resource-connections':
+          return send(res, 200, this.resourceConnections())
+        case '/feed/resource-choices':
+        case '/feed/resource-watch':
+          return send(res, 200, await this.selectResource(String(body.scope ?? ''), String(body.connection ?? ''),
+            Number(body.generation), String(body.key ?? ''), route.endsWith('-watch')))
         case '/lang': {
           const lang = String(body.lang ?? '').trim().slice(0, 20)
           if (lang && lang !== this.store.lang) {

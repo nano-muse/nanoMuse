@@ -1296,6 +1296,9 @@
     <string name="nm_deadline_notice">Öffne den Feed für deinen nächsten Schritt.</string>
     <string name="nm_feed_use_recent_chats">Aktuelle Chats für den Feed nutzen</string>
     <string name="nm_feed_recent_chats_hint">Nur Nachrichten, die du nach dem Aktivieren hier eingibst. Geschützte Chats sind ausgenommen.</string>
+    <string name="nm_calendar_checkin_setting">Bei verschobenen oder überlappenden Terminen in meinen sichtbaren Handykalendern schreiben</string>
+    <string name="nm_calendar_moved">Ein Termin in deinem Kalender wurde von %1$s auf %2$s verschoben. Möchtest du deine Planung überprüfen?</string>
+    <string name="nm_calendar_overlap">Zwei Termine überschneiden sich (%1$s und %2$s). Möchtest du nach Alternativen schauen?</string>
     <string name="nm_chat_checkin_setting">Bei fälligen Vorhaben im Chat schreiben</string>
     <string name="nm_chat_checkin_body">Du hattest das für heute geplant:\n„%1$s“\n\nWie läuft es? Kann ich dir bei der Vorbereitung helfen?</string>
 </resources>

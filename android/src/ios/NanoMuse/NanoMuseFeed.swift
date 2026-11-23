@@ -887,6 +887,9 @@ struct NanoMuseFeedSettingsSheet: View {
                     Text(AppLocalized("Between 09:00 and 20:00, nanoMuse can check in once a day about a goal due today or a commitment from your main chat if chat preparation is on."))
                 }
                 Section {
+                    NavigationLink(AppLocalized("Calendar changes in chat")) { NanoMuseCalendarWatchSettings() }
+                }
+                Section {
                     Toggle(AppLocalized("Prepare from my chats"), isOn: Binding(get: { useChat }, set: { NanoMuseFeedChatIndex.setEnabled($0) }))
                         .tint(NanoMuseTones.action)
                 } footer: {

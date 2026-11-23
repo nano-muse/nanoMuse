@@ -4,6 +4,17 @@
  * Run `npm test` — the i18n test lists the strings that still lack a translation.
  */
 const zhCN: Record<string, string> = {
+  "Last background check: {time}": "最近一次后台检查：{time}",
+  "Waiting for the first background check.": "正在等待首次后台检查。",
+  "Some sources could not be read.": "部分信息源暂时无法读取。",
+  "Updates from connected sources": "留意已接入的信息",
+  "Your configured model can review changes in the sources you select and leave a message in your main chat when something needs attention.": "当前模型可以查看你勾选的信息源中有什么变化，遇到值得留意的事会在主要聊天里告诉你。",
+  "New email in my connected inbox": "已连接邮箱中的新邮件",
+  "Changes in my connected calendars": "已连接日历中的变化",
+  "Choose MCP resources": "选择 MCP 资源",
+  "No connected server offered a text resource.": "已连接的服务没有提供可选的文本资源。",
+  "Also consider my recent main chat": "同时参考我最近的主要聊天",
+  "Also consider my recent main chat and active goals": "同时参考我最近的主要聊天和进行中的目标",
   // ── Shell, tabs, connection ───────────────────────────────────────────────────────
   "Follow up on goals, calendar conflicts and expected replies": "跟进目标、日程冲突和等待的回复",
   "Goal and calendar follow-ups": "目标和日历跟进",
