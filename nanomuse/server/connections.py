@@ -1719,12 +1719,15 @@ class Connections:
                 if not active():
                     return None
                 try:
-                    text = resource_preview(await reader.read(resource))
+                    raw = await reader.read(resource)
+                    if raw is None:
+                        return None
+                    text = resource_preview(raw)
                 except Exception:
                     return None
                 return (
                     ContextSample("mcp", resource.id, preview(resource.label, 180), text)
-                    if text and active()
+                    if active()
                     else None
                 )
 

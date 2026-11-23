@@ -34,9 +34,10 @@ def choice(reason, *quotes):
     return answer
 
 
-async def test_selected_mcp_changes_can_start_the_first_conversation(settings, tmp_path):
+@pytest.mark.parametrize("initial", ["", "Draft complete."])
+async def test_selected_mcp_changes_can_start_the_first_conversation(settings, tmp_path, initial):
     board = tmp_path / "progress.txt"
-    board.write_text("Draft complete.", "utf-8")
+    board.write_text(initial, "utf-8")
     quote = "Printing is blocked until the cover proof is approved."
     llm = MockLLM([choice("blocker", quote)])
     service = MuseService(settings, llm=llm)
@@ -57,7 +58,7 @@ async def test_selected_mcp_changes_can_start_the_first_conversation(settings, t
         key = next(o["id"] for o in options if "Team updates" in o["label"])
         watch.configure(before, False, False, [key], False)
         await watch.poll(now)
-        assert not llm.calls
+        assert not llm.calls and not watch.view()["unavailable"]
         board.write_text("Draft complete.\n" + quote, "utf-8")
         await watch.poll(now.replace(hour=3))
         assert not llm.calls

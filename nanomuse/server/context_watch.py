@@ -317,9 +317,14 @@ class ContextWatch:
         for s in samples:
             key = fingerprint(s.source, s.key)
             text = svc.app.vault.redact(s.text)
-            if not text.strip():
-                continue
             record = Source(s.source, s.key, text, True, recorded_at=s.recorded_at, label=s.label)
+            if not text.strip():
+                if s.source == "mcp":
+                    # A successful read of an empty board is a baseline too. The first entry
+                    # can then be a change, even if the board was empty when selected.
+                    mcp_seen[s.key] = record.revision
+                    facts["mcp"][s.key] = []
+                continue
             external[key] = record
             if s.source == "calendar" and fingerprint(s.calendar) not in initialized:
                 cal_seen[s.key] = record.revision

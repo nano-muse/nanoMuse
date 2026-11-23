@@ -82,22 +82,24 @@ class MCPResourceReader:
                 cursors.add(cursor)
         return list(result.values())
 
-    async def read(self, resource: MCPResource) -> str:
+    async def read(self, resource: MCPResource) -> str | None:
         async with asyncio.timeout(self.timeout):
             reply = await self.session.read_resource(resource.uri)
         parts: list[str] = []
+        readable = False
         remaining = 16384
         for part in (getattr(reply, "contents", None) or [])[:16]:
             text = getattr(part, "text", "")
             mime = getattr(part, "mime_type", None) or getattr(part, "mimeType", None)
             if str(part.uri) != resource.uri or not isinstance(text, str) or not _text_type(mime):
                 continue
+            readable = True
             text = text.strip()
             structured = "json" in (mime or "").lower() or text.startswith(("{", "[{", '["'))
             if structured:
                 # Filter complete JSON by field before truncating. Do not reinterpret fragments
                 # of a large object (or several concatenated objects) as plain text.
-                return self.redact(text) if len(text) <= 256 * 1024 else ""
+                return self.redact(text) if len(text) <= 256 * 1024 else None
             if len(text) > remaining:
                 # Project logs commonly append updates at the end; bound both ends.
                 head = remaining // 2
@@ -113,4 +115,4 @@ class MCPResourceReader:
                 remaining -= len(text) + 1
             if remaining <= 0:
                 break
-        return self.redact("\n".join(parts))
+        return self.redact("\n".join(parts)) if readable else None
