@@ -70,15 +70,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.scheduled.ScheduledTaskStore
 import com.openminis.app.ui.markdown.MarkdownText
 import com.openminis.app.ui.theme.ChatColors
+import io.github.nanomuse.feed.FeedChatEvidence
+import io.github.nanomuse.feed.FeedPreparationRunner
 import io.github.nanomuse.feed.FeedFlow
 import io.github.nanomuse.feed.FeedPost
 import io.github.nanomuse.feed.FeedStore
 import io.github.nanomuse.ui.home.MuseTones
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -111,9 +116,27 @@ fun FeedTab(
     val protected by io.github.nanomuse.guard.SessionAccess.protected.collectAsState()
     val goalStore = remember(context) { io.github.nanomuse.goals.GoalStore.get(context) }
     val goals by goalStore.goals.collectAsState()
-    val posts = remember(savedPosts, protected, goals) {
+    val chatRevision by FeedChatEvidence.revision.collectAsState()
+    val locked by io.github.nanomuse.guard.AppAccess.locked.collectAsState()
+    var livePairs by remember(chatRevision, protected, locked, savedPosts) { mutableStateOf(emptySet<String>()) }
+    LaunchedEffect(chatRevision, protected, locked, savedPosts) {
+        if (!locked && FeedChatEvidence.enabled(context) && savedPosts.any { it.chatBased }) {
+            val app = context.applicationContext as MinisApp
+            FeedChatEvidence.changes(app).collectLatest {
+                livePairs = emptySet()
+                livePairs = try {
+                    FeedPreparationRunner.visibleChatCards(app)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    emptySet()
+                }
+            }
+        }
+    }
+    val posts = remember(savedPosts, protected, goals, livePairs) {
         val byId = goals.associateBy { it.id }
-        savedPosts.filter { it.visibleWith(protected, byId[it.goalId]) }
+        savedPosts.filter { it.visibleWith(protected, byId[it.goalId]) && (!it.chatBased || it.preparation in livePairs) }
     }
     val introAck by FeedFlow.introAcknowledged.collectAsState()
     val generating by FeedFlow.generating.collectAsState()
@@ -498,6 +521,16 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
                             )
                         }
                         Switch(checked = task?.enabled == true, enabled = task != null, onCheckedChange = { FeedFlow.setEnabled(context, it) })
+                    }
+                    HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
+                    val chatRevision by FeedChatEvidence.revision.collectAsState()
+                    val chatEnabled = remember(context, chatRevision) { FeedChatEvidence.enabled(context) }
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.nm_feed_use_recent_chats), fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text(stringResource(R.string.nm_feed_recent_chats_hint), fontSize = 12.sp, color = ChatColors.secondaryText)
+                        }
+                        Switch(checked = chatEnabled, onCheckedChange = { FeedChatEvidence.enable(context, it) })
                     }
                     HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
                     GoalDeadlineSettings()

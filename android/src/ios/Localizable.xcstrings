@@ -103646,6 +103646,65 @@
         }
       }
     },
+    "Prepare from my chats" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit meinen Chats vorausplanen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare from my chats"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparar a partir de mis chats"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparer à partir de mes discussions"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットから準備する"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내 채팅으로 준비하기"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готовить материалы по моим чатам"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根据聊天提前准备"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根據聊天提前準備"
+          }
+        }
+      }
+    },
     "Primary" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -151851,6 +151910,65 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用"
+          }
+        }
+      }
+    },
+    "Use new messages you send in unlocked chats with memory on to prepare for upcoming commitments. Turning this off removes their cards." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Nachrichten aus ungesperrten Chats mit aktivierter Erinnerung helfen, anstehende Zusagen vorzubereiten. Beim Ausschalten werden diese Karten entfernt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use new messages you send in unlocked chats with memory on to prepare for upcoming commitments. Turning this off removes their cards."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa los nuevos mensajes que envíes en chats sin bloqueo con la memoria activada para preparar tus próximos compromisos. Al desactivar esta opción se eliminan sus tarjetas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilise les nouveaux messages que vous envoyez dans des discussions non verrouillées avec la mémoire activée pour préparer vos prochains engagements. Désactiver cette option supprime les fiches associées."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモリがオンでロックされていないチャットで新しく送ったメッセージから、今後の予定に備えます。オフにすると関連カードを削除します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "메모리가 켜져 있고 잠금이 설정되지 않은 채팅에서 새로 보낸 메시지로 다가오는 약속을 준비합니다. 끄면 관련 카드가 삭제됩니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новые сообщения, которые вы отправляете в незаблокированных чатах с включённой памятью, помогают подготовиться к предстоящим делам. Если отключить эту настройку, связанные карточки будут удалены."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从开启记忆且未加锁的对话中，根据你新发的消息为即将履行的承诺准备材料。关闭后会移除这些卡片。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從開啟記憶且未加鎖的對話中，根據你新傳送的訊息為即將履行的承諾準備資料。關閉後會移除這些卡片。"
           }
         }
       }

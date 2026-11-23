@@ -162,6 +162,9 @@ interface SyncDao {
     @Query("SELECT sessionId FROM session_owners WHERE owner = :owner")
     suspend fun sessionsOf(owner: String): List<String>
 
+    @Query("SELECT sessionId FROM session_owners WHERE owner = :owner AND sessionId IN (:ids)")
+    suspend fun ownedCandidates(owner: String, ids: List<String>): List<String>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putOwners(list: List<SessionOwner>)
 

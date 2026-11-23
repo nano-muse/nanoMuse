@@ -1290,4 +1290,6 @@
     <string name="nm_deadline_cards">Paparkan tarikh akhir matlamat dalam Suapan</string>
     <string name="nm_deadline_alerts">Pemberitahuan tarikh akhir matlamat</string>
     <string name="nm_deadline_notice">Buka Suapan untuk melihat langkah seterusnya.</string>
+    <string name="nm_feed_use_recent_chats">Gunakan sembang terkini untuk suapan</string>
+    <string name="nm_feed_recent_chats_hint">Hanya mesej yang anda taip di sini selepas ciri ini dihidupkan. Sembang yang dilindungi dikecualikan.</string>
 </resources>

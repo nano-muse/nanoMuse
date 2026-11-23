@@ -1290,4 +1290,6 @@
     <string name="nm_deadline_cards">Tampilkan tenggat tujuan di Feed</string>
     <string name="nm_deadline_alerts">Notifikasi tenggat tujuan</string>
     <string name="nm_deadline_notice">Buka Feed untuk melihat langkah berikutnya.</string>
+    <string name="nm_feed_use_recent_chats">Gunakan chat terbaru untuk Feed</string>
+    <string name="nm_feed_recent_chats_hint">Hanya pesan yang Anda ketik di sini setelah diaktifkan. Chat yang dilindungi dikecualikan.</string>
 </resources>

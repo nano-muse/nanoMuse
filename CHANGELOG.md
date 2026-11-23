@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added opt-in Feed preparation from new chat commitments on Android and iPhone. Desktop kept track of separate commitments across topic changes. The web Feed followed expected replies, updated their dates, and prepared an editable inquiry when one came due.
+
 - Added Feed preparation with source excerpts on Android, iPhone, desktop and web. Related records can become a draft, brief, checklist or focused question. The web Feed also learned to set aside handled matters and optionally revisit changed plans.
 
 - Added deadline follow-ups to the Feed on Android, iPhone, desktop and web. The web Feed also surfaced blocked steps, pending plan changes and calendar overlaps. Android, iPhone and the web offered optional notifications with private details kept in the Feed.

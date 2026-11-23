@@ -1294,4 +1294,6 @@
     <string name="nm_deadline_cards">Zieltermine im Feed anzeigen</string>
     <string name="nm_deadline_alerts">Benachrichtigungen zu Zielterminen</string>
     <string name="nm_deadline_notice">Öffne den Feed für deinen nächsten Schritt.</string>
+    <string name="nm_feed_use_recent_chats">Aktuelle Chats für den Feed nutzen</string>
+    <string name="nm_feed_recent_chats_hint">Nur Nachrichten, die du nach dem Aktivieren hier eingibst. Geschützte Chats sind ausgenommen.</string>
 </resources>

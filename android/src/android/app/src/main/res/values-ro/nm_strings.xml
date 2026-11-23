@@ -1298,4 +1298,6 @@
     <string name="nm_deadline_cards">Afișează termenele obiectivelor în flux</string>
     <string name="nm_deadline_alerts">Notificări pentru termenele obiectivelor</string>
     <string name="nm_deadline_notice">Deschide fluxul pentru a vedea pasul următor.</string>
+    <string name="nm_feed_use_recent_chats">Folosește conversațiile recente în flux</string>
+    <string name="nm_feed_recent_chats_hint">Sunt folosite doar mesajele scrise aici după activare. Conversațiile protejate sunt excluse.</string>
 </resources>

@@ -2428,6 +2428,11 @@ actor ChatStore {
         listFolders().first(where: { $0.id == id })
     }
 
+    // nanoMuse: the Feed reads a bounded set of original local composer turns using this actor's database.
+    func nmFeedTurns(_ references: [NanoMuseFeedChatContext.Reference]) -> [NanoMuseFeedChatContext.Turn] {
+        NanoMuseFeedChatContext.read(references, db: db)
+    }
+
     func getMemoryEnabled(sessionId: String) -> Bool {
         // [T-memory-global-toggle-settings-ui-ios] If the session row
         // already exists, return its stored per-session value. If no
@@ -2467,6 +2472,7 @@ actor ChatStore {
     }
 
     func setMemoryEnabled(sessionId: String, enabled: Bool) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         let sql = "UPDATE sessions SET memory_enabled = ? WHERE id = ?"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -2519,6 +2525,7 @@ actor ChatStore {
     }
 
     private func deleteSessionLocalRowsOnly(_ id: String) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         // [T-ios-listsessions-cache] Invalidate here (the low-level row delete)
         // so ALL callers are covered — deleteSession AND deleteSessionLocalOnly.
         invalidateSessionListCache()
@@ -3028,6 +3035,7 @@ actor ChatStore {
     }
 
     func deleteMessages(sessionId: String) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         invalidateSessionListCache()
         // Mark every message dirty for cloud deletion BEFORE the DELETE so other
         // devices remove them on next sync. Without this, Clear Chat wipes
@@ -3103,6 +3111,7 @@ actor ChatStore {
     /// keepCount-th row (ascending, 1-based), then delete strictly AFTER it.
     /// This is correct regardless of whether sort_order is dense or shifted.
     func deleteMessagesAfter(sessionId: String, keepCount: Int) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         invalidateSessionListCache()
         // DIAG: snapshot state before delete
         let beforeStats = sessionWriteStats(sessionId: sessionId)
@@ -6714,6 +6723,7 @@ extension ChatStore {
     /// Used when a remote device signals a message-level deletion (retry / manual delete)
     /// that should propagate across devices.
     func deleteLocalMessage(messageId: String) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         invalidateSessionListCache()
         let sql = "DELETE FROM messages WHERE id = ?"
         var stmt: OpaquePointer?

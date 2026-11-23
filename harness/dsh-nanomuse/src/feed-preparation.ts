@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { ActivityRecord, Goal, LibraryItem, MemoryItem } from './rooms.ts'
+import { commitmentText, draftDelivered, statusUpdate } from './chat-commitments.ts'
 import { localDateKey, validGoalDate } from './goal-follow-up.ts'
 
 const DAY = 86_400_000
@@ -29,6 +30,7 @@ export interface Source {
   origin: string
   timing: string
   deliverable?: 'draft'
+  commitment?: string
 }
 export interface Preparation {
   kind: 'draft' | 'checklist' | 'question'
@@ -50,9 +52,21 @@ export interface PrepData {
 
 /** Respect an explicit request to prepare correspondence. A request for a checklist about
  * writing an email still asks for a checklist. Other intents stay with the model. */
-function asksForDraft(request: string): boolean {
+export function asksForDraft(request: string): boolean {
   if (/\b(?:checklist|steps|how (?:do|to|can)|do not|don't|already sent)\b|清单|步骤|怎么|如何|不用|不需要|已经发/iu.test(request)) return false
   return /\b(?:send|write|draft|compose)\b[^.!?\n]{0,90}\b(?:e-?mail|message|reply|inquiry|enquiry|invitation|letter|opening remarks)\b|(?:写|发|起草|拟)[^。！？\n]{0,40}(?:邮件|短信|消息|回复|回信|邀请函|开场白|询价函)/iu.test(request)
+}
+
+export function currentFeedGoals(goals: Goal[], activity: ActivityRecord[], owner: string | undefined, now: number): Goal[] {
+  if (owner === undefined) return goals
+  const byChat = new Map(activity.map(r => [r.sessionId, r.commitments]))
+  return goals.filter(g => {
+    const state = byChat.get(g.sessionId)
+    // Only an explicit correction in the goal's own chat overrides its Feed cards. A
+    // drafted message doesn't establish that the person completed a real-world goal.
+    return state?.owner !== owner || !state.items.some(i => i.goalId === g.id && i.revision &&
+      i.changedAt >= g.updatedAt && i.changedAt <= now && now - i.changedAt <= 7 * DAY)
+  })
 }
 
 export function preparationSources(data: PrepData, now: number, cited?: ReadonlySet<string>): Source[] {
@@ -61,15 +75,15 @@ export function preparationSources(data: PrepData, now: number, cited?: Readonly
   const visible = (id: string) => id && !muted.has(id) && data.accessible(id)
   const recent = (at: number, days: number) => at <= now && at >= now - days * DAY
   const today = Date.parse(localDateKey(now) + 'T00:00:00Z')
-  function add(kind: SourceKind, key: string, origin: string, label: string, body: string, timing = '') {
+  function add(kind: SourceKind, key: string, origin: string, label: string, body: string, timing = '', commitment?: string) {
     const title = compact(label, 120)
     const text = compact(body, 650)
     if (!title || !text) return
     const id = fingerprint([kind, key, title, text])
-    if (!cited || cited.has(id)) sources.push({ id, kind, origin, title, text, timing, ...(kind === 'goal' ? { goalId: key } : {}),
+    if (!cited || cited.has(id)) sources.push({ id, kind, origin, title, text, timing, ...(commitment ? { commitment } : {}), ...(kind === 'goal' ? { goalId: key } : {}),
       ...(kind === 'conversation' && asksForDraft(body) ? { deliverable: 'draft' as const } : {}) })
   }
-  const active = data.goals.filter(g => g.status === 'tracking' && visible(g.sessionId))
+  const active = currentFeedGoals(data.goals.filter(g => g.status === 'tracking' && visible(g.sessionId)), data.activity, data.owner, now)
   const goalTiming = (g: Goal) => {
     const days = validGoalDate(g.due) ? (Date.parse(g.due + 'T00:00:00Z') - today) / DAY : Infinity
     if (days >= -7 && days <= 7) return `due ${g.due}, ${days} days from today`
@@ -82,15 +96,28 @@ export function preparationSources(data: PrepData, now: number, cited?: Readonly
     add('goal', g.id, g.sessionId, g.title, [g.title, g.due, g.nextStep, g.summary, g.description, ...(g.steps ?? []).slice(0, 2)].filter(Boolean).join(' · '), goalTiming(g))
   }
   const requestTime = (r: ActivityRecord) => r.requestAt ?? (r.turns === 1 ? r.startedAt : 0)
-  const requests = data.activity.filter(r => r.request && r.status === 'done' && visible(r.sessionId) && recent(requestTime(r), 3))
-    .sort((a, b) => requestTime(b) - requestTime(a))
-  for (const r of cited ? requests : requests.slice(0, 4)) {
-    // A draft already delivered in this turn does not need drafting again. Its words are
-    // used only for this local check and never become source material for the model.
-    if (asksForDraft(r.request) && r.steps?.some(step => step.kind === 'answer' && step.at >= requestTime(r)
-      && /(?:^|\n)\s*(?:subject\s*:|主题[：:]|dear [^,\n]{1,60},|尊敬的[^：:\n]{1,30}[：:])/iu.test(step.detail))) continue
-    add('conversation', r.sessionId, r.sessionId, compact(r.request, 80), r.request, 'person wrote this on ' + localDateKey(requestTime(r)))
+  const requests: { key: string; chat: string; text: string; at: number; timing: string; commitment?: string }[] = []
+  for (const record of data.activity) {
+    if (!visible(record.sessionId) || (record.requestOwner !== undefined && record.requestOwner !== data.owner)) continue
+    const state = record.commitments
+    if (state && state.owner !== data.owner) continue
+    if (record.status !== 'done' && !cited) continue
+    if (state) {
+      for (const item of state.items) {
+        if (item.closed || !recent(item.changedAt, item.due ? 7 : 3) || (item.due && item.due < localDateKey(now))) continue
+        requests.push({ key: item.changed ? record.sessionId + ':' + item.changedAt : record.sessionId, chat: record.sessionId,
+          text: commitmentText(item), at: item.changedAt, commitment: fingerprint([record.sessionId, item.request]),
+          timing: 'person wrote this on ' + localDateKey(item.changedAt) + (item.due ? '; current date for this commitment: ' + item.due : '') })
+      }
+      if (state.items.length || statusUpdate(record.request)) continue
+    }
+    const at = requestTime(record)
+    if (!record.request || record.status !== 'done' || !recent(at, 3) || statusUpdate(record.request)) continue
+    if (asksForDraft(record.request) && record.steps?.some(step => step.kind === 'answer' && step.at >= at && draftDelivered(step.detail))) continue
+    requests.push({ key: record.sessionId, chat: record.sessionId, text: record.request, at, timing: 'person wrote this on ' + localDateKey(at) })
   }
+  requests.sort((a, b) => b.at - a.at)
+  for (const r of cited ? requests : requests.slice(0, 6)) add('conversation', r.key, r.chat, compact(r.text, 80), r.text, r.timing, r.commitment)
   const files = data.files.filter(f => visible(f.sessionId) && recent(f.at, 14)).sort((a, b) => b.at - a.at)
   for (const f of cited ? files : files.slice(0, 6)) {
     // The Library's existing label and description only. Never open the file.

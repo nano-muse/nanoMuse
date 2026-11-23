@@ -1294,4 +1294,6 @@
     <string name="nm_deadline_cards">Mostrar fechas límite de objetivos en el feed</string>
     <string name="nm_deadline_alerts">Notificaciones de objetivos por vencer</string>
     <string name="nm_deadline_notice">Abre el feed para ver tu próximo paso.</string>
+    <string name="nm_feed_use_recent_chats">Usar chats recientes en el feed</string>
+    <string name="nm_feed_recent_chats_hint">Solo se usan los mensajes que escribas aquí tras activar esta opción. Se excluyen los chats protegidos.</string>
 </resources>

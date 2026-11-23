@@ -1302,4 +1302,6 @@
     <string name="nm_deadline_cards">Pokaż terminy celów w aktualnościach</string>
     <string name="nm_deadline_alerts">Powiadomienia o terminach celów</string>
     <string name="nm_deadline_notice">Otwórz aktualności, aby zobaczyć kolejny krok.</string>
+    <string name="nm_feed_use_recent_chats">Używaj ostatnich rozmów w aktualnościach</string>
+    <string name="nm_feed_recent_chats_hint">Tylko wiadomości wpisane tutaj po włączeniu opcji. Chronione rozmowy są pomijane.</string>
 </resources>

@@ -4770,7 +4770,7 @@ struct AIChatView: View {
         // onChange binding, so doing it before send() left send() with empty text
         // → "send() GUARD FAILED" and nothing was sent. send() consumes and clears
         // inputText itself; we re-arm voice listening only AFTER it has run.
-        vm.send()
+        vm.send(fromFeedComposer: true) // nanoMuse: positive provenance for optional preparation from chat
         // [inline-voice] Stay in voice mode after sending — clear the recognized
         // text and re-arm listening for the next utterance (close with ✕).
         if voiceInputActive {

@@ -3,7 +3,7 @@
 import Foundation
 
 enum NanoMuseFeedPreparation {
-    enum Role { case goal, note, commitment }
+    enum Role { case goal, note, commitment, chat }
 
     struct Signal: Equatable {
         let id: String
@@ -137,7 +137,7 @@ enum NanoMuseFeedPreparation {
         return !matches(place + #"|\b(venue|location|lodging|lunch|dinner|breakfast|travel|commute)\b|场地|场所|地點|选址|地点|聚餐|午餐|晚餐|住宿|出行|通勤"#, in: folded(primary))
     }
 
-    static func candidates(primaries: [Signal], notes: [Signal], seen: Set<String>) -> [Pair] {
+    static func candidates(primaries: [Signal], notes: [Signal], seen: Set<String>, limit: Int = 6) -> [Pair] {
         let noteTopics = notes.filter { !isClosed($0.text) }.map { ($0, topics($0.text)) }
         var matches: [(pair: Pair, strength: Int)] = []
         for primary in primaries {
@@ -156,7 +156,7 @@ enum NanoMuseFeedPreparation {
         // Inputs are in date order. For equal relevance retain that order.
         return matches.enumerated().sorted { lhs, rhs in
             lhs.element.strength == rhs.element.strength ? lhs.offset < rhs.offset : lhs.element.strength > rhs.element.strength
-        }.prefix(6).map { $0.element.pair }
+        }.prefix(limit).map { $0.element.pair }
     }
 
     static func prompt(pairs: [Pair], preferences: String, today: String, recent: [String], language: String) -> String {

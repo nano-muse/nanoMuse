@@ -3316,6 +3316,7 @@ class ChatViewModel(
      * up. Mirrors iOS `pendingSendText` / `pendingSendAttachments`.
      */
     private var pendingSendText: String? = null
+    private var nmPendingFeedScope: String? = null // nanoMuse: parked alongside the composer text.
 
     private val _showCompactBeforeSendPrompt = MutableStateFlow(false)
     val showCompactBeforeSendPrompt: StateFlow<Boolean> = _showCompactBeforeSendPrompt.asStateFlow()
@@ -3332,7 +3333,7 @@ class ChatViewModel(
         pendingSendText = null
         // nanoMuse: the outgoing-request guard performs one bounded attempt after the new
         // message is saved. A pre-send failure must not start the same attempt again (#719).
-        sendMessage(text, skipContextCheck = true)
+        sendMessage(text, skipContextCheck = true, feedScope = nmPendingFeedScope.also { nmPendingFeedScope = null }) // nanoMuse
     }
 
     /** Dialog action: send without compacting. */
@@ -3340,7 +3341,7 @@ class ChatViewModel(
         _showCompactBeforeSendPrompt.value = false
         val text = pendingSendText ?: return
         pendingSendText = null
-        sendMessage(text, skipContextCheck = true)
+        sendMessage(text, skipContextCheck = true, feedScope = nmPendingFeedScope.also { nmPendingFeedScope = null }) // nanoMuse
     }
 
     /** Dialog dismissed — restore the text to the composer so it isn't lost. */
@@ -5890,7 +5891,7 @@ class ChatViewModel(
      * current agent loop finishes, drainQueuedPrompts() consumes the queue.
      * Mirrors iOS AIChatViewModel.enqueuePrompt().
      */
-    fun enqueuePrompt(text: String) {
+    fun enqueuePrompt(text: String, feedScope: String? = null) { // nanoMuse: background callers have no Feed scope.
         val trimmed = text.trim()
         val pendingAttachments = _attachments.value
         if ((trimmed.isBlank() && pendingAttachments.isEmpty()) || !_isStreaming.value) return
@@ -5899,6 +5900,7 @@ class ChatViewModel(
             id = "queued_${System.currentTimeMillis()}_${(Math.random() * 1_000_000).toInt()}",
             text = trimmed,
             attachments = pendingAttachments,
+            feedScope = feedScope, // nanoMuse: preserve local composer origin while queued.
         )
         _promptQueue.value = _promptQueue.value + prompt
 
@@ -6051,6 +6053,7 @@ class ChatViewModel(
             bodyPartsJson = queuedPaste?.partsJson,
         )
         val userEntity = chatRepository.appendMessage(sid, "user", userPartsJson)
+        io.github.nanomuse.feed.FeedChatEvidence.recorded(context, queued.map { it.feedScope }.distinct().singleOrNull(), userEntity, _memoryEnabled.value) // nanoMuse: only wholly composer-authored turns.
         io.github.nanomuse.sync.ConversationSync.sent(sid) // nanoMuse: pushed at send (C8), then "working" (C9)
         agentHistory.add(
             LLMMessage(
@@ -6197,7 +6200,8 @@ class ChatViewModel(
                 prepared.attachedFilesXml,
                 bodyPartsJson = drainPaste?.partsJson,
             )
-            chatRepository.appendMessage(sid, "user", userPartsJson)
+            val savedUser = chatRepository.appendMessage(sid, "user", userPartsJson)
+            io.github.nanomuse.feed.FeedChatEvidence.recorded(context, queued.map { it.feedScope }.distinct().singleOrNull(), savedUser, _memoryEnabled.value) // nanoMuse
             io.github.nanomuse.sync.ConversationSync.sent(sid) // nanoMuse: pushed at send (C8), then "working" (C9)
 
             agentHistory.add(LLMMessage(
@@ -6271,14 +6275,18 @@ class ChatViewModel(
     internal fun nmCancelHeadless(turnId: String): Boolean =
         io.github.nanomuse.hub.HeadlessTurn.stop(nmHeadlessReceipt, turnId) { cancelStream() }
 
-    fun sendMessage(text: String) {
+    // nanoMuse: only a send from the local composer may nominate personal Feed material.
+    fun sendMessage(text: String) = nmRouteMessage(text, null)
+    fun nmSendComposer(text: String) = nmRouteMessage(text,
+        io.github.nanomuse.feed.FeedChatEvidence.scope(context, realSessionId.ifEmpty { sessionId }, _memoryEnabled.value))
+    private fun nmRouteMessage(text: String, feedScope: String?) {
         if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
         // nanoMuse: explicit device work is routed before any local model or avatar action.
         if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
                 _attachments.value.isNotEmpty() || _pastedTexts.value.isNotEmpty(), _isCompacting.value)) return
-        if (_isStreaming.value) { enqueuePrompt(text); return }
+        if (_isStreaming.value) { enqueuePrompt(text, feedScope); return } // nanoMuse: carry the author through the queue.
         if (nmInterceptAvatar(text)) { nmCountableTurn = false; return }
-        sendMessage(text, skipContextCheck = false)
+        sendMessage(text, skipContextCheck = false, feedScope = feedScope) // nanoMuse: composer origin.
     }
 
     // nanoMuse: only the adapter touches upstream state; the lifecycle lives in RemoteChatBridge.
@@ -6339,7 +6347,7 @@ class ChatViewModel(
         val draft = _inputText.value
         val draftAttachments = _attachments.value
         _attachments.value = next.attachments
-        sendMessage(next.text)
+        nmRouteMessage(next.text, next.feedScope) // nanoMuse: restore the origin of this queued message.
         if (_inputText.value.isEmpty() || _inputText.value == draft) {
             _inputText.value = draft
             _attachments.value = draftAttachments
@@ -6752,7 +6760,7 @@ class ChatViewModel(
      *   re-entry with `skipCompactCheck`.
      */
     // nanoMuse: the optional receipt identifies the exact headless invocation's user row.
-    private fun sendMessage(text: String, skipContextCheck: Boolean, headless: io.github.nanomuse.hub.HeadlessTurn.Receipt? = null) {
+    private fun sendMessage(text: String, skipContextCheck: Boolean, headless: io.github.nanomuse.hub.HeadlessTurn.Receipt? = null, feedScope: String? = null) { // nanoMuse: local composer consent.
         // [T-android-paste-mediaref] `[Pasted#N]` markers are NOT expanded here
         // any more.
         //
@@ -6773,7 +6781,7 @@ class ChatViewModel(
         val trimmed = text.trim()
         // While streaming, enqueue instead of silently dropping (iOS: send vs enqueuePrompt).
         if (_isStreaming.value) {
-            enqueuePrompt(text)
+            enqueuePrompt(text, feedScope) // nanoMuse: preserve the origin if streaming started.
             return
         }
         // T180: allow attachments-only sends (no caption). Mirrors iOS, where
@@ -6795,6 +6803,7 @@ class ChatViewModel(
             when (checkContextBeforeSend()) {
                 PreSendContextAction.PROCEED -> {}
                 PreSendContextAction.COMPACT_THEN_SEND -> {
+                    nmPendingFeedScope = feedScope // nanoMuse: retain consent across pre-send compaction.
                     pendingSendText = text
                     _inputText.value = ""
                     compactAndSendPending()
@@ -6803,6 +6812,7 @@ class ChatViewModel(
                 PreSendContextAction.ASK_USER -> {
                     // Park the text on the VM (not the composer) so the dialog
                     // owns it; cancelCompactBeforeSend puts it back.
+                    nmPendingFeedScope = feedScope // nanoMuse: retain consent across pre-send compaction.
                     pendingSendText = text
                     _inputText.value = ""
                     _showCompactBeforeSendPrompt.value = true
@@ -6900,6 +6910,7 @@ class ChatViewModel(
                 bodyPartsJson = pasted?.partsJson,
             )
             val persistedUser = chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            io.github.nanomuse.feed.FeedChatEvidence.recorded(context, feedScope, persistedUser, _memoryEnabled.value) // nanoMuse: keeps only the row reference.
             headless?.saved(persistedUser.id) // nanoMuse: publish identity only after persistence.
             io.github.nanomuse.sync.ConversationSync.sent(activeSessionId) // nanoMuse: the person's line reaches the other devices at send (C8), then "working" (C9)
             io.github.nanomuse.chat.RoutineWakes.claim(activeSessionId, persistedUser.id) // nanoMuse: a routine's prompt is marked as such on its row

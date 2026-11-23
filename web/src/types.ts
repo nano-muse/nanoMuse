@@ -1387,6 +1387,10 @@ export interface FeedItem {
   quiet?: boolean;
 }
 
+export interface WaitingFollowup {
+  kind: "waiting"; id: string; quote: string; subject: string; sender?: string; due: string; time?: string; correction: string;
+}
+
 export type FeedFollowup =
   | { kind: "review"; id: string; goal_id: string; title: string; reason: "blocked" | "proposal"; detail: string; note: string; observed_on: string }
   | { kind: "goal"; id: string; goal_id: string; title: string; due: string; days_until: number; next_step: string | null }
@@ -1394,6 +1398,7 @@ export type FeedFollowup =
 
 export interface UpcomingData {
   followups?: FeedFollowup[];
+  waiting_followup?: WaitingFollowup | null;
   proactive: boolean;
   proactivity: Proactivity;
   interval_minutes: number;

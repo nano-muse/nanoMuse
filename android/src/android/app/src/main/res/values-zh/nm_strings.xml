@@ -1267,4 +1267,6 @@
     <string name="nm_deadline_cards">在动态中显示目标截止日期</string>
     <string name="nm_deadline_alerts">目标到期通知</string>
     <string name="nm_deadline_notice">打开动态，查看下一步。</string>
+    <string name="nm_feed_use_recent_chats">用近期聊天准备动态</string>
+    <string name="nm_feed_recent_chats_hint">仅使用开启后你在此设备输入的消息。加锁的对话会跳过。</string>
 </resources>

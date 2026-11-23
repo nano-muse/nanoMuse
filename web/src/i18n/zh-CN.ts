@@ -5,8 +5,15 @@
  */
 const zhCN: Record<string, string> = {
   // ── Shell, tabs, connection ───────────────────────────────────────────────────────
+  "Follow up on goals, calendar conflicts and expected replies": "跟进目标、日程冲突和等待的回复",
   "Goal and calendar follow-ups": "目标和日历跟进",
   "Help me plan around the overlap between {first} and {second}.": "帮我看看「{first}」和「{second}」时间重叠了，该怎么安排。",
+  "This follow-up has changed.": "这件事有了新进展。",
+  "You were waiting for a reply": "你在等的回复",
+  "Expected from {sender} by {date}": "原定 {sender} 在 {date} 前回复",
+  "Expected by {date}": "原定回复日期为 {date}",
+  "Edit follow-up message": "编辑跟进消息",
+  "Hi, do you have an update on {subject}?": "你好，想跟进一下「{subject}」，请问有新进展吗？",
   "Calendar overlap": "日程时间重叠",
   "Next step: {step}": "下一步：{step}",
   "Review goal": "查看目标",

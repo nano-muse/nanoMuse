@@ -588,6 +588,8 @@ Set the optional due date in Goals. While the desktop app is running and the Fee
 
 The Feed can also prepare material from an unfinished goal or a recent request you wrote in a completed conversation. A separate memory, conversation or saved file label can supply a relevant constraint. For example, a promise to contact a museum and a saved accessibility requirement can become an editable booking inquiry. Expand the sources on the card to see where the information came from. The preparation call uses the current chat model without tools. Existing scheduled reading with written preferences stays available, and you can request research explicitly.
 
+A chat can hold several unfinished commitments. You can discuss something else and come back to one by name. If you say the museum visit moved to Friday, its original request stays attached to the new date. Saying that you sent the museum inquiry withdraws its preparation and leaves your other commitments alone. A writing request that already received a draft also stops generating one.
+
 The four rooms are on the rail (Chats, Search,
 Feed, Ideas, Goals, Library, Devices), each one `main` panel of the harness's layout,
 so the chat column stays where it is and a room opens in its place. One host service

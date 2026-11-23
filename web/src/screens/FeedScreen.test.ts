@@ -173,3 +173,25 @@ it("shows verified excerpts, opens the prepared draft and remembers a handled ma
   expect(api.handlePreparation).toHaveBeenCalledWith(prep.id);
   expect(JSON.stringify(screen.toJSON())).not.toContain("An editable note");
 });
+
+it("uses the expected reply to open an unsent follow-up and shows the correction", async () => {
+  vi.spyOn(api, "hideFeedFollowup").mockResolvedValue({ ok: true });
+  const waiting = { kind: "waiting" as const, id: "wait_42", quote: "I am waiting for the Atlas quote today.",
+    due: "2026-11-25", subject: "the Atlas quote", sender: "the supplier", time: "15:30", correction: "Moved to Wednesday." };
+  vi.mocked(api.upcoming).mockResolvedValue({ ...upcoming, proactive: true, waiting_followup: waiting });
+  await mount();
+  const card = screen.root.findByProps({ "aria-label": "You were waiting for a reply" });
+  expect(JSON.stringify(screen.toJSON())).toContain(waiting.correction);
+  expect(JSON.stringify(screen.toJSON())).toContain("Expected from the supplier by 2026-11-25 15:30");
+  const click = async (label: string) => {
+    const button = card.findAllByType("button").find((b) => b.children.join("") === label);
+    await act(async () => { await button!.props.onClick(); });
+  };
+  await click("Edit follow-up message");
+  expect(store.openThread).toHaveBeenCalledWith("main");
+  expect(store.draft).toHaveBeenCalledWith("Hi, do you have an update on the Atlas quote?");
+  vi.mocked(api.upcoming).mockResolvedValue(upcoming);
+  await click("Dismiss");
+  expect(api.hideFeedFollowup).toHaveBeenCalledWith(waiting.id, "dismiss");
+  expect(screen.root.findAllByProps({ "aria-label": "You were waiting for a reply" })).toHaveLength(0);
+});

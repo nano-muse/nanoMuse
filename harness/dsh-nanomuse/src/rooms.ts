@@ -29,7 +29,8 @@ import { avatarFence, avatarMemoryLine } from './avatar-flow.ts'
 import { FENCE_FEED, FENCE_GOAL, FENCE_GOAL_UPDATE, findFences, goalCategory, goalCheckPrompt, goalCreationNote, goalHomeNote, goalOpener, parseFeedDraft, parseGoalBlock, parseGoalUpdate, parseIdeas, type GoalBlock, type GoalUpdateBlock, type IdeaKind, type StaticIdea } from './fences.ts'
 import { afterTurn, boundTo, currentSuggestions, dismissChooser, FIRST_RUN_EMPTY, pickName, promptAddendum, readFirstRun, startConversation, type FirstRunState } from './firstrun.ts'
 import { DEFAULT_NUDGES, dueAsk, LEDGER_EMPTY, NUDGES_EVERY_MS, NUDGES_ORIGIN, NUDGES_TIMEOUT_MS, readLedger, readNudges, recordAsk, recordDay, recordStarred, recordTask, type Ask, type Moment, type NudgeLedger, type NudgesPolicy, type NudgesView } from './nudges.ts'
-import { canPrepare, contextKey, parsePreparation, preparationRequest, preparationSources, type Preparation, type Source } from './feed-preparation.ts'
+import { noteCommitment, draftDelivered, type ChatCommitments } from './chat-commitments.ts'
+import { asksForDraft, canPrepare, currentFeedGoals, contextKey, parsePreparation, preparationRequest, preparationSources, type Preparation, type Source } from './feed-preparation.ts'
 import { followUpText, localDateKey, nextGoalFollowUp, validGoalDate, type GoalFollowUpReason } from './goal-follow-up.ts'
 import { homeDir, homeWorkspace } from './home.ts'
 import { packageAssetsDir } from './profile.ts'
@@ -294,6 +295,9 @@ export interface ActivityRecord {
   /** The person's first words in the latest turn (the task), cut. */
   request: string
   requestAt?: number
+  requestOwner?: string
+  /** Private Feed state scoped to this chat and account. */
+  commitments?: ChatCommitments
   /** The agent's last words, cut. */
   words: string
   /** The tool step under way, for the status line under the face. */
@@ -318,7 +322,7 @@ export interface FeedRoutine {
 
 interface Store {
   lang: string
-  feed: { instructions: string; generatedAt: number; lastTry: number; posts: FeedPost[]; routine: FeedRoutine; lastGoalFollowUpDay?: string; preparation?: { context: string; day: string; seen: string[] } }
+  feed: { instructions: string; generatedAt: number; lastTry: number; posts: FeedPost[]; routine: FeedRoutine; lastGoalFollowUpDay?: string; preparation?: { context: string; day: string; seen: string[]; published?: { owner: string; subject: string; source: string }; revisedOn?: string } }
   /** `marks` is what the person did with each idea of the static list; `items` is the list as the browser sees it. */
   ideas: { generatedAt: number; lastTry: number; items: Idea[]; marks: Record<string, { started?: string; dismissed?: boolean }> }
   goals: Goal[]
@@ -554,18 +558,19 @@ export default class NanomuseRooms extends Service {
 
   view(): RoomsView {
     // the records travel without their steps' texts; `/activity?session=` has one in full
-    const activity = this.store.activity.filter((r) => !this.ctx.nanomuseCloud.isClearedSession(r.sessionId)).map((r) => ({ ...r, steps: r.steps.map((s) => ({ ...s, detail: '', result: '' })) }))
+    const activity = this.store.activity.filter((r) => !this.ctx.nanomuseCloud.isClearedSession(r.sessionId)).map(({ commitments: _private, requestOwner: _owner, ...r }) => ({ ...r, steps: r.steps.map((s) => ({ ...s, detail: '', result: '' })) }))
     const goals = this.goals
-    const accessibleGoals = new Set(goals.map((goal) => goal.id))
     const now = Date.now()
+    const accessibleGoals = new Set(currentFeedGoals(goals, this.store.activity, this.ctx.nanomuseCloud.feedOwner, now).map(goal => goal.id))
     const prepSources = this.store.feed.posts.some(p => p.preparation) ? this.prepSources(now, this.store.feed.posts) : []
     const visible = this.store.feed.posts.filter(post => this.prepVisible(post, prepSources))
+    const { preparation: _ledger, ...publicFeed } = this.store.feed
     const preparedGoals = new Set(visible.flatMap(post => post.preparation?.sources.map(s => s.goalId) ?? []))
     const posts = visible.filter(post => !post.goalId || (!preparedGoals.has(post.goalId) && (post.goalExpiresAt ?? 0) > now && accessibleGoals.has(post.goalId)))
     return {
       ...this.store,
       goals,
-      feed: { ...this.store.feed, posts },
+      feed: { ...publicFeed, posts },
       ideas: { ...this.store.ideas, items: this.ideaItems() },
       activity,
       busy: { ...this.busy },
@@ -826,7 +831,10 @@ export default class NanomuseRooms extends Service {
 
   activityOf(sessionId: string): ActivityRecord | undefined {
     if (this.ctx.nanomuseCloud.isClearedSession(sessionId)) return undefined
-    return this.store.activity.find((r) => r.sessionId === sessionId)
+    const record = this.store.activity.find((r) => r.sessionId === sessionId)
+    if (!record) return
+    const { commitments: _private, requestOwner: _owner, ...activity } = record
+    return activity
   }
 
   // ---- the agent's documents: IDENTITY.md, SOUL.md, MEMORY.md -------------------------------
@@ -929,11 +937,30 @@ export default class NanomuseRooms extends Service {
     }
   }
 
+  private commitmentOwner(record: ActivityRecord, goal: Goal | undefined): string | undefined {
+    const owner = this.ctx.nanomuseCloud.feedOwner
+    if (owner !== undefined && this.store.feed.routine.on && !this.isBatch(record.sessionId) &&
+        (!goal || (!goal.feedMuted && goal.status === 'tracking')) &&
+        this.ctx.nanomuseCloud.scheduleSessionAccess('nanomuse-feed')(record.sessionId)) return owner
+  }
+
   private trackActivity(session: Session, event: SessionEvent): void {
     if (this.ctx.nanomuseCloud.isClearedSession(String(session.id))) return
     const type: string = event.type
     if (type === 'turn/start') {
       const record = this.recordFor(session.id, true)!
+      // Migrate the previous human request before turn/start discards its answer.
+      if (!record.commitments && record.status === 'done' && record.requestAt && record.request) {
+        const goal = this.store.goals.find(g => g.sessionId === record.sessionId)
+        const owner = this.commitmentOwner(record, goal)
+        if (owner !== undefined && (record.requestOwner === undefined || record.requestOwner === owner)) {
+          const state: ChatCommitments = { owner, items: [] }
+          noteCommitment(state, record.request, record.requestAt, goal)
+          const item = state.items[0]
+          if (item && asksForDraft(item.request) && record.steps.some(s => s.kind === 'answer' && s.at >= item.at && draftDelivered(s.detail))) item.closed = true
+          record.commitments = state
+        }
+      }
       record.status = 'running'
       record.current = null
       record.endedAt = 0
@@ -950,10 +977,23 @@ export default class NanomuseRooms extends Service {
         if (event.data.source.kind !== 'user') return
         const text = textOf(event.data.content).replace(/\s+/g, ' ').trim()
         if (text) {
+          const at = Date.now()
+          const goal = this.store.goals.find(g => g.sessionId === record.sessionId)
+          const owner = this.commitmentOwner(record, goal)
+          if (owner !== undefined) {
+            const state: ChatCommitments = record.commitments?.owner === owner ? record.commitments : { owner, items: [] }
+            noteCommitment(state, text.slice(0, 200), at, goal)
+            state.turn = record.turns
+            record.commitments = state
+          } else if (record.commitments) {
+            // A turn we cannot track may have settled the open task.
+            delete record.commitments
+          }
           record.request = text.slice(0, 200)
-          record.requestAt = Date.now()
+          record.requestAt = at
+          record.requestOwner = this.ctx.nanomuseCloud.feedOwner ?? ''
         }
-        this.activityChanged(record)
+        this.activityChanged(record, true)
         return
       }
       case 'tool/call': {
@@ -994,6 +1034,14 @@ export default class NanomuseRooms extends Service {
         record.status = reason.kind === 'error' ? 'error' : reason.kind === 'completed' ? 'done' : 'stopped'
         record.current = null
         record.endedAt = Date.now()
+        const state = record.commitments
+        const focus = state?.owner === this.ctx.nanomuseCloud.feedOwner ? state?.items.find(i => i.request === state.focus) : undefined
+        if (record.status === 'done' && state?.turn === record.turns && focus && !focus.closed && asksForDraft(focus.request) &&
+            record.steps.some(s => s.kind === 'answer' && draftDelivered(s.detail))) {
+          focus.closed = true
+          focus.changedAt = record.endedAt
+          focus.changed = true
+        }
         this.pushStep(record, { at: Date.now(), kind: 'end', name: '', title: '', detail: reason.kind === 'error' ? String(reason.error.message ?? '') : reason.kind, result: '', callId: '' })
         this.activityChanged(record, true)
         return
@@ -1178,6 +1226,9 @@ export default class NanomuseRooms extends Service {
 
   async deletePost(id: string): Promise<void> {
     const post = this.store.feed.posts.find(p => p.id === id)
+    if (post?.preparation?.sources.some(source => source.id === this.store.feed.preparation?.published?.source)) {
+      delete this.store.feed.preparation!.published
+    }
     const covered = new Set(post?.preparation?.sources.map(s => s.goalId))
     this.store.feed.posts = this.store.feed.posts.filter(p => p.id !== id && (!p.goalId || !covered.has(p.goalId)))
     await this.save()
@@ -1223,12 +1274,21 @@ export default class NanomuseRooms extends Service {
     const now = Date.now()
     const day = localDateKey(now)
     if (this.busy.feed) return 'busy'
-    if (!manual && (!feed.routine.on || !routineDue(feed.routine.time, 0, now) || feed.preparation?.day === day)) return 'quiet'
+    if (!manual && (!feed.routine.on || !routineDue(feed.routine.time, 0, now))) return 'quiet'
     const cloud = this.ctx.nanomuseCloud
     const owner = cloud.feedOwner
     if (owner === undefined) return 'quiet'
     const access = cloud.scheduleSessionAccess('nanomuse-feed')
-    const sources = this.prepSources(now)
+    const replacement = !manual && feed.preparation?.day === day
+    const published = feed.preparation?.published
+    if (replacement && (!published || published.owner !== owner || feed.preparation?.revisedOn === day)) return 'quiet'
+    const forReview = (at: number) => {
+      const all = this.prepSources(at)
+      if (!replacement || !published) return all
+      const revised = all.find(s => s.commitment === published.subject && s.id !== published.source)
+      return revised ? [revised, ...all.filter(s => !s.timing && s.origin !== revised.origin)] : []
+    }
+    const sources = forReview(now)
     if (!canPrepare(sources)) return 'quiet'
     const key = contextKey(sources, this.lang, feed.instructions, owner)
     if (!manual && key === feed.preparation?.context) return 'quiet'
@@ -1244,7 +1304,7 @@ export default class NanomuseRooms extends Service {
       const answer = await cloud.prepareFeed(request.system, request.input, abort.signal)
       if (abort.signal.aborted || !access('nanomuse-feed') || cloud.feedOwner !== owner || this.store.feed !== feed ||
           this.lang !== lang || feed.instructions !== instructions || (!manual && !feed.routine.on)) return 'quiet'
-      const current = this.prepSources(Date.now())
+      const current = forReview(Date.now())
       if (localDateKey(Date.now()) !== day || contextKey(current, lang, instructions, owner) !== key) return 'quiet'
       const result = parsePreparation(answer, sources, owner, now)
       const seen = feed.preparation?.seen ?? []
@@ -1256,7 +1316,13 @@ export default class NanomuseRooms extends Service {
         addedId = newId('post')
         feed.posts = [{ ...result, id: addedId, at: Date.now(), area: 'planning', image: '', prompt: '', emoji: '📝', liked: false }, ...feed.posts].slice(0, FEED_KEEP)
       }
-      feed.preparation = { context: key, day: publish ? localDateKey(Date.now()) : prevState?.day ?? '', seen: publish ? [result.preparation.key, ...seen].slice(0, FEED_KEEP) : seen }
+      const anchor = publish ? sources.find(s => s.commitment && result.preparation.sources.some(ref => ref.id === s.id)) : undefined
+      feed.preparation = { ...prevState, context: key, day: publish ? localDateKey(Date.now()) : prevState?.day ?? '',
+        seen: publish ? [result.preparation.key, ...seen].slice(0, FEED_KEEP) : seen,
+        ...(replacement ? { revisedOn: day } : {}),
+      }
+      if (publish && anchor?.commitment) feed.preparation.published = { owner, subject: anchor.commitment, source: anchor.id }
+      else if (publish) delete feed.preparation.published
       try {
         await this.save(true, true)
       } catch (error) {
@@ -2003,7 +2069,7 @@ export default class NanomuseRooms extends Service {
     const previousCount = feed.posts.length
     feed.posts = feed.posts.filter((post) => !post.goalId || (feed.routine.on && (post.goalExpiresAt ?? 0) > now))
     const due = feed.routine.on && (!feed.lastGoalFollowUpDay || feed.lastGoalFollowUpDay < day) && routineDue(feed.routine.time, 0, now)
-    const candidate = due ? nextGoalFollowUp(this.goals, day, now) : undefined
+    const candidate = due ? nextGoalFollowUp(currentFeedGoals(this.goals, this.store.activity, this.ctx.nanomuseCloud.feedOwner, now), day, now) : undefined
     if (candidate) {
       const { goal, stage, reason } = candidate
       goal.followUpSeen ??= {}

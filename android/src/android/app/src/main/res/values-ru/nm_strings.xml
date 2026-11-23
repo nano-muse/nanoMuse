@@ -1302,4 +1302,6 @@
     <string name="nm_deadline_cards">Показывать сроки целей в ленте</string>
     <string name="nm_deadline_alerts">Уведомления о сроках целей</string>
     <string name="nm_deadline_notice">Откройте ленту, чтобы увидеть следующий шаг.</string>
+    <string name="nm_feed_use_recent_chats">Учитывать недавние чаты в ленте</string>
+    <string name="nm_feed_recent_chats_hint">Используются только сообщения, введённые здесь после включения. Защищённые чаты исключены.</string>
 </resources>

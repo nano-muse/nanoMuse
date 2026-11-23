@@ -1260,4 +1260,6 @@
     <string name="nm_deadline_cards">在動態顯示目標期限</string>
     <string name="nm_deadline_alerts">目標到期通知</string>
     <string name="nm_deadline_notice">開啟動態，查看下一步。</string>
+    <string name="nm_feed_use_recent_chats">用近期聊天準備動態</string>
+    <string name="nm_feed_recent_chats_hint">只使用開啟後你在此裝置輸入的訊息。已鎖定的對話會略過。</string>
 </resources>

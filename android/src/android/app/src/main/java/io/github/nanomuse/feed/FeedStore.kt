@@ -88,7 +88,7 @@ object FeedStore {
             val post = FeedPost(
                 day = day, index = next, title = d.title.trim().take(80), type = d.type, emoji = d.emoji,
                 body = d.body.trim(), source = d.source, createdAt = now, liked = false, file = file,
-                preparation = d.preparation, goalId = d.goalId, sourceSessions = d.sourceSessions,
+                preparation = d.preparation, goalId = d.goalId, sourceSessions = d.sourceSessions, chatBased = d.chatBased,
             )
             runCatching { file.writeText(post.serialize()) }
                 .onSuccess { written += post; next++ }
@@ -132,6 +132,7 @@ object FeedStore {
         val preparation: String = "",
         val goalId: String = "",
         val sourceSessions: List<String> = emptyList(),
+        val chatBased: Boolean = false,
     )
 
     data class AppendResult(val written: List<FeedPost>, val droppedByLimit: Int)

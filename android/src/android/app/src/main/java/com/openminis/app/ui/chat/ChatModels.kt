@@ -203,6 +203,7 @@ data class QueuedPrompt(
     val id: String,
     val text: String,
     val attachments: List<InputAttachment> = emptyList(),
+    val feedScope: String? = null, // nanoMuse: opt-in receipt for locally authored queued text.
 )
 
 /**

@@ -13,6 +13,7 @@ from nanomuse.calendar.feeds import CalendarFeeds
 from nanomuse.goals.store import Goal, parse_due
 from nanomuse.memory.store import MemoryStore, tokenize
 from nanomuse.server.followups import fresh_busy_events
+from nanomuse.server.waiting import personal_message, waiting_for
 
 PROMPT = """You are a personal assistant preparing something genuinely useful before it is asked for.
 Answer in the requested language. Return either [] or one JSON object inside an array.
@@ -117,11 +118,20 @@ def sources_for(
 
     if profile.strip():
         records.append(Source("profile", "profile", profile.strip()[:450], False))
+    _, handled_locally = waiting_for(timeline, now)
     exchanges: list[tuple[dict[str, Any], str]] = []
+    personal_turn = False
     for ev in timeline[-150:]:
         if ev.get("type") == "user":
-            exchanges.append((ev, ""))
-        elif ev.get("type") == "assistant" and ev.get("source") in (None, "", "user") and exchanges:
+            personal_turn = personal_message(ev) and ev.get("id") not in handled_locally
+            if personal_turn:
+                exchanges.append((ev, ""))
+        elif (
+            ev.get("type") == "assistant"
+            and ev.get("source") in (None, "", "user")
+            and personal_turn
+            and not ev.get("via_device")
+        ):
             exchanges[-1] = (exchanges[-1][0], str(ev.get("text") or "")[:400])
     for ev, reply in exchanges[-5:]:
         text = ev.get("text")

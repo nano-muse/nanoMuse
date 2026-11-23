@@ -1274,4 +1274,6 @@
     <string name="nm_deadline_cards">Show goal deadlines in Feed</string>
     <string name="nm_deadline_alerts">Goal deadline notifications</string>
     <string name="nm_deadline_notice">Open Feed to review your next step.</string>
+    <string name="nm_feed_use_recent_chats">Use recent chats for Feed</string>
+    <string name="nm_feed_recent_chats_hint">Use messages you type after turning this on. Protected chats are excluded.</string>
 </resources>

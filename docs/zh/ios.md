@@ -41,6 +41,8 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 
 动态可以根据目标，也可以根据最近日记里有明确时间的约定做准备。另一篇笔记或已记录的偏好要能补充相关细节，卡片里可以核对两处原文。已取消或已过期的约定会被筛掉。定时准备只读取已有材料。
 
+在动态设置打开「根据聊天提前准备」后，你在这部 iPhone 上新发出的文字也能成为依据。对话须允许记忆且未加锁。例如，你说周五要给博物馆发参观申请，另有一条关于无台阶入口的偏好，动态就可以提前起草。后来改期或说申请已经发出，动态会重新核对。关闭这个设置会移除用聊天生成的卡片。
+
 `python scripts/rebrand.py` 应用以下调整。脚本可重复执行且结果一致，每次更新上游后都应运行：
 
 - **应用标识**。 Bundle id 改为 `io.github.nanomuse.app` 及 `.ShareExtension`、`.AgentWidget`、`.FileProvider` 扩展，App Group 为 `group.io.github.nanomuse.app`，iCloud 容器为 `iCloud.io.github.nanomuse.app`。包含 bundle id 的后台任务、UTType 和 URL scheme 标识也一起修改。iOS 没有 Android 的源码包名限制，因此整组标识可统一调整。系统注册的链接前缀为 `nanomuse` 和 `nanomuse-mcp`，分享扩展使用 `nanomuse://share`，避免与同机 OpenMinis 冲突。App 内部继续采用上游 `minis://…`，兼容沙箱、系统提示词和模型；系统传入的 `nanomuse://` 由 `NanoMuse/NanoMuseOwnScheme.swift` 转为对应 `minis://`。聊天以外的自有按钮通过 App 深链接路由打开，不交给系统。

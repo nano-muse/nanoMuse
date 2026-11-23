@@ -88,6 +88,7 @@ object FeedFlow {
     }
 
     fun leave(context: Context) {
+        FeedChatEvidence.accountChange(leaving = true)
         FeedPreparationRunner.accountChange(leaving = true)
         io.github.nanomuse.goals.GoalFollowUps.leave(context)
         lastWritten = emptyList()
@@ -97,6 +98,7 @@ object FeedFlow {
 
     /** Another account's preferences and routine are in place (contract C12): read them again. */
     fun refresh(context: Context) {
+        FeedChatEvidence.accountChange(leaving = false)
         FeedPreparationRunner.accountChange(leaving = false)
         io.github.nanomuse.goals.GoalFollowUps.start(context)
         lastWritten = emptyList()
@@ -334,7 +336,7 @@ object FeedFlow {
         if (!isFeedSession(context, sessionId)) return null
         val digest = digest(context)
         val goalStore = GoalStore.get(context)
-        val recent = FeedStore.posts.value.filter { it.visibleWith(SessionAccess.protected.value, goalStore.get(it.goalId)) }
+        val recent = FeedStore.posts.value.filter { !it.chatBased && it.visibleWith(SessionAccess.protected.value, goalStore.get(it.goalId)) }
             .take(24).map { it.title }
         return buildString {
             appendLine("## This conversation writes the user's feed (nanoMuse)")

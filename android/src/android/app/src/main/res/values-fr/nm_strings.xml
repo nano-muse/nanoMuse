@@ -1295,4 +1295,6 @@
     <string name="nm_deadline_cards">Afficher les échéances des objectifs dans le fil</string>
     <string name="nm_deadline_alerts">Notifications des échéances des objectifs</string>
     <string name="nm_deadline_notice">Ouvrez le fil pour voir la prochaine étape.</string>
+    <string name="nm_feed_use_recent_chats">Utiliser les discussions récentes pour le fil</string>
+    <string name="nm_feed_recent_chats_hint">Seuls les messages saisis ici après activation sont utilisés. Les discussions protégées sont exclues.</string>
 </resources>

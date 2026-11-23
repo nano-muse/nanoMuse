@@ -68,6 +68,8 @@ A goal can have a local deadline chosen at creation or in Goals. The Feed shows 
 
 The Feed can prepare material for an open goal or an upcoming appointment recorded in a recent diary entry. A separate note or saved preference must add something relevant. Each card includes its source excerpts. An explicit cancellation or a passed appointment can rule out a diary signal. The scheduled writer has no tools.
 
+Turn on *Prepare from my chats* in Feed settings to include new text you send on this iPhone in unlocked chats with memory enabled. A commitment with a date and a separate relevant note can become a draft, even if you never created a goal. When you change the date or say you already sent the message, the Feed rechecks the source before showing the preparation. Turning the setting off removes its chat-based cards.
+
 Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pull):
 
 - **Identity.** Bundle ids `io.github.nanomuse.app` (+ `.ShareExtension`, `.AgentWidget`,

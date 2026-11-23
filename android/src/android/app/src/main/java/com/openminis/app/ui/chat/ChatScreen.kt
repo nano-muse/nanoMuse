@@ -1762,7 +1762,7 @@ fun ChatScreen(
         viewModel.setInputText("")
         releaseComposerAfterSend()
         viewModel.nmMarkPersonTurn() // nanoMuse: the person started this turn (StarPrompt counts those)
-        viewModel.sendMessage(rawText)
+        viewModel.nmSendComposer(rawText) // nanoMuse: explicitly marks a local composer submission.
         noteSendForInputModePref()
         userScrolledAway = false
         coroutineScope.launch {
@@ -5770,7 +5770,7 @@ fun ChatScreen(
                             viewModel.setInputText("")
                             releaseComposerAfterSend()
                             viewModel.nmMarkPersonTurn() // nanoMuse: the person started this turn (StarPrompt counts those)
-                            viewModel.sendMessage(toSend)
+                            viewModel.nmSendComposer(toSend) // nanoMuse: local composer submission.
                             noteSendForInputModePref()
                             userScrolledAway = false
                             coroutineScope.launch {

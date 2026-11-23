@@ -1290,4 +1290,6 @@
     <string name="nm_deadline_cards">目標の期限をフィードに表示</string>
     <string name="nm_deadline_alerts">目標の期限通知</string>
     <string name="nm_deadline_notice">フィードで次のステップを確認できます。</string>
+    <string name="nm_feed_use_recent_chats">最近のチャットをフィードに使う</string>
+    <string name="nm_feed_recent_chats_hint">有効にした後、この端末で入力したメッセージを使います。保護されたチャットは対象外です。</string>
 </resources>

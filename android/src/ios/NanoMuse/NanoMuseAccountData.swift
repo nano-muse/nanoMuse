@@ -312,6 +312,7 @@ final class NanoMuseAccountData {
             ("memory", NanoMuseDirs.memory),
             ("shared", AIChatViewModel.minisSharedPersistentDir),
             ("feed", NanoMuseDirs.root.appendingPathComponent("feed", isDirectory: true)),
+            ("feed-chat", NanoMuseDirs.root.appendingPathComponent("feed-chat", isDirectory: true)),
             ("feed-preferences.md", NanoMuseDirs.root.appendingPathComponent("feed-preferences.md")),
             ("goals.json", NanoMuseDirs.root.appendingPathComponent("goals.json")),
             ("routines.json", NanoMuseDirs.root.appendingPathComponent("routines.json")),

@@ -1294,4 +1294,6 @@
     <string name="nm_deadline_cards">Akışta hedeflerin bitiş tarihlerini göster</string>
     <string name="nm_deadline_alerts">Hedef bitiş tarihi bildirimleri</string>
     <string name="nm_deadline_notice">Sonraki adımı görmek için akışı açın.</string>
+    <string name="nm_feed_use_recent_chats">Akış için son sohbetleri kullan</string>
+    <string name="nm_feed_recent_chats_hint">Yalnızca bu seçeneği açtıktan sonra burada yazdığınız iletiler kullanılır. Korumalı sohbetler hariçtir.</string>
 </resources>

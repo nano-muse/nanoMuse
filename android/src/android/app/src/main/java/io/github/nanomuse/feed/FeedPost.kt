@@ -23,6 +23,7 @@ data class FeedPost(
     val preparation: String = "",
     val goalId: String = "",
     val sourceSessions: List<String> = emptyList(),
+    val chatBased: Boolean = false,
 ) {
     val id: String get() = "$day/${"%02d".format(Locale.ROOT, index)}"
 
@@ -41,6 +42,7 @@ data class FeedPost(
         if (preparation.isNotEmpty()) appendLine("preparation: $preparation")
         if (goalId.isNotBlank()) appendLine("goal-id: ${escape(goalId)}")
         if (sourceSessions.isNotEmpty()) appendLine("source-sessions: ${sourceSessions.joinToString(",")}")
+        if (chatBased) appendLine("chat-based: true")
         if (liked) appendLine("liked: true")
         appendLine("---")
         appendLine()
@@ -77,6 +79,7 @@ data class FeedPost(
                 file = file,
                 goalId = meta["goal-id"].orEmpty(),
                 preparation = meta["preparation"].orEmpty(),
+                chatBased = meta["chat-based"] == "true",
                 sourceSessions = meta["source-sessions"].orEmpty().split(",").filter { it.isNotEmpty() },
             )
         }

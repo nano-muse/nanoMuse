@@ -3698,3 +3698,43 @@ def test_explicit_inquiry_needs_no_goal_and_never_sends_the_result(server):
     assert card["body"] == draft and card["form"] == "draft"
     assert len(card["sources"]) == 2 and not llm.calls[0]["tools"]
     assert not any(e.get("text") == draft for e in service.threads["main"].timeline.events)
+
+
+def test_waiting_card_works_without_model_and_follows_the_changed_date(server):
+    client, service, llm = server
+    now = datetime.now().astimezone()
+    history = service.threads["main"].timeline
+    history.add({"type": "user", "text": "我在等供应商今天发来星桥报价。"})
+    first = client.get("/api/upcoming").json()["waiting_followup"]
+    assert first["subject"] == "星桥报价" and first["due"] == now.date().isoformat()
+    assert not client.get("/api/upcoming").json()["followups"]  # older clients
+    assert not client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    client.put(f"/api/feed/followups/{first['id']}?choice=dismiss")
+    assert client.get("/api/upcoming").json()["waiting_followup"] is None
+    history.add({"type": "user", "text": "改到明天。"})
+    assert client.get("/api/upcoming").json()["waiting_followup"] is None
+    second = service.waiting_followup(now + timedelta(days=1))
+    assert second and second["id"] != first["id"] and second["correction"] == "改到明天。"
+    client.put("/api/feed/instructions", json={"followups": False})
+    assert service.waiting_followup(now + timedelta(days=1)) is None
+    client.put("/api/feed/instructions", json={"followups": True})
+    history.add({"type": "user", "text": "星桥报价收到了。"})
+    assert service.waiting_followup(now + timedelta(days=1)) is None and not llm.calls
+
+
+def test_last_day_wait_can_be_snoozed_until_tomorrow(server):
+    client, service, _ = server
+    now = datetime.now().astimezone()
+    service.threads["main"].timeline.add(
+        {
+            "type": "user",
+            "ts": (now - timedelta(days=3)).isoformat(),
+            "text": "I'm waiting for the Atlas quote by today.",
+        }
+    )
+    card = client.get("/api/upcoming").json()["waiting_followup"]
+    assert card and service.waiting_followup(now + timedelta(days=1)) is None
+    client.put(f"/api/feed/followups/{card['id']}?choice=tomorrow").raise_for_status()
+    assert service.waiting_followup(now) is None
+    assert service.waiting_followup(now + timedelta(days=1)) == card
+    assert service.waiting_followup(now + timedelta(days=2)) is None

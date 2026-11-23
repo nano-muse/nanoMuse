@@ -155,6 +155,8 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 准备材料使用当前模型，生成时不调用工具。它可以参考有效目标、未来 24 小时内即将开始且缓存新鲜的忙碌日程、个人偏好、已保存的记忆和主要聊天最近的交流。引用在展示前会与本地记录核对，依据不足或已经失效时可以留空。从动态回到主要聊天编辑草稿时，输入框会保留切换前未发送的文字。开启动态设置中的「计划有变化时再看看」后，如果目标、近期日程或主要聊天里有明确时间的写作事项有变化，每天最多额外检查一次。该选项需要已开启每日例程和主动服务，并遵守免打扰设置。普通截止卡片和通知有独立开关。
 
+在主要聊天里说「我在等供应商周五下午三点发来星桥报价」，到了周五三点，动态就可以提醒你问进展。日期和时间按运行服务的当地时间计算，过期后三天内仍可跟进。卡片可展开核对原话和改期记录，说「星桥报价收到了」或明确取消后会撤下。每次最多展示一件等回复的事，可以选「明天再提醒」、关闭，或把询问放进主要聊天的输入框自行编辑。这项判断直接读取聊天记录，无需调用模型或查询邮箱。
+
 设置中的「主动性」决定智能体主动推进任务和通知你的频率：
 
 | 档位 | 执行频率 | 何时通知 |
@@ -207,7 +209,7 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | PUT | `/api/feed/posts/{id}/handled` | 隐藏围绕当前事项版本的准备材料。 |
 | POST | `/api/feed/posts/refresh[?prepare_only=true]` | 传 `prepare_only=true` 时只根据已有材料准备，可返回空列表。旧版客户端仍可以手动请求阅读文章。 |
 | DELETE | `/api/feed/posts/{id}` | 删除指定文章。 |
-| GET | `/api/upcoming` | 返回 `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`。`next_wake_at` 为提醒、目标检查或后台任务中最近的待执行时间，供能够设置系统闹钟的宿主使用，见 [local-runtime.md](local-runtime.md#waking-up)。 |
+| GET | `/api/upcoming` | 返回 `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], waiting_followup, queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`。`next_wake_at` 为提醒、目标检查或后台任务中最近的待执行时间，供能够设置系统闹钟的宿主使用，见 [local-runtime.md](local-runtime.md#waking-up)。 |
 | POST | `/api/tick` | 立即唤醒调度器，检查并执行已到期工作，返回 `{ok, next_wake_at}`。Android 的系统闹钟触发后调用此接口。 |
 | GET / POST | `/api/reminders[?all=1]` | 获取活跃提醒，带参数时获取最近全部提醒；或创建 `{text, at ("YYYY-MM-DD HH:MM") or repeat ("daily 08:00", …), kind (remind · task), thread}`。 |
 | POST / DELETE | `/api/reminders/{id}/fire`、`/api/reminders/{id}` | 立即在原聊天发送提醒；或取消该提醒。 |
@@ -293,6 +295,8 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | POST | `/api/push/subscribe` `{subscription}`、`/api/push/unsubscribe` `{endpoint}` | 注册或删除本设备 `PushSubscription`。 |
 | POST | `/api/push/test` | 向全部已订阅设备发送测试通知。 |
 | WS | `/ws` | 实时消息连接，首帧为 `{"kind": "auth", "token": …}`。 |
+
+可选字段 `waiting_followup` 在没有到期待回复事项时为 `null`。有卡片时包含 `kind`（`waiting`）、`id`、`subject`、`sender`（原话提到的对方）、`quote`、`due`（YYYY-MM-DD），以及 `time`（HH:MM）和 `correction`。未指定时间或没有改期时，对应字段为空字符串。
 
 ### WebSocket {#websocket}
 

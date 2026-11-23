@@ -20,7 +20,7 @@ import time
 import uuid
 from collections.abc import Coroutine
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from datetime import time as time_of_day
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -64,6 +64,7 @@ from nanomuse.server.followups import current_followups
 from nanomuse.server.outbox import Delivery, DeliveryOutbox
 from nanomuse.server.providers import ChatGPTSignIn, Providers
 from nanomuse.server.push import PushService
+from nanomuse.server.waiting import waiting_for
 from nanomuse.server.webui import WebUI, current_thread
 from nanomuse.sync import ConversationSync, parse_mention, system_note
 from nanomuse.telemetry import telemetry
@@ -3049,13 +3050,42 @@ class MuseService:
             only_id=only_id,
         )
 
+    def waiting_followup(self, now: datetime, only_id: str | None = None) -> dict[str, str] | None:
+        data = self.feed_posts()
+        main = self.threads.get(MAIN_THREAD)
+        if not self.profile.proactive or data.get("followups_enabled") is False or not main:
+            return None
+        pending, _ = waiting_for(main.timeline.events, now)
+        today = now.date()
+        hidden = data.get("followups_hidden", {})
+        ready = (
+            item
+            for item in pending
+            if (
+                item.ready(now)
+                or data.get("waiting_snoozed", {}).get(item.key) == today.isoformat()
+            )
+            and (only_id is None or item.key == only_id)
+            and hidden.get(item.key, "") <= today.isoformat()
+        )
+        item = min(
+            ready, key=lambda w: (w.due, w.clock.isoformat() if w.clock else ""), default=None
+        )
+        return item.card() if item else None
+
     def hide_followup(self, key: str, until_tomorrow: bool) -> None:
         now = datetime.now().astimezone()
-        card = next(iter(self.followups(now, only_id=key)), None)
+        card = (
+            self.waiting_followup(now, key)
+            if key.startswith("wait_")
+            else next(iter(self.followups(now, only_id=key)), None)
+        )
         if card is None:
             return  # already hidden, completed or rescheduled
         if until_tomorrow:
             expires = now.date() + timedelta(days=1)
+        elif card["kind"] == "waiting":
+            expires = date.fromisoformat(card["due"]) + timedelta(days=4)
         elif card["kind"] in ("goal", "review"):
             anchor = card["due"] if card["kind"] == "goal" else card["observed_on"]
             expires = datetime.fromisoformat(anchor).date() + timedelta(days=8)
@@ -3065,6 +3095,15 @@ class MuseService:
         hidden = {
             k: v for k, v in data.get("followups_hidden", {}).items() if v > now.date().isoformat()
         }
+        if card["kind"] == "waiting":
+            snoozed = {
+                k: v
+                for k, v in data.get("waiting_snoozed", {}).items()
+                if k != key and v >= now.date().isoformat()
+            }
+            if until_tomorrow:
+                snoozed[key] = expires.isoformat()
+            data["waiting_snoozed"] = snoozed
         hidden[key] = expires.isoformat()
         data["followups_hidden"] = hidden
         self._save_feed(data)
@@ -3101,6 +3140,7 @@ class MuseService:
         quiet_until = self.profile.quiet_hours_end()
         return {
             "followups": self.followups(goals=goals),
+            "waiting_followup": self.waiting_followup(datetime.now().astimezone()),
             "check_ins": check_ins,
             "reminders": [r.to_dict() for r in self.app.reminders.list(None)],
             "triggers": self.triggers_view(),

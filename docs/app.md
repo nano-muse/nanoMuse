@@ -161,11 +161,13 @@ The page takes a few query parameters, which the Android app uses and a bookmark
 
 ## Background work
 
-The top of the Feed can show two things to look at now: one saved goal and one pair of timed calendar events that overlap in the next 24 hours. Goals due today come first, then those overdue by up to seven days, then tomorrow's. When no deadline needs attention, a plan change awaiting your decision or a step marked blocked in the last seven days can appear with its recorded reason. These two signals stay in the Feed. Open a goal to see its next step. For a conflict, *Discuss overlap* prepares a question in the main chat for you to edit and send. *Remind me tomorrow* and *Dismiss* apply to that deadline or those event times. Changing the date or moving an event gives the new timing its own card.
+The Feed can show a saved goal and a pair of timed calendar events that overlap in the next 24 hours. Goals due today come first, then those overdue by up to seven days, then tomorrow's. When no deadline needs attention, a plan change awaiting your decision or a step marked blocked in the last seven days can appear with its recorded reason. These two signals stay in the Feed. Open a goal to see its next step. For a conflict, *Discuss overlap* prepares a question in the main chat for you to edit and send. *Remind me tomorrow* and *Dismiss* apply to that deadline or those event times. Changing the date or moving an event gives the new timing its own card.
 
 These cards work without a model. They use saved goals and fresh connected calendars, and skip cancelled, all-day and free events. Under Feed settings you can turn the cards off or opt into a generic notification on devices subscribed to web push. While the server runs, it can notify you about a goal or a conflict starting within two hours, between 09:00 and 20:00 server time and outside your quiet hours. Feed notifications share a limit of one per day. A goal with a scheduled check-in keeps its own reminder. Turning proactivity off hides the cards and stops their alerts. Separately, the daily writer can leave the Feed quiet when it finds no new observation.
 
 The preparation writer uses the configured model without tools. It considers active goals, fresh busy calendar events starting within 24 hours, saved preferences and memories, and recent exchanges in the main chat. It checks the cited excerpts against the current records. Missing or changed evidence can leave the Feed quiet. Editing a preparation in the main chat keeps any text already in the composer when you move between tabs. In Feed settings, *Revisit when plans change* allows one extra model review per local day when the evidence changes around a goal, an upcoming event or a timed writing commitment in the main chat. It requires the daily routine and proactivity to be on and observes quiet hours. Ordinary deadline cards and their notifications have separate controls.
+
+The Feed can also follow an expected reply mentioned in the main chat. If you write “I’m waiting for the supplier to send the Atlas quote by Friday at 3 PM”, it can show the quote from that time on Friday and for the next three days. Dates and times use the runtime’s local time. Expand the card to see your original words and any change of date. A clear receipt or cancellation retires it. The Feed shows one expected reply at a time. You can snooze it until tomorrow, dismiss it, or put an inquiry in the main chat to edit. This check reads the chat locally and uses no model or mailbox.
 
 The agent does things on its own, but not too many. The *Proactivity* dial in Settings sets how much:
 
@@ -219,7 +221,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | PUT | `/api/feed/posts/{id}/handled` | dismiss preparation for this version of its subject |
 | POST | `/api/feed/posts/refresh[?prepare_only=true]` | `prepare_only=true` requests grounded preparation and permits an empty result. Older clients can still explicitly request reading posts |
 | DELETE | `/api/feed/posts/{id}` | remove one post |
-| GET | `/api/upcoming` | `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`: `next_wake_at` is the earliest moment anything scheduled is due (a reminder, a check-in, the next pass), for a host that can set an alarm ([local-runtime.md](local-runtime.md#waking-up)) |
+| GET | `/api/upcoming` | `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], waiting_followup, queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`: `next_wake_at` is the earliest moment anything scheduled is due (a reminder, a check-in, the next pass), for a host that can set an alarm ([local-runtime.md](local-runtime.md#waking-up)) |
 | POST | `/api/tick` | wake the scheduler now: it looks at what is due and runs it; `{ok, next_wake_at}`. The Android app calls it when its alarm fires |
 | GET / POST | `/api/reminders[?all=1]` | active (or all recent) reminders / create `{text, at ("YYYY-MM-DD HH:MM") or repeat ("daily 08:00", …), kind (remind · task), thread}` |
 | POST / DELETE | `/api/reminders/{id}/fire`, `/api/reminders/{id}` | deliver it now in its chat / cancel |
@@ -305,6 +307,8 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | POST | `/api/push/subscribe` `{subscription}`, `/api/push/unsubscribe` `{endpoint}` | register / drop this device's `PushSubscription` |
 | POST | `/api/push/test` | send a test notification to every subscribed device |
 | WS | `/ws` | live events; the first frame is `{"kind": "auth", "token": …}` |
+
+The optional `waiting_followup` is null when there is nothing due. Otherwise it includes `kind` (`waiting`), `id`, `subject`, `sender` (when named), `quote`, `due` (YYYY-MM-DD), and `time` (HH:MM) and `correction` strings, empty when unspecified.
 
 ### WebSocket
 

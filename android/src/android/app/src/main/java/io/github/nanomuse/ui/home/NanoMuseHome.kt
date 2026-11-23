@@ -335,12 +335,14 @@ fun NanoMuseHome(
     fun discussPost(post: io.github.nanomuse.feed.FeedPost) {
         scope.launch {
             val app = context.applicationContext as? com.openminis.app.MinisApp ?: return@launch
+            if (!io.github.nanomuse.feed.FeedPreparationRunner.mayDiscuss(app, post)) return@launch
             val id = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 io.github.nanomuse.goals.GoalSessions.create(app, post.title.take(40))
             } ?: run {
                 Toast.makeText(context, R.string.nm_feed_routine_needs_model, Toast.LENGTH_SHORT).show()
                 return@launch
             }
+            if (!io.github.nanomuse.feed.FeedPreparationRunner.mayDiscuss(app, post)) return@launch
             showSession(id)
             val opener = context.getString(R.string.nm_feed_discuss_opener, post.title, post.body.take(1200))
             com.openminis.app.debug.HeadlessChatRunner.prompt(

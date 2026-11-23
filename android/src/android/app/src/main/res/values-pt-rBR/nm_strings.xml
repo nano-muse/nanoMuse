@@ -1295,4 +1295,6 @@
     <string name="nm_deadline_cards">Mostrar prazos das metas no feed</string>
     <string name="nm_deadline_alerts">Notificações de prazo das metas</string>
     <string name="nm_deadline_notice">Abra o feed para ver o próximo passo.</string>
+    <string name="nm_feed_use_recent_chats">Usar conversas recentes no feed</string>
+    <string name="nm_feed_recent_chats_hint">Usa apenas mensagens digitadas aqui após a ativação. Conversas protegidas ficam de fora.</string>
 </resources>

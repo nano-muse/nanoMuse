@@ -1290,4 +1290,6 @@
     <string name="nm_deadline_cards">피드에 목표 마감일 표시</string>
     <string name="nm_deadline_alerts">목표 마감 알림</string>
     <string name="nm_deadline_notice">피드를 열어 다음 단계를 확인하세요.</string>
+    <string name="nm_feed_use_recent_chats">최근 채팅을 피드에 사용</string>
+    <string name="nm_feed_recent_chats_hint">이 설정을 켠 뒤 이 기기에서 입력한 메시지만 사용합니다. 보호된 채팅은 제외됩니다.</string>
 </resources>

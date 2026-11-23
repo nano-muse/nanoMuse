@@ -251,3 +251,185 @@ test('a draft already delivered in the same turn suppresses correspondence prepa
   assert.equal(await rooms.prepareFeed(true), 'quiet')
   assert.equal(cloud.inputs.length, 0)
 })
+
+function turn(rooms, words, answer = '', chat = 'visit-chat') {
+  const session = { id: chat }
+  rooms.trackActivity(session, { type: 'turn/start' })
+  const content = [{ type: 'text', text: words }]
+  rooms.trackActivity(session, { type: 'user/message', data: { content, source: { kind: 'user' } } })
+  if (answer) rooms.trackActivity(session, { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: answer }] } } })
+  rooms.trackActivity(session, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+}
+
+function draftMuseum(cloud) {
+  cloud.prepareFeed = async (_system, json) => {
+    const data = JSON.parse(json); cloud.inputs.push(data)
+    const chat = data.records.find(r => r.kind === 'conversation' && r.text.includes('museum'))
+    const note = data.records.find(r => r.kind === 'memory')
+    return JSON.stringify([{ title: 'Museum inquiry', kind: 'draft', why: 'You promised to send the booking inquiry.',
+      body: 'Can our museum group use the step-free entrance?', sources: [
+        { id: chat.id, quote: 'museum a booking inquiry' }, { id: note.id, quote: 'step-free entrance' },
+      ] }])
+  }
+}
+
+test('a user commitment survives another turn and restart; a short reschedule withdraws the stale card and can replace it once that day', async t => {
+  const { rooms, cloud, restart } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  draftMuseum(cloud)
+  turn(rooms, 'I promised to send the museum a booking inquiry tomorrow.')
+  assert.equal(await rooms.prepareFeed(), 'prepared')
+  const first = rooms.view().feed.posts[0]
+  turn(rooms, 'Where is the nearest bakery?')
+  assert.ok(rooms.view().feed.posts.some(p => p.id === first.id))
+  turn(rooms, 'The bakery delivery was cancelled.')
+  assert.ok(rooms.view().feed.posts.some(p => p.id === first.id))
+  turn(rooms, 'The museum cafe lunch was cancelled.')
+  assert.ok(rooms.view().feed.posts.some(p => p.id === first.id))
+  assert.equal(await rooms.prepareFeed(), 'quiet')
+  assert.equal(cloud.inputs.length, 1)
+  await rooms.save()
+  const restored = await restart()
+  restored.activityChanged = () => {}
+  assert.ok(restored.view().feed.posts.some(p => p.id === first.id))
+  assert.ok(!('commitments' in restored.activityOf('visit-chat')))
+  assert.ok(!('commitments' in restored.view().activity[0]))
+  turn(restored, 'The museum booking inquiry moved to Friday.')
+  assert.ok(!restored.view().feed.posts.some(p => p.id === first.id))
+  await assert.rejects(restored.discuss(first.id))
+  assert.equal(await restored.prepareFeed(), 'prepared')
+  const source = cloud.inputs.at(-1).records.find(r => r.kind === 'conversation')
+  assert.match(source.timing, /2026-11-27/)
+  assert.match(source.text, /Friday/)
+  assert.doesNotMatch(source.text, /tomorrow/i)
+  turn(restored, 'Move it to Sunday instead.')
+  assert.equal(restored.view().feed.posts.length, 0)
+  assert.equal(await restored.prepareFeed(), 'quiet')
+  assert.equal(cloud.inputs.length, 2)
+})
+
+test('same-chat Chinese references settle only the current commitment, and a new undertaking can reopen it', async t => {
+  const { rooms, cloud } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  turn(rooms, '我答应明天给美术馆写一封预约邮件。')
+  turn(rooms, '我答应明天给博物馆写一封咨询邮件。')
+  turn(rooms, '改到周五')
+  let texts = rooms.prepSources(now).filter(s => s.kind === 'conversation')
+  assert.equal(texts.length, 2)
+  assert.match(texts.find(s => s.text.includes('博物馆')).text, /改到周五/)
+  assert.match(texts.find(s => s.text.includes('美术馆')).text, /明天/)
+  turn(rooms, '已经发了')
+  texts = rooms.prepSources(now).filter(s => s.kind === 'conversation')
+  assert.equal(texts.length, 1)
+  assert.match(texts[0].text, /美术馆/)
+  turn(rooms, 'I already sent it.', '', 'another-chat')
+  assert.match(rooms.prepSources(now).find(s => s.kind === 'conversation').text, /美术馆/)
+  turn(rooms, '还是要发，改到周六')
+  assert.equal(rooms.prepSources(now).filter(s => s.kind === 'conversation').length, 2)
+  turn(rooms, '博物馆咨询邮件已经发了。')
+  assert.equal(rooms.prepSources(now).filter(s => s.kind === 'conversation').length, 1)
+  cloud.feedOwner = 'other'
+  assert.equal(rooms.prepSources(now).length, 0)
+})
+
+test('a later complete draft settles its own chat commitment; uncertainty, tool turns and unrelated corrections cannot settle it', async t => {
+  const { rooms, cloud } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  draftMuseum(cloud)
+  const words = 'I promised to send the museum a booking inquiry tomorrow.'
+  turn(rooms, words)
+  assert.equal(await rooms.prepareFeed(), 'prepared')
+  const id = rooms.view().feed.posts[0].id
+  turn(rooms, 'The museum booking was not cancelled.')
+  assert.ok(rooms.view().feed.posts.some(p => p.id === id))
+  turn(rooms, 'If the museum booking is cancelled, what should I do?')
+  assert.ok(rooms.view().feed.posts.some(p => p.id === id))
+  turn(rooms, words, 'Subject: Booking inquiry\nDear museum team, which step-free entrance is available?')
+  assert.ok(!rooms.view().feed.posts.some(p => p.id === id))
+  assert.equal(await rooms.prepareFeed(true), 'quiet')
+  assert.equal(cloud.inputs.length, 1)
+})
+
+test('a cancellation during writing cannot land a stale draft; dated goal cards defer to explicit corrections in their own chat', async t => {
+  const { rooms, cloud } = await fixture(t)
+  rooms.activityChanged = () => {}
+  rooms.store.goals[0].title = 'Museum booking inquiry'
+  const originalDue = rooms.store.goals[0].due
+  turn(rooms, 'I promised to send the museum a booking inquiry tomorrow.')
+  cloud.prepareFeed = async (_system, json) => {
+    const { records } = JSON.parse(json)
+    turn(rooms, 'The museum booking inquiry has been cancelled.')
+    return JSON.stringify([result(records)])
+  }
+  assert.equal(await rooms.prepareFeed(true), 'quiet')
+  assert.deepEqual(rooms.prepSources(now).map(s => s.kind), ['memory'])
+  await rooms.tick()
+  assert.deepEqual(rooms.view().feed.posts, [])
+  assert.equal(rooms.store.goals[0].due, originalDue)
+  assert.equal(rooms.store.goals[0].status, 'tracking')
+  rooms.store.goals[0].updatedAt = now + 1
+  assert.ok(rooms.prepSources(now + 2).some(s => s.kind === 'goal'))
+})
+
+test('a user can defer an item without a date, resume it, and drop the same-day refresh by deleting its card', async t => {
+  const { rooms, cloud } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  draftMuseum(cloud)
+  turn(rooms, 'I promised to send the museum a booking inquiry tomorrow.')
+  assert.equal(await rooms.prepareFeed(), 'prepared')
+  await rooms.deletePost(rooms.view().feed.posts[0].id)
+  turn(rooms, 'Postpone it.')
+  assert.equal(rooms.prepSources(now).some(s => s.kind === 'conversation'), false)
+  turn(rooms, 'Move it to Friday instead.')
+  assert.ok(rooms.prepSources(now).some(s => s.timing.includes('2026-11-27')))
+  assert.equal(await rooms.prepareFeed(), 'quiet')
+  assert.equal(cloud.inputs.length, 1)
+})
+
+test('restoring an older task record does not revive delivered work or carry a new account request across profiles', async t => {
+  const { rooms, cloud } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  const words = 'I promised to send the museum a booking inquiry tomorrow.'
+  turn(rooms, words, 'Subject: Booking inquiry\nDear museum team, which entrance is available?')
+  const legacy = rooms.store.activity[0]
+  delete legacy.commitments
+  delete legacy.requestOwner
+  turn(rooms, 'Where can I buy bread?')
+  assert.deepEqual(rooms.prepSources(now).map(s => s.kind), ['memory'])
+  rooms.store.feed.routine.on = false
+  turn(rooms, words)
+  cloud.feedOwner = 'other'
+  rooms.store.feed.routine.on = true
+  assert.equal(rooms.prepSources(now).length, 0)
+  turn(rooms, 'Move it to Friday.')
+  assert.equal(rooms.prepSources(now).length, 0)
+})
+
+test('alternative dates await a decision; next week is absolute and an unfocused done cannot choose between tasks', async t => {
+  const { rooms } = await fixture(t)
+  rooms.store.goals = []
+  rooms.activityChanged = () => {}
+  const records = () => rooms.prepSources(now).filter(s => s.kind === 'conversation')
+  turn(rooms, '我答应明天给美术馆写一封预约邮件。')
+  turn(rooms, '我答应明天给博物馆写一封咨询邮件。')
+  turn(rooms, '附近有面包店吗？')
+  turn(rooms, '办完了')
+  assert.equal(records().length, 2)
+  turn(rooms, '博物馆咨询邮件改到周三或周五。')
+  assert.equal(records().length, 1)
+  assert.match(records()[0].text, /美术馆/)
+  turn(rooms, '就定在下周五')
+  assert.equal(records().length, 2)
+  assert.match(records().find(s => s.text.includes('博物馆')).timing, /2026-12-04/)
+  turn(rooms, 'Move it to next week on Friday instead.')
+  assert.match(records().find(s => s.text.includes('博物馆')).timing, /2026-12-04/)
+  turn(rooms, 'Move it to Friday or Saturday.')
+  assert.equal(records().length, 1)
+  turn(rooms, 'Move it from Saturday to Sunday.')
+  assert.match(records().find(s => s.text.includes('博物馆')).timing, /2026-11-29/)
+})

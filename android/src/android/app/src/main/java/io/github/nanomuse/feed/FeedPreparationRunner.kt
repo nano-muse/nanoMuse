@@ -79,11 +79,18 @@ internal object FeedPreparationRunner {
                 // across restarts and feed pruning, even if the writer rephrases a card.
                 val issued = prefs.getString(ISSUED, "").orEmpty().split(',').filter { it.isNotEmpty() }.toSet()
                 val published = issued + FeedStore.posts.value.map { it.preparation }
-                fun facts() = gather(app, today, session.memoryEnabled != 0 && MemoryGlobalPrefs.isGlobalEnabled(app))
+                suspend fun facts(): List<Fact> {
+                    val live = app.chatRepository.getSession(run.session) ?: return emptyList()
+                    return gather(app, today, live.memoryEnabled != 0 && MemoryGlobalPrefs.isGlobalEnabled(app))
+                }
                 val pairs = FeedPreparation.unseen(facts(), published) { pair ->
                     reviewed.optString(reviewKey(pair.id)) >= oldest
                 }
-                if (pairs.isEmpty() || !permitted()) return@withContext quiet
+                fun sourcesVisible(): Boolean {
+                    val locked = SessionAccess.protected.value.mapTo(hashSetOf()) { FeedPreparation.hash(it) }
+                    return pairs.none { p -> (p.left.sourceSessions + p.right.sourceSessions).any { it in locked } }
+                }
+                if (pairs.isEmpty() || !permitted() || !sourcesVisible()) return@withContext quiet
                 val repo = app.providerRepository
                 val binding = (task.modelBinding ?: session.modelBinding)?.let { JSONObject(it) }
                 val usable = repo.allVisibleEntries().filter { entry ->
@@ -105,6 +112,9 @@ internal object FeedPreparationRunner {
                     withTimeout(90_000L) {
                         val request = currentCoroutineContext().job
                         withContext(Dispatchers.Main.immediate) { SessionActivityTracker.setFeedPreparation { request.cancel() } }
+                        if (!permitted() || pairs.any { it.left.kind == Kind.CHAT || it.right.kind == Kind.CHAT } &&
+                            FeedPreparation.revalidate(pairs, facts()).isEmpty()) return@withTimeout "[quiet]"
+                        if (!permitted() || !sourcesVisible()) return@withTimeout "[quiet]"
                         withContext(Provenance.Session(run.session)) {
                             FeedPreparation.request(provider, pairs, instructions, language)
                         }
@@ -119,9 +129,11 @@ internal object FeedPreparationRunner {
                 if (session.memoryEnabled != live.memoryEnabled || session.modelBinding != live.modelBinding ||
                     session.modelId != live.modelId) return@withContext quiet
                 // The goal, its protection, the diary or the instructions may have changed during generation.
+                val evidenceRevision = FeedChatEvidence.revision.value
+                val nowFacts = facts()
                 synchronized(this@FeedPreparationRunner) {
                     if (!permitted() || FeedStore.preferences.value + "\n" + task.prompt != instructions) return@synchronized quiet
-                    val nowFacts = facts()
+                    if (!sourcesVisible() || evidenceRevision != FeedChatEvidence.revision.value) return@synchronized quiet
                     val valid = FeedPreparation.revalidate(pairs, nowFacts)
                     val proposed = FeedPreparation.draft(reply, valid)
                     if (proposed == null && reply.trim() != "[quiet]") return@synchronized quiet
@@ -146,7 +158,23 @@ internal object FeedPreparationRunner {
             } finally { writing.unlock() }
         }
 
-    private fun gather(app: MinisApp, today: LocalDate, memory: Boolean): List<Fact> = buildList {
+    internal suspend fun visibleChatCards(app: MinisApp): Set<String> = withContext(Dispatchers.IO) {
+        val feed = FeedFlow.sessionId(app)?.let { app.chatRepository.getSession(it) }
+        if (feed == null || feed.memoryEnabled == 0 || !MemoryGlobalPrefs.isGlobalEnabled(app) ||
+            SessionAccess.isProtected(feed.id) || AppAccess.locked.value || !FeedChatEvidence.enabled(app)) emptySet()
+        else FeedPreparation.candidates(gather(app, LocalDate.now(), true))
+            .filter { it.left.kind == Kind.CHAT || it.right.kind == Kind.CHAT }.mapTo(hashSetOf()) { it.id }
+    }
+
+    internal suspend fun mayDiscuss(app: MinisApp, post: FeedPost): Boolean {
+        if (!post.chatBased) return true
+        val revision = FeedChatEvidence.revision.value
+        val live = visibleChatCards(app)
+        return revision == FeedChatEvidence.revision.value && post.preparation in live &&
+            !AppAccess.locked.value && post.visibleWith(SessionAccess.protected.value) && post in FeedStore.posts.value
+    }
+
+    private suspend fun gather(app: MinisApp, today: LocalDate, memory: Boolean): List<Fact> = buildList {
         val protected = SessionAccess.protected.value
         val goals = GoalStore.get(app).all().filter {
             it.status == GoalStatus.ACTIVE && !it.isProtectedBy(protected) &&
@@ -163,6 +191,7 @@ internal object FeedPreparationRunner {
             add(Fact(Kind.GOAL, "goal/${goal.id}", goal.title.take(80), text, sessions, if (near) 10 else 3, near || recent, goal.id))
         }
         if (!memory) return@buildList
+        addAll(FeedChatEvidence.facts(app, today))
         val dir = File(app.filesDir, "minis-global/memory")
         fun read(file: File, kind: Kind, priority: Int) {
             if (!file.isFile || java.nio.file.Files.isSymbolicLink(file.toPath())) return

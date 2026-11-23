@@ -1294,4 +1294,6 @@
     <string name="nm_deadline_cards">Ipakita sa Feed ang mga takdang petsa ng layunin</string>
     <string name="nm_deadline_alerts">Abiso sa takdang petsa ng layunin</string>
     <string name="nm_deadline_notice">Buksan ang Feed para makita ang susunod na hakbang.</string>
+    <string name="nm_feed_use_recent_chats">Gamitin ang mga bagong chat para sa Feed</string>
+    <string name="nm_feed_recent_chats_hint">Mga mensaheng ita-type mo lang dito pagkatapos i-on ito. Hindi kasama ang mga protektadong chat.</string>
 </resources>

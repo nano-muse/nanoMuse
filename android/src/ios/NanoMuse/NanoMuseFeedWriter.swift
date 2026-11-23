@@ -12,6 +12,7 @@ enum NanoMuseFeedWriter {
 
     static func accountChanging(_ changing: Bool) {
         switching = changing
+        NanoMuseFeedChatIndex.invalidate()
         generation = UUID()
         pending?.cancel()
         pending = nil
@@ -62,7 +63,37 @@ enum NanoMuseFeedWriter {
         return signals
     }
 
-    private static func pairs(at now: Date) -> [NanoMuseFeedPreparation.Pair] {
+    private static func chatSignals(at now: Date) async -> [Signal] {
+        let epoch = NanoMuseFeedChatIndex.epoch
+        let refs = NanoMuseFeedChatIndex.references(now: now)
+        guard !switching, !refs.isEmpty else { return [] }
+        let turns = await ChatStore.shared.nmFeedTurns(refs)
+        guard !switching, epoch == NanoMuseFeedChatIndex.epoch else { return [] }
+        guard refs == NanoMuseFeedChatIndex.references(now: now) else { return [] }
+        return NanoMuseFeedChatContext.outstanding(turns, now: now).map { item in
+            let due = NanoMuseDay.key(item.due)
+            let text = [item.request, item.update].compactMap { $0 }.joined(separator: "\n")
+            return Signal(id: item.ref.session, version: digest([item.ref.session, item.ref.message, item.revision, due, text].joined(separator: "\n")),
+                          label: AppLocalized("Chat"), text: text, timely: true, role: .chat, eventDay: due)
+        }
+    }
+
+    static func liveChatKeys() async -> Set<String> {
+        guard !switching, let sid = NanoMuseFeedFlow.sessionId, !SessionLockStore.shared.isLocked(sid),
+              await ChatStore.shared.getMemoryEnabled(sessionId: sid) else { return [] }
+        let now = Date()
+        let chats = await chatSignals(at: now)
+        guard !chats.isEmpty, !switching, NanoMuseFeedFlow.sessionId == sid, !SessionLockStore.shared.isLocked(sid) else { return [] }
+        let pairs = NanoMuseFeedPreparation.candidates(primaries: chats, notes: notes(day: now), seen: [], limit: Int.max)
+        return Set(pairs.map(\.key))
+    }
+
+    private static func pairs(at now: Date) async -> [NanoMuseFeedPreparation.Pair] {
+        let chats = await chatSignals(at: now)
+        return candidates(chats: chats, now: now)
+    }
+
+    private static func candidates(chats: [Signal], now: Date) -> [NanoMuseFeedPreparation.Pair] {
         let locks = SessionLockStore.shared.lockedSessionIds
         let day = NanoMuseDay.key(now)
         let cal = Calendar.current
@@ -88,7 +119,7 @@ enum NanoMuseFeedWriter {
         }
         let notes = notes(day: now)
         let days = (0...7).compactMap { cal.date(byAdding: .day, value: $0, to: now) }.map { NanoMuseDay.key($0) }
-        let primaries = signals + NanoMuseFeedPreparation.commitments(notes: notes, upcomingDays: days)
+        let primaries = chats + signals + NanoMuseFeedPreparation.commitments(notes: notes, upcomingDays: days)
         guard !primaries.isEmpty else { return [] }
         return NanoMuseFeedPreparation.candidates(primaries: primaries, notes: notes, seen: NanoMuseFeedStore.shared.seenPreparations)
     }
@@ -122,7 +153,7 @@ enum NanoMuseFeedWriter {
                       owner: NanoMuseAccountData.shared.current, preferences: NanoMuseFeedStore.shared.preferences)
         guard run.allowed, let session = routine.sessionId,
               await ChatStore.shared.getMemoryEnabled(sessionId: session), run.allowed,
-              !pairs(at: Date()).isEmpty else { return run.outcome() }
+              !(await pairs(at: Date())).isEmpty, run.allowed else { return run.outcome() }
         let cached = ViewModelCache.shared.getOrCreate(for: session)
         if cached.isNew { await cached.vm.loadSession() }
         guard run.allowed, cached.vm.memoryEnabled else { return run.outcome() }
@@ -132,15 +163,19 @@ enum NanoMuseFeedWriter {
         do {
             let call = Task { @MainActor in
                 guard run.allowed, cached.vm.memoryEnabled else { return true }
-                let candidates = pairs(at: Date())
-                guard !candidates.isEmpty else { return true }
+                let chatEpoch = NanoMuseFeedChatIndex.epoch
+                let candidates = await pairs(at: Date())
+                guard run.allowed, cached.vm.memoryEnabled, !candidates.isEmpty,
+                      candidates.allSatisfy({ $0.primary.role != .chat || NanoMuseFeedChatIndex.allows($0.primary.id) }) else { return true }
                 let recent = NanoMuseFeedStore.shared.recentVisibleTitles(limit: 10)
                 let language = AppBundle.current.preferredLocalizations.first ?? Locale.preferredLanguages.first ?? "en"
                 let prompt = NanoMuseFeedPreparation.prompt(pairs: candidates, preferences: run.preferences, today: NanoMuseDay.key(),
                                                             recent: recent, language: language)
                 let text = try await complete(prompt: prompt, provider: provider, session: session)
                 guard run.allowed, cached.vm.memoryEnabled, let choice = NanoMuseFeedPreparation.verify(text, pairs: candidates),
-                      pairs(at: Date()).contains(where: { $0.key == choice.pair.key }) else { return true }
+                      (await pairs(at: Date())).contains(where: { $0.key == choice.pair.key }),
+                      choice.pair.primary.role != .chat || (NanoMuseFeedChatIndex.epoch == chatEpoch && NanoMuseFeedChatIndex.allows(choice.pair.primary.id)),
+                      run.allowed, cached.vm.memoryEnabled else { return true }
                 return save(choice)
             }
             return run.outcome(try await wait(call, epoch: run.epoch))
@@ -160,6 +195,7 @@ enum NanoMuseFeedWriter {
         draft.citations = choice.citations
         draft.preparationGoal = choice.pair.primary.role == .goal ? choice.pair.primary.id : nil
         draft.preparationKey = choice.pair.key
+        draft.preparationChat = choice.pair.primary.role == .chat ? choice.pair.primary.id : nil
         return !store.append([draft]).isEmpty
     }
 
