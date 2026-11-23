@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Fixed an Android crash when returning to the home screen immediately after opening a chat notification.
+
 - Added optional check-ins in the conversation itself. Android, iPhone and desktop could ask about a due commitment, and the web runtime could ask whether an expected reply arrived. People could answer directly in the chat.
 
 - Added opt-in Feed preparation from new chat commitments on Android and iPhone. Desktop kept track of separate commitments across topic changes. Dated commitments mentioned the previous week could still surface near their due date. The web Feed followed expected replies, updated their dates, and prepared an editable inquiry when one came due.
