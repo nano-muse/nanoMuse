@@ -79,6 +79,19 @@ final class NanoMuseFeedPreparationTests: XCTestCase {
         XCTAssertNil(Plan.verify(actual.replacingOccurrences(of: "原型设计", with: "原型设计，现场有30人"), pairs: pairs))
     }
 
+    func testBodyAliasOnlyForAnExplicitDraftAndWithFullValidation() throws {
+        let event = Plan.Signal(id: "diary", version: "a", label: "Diary", text: "明天参加海桥项目设计评审，需要开场。", timely: true, role: .commitment)
+        let pref = Plan.Signal(id: "USER.md", version: "b", label: "USER.md", text: "海桥项目的设计评审先看原型，再谈取舍。", timely: false)
+        let pairs = Plan.candidates(primaries: [event], notes: [pref], seen: [])
+        let response = #"{"pair":1,"kind":"body","title":"设计评审开场","body":"大家好，我们今天的海桥项目设计评审先看原型，再讨论取舍。"}"#
+        XCTAssertNotNil(Plan.verify(response, pairs: pairs))
+        XCTAssertNil(Plan.verify(response.replacingOccurrences(of: "大家好，我们", with: "尊敬的各位专家，我们"), pairs: pairs))
+        XCTAssertNil(Plan.verify(response.replacingOccurrences(of: "大家好，我们", with: "现场有20人，我们"), pairs: pairs))
+        XCTAssertNil(Plan.verify(response.replacingOccurrences(of: "大家好，我们", with: "下一步：我们"), pairs: pairs))
+        let withoutOpening = Plan.Signal(id: "diary", version: "c", label: "Diary", text: "明天参加海桥项目设计评审。", timely: true, role: .commitment)
+        XCTAssertNil(Plan.verify(response, pairs: Plan.candidates(primaries: [withoutOpening], notes: [pref], seen: [])))
+    }
+
     func testCompatiblePostMetadataRoundTrip() throws {
         let file = URL(fileURLWithPath: "/sample.md")
         func parse(_ text: String) throws -> NanoMusePost {

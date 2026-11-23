@@ -228,7 +228,12 @@ enum NanoMuseFeedPreparation {
         let sourceText = pair.primary.text + "\n" + pair.note.text
         let inputFacts = concreteFacts(sourceText)
         let rawBody = a.body.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = a.kind == "draft" ? removeUnverifiedOpeningTime(rawBody, supported: inputFacts) : rawBody
+        // Some models use the name of the text field as the kind. Only an explicit request
+        // for words to use can disambiguate it; validate its contents exactly like a draft.
+        let wantsDraft = matches(#"\b(draft|opening|script|reply|speech)\b|开场|開場|开头|開頭|草稿|发言稿|發言稿|回信|致辞|致辭|下書き|挨拶文|초안|인사말"#,
+                                 in: folded(pair.primary.text))
+        let kind = a.kind == "body" && wantsDraft ? "draft" : a.kind
+        let body = kind == "draft" ? removeUnverifiedOpeningTime(rawBody, supported: inputFacts) : rawBody
         let primaryTopics = topics(pair.primary.text)
         let noteTopics = topics(pair.note.text)
         let bodyTopics = topics(body)
@@ -240,7 +245,7 @@ enum NanoMuseFeedPreparation {
               !uniqueDetails.isDisjoint(with: bodyTopics), proposedFacts.isSubset(of: inputFacts),
               !namedAudience.contains(where: { body.localizedCaseInsensitiveContains($0) && !sourceText.localizedCaseInsensitiveContains($0) }),
               !body.contains("```nanomuse-"), body != pair.note.text, body != pair.primary.text else { return nil }
-        switch a.kind {
+        switch kind {
         case "checklist": guard body.split(separator: "\n").count >= 2 else { return nil }
         case "question": guard body.hasSuffix("?") || body.hasSuffix("？") else { return nil }
         case "draft": guard !isDelegatedDraft(body) else { return nil }
