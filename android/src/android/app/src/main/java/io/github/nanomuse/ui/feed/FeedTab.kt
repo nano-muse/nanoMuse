@@ -107,7 +107,14 @@ fun FeedTab(
     bottomInset: Dp = 0.dp,
 ) {
     val context = LocalContext.current
-    val posts by FeedStore.posts.collectAsState()
+    val savedPosts by FeedStore.posts.collectAsState()
+    val protected by io.github.nanomuse.guard.SessionAccess.protected.collectAsState()
+    val goalStore = remember(context) { io.github.nanomuse.goals.GoalStore.get(context) }
+    val goals by goalStore.goals.collectAsState()
+    val posts = remember(savedPosts, protected, goals) {
+        val byId = goals.associateBy { it.id }
+        savedPosts.filter { it.visibleWith(protected, byId[it.goalId]) }
+    }
     val introAck by FeedFlow.introAcknowledged.collectAsState()
     val generating by FeedFlow.generating.collectAsState()
     val settingsOpen by FeedUi.settingsOpen.collectAsState()
@@ -117,6 +124,7 @@ fun FeedTab(
     // The routine needs a model; retry quietly whenever the tab shows.
     LaunchedEffect(Unit) { runCatching { FeedFlow.ensureRoutine(context) } }
 
+    LaunchedEffect(posts, infoPost) { if (infoPost != null && infoPost !in posts) infoPost = null }
     val deadline = currentGoalDeadline()
     val days = remember(posts) { posts.groupBy { it.day }.toList() }
 
@@ -143,7 +151,7 @@ fun FeedTab(
                     PostCard(
                         post = post,
                         onLike = { FeedStore.setLiked(post, !post.liked) },
-                        onDiscuss = { onDiscuss(post) },
+                        onDiscuss = { if (post.visibleWith(io.github.nanomuse.guard.SessionAccess.protected.value, goalStore.get(post.goalId))) onDiscuss(post) },
                         onInfo = { infoPost = post },
                         modifier = Modifier.animateItem(), // new posts settle in, removed ones fade out
                     )
@@ -159,7 +167,7 @@ fun FeedTab(
         )
     }
 
-    infoPost?.let { post ->
+    infoPost?.takeIf { it in posts }?.let { post ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { infoPost = null },
@@ -171,6 +179,15 @@ fun FeedTab(
                 Spacer(Modifier.height(12.dp))
                 InfoRow(stringResource(R.string.nm_feed_info_type), typeLabel(post.type))
                 InfoRow(stringResource(R.string.nm_feed_info_written), DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(post.createdAt)))
+                val goal = goalStore.get(post.goalId)
+                if (goal != null && !goal.isProtectedBy(protected)) {
+                    TextButton(onClick = {
+                        if (!goal.isProtectedBy(io.github.nanomuse.guard.SessionAccess.protected.value)) {
+                            infoPost = null
+                            onOpenGoal(goal)
+                        }
+                    }) { Text(goal.title) }
+                }
                 if (post.source.isNotEmpty()) InfoRow(stringResource(R.string.nm_feed_info_source), post.source.joinToString("\n"))
                 InfoRow(stringResource(R.string.nm_feed_info_file), "minis-global/nanomuse/feed/${post.day}/${"%02d".format(Locale.ROOT, post.index)}.md")
                 Spacer(Modifier.height(16.dp))
@@ -246,12 +263,20 @@ private fun PostCard(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(4.dp))
-                    MarkdownText(
-                        markdown = post.body,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp),
-                    )
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        MarkdownText(
+                            markdown = post.body,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp),
+                        )
+                    }
                 }
+            }
+            if (post.preparation.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.nm_feed_info_source) + " · " + post.source.joinToString(" · ") { it.substringBefore(" · ") },
+                    style = MaterialTheme.typography.labelSmall, color = ChatColors.secondaryText,
+                )
             }
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

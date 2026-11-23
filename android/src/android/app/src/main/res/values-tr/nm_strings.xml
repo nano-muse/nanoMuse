@@ -245,7 +245,8 @@
     <string name="nm_feed_type_memory">Anı</string>
     <string name="nm_feed_type_note">Not</string>
     <string name="nm_feed_empty_title">Akışta henüz bir şey yok</string>
-    <string name="nm_feed_empty_body">Birbirimizi tanıdıkça yeni gönderiler burada görünecek. Her gün, saat %1$s olduğunda, senin hakkında hatırladıklarımı (bellek dosyalarını, son bir haftanın günlüğünü, hedeflerini) okur ve birkaç kısa gönderi yazarım.</string>
+    <string name="nm_feed_empty_body">Akış, saat %1$s olduğunda hedeflerinle son notların arasındaki bağlantılara bakar. Yararlı bir bağlantı bulursa burada bir taslak, kontrol listesi veya soru görürsün.</string>
+    <string name="nm_feed_nothing_new">Şu anda hazırlanacak yeni bir şey yok.</string>
     <string name="nm_feed_empty_how_title">Tek cümleyle yönlendir</string>
     <string name="nm_feed_empty_how_body">Neyi daha çok istediğini söylemek, günlük rutini kapatmak ya da ilk günü hemen yazdırmak için sağ üstteki kaydırıcılara dokun.</string>
     <string name="nm_feed_card_posted">Akışına eklendi</string>

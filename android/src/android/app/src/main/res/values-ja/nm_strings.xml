@@ -242,7 +242,8 @@
     <string name="nm_feed_type_memory">メモリ</string>
     <string name="nm_feed_type_note">メモ</string>
     <string name="nm_feed_empty_title">フィードにはまだ何もありません</string>
-    <string name="nm_feed_empty_body">お互いを知っていくにつれて、新しい投稿がここに表示されます。毎日 %1$s に、あなたについて覚えていること（メモリファイル、直近 1 週間の日記、あなたの目標）を読み返して、短い投稿をいくつか書きます。</string>
+    <string name="nm_feed_empty_body">%1$s に、目標と最近のメモに関係があるかを確認します。役に立つ内容があれば、下書き、チェックリスト、または確認したい質問がここに表示されます。</string>
+    <string name="nm_feed_nothing_new">今は新しく準備するものはありません。</string>
     <string name="nm_feed_empty_how_title">一文で方向づける</string>
     <string name="nm_feed_empty_how_body">右上のスライダーをタップして、もっと読みたいことを伝えたり、毎日のルーティンをオフにしたり、最初の 1 日分を今すぐ書かせたりできます。</string>
     <string name="nm_feed_card_posted">フィードに追加しました</string>

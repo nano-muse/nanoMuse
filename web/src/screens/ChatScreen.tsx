@@ -23,7 +23,7 @@ import { countDay, countTask, StarNudgeOnce } from "../components/StarNudge";
 import { noteStopped, StopAskCard, Thumbs, useStopAsk } from "../components/Feedback";
 import { useShowSteps } from "../steps";
 
-export function ChatScreen() {
+export function ChatScreen({ drafts }: { drafts: Map<string, string> }) {
   const { state, send, sendViaCloud, decide, loadEvents, openFile, toast, setDrawer, setTab } = useStore();
   const t = useT();
   const { profile, status, activeThread, threads } = state;
@@ -349,6 +349,9 @@ export function ChatScreen() {
 
       <AllowanceHeadsUp />
       <Composer
+        key={activeThread}
+        thread={activeThread}
+        drafts={drafts}
         name={name}
         busy={!!thread?.busy && pendingApprovals === 0}
         waiting={events.some((e) => e.type === "question" && e.status === "pending")}
@@ -760,7 +763,11 @@ export function Composer({
   waiting,
   onSend,
   onStop,
+  drafts,
+  thread,
 }: {
+  drafts?: Map<string, string>;
+  thread?: string;
   name: string;
   busy: boolean;
   waiting: boolean;
@@ -768,7 +775,12 @@ export function Composer({
   onStop?: () => Promise<void>;
 }) {
   const { state, draft, draftFiles, toast } = useStore();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => thread ? drafts?.get(thread) ?? "" : "");
+  useEffect(() => {
+    if (!thread || !drafts) return;
+    if (text) drafts.set(thread, text);
+    else drafts.delete(thread);
+  }, [drafts, text, thread]);
   const [sending, setSending] = useState(false);
   const [stopping, setStopping] = useState(false);
   // voice input: the words recognised so far replace what dictation put in the box, after
@@ -862,7 +874,8 @@ export function Composer({
   // text handed over from another screen (a skill's "Use" button)
   useEffect(() => {
     if (state.draft === null) return;
-    setText(state.draft);
+    const incoming = state.draft;
+    setText((existing) => existing.trim() && existing !== incoming ? `${existing}\n\n${incoming}` : incoming);
     draft(null);
     const el = ref.current;
     if (el) {

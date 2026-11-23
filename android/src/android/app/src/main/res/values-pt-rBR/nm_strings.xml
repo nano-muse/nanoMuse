@@ -246,7 +246,8 @@
     <string name="nm_feed_type_memory">Memória</string>
     <string name="nm_feed_type_note">Nota</string>
     <string name="nm_feed_empty_title">Nada no feed ainda</string>
-    <string name="nm_feed_empty_body">Conforme formos nos conhecendo, novos posts aparecem aqui. Todo dia às %1$s eu leio o que lembro sobre você (seus arquivos de memória, a última semana do diário, suas metas) e escrevo alguns posts curtos.</string>
+    <string name="nm_feed_empty_body">Às %1$s, o feed procura relações entre suas metas e suas anotações recentes. Se encontrar algo útil, você verá um rascunho, uma lista de tarefas ou uma pergunta aqui.</string>
+    <string name="nm_feed_nothing_new">Não há nada novo para preparar no momento.</string>
     <string name="nm_feed_empty_how_title">Oriente com uma frase</string>
     <string name="nm_feed_empty_how_body">Toque nos controles no canto superior direito para me dizer do que quer mais, desligar a rotina diária ou pedir que eu escreva o primeiro dia agora.</string>
     <string name="nm_feed_card_posted">Adicionado ao seu feed</string>

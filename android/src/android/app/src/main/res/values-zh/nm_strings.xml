@@ -241,7 +241,8 @@
     <string name="nm_feed_type_memory">记忆</string>
     <string name="nm_feed_type_note">随记</string>
     <string name="nm_feed_empty_title">动态里还没有内容</string>
-    <string name="nm_feed_empty_body">随着我们相互了解，新的帖子会显示在这里。每天 %1$s，我会读一遍记得的关于你的东西（记忆文件、最近一周的日记、你的目标）然后写几条简短的帖子。</string>
+    <string name="nm_feed_empty_body">动态会在 %1$s 查看目标和近期记录。有具体关联时，这里会出现一份草稿、一张清单或一个值得确认的问题。</string>
+    <string name="nm_feed_nothing_new">目前没有新的内容需要准备。</string>
     <string name="nm_feed_empty_how_title">一句话就能调整</string>
     <string name="nm_feed_empty_how_body">点右上角的滑杆，告诉我你想多看什么、关掉每天的例程，或者让我现在就写第一天。</string>
     <string name="nm_feed_card_posted">已加入动态</string>

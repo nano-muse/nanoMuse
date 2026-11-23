@@ -831,6 +831,9 @@ export interface Idea {
 }
 
 export interface FeedPost {
+  form?: "brief" | "draft" | "checklist" | "question";
+  why_now?: string;
+  sources?: { kind: "calendar" | "goal" | "memory" | "profile" | "conversation"; quote: string }[];
   id: string;
   ts: string;
   title: string;
@@ -842,6 +845,7 @@ export interface FeedPost {
 }
 
 export interface FeedPostsData {
+  on_change?: boolean;
   followups_enabled?: boolean;
   followup_push?: boolean;
   instructions: string;

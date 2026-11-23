@@ -254,7 +254,7 @@ final class NanoMuseScheduler: ObservableObject {
     private func handleBackgroundRefresh(_ task: BGAppRefreshTask) {
         task.expirationHandler = { }
         let now = Date()
-        for r in routines where r.isDue(at: now) {
+        for r in routines where r.isDue(at: now) && r.id != NanoMuseFeedFlow.routineId {
             postDueNotification(r, at: now)
         }
         scheduleBackgroundRefresh()
@@ -293,7 +293,13 @@ final class NanoMuseScheduler: ObservableObject {
         r.lastFiredAt = startedAt
         update(r)
 
-        let outcome = await NanoMuseHeadless.run(prompt: prompt(for: r), sessionId: r.sessionId, title: r.label, source: "nanomuse-routine", routine: r.label, run: runKind(r))
+        let outcome: NanoMuseHeadless.Outcome
+        if r.id == NanoMuseFeedFlow.routineId {
+            outcome = await NanoMuseFeedWriter.run(r, manual: trigger == "manual" || trigger == "feed-now")
+        } else {
+            outcome = await NanoMuseHeadless.run(prompt: prompt(for: r), sessionId: r.sessionId, title: r.label,
+                                                source: "nanomuse-routine", routine: r.label, run: runKind(r))
+        }
         guard var fresh = routine(id: id) else { return outcome.ok }
         if fresh.sessionId == nil, let sid = outcome.sessionId { fresh.sessionId = sid }
         fresh.runs.insert(NanoMuseRoutine.Run(at: startedAt, ok: outcome.ok, note: outcome.note), at: 0)
@@ -325,6 +331,7 @@ final class NanoMuseScheduler: ObservableObject {
             let now = Date()
             // iOS keeps 64 pending requests per app; the soonest routines get the slots.
             let soon = self.routines
+                .filter { $0.id != NanoMuseFeedFlow.routineId }
                 .compactMap { r in r.enabled ? r.nextDue(after: now).map { (r, $0) } : nil }
                 .filter { $0.1 > now.addingTimeInterval(30) }
                 .sorted { $0.1 < $1.1 }

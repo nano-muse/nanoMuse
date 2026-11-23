@@ -251,7 +251,8 @@
     <string name="nm_feed_type_memory">Память</string>
     <string name="nm_feed_type_note">Заметка</string>
     <string name="nm_feed_empty_title">В ленте пока пусто</string>
-    <string name="nm_feed_empty_body">По мере того как мы узнаём друг друга, здесь будут появляться новые посты. Каждый день в %1$s я перечитываю то, что помню о вас (файлы памяти, дневник за последнюю неделю, ваши цели) и пишу несколько коротких постов.</string>
+    <string name="nm_feed_empty_body">В %1$s лента ищет связь между вашими целями и недавними заметками. Если найдётся что-то полезное, здесь появится черновик, список дел или вопрос.</string>
+    <string name="nm_feed_nothing_new">Пока нечего готовить.</string>
     <string name="nm_feed_empty_how_title">Направьте её одной фразой</string>
     <string name="nm_feed_empty_how_body">Нажмите на ползунки вверху справа, чтобы сказать, чего вы хотите больше, выключить ежедневную рутину или попросить меня написать первый день прямо сейчас.</string>
     <string name="nm_feed_card_posted">Добавлено в вашу ленту</string>

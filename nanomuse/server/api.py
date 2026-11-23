@@ -141,6 +141,7 @@ class FeedInstructionsBody(BaseModel):
     instructions: str | None = None
     followups: bool | None = None
     followup_push: bool | None = None
+    on_change: bool | None = None
     daily: bool | None = None
     time: str | None = None
 
@@ -1914,18 +1915,20 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.get("/api/feed/posts", dependencies=dep)
     async def feed_posts() -> dict[str, Any]:
-        return svc.feed_posts()
+        return svc.feed_view()
 
     @app.put("/api/feed/instructions", dependencies=dep)
     async def feed_instructions(body: FeedInstructionsBody) -> dict[str, Any]:
         try:
-            return svc.set_feed_instructions(
+            data = svc.set_feed_instructions(
                 body.instructions,
                 daily=body.daily,
                 time=body.time,
                 followups=body.followups,
                 followup_push=body.followup_push,
+                on_change=body.on_change,
             )
+            return svc.feed_view(data)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
@@ -1935,13 +1938,19 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
         return {"ok": True}
 
     @app.post("/api/feed/posts/refresh", dependencies=dep)
-    async def feed_refresh() -> dict[str, Any]:
+    async def feed_refresh(prepare_only: bool = False) -> dict[str, Any]:
         try:
-            return await svc.write_feed_posts()
+            return svc.feed_view(await svc.write_feed_posts(prepare_only=prepare_only))
         except Exception as exc:  # noqa: BLE001 — the model may be down; the app shows why
             data = svc.feed_posts()
             data["error"] = f"{type(exc).__name__}: {exc}"
-            return data
+            return svc.feed_view(data)
+
+    @app.put("/api/feed/posts/{post_id}/handled", dependencies=dep)
+    async def feed_handled(post_id: str) -> dict[str, bool]:
+        if not svc.handle_preparation(post_id):
+            raise HTTPException(404, "no such preparation")
+        return {"ok": True}
 
     @app.delete("/api/feed/posts/{post_id}", dependencies=dep)
     async def feed_delete(post_id: str) -> dict[str, Any]:

@@ -2498,6 +2498,33 @@ export default class NanomuseCloud extends Service {
     return row ? helloLlm(row.provider, chat.model) : undefined
   }
 
+  /** Desktop memory written on behalf of an account stays with that account in proactive requests. */
+  get feedOwner(): string | undefined {
+    if (this.changingAccount || this.state.accountTransition) return undefined
+    return this.state.account ? 'account:' + this.state.account.id : 'local'
+  }
+
+  async prepareFeed(system: string, input: string, signal: AbortSignal): Promise<string> {
+    const llm = this.ctx.get('llm')
+    const choice = this.defaultModelService()?.currentSelection()
+    if (!llm || !choice?.provider || !choice.model) throw new Error('No chat model is available')
+    const sessionId = ('feed-' + randomUUID()) as SessionId
+    this.provenance.setRun(sessionId, 'feed')
+    let text = '', finished = false
+    try {
+      for await (const part of llm.stream({ ...choice, system, messages: [{ role: 'user', content: [{ type: 'text', text: input }] }],
+        tools: [], maxTokens: 1600, sessionId, signal })) {
+        if (part.type === 'text-delta') text += part.text
+        if (part.type === 'tool-call-delta' || (part.type === 'block-end' && part.block.type === 'tool-call') || text.length > 16_000) throw new Error('Invalid preparation response')
+        if (part.type === 'finish') finished = part.reason.kind === 'stop'
+      }
+      if (!finished || signal.aborted) throw new Error('Preparation did not finish')
+      return text
+    } finally {
+      this.provenance.forget(sessionId)
+    }
+  }
+
   chatChoice(): { provider: string; model: string } {
     try {
       const current = this.defaultModelService()?.currentSelection()

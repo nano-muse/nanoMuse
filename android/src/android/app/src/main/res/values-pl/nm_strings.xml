@@ -251,7 +251,8 @@
     <string name="nm_feed_type_memory">Pamięć</string>
     <string name="nm_feed_type_note">Notatka</string>
     <string name="nm_feed_empty_title">W aktualnościach nic jeszcze nie ma</string>
-    <string name="nm_feed_empty_body">W miarę jak się poznajemy, będą się tu pojawiać nowe wpisy. Codziennie o %1$s czytam, co o tobie pamiętam (twoje pliki pamięci, dziennik z ostatniego tygodnia, twoje cele) i piszę kilka krótkich wpisów.</string>
+    <string name="nm_feed_empty_body">O %1$s kanał szuka powiązań między Twoimi celami a ostatnimi notatkami. Jeśli znajdzie coś przydatnego, pojawi się tu szkic, lista kontrolna lub pytanie.</string>
+    <string name="nm_feed_nothing_new">Na razie nie ma nic nowego do przygotowania.</string>
     <string name="nm_feed_empty_how_title">Pokieruj jednym zdaniem</string>
     <string name="nm_feed_empty_how_body">Dotknij suwaków w prawym górnym rogu, aby powiedzieć mi, czego chcesz więcej, wyłączyć codzienną rutynę albo kazać mi napisać pierwszy dzień już teraz.</string>
     <string name="nm_feed_card_posted">Dodano do twoich aktualności</string>

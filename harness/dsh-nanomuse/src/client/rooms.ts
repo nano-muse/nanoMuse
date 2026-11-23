@@ -4,6 +4,7 @@
  * reads with `useSyncExternalStore` (the same shape `live.ts` gives the
  * account), and the calls the rooms make. Types mirror `src/rooms.ts`.
  */
+import type { Preparation } from '../feed-preparation.ts'
 import { useSyncExternalStore } from 'react'
 
 export interface FeedPost {
@@ -16,6 +17,7 @@ export interface FeedPost {
   image: string
   prompt: string
   liked: boolean
+  preparation?: Preparation
   goalId?: string
   goalExpiresAt?: number
   sessionId?: string
@@ -133,6 +135,7 @@ export interface DocText {
 
 /** The feed's daily routine (C5), as the host keeps it. */
 export interface FeedRoutine {
+  reading?: boolean
   on: boolean
   time: string
   ensuredAt: number

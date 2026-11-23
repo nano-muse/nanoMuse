@@ -245,7 +245,8 @@
     <string name="nm_feed_type_memory">Gedächtnis</string>
     <string name="nm_feed_type_note">Notiz</string>
     <string name="nm_feed_empty_title">Noch nichts im Feed</string>
-    <string name="nm_feed_empty_body">Je besser wir uns kennenlernen, desto mehr neue Beiträge erscheinen hier. Jeden Tag um %1$s lese ich, was ich über dich weiß (deine Gedächtnisdateien, das Tagebuch der letzten Woche, deine Ziele) und schreibe ein paar kurze Beiträge.</string>
+    <string name="nm_feed_empty_body">Um %1$s sucht der Feed nach Zusammenhängen zwischen deinen Zielen und aktuellen Notizen. Daraus kann ein Entwurf, eine Checkliste oder eine Frage entstehen.</string>
+    <string name="nm_feed_nothing_new">Derzeit gibt es nichts Neues vorzubereiten.</string>
     <string name="nm_feed_empty_how_title">Mit einem Satz lenken</string>
     <string name="nm_feed_empty_how_body">Tippe oben rechts auf die Regler, um mir zu sagen, wovon du mehr willst, die tägliche Routine abzuschalten oder mich den ersten Tag jetzt schreiben zu lassen.</string>
     <string name="nm_feed_card_posted">Zu deinem Feed hinzugefügt</string>

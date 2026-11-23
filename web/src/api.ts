@@ -300,9 +300,10 @@ export const api = {
   /** The feed's preferences; only the fields given change (`daily`/`time` are the 08:00 routine). */
   hideFeedFollowup: (id: string, choice: "tomorrow" | "dismiss") =>
     request<{ ok: boolean }>(`/api/feed/followups/${encodeURIComponent(id)}?choice=${choice}`, { method: "PUT" }),
-  setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean }) =>
+  setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; on_change?: boolean }) =>
     request<FeedPostsData>("/api/feed/instructions", { method: "PUT", body: JSON.stringify(body) }),
-  refreshFeedPosts: () => request<FeedPostsData>("/api/feed/posts/refresh", { method: "POST" }),
+  refreshFeedPosts: () => request<FeedPostsData>("/api/feed/posts/refresh?prepare_only=true", { method: "POST" }),
+  handlePreparation: (id: string) => request<{ ok: boolean }>(`/api/feed/posts/${encodeURIComponent(id)}/handled`, { method: "PUT" }),
   deleteFeedPost: (id: string) => request<{ ok: boolean }>(`/api/feed/posts/${id}`, { method: "DELETE" }),
   upcoming: () => request<UpcomingData>("/api/upcoming"),
   reminders: (all = false) => request<Reminder[]>(`/api/reminders${all ? "?all=1" : ""}`),

@@ -242,7 +242,8 @@
     <string name="nm_feed_type_memory">Memori</string>
     <string name="nm_feed_type_note">Catatan</string>
     <string name="nm_feed_empty_title">Feed masih kosong</string>
-    <string name="nm_feed_empty_body">Seiring kita saling mengenal, tulisan baru akan muncul di sini. Setiap hari pukul %1$s aku membaca apa yang kuingat tentangmu (file memorimu, catatan harian seminggu terakhir, tujuanmu) dan menulis beberapa tulisan pendek.</string>
+    <string name="nm_feed_empty_body">Pada pukul %1$s, feed mencari kaitan antara tujuan dan catatan terbaru Anda. Jika ada kaitan yang berguna, draf, daftar periksa, atau pertanyaan akan muncul di sini.</string>
+    <string name="nm_feed_nothing_new">Saat ini tidak ada hal baru yang perlu disiapkan.</string>
     <string name="nm_feed_empty_how_title">Arahkan dengan satu kalimat</string>
     <string name="nm_feed_empty_how_body">Ketuk ikon pengatur di kanan atas untuk memberi tahu apa yang kamu ingin lebih banyak, mematikan rutinitas harian, atau memintaku menulis hari pertama sekarang.</string>
     <string name="nm_feed_card_posted">Ditambahkan ke feed-mu</string>

@@ -63,7 +63,6 @@ export function FeedScreen() {
   const { state, send, draft, openGoal, openThread, openFile, markFeedSeen, setTab, toast } = useStore();
   const feedVersion = `${state.feedVersion}:${state.remindersVersion}`;
   const activityRequest = useFeedRequest(readActivity, feedVersion);
-  const postsRequest = useFeedRequest(api.feedPosts, feedVersion);
   const [clock, setClock] = useState(0);
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
@@ -72,6 +71,8 @@ export function FeedScreen() {
     document.addEventListener("visibilitychange", refresh);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
   }, []);
+  const postsRequest = useFeedRequest(api.feedPosts,
+    `${feedVersion}:${state.goalsVersion}:${state.memoryVersion}:${state.calendarVersion}:${state.connectionsVersion}:${clock}`);
   const upcomingRequest = useFeedRequest(api.upcoming,
     `${feedVersion}:${state.goalsVersion}:${state.calendarVersion}:${state.connectionsVersion}:${state.profile?.proactive}:${postsRequest.data?.followups_enabled}:${clock}`);
   const calendarRequest = useFeedRequest(api.calendar, `${state.calendarVersion}:${state.connectionsVersion}`);
@@ -105,6 +106,9 @@ export function FeedScreen() {
       const d = await api.refreshFeedPosts();
       setPosts(d);
       if (d.error) toast(t("Could not write posts: {error}", { error: d.error }));
+      else if (!d.posts.some((p) => !posts?.posts.some((old) => old.id === p.id))) {
+        toast(t("Nothing new to prepare from your saved information."));
+      }
     } catch (e) {
       toast((e as Error).message);
     } finally {
@@ -112,7 +116,18 @@ export function FeedScreen() {
     }
   };
   /** "Discuss" on a post: the follow-up it suggested, or the post itself, into the main chat. */
+  const handlePreparation = async (post: FeedPost) => {
+    try {
+      await api.handlePreparation(post.id);
+      setPosts((old) => old && { ...old, posts: old.posts.filter((p) => p.id !== post.id) });
+    } catch (e) { toast((e as Error).message); }
+  };
   const discuss = (p: FeedPost) => {
+    if (p.form) {
+      openThread("main");
+      draft(p.form === "draft" ? p.body : [p.prompt || p.title, p.body].join("\n\n"));
+      return;
+    }
     send("main", p.prompt || `${t("About this post from my feed:")}\n\n**${p.title}**\n\n${p.body.slice(0, 1200)}`).catch((e: Error) => toast(e.message || t("Could not send")));
     openThread("main");
   };
@@ -160,7 +175,7 @@ export function FeedScreen() {
                   title={t("No new posts yet")}
                   body={t("When something in your goals, calendar or recent conversations is worth following up, a post can appear here.")}
                 />
-                <StaticCard emoji="📝" title={t("Steer it with one sentence")} body={t("Tap the sliders at the top right to tell me what you want more of, switch the daily routine off, or have me write the first day now.")} />
+                <StaticCard emoji="📝" title={t("Steer it with one sentence")} body={t("Open Feed settings to choose what to prepare and when to check.")} />
                 {state.settings && !state.settings.llm_ready && (
                   <FeedCard>
                     <button type="button" onClick={() => setTab("you")} className="flex w-full items-center gap-2 p-4 text-left text-[14px] text-muted">
@@ -176,7 +191,7 @@ export function FeedScreen() {
                       </div>
                     ) : (
                       <button type="button" onClick={() => void writeNow()} className="h-[46px] w-full rounded-full bg-accent text-[15px] font-semibold text-accent-fg">
-                        {t("Write it now")}
+                        {t("Prepare now")}
                       </button>
                     )}
                   </div>
@@ -197,7 +212,7 @@ export function FeedScreen() {
               </FeedCard>
             )}
             {list.map((p) => (
-              <PostCard key={p.id} post={p} onDiscuss={() => discuss(p)} onInfo={() => setInfoPost(p)} />
+              <PostCard key={p.id} post={p} onDiscuss={() => discuss(p)} onInfo={() => setInfoPost(p)} onHandled={() => void handlePreparation(p)} />
             ))}
           </section>
         ))}
@@ -363,7 +378,9 @@ function areaLabel(area: string): string {
 }
 
 /** Muse's post: an emoji tile, the title, the body, a footer of discuss · info. */
-function PostCard({ post, onDiscuss, onInfo }: { post: FeedPost; onDiscuss: () => void; onInfo: () => void }) {
+function PostCard({ post, onDiscuss, onInfo, onHandled }: {
+  post: FeedPost; onDiscuss: () => void; onInfo: () => void; onHandled: () => void;
+}) {
   const t = useT();
   return (
     <FeedCard>
@@ -372,15 +389,28 @@ function PostCard({ post, onDiscuss, onInfo }: { post: FeedPost; onDiscuss: () =
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-[22px] leading-none">{AREA_EMOJI[post.area] ?? "📝"}</div>
           <div className="min-w-0 flex-1">
             <h3 className="text-[16px] font-semibold leading-[22px]">{post.title}</h3>
+            {post.why_now && <p className="mt-1 text-sm text-muted">{post.why_now}</p>}
             <div className="md mt-1 text-[15px] leading-[22px] text-fg/85">
               <Markdown text={post.body} />
             </div>
+            {post.sources && post.sources.length > 0 && (
+              <details className="mt-2 text-sm text-muted">
+                <summary className="cursor-pointer">{t("What this is based on")}</summary>
+                <ul className="mt-1 space-y-1">
+                  {post.sources.map((source, i) => <li key={i}><strong>{({
+                    goal: t("Goal"), calendar: t("Calendar"), memory: t("Saved memory"),
+                    conversation: t("Your message"), profile: t("Your profile"),
+                  })[source.kind]}</strong> · {source.quote}</li>)}
+                </ul>
+              </details>
+            )}
           </div>
         </div>
         <div className="mt-1.5 flex items-center">
           <button type="button" onClick={onDiscuss} className="flex items-center gap-1.5 rounded-full px-2 py-2 text-[14px] hover:bg-surface-2">
-            <MessageCircle size={22} strokeWidth={1.8} /> {t("Discuss")}
+            <MessageCircle size={22} strokeWidth={1.8} /> {post.form === "draft" ? t("Edit draft") : post.form ? t("Prepare a follow-up") : t("Discuss")}
           </button>
+          {post.form && <button type="button" onClick={onHandled} className="rounded-full px-2 py-2 text-sm text-muted hover:bg-surface-2">{t("Already handled")}</button>}
           <button type="button" onClick={onInfo} aria-label={t("About this post")} className="ml-auto rounded-full p-2 hover:bg-surface-2">
             <Info size={22} strokeWidth={1.8} />
           </button>
@@ -397,7 +427,7 @@ function IntroCard({ instructions, onEdit, onAck }: { instructions: string; onEd
     <FeedCard>
       <div className="px-4 py-3.5">
         <div className="text-[17px] font-semibold">{t("About the feed")}</div>
-        <p className="mt-1 text-[13px] leading-[18px] text-muted">{t("Short posts your agent writes for you from what it remembers: your memory files, the last week of diary, your goals. The sentence below steers every post from now on; edit it any time.")}</p>
+        <p className="mt-1 text-[13px] leading-[18px] text-muted">{t("Your agent can turn related goals, calendar entries and things you have told it into a draft or a brief. Each preparation shows the records it used.")}</p>
       </div>
       <div className="border-t border-border/70 px-4 py-3.5">
         <p className="text-[15px] leading-[22px]">{instructions || t("Build me a feed about what I care about. Keep it short and direct, easy to skim, no clickbait.")}</p>
@@ -472,7 +502,7 @@ function FeedSettingsSheet({
     }
   };
   // the daily routine is saved as it is switched or moved — a setting, not part of the sentence
-  const routine = async (body: { daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean }) => {
+  const routine = async (body: { daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; on_change?: boolean }) => {
     try {
       onChange(await api.setFeedInstructions(body));
     } catch (e) {
@@ -509,6 +539,12 @@ function FeedSettingsSheet({
             disabled={!data}
           />
           {data?.daily !== false && (
+            <Toggle label={t("Revisit when plans change")}
+              hint={t("One extra model review per day at most, when a goal or upcoming event has new context. Quiet hours apply.")}
+              checked={data?.on_change === true} disabled={!data}
+              onChange={(v) => void routine({ on_change: v })} />
+          )}
+          {data?.daily !== false && (
             <label className="flex items-center justify-between gap-3 text-[13px] text-muted">
               <span>{t("Time of day")}</span>
               <input
@@ -528,7 +564,7 @@ function FeedSettingsSheet({
           className="flex w-full items-center justify-center gap-2 rounded-full bg-surface-2 py-2.5 text-[15px] font-medium disabled:opacity-60"
         >
           {writing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="text-accent" />}
-          {writing ? t("Writing…") : t("Write it now")}
+          {writing ? t("Writing…") : t("Prepare now")}
         </button>
         <button type="button" onClick={() => void save()} disabled={saving} className="h-[46px] w-full rounded-full bg-accent text-[15px] font-semibold text-accent-fg disabled:opacity-60">
           {t("Save")}

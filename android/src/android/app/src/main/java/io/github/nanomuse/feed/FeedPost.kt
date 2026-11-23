@@ -20,16 +20,27 @@ data class FeedPost(
     val createdAt: Long,
     val liked: Boolean,
     val file: File,
+    val preparation: String = "",
+    val goalId: String = "",
+    val sourceSessions: List<String> = emptyList(),
 ) {
     val id: String get() = "$day/${"%02d".format(Locale.ROOT, index)}"
+
+    fun visibleWith(protected: Set<String>, goal: io.github.nanomuse.goals.Goal? = null): Boolean =
+        goal?.isProtectedBy(protected) != true &&
+            (sourceSessions.isEmpty() || protected.none { FeedPreparation.hash(it) in sourceSessions })
 
     fun serialize(): String = buildString {
         appendLine("---")
         appendLine("title: ${escape(title)}")
         appendLine("type: $type")
         if (emoji.isNotBlank()) appendLine("emoji: $emoji")
-        if (source.isNotEmpty()) appendLine("source: ${source.joinToString("; ") { escape(it) }}")
+        if (preparation.isNotEmpty()) appendLine("excerpts: ${org.json.JSONArray(source)}")
+        else if (source.isNotEmpty()) appendLine("source: ${source.joinToString("; ") { escape(it) }}")
         appendLine("created: ${ISO.format(java.time.Instant.ofEpochMilli(createdAt).atZone(java.time.ZoneId.systemDefault()))}")
+        if (preparation.isNotEmpty()) appendLine("preparation: $preparation")
+        if (goalId.isNotBlank()) appendLine("goal-id: ${escape(goalId)}")
+        if (sourceSessions.isNotEmpty()) appendLine("source-sessions: ${sourceSessions.joinToString(",")}")
         if (liked) appendLine("liked: true")
         appendLine("---")
         appendLine()
@@ -58,10 +69,15 @@ data class FeedPost(
                 type = meta["type"].orEmpty().ifBlank { "note" },
                 emoji = meta["emoji"].orEmpty(),
                 body = body.trim(),
-                source = meta["source"]?.split(";")?.map { unescape(it.trim()) }?.filter { it.isNotEmpty() }.orEmpty(),
+                source = meta["excerpts"]?.let { json ->
+                    runCatching { org.json.JSONArray(json).let { a -> List(a.length()) { i -> a.getString(i) } } }.getOrNull()
+                } ?: meta["source"]?.split(";")?.map { unescape(it.trim()) }?.filter { it.isNotEmpty() }.orEmpty(),
                 createdAt = created,
                 liked = meta["liked"] == "true",
                 file = file,
+                goalId = meta["goal-id"].orEmpty(),
+                preparation = meta["preparation"].orEmpty(),
+                sourceSessions = meta["source-sessions"].orEmpty().split(",").filter { it.isNotEmpty() },
             )
         }
 

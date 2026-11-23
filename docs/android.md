@@ -119,6 +119,8 @@ usage, the model menu) goes to that address.
 
 Give a goal a deadline when creating it, or edit the date in Goals. The Feed shows one approaching or recently missed deadline with its next unchecked step. Mark the step done, open the goal, bring the card back tomorrow or dismiss that deadline. These cards work offline. Feed settings also offer a separate local notification, off by default. With notifications allowed, it can point you back to the Feed during the day without putting the goal title on the lock screen. Android controls alarm delivery.
 
+The daily Feed can also prepare a draft, checklist, brief or question. An active goal or a concrete upcoming commitment in a recent diary entry can give it a subject. A separate related note or preference supplies a detail. For example, a note about tomorrow’s factory visit and a preference for printed checklists can become a packing list. Open the card to check its sources. The scheduled run can add one preparation per day. Select the text to copy it or choose Discuss. The preparation call has no tools.
+
 Shell progress updates preserve text beyond a shorter rewrite. Terminal color and title codes are removed before those updates, so they cannot leave escape fragments in the output.
 
 The agent's system prompt keeps its safety, tool and phone-operation instructions in a stable

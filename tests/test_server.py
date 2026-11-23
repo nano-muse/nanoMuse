@@ -3479,6 +3479,8 @@ def test_scheduled_feed_rechecks_preferences_and_retries_malformed_replies(serve
     _, service, llm = server
     real_ask = service.app.llm.ask_complete
     service.set_feed_instructions(daily=True)
+    service.app.goals.create("Prepare the review")
+    service.settings.agent.user_profile = "My reviews start with the decision."
     llm.script.append(LLMResponse(content="service temporarily unavailable"))
     with pytest.raises(ValueError, match="post list"):
         asyncio.run(service.write_feed_posts(scheduled=True))
@@ -3534,3 +3536,165 @@ def test_duplicate_generated_during_deletion_cannot_resurrect_the_post(server, m
 
     monkeypatch.setattr(service.app.llm, "ask_complete", regenerate)
     assert asyncio.run(service.write_feed_posts())["posts"] == []
+
+
+def _review_post(title="An agenda you can use"):
+    return {
+        "title": title,
+        "form": "brief",
+        "anchor": "S1",
+        "why_now": "The Atlas review is coming up.",
+        "body": "Opening question: which Atlas decision needs an owner?",
+        "area": "planning",
+        "sources": [
+            {"id": "S1", "quote": "Atlas review"},
+            {"id": "S2", "quote": "start with the decision"},
+        ],
+    }
+
+
+def test_preparations_cite_real_records_remember_feedback_and_allow_a_changed_goal(server):
+    client, service, llm = server
+    service.settings.agent.user_profile = "For reviews, start with the decision and its owner."
+    goal = service.app.goals.create("Atlas review", steps=["Draft agenda"])
+
+    def ask(post):
+        llm.script.append(LLMResponse(content=json.dumps([post])))
+        return client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+
+    (first,) = ask(_review_post())
+    assert first["sources"] == [
+        {"kind": "goal", "quote": "Atlas review"},
+        {"kind": "profile", "quote": "start with the decision"},
+    ]
+    assert llm.calls[-1]["tools"] is None or llm.calls[-1]["tools"] == []
+    assert ask(_review_post("A different headline")) == [first]
+    assert client.put(f"/api/feed/posts/{first['id']}/handled").status_code == 200
+    assert client.get("/api/feed/posts").json()["posts"] == []
+    assert service.app.goals.get(goal.id).status == "active"
+    # Following up on a changed plan is legitimate, as is retaining the unsnoozed preference.
+    service.app.goals.update(goal.id, description="New decision requested: timeline")
+    assert len(ask(_review_post())) == 1
+
+
+def test_automatic_preparation_no_evidence_skips_model_and_corrections_cancel_inflight(
+    server, monkeypatch
+):
+    _, service, llm = server
+    assert asyncio.run(service.write_feed_posts(scheduled=True))["posts"] == []
+    assert not llm.calls
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    goal = service.app.goals.create("Atlas review")
+
+    async def cancelled(*args, **kwargs):
+        service.app.goals.set_status(goal.id, "done")
+        return LLMResponse(content=json.dumps([_review_post()]))
+
+    monkeypatch.setattr(service.app.llm, "ask_complete", cancelled)
+    assert asyncio.run(service.write_feed_posts(scheduled=True))["posts"] == []
+
+
+def test_optional_change_review_spends_once_only_on_changed_plans_and_respects_quiet(server):
+    client, service, llm = server
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    goal = service.app.goals.create("Atlas review")
+    llm.script.append(LLMResponse(content="[]"))
+    asyncio.run(service.write_feed_posts(scheduled=True))
+    assert len(llm.calls) == 1
+    assert client.put("/api/feed/instructions", json={"on_change": True}).json()["on_change"]
+    data = service.feed_posts()
+    daily = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+    data["generated_at"] = daily
+    service._save_feed(data)
+
+    def revisit():
+        return asyncio.run(service.write_feed_posts(scheduled=True, changed=True))
+
+    revisit()
+    assert len(llm.calls) == 1
+    service.app.goals.update(goal.id, description="Partner requested a decision on Friday")
+    service.profile.proactivity = "off"
+    revisit()
+    assert len(llm.calls) == 1
+    service.profile.proactivity = "default"
+    llm.script.append(LLMResponse(content=json.dumps([_review_post()])))
+    result = revisit()
+    assert len(result["posts"]) == 1 and result["generated_at"] == daily
+    service.app.goals.update(goal.id, description="The meeting moved again")
+    revisit()
+    assert len(llm.calls) == 2
+
+
+def test_completed_goal_expires_preparation_in_public_feed_but_preserves_legacy_reading(server):
+    client, service, llm = server
+    goal = service.app.goals.create("Atlas review")
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    llm.script.append(LLMResponse(content=json.dumps([_review_post()])))
+    view = client.post("/api/feed/posts/refresh?prepare_only=true").json()
+    assert view["posts"][0]["sources"] and "preparation_history" not in view
+    legacy = {
+        "id": "old",
+        "title": "Reading",
+        "body": "Old post",
+        "ts": "",
+        "area": "fun",
+        "prompt": "",
+    }
+    raw = service.feed_posts()
+    raw["posts"].append(legacy)
+    service._save_feed(raw)
+    service.app.goals.set_status(goal.id, "done")
+    assert client.get("/api/feed/posts").json()["posts"] == [legacy]
+    assert client.put("/api/feed/instructions", json={"daily": False}).json()["posts"] == [legacy]
+
+
+def test_recent_request_finds_related_older_memory_without_a_formal_goal(server):
+    client, service, llm = server
+    memory = service.app.memory
+    memory.add("At Atlas reviews, ask for the rollback owner.", category="preference")
+    for i in range(9):
+        memory.add(f"Trail {i} has a blue marker at the entrance.")
+    service.threads["main"].timeline.add({"type": "user", "text": "Tomorrow is the Atlas review."})
+    data = service._preparation_sources(service.feed_posts())
+    anchor_id = next(k for k, s in data.items() if s.kind == "conversation")
+    source_id = next(k for k, s in data.items() if "rollback owner" in s.text)
+    post = {
+        **_review_post(),
+        "anchor": anchor_id,
+        "sources": [
+            {"id": anchor_id, "quote": "Atlas review"},
+            {"id": source_id, "quote": "rollback owner"},
+        ],
+    }
+    llm.script.append(LLMResponse(content=json.dumps([post])))
+    (ready,) = client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    assert [ref["kind"] for ref in ready["sources"]] == ["conversation", "memory"]
+    assert not {"source_revisions", "anchor_revision", "basis"}.intersection(ready)
+
+
+def test_later_cancellation_withdraws_live_card_but_an_unrelated_cancellation_does_not(server):
+    client, service, llm = server
+    goal = service.app.goals.create("Atlas review")
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    llm.script.append(LLMResponse(content=json.dumps([_review_post()])))
+    (post,) = client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    timeline = service.threads["main"].timeline
+    timeline.add({"type": "user", "text": "The kitchen delivery was cancelled."})
+    assert client.get("/api/feed/posts").json()["posts"] == [post]
+    timeline.add({"type": "user", "text": "The Atlas review has been cancelled."})
+    assert client.get("/api/feed/posts").json()["posts"] == []
+    assert service.app.goals.get(goal.id).status == "active"
+
+
+def test_explicit_inquiry_needs_no_goal_and_never_sends_the_result(server):
+    client, service, llm = server
+    service.settings.agent.user_profile = "The museum group needs a step-free entrance."
+    service.threads["main"].timeline.add(
+        {"type": "user", "text": "Draft the inquiry for tomorrow's museum visit."}
+    )
+    draft = "Could you tell our group which museum entrance has step-free access?"
+    llm.script.append(LLMResponse(content=json.dumps({"draft": draft})))
+    (card,) = client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    assert card["body"] == draft and card["form"] == "draft"
+    assert len(card["sources"]) == 2 and not llm.calls[0]["tools"]
+    assert not any(e.get("text") == draft for e in service.threads["main"].timeline.events)

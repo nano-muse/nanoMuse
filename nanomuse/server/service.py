@@ -49,7 +49,7 @@ from nanomuse.private import keep_private
 from nanomuse.reminders import Reminder
 from nanomuse.schema import Attachment, Message, Role
 from nanomuse.sentinel.grants import normalize_scope
-from nanomuse.server import firstrun
+from nanomuse.server import firstrun, preparations
 from nanomuse.server.connections import Connections, check_base_url
 from nanomuse.server.events import (
     MAIN_THREAD,
@@ -472,6 +472,8 @@ class MuseService:
         self.starting: str = "not started"
         self._tidying = False
         self._writing_feed = False
+        self._next_context_check = 0.0
+        self._feed_retry_after_change = 0.0
         self._feed_failed_at: float | None = None
         self._started = False
         self.started_at = now_iso()
@@ -2142,14 +2144,27 @@ class MuseService:
         an hour later, not every tick."""
         if (
             self.profile.in_quiet_hours()
-            or not self.feed_posts_due()
-            or not self.settings_view()["llm_ready"]
+            or self._writing_feed
+            or time.monotonic() < self._feed_retry_after_change
         ):
             return
         if self._feed_failed_at and time.monotonic() - self._feed_failed_at < FEED_RETRY_S:
             return
+        daily_due = self.feed_posts_due()
+        if not daily_due and time.monotonic() < self._next_context_check:
+            return
+        if not daily_due:
+            self._next_context_check = time.monotonic() + 600
+            prefs = self.feed_posts()
+            if not self._changed_review_allowed(prefs, datetime.now().astimezone()):
+                return
+        if not self.settings_view()["llm_ready"]:
+            return
         try:
-            await self.write_feed_posts(scheduled=True)
+            if daily_due:
+                await self.write_feed_posts(scheduled=True)
+            else:
+                await self.write_feed_posts(scheduled=True, changed=True)
             self._feed_failed_at = None
         except Exception as exc:  # noqa: BLE001 — the model may be down; the routine keeps its day
             self._feed_failed_at = time.monotonic()
@@ -2421,6 +2436,38 @@ class MuseService:
         data["time"] = _feed_time(data.get("time")) or FEED_DEFAULT_TIME
         return data
 
+    def feed_view(self, data: dict[str, Any] | None = None) -> dict[str, Any]:
+        """New preparations expire with their evidence. Older reading posts stay in the feed."""
+        data = self.feed_posts() if data is None else data
+        view: dict[str, Any] = {
+            k: data[k]
+            for k in (
+                "instructions",
+                "generated_at",
+                "daily",
+                "time",
+                "on_change",
+                "followup_push",
+                "followups_enabled",
+                "error",
+            )
+            if k in data
+        }
+        current: dict[str, bool] = {}
+        if any("source_revisions" in post for post in data["posts"]):
+            current = {s.revision: s.anchor for s in self._preparation_sources(data).values()}
+        view["posts"] = [
+            {
+                k: v
+                for k, v in post.items()
+                if k not in ("basis", "source_revisions", "anchor_revision")
+            }
+            for post in data["posts"]
+            if set(post.get("source_revisions", ())).issubset(current)
+            and ("anchor_revision" not in post or current.get(post["anchor_revision"]))
+        ]
+        return view
+
     def _save_feed(self, data: dict[str, Any]) -> None:
         data["posts"] = data["posts"][:FEED_KEEP]
         path = self._feed_file()
@@ -2441,6 +2488,7 @@ class MuseService:
         time: str | None = None,
         followups: bool | None = None,
         followup_push: bool | None = None,
+        on_change: bool | None = None,
     ) -> dict[str, Any]:
         """The feed's preferences: what to write about, and the daily routine (on or off, and
         when). A ``time`` that is not ``HH:MM`` is refused with :class:`ValueError`."""
@@ -2449,6 +2497,9 @@ class MuseService:
             data["instructions"] = text.strip()[:2000]
         if daily is not None:
             data["daily"] = bool(daily)
+        if on_change is not None:
+            data["on_change"] = on_change
+            self._next_context_check = 0.0
         if followup_push is not None:
             data["followup_push"] = followup_push
         if followups is not None:
@@ -2592,32 +2643,160 @@ class MuseService:
             ui = prompts.language_name(self.firstrun.state.lang)
         return ui or "the same language as the context above"
 
-    async def write_feed_posts(self, n: int = 3, *, scheduled: bool = False) -> dict[str, Any]:
-        """Write a fresh batch of posts and notify the phone once about the first."""
+    def _preparation_sources(self, data: dict[str, Any]) -> dict[str, preparations.Source]:
+        main = self.threads.get(MAIN_THREAD)
+        return preparations.sources_for(
+            self.app.goals.list("active"),
+            self.app.calendar,
+            self.app.memory,
+            self.settings.agent.user_profile,
+            main.timeline.events if main else [],
+            datetime.now().astimezone(),
+            data.get("handled_preparations", []),
+        )
+
+    def _changed_review_allowed(self, data: dict[str, Any], now: datetime) -> bool:
+        if not (
+            data.get("on_change")
+            and data["daily"]
+            and self.profile.proactive
+            and data.get("last_preparation_input")
+            and data.get("generated_at")
+        ):
+            return False
+        try:
+            daily = datetime.fromisoformat(data["generated_at"]).astimezone()
+            last = (
+                datetime.fromisoformat(data["last_change_review"]).astimezone()
+                if data.get("last_change_review")
+                else None
+            )
+        except (TypeError, ValueError):
+            return False
+        return now - daily >= timedelta(hours=2) and (last is None or last.date() < now.date())
+
+    def handle_preparation(self, post_id: str) -> bool:
+        data = self.feed_posts()
+        post = next((p for p in data["posts"] if p.get("id") == post_id), None)
+        if not post or not (anchor := post.get("anchor_revision")):
+            return False
+        handled = data.get("handled_preparations", [])
+        data["handled_preparations"] = [anchor, *(k for k in handled if k != anchor)][:200]
+        data["posts"] = [p for p in data["posts"] if p.get("anchor_revision") != anchor]
+        self._save_feed(data)
+        self.bus.publish({"kind": "feed_posts"})
+        return True
+
+    async def write_feed_posts(
+        self,
+        n: int = 3,
+        *,
+        scheduled: bool = False,
+        changed: bool = False,
+        prepare_only: bool = False,
+    ) -> dict[str, Any]:
+        """Prepare something from current records; an explicit request can also write ordinary posts."""
         if self._writing_feed:
             return self.feed_posts()
         self._writing_feed = True
         try:
             data = self.feed_posts()
-            prompt = FEED_PROMPT.format(
-                name=self.profile.name,
-                n=n,
-                instructions=data["instructions"]
-                or "(none yet; write what a good personal agent would)",
-                context="\n".join(self._feed_context()),
-                recent_titles=json.dumps(
-                    [p["title"] for p in data["posts"][:20]], ensure_ascii=False
-                ),
-                language=self.feed_language(),
-            )
+            if scheduled and (not data["daily"] or self.profile.in_quiet_hours()):
+                return data
+            offered = self._preparation_sources(data) if scheduled or prepare_only else {}
+            signature = preparations.review_signature(offered)
+            grounded = preparations.has_material(offered)
+            if changed:
+                if (
+                    not self._changed_review_allowed(data, datetime.now().astimezone())
+                    or not grounded
+                    or not preparations.time_to_revisit(offered)
+                    or signature == data.get("last_preparation_input")
+                ):
+                    return data
+                # Claim the discretionary daily call before waiting for the model, including on a restart.
+                data["last_change_review"] = now_iso()
+                self._save_feed(data)
+            if (scheduled or prepare_only) and not grounded:
+                data["generated_at"] = now_iso()
+                data["last_preparation_input"] = signature
+                self._save_feed(data)
+                return data
+            pairs = preparations.candidate_pairs(offered)
+            direct = preparations.draft_pair(offered, pairs)
+            if direct:
+                a, b = pairs[direct]
+                context = {
+                    "language": self.feed_language(),
+                    "preference": data["instructions"],
+                    "commitment": offered[a].text,
+                    "supporting_detail": offered[b].text,
+                    "recent_exchanges": [
+                        (s.text, s.reply)
+                        for s in offered.values()
+                        if s.kind == "conversation" and (s != offered[a] or s.reply)
+                    ],
+                }
+                messages = [
+                    Message.system(preparations.draft_prompt(offered[a].text)),
+                    Message.user(json.dumps(context, ensure_ascii=False)),
+                ]
+            elif grounded:
+                records = [
+                    {
+                        "id": k,
+                        "kind": v.kind,
+                        "eligible": v.anchor,
+                        "text": v.text,
+                        **({"prior_reply": v.reply} if v.reply else {}),
+                    }
+                    for k, v in offered.items()
+                ]
+                messages = [
+                    Message.system(preparations.PROMPT),
+                    Message.user(
+                        json.dumps(
+                            {
+                                "local_time": datetime.now()
+                                .astimezone()
+                                .isoformat(timespec="minutes"),
+                                "language": self.feed_language(),
+                                "feed_preferences": data["instructions"],
+                                "records": records,
+                                "candidate_pairs": [
+                                    {
+                                        "pair": pid,
+                                        "commitment": offered[a].text,
+                                        "support": offered[b].text,
+                                    }
+                                    for pid, (a, b) in pairs.items()
+                                ],
+                            },
+                            ensure_ascii=False,
+                        )
+                    ),
+                ]
+            else:
+                prompt = FEED_PROMPT.format(
+                    name=self.profile.name,
+                    n=n,
+                    instructions=data["instructions"] or "(none yet)",
+                    context="\n".join(self._feed_context()),
+                    recent_titles=json.dumps(
+                        [p["title"] for p in data["posts"][:20]], ensure_ascii=False
+                    ),
+                    language=self.feed_language(),
+                )
+                messages = [Message.user(prompt)]
             with llm_session.run("feed"):
-                response = await self.app.llm.ask_complete([Message.user(prompt)], tools=None)
+                response = await self.app.llm.ask_complete(messages, tools=None)
             # Preferences and posts can change while the model is writing.
             latest = self.feed_posts()
             if scheduled and (
                 not latest["daily"]
                 or self.profile.in_quiet_hours()
                 or latest["instructions"] != data["instructions"]
+                or (changed and (not latest.get("on_change") or not self.profile.proactive))
             ):
                 return latest
             # A post deleted during this request must not come back in the response.
@@ -2628,24 +2807,44 @@ class MuseService:
             data = latest
             posts = []
             reply = response.content or ""
-            parsed = _parse_posts(reply)
-            if scheduled and not parsed:
+            parsed = _idea_objects(reply)
+            if direct and (not parsed or all(isinstance(x, dict) and "draft" in x for x in parsed)):
+                artifact = preparations.from_draft(reply, direct, offered[pairs[direct][0]])
+                parsed = [artifact] if artifact else []
+            elif scheduled and not parsed:
                 visible = re.sub(r"<think>.*?</think>", "", reply, flags=re.S).strip()
                 if not re.fullmatch(r"(?:```(?:json)?\s*)?\[\s*\](?:\s*```)?", visible):
                     raise ValueError("The model did not return a Feed post list.")
-            for post in parsed:
+            current = self._preparation_sources(latest) if grounded else {}
+            # A new message may resolve the matter while the model is writing.
+            if grounded and preparations.review_signature(current) != signature:
+                self._feed_retry_after_change = time.monotonic() + 600
+                return latest
+            recent_bases = data.get("preparation_history", [])
+            for raw in parsed:
+                if not isinstance(raw, dict) or not (post := _feed_post(raw)):
+                    continue
+                if grounded:
+                    extra = preparations.prepare(raw, offered, current)
+                    if extra is None or extra["basis"] in recent_bases:
+                        continue
+                    post.update(extra)
                 title = post["title"].strip().casefold()
-                if title not in seen:
+                if grounded or title not in seen:
                     posts.append(post)
                     seen.add(title)
-                if len(posts) >= n:
+                if len(posts) >= (1 if grounded else n):
                     break
+            if grounded:
+                data["preparation_history"] = ([p["basis"] for p in posts] + recent_bases)[:200]
+                data["last_preparation_input"] = signature
             now = now_iso()
             for p in posts:
                 p["id"] = new_id("post")
                 p["ts"] = now
             data["posts"] = [*posts, *data["posts"]]
-            data["generated_at"] = now
+            if not changed:
+                data["generated_at"] = now
             self._save_feed(data)
             self.bus.publish({"kind": "feed_posts"})
             if posts:
@@ -3251,24 +3450,22 @@ def _parse_ideas(text: str) -> list[dict[str, str]]:
     return ideas[:8]
 
 
-def _parse_posts(text: str) -> list[dict[str, str]]:
-    posts: list[dict[str, str]] = []
-    for item in _idea_objects(text):
-        if not isinstance(item, dict):
-            continue
-        title = str(item.get("title", "")).strip()
-        body = str(item.get("body", "")).strip()
-        if title and body:
-            area = str(item.get("area", "")).strip().lower()
-            posts.append(
-                {
-                    "title": title[:120],
-                    "body": body[:2000],
-                    "area": area if area in IDEA_AREAS else "fun",
-                    "prompt": str(item.get("prompt", "")).strip()[:1000],
-                }
-            )
-    return posts[:6]
+def _feed_post(item: dict[str, Any]) -> dict[str, Any] | None:
+    title, body = item.get("title"), item.get("body")
+    if (
+        not isinstance(title, str)
+        or not title.strip()
+        or not isinstance(body, str)
+        or not body.strip()
+    ):
+        return None
+    area = str(item.get("area", "")).strip().lower()
+    return {
+        "title": title.strip()[:120],
+        "body": body.strip()[:2000],
+        "area": area if area in IDEA_AREAS else "planning",
+        "prompt": str(item.get("prompt") or "").strip()[:1000],
+    }
 
 
 __all__ = ["MuseService", "Profile", "Thread", "goal_to_dict", "new_id"]

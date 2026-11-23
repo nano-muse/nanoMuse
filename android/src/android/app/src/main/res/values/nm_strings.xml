@@ -245,7 +245,8 @@
     <string name="nm_feed_type_memory">Memory</string>
     <string name="nm_feed_type_note">Note</string>
     <string name="nm_feed_empty_title">Nothing in the feed yet</string>
-    <string name="nm_feed_empty_body">As we get to know each other, new posts will show up here. Every day at %1$s I read what I remember about you (your memory files, the last week of diary, your goals) and write a few short posts.</string>
+    <string name="nm_feed_empty_body">At %1$s the Feed looks for a connection between your goals and recent notes. When it finds something useful, a draft, checklist or question appears here.</string>
+    <string name="nm_feed_nothing_new">There is nothing new to prepare right now.</string>
     <string name="nm_feed_empty_how_title">Steer it with one sentence</string>
     <string name="nm_feed_empty_how_body">Tap the sliders at the top right to tell me what you want more of, switch the daily routine off, or have me write the first day now.</string>
     <string name="nm_feed_card_posted">Added to your feed</string>

@@ -236,7 +236,8 @@
     <string name="nm_feed_type_memory">記憶</string>
     <string name="nm_feed_type_note">隨記</string>
     <string name="nm_feed_empty_title">動態裡還沒有內容</string>
-    <string name="nm_feed_empty_body">隨著我們相互了解，新的貼文會顯示在這裡。每天 %1$s，我會讀一遍記得的關於你的東西（記憶檔案、最近一週的日記、你的目標）然後寫幾條簡短的貼文。</string>
+    <string name="nm_feed_empty_body">動態會在 %1$s 查看目標和近期紀錄。有具體關聯時，這裡會出現一份草稿、一張清單或一個值得確認的問題。</string>
+    <string name="nm_feed_nothing_new">目前沒有新的內容需要準備。</string>
     <string name="nm_feed_empty_how_title">一句話就能調整</string>
     <string name="nm_feed_empty_how_body">點右上角的滑桿，告訴我你想多看什麼、關掉每天的例程，或者讓我現在就寫第一天。</string>
     <string name="nm_feed_card_posted">已加入動態</string>

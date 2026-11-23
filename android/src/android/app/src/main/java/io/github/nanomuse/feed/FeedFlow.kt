@@ -40,11 +40,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * How the feed gets written, Muse style: one built-in routine (a plain scheduled task the user
- * can switch off or re-time), which sends a one-line prompt into the feed's own conversation.
- * That conversation's system prompt carries the user's feed preferences and a digest of what the
- * agent knows (GLOBAL.md, the last seven days of diary, USER.md, goals); the model answers with
- * `nanomuse-feed` blocks, which the app turns into files under `feed/YYYY-MM-DD/` and into cards.
+ * The built-in Feed routine prepares one sourced draft using the configured model and no tools.
+ * A person can also discuss a post or explicitly request research in the Feed conversation,
+ * where a requested `nanomuse-feed` block is saved by [afterTurn].
  *
  * The conversation is the agent's workbench, not a chat of the person's: it is kept out of the
  * drawer, the chat list, the search and the main-chat fallback ([hidden]), the posts show in the
@@ -90,6 +88,7 @@ object FeedFlow {
     }
 
     fun leave(context: Context) {
+        FeedPreparationRunner.accountChange(leaving = true)
         io.github.nanomuse.goals.GoalFollowUps.leave(context)
         lastWritten = emptyList()
         lastDroppedByLimit = 0
@@ -98,6 +97,7 @@ object FeedFlow {
 
     /** Another account's preferences and routine are in place (contract C12): read them again. */
     fun refresh(context: Context) {
+        FeedPreparationRunner.accountChange(leaving = false)
         io.github.nanomuse.goals.GoalFollowUps.start(context)
         lastWritten = emptyList()
         lastDroppedByLimit = 0
@@ -162,7 +162,7 @@ object FeedFlow {
     }
 
     /** Runs the routine right now (the "Write it now" button). */
-    fun generateNow(context: Context) = writeNow(context) {}
+    fun generateNow(context: Context) = writeNow(context, explicit = true) {}
 
     /**
      * The first feed day, written on its own right after the first conversation ends (the
@@ -171,11 +171,11 @@ object FeedFlow {
      */
     fun writeFirstDay(context: Context) {
         val p = prefs(context)
-        if (p.getBoolean(KEY_FIRST_DAY, false)) return
+        if (p.getBoolean(KEY_FIRST_DAY, false) || task(context)?.enabled == false) return
         writeNow(context) { p.edit().putBoolean(KEY_FIRST_DAY, true).apply() }
     }
 
-    private fun writeNow(context: Context, onDispatch: () -> Unit) {
+    private fun writeNow(context: Context, explicit: Boolean = false, onDispatch: () -> Unit) {
         if (_generating.value) return
         scope.launch {
             _generating.value = true
@@ -186,7 +186,13 @@ object FeedFlow {
                 }
                 onDispatch()
                 val app = context.applicationContext as MinisApp
-                ScheduledAgentRunner.run(app, task, waitForCompletion = true)
+                ScheduledAgentRunner.run(app, task, waitForCompletion = true, requireEnabledFeed = !explicit)
+                if (explicit && task(app)?.let { it.id == task.id && it.lastResultPreview == "[quiet]" } == true) {
+                    withContext(Dispatchers.Main) {
+                        if (ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+                            Toast.makeText(app, R.string.nm_feed_nothing_new, Toast.LENGTH_SHORT).show()
+                    }
+                }
             } finally {
                 _generating.value = false
             }
@@ -269,15 +275,16 @@ object FeedFlow {
             lastDroppedByLimit = 0
             return true
         }
+        val prepared = response == FeedPreparationRunner.WRITTEN
         val recentRun = System.currentTimeMillis() - lastWrittenAt < 30 * 60_000L
         val titles = lastWritten.takeIf { recentRun }.orEmpty()
         val droppedByLimit = lastDroppedByLimit.takeIf { recentRun } ?: 0
-        if (titles.isEmpty() && droppedByLimit == 0) return false
+        if (!prepared && titles.isEmpty() && droppedByLimit == 0) return false
         lastWritten = emptyList()
         lastDroppedByLimit = 0
         if (ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return true
         val titleText = titles.take(3).joinToString(" · ")
-        val body = if (droppedByLimit > 0) {
+        val body = if (prepared) context.getString(R.string.nm_deadline_notice) else if (droppedByLimit > 0) {
             val notice = context.getString(R.string.nm_feed_limit_notice, droppedByLimit)
             if (titleText.isEmpty()) notice else "$titleText · $notice"
         } else titleText
@@ -326,7 +333,9 @@ object FeedFlow {
     fun systemAddendum(context: Context, sessionId: String): String? {
         if (!isFeedSession(context, sessionId)) return null
         val digest = digest(context)
-        val recent = FeedStore.posts.value.take(24).map { it.title }
+        val goalStore = GoalStore.get(context)
+        val recent = FeedStore.posts.value.filter { it.visibleWith(SessionAccess.protected.value, goalStore.get(it.goalId)) }
+            .take(24).map { it.title }
         return buildString {
             appendLine("## This conversation writes the user's feed (nanoMuse)")
             appendLine("The Feed tab shows short posts for this user. Their standing instruction is:")

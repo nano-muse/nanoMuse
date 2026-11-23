@@ -787,6 +787,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (state.loaded) setAppBadge(state.pendingApprovals.length);
   }, [state.loaded, state.pendingApprovals.length]);
 
+  const setTab = useCallback((tab: Tab) => dispatch({ type: "tab", tab }), []);
   const value = useMemo<StoreValue>(
     () => ({
       state,
@@ -831,7 +832,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       refreshSettings,
       refreshHub,
       openGoal: (id) => dispatch({ type: "openGoal", id }),
-      setTab: (tab) => dispatch({ type: "tab", tab }),
+      setTab,
       setDrawer: (open) => dispatch({ type: "drawer", open }),
       openThread: (thread) => dispatch({ type: "activeThread", thread }),
       markFeedSeen: (at) => dispatch({ type: "feedSeen", at }),
@@ -848,7 +849,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       toast: (text) => dispatch({ type: "toast", toast: t(text) }),
     }),
-    [state, loadEvents, refreshGoals, refreshSettings, refreshHub],
+    [state, setTab, loadEvents, refreshGoals, refreshSettings, refreshHub],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

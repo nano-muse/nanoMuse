@@ -248,7 +248,8 @@
     <string name="nm_feed_type_memory">Amintire</string>
     <string name="nm_feed_type_note">Notă</string>
     <string name="nm_feed_empty_title">Nimic în flux încă</string>
-    <string name="nm_feed_empty_body">Pe măsură ce ne cunoaștem, aici vor apărea postări noi. În fiecare zi la %1$s citesc ce îmi amintesc despre tine (fișierele de memorie, jurnalul ultimei săptămâni, obiectivele tale) și scriu câteva postări scurte.</string>
+    <string name="nm_feed_empty_body">La %1$s, fluxul caută legături între obiectivele tale și notițele recente. Dacă găsește ceva util, aici apare o ciornă, o listă de verificare sau o întrebare.</string>
+    <string name="nm_feed_nothing_new">Nu este nimic nou de pregătit momentan.</string>
     <string name="nm_feed_empty_how_title">Ghidează-l cu o propoziție</string>
     <string name="nm_feed_empty_how_body">Atinge butonul de reglaje din dreapta sus ca să-mi spui ce vrei mai mult, să oprești rutina zilnică sau să mă pui să scriu prima zi acum.</string>
     <string name="nm_feed_card_posted">Adăugat în fluxul tău</string>

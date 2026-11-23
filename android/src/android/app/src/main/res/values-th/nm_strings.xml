@@ -242,7 +242,8 @@
     <string name="nm_feed_type_memory">ความทรงจำ</string>
     <string name="nm_feed_type_note">บันทึก</string>
     <string name="nm_feed_empty_title">ยังไม่มีอะไรในฟีด</string>
-    <string name="nm_feed_empty_body">เมื่อเรารู้จักกันมากขึ้น โพสต์ใหม่จะแสดงที่นี่ ทุกวันเวลา %1$s ฉันจะอ่านสิ่งที่จำได้เกี่ยวกับคุณ (ไฟล์ความทรงจำ ไดอารี่สัปดาห์ล่าสุด เป้าหมายของคุณ) แล้วเขียนโพสต์สั้น ๆ สักสองสามโพสต์</string>
+    <string name="nm_feed_empty_body">เมื่อถึงเวลา %1$s ฟีดจะค้นหาความเชื่อมโยงระหว่างเป้าหมายกับบันทึกล่าสุดของคุณ หากพบสิ่งที่เป็นประโยชน์ คุณจะเห็นฉบับร่าง รายการตรวจสอบ หรือคำถามที่นี่</string>
+    <string name="nm_feed_nothing_new">ตอนนี้ยังไม่มีเรื่องใหม่ที่ต้องเตรียม</string>
     <string name="nm_feed_empty_how_title">กำกับทิศทางด้วยประโยคเดียว</string>
     <string name="nm_feed_empty_how_body">แตะไอคอนตัวเลื่อนที่มุมขวาบนเพื่อบอกฉันว่าคุณอยากได้อะไรมากขึ้น ปิดกิจวัตรรายวัน หรือให้ฉันเขียนวันแรกตอนนี้เลย</string>
     <string name="nm_feed_card_posted">เพิ่มลงฟีดของคุณแล้ว</string>

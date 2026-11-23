@@ -586,6 +586,8 @@ rather than a messenger.
 
 Set the optional due date in Goals. While the desktop app is running and the Feed routine is enabled, it can add one local follow-up per day after the scheduled time. The card explains which deadline or recent goal check brought it up, includes a planned step when available, and opens the original conversation. You can mute an individual goal. This follow-up works without a model.
 
+The Feed can also prepare material from an unfinished goal or a recent request you wrote in a completed conversation. A separate memory, conversation or saved file label can supply a relevant constraint. For example, a promise to contact a museum and a saved accessibility requirement can become an editable booking inquiry. Expand the sources on the card to see where the information came from. The preparation call uses the current chat model without tools. Existing scheduled reading with written preferences stays available, and you can request research explicitly.
+
 The four rooms are on the rail (Chats, Search,
 Feed, Ideas, Goals, Library, Devices), each one `main` panel of the harness's layout,
 so the chat column stays where it is and a room opens in its place. One host service

@@ -45,7 +45,7 @@ nanomuse serve --port 9000 --no-qr
 
 保存模型前，「开始」不可点击；「跳过设置」始终可用，也会跳过首次对话。刷新页面会保留已完成项。之后可从形象菜单修改名称、形象、简介和语气，「设置」也提供身份表单。设置完成或已有对话后，不再显示引导。
 
-「开始」通过 `POST /api/firstrun/start` 标记设置完成，作用与 `POST /api/onboarded` 相同。如果此时已有对话，或首次对话结束，后台会生成第一天的动态内容，让你首次打开「动态」时即可阅读；其他情况下，动态先显示介绍卡并说明每日例程时间。
+「开始」通过 `POST /api/firstrun/start` 标记设置完成，作用与 `POST /api/onboarded` 相同。如果此时已有对话，或首次对话结束，后台会检查是否有值得提前准备的事项。缺少相关材料时，动态可以只显示介绍卡和每日例程时间。
 
 ## 界面与功能 {#what-is-on-the-screen}
 
@@ -65,7 +65,7 @@ nanomuse serve --port 9000 --no-qr
 
 网页画面仅保存在服务器当前会话内存中，每聊天最近约十二帧；重启后旧卡片显示占位内容。需要安装浏览器工具 `pip install "nanomuse[browser]" && playwright install chromium`，或使用 `-browser` Docker 镜像。旧版 Android 连接后也可提供自身 WebView（内嵌浏览器），卡片 `backend` 会说明实际后端。在手机上接管 WebView 时，会弹出真实网页面板，可用手机键盘和自动填充登录，再点「完成」继续。兼容性与登录限制见 [browser.md](browser.md)。
 
-**动态**。上方「动态偏好」可填写想读的内容，例如骑行、Rust 和每周一道菜谱。每天一次，或点击「写几条新的」时，智能体根据偏好、目标和记忆生成三条短文。每条「问问 {name}」会围绕该内容开启聊天。下方「你离开期间」列出后台任务结果和文件、全部聊天中待处理审批与问题、今日日历，以及显示下次时间和待推进目标的「接下来」。未读数显示在标签上。
+**动态**。每日例程或「现在准备一份」可以写出提纲、草稿、清单，或者一个有待你决定的问题。例如，明天有试点复盘，而你曾说过希望每项决策都有负责人，动态就可以提前准备会议提纲。展开「依据哪些信息」能看原始摘录。「编辑草稿」把内容放进输入框。「这件事已处理」会撤下针对这版事项的准备材料，保留原目标和日程。「你离开期间」仍会列出后台任务结果、文件和待处理审批。
 
 帖子、活动、「接下来」或日历加载失败时，只在对应区域显示错误和「重试」。重试仅请求该区域，刷新失败也保留上次成功内容，并附错误说明。
 
@@ -153,6 +153,8 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 这些卡片直接读取已保存的目标和最近成功更新的日历，可在未配置模型时使用。全天、已取消和标为空闲的活动不参与冲突判断。在动态设置中可以关闭卡片，也可以选择接收通知。服务器运行期间，目标跟进或两小时内的日程冲突可以触发通知，发送时段为服务器当地时间 09:00 至 20:00，并遵守免打扰设置。动态通知每天合计最多一条，锁屏只显示有更新。已设定期检查的目标沿用原来的提醒。关闭主动服务会隐藏卡片并停止对应通知。每日动态没有新依据时也可以留空。
 
+准备材料使用当前模型，生成时不调用工具。它可以参考有效目标、未来 24 小时内即将开始且缓存新鲜的忙碌日程、个人偏好、已保存的记忆和主要聊天最近的交流。引用在展示前会与本地记录核对，依据不足或已经失效时可以留空。从动态回到主要聊天编辑草稿时，输入框会保留切换前未发送的文字。开启动态设置中的「计划有变化时再看看」后，如果目标、近期日程或主要聊天里有明确时间的写作事项有变化，每天最多额外检查一次。该选项需要已开启每日例程和主动服务，并遵守免打扰设置。普通截止卡片和通知有独立开关。
+
 设置中的「主动性」决定智能体主动推进任务和通知你的频率：
 
 | 档位 | 执行频率 | 何时通知 |
@@ -199,10 +201,11 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | GET | `/api/ideas?refresh=1` | 获取已有建议，或按参数重新生成。 |
 | GET | `/api/activity` | 返回最新审计记录、已授予的 `grants[]`，各项含 `key`、`tool`、`target`、`scope`、`expires_at`，以及对话污染标记。 |
 | GET | `/api/feed?limit=` | 按最新在前返回「你离开期间」：`{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}`。 |
-| GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, followups_enabled?, followup_push?, generated_at, posts[{id, ts, title, body, area, prompt}], error?}`。 |
-| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
+| GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}`。 |
+| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, on_change?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
 | PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | 明天再次显示当前跟进卡片，或隐藏该项。 |
-| POST | `/api/feed/posts/refresh` | 立即生成新文章；模型拒绝时通过 `error` 说明。 |
+| PUT | `/api/feed/posts/{id}/handled` | 隐藏围绕当前事项版本的准备材料。 |
+| POST | `/api/feed/posts/refresh[?prepare_only=true]` | 传 `prepare_only=true` 时只根据已有材料准备，可返回空列表。旧版客户端仍可以手动请求阅读文章。 |
 | DELETE | `/api/feed/posts/{id}` | 删除指定文章。 |
 | GET | `/api/upcoming` | 返回 `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`。`next_wake_at` 为提醒、目标检查或后台任务中最近的待执行时间，供能够设置系统闹钟的宿主使用，见 [local-runtime.md](local-runtime.md#waking-up)。 |
 | POST | `/api/tick` | 立即唤醒调度器，检查并执行已到期工作，返回 `{ok, next_wake_at}`。Android 的系统闹钟触发后调用此接口。 |

@@ -242,7 +242,8 @@
     <string name="nm_feed_type_memory">메모리</string>
     <string name="nm_feed_type_note">메모</string>
     <string name="nm_feed_empty_title">아직 피드에 글이 없습니다</string>
-    <string name="nm_feed_empty_body">서로 알아 가면서 새 글이 여기에 나타날 거예요. 매일 %1$s에 제가 기억하는 것(메모리 파일, 지난 한 주의 일기, 목표)을 읽고 짧은 글 몇 편을 써요.</string>
+    <string name="nm_feed_empty_body">%1$s에 피드가 목표와 최근 메모 사이의 연관성을 살펴봅니다. 도움이 되는 내용이 있으면 여기에 초안, 체크리스트 또는 질문이 표시됩니다.</string>
+    <string name="nm_feed_nothing_new">지금은 새로 준비할 내용이 없습니다.</string>
     <string name="nm_feed_empty_how_title">한 문장으로 방향 잡기</string>
     <string name="nm_feed_empty_how_body">오른쪽 위의 슬라이더를 탭해서 더 보고 싶은 것을 알려 주거나, 매일 루틴을 끄거나, 첫날 글을 지금 쓰게 하세요.</string>
     <string name="nm_feed_card_posted">피드에 추가했습니다</string>

@@ -242,7 +242,8 @@
     <string name="nm_feed_type_memory">Memori</string>
     <string name="nm_feed_type_note">Nota</string>
     <string name="nm_feed_empty_title">Belum ada apa-apa dalam suapan</string>
-    <string name="nm_feed_empty_body">Semakin kita saling mengenali, catatan baharu akan muncul di sini. Setiap hari pada %1$s saya membaca apa yang saya ingat tentang anda (fail memori anda, diari seminggu lepas, matlamat anda) dan menulis beberapa catatan pendek.</string>
+    <string name="nm_feed_empty_body">Pada pukul %1$s, suapan mencari kaitan antara matlamat dan nota terbaharu anda. Jika ada kaitan yang berguna, draf, senarai semak atau soalan akan dipaparkan di sini.</string>
+    <string name="nm_feed_nothing_new">Tiada perkara baharu untuk disediakan buat masa ini.</string>
     <string name="nm_feed_empty_how_title">Kemudikan dengan satu ayat</string>
     <string name="nm_feed_empty_how_body">Ketik penggelongsor di penjuru kanan atas untuk memberitahu saya apa yang anda mahu lebih, mematikan rutin harian, atau minta saya tulis hari pertama sekarang.</string>
     <string name="nm_feed_card_posted">Ditambah ke suapan anda</string>

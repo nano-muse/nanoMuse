@@ -246,7 +246,8 @@
     <string name="nm_feed_type_memory">Mémoire</string>
     <string name="nm_feed_type_note">Note</string>
     <string name="nm_feed_empty_title">Rien dans le fil pour l’instant</string>
-    <string name="nm_feed_empty_body">À mesure que nous ferons connaissance, de nouveaux billets apparaîtront ici. Chaque jour à %1$s, je relis ce dont je me souviens de vous (vos fichiers de mémoire, la dernière semaine de journal, vos objectifs) et j’écris quelques billets courts.</string>
+    <string name="nm_feed_empty_body">À %1$s, le fil cherche un lien entre vos objectifs et vos notes récentes. Selon ce qu’il trouve, il peut vous proposer un brouillon, une liste de tâches ou une question.</string>
+    <string name="nm_feed_nothing_new">Il n’y a rien de nouveau à préparer pour le moment.</string>
     <string name="nm_feed_empty_how_title">Guidez-le en une phrase</string>
     <string name="nm_feed_empty_how_body">Touchez les curseurs en haut à droite pour me dire ce que vous voulez voir davantage, désactiver la routine quotidienne, ou me faire écrire le premier jour tout de suite.</string>
     <string name="nm_feed_card_posted">Ajouté à votre fil</string>

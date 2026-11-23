@@ -245,7 +245,8 @@
     <string name="nm_feed_type_memory">Memorya</string>
     <string name="nm_feed_type_note">Tala</string>
     <string name="nm_feed_empty_title">Wala pang laman ang feed</string>
-    <string name="nm_feed_empty_body">Habang nagkakakilala tayo, lalabas dito ang mga bagong post. Araw-araw nang %1$s, binabasa ko ang mga naaalala ko tungkol sa iyo (ang mga memory file mo, ang diary ng nakaraang linggo, ang mga layunin mo) at sumusulat ako ng ilang maiikling post.</string>
+    <string name="nm_feed_empty_body">Sa %1$s, naghahanap ang feed ng kaugnayan sa mga layunin at kamakailang tala mo. Kung may kapaki-pakinabang na ugnayan, makakakita ka rito ng draft, checklist o tanong.</string>
+    <string name="nm_feed_nothing_new">Walang bagong kailangang ihanda ngayon.</string>
     <string name="nm_feed_empty_how_title">Gabayan ito sa isang pangungusap</string>
     <string name="nm_feed_empty_how_body">I-tap ang mga slider sa kanang itaas para sabihin sa akin kung ano ang gusto mong madagdagan, i-off ang araw-araw na routine, o ipasulat na sa akin ngayon ang unang araw.</string>
     <string name="nm_feed_card_posted">Naidagdag sa feed mo</string>

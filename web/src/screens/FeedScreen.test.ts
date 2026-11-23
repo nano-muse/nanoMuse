@@ -158,3 +158,18 @@ it("shows the recorded reason for a plan review and honors the Feed preference",
   await act(async () => { store.state.feedVersion++; screen.update(createElement(FeedScreen)); });
   expect(screen.root.findAllByProps({ "aria-label": "Plan change to review" })).toHaveLength(0);
 });
+
+it("shows verified excerpts, opens the prepared draft and remembers a handled matter", async () => {
+  const prep = { ...posts.posts[0], form: "draft" as const, body: "An editable note",
+    why_now: "Tomorrow is the review", sources: [{ kind: "goal" as const, quote: "Prepare the review" }] };
+  vi.mocked(api.feedPosts).mockResolvedValue({ ...posts, posts: [prep] });
+  vi.spyOn(api, "handlePreparation").mockResolvedValue({ ok: true });
+  await mount();
+  expect(JSON.stringify(screen.toJSON())).toContain("Prepare the review");
+  const button = (label: string) => screen.root.findAllByType("button").find((node) => node.children.includes(label));
+  await act(async () => { button("Edit draft")!.props.onClick(); });
+  expect(store.draft).toHaveBeenCalledWith("An editable note");
+  await act(async () => { button("Already handled")!.props.onClick(); });
+  expect(api.handlePreparation).toHaveBeenCalledWith(prep.id);
+  expect(JSON.stringify(screen.toJSON())).not.toContain("An editable note");
+});

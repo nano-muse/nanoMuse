@@ -124,7 +124,7 @@ _CachedWindow = tuple[datetime, tuple[tuple[str, float, int], ...], list[Occurre
 _windows: WeakKeyDictionary[CalendarFeeds, _CachedWindow] = WeakKeyDictionary()
 
 
-def _busy_events(calendar: CalendarFeeds, now: datetime) -> list[Occurrence]:
+def fresh_busy_events(calendar: CalendarFeeds, now: datetime) -> list[Occurrence]:
     if not calendar.configured:
         _windows.pop(calendar, None)
         return []
@@ -163,7 +163,7 @@ def _upcoming_overlap(
     start = now.astimezone(UTC)
     end = start + timedelta(hours=24)
     active: list[Occurrence] = []
-    for later in _busy_events(calendar, now):
+    for later in fresh_busy_events(calendar, now):
         begins = later.start.astimezone(UTC)
         if begins >= end:
             break

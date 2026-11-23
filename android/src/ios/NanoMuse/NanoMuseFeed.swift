@@ -2,12 +2,10 @@
 //  NanoMuseFeed.swift
 //  nanoMuse
 //
-//  The Feed, Muse style: short posts the agent writes for the person, from
-//  what it remembers (GLOBAL.md, the last week of diary, USER.md, goals).
-//  One built-in routine sends "Write today's feed." into the feed's own
-//  conversation; the model answers with ```nanomuse-feed``` blocks, which
-//  become `nanomuse/feed/YYYY-MM-DD/NN.md` files and cards. Plain files on
-//  purpose — the agent can read them back and a backup carries them.
+//  The daily Feed pairs a goal with a relevant journal or memory excerpt. A tool-free
+//  model call can prepare a card, or stay quiet. Requests in the Feed's work chat
+//  still accept nanomuse-feed blocks. Posts live in nanomuse/feed/YYYY-MM-DD/NN.md.
+//
 //  Android: feed/FeedPost.kt, feed/FeedStore.kt, feed/FeedFlow.kt, ui/feed/FeedTab.kt.
 //
 
@@ -28,6 +26,9 @@ struct NanoMusePost: Identifiable, Equatable {
     var createdAt: Date
     var liked: Bool
     var file: URL
+    var preparationGoal: String? = nil
+    var preparationKey: String? = nil
+    var citations: [NanoMuseFeedPreparation.Citation]? = nil
 
     var id: String { "\(day)/" + String(format: "%02d", index) }
 
@@ -77,8 +78,12 @@ struct NanoMusePost: Identifiable, Equatable {
         s += "title: \(Self.escape(title))\n"
         s += "type: \(type)\n"
         if !emoji.trimmingCharacters(in: .whitespaces).isEmpty { s += "emoji: \(emoji)\n" }
-        if !source.isEmpty { s += "source: \(source.map(Self.escape).joined(separator: "; "))\n" }
+        if let citations, let encoded = try? JSONEncoder().encode(citations) {
+            s += "citations: " + String(decoding: encoded, as: UTF8.self) + "\n"
+        } else if !source.isEmpty { s += "source: \(source.map(Self.escape).joined(separator: "; "))\n" }
         s += "created: \(Self.iso.string(from: createdAt))\n"
+        if let preparationGoal { s += "preparation-goal: \(Self.escape(preparationGoal))\n" }
+        if let preparationKey { s += "preparation-key: \(Self.escape(preparationKey))\n" }
         if liked { s += "liked: true\n" }
         s += "---\n\n"
         s += body.trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
@@ -93,9 +98,10 @@ struct NanoMusePost: Identifiable, Equatable {
         if title.isEmpty {
             title = body.split(separator: "\n", omittingEmptySubsequences: true).first.map { String($0).trimmingCharacters(in: CharacterSet(charactersIn: "# ")) } ?? ""
         }
-        let source = (meta["source"] ?? "").split(separator: ";").map { unescape(String($0)) }.filter { !$0.isEmpty }
+        let citations = meta["citations"].flatMap { try? JSONDecoder().decode([NanoMuseFeedPreparation.Citation].self, from: Data($0.utf8)) }
+        let source = citations?.map(\.display) ?? (meta["source"] ?? "").split(separator: ";").map { unescape(String($0)) }.filter { !$0.isEmpty }
         let type = (meta["type"] ?? "").isEmpty ? "note" : meta["type"]!
-        return NanoMusePost(day: day, index: index, title: title, type: type, emoji: meta["emoji"] ?? "", body: body.trimmingCharacters(in: .whitespacesAndNewlines), source: source, createdAt: created, liked: meta["liked"] == "true", file: file)
+        return NanoMusePost(day: day, index: index, title: title, type: type, emoji: meta["emoji"] ?? "", body: body.trimmingCharacters(in: .whitespacesAndNewlines), source: source, createdAt: created, liked: meta["liked"] == "true", file: file, preparationGoal: meta["preparation-goal"], preparationKey: meta["preparation-key"], citations: citations)
     }
 
     static func splitFrontMatter(_ text: String) -> ([String: String], String) {
@@ -118,6 +124,9 @@ struct NanoMusePost: Identifiable, Equatable {
         var emoji: String
         var body: String
         var source: [String]
+        var preparationGoal: String? = nil
+        var preparationKey: String? = nil
+        var citations: [NanoMuseFeedPreparation.Citation]? = nil
 
         init?(block o: [String: Any]) {
             let title = (o["title"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -146,6 +155,22 @@ final class NanoMuseFeedStore: ObservableObject {
     static let shared = NanoMuseFeedStore()
     static let maxPostsPerDay = 12
     static let keepDays = 30
+    private let seenKey = "nanomuse.feed.preparations.seen"
+
+    var seenPreparations: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: seenKey) ?? []).union(posts.compactMap(\.preparationKey))
+    }
+
+    /// A deleted card must stay dismissed even after a restore from its Markdown file.
+    /// Only fingerprints live in the account's defaults. Sign-out stashes or erases them.
+    func remember(_ key: String?) {
+        guard let key else { return }
+        var seen = UserDefaults.standard.stringArray(forKey: seenKey) ?? []
+        guard !seen.contains(key) else { return }
+        seen.append(key)
+        UserDefaults.standard.set(seen, forKey: seenKey)
+    }
+
 
     /// Newest day first, then by index.
     @Published private(set) var posts: [NanoMusePost] = []
@@ -202,6 +227,24 @@ final class NanoMuseFeedStore: ObservableObject {
         preferences = saved.isEmpty ? Self.defaultPreferences : saved
     }
 
+    func recentVisibleTitles(limit: Int) -> [String] {
+        var titles: [String] = []
+        for post in posts where canShow(post) {
+            titles.append(post.title)
+            if titles.count == limit { break }
+        }
+        return titles
+    }
+
+    func canShow(_ post: NanoMusePost) -> Bool {
+        guard post.preparationKey != nil else { return true }
+        let locks = SessionLockStore.shared
+        guard !locks.appIsLocked, NanoMuseFeedFlow.sessionId.map(locks.isLocked) != true else { return false }
+        guard let id = post.preparationGoal else { return true }
+        guard let goal = NanoMuseGoalStore.shared.goal(id: id) else { return false }
+        return !goal.usesProtectedSession(in: locks.lockedSessionIds)
+    }
+
     func savePreferences(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         try? (t + "\n").write(to: preferencesFile, atomically: true, encoding: .utf8)
@@ -216,6 +259,7 @@ final class NanoMuseFeedStore: ObservableObject {
     }
 
     func delete(_ post: NanoMusePost) {
+        remember(post.preparationKey)
         try? FileManager.default.removeItem(at: post.file)
         posts.removeAll { $0.file == post.file }
     }
@@ -232,9 +276,10 @@ final class NanoMuseFeedStore: ObservableObject {
         for d in drafts {
             if next > Self.maxPostsPerDay { break }
             let file = dir.appendingPathComponent(String(format: "%02d.md", next))
-            let post = NanoMusePost(day: day, index: next, title: String(d.title.prefix(80)), type: d.type, emoji: d.emoji, body: d.body, source: d.source, createdAt: now, liked: false, file: file)
+            let post = NanoMusePost(day: day, index: next, title: String(d.title.prefix(80)), type: d.type, emoji: d.emoji, body: d.body, source: d.source, createdAt: now, liked: false, file: file, preparationGoal: d.preparationGoal, preparationKey: d.preparationKey, citations: d.citations)
             do {
                 try post.serialize().write(to: file, atomically: true, encoding: .utf8)
+                remember(post.preparationKey)
                 written.append(post)
                 next += 1
             } catch {
@@ -357,7 +402,8 @@ enum NanoMuseFeedFlow {
 
     /// After every finished turn: `nanomuse-feed` blocks become posts.
     static func afterTurn(session: String, assistantText: String?) {
-        guard let text = assistantText, NanoMuseFences.contains(text, kind: block) else { return }
+        guard NanoMuseAccountData.shared.shows(session), !SessionLockStore.shared.appIsLocked, !SessionLockStore.shared.isLocked(session),
+              let text = assistantText, NanoMuseFences.contains(text, kind: block) else { return }
         let store = NanoMuseFeedStore.shared
         let today = store.posts.filter { $0.day == NanoMuseDay.key() }
         let drafts = NanoMuseFences.objects(block, in: text)
@@ -368,16 +414,20 @@ enum NanoMuseFeedFlow {
     }
 
     /// Appended to the system prompt of the feed's conversation (nil elsewhere).
-    static func systemAddendum(session: String) -> String? {
+    static func systemAddendum(session: String, memoryEnabled: Bool) -> String? {
         guard isFeedSession(session) else { return nil }
         let store = NanoMuseFeedStore.shared
-        let recent = store.posts.prefix(24).map(\.title)
+        let recent = memoryEnabled ? store.recentVisibleTitles(limit: 24) : []
         var s = "## This conversation writes the user's feed (nanoMuse)\n"
         s += "The Feed tab shows short posts you write for the user, like Muse's feed. The user's standing instruction for it:\n"
         s += "> " + store.preferences.replacingOccurrences(of: "\n", with: "\n> ") + "\n\n"
-        s += "What you know about them right now (from GLOBAL.md, the diary of the last seven days, USER.md and their goals):\n"
-        let d = digest()
-        s += (d.isEmpty ? "(nothing recorded yet; write a gentle first day: what the feed is for, and three things you could start tracking or preparing if they tell you a little about themselves)" : d) + "\n\n"
+        if memoryEnabled {
+            s += "What you know about them right now (from GLOBAL.md, the diary of the last seven days, USER.md and their goals):\n"
+            let d = digest()
+            s += (d.isEmpty ? "(nothing recorded yet; write a gentle first day: what the feed is for, and three things you could start tracking or preparing if they tell you a little about themselves)" : d) + "\n\n"
+        } else {
+            s += "Memory is off for this conversation. Use only what the user shares here.\n\n"
+        }
         s += "When a message asks you to write the feed: reply with one short line, then 3 to 6 posts, EACH as its own fenced code block tagged `nanomuse-feed` "
         s += "containing JSON {\"emoji\": \"one emoji\", \"title\": \"<= 30 characters\", \"type\": \"brief|reminder|idea|goal|memory|note\", "
         s += "\"body\": \"2 to 6 sentences or a short bullet list, Markdown allowed\", \"source\": [\"where it came from, e.g. GLOBAL.md, diary 2026-09-24, goal: <title>\"]}. "
@@ -436,9 +486,13 @@ struct NanoMuseFeedRoom: View {
     @State private var introShown = !NanoMuseFeedFlow.introAcknowledged
     @State private var detail: NanoMusePost?
 
+    @ObservedObject private var locks = SessionLockStore.shared
+    @ObservedObject private var goals = NanoMuseGoalStore.shared
+
+    private var visiblePosts: [NanoMusePost] { store.posts.filter { store.canShow($0) } }
     private var groupedDays: [String] {
         var seen: [String] = []
-        for p in store.posts where !seen.contains(p.day) { seen.append(p.day) }
+        for p in visiblePosts where !seen.contains(p.day) { seen.append(p.day) }
         return seen
     }
 
@@ -466,7 +520,7 @@ struct NanoMuseFeedRoom: View {
                     if introShown {
                         introCard
                     }
-                    if store.posts.isEmpty {
+                    if visiblePosts.isEmpty {
                         emptyState
                     } else {
                         ForEach(groupedDays, id: \.self) { day in
@@ -476,8 +530,8 @@ struct NanoMuseFeedRoom: View {
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 4)
                             }
-                            ForEach(store.posts.filter { $0.day == day }) { post in
-                                NanoMusePostCard(post: post, onDiscuss: { onDiscuss(post) }, onOpen: { detail = post })
+                            ForEach(visiblePosts.filter { $0.day == day }) { post in
+                                NanoMusePostCard(post: post, onDiscuss: { if store.canShow(post) { onDiscuss(post) } }, onOpen: { detail = post })
                             }
                         }
                     }
@@ -491,9 +545,15 @@ struct NanoMuseFeedRoom: View {
             store.reload()
             Task { @MainActor in await NanoMuseFeedFlow.ensureRoutine() }
         }
+        .nmOnChange(of: visiblePosts.map(\.id)) { ids in
+            if let post = detail, !ids.contains(post.id) { detail = nil }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .nanoMuseAccountSwitched)) { _ in detail = nil }
         .sheet(isPresented: $showSettings) { NanoMuseFeedSettingsSheet(onOpenSession: onOpenSession) }
         .sheet(item: $detail) { post in
-            NanoMusePostDetail(post: post, onDiscuss: { detail = nil; onDiscuss(post) })
+            if let current = visiblePosts.first(where: { $0.id == post.id && $0.createdAt == post.createdAt && $0.preparationKey == post.preparationKey }) {
+                NanoMusePostDetail(post: current, onDiscuss: { detail = nil; if store.canShow(current) { onDiscuss(current) } })
+            }
         }
     }
 
@@ -545,7 +605,7 @@ struct NanoMuseFeedRoom: View {
     private var emptyState: some View {
         let time = NanoMuseDay.clock(hour: NanoMuseFeedFlow.routine?.hour ?? NanoMuseFeedFlow.defaultHour, minute: NanoMuseFeedFlow.routine?.minute ?? NanoMuseFeedFlow.defaultMinute)
         staticCard("🖼️", AppLocalized("Nothing in the feed yet"),
-                   String(format: AppLocalized("As we get to know each other, new posts will show up here. Every day at %@ I read what I remember about you, your memory files, the last week of diary and your goals, and write a few short posts."), time))
+                   String(format: AppLocalized("After %@, the Feed checks goals and notes while the app is active. When two records connect, it can prepare a draft, a checklist or a question. Open the card to see both sources."), time))
         staticCard("📝", AppLocalized("Steer it with one sentence"),
                    AppLocalized("Tap the sliders at the top right to tell me what you want more of, switch the daily routine off, or have me write the first day now."))
         VStack(spacing: 8) {
@@ -616,6 +676,10 @@ struct NanoMusePostCard: View {
             NanoMuseInlineMarkdown(text: post.body)
                 .font(.subheadline)
                 .lineLimit(6)
+            if let citations = post.citations {
+                Label(citations.map(\.label).joined(separator: " · "), systemImage: "link")
+                    .lineLimit(2).font(.caption).foregroundStyle(.secondary)
+            }
             HStack(spacing: 14) {
                 Text(post.createdAt.formatted(date: .omitted, time: .shortened)).font(.caption).foregroundStyle(.tertiary)
                 Spacer()
@@ -677,7 +741,7 @@ struct NanoMusePostDetail: View {
                     Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 8) {
                         row(AppLocalized("Type"), NanoMusePost.typeLabel(post.type))
                         row(AppLocalized("Written"), post.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        if !post.source.isEmpty { row(AppLocalized("From"), post.source.joined(separator: " · ")) }
+                        if !post.source.isEmpty { row(AppLocalized("From"), post.source.joined(separator: "\n")) }
                         row(AppLocalized("File"), "nanomuse/feed/\(post.id).md")
                     }
                     .font(.footnote)
