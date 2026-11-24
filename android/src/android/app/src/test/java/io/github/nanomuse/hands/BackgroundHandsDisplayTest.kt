@@ -93,6 +93,16 @@ class BackgroundHandsDisplayTest {
         assertEquals(4, waits)
     }
 
+    @Test fun replacementMustStayStableAndAnyGapResetsItsGeometrySamples() {
+        val positions = listOf(10, 12, 13, 13, null, 13, 13, 13).iterator()
+        var waits = 0
+        val stable = awaitHandsObservation(8, { waits++ }, stableSamples = 3) {
+            positions.next() ?: throw HandsCaptureFailure.WindowPending()
+        }
+        assertEquals(13, stable)
+        assertEquals(7, waits)
+    }
+
     @Test fun aGapDuringCaptureDiscardsTheImageEvenWhenTheSameWindowComesBack() {
         var captures = 0
         val image = captureHandsWindow({ 7 }, {}) {

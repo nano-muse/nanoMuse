@@ -73,19 +73,29 @@ internal fun handsWindowOwnership(owners: List<CharSequence?>, pkg: String): Han
 }
 
 /** Wait only for a new observation. Every read must recheck the display, lock and owner. */
-internal fun <T> awaitHandsObservation(attempts: Int, pause: () -> Unit, read: () -> T): T {
-    var remaining = attempts
-    while (true) {
-        try { return read() } catch (pending: HandsCaptureFailure.WindowPending) {
-            if (--remaining <= 0) throw pending
-            pause()
+internal fun <T> awaitHandsObservation(attempts: Int, pause: () -> Unit, stableSamples: Int = 1, read: () -> T): T {
+    var prior: T? = null
+    var consecutive = 0
+    repeat(attempts) { index ->
+        try {
+            val next = read()
+            consecutive = if (consecutive > 0 && next == prior) consecutive + 1 else 1
+            if (consecutive >= stableSamples) return next
+            prior = next
+        } catch (_: HandsCaptureFailure.WindowPending) {
+            consecutive = 0
+            prior = null
         }
+        if (index + 1 < attempts) pause()
     }
+    throw HandsCaptureFailure.WindowPending()
 }
 
 /** A starting window can be replaced by an actual activity. Re-sample its successor only after
  * identifying it again. One window transition and one independent platform throttle are tolerated. */
-internal fun <W, T> captureHandsWindow(current: () -> W, waitForInterval: () -> Unit, capture: (W) -> T): T {
+internal fun <W, T> captureHandsWindow(
+    current: () -> W, waitForInterval: () -> Unit, afterChange: () -> W = current, capture: (W) -> T,
+): T {
     var window = current()
     var changed = false
     var waited = false
@@ -98,7 +108,7 @@ internal fun <W, T> captureHandsWindow(current: () -> W, waitForInterval: () -> 
                 waited = true
                 waitForInterval()
             }
-            val next = current()
+            val next = if (retry is HandsCaptureFailure.RateLimited) current() else afterChange()
             if (next != window || retry is HandsCaptureFailure.WindowPending) {
                 if (changed) throw HandsCaptureFailure.WindowChanged()
                 changed = true
@@ -188,8 +198,8 @@ internal class BackgroundHandsDisplay private constructor(
         throw failure
     }
 
-    private fun nextWindow(attempts: Int = 17): WindowFrame = try {
-        awaitHandsObservation(attempts, { Thread.sleep(75) }) {
+    private fun nextWindow(attempts: Int = 17, stableSamples: Int = 1): WindowFrame = try {
+        awaitHandsObservation(attempts, { Thread.sleep(75) }, stableSamples) {
             checkRunning()
             frameOf(targetWindows().first())
         }
@@ -224,6 +234,7 @@ internal class BackgroundHandsDisplay private constructor(
             return captureHandsWindow(
                 current = { nextWindow() },
                 waitForInterval = { Thread.sleep(CAPTURE_INTERVAL_MS) },
+                afterChange = { nextWindow(stableSamples = 3) },
             ) { target ->
                 val bitmap = capture(target.id, 5_000)
                 var output: Bitmap? = null
@@ -238,6 +249,9 @@ internal class BackgroundHandsDisplay private constructor(
                     if (output !== bitmap) bitmap.recycle()
                 }
             }
+        } catch (_: HandsCaptureFailure.WindowChanged) {
+            // A bounded recovery could not establish a stable target. Offer local handoff.
+            throw UnmappedWindow("Android continued to move or replace the background app window.")
         } finally {
             captureLock.unlock()
         }
