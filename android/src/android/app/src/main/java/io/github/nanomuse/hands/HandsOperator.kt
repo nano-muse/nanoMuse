@@ -23,6 +23,8 @@ import com.openminis.app.sandbox.PRootKernel
 import com.openminis.app.service.SessionActivityTracker
 import io.github.nanomuse.cloud.ClientEvents
 import io.github.nanomuse.cloud.Provenance
+import io.github.nanomuse.guard.AppAccess
+import io.github.nanomuse.guard.SessionAccess
 import io.github.nanomuse.guard.GateOutcome
 import io.github.nanomuse.guard.GuardKind
 import io.github.nanomuse.guard.RiskAssessment
@@ -32,7 +34,11 @@ import io.github.nanomuse.guard.RiskGate
 import io.github.nanomuse.guard.RiskRequest
 import io.github.nanomuse.guard.TapWords
 import io.github.nanomuse.status.KeepAwake
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.EmptyCoroutineContext
@@ -105,7 +111,7 @@ class HandsOperator(private val context: Context) {
     private fun canInspect(): Boolean {
         val ticket = owner ?: return false
         return !stop.get() && HandsReplayAccess.current(context, ticket) &&
-            eventSession?.let(io.github.nanomuse.guard.SessionAccess::isLocked) != true &&
+            eventSession?.let(SessionAccess::isLocked) != true &&
             !context.getSystemService(KeyguardManager::class.java).isDeviceLocked &&
             Hands.enabled(context) && Hands.backgroundScreen(context) && Settings.canDrawOverlays(context)
     }
@@ -196,6 +202,7 @@ class HandsOperator(private val context: Context) {
             }
         }
         var listening = false
+        var accessMonitor: Job? = null
         try {
             val svc = MinisAccessibilityService.getInstance()
                 ?: return finish(Outcome.Failed("the accessibility service is not running"), steps, runId, lastScreen, traceDir, log, model?.label)
@@ -212,6 +219,13 @@ class HandsOperator(private val context: Context) {
                 androidx.core.content.ContextCompat.registerReceiver(context, screenOff,
                     IntentFilter(Intent.ACTION_SCREEN_OFF), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
                 listening = true
+                // Revoke while a model request or approval is waiting. Coming back to the
+                // same account later cannot revive that run or its last visible frame.
+                accessMonitor = CoroutineScope(Dispatchers.Main.immediate).launch {
+                    combine(AppAccess.locked, SessionAccess.revision, HandsReplayAccess.changes) { appLocked, _, _ ->
+                        appLocked || !canInspect()
+                    }.collect { if (it) requestStop("The screen or account was locked or changed.") }
+                }
                 capsule.previewAllowed = ::canInspect
                 capsule.togglePause = {
                     inspection.toggle().also { paused -> if (paused) inFlightDecision.get()?.cancel() }
@@ -520,6 +534,7 @@ class HandsOperator(private val context: Context) {
             AppLogger.warning(TAG, "run failed: ${t.javaClass.simpleName} ${t.message}")
             return finish(Outcome.Failed("${t.javaClass.simpleName}: ${t.message}"), steps, runId, lastScreen, traceDir, log, model?.label)
         } finally {
+            accessMonitor?.cancel()
             if (listening) runCatching { context.unregisterReceiver(screenOff) }
             backgroundModelJob?.cancel()
             if (::display.isInitialized) runCatching { display.close() }.onFailure { AppLogger.warning(TAG, "closing background display: ${it.message}") }
