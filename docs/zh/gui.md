@@ -287,3 +287,5 @@ Linux 操作器仅支持 **X11（Xorg）**。实际坐标是 X 根窗口像素�
 - Android 执行器需要 Android 11+。`FLAG_SECURE` 保护的银行 App、支付页或密码管理器会返回黑图，并明确告知操作器。无论 label 如何，Android 执行器都不向密码框 `type`。系统可能拒绝后台 `open_app`，此时执行器会说明并让用户按主屏键、点击图标；Android 14 前，「显示在其他应用上层」权限可改善该情况。输入框允许时使用 `ACTION_SET_TEXT`，否则通过剪贴板粘贴。
 
 Android 还会在同一对话、同一已识别 App 的后续明确请求之间保留有限记录，支持可选的更大幅度纵向滚动，并保留完整 JSON 结果，见[继续操作屏幕](android.md#hands-continuity)。
+
+Android 的 `nanomuse-hands status` 会分别报告后台屏连接状态 `background_bridge_ready` 和可选服务 Shizuku 的状态 `shizuku_ready`。只使用内置无线调试连接，前者也可以为真。若之前配对过且其他条件都满足，`can_start` 会允许新任务尝试重连。查询状态本身不会发起连接。详见[后台独立屏幕](android.md#hands-background-screen)。
