@@ -65,7 +65,7 @@ internal class WirelessDisplayStream private constructor(private val socket: SSL
                 if (upgrade?.command != AdbMessage.STLS) throw IOException("This port does not offer wireless debugging TLS")
                 out.write(AdbMessage(AdbMessage.STLS, AdbMessage.STLS_VERSION, 0).encode())
                 out.flush()
-                val ssl = tls.wrap(plain, target, client = true)
+                val ssl = tls.wrap(plain, target)
                 return WirelessDisplayStream(ssl).also { it.start(activation) }
             } catch (cause: Throwable) {
                 plain.close()

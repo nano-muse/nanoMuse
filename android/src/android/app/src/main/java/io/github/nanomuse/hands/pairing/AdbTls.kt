@@ -6,7 +6,6 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.Principal
 import java.security.PrivateKey
-import java.security.Provider
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLEngine
@@ -26,16 +25,16 @@ internal fun interface KeyingMaterialExporter {
 internal class AdbTls(
     val identity: AdbIdentity,
     private val exporter: KeyingMaterialExporter,
-    private val provider: Provider? = null,
 ) {
     val context: SSLContext by lazy {
-        val ctx = if (provider == null) SSLContext.getInstance("TLS") else SSLContext.getInstance("TLS", provider)
+        val ctx = SSLContext.getInstance("TLS")
         ctx.init(arrayOf(FixedKeyManager(identity.privateKey, identity.certificate)), arrayOf(TrustAll), null)
         ctx
     }
 
     /** 用调用方已核对的 [target] 新建 TCP 连接并完成 TLS 握手;不重新解析主机名。 */
     fun connect(target: InetSocketAddress, timeoutMs: Int): SSLSocket {
+        require(target.address?.isLoopbackAddress == true)
         val plain = Socket()
         try {
             plain.tcpNoDelay = true
@@ -45,17 +44,18 @@ internal class AdbTls(
             plain.close()
             throw e
         }
-        return wrap(plain, target, client = true)
+        return wrap(plain, target)
     }
 
-    /** 在已有连接上做 TLS 握手;[client] = false 只给测试里的假服务端用。 */
-    fun wrap(plain: Socket, target: InetSocketAddress, client: Boolean): SSLSocket {
+    /** adbd uses a self-signed certificate. Restrict both the requested and actual peer to
+     * loopback. The system code authenticates pairing; the shell UID and ticket bind the helper. */
+    fun wrap(plain: Socket, target: InetSocketAddress): SSLSocket {
+        require(plain.inetAddress?.isLoopbackAddress == true && target.address?.isLoopbackAddress == true)
         val host = target.address?.hostAddress ?: throw IllegalArgumentException("ADB address must be resolved")
         val s = context.socketFactory.createSocket(plain, host, target.port, true) as SSLSocket
         try {
             s.enabledProtocols = arrayOf("TLSv1.3")
-            s.useClientMode = client
-            if (!client) s.needClientAuth = true
+            s.useClientMode = true
             s.startHandshake()
         } catch (e: Exception) {
             s.close()
