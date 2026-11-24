@@ -249,7 +249,7 @@ class HandsOperator(private val context: Context) {
             var modelErrors = 0
             var windowChanges = 0
             // the same action on an unchanged screen: a note at the third, a stop at the sixth
-            val watch = HandsLoopWatch()
+            var watch = HandsLoopWatch()
             var loopNote: String? = null
 
             // The app the caller named comes first, before the model looks.
@@ -410,6 +410,19 @@ class HandsOperator(private val context: Context) {
                     HandsLoopWatch.Verdict.FINE -> loopNote = null
                 }
 
+                // An approval can arrive after the user paused and resumed the run.
+                // Reobserve before admitting an input based on that earlier frame.
+                fun approvalStillCurrent(): Boolean {
+                    checkRunning()
+                    if (!background || inspection.current(checkNotNull(observation))) return true
+                    turns.removeAt(turns.lastIndex)
+                    steps--
+                    watch = HandsLoopWatch()
+                    loopNote = null
+                    log += "Paused while awaiting approval. No input was sent."
+                    return false
+                }
+
                 // ── act ──
                 when (action) {
                     is HandsAction.Status -> {
@@ -449,7 +462,7 @@ class HandsOperator(private val context: Context) {
                         // A remembered approval, or a payment that ran on one: the chat model
                         // sees it in the log and tells the user where it lives.
                         gate.notice?.let { log += it }
-                        checkRunning()
+                        if (!approvalStillCurrent()) continue
                         val ok = tapAction(svc, action, px, py, onScreen)
                         lastResult = if (ok) "${action.describe()} at ($px, $py) was performed." else "the gesture at ($px, $py) was rejected by the system; try again or another way."
                         Thread.sleep(TAP_SETTLE_MS)
@@ -491,7 +504,7 @@ class HandsOperator(private val context: Context) {
                             return finish(Outcome.Infeasible("the user did not allow sending with Enter — ${gate.denied}"), steps, runId, lastScreen, traceDir, log, model.label)
                         }
                         gate.notice?.let { log += it }
-                        checkRunning()
+                        if (!approvalStillCurrent()) continue
                         capsule.stage?.say(fxLabel(action))
                         lastResult = if (background && focusedField(svc) != field) {
                             "the focused field changed; look at the screen again before submitting."
