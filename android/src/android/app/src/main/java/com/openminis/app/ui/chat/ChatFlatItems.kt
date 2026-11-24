@@ -443,6 +443,12 @@ internal sealed class FlatChatItem {
         override val contentType = "info"
     }
 
+    // nanoMuse: a saved result remains reachable even when intermediate tool calls are hidden.
+    data class HandsReplay(val messageId: String, val runId: String) : FlatChatItem() {
+        override val key = "nm_hands_replay:$messageId:$runId"
+        override val contentType = "nm_hands_replay"
+    }
+
     // nanoMuse: the first-conversation name chooser; rendered by
     // io.github.nanomuse.ui.onboarding.NamingCard from the view model's state.
     data class NanoMuseNaming(val messageId: String) : FlatChatItem() {
@@ -596,6 +602,7 @@ internal fun buildFlatChatItems(
             is FlatChatItem.AssistantThinking -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantToolUse -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantInfo -> item.copy(messageId = "${item.messageId}#$n")
+            is FlatChatItem.HandsReplay -> item.copy(messageId = "${item.messageId}#$n") // nanoMuse
             is FlatChatItem.NanoMuseNaming -> item.copy(messageId = "${item.messageId}#$n") // nanoMuse
             is FlatChatItem.NanoMuseAvatarOptions -> item.copy(messageId = "${item.messageId}#$n") // nanoMuse
             is FlatChatItem.NanoMuseAvatarShare -> item.copy(messageId = "${item.messageId}#$n") // nanoMuse
@@ -658,12 +665,14 @@ internal fun buildFlatChatItems(
         // it; leave the whole turn out (its steps are still in the history).
         // The look-back below skips such turns too, so the reply that
         // follows one keeps its header.
-        if (!showSteps && message.role != "system" && stepsOnlyTurn(message)) continue
+        val onlyHiddenSteps = !showSteps && !isSystem && stepsOnlyTurn(message)
+        // nanoMuse: a replay in a tool-only turn stands on its own, without an empty assistant header.
+        if (onlyHiddenSteps && message.toolBlocks.none { it.handsRunId != null }) continue
         val prevNonSystem = (idx - 1 downTo 0).asSequence()
             .map { messages[it] }
             .firstOrNull { it.role != "system" && (showSteps || !stepsOnlyTurn(it)) }
         val isResumeContinuation = prevNonSystem?.role == "assistant"
-        if (!isSystem && !isResumeContinuation) {
+        if (!isSystem && !isResumeContinuation && !onlyHiddenSteps) {
             out.add(dedupe(FlatChatItem.AssistantHeader(message.id)))
         }
 
@@ -724,6 +733,8 @@ internal fun buildFlatChatItems(
                     isLastCancelled = block.id == lastCancelledToolId,
                 )))
             }
+            // nanoMuse: the native receipt belongs to this tool result. Never derive links from assistant text.
+            block.handsRunId?.let { out.add(dedupe(FlatChatItem.HandsReplay(message.id, it))) }
         }
 
         // Typing indicator: show while streaming and either (a) no visible

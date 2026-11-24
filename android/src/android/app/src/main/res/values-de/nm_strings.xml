@@ -535,6 +535,9 @@
     <string name="nm_hands_preview_hide">Zuklappen</string>
     <string name="nm_hands_preview_pause">Pausieren</string>
     <string name="nm_hands_preview_resume">Fortsetzen</string>
+    <string name="nm_hands_handoff_phone">Am Handy übernehmen</string>
+    <string name="nm_hands_handoff_unavailable">Die ursprüngliche Seite konnte nicht auf das Handy wechseln. Öffne die App, um fortzufahren.</string>
+    <string name="nm_hands_handed_over">Die App ist jetzt auf deinem Handy zu sehen. Du kannst an dieser Stelle weitermachen.</string>
     <string name="nm_hands_preview_wait">Warte auf den Hintergrundbildschirm</string>
     <string name="nm_hands_background_screen">Hintergrundbildschirm</string>
     <string name="nm_hands_background_detail">Der Assistent bedient eine kompatible App auf einem separaten Bildschirm, während du dein Handy weiter nutzt. Sobald du übernehmen musst, endet die Aufgabe.</string>
@@ -1332,4 +1335,5 @@
     <string name="nm_hands_replay_pause">Pause</string>
     <string name="nm_hands_replay_type">Text eingeben</string>
     <string name="nm_hands_replay_observed">Bildschirm betrachtet</string>
+    <string name="nm_hands_replay_open">Bildschirmaktionen ansehen</string>
 </resources>

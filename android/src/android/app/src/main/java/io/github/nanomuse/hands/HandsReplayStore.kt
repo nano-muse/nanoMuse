@@ -52,6 +52,17 @@ internal object HandsReplayStore {
         HandsReplay.record(run.id, data, images, result).takeIf { eligible(ctx, ticket, run.session) }
     }
 
+    suspend fun hasRecording(ctx: Context, ticket: HandsReplayAccess.Ticket, run: HandsReplay.Run): Boolean = withContext(Dispatchers.IO) {
+        if (!eligible(ctx, ticket, run.session)) return@withContext false
+        val dir = HandsReplay.runDir(ctx.filesDir.canonicalFile, run) ?: return@withContext false
+        val available = runCatching {
+            read(dir.resolve("trace.jsonl"), 1, allowPrefix = true) != null || HandsReplay.screenshots(dir).any {
+                read(dir.resolve("step-$it.jpg"), 1, allowPrefix = true) != null
+            }
+        }.getOrDefault(false)
+        available && visible(ctx, ticket, run.session)
+    }
+
     suspend fun screenshot(ctx: Context, ticket: HandsReplayAccess.Ticket, run: HandsReplay.Run, frame: HandsReplay.Frame): Bitmap? =
         withContext(Dispatchers.IO) {
             if (!frame.screen || !eligible(ctx, ticket, run.session)) return@withContext null

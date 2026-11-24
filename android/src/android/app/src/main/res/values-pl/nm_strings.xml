@@ -541,6 +541,9 @@
     <string name="nm_hands_preview_hide">Ukryj</string>
     <string name="nm_hands_preview_pause">Wstrzymaj</string>
     <string name="nm_hands_preview_resume">Wznów</string>
+    <string name="nm_hands_handoff_phone">Przejmij na telefonie</string>
+    <string name="nm_hands_handoff_unavailable">Nie udało się przenieść strony na ekran telefonu. Otwórz aplikację, aby kontynuować.</string>
+    <string name="nm_hands_handed_over">Aplikacja jest na ekranie telefonu. Możesz kontynuować od tego kroku.</string>
     <string name="nm_hands_preview_wait">Oczekiwanie na ekran w tle</string>
     <string name="nm_hands_background_screen">Ekran w tle</string>
     <string name="nm_hands_background_detail">Asystent obsługuje jedną zgodną aplikację na osobnym ekranie, a Ty możesz nadal korzystać z telefonu. Zadanie kończy się, gdy musisz przejąć sterowanie.</string>
@@ -1340,4 +1343,5 @@
     <string name="nm_hands_replay_pause">Wstrzymaj</string>
     <string name="nm_hands_replay_type">Wpisz tekst</string>
     <string name="nm_hands_replay_observed">Sprawdzono ekran</string>
+    <string name="nm_hands_replay_open">Obejrzyj przebieg działań na ekranie</string>
 </resources>

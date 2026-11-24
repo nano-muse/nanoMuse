@@ -21,8 +21,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object HandsDisplayHost {
     private val inUse = AtomicBoolean()
 
-    class Handle internal constructor(val display: Display, val userId: Int, private val release: () -> Unit) : AutoCloseable {
+    class Handle internal constructor(val display: Display, val userId: Int, private val service: IHandsDisplay, private val release: () -> Unit) : AutoCloseable {
         private val closed = AtomicBoolean()
+        fun rememberTask(pkg: String) = !closed.get() && runCatching { service.rememberTask(pkg) }.getOrDefault(false)
+        fun handOffToPhone() = !closed.get() && runCatching { service.handOffToPhone() }.getOrDefault(false)
         override fun close() {
             if (closed.compareAndSet(false, true)) release()
         }
@@ -36,7 +38,7 @@ internal object HandsDisplayHost {
         // A binder timeout from a previous run must never tear down the next run's screen.
         val tag = "nanomuse-hands-display-" + UUID.randomUUID()
         val args = Shizuku.UserServiceArgs(ComponentName(context, HandsDisplayUserService::class.java))
-            .tag(tag).version(2).daemon(false).processNameSuffix("hands_display")
+            .tag(tag).version(3).daemon(false).processNameSuffix("hands_display")
         val connected = CountDownLatch(1)
         val connection = object : ServiceConnection {
             @Volatile var remote: IHandsDisplay? = null
@@ -69,7 +71,7 @@ internal object HandsDisplayHost {
             check(id > Display.DEFAULT_DISPLAY) { "Android did not allocate a separate screen." }
             val display = checkNotNull(context.getSystemService(DisplayManager::class.java).getDisplay(id))
             check(display.isValid) { "The background display was removed." }
-            return Handle(display, session[1], ::release)
+            return Handle(display, session[1], remote, ::release)
         } catch (failure: Throwable) {
             runCatching { release() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure

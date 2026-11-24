@@ -532,6 +532,9 @@
     <string name="nm_hands_preview_hide">Tutup</string>
     <string name="nm_hands_preview_pause">Jeda</string>
     <string name="nm_hands_preview_resume">Sambung</string>
+    <string name="nm_hands_handoff_phone">Ambil alih di telefon</string>
+    <string name="nm_hands_handoff_unavailable">Halaman asal tidak dapat dialihkan ke skrin telefon. Buka aplikasi untuk meneruskan.</string>
+    <string name="nm_hands_handed_over">Aplikasi kini berada pada skrin telefon. Anda boleh meneruskan langkah ini.</string>
     <string name="nm_hands_preview_wait">Menunggu skrin latar belakang</string>
     <string name="nm_hands_background_screen">Skrin latar belakang</string>
     <string name="nm_hands_background_detail">Pembantu menggunakan satu aplikasi yang serasi pada skrin berasingan semasa anda terus menggunakan telefon. Tugas berhenti jika anda perlu mengambil alih.</string>
@@ -1328,4 +1331,5 @@
     <string name="nm_hands_replay_pause">Jeda</string>
     <string name="nm_hands_replay_type">Masukkan teks</string>
     <string name="nm_hands_replay_observed">Skrin diperiksa</string>
+    <string name="nm_hands_replay_open">Lihat ulang tayang tindakan skrin</string>
 </resources>

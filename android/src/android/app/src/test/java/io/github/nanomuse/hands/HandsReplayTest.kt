@@ -12,6 +12,20 @@ class HandsReplayTest {
             .put("reply", "Thought: private reasoning\nAction: $action").put("result", result).put("screen", target).toString()
     private fun lines(vararg values: String): ByteArray = (values.joinToString("\n") + "\n").toByteArray()
 
+    @Test fun onlyHandsToolReceiptsForCanonicalSavedRunsBecomeReplayEntries() {
+        val args = JSONObject().put("command", "nanomuse-hands run --task 'check the screen'").toString()
+        fun body(run: String, trace: String?) = JSONObject().put("run_id", run).put("trace", trace ?: JSONObject.NULL).toString()
+        val path = "/var/minis/attachments/hands/$id/trace.jsonl"
+        assertEquals(id, HandsReplay.receiptId("shell_execute", args, body(id, path) + "\n (exit code 4)"))
+        assertNull(HandsReplay.receiptId("file_read", args, body(id, path)))
+        assertNull(HandsReplay.receiptId("shell_execute", """{"command":"ls"}""", body(id, path)))
+        assertNull(HandsReplay.receiptId("shell_execute", """{"command":"echo 'nanomuse-hands run --task test'"}""", body(id, path)))
+        assertEquals(id, HandsReplay.receiptId("shell_execute", """{"command":"cd /tmp && timeout 30 /usr/bin/nanomuse-hands run --task 'look'"}""", body(id, path)))
+        assertNull(HandsReplay.receiptId("shell_execute", args, body(id, null)))
+        assertNull(HandsReplay.receiptId("shell_execute", args, body(id, "/tmp/trace.jsonl")))
+        assertNull(HandsReplay.receiptId("shell_execute", args, body("../other", path)))
+    }
+
     @Test fun legacyCaptureAndSwipeKeepGridCoordinatesInStepOrder() {
         val a = row(9, """{"action_type":"swipe","start_coordinate":[200,400],"end_coordinate":[700,300]}""")
         val b = row(2, """{"action_type":"click","coordinate":[300,550],"target":"OK"}""")

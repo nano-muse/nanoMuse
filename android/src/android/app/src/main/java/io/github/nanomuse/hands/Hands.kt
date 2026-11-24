@@ -252,7 +252,7 @@ object Hands {
                 append("The screen is available: `nanomuse-hands run --task \"<one clear task, with every detail the hands need>\" $appArgument` ")
                 append("(screen model: ${r.model?.label}). It looks at screenshots — never the accessibility tree — and taps, types and swipes; a capsule with Stop shows the user what it does. ")
                 if (r.backgroundScreen) {
-                    append("Background screen is selected. Use an exact package name or a unique installed app label from `nanomuse-hands apps`. Stay in that app and never go Home. If the user needs to take over, the run ends. Never switch to the main screen or ask for a password, code or card number. ")
+                    append("Background screen is selected. Use an exact package name or a unique installed app label from `nanomuse-hands apps`. Stay in that app and never go Home. If the user needs to act in the app, they can take over the open task using the capsule. Relay the needs_user result and wait. Never switch to the main screen or ask for a password, code or card number. ")
                 } else {
                     append("It never types passwords, codes or card numbers: for a login or a code it hands the phone to the user and waits. ")
                 }

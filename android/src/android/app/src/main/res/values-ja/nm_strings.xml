@@ -532,6 +532,9 @@
     <string name="nm_hands_preview_hide">閉じる</string>
     <string name="nm_hands_preview_pause">一時停止</string>
     <string name="nm_hands_preview_resume">再開</string>
+    <string name="nm_hands_handoff_phone">スマートフォンで引き継ぐ</string>
+    <string name="nm_hands_handoff_unavailable">元のページをスマートフォンの画面に移せませんでした。アプリを開いて続けてください。</string>
+    <string name="nm_hands_handed_over">アプリをスマートフォンの画面に移しました。この手順から続けられます。</string>
     <string name="nm_hands_preview_wait">バックグラウンド画面を待っています</string>
     <string name="nm_hands_background_screen">バックグラウンド画面</string>
     <string name="nm_hands_background_detail">スマートフォンを使いながら、別の画面でアシスタントに対応アプリを1つ操作させます。ご自身の操作が必要になるとタスクを終了します。</string>
@@ -1328,4 +1331,5 @@
     <string name="nm_hands_replay_pause">一時停止</string>
     <string name="nm_hands_replay_type">文字を入力</string>
     <string name="nm_hands_replay_observed">画面を確認</string>
+    <string name="nm_hands_replay_open">画面操作を再生</string>
 </resources>

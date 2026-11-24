@@ -522,6 +522,9 @@
     <string name="nm_hands_preview_hide">收起</string>
     <string name="nm_hands_preview_pause">暂停</string>
     <string name="nm_hands_preview_resume">继续</string>
+    <string name="nm_hands_handoff_phone">在手机上接手</string>
+    <string name="nm_hands_handoff_unavailable">原来的页面未能切到主屏。请打开应用继续。</string>
+    <string name="nm_hands_handed_over">应用已切到手机主屏，你可以从当前这一步继续。</string>
     <string name="nm_hands_preview_wait">正在等候后台画面</string>
     <string name="nm_hands_background_screen">后台独立屏幕</string>
     <string name="nm_hands_background_detail">让助手在独立屏幕上操作一个兼容的应用，你可以继续使用手机。需要你接手时，任务会停止。</string>
@@ -1305,4 +1308,5 @@
     <string name="nm_hands_replay_pause">暂停</string>
     <string name="nm_hands_replay_type">输入文字</string>
     <string name="nm_hands_replay_observed">查看屏幕</string>
+    <string name="nm_hands_replay_open">查看操作回放</string>
 </resources>

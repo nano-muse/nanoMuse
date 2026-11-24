@@ -171,8 +171,14 @@ class BackgroundHandsDisplayInstrumentedTest {
                 lastMovement = SystemClock.uptimeMillis()
             }
             if (geometry == null || SystemClock.uptimeMillis() - lastMovement < 300) return@until false
-            session.screenshot().recycle()
-            true
+            try {
+                session.screenshot().recycle()
+                session.roots().single().findAccessibilityNodeInfosByText(label).isNotEmpty()
+            } catch (_: HandsCaptureFailure.WindowChanged) {
+                false
+            } catch (_: HandsCaptureFailure.WindowPending) {
+                false
+            }
         }
     }
 
@@ -215,15 +221,143 @@ class BackgroundHandsDisplayInstrumentedTest {
         }
     }
 
-    @Test fun shadowInsetsWithoutAnExactMappingBlockModelPreviewAndInput() {
+    @Test fun raisedDialogUsesWindowPixelsAndClickCoordinatesAfterMoving() {
         BackgroundHandsDisplay.open(context, service, fixture).use { session ->
             observeFixture(session, "Raised window")
-            val button = session.roots().single().findAccessibilityNodeInfosByText("Raised window").single()
-            assertTrue(button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
-            assertThrows(BackgroundHandsDisplay.UnmappedWindow::class.java) { observeFixture(session, "Move dialog") }
+            assertTrue(session.roots().single().findAccessibilityNodeInfosByText("Raised window").single()
+                .performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            observeFixture(session, "Move dialog")
+            fun control(label: String) = Rect().also {
+                session.roots().single().findAccessibilityNodeInfosByText(label).single().getBoundsInScreen(it)
+            }
+            val move = control("Move dialog")
+            val form = control("Change form")
+            val image = session.screenshot()
+            val imageWidth = image.width
+            val imageHeight = image.height
+            try {
+                assertEquals(Color.BLACK, image.getPixel(2, 2))
+                assertEquals(Color.RED, image.getPixel(move.left + 12, move.centerY()))
+                assertEquals(Color.CYAN, image.getPixel(form.right - 12, form.centerY()))
+            } finally { image.recycle() }
+            until("The raised dialog was not correctly mapped in preview.") {
+                val thumb = session.preview() ?: return@until false
+                try { thumb.getPixel((form.right - 12) * thumb.width / imageWidth,
+                    form.centerY() * thumb.height / imageHeight) == Color.CYAN } finally { thumb.recycle() }
+            }
+            assertTrue(session.tap(move.centerX(), move.centerY(), 60))
+            until("Tapping the mapped control did not move the window.") { !session.stillObserved() }
+            observeFixture(session, "Change form")
+            val moved = control("Change form")
+            assertTrue(moved.left > form.left)
+            assertTrue(session.tap(moved.right - 12, moved.centerY(), 60))
+            until("The edge tap did not show the protected field.") {
+                val all = service.windowsOnAllDisplays
+                (0 until all.size()).asSequence().filter { all.keyAt(it) != Display.DEFAULT_DISPLAY }
+                    .flatMap { all.valueAt(it).asSequence() }.any { win ->
+                        val root = win.root?.takeIf { it.packageName == pkg } ?: return@any false
+                        fun secret(node: AccessibilityNodeInfo): Boolean = node.isPassword ||
+                            (0 until node.childCount).any { node.getChild(it)?.let(::secret) == true }
+                        secret(root)
+                    }
+            }
+            assertThrows(BackgroundHandsDisplay.ProtectedScreen::class.java) { session.tap(moved.centerX(), moved.centerY(), 60) }
+            assertNull(session.preview())
+            assertThrows(BackgroundHandsDisplay.ProtectedScreen::class.java) { session.screenshot() }
+            assertThrows(IllegalStateException::class.java) { session.back() }
+        }
+    }
+
+    @Test fun systemAlertWithOrdinaryTextAndButtonsCanBeOperated() {
+        BackgroundHandsDisplay.open(context, service, fixture).use { session ->
+            observeFixture(session, "Standard alert")
+            assertTrue(session.roots().single().findAccessibilityNodeInfosByText("Standard alert").single()
+                .performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            observeFixture(session, "Review draft")
+            val read = session.roots().single().findAccessibilityNodeInfosByText("Read draft").single()
+            val button = Rect().also { read.getBoundsInScreen(it) }
+            assertTrue(session.tap(button.centerX(), button.centerY(), 60))
+            observeFixture(session, "Draft opened")
+        }
+    }
+
+    @Test fun ambiguousFlatRaisedWindowBlocksModelPreviewAndInput() {
+        BackgroundHandsDisplay.open(context, service, fixture).use { session ->
+            observeFixture(session, "Flat window")
+            assertTrue(session.roots().single().findAccessibilityNodeInfosByText("Flat window").single()
+                .performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            assertThrows(BackgroundHandsDisplay.UnmappedWindow::class.java) { observeFixture(session, "Flat surface") }
             SystemClock.sleep(600)
             assertNull(session.preview())
             assertThrows(IllegalStateException::class.java) { session.back() }
+        }
+    }
+
+    @Test fun handoffRefusesASecondTaskFromTheSameApp() {
+        val displays = context.getSystemService(DisplayManager::class.java)
+        val before = displays.displays.map { it.displayId }.toSet()
+        BackgroundHandsDisplay.open(context, service, fixture).use { session ->
+            observeFixture(session, "Moving window")
+            val original = session.roots().single().findAccessibilityNodeInfosByText("Fixture task").single()
+                .contentDescription.toString()
+            val owned = (displays.displays.map { it.displayId }.toSet() - before).single()
+            val launch = "am start -W --display $owned -f 0x18000000 -n $pkg/io.github.nanomuse.hands.HandsDisplayFixture"
+            ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(launch)).bufferedReader().use { it.readText() }
+            until("The second task did not become visible.") {
+                service.windowsOnAllDisplays[owned].orEmpty().any { window ->
+                    window.root?.findAccessibilityNodeInfosByText("Fixture task").orEmpty()
+                        .any { node -> node.contentDescription?.toString()?.let { it != original } == true }
+                }
+            }
+            assertFalse(session.handOffToPhone())
+            assertFalse(pkg in primaryApps())
+        }
+        until("The secondary display was not removed.") { before == displays.displays.map { it.displayId }.toSet() }
+    }
+
+    @Test fun handoffMovesTheOriginalTaskAndReleasesTheSecondaryDisplay() {
+        val displays = context.getSystemService(DisplayManager::class.java)
+        val before = displays.displays.map { it.displayId }.toSet()
+        BackgroundHandsDisplay.open(context, service, fixture).use { session ->
+            observeFixture(session, "Moving window")
+            val marker = session.roots().single().findAccessibilityNodeInfosByText("Fixture task").single()
+                .contentDescription.toString()
+            assertTrue(marker.matches(Regex("Fixture task [0-9]+")))
+            assertFalse(pkg in primaryApps())
+            assertTrue("Expected the isolated task to be eligible for handoff", session.canHandOff)
+            assertTrue(session.handOffToPhone())
+            assertFalse(session.handOffToPhone())
+            try {
+                until("The original task did not arrive on the main screen.") {
+                    service.windowsOnAllDisplays[Display.DEFAULT_DISPLAY].orEmpty().any {
+                        it.root?.let { root -> root.packageName == pkg &&
+                            root.findAccessibilityNodeInfosByText(marker).any { node -> node.contentDescription == marker } } == true
+                    }
+                }
+                assertThrows(IllegalStateException::class.java) { session.tap(10, 10, 60) }
+            } finally {
+                if (pkg in primaryApps()) {
+                    automation.executeShellCommand("input -d 0 keyevent KEYCODE_BACK").close()
+                    until("The handed-off fixture did not close.") { pkg !in primaryApps() }
+                }
+            }
+        }
+        until("The secondary display survived its handoff.") { before == displays.displays.map { it.displayId }.toSet() }
+    }
+
+    @Test fun enteringAnotherActivityRequiresAndAllowsAFreshObservation() {
+        BackgroundHandsDisplay.open(context, service, fixture).use { session ->
+            observeFixture(session, "Next page")
+            val next = session.roots().single().findAccessibilityNodeInfosByText("Next page").single()
+            val button = Rect().also { next.getBoundsInScreen(it) }
+            assertTrue(session.tap(button.centerX(), button.centerY(), 60))
+            until("The old activity remained authorized.") { !session.stillObserved() }
+            assertThrows(IllegalStateException::class.java) { session.tap(button.centerX(), button.centerY(), 60) }
+            session.screenshot().recycle()
+            observeFixture(session, "Second activity")
+            val detail = session.screenshot()
+            try { assertEquals(Color.MAGENTA, detail.getPixel(detail.width / 2, detail.height / 2)) }
+            finally { detail.recycle() }
         }
     }
 

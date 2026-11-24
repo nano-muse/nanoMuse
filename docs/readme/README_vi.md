@@ -195,7 +195,7 @@ nanoMuse được xây trên công sức của người khác; điều khoản �
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): trợ lý chạy ngay trên thiết bị, là nền của ứng dụng điện thoại, với [proot](https://github.com/nano-muse/proot) và [Alpine Linux](https://alpinelinux.org/) làm hộp cát.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): harness mà ứng dụng máy tính là một plugin.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): bộ điều khiển đôi tay trên máy tính được chuyển từ mã của họ, và các điểm đánh dấu trên sân khấu theo ScreenMarker của họ.
-- [Mika](https://github.com/wangzan101/Mika) của wangzan101 đã gợi ý cho chúng tôi cách dùng màn hình Android riêng, xem trực tiếp và phát lại các bước thao tác.
+- [Mika](https://github.com/wangzan101/Mika) của wangzan101 đã gợi ý cho chúng tôi cách dùng màn hình Android riêng, xem trực tiếp, chuyển quyền thao tác cho người dùng và phát lại các bước.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): bộ điều khiển điện thoại, dấu vết và ý tưởng sản phẩm.
 
 ## Tuyên bố

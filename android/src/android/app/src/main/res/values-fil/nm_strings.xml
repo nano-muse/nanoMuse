@@ -535,6 +535,9 @@
     <string name="nm_hands_preview_hide">Itago</string>
     <string name="nm_hands_preview_pause">I-pause</string>
     <string name="nm_hands_preview_resume">Ituloy</string>
+    <string name="nm_hands_handoff_phone">Ituloy sa telepono</string>
+    <string name="nm_hands_handoff_unavailable">Hindi nailipat ang dating pahina sa screen ng telepono. Buksan ang app para magpatuloy.</string>
+    <string name="nm_hands_handed_over">Nasa screen ng telepono ang app. Maaari mong ituloy ang hakbang na ito.</string>
     <string name="nm_hands_preview_wait">Hinihintay ang screen sa background</string>
     <string name="nm_hands_background_screen">Screen sa background</string>
     <string name="nm_hands_background_detail">Gumagamit ang assistant ng isang katugmang app sa hiwalay na screen habang ginagamit mo ang telepono. Hihinto ang gawain kapag kailangan mong pumalit.</string>
@@ -1332,4 +1335,5 @@
     <string name="nm_hands_replay_pause">I-pause</string>
     <string name="nm_hands_replay_type">Maglagay ng teksto</string>
     <string name="nm_hands_replay_observed">Sinuri ang screen</string>
+    <string name="nm_hands_replay_open">Panoorin ang mga hakbang sa screen</string>
 </resources>

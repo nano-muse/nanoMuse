@@ -102,6 +102,8 @@ class HandsOperator(private val context: Context) {
 
     private val stop = AtomicBoolean(false)
     private val stopReason = AtomicReference<String?>(null)
+    private val phoneRequested = AtomicBoolean(false)
+    private val phoneDecision = CountDownLatch(1)
     private val userSignal = AtomicReference<CountDownLatch?>(null)
     private val background = Hands.backgroundScreen(context)
     private val backgroundModelJob = if (background) Job() else null
@@ -142,10 +144,35 @@ class HandsOperator(private val context: Context) {
     fun requestStop(reason: String = "the user tapped Stop") {
         stopReason.compareAndSet(null, reason)
         stop.set(true)
+        phoneDecision.countDown()
         if (background) capsule.hide()
         backgroundModelJob?.cancel()
         ownPendingRequest()?.let { RiskGate.decide(it.id, RiskDecision.DENY) }
         userSignal.get()?.countDown()
+    }
+
+    private class ManualStep(val instruction: String? = null) : RuntimeException()
+
+    private fun requestPhone() {
+        if (!::display.isInitialized || !display.canHandOff || !canInspect() || !phoneRequested.compareAndSet(false, true)) return
+        phoneDecision.countDown()
+        backgroundModelJob?.cancel()
+        ownPendingRequest()?.let { RiskGate.decide(it.id, RiskDecision.DENY) }
+    }
+
+    private fun handoffOutcome(instruction: String?): Outcome {
+        val prompt = instruction ?: context.getString(R.string.nm_hands_background_protected)
+        if (!::display.isInitialized || !display.canHandOff) return Outcome.NeedsUser(prompt)
+        if (!phoneRequested.get() && canInspect()) {
+            capsule.offerPhone(prompt)
+            phoneDecision.await(60, TimeUnit.SECONDS)
+        }
+        if (!canInspect()) return Outcome.Stopped(stopReason.get() ?: "The screen or account changed.")
+        if (phoneRequested.get()) {
+            val moved = runCatching { display.handOffToPhone() }.getOrDefault(false)
+            return Outcome.NeedsUser(context.getString(if (moved) R.string.nm_hands_handed_over else R.string.nm_hands_handoff_unavailable))
+        }
+        return Outcome.NeedsUser(prompt)
     }
 
     private class RunStopped(message: String) : RuntimeException(message)
@@ -156,6 +183,7 @@ class HandsOperator(private val context: Context) {
             throw RunStopped("The screen operation setting changed.")
         }
         if (background && !canInspect()) throw RunStopped("The screen, account or permission changed.")
+        if (phoneRequested.get()) throw ManualStep()
     }
 
     private fun roots(svc: MinisAccessibilityService): List<AccessibilityNodeInfo> =
@@ -239,7 +267,9 @@ class HandsOperator(private val context: Context) {
                         }
                     }
                 }
-                capsule.previewAllowed = ::canInspect
+                capsule.previewAllowed = { canInspect() && !phoneRequested.get() }
+                capsule.canHandOff = { ::display.isInitialized && display.canHandOff && canInspect() }
+                capsule.onPhone = ::requestPhone
                 capsule.togglePause = {
                     inspection.toggle().also { paused -> if (paused) inFlightDecision.get()?.cancel() }
                 }
@@ -254,13 +284,14 @@ class HandsOperator(private val context: Context) {
             val provider = ProviderFactory.create(model.instance, model.apiKey, model.entry.model, context)
             val apps = if (background) listOfNotNull(app) else HandsApps.launchable(context)
             val system = HandsPrompt.system(opts.task, apps.map { it.label }.take(MAX_APPS_IN_PROMPT), opts.agentName, opts.language) +
-                if (background) "\nYou are operating only the named app on a separate display. Home and switching apps are unavailable. For logins, protected screens, or manual steps, ask the user and end the run." else ""
+                if (background) "\nYou are operating only the named app on a separate display. Home and switching apps are unavailable. For logins, protected screens or steps that a person must perform in the app, use take_over. The user can choose to bring the open app to their phone and finish there. Use ask_user for a question they can answer in chat." else ""
             val turns = mutableListOf<Turn>()
             var lastResult: String? = null
             var formatErrors = 0
             var blackScreens = 0
             var modelErrors = 0
             var windowChanges = 0
+            var interruptedLooks = 0
             // the same action on an unchanged screen: a note at the third, a stop at the sixth
             var watch = HandsLoopWatch()
             var loopNote: String? = null
@@ -295,12 +326,21 @@ class HandsOperator(private val context: Context) {
                 val screenH = shot.height
                 val jpeg = try {
                     if (background && focusedField(svc)?.let(::secretField) == true) {
-                        return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_secret)), steps, runId, lastScreen, traceDir, log, model.label)
+                        throw ManualStep(context.getString(R.string.nm_hands_background_secret))
                     }
                     encode(shot)
+                } catch (stale: HandsCaptureFailure) {
+                    // The app can replace its activity between the screenshot and focus check.
+                    // Nothing was sent to the model or dispatched to the app for this look.
+                    if (!background || (stale !is HandsCaptureFailure.WindowChanged &&
+                        stale !is HandsCaptureFailure.WindowPending)) throw stale
+                    if (++interruptedLooks > 2) throw ManualStep(context.getString(R.string.nm_hands_background_protected))
+                    steps--
+                    continue
                 } finally { shot.recycle() }
+                interruptedLooks = 0
                 if (background && jpeg.black) {
-                    return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_protected)), steps, runId, lastScreen, traceDir, log, model.label)
+                    throw ManualStep(context.getString(R.string.nm_hands_background_protected))
                 }
                 lastScreen = save(traceDir, steps, jpeg, runId)
                 if (jpeg.black) {
@@ -364,8 +404,7 @@ class HandsOperator(private val context: Context) {
                         // No input has been dispatched for this decision. A same-app dialog
                         // gets a fresh look, while foreign and protected windows still stop the run.
                         if (++windowChanges > 2) {
-                            return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_protected)),
-                                steps, runId, lastScreen, traceDir, log, model.label)
+                            throw ManualStep(context.getString(R.string.nm_hands_background_protected))
                         }
                         lastResult = "The target window changed before input. Inspect its current state."
                         steps--
@@ -401,7 +440,7 @@ class HandsOperator(private val context: Context) {
                         else -> ""
                     }
                     if (TapWords.looksSecret(prompt)) {
-                        return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_secret)), steps, runId, lastScreen, traceDir, log, model.label)
+                        throw ManualStep(context.getString(R.string.nm_hands_background_secret))
                     }
                 }
                 capsule.working(steps, parsed.thought.ifBlank { action.describe() }.take(140))
@@ -450,7 +489,7 @@ class HandsOperator(private val context: Context) {
                         return finish(Outcome.NeedsUser(action.question.ifBlank { parsed.thought }), steps, runId, lastScreen, traceDir, log, model.label)
                     }
                     is HandsAction.TakeOver -> {
-                        if (background) return finish(Outcome.NeedsUser(action.reason.ifBlank { parsed.thought }.ifBlank { "Open the selected app yourself to complete this step." }), steps, runId, lastScreen, traceDir, log, model.label)
+                        if (background) throw ManualStep(action.reason.ifBlank { parsed.thought }.ifBlank { context.getString(R.string.nm_hands_background_protected) })
                         val cont = waitForUser(action.reason.ifBlank { parsed.thought })
                         step(runId, steps, "take_over", if (cont) "handed_over" else "stopped", thoughtMs)
                         if (!cont) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
@@ -497,7 +536,7 @@ class HandsOperator(private val context: Context) {
                         if (!TapWords.looksSecret(action.field)) capsule.stage?.say(fxLabel(action))
                         lastResult = typeText(svc, action)
                         if (lastResult == HANDOFF) {
-                            if (background) return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_secret)), steps, runId, lastScreen, traceDir, log, model.label)
+                            if (background) throw ManualStep(context.getString(R.string.nm_hands_background_secret))
                             val cont = waitForUser(context.getString(com.openminis.app.R.string.nm_hands_secret_field))
                             if (!cont) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
                             lastResult = "that field is a password or code field, which you never type; the user filled it in and says to continue."
@@ -508,7 +547,7 @@ class HandsOperator(private val context: Context) {
                         // Enter in a messenger's field *is* the send button: the same card a tap on “Send” gets.
                         val field = focusedField(svc)
                         if (background && field != null && secretField(field)) {
-                            return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_secret)), steps, runId, lastScreen, traceDir, log, model.label)
+                            throw ManualStep(context.getString(R.string.nm_hands_background_secret))
                         }
                         val gate = approveEnter(svc, opts.sessionId, field)
                         if (gate.denied != null) {
@@ -555,7 +594,10 @@ class HandsOperator(private val context: Context) {
                     }
                     is HandsAction.Wait -> {
                         capsule.stage?.say(fxLabel(action))
-                        Thread.sleep(action.seconds * 1000L)
+                        if (background) {
+                            phoneDecision.await(action.seconds.toLong(), TimeUnit.SECONDS)
+                            checkRunning()
+                        } else Thread.sleep(action.seconds * 1000L)
                         lastResult = "waited ${action.seconds}s."
                     }
                 }
@@ -564,8 +606,10 @@ class HandsOperator(private val context: Context) {
                 if (action !is HandsAction.TakeOver) step(runId, steps, actionWord(action), if (lastResult?.contains("rejected by the system") == true) "failed" else "ok", thoughtMs)
             }
             return finish(Outcome.Infeasible("the step limit (${opts.maxSteps}) was reached before the task was done"), steps, runId, lastScreen, traceDir, log, model.label, end = "max_steps")
+        } catch (manual: ManualStep) {
+            return finish(handoffOutcome(manual.instruction), steps, runId, lastScreen, traceDir, log, model?.label)
         } catch (_: BackgroundHandsDisplay.NeedsUser) {
-            return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_protected)), steps, runId, lastScreen, traceDir, log, model?.label)
+            return finish(handoffOutcome(null), steps, runId, lastScreen, traceDir, log, model?.label)
         } catch (s: RunStopped) {
             return finish(Outcome.Stopped(s.message ?: "stopped"), steps, runId, lastScreen, traceDir, log, model?.label)
         } catch (t: Throwable) {

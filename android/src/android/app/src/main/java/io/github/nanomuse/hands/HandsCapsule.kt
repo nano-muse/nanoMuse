@@ -70,6 +70,9 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     private var pane: HandsPreviewPanel? = null
     private var togglePreview: TextView? = null
     private var pauseButton: TextView? = null
+    private var phoneButton: TextView? = null
+    var canHandOff: () -> Boolean = { false }
+    var onPhone: (() -> Unit)? = null
     private var controls: LinearLayout? = null
     private var paused = false
     private var workingTitle = ""
@@ -112,6 +115,8 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
         stage?.mood(HandsStage.Mood.WORKING)
         togglePreview?.visibility = View.VISIBLE
         pauseButton?.isEnabled = true
+        pauseButton?.visibility = View.VISIBLE
+        phoneButton?.isEnabled = canHandOff()
         ring?.turning(!paused)
         bars?.visibility = if (paused) View.GONE else View.VISIBLE
         workingTitle = context.getString(R.string.nm_hands_step, step)
@@ -138,6 +143,18 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
         denyBtn?.visibility = View.GONE
     }
 
+    /** An explicit choice before the selected app can replace what the user is doing. */
+    fun offerPhone(reason: String) = onMain {
+        if (ended) return@onMain
+        collapsePreview()
+        takeOver(reason)
+        continueBtn?.visibility = View.GONE
+        togglePreview?.visibility = View.GONE
+        pauseButton?.visibility = View.GONE
+        controls?.visibility = View.VISIBLE
+        phoneButton?.isEnabled = canHandOff()
+    }
+
     /**
      * A tap waits for approval. [decidable]: Allow once / Deny right here on the capsule — the
      * person is in the operated app, not in nanoMuse. Money is confirmed with the screen lock,
@@ -162,7 +179,7 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     fun hide() = onMain {
         ended = true
         collapsePreview()
-        pane = null; controls = null; togglePreview = null; pauseButton = null
+        pane = null; controls = null; togglePreview = null; pauseButton = null; phoneButton = null
         val v = root
         root = null; params = null; titleView = null; detailView = null; continueBtn = null; openBtn = null; allowBtn = null; denyBtn = null
         ring?.turning(false); ring = null
@@ -361,9 +378,13 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
                     titleView?.text = if (paused) context.getString(R.string.nm_goal_status_paused) else workingTitle
                 }
             }
+            val phone = button(context.getString(R.string.nm_hands_handoff_phone), ACCENT) {
+                if (canHandOff()) onPhone?.invoke()
+            }.apply { filterTouchesWhenObscured = true }
             val show = button(context.getString(R.string.nm_hands_preview_show), ACCENT) {
                 if (preview.visibility == View.VISIBLE || !previewAllowed()) collapsePreview()
                 else {
+                    phone.isEnabled = canHandOff()
                     preview.expanded(true)
                     actions.visibility = View.VISIBLE
                     togglePreview?.setText(R.string.nm_hands_preview_hide)
@@ -371,7 +392,9 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
             }
             pane = preview; controls = actions; togglePreview = show; pauseButton = pause
             pill.addView(show)
+            phoneButton = phone
             actions.addView(pause)
+            actions.addView(phone)
             container.addView(pill)
             val height = minOf(context.resources.displayMetrics.heightPixels / 3, dp(260))
             container.addView(preview, LinearLayout.LayoutParams(-1, height))

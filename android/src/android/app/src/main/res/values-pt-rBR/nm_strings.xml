@@ -536,6 +536,9 @@
     <string name="nm_hands_preview_hide">Ocultar</string>
     <string name="nm_hands_preview_pause">Pausar</string>
     <string name="nm_hands_preview_resume">Retomar</string>
+    <string name="nm_hands_handoff_phone">Continuar no celular</string>
+    <string name="nm_hands_handoff_unavailable">Não foi possível mover a página para a tela do celular. Abra o aplicativo para continuar.</string>
+    <string name="nm_hands_handed_over">O aplicativo está na tela do celular. Você pode continuar a partir desta etapa.</string>
     <string name="nm_hands_preview_wait">Aguardando a tela em segundo plano</string>
     <string name="nm_hands_background_screen">Tela em segundo plano</string>
     <string name="nm_hands_background_detail">O assistente usa um aplicativo compatível em uma tela separada enquanto você continua usando o celular. A tarefa termina se você precisar assumir o controle.</string>
@@ -1333,4 +1336,5 @@
     <string name="nm_hands_replay_pause">Pausar</string>
     <string name="nm_hands_replay_type">Digitar texto</string>
     <string name="nm_hands_replay_observed">Tela observada</string>
+    <string name="nm_hands_replay_open">Rever ações na tela</string>
 </resources>

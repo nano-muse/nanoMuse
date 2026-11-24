@@ -44,7 +44,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
-internal fun HandsReplayScreen(onBack: () -> Unit) {
+internal fun replayTicket(): HandsReplayAccess.Ticket? {
     val ctx = LocalContext.current
     val life = LocalLifecycleOwner.current.lifecycle
     var visible by remember(life) { mutableStateOf(life.currentState.isAtLeast(Lifecycle.State.STARTED)) }
@@ -55,11 +55,34 @@ internal fun HandsReplayScreen(onBack: () -> Unit) {
     }
     val changes by HandsReplayAccess.changes.collectAsState()
     val appLocked by AppAccess.locked.collectAsState()
+    return remember(ctx, changes, appLocked, visible) { if (visible && !appLocked) HandsReplayAccess.ticket(ctx) else null }
+}
+
+@Composable
+internal fun HandsReplayScreen(direct: ChatReplaySelection? = null, onBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = replayTicket()
     val protected by SessionAccess.protected.collectAsState()
     val hidden by ConversationSync.hidden.collectAsState()
     val sessionRepo = (ctx.applicationContext as? MinisApp)?.chatRepositoryOrNull
-    val scope = remember(changes, appLocked, visible) { if (visible && !appLocked) HandsReplayAccess.ticket(ctx) else null }
     val title = stringResource(R.string.nm_hands_replay_title)
+    if (direct != null) {
+        if (scope == null || scope != direct.ticket || sessionRepo == null ||
+            direct.run.session in protected || direct.run.session in hidden) {
+            LaunchedEffect(direct) { onBack() }
+            return
+        }
+        val visible by remember(sessionRepo, direct.run.session) {
+            sessionRepo.observeSessions().map { rows -> rows.any { it.id == direct.run.session } }.distinctUntilChanged()
+        }.collectAsState(initial = null)
+        BackHandler(onBack = onBack)
+        when (visible) {
+            true -> key(direct) { RunPlayer(direct.run, scope, onBack) }
+            false -> LaunchedEffect(direct) { onBack() }
+            null -> Unit
+        }
+        return
+    }
     if (scope == null || sessionRepo == null) {
         BackHandler(onBack = onBack)
         SettingsScaffold(title = title, onBack = onBack) {}

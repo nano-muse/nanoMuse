@@ -535,6 +535,9 @@
     <string name="nm_hands_preview_hide">Gizle</string>
     <string name="nm_hands_preview_pause">Duraklat</string>
     <string name="nm_hands_preview_resume">Sürdür</string>
+    <string name="nm_hands_handoff_phone">Telefonda devral</string>
+    <string name="nm_hands_handoff_unavailable">Önceki sayfa telefon ekranına taşınamadı. Devam etmek için uygulamayı açın.</string>
+    <string name="nm_hands_handed_over">Uygulama telefon ekranında. Bu adımdan devam edebilirsiniz.</string>
     <string name="nm_hands_preview_wait">Arka plan ekranı bekleniyor</string>
     <string name="nm_hands_background_screen">Arka plan ekranı</string>
     <string name="nm_hands_background_detail">Siz telefonu kullanırken asistan ayrı bir ekranda uyumlu tek bir uygulamayı kullanır. Kontrolü devralmanız gerekirse görev sona erer.</string>
@@ -1332,4 +1335,5 @@
     <string name="nm_hands_replay_pause">Duraklat</string>
     <string name="nm_hands_replay_type">Metin gir</string>
     <string name="nm_hands_replay_observed">Ekran incelendi</string>
+    <string name="nm_hands_replay_open">Ekran işlemlerini yeniden izle</string>
 </resources>

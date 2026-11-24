@@ -536,6 +536,9 @@
     <string name="nm_hands_preview_hide">Masquer</string>
     <string name="nm_hands_preview_pause">Pause</string>
     <string name="nm_hands_preview_resume">Reprendre</string>
+    <string name="nm_hands_handoff_phone">Reprendre sur le téléphone</string>
+    <string name="nm_hands_handoff_unavailable">La page n’a pas pu être transférée sur l’écran du téléphone. Ouvrez l’application pour continuer.</string>
+    <string name="nm_hands_handed_over">L’application est sur l’écran du téléphone. Vous pouvez reprendre à cette étape.</string>
     <string name="nm_hands_preview_wait">En attente de l’écran en arrière-plan</string>
     <string name="nm_hands_background_screen">Écran en arrière-plan</string>
     <string name="nm_hands_background_detail">L’assistant utilise une application compatible sur un écran séparé pendant que vous utilisez votre téléphone. La tâche s’arrête si vous devez intervenir.</string>
@@ -1333,4 +1336,5 @@
     <string name="nm_hands_replay_pause">Pause</string>
     <string name="nm_hands_replay_type">Saisir du texte</string>
     <string name="nm_hands_replay_observed">Écran observé</string>
+    <string name="nm_hands_replay_open">Revoir les actions à l’écran</string>
 </resources>

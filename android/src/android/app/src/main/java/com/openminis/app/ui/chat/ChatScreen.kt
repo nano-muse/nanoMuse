@@ -564,6 +564,9 @@ fun ChatScreen(
     // nanoMuse: a retained draft route must also gate its promoted, persisted identity.
     if (nmDisplayedSessionId != sessionId && !io.github.nanomuse.ui.guard.SessionAccessGate(nmDisplayedSessionId, nmConversationVisible)) return
     io.github.nanomuse.ui.chat.ReplyPresenceEffect(nmDisplayedSessionId, nmConversationVisible)
+    // nanoMuse: the replay belongs to the persisted chat, including a draft promoted during this turn.
+    var handsReplay by remember(nmDisplayedSessionId, nmConversationVisible) { mutableStateOf<io.github.nanomuse.ui.hands.ChatReplaySelection?>(null) }
+    handsReplay?.let { replay -> io.github.nanomuse.ui.hands.ChatReplayDialog(replay) { handsReplay = null } }
     // [T-android-larky-longsession-followup] Consume the tail-windowed
     // view instead of the canonical full list. For sessions with ≤300
     // messages this is the SAME reference (zero overhead); for longer
@@ -3657,6 +3660,7 @@ fun ChatScreen(
                     is FlatChatItem.NanoMuseAvatarShare -> false // nanoMuse
                     is FlatChatItem.NanoMuseAvatarConfirm -> false // nanoMuse
                     is FlatChatItem.NanoMuseAllowance -> false // nanoMuse
+                    is FlatChatItem.HandsReplay -> grayedMap[originalMessageId(messageId)] == true // nanoMuse
                     is FlatChatItem.NanoMuseThumbs -> false // nanoMuse
                     is FlatChatItem.AssistantTyping -> false
                     is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
@@ -4348,6 +4352,10 @@ fun ChatScreen(
                                     )
                                 }
                             }
+                            // nanoMuse: this opens a specific saved screen operation, including older chat history.
+                            is FlatChatItem.HandsReplay -> io.github.nanomuse.ui.hands.ChatReplayButton(
+                                nmDisplayedSessionId, item.runId, onOpen = { handsReplay = it },
+                            )
                             // nanoMuse: the two thumbs under the newest finished reply (and under an older one that was voted on)
                             is FlatChatItem.NanoMuseThumbs -> io.github.nanomuse.ui.feedback.ThumbsRow(
                                 sessionId = viewModel.activeSessionId,

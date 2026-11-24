@@ -1,5 +1,6 @@
 package io.github.nanomuse.hands
 
+import io.github.nanomuse.guard.ShellGuard
 import org.json.JSONObject
 import java.io.File
 import java.nio.file.Files
@@ -20,6 +21,25 @@ internal object HandsReplay {
     data class Frame(val number: Int, val at: Long?, val action: Action, val screen: Boolean,
                      val start: HandsAction.Point? = null, val end: HandsAction.Point? = null, val detail: String = "")
     data class Record(val frames: List<Frame>, val partial: Boolean, val outcome: String?, val mode: String?)
+
+    /** Decode the native CLI receipt before the chat truncates long shell output. Paths in it are never opened. */
+    fun receiptId(tool: String, args: String, output: String?): String? {
+        if (tool != "shell_execute" || output == null || output.length !in 2..MAX_TRACE ||
+            args.length > MAX_LINE || !args.contains("nanomuse-hands")) return null
+        return runCatching {
+            val command = JSONObject(args).optString("command")
+            val runsHands = ShellGuard.splitPipelines(command).any { pipeline ->
+                ShellGuard.splitPipes(pipeline).any { segment ->
+                    val words = ShellGuard.unwrap(ShellGuard.tokenize(segment))
+                    words.firstOrNull()?.substringAfterLast('/') == "nanomuse-hands" && words.getOrNull(1) == "run"
+                }
+            }
+            if (!runsHands) return null
+            val body = JSONObject(output.trimStart())
+            val id = (body.opt("run_id") as? String)?.takeIf { runId.matches(it) } ?: return null
+            id.takeIf { body.opt("trace") == "/var/minis/attachments/hands/$id/trace.jsonl" }
+        }.getOrNull()
+    }
 
     fun handsRoot(root: File, session: String): File? {
         if (!session.matches(sessionId)) return null

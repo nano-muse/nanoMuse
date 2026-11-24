@@ -526,6 +526,9 @@
     <string name="nm_hands_preview_hide">Hide screen</string>
     <string name="nm_hands_preview_pause">Pause</string>
     <string name="nm_hands_preview_resume">Resume</string>
+    <string name="nm_hands_handoff_phone">Take over on phone</string>
+    <string name="nm_hands_handoff_unavailable">The original page could not move to your phone screen. Open the app to continue.</string>
+    <string name="nm_hands_handed_over">The app is on your phone screen. You can continue from this step.</string>
     <string name="nm_hands_preview_wait">Waiting for the background screen</string>
     <string name="nm_hands_background_screen">Background screen</string>
     <string name="nm_hands_background_detail">Use one compatible app on a separate screen while you use your phone. The task stops if you need to take over.</string>
@@ -1312,4 +1315,5 @@
     <string name="nm_hands_replay_pause">Pause</string>
     <string name="nm_hands_replay_type">Enter text</string>
     <string name="nm_hands_replay_observed">Screen observed</string>
+    <string name="nm_hands_replay_open">View screen replay</string>
 </resources>

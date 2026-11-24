@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Android users could take over a background app on the same open page and open its screen replay directly from the chat. The operator also learned to align shadowed dialogs when their position could be verified.
+
 - Added a live preview, pause and resume to the Android background screen, adapted its viewport to the phone and added local playback of recorded screen steps.
 
 - Added independent public-source follow-ups on Android and iPhone. Each phone could discover a source in its main chat, check for changes while the computer was off, and send a relevant update with its original link.

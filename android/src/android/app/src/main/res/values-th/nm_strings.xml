@@ -532,6 +532,9 @@
     <string name="nm_hands_preview_hide">ซ่อน</string>
     <string name="nm_hands_preview_pause">หยุดชั่วคราว</string>
     <string name="nm_hands_preview_resume">ทำต่อ</string>
+    <string name="nm_hands_handoff_phone">ทำต่อบนโทรศัพท์</string>
+    <string name="nm_hands_handoff_unavailable">ย้ายหน้าเดิมไปยังหน้าจอโทรศัพท์ไม่ได้ โปรดเปิดแอปเพื่อทำต่อ</string>
+    <string name="nm_hands_handed_over">แอปอยู่บนหน้าจอโทรศัพท์แล้ว คุณทำต่อจากขั้นตอนนี้ได้</string>
     <string name="nm_hands_preview_wait">กำลังรอหน้าจอเบื้องหลัง</string>
     <string name="nm_hands_background_screen">หน้าจอเบื้องหลัง</string>
     <string name="nm_hands_background_detail">ให้ผู้ช่วยใช้งานแอปที่รองรับหนึ่งแอปบนหน้าจอแยกขณะที่คุณใช้โทรศัพท์ต่อได้ งานจะหยุดเมื่อคุณต้องเข้ามาควบคุมเอง</string>
@@ -1328,4 +1331,5 @@
     <string name="nm_hands_replay_pause">หยุดชั่วคราว</string>
     <string name="nm_hands_replay_type">ป้อนข้อความ</string>
     <string name="nm_hands_replay_observed">ดูหน้าจอ</string>
+    <string name="nm_hands_replay_open">ดูการทำงานบนหน้าจอย้อนหลัง</string>
 </resources>

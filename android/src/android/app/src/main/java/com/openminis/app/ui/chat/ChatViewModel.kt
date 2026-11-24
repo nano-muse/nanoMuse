@@ -9272,6 +9272,7 @@ class ChatViewModel(
                     android.util.Log.d("ToolChain[VM]", "[turn=$turn] block[$blockIdx] status→$finalStatus title=${result.toolTitle} contentLen=${finalContent.length}")
                     allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(
                         toolStatus = finalStatus,
+                        handsRunId = io.github.nanomuse.hands.HandsReplay.receiptId(name, argsStr, result.output), // nanoMuse
                         content = finalContent,
                         toolTitle = result.toolTitle.ifEmpty { allToolBlocks[blockIdx].toolTitle },
                         durationMs = elapsed,
@@ -12424,6 +12425,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                                 toolName = value.optString("name", ""),
                                 toolTitle = value.optString("description", ""),
                                 toolArgs = toolInput,
+                                handsRunId = io.github.nanomuse.hands.HandsReplay.receiptId(value.optString("name"), toolInput, result?.output), // nanoMuse
                                 content = result?.output?.lines()?.takeLast(80)?.joinToString("\n") ?: "",
                                 toolStatus = when {
                                     result == null -> ToolBlockStatus.SUCCESS

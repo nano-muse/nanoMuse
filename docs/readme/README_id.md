@@ -195,7 +195,7 @@ nanoMuse berdiri di atas karya orang lain; [THIRD_PARTY_NOTICES.md](../../THIRD_
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): agen di perangkat yang menjadi dasar aplikasi ponsel, dengan [proot](https://github.com/nano-muse/proot) dan [Alpine Linux](https://alpinelinux.org/) untuk sandbox-nya.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): harness agen tempat aplikasi desktop menjadi plugin-nya.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): operator tangan di desktop adalah porting dari milik mereka, dan penanda di panggung mengikuti ScreenMarker mereka.
-- [Mika](https://github.com/wangzan101/Mika) karya wangzan101 mengilhami layar Android terpisah, pratinjau langsung, dan pemutaran ulang langkah.
+- [Mika](https://github.com/wangzan101/Mika) karya wangzan101 mengilhami layar Android terpisah, pratinjau langsung, pengalihan kendali ke pengguna, dan pemutaran ulang langkah.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): operator ponsel, jejak, dan gagasan produknya.
 
 ## Penafian

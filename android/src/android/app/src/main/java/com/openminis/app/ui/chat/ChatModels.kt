@@ -272,6 +272,7 @@ data class AssistantBlock(
      * Null for non-Gemini providers and thinking-off Gemini calls.
      */
     val thoughtSignature: String? = null,
+    val handsRunId: String? = null, // nanoMuse: validated local screen-run receipt for the replay entry.
 ) {
     val isText: Boolean get() = kind == "text"
 }

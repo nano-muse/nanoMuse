@@ -13,6 +13,16 @@ import org.junit.Test
 
 class AssistantBubbleGroupingTest {
 
+    @Test fun savedScreenReplayRemainsInTheChatWhenStepsAreHidden() {
+        val block = AssistantBlock(id = "call", kind = "tool_use", toolName = "shell_execute", handsRunId = "20260112-032915")
+        val message = ChatMessage("reply", "assistant", "", toolBlocks = listOf(block))
+        for (show in listOf(false, true)) {
+            val items = buildFlatChatItems(listOf(message), showSteps = show)
+            assertEquals("20260112-032915", items.filterIsInstance<FlatChatItem.HandsReplay>().single().runId)
+            assertEquals(show, items.any { it is FlatChatItem.AssistantToolUse })
+        }
+    }
+
     @Test
     fun `a single assistant markdown turn stays in one bubble across lists headings and code blocks`() {
         val md = """

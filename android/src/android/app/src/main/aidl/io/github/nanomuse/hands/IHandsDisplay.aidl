@@ -8,4 +8,7 @@ interface IHandsDisplay {
     // Returns the display ID and the Android user ID of the calling nanoMuse app.
     int[] open(in Surface surface, int width, int height, int dpi, IBinder owner) = 1;
     void close() = 2;
+    // Pin the launched app's only task. The only possible destination is the phone itself.
+    boolean rememberTask(String packageName) = 3;
+    boolean handOffToPhone() = 4;
 }

@@ -1,5 +1,7 @@
 package io.github.nanomuse.hands
 
+import android.app.KeyguardManager
+import android.content.ComponentName
 import android.content.Context
 import android.graphics.Point
 import android.hardware.display.DisplayManager
@@ -7,6 +9,7 @@ import android.hardware.display.VirtualDisplay
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.Process
 import android.os.UserHandle
 import android.view.Display
@@ -19,6 +22,9 @@ import kotlin.system.exitProcess
 class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub() {
     private val clientUid = context.applicationInfo.uid
     private var virtual: VirtualDisplay? = null
+    private data class TargetTask(val id: Int, val pkg: String)
+    private var target: TargetTask? = null
+    private var profileId = -1
     private var surface: Surface? = null
     private var client: IBinder? = null
     private val clientDied = IBinder.DeathRecipient { synchronized(this) { releaseDisplay() } }
@@ -59,6 +65,7 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
             val profile = UserHandle.getUserHandleForUid(clientUid)
             val userId = UserHandle::class.java.getMethod("getIdentifier").invoke(profile) as Int
             check(userId >= 0)
+            profileId = userId
             return intArrayOf(display.displayId, userId)
         } catch (failure: Throwable) {
             releaseDisplay()
@@ -66,6 +73,63 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
         } finally {
             Binder.restoreCallingIdentity(identity)
         }
+    }
+
+    // These system calls run under the already authorized Shizuku identity. Query only our
+    // private display. Never accept a task ID, profile or destination display from a caller.
+    private val taskApi get() = Class.forName("android.app.IActivityTaskManager")
+    private fun manager() = Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null)
+
+    private fun onlyTask(service: Any?, pkg: String): TargetTask? {
+        val display = virtual?.display?.takeIf { it.isValid && it.displayId > Display.DEFAULT_DISPLAY } ?: return null
+        val roots = taskApi.getMethod("getAllRootTaskInfosOnDisplay", Integer.TYPE)
+            .invoke(service, display.displayId) as? List<*> ?: return null
+        val root = roots.singleOrNull() ?: return null
+        val type = root.javaClass
+        val taskId = type.getField("taskId").getInt(root)
+        val leaves = type.getField("childTaskIds").get(root) as? IntArray ?: return null
+        val users = type.getField("childTaskUserIds").get(root) as? IntArray ?: return null
+        val sameDisplay = type.getField("displayId").getInt(root) == display.displayId
+        val sameUser = type.getField("userId").getInt(root) == profileId
+        if (taskId < 0 || !sameDisplay || !sameUser || leaves.singleOrNull() != taskId ||
+            users.singleOrNull() != profileId) {
+            android.util.Log.i("HandsDisplay", "Unsupported task layout: sameDisplay=$sameDisplay, sameUser=$sameUser, singleLeaf=" +
+                (leaves.singleOrNull() == taskId) + ", singleProfile=" + (users.singleOrNull() == profileId))
+            return null
+        }
+        val base = type.getField("baseActivity").get(root) as? ComponentName
+        val top = type.getField("topActivity").get(root) as? ComponentName
+        return if (base?.packageName == pkg && top?.packageName == pkg) TargetTask(taskId, pkg) else null
+    }
+
+    @Synchronized
+    override fun rememberTask(packageName: String): Boolean {
+        enforceClient()
+        val identity = Binder.clearCallingIdentity()
+        return try {
+            if (target == null) target = onlyTask(manager(), packageName)
+            target?.pkg == packageName
+        } catch (failure: ReflectiveOperationException) {
+            android.util.Log.i("HandsDisplay", "Task handoff unavailable: " + (failure.cause ?: failure).javaClass.simpleName)
+            false
+        } finally { Binder.restoreCallingIdentity(identity) }
+    }
+
+    @Synchronized
+    override fun handOffToPhone(): Boolean {
+        enforceClient()
+        val identity = Binder.clearCallingIdentity()
+        return try {
+            val expected = target ?: return false
+            val service = manager()
+            if (onlyTask(service, expected.pkg) != expected ||
+                context.getSystemService(KeyguardManager::class.java).isDeviceLocked ||
+                !context.getSystemService(PowerManager::class.java).isInteractive) return false
+            target = null
+            taskApi.getMethod("moveRootTaskToDisplay", Integer.TYPE, Integer.TYPE)
+                .invoke(service, expected.id, Display.DEFAULT_DISPLAY)
+            true
+        } finally { Binder.restoreCallingIdentity(identity) }
     }
 
     private fun hideKeyboard(id: Int) {
@@ -99,6 +163,8 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
     }
 
     private fun releaseDisplay() {
+        target = null
+        profileId = -1
         client?.let { runCatching { it.unlinkToDeath(clientDied, 0) } }
         client = null
         try {

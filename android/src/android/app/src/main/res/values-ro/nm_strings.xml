@@ -538,6 +538,9 @@
     <string name="nm_hands_preview_hide">Ascunde</string>
     <string name="nm_hands_preview_pause">Pauză</string>
     <string name="nm_hands_preview_resume">Reia</string>
+    <string name="nm_hands_handoff_phone">Continuă pe telefon</string>
+    <string name="nm_hands_handoff_unavailable">Pagina nu a putut fi mutată pe ecranul telefonului. Deschide aplicația pentru a continua.</string>
+    <string name="nm_hands_handed_over">Aplicația este pe ecranul telefonului. Poți continua de la acest pas.</string>
     <string name="nm_hands_preview_wait">Se așteaptă ecranul din fundal</string>
     <string name="nm_hands_background_screen">Ecran în fundal</string>
     <string name="nm_hands_background_detail">Asistentul folosește o aplicație compatibilă pe un ecran separat, iar tu poți folosi în continuare telefonul. Sarcina se oprește dacă trebuie să preiei controlul.</string>
@@ -1336,4 +1339,5 @@
     <string name="nm_hands_replay_pause">Pauză</string>
     <string name="nm_hands_replay_type">Introdu text</string>
     <string name="nm_hands_replay_observed">Ecran verificat</string>
+    <string name="nm_hands_replay_open">Vezi reluarea acțiunilor pe ecran</string>
 </resources>

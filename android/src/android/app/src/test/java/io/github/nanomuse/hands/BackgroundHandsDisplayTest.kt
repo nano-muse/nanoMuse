@@ -69,6 +69,40 @@ class BackgroundHandsDisplayTest {
         assertEquals(3, calls)
     }
 
+    @Test fun activityTransitionsWaitOnlyForUnidentifiedWindowsDuringObservation() {
+        val pkg = "fixture"
+        assertEquals(HandsWindowOwnership.Pending, handsWindowOwnership(emptyList(), pkg))
+        assertEquals(HandsWindowOwnership.Pending, handsWindowOwnership(listOf(pkg, null), pkg))
+        assertEquals(HandsWindowOwnership.Foreign, handsWindowOwnership(listOf(null, "other", pkg), pkg))
+        assertEquals(HandsWindowOwnership.Foreign, handsWindowOwnership(listOf("other", null), pkg))
+        var polls = 0
+        var waits = 0
+        val top = awaitHandsObservation(4, { waits++ }) {
+            if (++polls <= 2) throw HandsCaptureFailure.WindowPending()
+            "new activity"
+        }
+        assertEquals("new activity", top)
+        assertEquals(2, waits)
+        assertThrows(SecurityException::class.java) {
+            awaitHandsObservation(8, { waits++ }) { throw SecurityException() }
+        }
+        assertEquals(2, waits)
+        assertThrows(HandsCaptureFailure.WindowPending::class.java) {
+            awaitHandsObservation(3, { waits++ }) { throw HandsCaptureFailure.WindowPending() }
+        }
+        assertEquals(4, waits)
+    }
+
+    @Test fun aGapDuringCaptureDiscardsTheImageEvenWhenTheSameWindowComesBack() {
+        var captures = 0
+        val image = captureHandsWindow({ 7 }, {}) {
+            if (++captures == 1) throw HandsCaptureFailure.WindowPending()
+            "fresh"
+        }
+        assertEquals("fresh", image)
+        assertEquals(2, captures)
+    }
+
     @Test fun previewRecognizesAllAndroidPasswordInputVariations() {
         for (variation in listOf(InputType.TYPE_TEXT_VARIATION_PASSWORD,
             InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD)) {
