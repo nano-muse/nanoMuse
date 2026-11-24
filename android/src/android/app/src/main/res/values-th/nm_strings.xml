@@ -545,6 +545,7 @@
     <string name="nm_hands_wireless_code">รหัสจับคู่หกหลัก</string>
     <string name="nm_hands_wireless_pair">จับคู่โทรศัพท์เครื่องนี้</string>
     <string name="nm_hands_wireless_port_missing">ป้อนพอร์ตที่แสดงบนโทรศัพท์แล้วลองอีกครั้ง</string>
+    <string name="nm_hands_wireless_paired">จับคู่แล้ว ระบบจะลองเชื่อมต่อเมื่อจำเป็น</string>
     <string name="nm_hands_wireless_pair_error">จับคู่ไม่สำเร็จ เปิดรหัสจับคู่ใหม่แล้วตรวจสอบพอร์ต</string>
     <string name="nm_hands_wireless_connect_error">เชื่อมต่อไม่ได้ ตรวจสอบว่าเปิดการแก้ไขข้อบกพร่องแบบไร้สายแล้ว และตรวจสอบพอร์ตในหน้าหลัก</string>
     <string name="nm_hands_wireless_notification">ป้อนรหัสผ่านการแจ้งเตือน</string>

@@ -548,6 +548,7 @@
     <string name="nm_hands_wireless_code">Anim na digit na pairing code</string>
     <string name="nm_hands_wireless_pair">Ipares ang teleponong ito</string>
     <string name="nm_hands_wireless_port_missing">Ilagay ang port na ipinapakita sa telepono at subukang muli.</string>
+    <string name="nm_hands_wireless_paired">Naipares na. Susubukang kumonekta kapag kailangan.</string>
     <string name="nm_hands_wireless_pair_error">Hindi naipares. Humingi ng bagong code at tingnan ang port nito.</string>
     <string name="nm_hands_wireless_connect_error">Hindi makakonekta. Tingnan ang Wireless debugging at ang port sa pangunahing pahina nito.</string>
     <string name="nm_hands_wireless_notification">Ilagay ang code sa notification</string>

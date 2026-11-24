@@ -545,6 +545,7 @@
     <string name="nm_hands_wireless_code">Kode penyandingan enam digit</string>
     <string name="nm_hands_wireless_pair">Sandingkan ponsel ini</string>
     <string name="nm_hands_wireless_port_missing">Masukkan port yang ditampilkan di ponsel lalu coba lagi.</string>
+    <string name="nm_hands_wireless_paired">Sudah disandingkan. Koneksi akan dicoba saat diperlukan.</string>
     <string name="nm_hands_wireless_pair_error">Penyandingan gagal. Minta kode baru dan periksa portnya.</string>
     <string name="nm_hands_wireless_connect_error">Tidak dapat terhubung. Periksa Debugging nirkabel dan port di halaman utamanya.</string>
     <string name="nm_hands_wireless_notification">Masukkan kode melalui notifikasi</string>

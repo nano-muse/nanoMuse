@@ -548,6 +548,7 @@
     <string name="nm_hands_wireless_code">Altı haneli eşleme kodu</string>
     <string name="nm_hands_wireless_pair">Bu telefonu eşle</string>
     <string name="nm_hands_wireless_port_missing">Telefonda görünen bağlantı noktasını girip yeniden deneyin.</string>
+    <string name="nm_hands_wireless_paired">Eşlendi. Gerektiğinde bağlanmayı dener.</string>
     <string name="nm_hands_wireless_pair_error">Eşleme başarısız oldu. Yeni bir eşleme kodu alın ve bağlantı noktasını kontrol edin.</string>
     <string name="nm_hands_wireless_connect_error">Bağlanılamadı. Kablosuz hata ayıklamayı ve ana sayfasındaki bağlantı noktasını kontrol edin.</string>
     <string name="nm_hands_wireless_notification">Kodu bildirimden gir</string>

@@ -99,6 +99,7 @@ fun HandsScreen(
                 subtitle = when {
                     active -> stringResource(R.string.nm_hands_status_working)
                     enabled && readiness.ready -> stringResource(R.string.nm_hands_status_ready)
+                    enabled && readiness.canStart -> stringResource(R.string.nm_hands_wireless_paired)
                     enabled -> stringResource(R.string.nm_hands_status_missing)
                     else -> stringResource(R.string.nm_hands_status_off)
                 },
@@ -148,8 +149,11 @@ fun HandsScreen(
                 SettingsRow(
                     title = stringResource(R.string.nm_hands_wireless_title),
                     subtitle = stringResource(
-                        if (readiness.backgroundBridgeReady) R.string.nm_hands_status_ready
-                        else R.string.nm_hands_wireless_pair,
+                        when {
+                            readiness.backgroundBridgeReady -> R.string.nm_hands_status_ready
+                            readiness.wirelessPaired -> R.string.nm_hands_wireless_paired
+                            else -> R.string.nm_hands_wireless_pair
+                        },
                     ),
                     icon = Icons.Outlined.Layers,
                     onClick = { showWireless = true },

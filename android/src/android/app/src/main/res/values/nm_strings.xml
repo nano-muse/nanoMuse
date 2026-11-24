@@ -539,6 +539,7 @@
     <string name="nm_hands_wireless_code">6-digit pairing code</string>
     <string name="nm_hands_wireless_pair">Pair this phone</string>
     <string name="nm_hands_wireless_port_missing">Enter the port shown on your phone, then try again.</string>
+    <string name="nm_hands_wireless_paired">Paired. Will try to connect when needed.</string>
     <string name="nm_hands_wireless_pair_error">Pairing failed. Open a new pairing code and check its port.</string>
     <string name="nm_hands_wireless_connect_error">Could not connect. Check Wireless debugging and the port on its main page.</string>
     <string name="nm_hands_wireless_notification">Enter code from a notification</string>

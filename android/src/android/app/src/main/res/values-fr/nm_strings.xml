@@ -549,6 +549,7 @@
     <string name="nm_hands_wireless_code">Code d’association à six chiffres</string>
     <string name="nm_hands_wireless_pair">Associer ce téléphone</string>
     <string name="nm_hands_wireless_port_missing">Saisissez le port affiché sur le téléphone et réessayez.</string>
+    <string name="nm_hands_wireless_paired">Appareil associé. Une connexion sera tentée si nécessaire.</string>
     <string name="nm_hands_wireless_pair_error">Échec de l’association. Demandez un nouveau code et vérifiez son port.</string>
     <string name="nm_hands_wireless_connect_error">Connexion impossible. Vérifiez le débogage sans fil et le port sur sa page principale.</string>
     <string name="nm_hands_wireless_notification">Saisir le code depuis une notification</string>

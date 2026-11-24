@@ -549,6 +549,7 @@
     <string name="nm_hands_wireless_code">Código de pareamento de seis dígitos</string>
     <string name="nm_hands_wireless_pair">Parear este telefone</string>
     <string name="nm_hands_wireless_port_missing">Digite a porta exibida no telefone e tente novamente.</string>
+    <string name="nm_hands_wireless_paired">Pareado. A conexão será tentada quando necessário.</string>
     <string name="nm_hands_wireless_pair_error">Falha no pareamento. Abra um novo código e confira a porta.</string>
     <string name="nm_hands_wireless_connect_error">Não foi possível conectar. Confira a depuração sem fio e a porta na página principal.</string>
     <string name="nm_hands_wireless_notification">Inserir o código pela notificação</string>

@@ -545,6 +545,7 @@
     <string name="nm_hands_wireless_code">Kod berpasangan enam digit</string>
     <string name="nm_hands_wireless_pair">Pasangkan telefon ini</string>
     <string name="nm_hands_wireless_port_missing">Masukkan port yang ditunjukkan pada telefon dan cuba lagi.</string>
+    <string name="nm_hands_wireless_paired">Telah dipasangkan. Sambungan akan dicuba apabila diperlukan.</string>
     <string name="nm_hands_wireless_pair_error">Gagal berpasangan. Dapatkan kod baharu dan semak portnya.</string>
     <string name="nm_hands_wireless_connect_error">Tidak dapat menyambung. Semak penyahpepijatan wayarles dan port pada halaman utamanya.</string>
     <string name="nm_hands_wireless_notification">Masukkan kod melalui pemberitahuan</string>

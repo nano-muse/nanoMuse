@@ -535,6 +535,7 @@
     <string name="nm_hands_wireless_code">六位配对码</string>
     <string name="nm_hands_wireless_pair">配对此手机</string>
     <string name="nm_hands_wireless_port_missing">请输入手机上显示的端口，然后重试。</string>
+    <string name="nm_hands_wireless_paired">已配对，需要时会尝试连接。</string>
     <string name="nm_hands_wireless_pair_error">配对失败。请重新打开配对码弹窗，核对端口后再试。</string>
     <string name="nm_hands_wireless_connect_error">连接失败。请确认无线调试已打开，并核对其主页上的端口。</string>
     <string name="nm_hands_wireless_notification">在通知中输入配对码</string>

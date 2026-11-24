@@ -554,6 +554,7 @@
     <string name="nm_hands_wireless_code">Sześciocyfrowy kod parowania</string>
     <string name="nm_hands_wireless_pair">Sparuj ten telefon</string>
     <string name="nm_hands_wireless_port_missing">Wpisz port widoczny na telefonie i spróbuj ponownie.</string>
+    <string name="nm_hands_wireless_paired">Sparowano. Próba połączenia nastąpi w razie potrzeby.</string>
     <string name="nm_hands_wireless_pair_error">Nie udało się sparować. Otwórz nowy kod parowania i sprawdź port.</string>
     <string name="nm_hands_wireless_connect_error">Nie udało się połączyć. Sprawdź debugowanie bezprzewodowe i port na jego głównej stronie.</string>
     <string name="nm_hands_wireless_notification">Wpisz kod w powiadomieniu</string>

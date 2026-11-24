@@ -530,6 +530,7 @@
     <string name="nm_hands_wireless_code">六位數配對碼</string>
     <string name="nm_hands_wireless_pair">配對這支手機</string>
     <string name="nm_hands_wireless_port_missing">請輸入手機顯示的通訊埠後再試一次。</string>
+    <string name="nm_hands_wireless_paired">已配對，需要時會嘗試連線。</string>
     <string name="nm_hands_wireless_pair_error">配對失敗。請重新開啟配對碼並核對通訊埠。</string>
     <string name="nm_hands_wireless_connect_error">連線失敗。請確認已開啟無線偵錯，並核對其主頁面上的通訊埠。</string>
     <string name="nm_hands_wireless_notification">在通知中輸入配對碼</string>

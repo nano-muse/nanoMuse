@@ -548,6 +548,7 @@
     <string name="nm_hands_wireless_code">Código de vinculación de seis dígitos</string>
     <string name="nm_hands_wireless_pair">Vincular este teléfono</string>
     <string name="nm_hands_wireless_port_missing">Introduce el puerto que muestra el teléfono y vuelve a intentarlo.</string>
+    <string name="nm_hands_wireless_paired">Vinculado. Se intentará conectar cuando sea necesario.</string>
     <string name="nm_hands_wireless_pair_error">No se pudo vincular. Solicita otro código y comprueba su puerto.</string>
     <string name="nm_hands_wireless_connect_error">No se pudo conectar. Comprueba la depuración inalámbrica y el puerto de su página principal.</string>
     <string name="nm_hands_wireless_notification">Introducir el código desde una notificación</string>

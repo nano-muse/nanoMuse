@@ -551,6 +551,7 @@
     <string name="nm_hands_wireless_code">Cod de asociere din șase cifre</string>
     <string name="nm_hands_wireless_pair">Asociază acest telefon</string>
     <string name="nm_hands_wireless_port_missing">Introdu portul afișat pe telefon și încearcă din nou.</string>
+    <string name="nm_hands_wireless_paired">Telefon asociat. Conectarea va fi încercată la nevoie.</string>
     <string name="nm_hands_wireless_pair_error">Asocierea a eșuat. Solicită un cod nou și verifică portul.</string>
     <string name="nm_hands_wireless_connect_error">Conectarea a eșuat. Verifică depanarea wireless și portul de pe pagina principală.</string>
     <string name="nm_hands_wireless_notification">Introdu codul printr-o notificare</string>

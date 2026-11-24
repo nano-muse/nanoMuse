@@ -545,6 +545,7 @@
     <string name="nm_hands_wireless_code">6 桁のペア設定コード</string>
     <string name="nm_hands_wireless_pair">この端末をペア設定</string>
     <string name="nm_hands_wireless_port_missing">端末に表示されたポートを入力し、もう一度お試しください。</string>
+    <string name="nm_hands_wireless_paired">ペア設定済みです。必要なときに接続を試みます。</string>
     <string name="nm_hands_wireless_pair_error">ペア設定に失敗しました。新しいコードを表示し、ポートを確認してください。</string>
     <string name="nm_hands_wireless_connect_error">接続できません。ワイヤレス デバッグの設定とトップ画面のポートを確認してください。</string>
     <string name="nm_hands_wireless_notification">通知からコードを入力</string>

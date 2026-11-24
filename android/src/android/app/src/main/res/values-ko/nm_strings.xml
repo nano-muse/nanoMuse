@@ -545,6 +545,7 @@
     <string name="nm_hands_wireless_code">6자리 페어링 코드</string>
     <string name="nm_hands_wireless_pair">이 휴대전화 페어링</string>
     <string name="nm_hands_wireless_port_missing">휴대전화에 표시된 포트를 입력하고 다시 시도하세요.</string>
+    <string name="nm_hands_wireless_paired">페어링되었습니다. 필요할 때 연결을 시도합니다.</string>
     <string name="nm_hands_wireless_pair_error">페어링할 수 없습니다. 새 코드를 열고 포트를 확인하세요.</string>
     <string name="nm_hands_wireless_connect_error">연결할 수 없습니다. 무선 디버깅 상태와 기본 화면의 포트를 확인하세요.</string>
     <string name="nm_hands_wireless_notification">알림에서 코드 입력</string>

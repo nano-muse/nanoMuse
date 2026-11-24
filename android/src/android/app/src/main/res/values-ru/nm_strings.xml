@@ -554,6 +554,7 @@
     <string name="nm_hands_wireless_code">Шестизначный код сопряжения</string>
     <string name="nm_hands_wireless_pair">Выполнить сопряжение</string>
     <string name="nm_hands_wireless_port_missing">Введите порт, указанный на телефоне, и повторите попытку.</string>
+    <string name="nm_hands_wireless_paired">Сопряжение выполнено. При необходимости приложение попробует подключиться.</string>
     <string name="nm_hands_wireless_pair_error">Не удалось выполнить сопряжение. Запросите новый код и проверьте порт.</string>
     <string name="nm_hands_wireless_connect_error">Не удалось подключиться. Проверьте беспроводную отладку и порт на её главной странице.</string>
     <string name="nm_hands_wireless_notification">Ввести код через уведомление</string>
