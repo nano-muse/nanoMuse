@@ -16,10 +16,20 @@ from nanomuse.agent.context import fit_context
 from nanomuse.calendar import CalendarFeeds
 from nanomuse.config import Settings
 from nanomuse.contacts import ContactBook
+from nanomuse.cost import recording as cost_recording
+from nanomuse.cost.recording import TaskCostRecorder
 from nanomuse.goals import GoalStore
 from nanomuse.llm import budget as task_budget
 from nanomuse.llm import session as llm_session
 from nanomuse.llm.base import BaseLLM
+from nanomuse.llm.decider import (
+    DecideOutcome,
+    Decider,
+    DecideRequest,
+    ScoreAnswer,
+    build_decider,
+    difficulty_question,
+)
 from nanomuse.llm.vision import keep_newest_images
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryItem, MemoryStore
@@ -76,6 +86,7 @@ class MuseAgent:
         skills: SkillLibrary | None = None,
         session_file: Path | None = None,
         conversation_id: str | None = None,
+        cost_recorder: TaskCostRecorder | None = None,
     ):
         self.settings = settings
         self.llm = llm
@@ -89,6 +100,11 @@ class MuseAgent:
         self.contacts = contacts
         self.skills = skills
         self.session_file = session_file
+        # The cost recorder of the app this agent belongs to, when the
+        # app built one.  It is the only recorder this agent feeds or
+        # is gated by; without one the agent falls back to the recorder
+        # installed in nanomuse.cost.recording, if any.
+        self.cost_recorder = cost_recorder
         # The conversation (thread) this agent is; approvals "for this conversation" are
         # bound to it and last as long as it does. Without one, each run stands alone.
         self.conversation_id = conversation_id
@@ -106,6 +122,9 @@ class MuseAgent:
         # before the next model call instead of waiting for the current run to finish.
         self.inbox: asyncio.Queue[str | Incoming] | None = None
         self._told_no_vision = False
+        # The decision layer for this agent, built from the [decider] settings on
+        # the first run that wants it; None until then and forever when disabled.
+        self._built_decider: Decider | None = None
         self.last_budget: dict[str, Any] = {}
         self._task_start = 0
         # The language of the screens the person reads this conversation on, from the latest
@@ -444,6 +463,46 @@ class MuseAgent:
 
         return len({sig(m) for m in assistants}) == 1
 
+    # ------------------------------------------------------------------ decision layer
+    async def _decider_shadow(self, user_input: str) -> None:
+        """The decision layer's one shadow question per run: how hard is this task.
+
+        Only with ``[decider] enabled``; with it off this returns before
+        anything is built or called.  The answer is written to the
+        decision log with the tier it would have picked at the
+        configured threshold, and changes nothing about the run: the
+        model, the tools and the budget are all exactly as they would
+        have been.  The decider fails open on its own; this wrapper
+        swallows anything else, because a shadow observer must never
+        break a task.
+        """
+        cfg = self.settings.decider
+        if not cfg.enabled:
+            return
+        try:
+            if self._built_decider is None:
+                self._built_decider = build_decider(self.settings)
+            threshold = cfg.threshold
+
+            def annotate(outcome: DecideOutcome) -> dict[str, Any]:
+                answers = outcome.answers or []
+                first = answers[0] if answers else None
+                if isinstance(first, ScoreAnswer):
+                    tier = "escalated" if first.score >= threshold else "default"
+                    return {"would_choose": tier}
+                return {"would_choose": None}
+
+            await self._built_decider.decide(
+                "task_difficulty",
+                DecideRequest(
+                    state=user_input[:2000],
+                    questions=[difficulty_question()],
+                ),
+                annotate=annotate,
+            )
+        except Exception:  # noqa: BLE001 - shadow mode observes; it never interferes
+            logger.exception("decider shadow call failed")
+
     # ------------------------------------------------------------------ main loop
     async def run(
         self,
@@ -455,6 +514,26 @@ class MuseAgent:
     ) -> str:
         if self.state == AgentState.RUNNING:
             raise RuntimeError("agent is already running")
+        # Reserve the agent before the first await below (the shadow
+        # classification): a run that arrives while that call is awaited
+        # is refused by the check above, before it can reset this run's
+        # budget or request boundary. A failure before _run takes over
+        # hands the state back, so a refused or cancelled attempt leaves
+        # the agent as it was.
+        reserved_from = self.state
+        self.state = AgentState.RUNNING
+        try:
+            # The cost gate's hard mode refuses here, before any work or spend;
+            # a no-op unless this agent's recorder (or, for an agent built
+            # without one, the fallback recorder) has a hard gate.
+            if self.cost_recorder is not None:
+                self.cost_recorder.preflight()
+            else:
+                cost_recording.preflight()
+            await self._decider_shadow(user_input)
+        except BaseException:
+            self.state = reserved_from
+            raise
         token = task_budget.begin(self.settings.agent.budget, inherit=False)
         budget = task_budget.current()
         assert budget is not None
@@ -483,6 +562,38 @@ class MuseAgent:
         finally:
             try:
                 self.last_budget = budget.snapshot()
+                # Feed the cost ledger from the real run; bookkeeping only, so a
+                # ledger failure never reaches the finished task.
+                try:
+                    # The ledger names the model that ran: the one in
+                    # the llm's own settings.  The client's ``name`` is
+                    # the wrapper's label (the prompt adapter's is
+                    # "prompt_tools"), never a model id, so it is only
+                    # a last resort: pricing by it missed every real
+                    # model and recorded zero costs.  The snapshot's
+                    # per-model split is what the recorder prices when
+                    # nested calls ran on other models; this name is
+                    # the task's own model and the fallback for a
+                    # snapshot without a split.
+                    model = str(
+                        getattr(getattr(self.llm, "settings", None), "model", None)
+                        or self.settings.llm.model
+                        or getattr(self.llm, "name", "")
+                    )
+                    if self.cost_recorder is not None:
+                        self.cost_recorder.record_finished_task(
+                            task_id=self.conversation_id or self.session_id,
+                            model=model,
+                            snapshot=self.last_budget,
+                        )
+                    else:
+                        cost_recording.record_finished_task(
+                            task_id=self.conversation_id or self.session_id,
+                            model=model,
+                            snapshot=self.last_budget,
+                        )
+                except Exception:
+                    logger.exception("cost ledger recording failed")
                 # a line in the audit log when a budget is in force or was reached; a task
                 # with no limits set leaves the log as it was
                 if budget.limited or budget.stopped:
@@ -602,8 +713,9 @@ class MuseAgent:
         ``schedule``, ``feed``, ``goal``, ``hub`` for the runs nobody typed), told to the
         relay with every call of the turn. Task-scoped approvals end when this call returns.
         """
-        if self.state == AgentState.RUNNING:
-            raise RuntimeError("agent is already running")
+        # run() reserved the agent before its first await, so the state is
+        # already RUNNING when this call is handed the run; the assignment
+        # is this run taking ownership, not a second check.
         self.state = AgentState.RUNNING
         self.turns += 1
         if language:
