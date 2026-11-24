@@ -242,7 +242,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
-- Added an optional background screen on compatible Android 14 and newer phones with authorized Shizuku, so Hands can operate one app while your keyboard and the Stop control stay on the main screen.
+- Added an optional background screen on compatible Android 14 and newer phones so Hands can operate one app while your keyboard and the Stop control stay on the main screen.
 
 - Grouped the app lock and protected chat settings on one page and clarified when each lock timer starts.
 
