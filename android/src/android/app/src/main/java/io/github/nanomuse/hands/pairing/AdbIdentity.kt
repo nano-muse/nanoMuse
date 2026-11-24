@@ -31,7 +31,7 @@ internal class AdbIdentity(val privateKey: PrivateKey, val certificate: X509Cert
     }
 
     companion object {
-        private const val ALIAS = "nanomuse_hands_wireless"
+        private const val ALIAS = "nanomuse_hands_wireless_sign"
         private fun keyStore() = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
         fun load(pairing: Boolean): AdbIdentity {
@@ -43,6 +43,9 @@ internal class AdbIdentity(val privateKey: PrivateKey, val certificate: X509Cert
                     KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY)
                         .setKeySize(2048)
                         .setDigests(KeyProperties.DIGEST_NONE, KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA384, KeyProperties.DIGEST_SHA512)
+                        // Conscrypt constructs the TLS signature padding, then uses a private
+                        // RSA/NoPadding operation. The Keystore key still has sign/verify purposes only.
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                         .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1, KeyProperties.SIGNATURE_PADDING_RSA_PSS)
                         .setCertificateSubject(X500Principal("CN=nanoMuse"))
                         .setCertificateNotAfter(Date(4_102_444_800_000L))
