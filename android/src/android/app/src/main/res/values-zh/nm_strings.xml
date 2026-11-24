@@ -1272,7 +1272,7 @@
     <string name="nm_calendar_checkin_setting">手机上可见日历的忙碌时段改期或冲突时，主动给我发消息</string>
     <string name="nm_calendar_moved">手机日历里有项安排从 %1$s 改到了 %2$s。要一起看看哪些计划需要调整吗？</string>
     <string name="nm_calendar_overlap">手机日历里的两项安排撞期了（%1$s 和 %2$s）。要一起看看可以怎么安排吗？</string>
-    <string name="nm_chat_checkin_setting">聊天里的待办到期时，主动给我发消息</string>
+    <string name="nm_chat_checkin_setting">聊天待办到期，或关注的信息源有重要更新时，给我发消息</string>
     <string name="nm_chat_checkin_body">你之前提过这件事，约定的日期是今天：\n「%1$s」\n\n现在进展怎么样？有什么需要我帮你准备的？</string>
     <string name="nm_public_sources">公开信息源</string>
     <string name="nm_public_hint">关注的来源有值得留意的新变化时，在主对话中提醒你。</string>

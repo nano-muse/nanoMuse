@@ -1307,7 +1307,7 @@
     <string name="nm_calendar_checkin_setting">Сообщать, если время событий в видимых календарях телефона изменилось или совпало</string>
     <string name="nm_calendar_moved">Событие в календаре перенесено с %1$s на %2$s. Хотите пересмотреть планы?</string>
     <string name="nm_calendar_overlap">Два события в календаре пересекаются (%1$s и %2$s). Хотите подобрать другое время?</string>
-    <string name="nm_chat_checkin_setting">Писать мне в день, о котором мы договорились в чате</string>
+    <string name="nm_chat_checkin_setting">Сообщать о сроках договорённостей из чата и новостях из моих подписок</string>
     <string name="nm_chat_checkin_body">На сегодня у тебя был такой план:\n«%1$s»\n\nКак дела? Помочь что-нибудь подготовить?</string>
     <string name="nm_public_sources">Публичные источники</string>
     <string name="nm_public_hint">Получайте в основном чате важные новости из источников, на которые вы подписаны.</string>

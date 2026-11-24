@@ -1307,7 +1307,7 @@
     <string name="nm_calendar_checkin_setting">Pisz do mnie, gdy zajęte terminy w widocznych kalendarzach telefonu zmienią się lub nałożą</string>
     <string name="nm_calendar_moved">Termin w kalendarzu zmienił się z %1$s na %2$s. Chcesz przejrzeć swoje plany?</string>
     <string name="nm_calendar_overlap">Dwa terminy w kalendarzu nakładają się (%1$s i %2$s). Chcesz rozważyć inne możliwości?</string>
-    <string name="nm_chat_checkin_setting">Napisz do mnie w dniu ustalonym na czacie</string>
+    <string name="nm_chat_checkin_setting">Powiadom mnie o ustaleniach z czatu, których termin nadszedł, oraz o nowościach z obserwowanych źródeł</string>
     <string name="nm_chat_checkin_body">W rozmowie pojawił się ten plan na dziś:\n„%1$s”\n\nJak idzie? Czy mogę pomóc w przygotowaniach?</string>
     <string name="nm_public_sources">Źródła publiczne</string>
     <string name="nm_public_hint">Otrzymuj w głównej rozmowie istotne wiadomości z obserwowanych źródeł.</string>

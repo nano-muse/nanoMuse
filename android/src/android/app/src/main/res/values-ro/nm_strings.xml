@@ -1303,7 +1303,7 @@
     <string name="nm_calendar_checkin_setting">Trimite-mi un mesaj când intervalele ocupate din calendarele vizibile pe telefon se schimbă sau se suprapun</string>
     <string name="nm_calendar_moved">Un eveniment din calendar s-a mutat de la %1$s la %2$s. Vrei să îți revizuiești planurile?</string>
     <string name="nm_calendar_overlap">Două evenimente din calendar se suprapun (%1$s și %2$s). Vrei să căutăm alternative?</string>
-    <string name="nm_chat_checkin_setting">Trimite-mi un mesaj în ziua stabilită în conversație</string>
+    <string name="nm_chat_checkin_setting">Anunță-mă când se apropie termenul unui angajament din conversație sau apar noutăți din sursele urmărite</string>
     <string name="nm_chat_checkin_body">Ai menționat acest plan pentru astăzi:\n„%1$s”\n\nCum merge? Te pot ajuta să pregătești ceva?</string>
     <string name="nm_public_sources">Surse publice</string>
     <string name="nm_public_hint">Primești în conversația principală noutățile importante din sursele urmărite.</string>

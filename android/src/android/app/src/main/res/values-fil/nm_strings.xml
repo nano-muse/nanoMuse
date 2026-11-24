@@ -1299,7 +1299,7 @@
     <string name="nm_calendar_checkin_setting">Padalhan ako ng mensahe kapag nagbago o nagsabay ang mga iskedyul sa mga nakikitang kalendaryo ng telepono</string>
     <string name="nm_calendar_moved">Inilipat ang isang kaganapan sa kalendaryo mula %1$s patungong %2$s. Gusto mong suriin ang iyong mga plano?</string>
     <string name="nm_calendar_overlap">May dalawang magkasabay na kaganapan sa kalendaryo (%1$s at %2$s). Gusto mong tingnan ang ibang pagpipilian?</string>
-    <string name="nm_chat_checkin_setting">Padalhan ako ng mensahe kapag araw na ng napag-usapan sa chat</string>
+    <string name="nm_chat_checkin_setting">Abisuhan ako kapag oras na ng napag-usapan sa chat o may balita mula sa sinusundan ko</string>
     <string name="nm_chat_checkin_body">Nabanggit mo itong plano para sa araw na ito:\n“%1$s”\n\nKumusta na? May maitutulong ba ako sa paghahanda?</string>
     <string name="nm_public_sources">Mga pampublikong mapagkukunan</string>
     <string name="nm_public_hint">Aabisuhan ka sa pangunahing chat kapag may mahalagang pagbabago sa sinusundan mo.</string>

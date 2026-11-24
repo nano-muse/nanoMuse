@@ -1295,7 +1295,7 @@
     <string name="nm_calendar_checkin_setting">Kirimi saya pesan jika jadwal sibuk di kalender ponsel yang terlihat berubah atau bertumpuk</string>
     <string name="nm_calendar_moved">Acara di kalender Anda berpindah dari %1$s ke %2$s. Ingin meninjau rencana Anda?</string>
     <string name="nm_calendar_overlap">Dua acara bertumpuk di kalender Anda (%1$s dan %2$s). Ingin melihat pilihan lain?</string>
-    <string name="nm_chat_checkin_setting">Kirim pesan saat janji dalam obrolan jatuh tempo</string>
+    <string name="nm_chat_checkin_setting">Beri tahu saya saat janji dalam percakapan jatuh tempo atau ada kabar dari sumber yang diikuti</string>
     <string name="nm_chat_checkin_body">Kamu menyebut rencana ini untuk hari ini:\n“%1$s”\n\nBagaimana perkembangannya? Ada yang bisa kubantu siapkan?</string>
     <string name="nm_public_sources">Sumber publik</string>
     <string name="nm_public_hint">Terima kabar penting dari sumber yang diikuti di percakapan utama.</string>

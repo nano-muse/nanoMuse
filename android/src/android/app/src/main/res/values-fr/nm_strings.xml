@@ -1300,7 +1300,7 @@
     <string name="nm_calendar_checkin_setting">Me prévenir lorsque des créneaux occupés changent ou se chevauchent dans les calendriers visibles du téléphone</string>
     <string name="nm_calendar_moved">Un événement de votre calendrier a été déplacé de %1$s à %2$s. Souhaitez-vous revoir votre planning ?</string>
     <string name="nm_calendar_overlap">Deux événements se chevauchent (%1$s et %2$s). Souhaitez-vous examiner les autres possibilités ?</string>
-    <string name="nm_chat_checkin_setting">Me contacter le jour prévu pour un engagement pris dans le chat</string>
+    <string name="nm_chat_checkin_setting">Me signaler les engagements du chat arrivés à échéance et les nouvelles des sources suivies</string>
     <string name="nm_chat_checkin_body">Tu avais prévu ceci pour aujourd’hui :\n« %1$s »\n\nOù en es-tu ? Veux-tu de l’aide pour préparer quelque chose ?</string>
     <string name="nm_public_sources">Sources publiques</string>
     <string name="nm_public_hint">Recevez dans la conversation principale les nouvelles importantes des sources suivies.</string>

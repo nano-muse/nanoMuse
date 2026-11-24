@@ -1265,7 +1265,7 @@
     <string name="nm_calendar_checkin_setting">手機上可見行事曆的忙碌時段改期或重疊時，主動傳訊息給我</string>
     <string name="nm_calendar_moved">手機行事曆有項安排從 %1$s 改到 %2$s。要一起看看哪些計畫需要調整嗎？</string>
     <string name="nm_calendar_overlap">手機行事曆有兩項安排重疊（%1$s 和 %2$s）。要一起看看其他時段嗎？</string>
-    <string name="nm_chat_checkin_setting">聊天中的待辦到期時，主動傳訊息給我</string>
+    <string name="nm_chat_checkin_setting">聊天待辦到期，或關注的來源有重要更新時，傳訊息給我</string>
     <string name="nm_chat_checkin_body">你之前提過這件事，約定的日期是今天：\n「%1$s」\n\n現在進展如何？有什麼需要我幫你準備的嗎？</string>
     <string name="nm_public_sources">公開資訊來源</string>
     <string name="nm_public_hint">關注的來源有值得留意的新變化時，在主要對話中提醒你。</string>

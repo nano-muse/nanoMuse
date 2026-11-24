@@ -1279,7 +1279,7 @@
     <string name="nm_calendar_checkin_setting">Message me when busy times in my visible phone calendars change or overlap</string>
     <string name="nm_calendar_moved">Your calendar changed. An event previously at %1$s is now at %2$s. Would you like to review your plans?</string>
     <string name="nm_calendar_overlap">Two calendar events overlap (%1$s and %2$s). Would you like to look at alternatives?</string>
-    <string name="nm_chat_checkin_setting">Message me when a chat commitment is due</string>
+    <string name="nm_chat_checkin_setting">Message me about due chat commitments and updates from followed sources</string>
     <string name="nm_chat_checkin_body">You mentioned this plan for today:\n“%1$s”\n\nHow is it going? Is there anything I can help you prepare?</string>
     <string name="nm_public_sources">Public sources</string>
     <string name="nm_public_hint">Check followed sources for changes worth mentioning in your main chat.</string>

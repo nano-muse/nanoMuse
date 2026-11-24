@@ -1295,7 +1295,7 @@
     <string name="nm_calendar_checkin_setting">Hantar mesej jika waktu sibuk dalam kalendar telefon yang dipaparkan berubah atau bertindih</string>
     <string name="nm_calendar_moved">Satu acara kalendar beralih daripada %1$s kepada %2$s. Mahu menyemak rancangan anda?</string>
     <string name="nm_calendar_overlap">Dua acara kalendar bertindih (%1$s dan %2$s). Mahu melihat pilihan lain?</string>
-    <string name="nm_chat_checkin_setting">Hantar mesej pada tarikh yang dijanjikan dalam sembang</string>
+    <string name="nm_chat_checkin_setting">Maklumkan apabila tiba masa yang dijanjikan dalam sembang atau ada berita daripada sumber yang diikuti</string>
     <string name="nm_chat_checkin_body">Anda pernah menyebut rancangan ini untuk hari ini:\n“%1$s”\n\nBagaimana perkembangannya? Ada yang boleh saya bantu sediakan?</string>
     <string name="nm_public_sources">Sumber awam</string>
     <string name="nm_public_hint">Terima perkembangan penting daripada sumber yang diikuti dalam sembang utama.</string>

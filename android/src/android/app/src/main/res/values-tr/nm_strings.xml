@@ -1299,7 +1299,7 @@
     <string name="nm_calendar_checkin_setting">Telefonda görünen takvimlerimdeki dolu saatler değiştiğinde veya çakıştığında bana yaz</string>
     <string name="nm_calendar_moved">Takvimindeki bir etkinliğin saati değişti. Önceki saat %1$s, yeni saat %2$s. Planlarını gözden geçirmek ister misin?</string>
     <string name="nm_calendar_overlap">Takvimindeki iki etkinliğin saati çakışıyor (%1$s ve %2$s). Alternatiflere bakmak ister misin?</string>
-    <string name="nm_chat_checkin_setting">Sohbette konuştuğumuz işin günü geldiğinde bana yaz</string>
+    <string name="nm_chat_checkin_setting">Sohbette konuştuğumuz işin zamanı geldiğinde veya takip ettiğim kaynaklarda önemli bir gelişme olduğunda bana yaz</string>
     <string name="nm_chat_checkin_body">Bugün için şu plandan söz etmiştin:\n“%1$s”\n\nNasıl gidiyor? Hazırlık için yardım edebileceğim bir şey var mı?</string>
     <string name="nm_public_sources">Herkese açık kaynaklar</string>
     <string name="nm_public_hint">Takip edilen kaynaklardaki önemli gelişmeleri ana sohbette bildir.</string>

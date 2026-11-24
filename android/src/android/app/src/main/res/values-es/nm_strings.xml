@@ -1299,7 +1299,7 @@
     <string name="nm_calendar_checkin_setting">Avísame si cambian o se solapan los horarios ocupados en los calendarios visibles del teléfono</string>
     <string name="nm_calendar_moved">Un evento del calendario ha pasado de %1$s a %2$s. ¿Quieres revisar tus planes?</string>
     <string name="nm_calendar_overlap">Hay dos eventos que se solapan (%1$s y %2$s). ¿Quieres revisar otras opciones?</string>
-    <string name="nm_chat_checkin_setting">Escribirme cuando llegue la fecha de un compromiso del chat</string>
+    <string name="nm_chat_checkin_setting">Avisarme de compromisos pendientes del chat y novedades de las fuentes que sigo</string>
     <string name="nm_chat_checkin_body">Mencionaste este plan para hoy:\n«%1$s»\n\n¿Cómo va? ¿Quieres que te ayude a preparar algo?</string>
     <string name="nm_public_sources">Fuentes públicas</string>
     <string name="nm_public_hint">Recibe en el chat principal las novedades importantes de las fuentes que sigues.</string>

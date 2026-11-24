@@ -1300,7 +1300,7 @@
     <string name="nm_calendar_checkin_setting">Avise quando horários ocupados nos calendários visíveis do celular mudarem ou coincidirem</string>
     <string name="nm_calendar_moved">Um compromisso passou de %1$s para %2$s. Quer rever seus planos?</string>
     <string name="nm_calendar_overlap">Dois compromissos coincidem (%1$s e %2$s). Quer avaliar as alternativas?</string>
-    <string name="nm_chat_checkin_setting">Me enviar uma mensagem na data de um compromisso da conversa</string>
+    <string name="nm_chat_checkin_setting">Avisar sobre compromissos da conversa que chegaram ao prazo e novidades das fontes que sigo</string>
     <string name="nm_chat_checkin_body">Você mencionou este plano para hoje:\n“%1$s”\n\nComo está indo? Posso ajudar a preparar alguma coisa?</string>
     <string name="nm_public_sources">Fontes públicas</string>
     <string name="nm_public_hint">Receba na conversa principal as novidades importantes das fontes que você segue.</string>
