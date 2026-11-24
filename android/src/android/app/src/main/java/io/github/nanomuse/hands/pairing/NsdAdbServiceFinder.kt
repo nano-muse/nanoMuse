@@ -49,6 +49,31 @@ internal class NsdAdbServiceFinder(context: Context) : AdbServiceFinder {
         return ports.toList()
     }
 
+    /** Returns as soon as the first local port for [serviceType] is resolved (used for live pairing dialog discovery). */
+    suspend fun findFirstPort(serviceType: String, timeoutMs: Long): Int? {
+        val services = Channel<NsdServiceInfo>(32)
+        val listener = object : NsdManager.DiscoveryListener {
+            override fun onServiceFound(info: NsdServiceInfo) { services.trySend(info) }
+            override fun onServiceLost(info: NsdServiceInfo) {}
+            override fun onDiscoveryStarted(serviceType: String) {}
+            override fun onDiscoveryStopped(serviceType: String) {}
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) { services.close() }
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
+        }
+        nsd.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
+        return try {
+            withTimeoutOrNull(timeoutMs) {
+                while (true) {
+                    val info = services.receiveCatching().getOrNull() ?: return@withTimeoutOrNull null
+                    resolve(info)?.let { return@withTimeoutOrNull it }
+                }
+                null
+            }
+        } finally {
+            runCatching { nsd.stopServiceDiscovery(listener) }
+        }
+    }
+
     /** 解析一条服务,是本机的就给出端口;解析失败或不是本机为 null。 */
     private suspend fun resolve(info: NsdServiceInfo): Int? {
         val done = Channel<Int?>(1)

@@ -126,6 +126,13 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- nanoMuse: resolve system settings and developer options for wireless pairing setup. -->
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.APPLICATION_DEVELOPMENT_SETTINGS" />
+        </intent>
         <!-- T234: needed for androidx.browser CustomTabsClient.bindCustomTabsService
              to discover the user's Chrome (or any Custom Tabs provider) under
              Android 11+ package-visibility rules. Without this the bind silently
