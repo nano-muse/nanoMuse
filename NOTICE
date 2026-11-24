@@ -28,6 +28,11 @@ source of every nanoMuse release is the tagged commit on
 https://github.com/nano-muse/nanoMuse together with the submodule
 android/deps/proot (https://github.com/nano-muse/proot).
 
+The Android wireless-debugging pairing code adapts parts of Mika,
+Copyright 2026 wangzan101, under the Apache License, Version 2.0.
+The source and APK include that licence and notice in
+android/src/android/app/src/main/assets/nanomuse/licenses/Mika.txt.
+
 Other components and their licences: THIRD_PARTY_NOTICES.md.
 
 The coding timeline's apply_patch reader is adapted from Remodex,
