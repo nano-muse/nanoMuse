@@ -73,6 +73,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
+      - name: Test the shared mobile HTTPS reader
+        working-directory: android/deps/rclone-mobile
+        run: go test -mod=readonly ./publicwatch
+
       - name: Native artifacts (proot, Alpine rootfs, rclone.aar)
         env:
           GOTOOLCHAIN: auto

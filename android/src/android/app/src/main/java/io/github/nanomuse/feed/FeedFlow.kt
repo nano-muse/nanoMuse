@@ -81,6 +81,7 @@ object FeedFlow {
 
     fun init(context: Context) {
         FeedStore.init(context)
+        PublicWatchJob.schedule(context)
         io.github.nanomuse.goals.GoalFollowUps.start(context)
         ChatCheckIns.schedule(context)
         _introAcknowledged.value = prefs(context).getBoolean(KEY_INTRO_ACK, false)
@@ -90,6 +91,7 @@ object FeedFlow {
 
     fun leave(context: Context) {
         FeedChatEvidence.accountChange(leaving = true)
+        PublicWatchStore.accountChange(leaving = true)
         FeedPreparationRunner.accountChange(leaving = true)
         io.github.nanomuse.goals.GoalFollowUps.leave(context)
         ChatCheckIns.cancel(context)
@@ -101,6 +103,8 @@ object FeedFlow {
     /** Another account's preferences and routine are in place (contract C12): read them again. */
     fun refresh(context: Context) {
         FeedChatEvidence.accountChange(leaving = false)
+        PublicWatchStore.accountChange(leaving = false)
+        PublicWatchJob.schedule(context)
         FeedPreparationRunner.accountChange(leaving = false)
         io.github.nanomuse.goals.GoalFollowUps.start(context)
         ChatCheckIns.schedule(context)

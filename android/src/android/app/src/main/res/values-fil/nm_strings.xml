@@ -1301,4 +1301,18 @@
     <string name="nm_calendar_overlap">May dalawang magkasabay na kaganapan sa kalendaryo (%1$s at %2$s). Gusto mong tingnan ang ibang pagpipilian?</string>
     <string name="nm_chat_checkin_setting">Padalhan ako ng mensahe kapag araw na ng napag-usapan sa chat</string>
     <string name="nm_chat_checkin_body">Nabanggit mo itong plano para sa araw na ito:\n“%1$s”\n\nKumusta na? May maitutulong ba ako sa paghahanda?</string>
+    <string name="nm_public_sources">Mga pampublikong mapagkukunan</string>
+    <string name="nm_public_hint">Aabisuhan ka sa pangunahing chat kapag may mahalagang pagbabago sa sinusundan mo.</string>
+    <string name="nm_public_unavailable">Pansamantalang hindi magamit ang mapagkukunan</string>
+    <string name="nm_public_link">Iugnay ang research ID</string>
+    <string name="nm_public_follow">Subaybayan</string>
+    <string name="nm_public_topic">Paksa ng pananaliksik</string>
+    <string name="nm_public_website">Website o RSS/Atom</string>
+    <string name="nm_public_error">Suriin ang mapagkukunan at subukang muli.</string>
+    <string name="nm_public_update">May balita mula sa sinusundan mo:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">Iminumungkahi</string>
+    <string name="nm_public_manual">Idinagdag mo</string>
+    <string name="nm_public_chat">Mula sa pangunahing chat</string>
+    <string name="nm_public_recurring">Ilang beses na nabanggit</string>
+    <string name="nm_public_connected">Mula sa nakakonektang mapagkukunan</string>
 </resources>

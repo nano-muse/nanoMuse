@@ -57,7 +57,7 @@ object Transcript {
     }
 
     fun items(messages: List<LocalMessage>): List<TranscriptItem> {
-        val rows = messages.map(::Row)
+        val rows = messages.filterNot { io.github.nanomuse.feed.ChatCheckIns.isLocalPublicMessage(it.id) }.map(::Row)
         // segments: each starts at a message of the person; rows before the first one form their own
         val segments = mutableListOf<MutableList<Row>>()
         for (r in rows) {

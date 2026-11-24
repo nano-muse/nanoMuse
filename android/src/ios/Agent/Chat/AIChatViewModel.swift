@@ -2236,6 +2236,9 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         // nanoMuse: only accept a send explicitly made from the local chat composer.
         let feedTicket = fromFeedComposer && pendingAttachments.isEmpty && sessionSource == nil && NanoMuseFeedChatContext.textLength.contains(text.count)
             ? NanoMuseFeedChatIndex.ticket(session: sessionId, memory: memoryEnabled) : nil
+        // nanoMuse: source discovery uses only direct composer text in the current local main chat.
+        let watchTicket = fromFeedComposer && pendingAttachments.isEmpty && sessionSource == nil && (2...6000).contains(text.count)
+            ? NanoMusePublicWatches.shared.captureTicket(session: sessionId, memory: memoryEnabled) : nil
         #if DEBUG
         logger.info("🔑DRAFT [vm=\(self.vmInstanceId)] send() text=\(text.count)ch attachments=\(pendingAttachments.count) isProcessing=\(self.isProcessing) sessionId=\(self.sessionId ?? "nil") draftId=\(self.draftId ?? "nil") inputText='\(String(self.inputText.prefix(30)))'")
         #else
@@ -2660,6 +2663,9 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 // nanoMuse: retain only an opaque pointer, recheck the original row when preparing a card.
                 if let feedTicket, let sid = self.sessionId, userMsg.nmRoutine == nil {
                     NanoMuseFeedChatIndex.record(feedTicket, session: sid, message: persistedId)
+                }
+                if let watchTicket, let sid = self.sessionId, userMsg.nmRoutine == nil { // nanoMuse: observe only after the user's turn is safely stored.
+                    NanoMusePublicWatches.shared.observe(watchTicket, session: sid, id: persistedId, text: text, memory: self.memoryEnabled)
                 }
             }
             if let sid = self.sessionId { NanoMuseSync.shared.userMessageSent(session: sid) } // nanoMuse: C8 — the person's line goes up now, the reply when the turn ends

@@ -1309,4 +1309,18 @@
     <string name="nm_calendar_overlap">Два события в календаре пересекаются (%1$s и %2$s). Хотите подобрать другое время?</string>
     <string name="nm_chat_checkin_setting">Писать мне в день, о котором мы договорились в чате</string>
     <string name="nm_chat_checkin_body">На сегодня у тебя был такой план:\n«%1$s»\n\nКак дела? Помочь что-нибудь подготовить?</string>
+    <string name="nm_public_sources">Публичные источники</string>
+    <string name="nm_public_hint">Получайте в основном чате важные новости из источников, на которые вы подписаны.</string>
+    <string name="nm_public_unavailable">Источник временно недоступен</string>
+    <string name="nm_public_link">Привязать научный идентификатор</string>
+    <string name="nm_public_follow">Подписаться</string>
+    <string name="nm_public_topic">Тема исследования</string>
+    <string name="nm_public_website">Сайт или RSS/Atom</string>
+    <string name="nm_public_error">Проверьте источник и попробуйте ещё раз.</string>
+    <string name="nm_public_update">Новость из вашей подписки:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">Предложено</string>
+    <string name="nm_public_manual">Добавлено вручную</string>
+    <string name="nm_public_chat">Из основного чата</string>
+    <string name="nm_public_recurring">Несколько упоминаний</string>
+    <string name="nm_public_connected">Из подключённого источника</string>
 </resources>

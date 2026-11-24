@@ -1302,4 +1302,18 @@
     <string name="nm_calendar_overlap">Dois compromissos coincidem (%1$s e %2$s). Quer avaliar as alternativas?</string>
     <string name="nm_chat_checkin_setting">Me enviar uma mensagem na data de um compromisso da conversa</string>
     <string name="nm_chat_checkin_body">Você mencionou este plano para hoje:\n“%1$s”\n\nComo está indo? Posso ajudar a preparar alguma coisa?</string>
+    <string name="nm_public_sources">Fontes públicas</string>
+    <string name="nm_public_hint">Receba na conversa principal as novidades importantes das fontes que você segue.</string>
+    <string name="nm_public_unavailable">Fonte temporariamente indisponível</string>
+    <string name="nm_public_link">Vincular um identificador de pesquisa</string>
+    <string name="nm_public_follow">Seguir</string>
+    <string name="nm_public_topic">Tema de pesquisa</string>
+    <string name="nm_public_website">Site ou RSS/Atom</string>
+    <string name="nm_public_error">Confira a fonte e tente novamente.</string>
+    <string name="nm_public_update">Novidade de uma fonte que você segue:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">Sugerida</string>
+    <string name="nm_public_manual">Adicionada por você</string>
+    <string name="nm_public_chat">Da conversa principal</string>
+    <string name="nm_public_recurring">Mencionada várias vezes</string>
+    <string name="nm_public_connected">De uma fonte conectada</string>
 </resources>

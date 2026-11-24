@@ -170,6 +170,101 @@ internal object ChatCheckIns {
         }
     }
 
+    fun isLocalPublicMessage(id: String) = isMessage(id) && id.substringAfterLast("-public-", "").matches(Regex("[0-9a-f]{24}"))
+
+    /** Both schedulers claim the same daily receipt inside a Room transaction. The event suffix
+     * survives process death after insertion and before the watch ledger acknowledges it. */
+    internal suspend fun publicWindow(app: MinisApp, owner: String, session: String, now: ZonedDateTime): Boolean {
+        if (!enabled(app) || nextWindow(now, prefs(app).getString(LAST_DAY, null)) != now || SessionActivityTracker.isActive(session)) return false
+        val chat = app.chatRepository.getSession(session) ?: return false
+        if (now.toInstant().toEpochMilli() - chat.updatedAt < Duration.ofMinutes(15).toMillis()) return false
+        val settled = app.database.openHelper.readableDatabase.query(
+            """SELECT role, error_info, stream_interrupt_count,
+               CASE WHEN length(parts_json) <= 131072 THEN parts_json ELSE '' END
+               FROM messages WHERE session_id = ? ORDER BY sort_order DESC LIMIT 1""", arrayOf<Any>(session)
+        ).use { cursor ->
+            !cursor.moveToFirst() || settledTail(cursor.getString(0), !cursor.isNull(1), cursor.getInt(2), cursor.getString(3))
+        }
+        if (!settled) return false
+        val day = prefix(owner, now)
+        return !app.database.openHelper.readableDatabase.query(
+            "SELECT 1 FROM messages WHERE id GLOB ? LIMIT 1", arrayOf<Any>("$day*")
+        ).use { it.moveToFirst() }
+    }
+
+    internal fun settledTail(role: String, failed: Boolean, interruptions: Int, parts: String): Boolean {
+        if (role != "assistant" || failed || interruptions != 0) return false
+        val rows = runCatching { org.json.JSONArray(parts) }.getOrNull() ?: return false
+        var content = false
+        for (i in 0 until rows.length()) {
+            val part = rows.optJSONObject(i) ?: return false
+            when (part.optString("type")) {
+                "toolUse", "toolResult" -> return false
+                "text" -> if (part.optString("value").isNotBlank()) content = true
+            }
+        }
+        return content
+    }
+
+    internal suspend fun deliverPublic(app: MinisApp, owner: String, session: String, event: String, body: String, synced: String, allowed: () -> Boolean): Boolean =
+        ConversationSync.withStableChats {
+            val now = ZonedDateTime.now()
+            val suffix = "-public-" + FeedPreparation.hash(owner, event)
+            var inserted = false
+            val acknowledged = app.database.withTransaction {
+                if (!allowed() || SyncDatabase.get(app).dao().ownedCandidates(owner, listOf(session)).isEmpty()) return@withTransaction false
+                val prior = app.database.openHelper.readableDatabase.query(
+                    "SELECT 1 FROM messages WHERE session_id = ? AND id GLOB ? LIMIT 1",
+                    arrayOf<Any>(session, "nm-checkin-*$suffix")
+                ).use { it.moveToFirst() }
+                if (prior || alreadyReceived(app, session, synced, now)) return@withTransaction true
+                if (!publicWindow(app, owner, session, now) || !allowed()) return@withTransaction false
+                val dao = app.chatRepository.dao
+                val parts = Transcript.partsJson(body, emptyList())
+                val row = MessageEntity(id = prefix(owner, now) + suffix.removePrefix("-"), sessionId = session,
+                    role = "assistant", partsJson = parts, createdAt = now.toInstant().toEpochMilli(),
+                    sortOrder = dao.nextSortOrder(session))
+                dao.insertMessage(row)
+                dao.updateLastMessage(session, ChatRepository.extractTextPreview(parts), row.createdAt)
+                if (!allowed()) throw Withdrawn()
+                inserted = true
+                true
+            }
+            if (inserted) {
+                prefs(app).edit().putString(LAST_DAY, now.toLocalDate().toString()).commit()
+                // The sync projection excludes these local-only messages.
+                ConversationSync.localAssistantAppended(session)
+                val viewing = withContext(Dispatchers.Main.immediate) {
+                    ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+                        session in SessionActivityTracker.presentSessions.value
+                }
+                if (!viewing && allowed()) {
+                    SessionBadgeStore.replies.received(session)
+                    notify(app, session)
+                }
+            }
+            acknowledged
+        }
+
+    /** Recognize the desktop's exact public-only wire message in recently *pulled*
+     * assistant rows. An arbitrary link in a user message never suppresses a notice. */
+    private suspend fun alreadyReceived(app: MinisApp, session: String, wire: String, now: ZonedDateTime): Boolean {
+        val recent = app.database.openHelper.readableDatabase.query(
+            """SELECT id, parts_json FROM (SELECT id, role, parts_json, created_at FROM messages
+               WHERE session_id = ? ORDER BY sort_order DESC LIMIT 48)
+               WHERE role = 'assistant' AND created_at >= ? AND length(parts_json) < 8192""",
+            arrayOf<Any>(session, now.minusDays(7).toInstant().toEpochMilli())
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    val part = runCatching { org.json.JSONArray(cursor.getString(1)).optJSONObject(0) }.getOrNull()
+                    if (part?.optString("type") == "text" && part.optString("value") == wire) add(cursor.getString(0))
+                }
+            }
+        }
+        return recent.isNotEmpty() && SyncDatabase.get(app).dao().includesPulled(session, recent)
+    }
+
     private fun commitment(app: MinisApp, now: ZonedDateTime, facts: List<FeedPreparation.Fact>): Note? {
         if (!enabled(app)) return null
         val consent = FeedChatEvidence.scope(app, "", true) ?: return null

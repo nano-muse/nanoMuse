@@ -191,7 +191,11 @@ If you tell nanoMuse “I maintain” followed by a GitHub repository link, it c
 
 The first successful read sets a baseline. While the runtime is online, GitHub and feed watches are due every four hours and research watches daily. Busy sources are sampled, so these checks can miss individual items. If the reader is offline it retries later. A change can wait through quiet hours. The same review that handles connected sources decides whether to send a main-chat message and includes the original public link when available. Following a source grants read access only. To receive alerts from Google Scholar itself, its email alerts can go to an inbox you have enabled for review. [Google Scholar alerts](https://scholar.google.com/intl/en/scholar/help.html#alerts)
 
-To see future public-source messages on a phone, sign in to the same account, enable conversation sync and turn on *Sync public updates to my devices* in Feed settings. Only messages reviewed using public evidence are eligible. The online runtime does the checks. Your phone receives the result on its next conversation sync.
+Android and iPhone can check these public sources themselves while the computer is off. Open the Feed settings on the phone to see, add, pause or dismiss sources. With main-chat memory enabled, new messages you write in that chat can also identify sources. Each phone keeps its own list, baseline and history. It checks while the app is open and when Android or iOS grants background time. A delayed background check can resume after reopening the app.
+
+A phone can ask its configured chat model to select one update worth mentioning. Only public item details go into that review. If selected, the original item and link appear in the phone’s main chat, subject to its existing check-in and daily limits. A new installation first learns what is already there. Two devices following the same source independently may each show it.
+
+To also receive messages prepared by the web runtime or desktop, enable conversation sync for the same account and turn on *Sync public updates to my devices* on the device doing that review. Its next eligible public-source message can then arrive through chat sync.
 
 The agent does things on its own, but not too many. The *Proactivity* dial in Settings sets how much:
 

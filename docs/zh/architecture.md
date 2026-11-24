@@ -34,7 +34,7 @@ sequenceDiagram
 
 | 区域 | 文件 | 说明 |
 |---|---|---|
-| 公开来源跟进 | `nanomuse/server/watch_discovery.py`、`public_watches.py`、`public_sources.py`、`public_feed.py` | 本地发现关注对象，按账号保存选择，匿名读取公开来源并识别变化。网页端把新证据交给 `context_watch.py`；桌面动态通过短时运行的 `watch-stdio` 进程复用同一套读取和状态处理逻辑。各端用自己的账号、模型判断和聊天投递流程。 |
+| 公开来源跟进 | `nanomuse/server/watch_discovery.py`、`public_watches.py`、`public_sources.py`、`public_feed.py` | 本地发现关注对象，按账号保存选择，匿名读取公开来源并识别变化。网页端把新证据交给 `context_watch.py`；桌面动态通过短时运行的 `watch-stdio` 进程复用同一套读取和状态处理逻辑。Android 和 iPhone 打包同一份 `android/src/shared/public-watches` 规则与来源适配器，通过 Go 读取器连接已校验的公网地址。各端自行处理账号、调度、模型判断和聊天投递。 |
 | 组件组装入口 | `nanomuse/app.py` | `NanoMuseApp` 根据设置组装 LLM、工具、保险库、哨兵、记忆、目标和智能体 |
 | 智能体循环 | `nanomuse/agent/core.py` | 组装提示词、裁剪上下文、检测停滞、持久保存会话、接收中途消息；可选共享[任务预算](runtime-budgets.md)，缩短工具结果时记录日志 |
 | 提示词 | `nanomuse/prompts.py` | 系统提示词、语言规则、文字系统检测，以及推进目标的提示词 |

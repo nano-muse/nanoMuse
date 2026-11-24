@@ -1297,4 +1297,18 @@
     <string name="nm_calendar_overlap">カレンダーの予定が重なっています（%1$s と %2$s）。別の時間を一緒に探しますか？</string>
     <string name="nm_chat_checkin_setting">チャットで話した予定の当日にメッセージを受け取る</string>
     <string name="nm_chat_checkin_body">以前話していた予定は今日ですね。\n「%1$s」\n\n進み具合はいかがですか？ 準備を手伝えることはありますか？</string>
+    <string name="nm_public_sources">公開情報源</string>
+    <string name="nm_public_hint">フォロー中の情報源に注目すべき変化があれば、メインチャットでお知らせします。</string>
+    <string name="nm_public_unavailable">現在この情報源を読み込めません</string>
+    <string name="nm_public_link">研究 ID を関連付ける</string>
+    <string name="nm_public_follow">フォロー</string>
+    <string name="nm_public_topic">研究テーマ</string>
+    <string name="nm_public_website">ウェブサイトまたは RSS/Atom</string>
+    <string name="nm_public_error">情報源を確認して、もう一度お試しください。</string>
+    <string name="nm_public_update">フォロー中の情報源に更新がありました。\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">おすすめ</string>
+    <string name="nm_public_manual">手動で追加</string>
+    <string name="nm_public_chat">メインチャットより</string>
+    <string name="nm_public_recurring">複数回の言及</string>
+    <string name="nm_public_connected">接続済みの情報源より</string>
 </resources>

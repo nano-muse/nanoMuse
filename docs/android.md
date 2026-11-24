@@ -262,6 +262,10 @@ colors. Background images, gradients and theme imports are not included.
 
 Under **Settings → Appearance**, the font-size labels for **Chat Input**, **Message Text** and **App Base** follow the app's language.
 
+## Public sources on this phone
+
+Open the Feed settings to follow a public source on this phone. Android checks when the app is open and when a scheduled job gets network access. A new issue, paper or feed entry can start a conversation, including when your computer is off. [Public sources and reminder settings](app.md#following-public-sources-over-time)
+
 ## Your own key
 
 The vendors the app knows are one file, `assets/nanomuse/providers.json`, a copy of the

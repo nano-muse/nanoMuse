@@ -42,7 +42,8 @@ else
   echo "== rootfs: present"
 fi
 
-if [ $force = 1 ] || [ ! -f "$LIBS/rclone.aar" ]; then
+if [ $force = 1 ] || [ ! -f "$LIBS/rclone.aar" ] || [ -n "$(find "$NM_ANDROID/deps/rclone-mobile" \
+  -type f \( -name '*.go' -o -name go.mod -o -name go.sum \) ! -name '*_test.go' -newer "$LIBS/rclone.aar" -print -quit)" ]; then
   echo "== rclone.aar (gomobile)"
   command -v gomobile >/dev/null || go install golang.org/x/mobile/cmd/gomobile@latest
   command -v gobind >/dev/null || go install golang.org/x/mobile/cmd/gobind@latest

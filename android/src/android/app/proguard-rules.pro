@@ -34,3 +34,17 @@
 -dontwarn java.beans.IntrospectionException
 -dontwarn java.beans.Introspector
 -dontwarn java.beans.PropertyDescriptor
+
+# nanoMuse: Rhino resolves its interpreter, VM bridge, RegExp and built-in JS
+# constructors by name. The phone uses its interpreter with safe standard objects.
+-keep class org.mozilla.javascript.Interpreter { *; }
+-keep class org.mozilla.javascript.jdk18.VMBridge_jdk18 { *; }
+-keep class org.mozilla.javascript.regexp.** { *; }
+-keep class org.mozilla.javascript.NativeContinuation { *; }
+-keep class org.mozilla.javascript.typedarrays.** { *; }
+-keepnames class org.mozilla.javascript.Context
+-keepnames class org.mozilla.javascript.ContextFactory
+-keepnames interface org.mozilla.javascript.Function
+-keepnames class org.mozilla.javascript.ScriptableObject
+# Optional Java bean conversion is unreachable: no Java objects enter the JS scope.
+-dontwarn java.beans.BeanDescriptor

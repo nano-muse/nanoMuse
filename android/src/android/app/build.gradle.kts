@@ -288,6 +288,8 @@ dependencies {
     implementation(group = "", name = "rclone", ext = "aar")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // nanoMuse: interpret the packaged public-source rules without a WebView or Java access.
+    implementation("org.mozilla:rhino:1.7.15.1")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
 
     // Kotlinx Serialization

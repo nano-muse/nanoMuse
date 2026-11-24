@@ -1301,4 +1301,18 @@
     <string name="nm_calendar_overlap">Zwei Termine überschneiden sich (%1$s und %2$s). Möchtest du nach Alternativen schauen?</string>
     <string name="nm_chat_checkin_setting">Bei fälligen Vorhaben im Chat schreiben</string>
     <string name="nm_chat_checkin_body">Du hattest das für heute geplant:\n„%1$s“\n\nWie läuft es? Kann ich dir bei der Vorbereitung helfen?</string>
+    <string name="nm_public_sources">Öffentliche Quellen</string>
+    <string name="nm_public_hint">Bei wichtigen Änderungen in gefolgten Quellen im Hauptchat Bescheid geben.</string>
+    <string name="nm_public_unavailable">Quelle vorübergehend nicht verfügbar</string>
+    <string name="nm_public_link">Forschungs-ID verknüpfen</string>
+    <string name="nm_public_follow">Folgen</string>
+    <string name="nm_public_topic">Forschungsthema</string>
+    <string name="nm_public_website">Website oder RSS/Atom</string>
+    <string name="nm_public_error">Quelle prüfen und erneut versuchen.</string>
+    <string name="nm_public_update">Neues aus einer gefolgten Quelle:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">Vorgeschlagen</string>
+    <string name="nm_public_manual">Selbst hinzugefügt</string>
+    <string name="nm_public_chat">Aus dem Hauptchat</string>
+    <string name="nm_public_recurring">Mehrmals erwähnt</string>
+    <string name="nm_public_connected">Aus einer verbundenen Quelle</string>
 </resources>

@@ -149,6 +149,7 @@ fun NanoMuseHome(
             if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
                 io.github.nanomuse.community.Nudges.refreshIfStale(context)
                 io.github.nanomuse.community.StarPrompt.dayOpened(context)
+                io.github.nanomuse.feed.PublicWatchJob.catchUp(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

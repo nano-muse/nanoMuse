@@ -124,6 +124,9 @@ interface SyncDao {
     @Query("SELECT * FROM sync_messages WHERE sessionId = :sessionId")
     suspend fun messages(sessionId: String): List<SyncMessage>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM sync_messages WHERE messageId IN (:ids) AND sessionId = :session AND device != '')")
+    suspend fun includesPulled(session: String, ids: List<String>): Boolean
+
     @Query("SELECT * FROM sync_messages WHERE mid = :mid")
     suspend fun messageByMid(mid: String): SyncMessage?
 

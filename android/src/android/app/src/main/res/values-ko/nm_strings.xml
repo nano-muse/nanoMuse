@@ -1297,4 +1297,18 @@
     <string name="nm_calendar_overlap">캘린더 일정 두 개가 겹쳐요(%1$s, %2$s). 다른 시간을 찾아볼까요?</string>
     <string name="nm_chat_checkin_setting">채팅에서 정한 날짜에 메시지 받기</string>
     <string name="nm_chat_checkin_body">오늘로 정해 둔 계획이 있어요.\n“%1$s”\n\n어떻게 되어 가고 있나요? 제가 준비를 도와드릴까요?</string>
+    <string name="nm_public_sources">공개 정보 출처</string>
+    <string name="nm_public_hint">팔로우하는 출처에 중요한 소식이 있으면 기본 채팅에서 알려 줍니다.</string>
+    <string name="nm_public_unavailable">현재 출처를 읽을 수 없습니다</string>
+    <string name="nm_public_link">연구 ID 연결</string>
+    <string name="nm_public_follow">팔로우</string>
+    <string name="nm_public_topic">연구 주제</string>
+    <string name="nm_public_website">웹사이트 또는 RSS/Atom</string>
+    <string name="nm_public_error">출처를 확인한 뒤 다시 시도하세요.</string>
+    <string name="nm_public_update">팔로우한 출처의 새 소식입니다.\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">추천</string>
+    <string name="nm_public_manual">직접 추가</string>
+    <string name="nm_public_chat">기본 채팅에서 발견</string>
+    <string name="nm_public_recurring">여러 번 언급됨</string>
+    <string name="nm_public_connected">연결된 출처에서 발견</string>
 </resources>

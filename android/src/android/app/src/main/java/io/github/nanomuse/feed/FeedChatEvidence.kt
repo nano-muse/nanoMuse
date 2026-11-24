@@ -84,6 +84,7 @@ object FeedChatEvidence {
 
     @Synchronized fun recorded(context: Context, receipt: String?, row: MessageEntity, memory: Boolean) {
         if (receipt == null || row.role != "user" || receipt != scope(context, row.sessionId, memory)) return
+        PublicWatchStore.observe(context, row, receipt)
         val text = ChatCommitments.plain(row.partsJson, person = true)
         if (text.isEmpty() || !ChatCommitments.relevant(text)) return
         val refs = listOf(Ref(row.sessionId, row.id, FeedPreparation.hash(text))) + references(context)

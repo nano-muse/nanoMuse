@@ -1227,7 +1227,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA0838CB2F3CA8A900049557 /* Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Terminal; sourceTree = "<group>"; };
-		4E4D0000000000000000AA01 /* NanoMuse */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = NanoMuse; sourceTree = "<group>"; };
+		4E4D0000000000000000AA01 /* NanoMuse */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {"Resources/public-watches.js" = text; /* nanoMuse: copy the engine as a bundle resource. */}; explicitFolders = (); path = NanoMuse; sourceTree = "<group>"; };
 		AA8A568C2F6FBB7A00A3E54E /* MinisUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MinisUITests; sourceTree = "<group>"; };
 		BB1000012F700000000000AA /* MinisTests */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (E5EXC0001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MinisTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */

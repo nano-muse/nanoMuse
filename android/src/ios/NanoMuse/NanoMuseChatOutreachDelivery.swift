@@ -29,6 +29,7 @@ final class NanoMuseChatOutreach: ObservableObject {
 
     func changeAccount(_ leaving: Bool) {
         permit.revoke()
+        NanoMusePublicWatches.shared.accountChanged(leaving)
         nextCalendarRead = .distantPast
         switching = leaving
         spent = nil
@@ -61,6 +62,37 @@ final class NanoMuseChatOutreach: ObservableObject {
             NanoMuseScheduler.shared.scheduleBackgroundRefresh()
             Task { await check() }
         } else if !enabled { clearNotification() }
+    }
+
+    func revokePublicWork() { permit.revoke() }
+
+    func publicTicket(owner: String, session: String) -> UInt? {
+        guard !switching, UserDefaults.standard.object(forKey: "nanomuse.shell.enabled") as? Bool ?? true, !Task.isCancelled,
+              UIApplication.shared.isProtectedDataAvailable, !SessionLockStore.shared.appIsLocked,
+              !SessionLockStore.shared.isLocked(session), !SessionActivityTracker.shared.activeSessions.contains(session),
+              NanoMuseAccountData.shared.current == owner, NanoMuseAccountData.shared.owner(of: session) == owner,
+              UserDefaults.standard.string(forKey: NanoMuseMainChat.key) == session else { return nil }
+        observe()
+        return permit.snapshot()
+    }
+
+    func canReviewPublic(owner: String, now: Date) -> Bool {
+        Self.chatEnabled() && NanoMuseOutreachJournal.withinHours(now) &&
+            !(spent?.owner == owner && (spent?.day ?? "") >= NanoMuseGoalDeadline.key(now))
+    }
+
+    func deliverPublic(_ item: NanoMuseOutreachJournal.Candidate, owner: String, session: String, ticket: UInt) async -> Bool {
+        let now = Date()
+        guard publicTicket(owner: owner, session: session) == ticket,
+              canReviewPublic(owner: owner, now: now) else { return false }
+        let day = NanoMuseGoalDeadline.key(now)
+        let result = await ChatStore.shared.nmDeliverOutreach(owner: NanoMuseAccountData.dirName(owner), session: session,
+            day: day, now: now, references: [], goal: nil, permit: permit, version: ticket, publicItem: item)
+        guard !switching, NanoMuseAccountData.shared.current == owner else { return false }
+        if case .seenPublicChange = result { return true }
+        await show(result, session: session, owner: owner, day: day)
+        if case .delivered = result { return true }
+        return false
     }
 
     private func clearNotification() {
@@ -160,14 +192,18 @@ final class NanoMuseChatOutreach: ObservableObject {
             default: break
             }
         }
+        await show(result, session: session, owner: owner, day: day)
+    }
+
+    private func show(_ result: NanoMuseOutreachJournal.Result, session: String, owner: String, day: String) async {
         switch result {
-        case .later, .seenCalendarChange: return
+        case .later, .seenCalendarChange, .seenPublicChange: return
         case .spent: spent = (owner, day)
         case .delivered(_, let item):
             spent = (owner, day)
             guard !SessionLockStore.shared.appIsLocked, !SessionLockStore.shared.isLocked(session),
                   UserDefaults.standard.string(forKey: NanoMuseMainChat.key) == session else { return }
-            NanoMuseSync.shared.conversationChanged(session)
+            if item.publicReceipt == nil { NanoMuseSync.shared.conversationChanged(session) }
             unreadMain = session
             showingMain(visibleMain)
             if unreadMain == session {

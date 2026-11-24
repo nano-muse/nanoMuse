@@ -887,6 +887,7 @@ struct NanoMuseFeedSettingsSheet: View {
                     Text(AppLocalized("Between 09:00 and 20:00, nanoMuse can ask about a goal due today or a new commitment you mentioned in your main chat. You can turn these check-ins off here."))
                 }
                 Section {
+                    NavigationLink(AppLocalized("Public sources")) { NanoMusePublicWatchSettings() }
                     NavigationLink(AppLocalized("Calendar changes in chat")) { NanoMuseCalendarWatchSettings() }
                 }
                 Section {

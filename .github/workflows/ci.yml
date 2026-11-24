@@ -50,6 +50,13 @@ jobs:
               - "cloud/**"
               - "demo/showcase/mirror/**" # the cloud's tests load the mirror scripts (#656)
               - ".github/workflows/ci.yml"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Verify the mobile public-watch bundle and its offline behavior
+        run: |
+          python3 scripts/mobile-public-watches.py --check
+          node --test android/src/shared/public-watches/*.test.mjs scripts/tests/mobile-public-readers.test.mjs
       # Every npm lock file in the repository, on every pull request, whatever it touched:
       # a private mirror's host must never land in one. harness.yml repeats it for tag builds
       # and pages.yml for the site; pnpm-lock.yaml records integrity hashes, not URLs.

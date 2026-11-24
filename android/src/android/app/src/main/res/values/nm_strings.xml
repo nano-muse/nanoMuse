@@ -1281,4 +1281,18 @@
     <string name="nm_calendar_overlap">Two calendar events overlap (%1$s and %2$s). Would you like to look at alternatives?</string>
     <string name="nm_chat_checkin_setting">Message me when a chat commitment is due</string>
     <string name="nm_chat_checkin_body">You mentioned this plan for today:\n“%1$s”\n\nHow is it going? Is there anything I can help you prepare?</string>
+    <string name="nm_public_sources">Public sources</string>
+    <string name="nm_public_hint">Check followed sources for changes worth mentioning in your main chat.</string>
+    <string name="nm_public_unavailable">Source temporarily unavailable</string>
+    <string name="nm_public_link">Link a research ID</string>
+    <string name="nm_public_follow">Follow</string>
+    <string name="nm_public_topic">Research topic</string>
+    <string name="nm_public_website">Website or RSS/Atom</string>
+    <string name="nm_public_error">Check the source and try again.</string>
+    <string name="nm_public_update">An update from a source you follow:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">Suggested</string>
+    <string name="nm_public_manual">Added by you</string>
+    <string name="nm_public_chat">From your main chat</string>
+    <string name="nm_public_recurring">Mentioned in several turns</string>
+    <string name="nm_public_connected">From a connected source</string>
 </resources>

@@ -1301,4 +1301,18 @@
     <string name="nm_calendar_overlap">Takvimindeki iki etkinliğin saati çakışıyor (%1$s ve %2$s). Alternatiflere bakmak ister misin?</string>
     <string name="nm_chat_checkin_setting">Sohbette konuştuğumuz işin günü geldiğinde bana yaz</string>
     <string name="nm_chat_checkin_body">Bugün için şu plandan söz etmiştin:\n“%1$s”\n\nNasıl gidiyor? Hazırlık için yardım edebileceğim bir şey var mı?</string>
+    <string name="nm_public_sources">Herkese açık kaynaklar</string>
+    <string name="nm_public_hint">Takip edilen kaynaklardaki önemli gelişmeleri ana sohbette bildir.</string>
+    <string name="nm_public_unavailable">Kaynağa geçici olarak erişilemiyor</string>
+    <string name="nm_public_link">Araştırma kimliğini bağla</string>
+    <string name="nm_public_follow">Takip et</string>
+    <string name="nm_public_topic">Araştırma konusu</string>
+    <string name="nm_public_website">Web sitesi veya RSS/Atom</string>
+    <string name="nm_public_error">Kaynağı kontrol edip tekrar deneyin.</string>
+    <string name="nm_public_update">Takip ettiğiniz bir kaynaktan haber var:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">Önerilen</string>
+    <string name="nm_public_manual">Siz eklediniz</string>
+    <string name="nm_public_chat">Ana sohbetten</string>
+    <string name="nm_public_recurring">Birkaç kez bahsedildi</string>
+    <string name="nm_public_connected">Bağlı bir kaynaktan</string>
 </resources>

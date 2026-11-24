@@ -1267,4 +1267,18 @@
     <string name="nm_calendar_overlap">手機行事曆有兩項安排重疊（%1$s 和 %2$s）。要一起看看其他時段嗎？</string>
     <string name="nm_chat_checkin_setting">聊天中的待辦到期時，主動傳訊息給我</string>
     <string name="nm_chat_checkin_body">你之前提過這件事，約定的日期是今天：\n「%1$s」\n\n現在進展如何？有什麼需要我幫你準備的嗎？</string>
+    <string name="nm_public_sources">公開資訊來源</string>
+    <string name="nm_public_hint">關注的來源有值得留意的新變化時，在主要對話中提醒你。</string>
+    <string name="nm_public_unavailable">暫時無法讀取此來源</string>
+    <string name="nm_public_link">連結研究識別碼</string>
+    <string name="nm_public_follow">關注</string>
+    <string name="nm_public_topic">研究主題</string>
+    <string name="nm_public_website">網站或 RSS/Atom</string>
+    <string name="nm_public_error">請檢查來源後再試一次。</string>
+    <string name="nm_public_update">你關注的來源有新動態：\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">建議關注</string>
+    <string name="nm_public_manual">手動新增</string>
+    <string name="nm_public_chat">來自主要對話</string>
+    <string name="nm_public_recurring">在多次對話中提到</string>
+    <string name="nm_public_connected">來自已連結的來源</string>
 </resources>

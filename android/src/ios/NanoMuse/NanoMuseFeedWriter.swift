@@ -199,13 +199,13 @@ enum NanoMuseFeedWriter {
         return !store.append([draft]).isEmpty
     }
 
-    private static func complete(prompt: String, provider: AgentProvider, session: String) async throws -> String {
+    static func complete(prompt: String, provider: AgentProvider, session: String, instructions: String = NanoMuseFeedPreparation.instructions) async throws -> String {
         let messages = [AgentMessage(role: .user, parts: [.text(prompt)])]
         let provenance = NanoMuseProvenance.Current(sessionId: session, conversation: NanoMuseOwnTurns.conversationKey(messages),
                                                     fields: .init(run: NanoMuseProvenance.runFeed, turn: 0, step: 1))
         return try await NanoMuseProvenance.$current.withValue(provenance) {
             try Task.checkCancellation()
-            let stream = try await provider.streamAgentMessage(messages: messages, systemPrompt: NanoMuseFeedPreparation.instructions,
+            let stream = try await provider.streamAgentMessage(messages: messages, systemPrompt: instructions,
                                                                tools: [], maxTokens: 1200, thinkingLevel: .off)
             var text = ""
             var ended = false

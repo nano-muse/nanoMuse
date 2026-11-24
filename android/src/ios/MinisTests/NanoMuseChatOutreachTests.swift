@@ -40,7 +40,7 @@ final class NanoMuseChatOutreachTests: XCTestCase {
         }, dirty: { _ in })
         switch result {
         case .spent: return "spent"
-        case .seenCalendarChange: return "seen"
+        case .seenCalendarChange, .seenPublicChange: return "seen"
         case .later: return "later"
         case .delivered(let id, _):
             XCTAssertTrue(id.hasPrefix(NanoMuseOutreachJournal.messagePrefix))
@@ -131,6 +131,62 @@ final class NanoMuseChatOutreachTests: XCTestCase {
         defaults.set(false, forKey: NanoMuseChatOutreach.preference)
         XCTAssertFalse(NanoMuseChatOutreach.chatEnabled(in: defaults))
         XCTAssertFalse(NanoMuseFeedChatIndex.allowsChatCheckIn(in: defaults))
+    }
+
+    func testPublicWatchDeliveryIsLocalAndAnEarlierReceiptSurvivesOtherDaysAndRestart() {
+        let name = "account", first = "2026-11-25"
+        execute("DELETE FROM messages")
+        func send(_ key: String, _ day: String) -> NanoMuseOutreachJournal.Result {
+            NanoMuseOutreachJournal.write(db: db, owner: name, session: "main", day: day, at: now, allowEmpty: true,
+                candidate: { .init(text: "New issue", goalID: nil, publicReceipt: key) },
+                dirty: { _ in XCTFail("Local watch notice queued for sync") })
+        }
+        XCTAssertTrue(NanoMuseOutreachJournal.readyForPublicReview(db: db, owner: name, session: "main", day: first, at: now))
+        guard case .delivered(let id, _) = send("one", first) else { return XCTFail("First notice missing") }
+        XCTAssertTrue(id.hasPrefix(NanoMuseOutreachJournal.localPublicPrefix))
+        execute("DELETE FROM messages")
+        XCTAssertFalse(NanoMuseOutreachJournal.readyForPublicReview(db: db, owner: name, session: "main", day: first, at: now))
+        guard case .delivered = send("two", "2026-11-26") else { return XCTFail("Second notice missing") }
+        execute("DELETE FROM messages")
+        XCTAssertEqual(sqlite3_close(db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_open(databaseURL.path, &db), SQLITE_OK)
+        guard case .seenPublicChange = send("one", "2026-11-27") else { return XCTFail("Earlier receipt replayed") }
+        XCTAssertEqual(count("SELECT COUNT(*) FROM messages"), 0)
+        XCTAssertTrue(NanoMuseOutreachJournal.readyForPublicReview(db: db, owner: name, session: "main", day: "2026-11-27", at: now))
+    }
+
+    func testSyncedCitationMatchingRequiresTheOriginalTitleAndFullURL() {
+        let item = NanoMuseWatchItem(id: "watch", key: "issue", text: "Report *one*", url: "https://example.org/issue/1", kind: "github_repo", target: "owner/project")
+        let result = NanoMuseOutreachJournal.write(db: db, owner: "owner", session: "main", day: "2026-11-25", at: now,
+            candidate: { .init(text: #"Report \*one\*"# + "\n" + item.url, goalID: nil) }, dirty: { _ in })
+        guard case .delivered(let msg, _) = result else { return XCTFail("Missing fixture") }
+        XCTAssertEqual(NanoMuseOutreachJournal.matchingPublicNotices(db: db, session: "main", item: item), [msg])
+        XCTAssertTrue(NanoMuseOutreachJournal.matchingPublicNotices(db: db, session: "main", item:
+            .init(id: "watch", key: "other", text: "Another issue", url: item.url, kind: item.kind, target: item.target)).isEmpty)
+        XCTAssertTrue(NanoMuseOutreachJournal.matchingPublicNotices(db: db, session: "main", item:
+            .init(id: "watch", key: "other", text: item.text, url: "https://example.org/issue/11", kind: item.kind, target: item.target)).isEmpty)
+    }
+
+    func testPublicReviewUsesTheExactSelectedSourceAndRejectsMalformedResponses() throws {
+        let item = NanoMuseWatchItem(id: "watch", key: "paper", text: "[A study](made-up) *title*", url: "https://example.org/work",
+                                     kind: "research_work", target: "10.1234/work")
+        XCTAssertEqual(NanoMusePublicReview.choice("{\"pick\":1}", count: 1), 1)
+        XCTAssertEqual(NanoMusePublicReview.choice("{\"pick\":0}", count: 1), 0)
+        for malformed in ["null", "{\"pick\":true}", "{\"pick\":2}", "{\"pick\":-1}", "OK"] {
+            XCTAssertNil(NanoMusePublicReview.choice(malformed, count: 1))
+        }
+        let message = try XCTUnwrap(NanoMusePublicReview.message(item))
+        XCTAssertTrue(message.contains(item.url))
+        XCTAssertFalse(message.contains("[A study](made-up)"))
+        let context = try XCTUnwrap(NanoMusePublicReview.historyText(displayed: message))
+        let body = try XCTUnwrap(context.components(separatedBy: "\n").last?.data(using: .utf8))
+        let decoded = try JSONDecoder().decode([String: String].self, from: body)
+        XCTAssertEqual(decoded["source_url"], item.url)
+        XCTAssertEqual(decoded["publisher_title"], message.components(separatedBy: "\n").first)
+        XCTAssertEqual(decoded["offer_shown"], message.components(separatedBy: "\n").last)
+        XCTAssertNil(NanoMusePublicReview.historyText(displayed: "Arbitrary notice"))
+        XCTAssertNil(NanoMusePublicReview.message(.init(id: "watch", key: "x", text: "Title", url: "file:///private/file",
+                                                        kind: "feed", target: "")))
     }
 
     func testLocalHoursAndRevocation() {

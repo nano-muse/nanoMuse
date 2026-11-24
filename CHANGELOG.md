@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added independent public-source follow-ups on Android and iPhone. Each phone could discover a source in its main chat, check for changes while the computer was off, and send a relevant update with its original link.
+
 - Added ongoing public-source follow-ups to desktop and the web runtime. nanoMuse could discover a project, researcher, topic or public feed in context and start a main-chat conversation about a new issue, paper, citation or announcement.
 
 - Enabled main-chat check-ins by default and kept earlier choices to turn them off. The web app offered background review when connecting an inbox, calendar or a new MCP server with one readable resource.

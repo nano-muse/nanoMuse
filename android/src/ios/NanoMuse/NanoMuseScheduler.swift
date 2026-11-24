@@ -244,7 +244,8 @@ final class NanoMuseScheduler: ObservableObject {
 
     func scheduleBackgroundRefresh() {
         let now = Date()
-        guard let next = [nextDue(after: now)?.at, NanoMuseChatOutreach.shared.nextRefresh(after: now)].compactMap({ $0 }).min() else { return }
+        guard let next = [nextDue(after: now)?.at, NanoMuseChatOutreach.shared.nextRefresh(after: now),
+                          NanoMusePublicWatches.shared.nextRefresh(after: now)].compactMap({ $0 }).min() else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskId)
         request.earliestBeginDate = max(next, now.addingTimeInterval(15 * 60))
         try? BGTaskScheduler.shared.submit(request)
@@ -259,6 +260,7 @@ final class NanoMuseScheduler: ObservableObject {
         }
         let work = Task { @MainActor [self] in
             await NanoMuseChatOutreach.shared.check(now: now)
+            await NanoMusePublicWatches.shared.check(background: true)
             scheduleBackgroundRefresh()
             task.setTaskCompleted(success: !Task.isCancelled)
         }
@@ -269,7 +271,10 @@ final class NanoMuseScheduler: ObservableObject {
 
     /// Run every routine that is due, one after the other.
     func catchUp(reason: String) {
-        Task { await NanoMuseChatOutreach.shared.check() }
+        Task {
+            await NanoMuseChatOutreach.shared.check()
+            await NanoMusePublicWatches.shared.check(background: false)
+        }
         guard catchUpTask == nil else { return }
         let now = Date()
         let due = routines.filter { $0.isDue(at: now) && !running.contains($0.id) }

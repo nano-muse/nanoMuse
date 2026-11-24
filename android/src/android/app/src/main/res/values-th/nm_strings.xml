@@ -1297,4 +1297,18 @@
     <string name="nm_calendar_overlap">กิจกรรมสองรายการในปฏิทินมีเวลาทับซ้อนกัน (%1$s และ %2$s) ต้องการดูทางเลือกอื่นไหม</string>
     <string name="nm_chat_checkin_setting">ส่งข้อความเมื่อถึงวันที่นัดหมายไว้ในแชต</string>
     <string name="nm_chat_checkin_body">คุณเคยบอกว่ามีแผนนี้วันนี้\n“%1$s”\n\nเป็นอย่างไรบ้าง มีอะไรให้ช่วยเตรียมไหม</string>
+    <string name="nm_public_sources">แหล่งข้อมูลสาธารณะ</string>
+    <string name="nm_public_hint">รับข่าวสำคัญจากแหล่งข้อมูลที่ติดตามในแชทหลัก</string>
+    <string name="nm_public_unavailable">แหล่งข้อมูลไม่พร้อมใช้งานชั่วคราว</string>
+    <string name="nm_public_link">เชื่อมโยงรหัสงานวิจัย</string>
+    <string name="nm_public_follow">ติดตาม</string>
+    <string name="nm_public_topic">หัวข้อวิจัย</string>
+    <string name="nm_public_website">เว็บไซต์หรือ RSS/Atom</string>
+    <string name="nm_public_error">ตรวจสอบแหล่งข้อมูลแล้วลองอีกครั้ง</string>
+    <string name="nm_public_update">มีข่าวจากแหล่งข้อมูลที่คุณติดตาม:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">แนะนำ</string>
+    <string name="nm_public_manual">คุณเพิ่มเอง</string>
+    <string name="nm_public_chat">จากแชทหลัก</string>
+    <string name="nm_public_recurring">มีการกล่าวถึงหลายครั้ง</string>
+    <string name="nm_public_connected">จากแหล่งข้อมูลที่เชื่อมต่อ</string>
 </resources>

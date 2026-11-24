@@ -518,6 +518,9 @@
             </intent-filter>
         </receiver>
 
+        <!-- nanoMuse: independently poll public sources when Android grants network time. -->
+        <service android:name="io.github.nanomuse.feed.PublicWatchJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false" />
+
         <!-- nanoMuse: a local check-in can wake the app while the conversation is closed. -->
         <receiver android:name="io.github.nanomuse.feed.ChatCheckIns$Receiver" android:exported="false">
             <intent-filter>

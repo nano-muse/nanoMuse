@@ -1297,4 +1297,18 @@
     <string name="nm_calendar_overlap">Dua acara bertumpuk di kalender Anda (%1$s dan %2$s). Ingin melihat pilihan lain?</string>
     <string name="nm_chat_checkin_setting">Kirim pesan saat janji dalam obrolan jatuh tempo</string>
     <string name="nm_chat_checkin_body">Kamu menyebut rencana ini untuk hari ini:\n“%1$s”\n\nBagaimana perkembangannya? Ada yang bisa kubantu siapkan?</string>
+    <string name="nm_public_sources">Sumber publik</string>
+    <string name="nm_public_hint">Terima kabar penting dari sumber yang diikuti di percakapan utama.</string>
+    <string name="nm_public_unavailable">Sumber sementara tidak tersedia</string>
+    <string name="nm_public_link">Tautkan ID penelitian</string>
+    <string name="nm_public_follow">Ikuti</string>
+    <string name="nm_public_topic">Topik penelitian</string>
+    <string name="nm_public_website">Situs web atau RSS/Atom</string>
+    <string name="nm_public_error">Periksa sumber lalu coba lagi.</string>
+    <string name="nm_public_update">Kabar dari sumber yang Anda ikuti:\n%1$s\n%2$s</string>
+    <string name="nm_public_suggested">Disarankan</string>
+    <string name="nm_public_manual">Ditambahkan sendiri</string>
+    <string name="nm_public_chat">Dari percakapan utama</string>
+    <string name="nm_public_recurring">Disebut beberapa kali</string>
+    <string name="nm_public_connected">Dari sumber terhubung</string>
 </resources>

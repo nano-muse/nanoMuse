@@ -2428,10 +2428,20 @@ actor ChatStore {
         listFolders().first(where: { $0.id == id })
     }
 
+    // nanoMuse: identify an exact public source update already delivered through conversation sync.
+    func nmMatchingPublicNotices(session: String, item: NanoMuseWatchItem) -> [String] {
+        NanoMuseOutreachJournal.matchingPublicNotices(db: db, session: session, item: item)
+    }
+
+    // nanoMuse: suppress paid reviews after the daily delivery even across process restarts.
+    func nmPublicReviewReady(owner: String, day: String, session: String) -> Bool {
+        NanoMuseOutreachJournal.readyForPublicReview(db: db, owner: owner, session: session, day: day, at: Date())
+    }
+
     // nanoMuse: persist assistant outreach and its daily receipt together, then refresh live chat consumers.
     func nmDeliverOutreach(owner: String, session: String, day: String, now: Date, references: [NanoMuseFeedChatContext.Reference],
                            goal: NanoMuseGoal?, permit: NanoMuseOutreachPermit, version: UInt,
-                           calendarItem: NanoMuseOutreachJournal.Candidate? = nil) -> NanoMuseOutreachJournal.Result {
+                           calendarItem: NanoMuseOutreachJournal.Candidate? = nil, publicItem: NanoMuseOutreachJournal.Candidate? = nil) -> NanoMuseOutreachJournal.Result {
         let result = permit.perform(version) {
             let prefs = UserDefaults.standard
             let fromCalendar = calendarItem != nil && !NanoMuseCalendarWatch.selected.isEmpty && NanoMuseCalendarReader.readable
@@ -2439,7 +2449,8 @@ actor ChatStore {
             guard !Task.isCancelled, fromChat || fromCalendar,
                   (prefs.object(forKey: "nanomuse.shell.enabled") as? Bool ?? true),
                   prefs.string(forKey: "nanomuse.main_chat.session") == session else { return .later }
-            return NanoMuseOutreachJournal.write(db: db, owner: owner, session: session, day: day, at: now, allowEmpty: fromCalendar, candidate: {
+            return NanoMuseOutreachJournal.write(db: db, owner: owner, session: session, day: day, at: now, allowEmpty: fromCalendar || publicItem != nil, candidate: {
+                if let publicItem { return fromChat ? publicItem : nil }
                 if fromCalendar { return calendarItem }
                 guard fromChat else { return nil }
                 if !references.isEmpty && NanoMuseFeedChatIndex.allowsChatCheckIn(in: prefs)
