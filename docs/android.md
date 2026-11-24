@@ -719,6 +719,8 @@ Choose the target by its exact package name or unique installed label with `nano
 
 The operator stays in the named app. Home and switching to another app are unavailable. The main screen keeps the Stop capsule and has no tap animation. Notifications, audio and links that open other apps still follow the target app’s and Android’s settings. If the task reaches a protected screen, a password or a step you must handle, the background run ends and you can open the app yourself.
 
+When an app replaces its startup window, the assistant takes a fresh screenshot. Some dialogs include a system shadow in their screenshots. If the picture cannot be aligned with the touchable window, the run stops so you can open the app and complete that step.
+
 Select **View screen** in the Stop capsule for a small, read-only view of the background app. It refreshes about once a second while expanded. Collapse it to stop capturing preview frames. The virtual screen takes its aspect ratio and density from the phone within a bounded image size. **Pause** lets an action already underway finish. **Resume** takes a new observation before deciding what to do. The Stop button remains available throughout.
 
 In **Settings → Hands → Screen history**, choose a recorded run to play its steps, move between them or see where a tap or swipe occurred. History uses the screenshots already retained with that conversation. Older runs may have only their last picture. The viewer shows the recorded actions for those steps.
