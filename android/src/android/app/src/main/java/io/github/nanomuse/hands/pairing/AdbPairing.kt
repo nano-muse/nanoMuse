@@ -19,7 +19,6 @@ internal object AdbServiceTypes {
     const val CONNECT = "_adb-tls-connect._tcp"
 }
 
-/** 在本机网络上找 adbd 公布的服务端口;找不到(超时)返回 null。 */
 /**
  * 找本机 adbd 公布的服务端口。同一服务可能查到好几条(关了又开无线调试后,旧的那条可能还留在 mDNS 里,新的改名带上序号),
  * 全部交出,先查到的在前,由调用方挨个试。
@@ -30,7 +29,6 @@ internal fun interface AdbServiceFinder {
 
 internal class AdbPairingException(val reason: Reason, message: String, cause: Throwable? = null) : IOException(message, cause) {
     enum class Reason {
-        /** 目标不是本机自己的地址:建 Socket 前拒绝,不能按网络故障重试。 */
         CONNECT_FAILED, TLS_FAILED, WRONG_CODE, PROTOCOL,
     }
 }
@@ -45,7 +43,7 @@ internal class AdbPeerInfo(val type: Int, val data: String)
  * 每个包前有 6 字节头:版本(1)、类型(0=SPAKE2,1=PEER_INFO)、负载长度(大端 uint32)。
  */
 internal class AdbPairing(private val tls: AdbTls) {
-    /** 与本机设备配对;校验结果同时就是实际连接地址,不再解析原 host。 */
+    /** 与本机回环地址上的 adbd 配对。 */
     fun pair(port: Int, code: String, timeoutMs: Int = 12_000): AdbPeerInfo {
         require(code.length == 6 && code.all { it in '0'..'9' })
         val target = HandsWireless.loopback(port)

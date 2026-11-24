@@ -6,8 +6,7 @@ import java.math.BigInteger
 
 /**
  * edwards25519 上的点运算(扩展齐次坐标 X:Y:Z:T,x=X/Z、y=Y/Z、xy=T/Z),公式与编码按 RFC 8032 §5.1。
- * 只给配对时的 SPAKE2 用:每次配对只做几次标量乘,BigInteger 足够快;不追求常数时间,
- * 因为私钥是一次性的,配对码在局域网对话框里本来就可见。
+ * 仅供本机一次性 SPAKE2 配对。BigInteger 运算不是恒定时间实现。
  */
 internal class EdPoint private constructor(
     private val x: BigInteger,
