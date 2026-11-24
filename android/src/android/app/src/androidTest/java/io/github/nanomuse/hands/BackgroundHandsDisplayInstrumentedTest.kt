@@ -1,5 +1,6 @@
 package io.github.nanomuse.hands
 
+import android.app.UiAutomation
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -38,6 +39,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class BackgroundHandsDisplayInstrumentedTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val automation get() = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
     private val context: Context get() = instrumentation.targetContext
     private val pkg: String get() = instrumentation.context.packageName
     private val fixture get() = HandsApps.App("Hands display fixture", pkg)
@@ -50,6 +52,24 @@ class BackgroundHandsDisplayInstrumentedTest {
         until("Enable the accessibility service first.") { MinisAccessibilityService.getInstance() != null }
         service = checkNotNull(MinisAccessibilityService.getInstance())
         until("Start Shizuku and grant nanoMuse access first.") { ShizukuManager.isReady() }
+        val home = automation.executeShellCommand(
+            "am start -W --display 0 -a android.intent.action.MAIN -c android.intent.category.HOME"
+        )
+        ParcelFileDescriptor.AutoCloseInputStream(home).use { it.readBytes() }
+        // am -W may finish while a closing fixture, splash, or launcher transition still has
+        // an accessibility window without a root. Require two stable, identifiable snapshots.
+        var prior = emptyList<Pair<Int, String>>()
+        until("The test fixture left a visible or unidentifiable window after returning Home.") {
+            val all = service.windowsOnAllDisplays
+            val mainHasApp = all[Display.DEFAULT_DISPLAY].orEmpty().any { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            val visible = (0 until all.size()).flatMap { index -> all.valueAt(index) }
+                .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                .map { it.id to it.root?.packageName?.toString().orEmpty() }
+            val ready = mainHasApp && visible.isNotEmpty() && visible == prior &&
+                visible.all { (_, owner) -> owner.isNotEmpty() && owner != pkg }
+            prior = visible
+            ready
+        }
     }
 
     private fun primaryApps(): Set<String> =
@@ -66,11 +86,6 @@ class BackgroundHandsDisplayInstrumentedTest {
     }
 
     @Test fun capturesAndTapsOnlyTheNewDisplayAndRemovesIt() {
-        val home = instrumentation.uiAutomation.executeShellCommand(
-            "am start -W --display 0 -a android.intent.action.MAIN -c android.intent.category.HOME"
-        )
-        ParcelFileDescriptor.AutoCloseInputStream(home).use { it.readBytes() }
-        until("The launcher did not appear on the main display.") { primaryApps().let { it.isNotEmpty() && pkg !in it } }
         val original = primaryApps()
         val displays = context.getSystemService(DisplayManager::class.java)
         val previous = displays.displays.map { it.displayId }.toSet()
@@ -139,9 +154,31 @@ class BackgroundHandsDisplayInstrumentedTest {
         assertEquals(original, primaryApps())
     }
 
+    /** open() may see Android's starting window before the actual fixture UI has rendered. */
+    private fun observeFixture(session: BackgroundHandsDisplay, label: String) {
+        var previous: Pair<Int, Rect>? = null
+        var lastMovement = SystemClock.uptimeMillis()
+        until("Could not observe the fixture control '$label' on a stable secondary window.") {
+            val all = service.windowsOnAllDisplays
+            val top = (0 until all.size()).asSequence().filter { all.keyAt(it) != Display.DEFAULT_DISPLAY }
+                .mapNotNull { all.valueAt(it).maxByOrNull { win -> win.layer } }
+                .firstOrNull { win -> win.root?.let {
+                    it.packageName == pkg && it.findAccessibilityNodeInfosByText(label).isNotEmpty()
+                } == true }
+            val geometry = top?.let { it.id to Rect().also { bounds -> it.getBoundsInScreen(bounds) } }
+            if (geometry != previous) {
+                previous = geometry
+                lastMovement = SystemClock.uptimeMillis()
+            }
+            if (geometry == null || SystemClock.uptimeMillis() - lastMovement < 300) return@until false
+            session.screenshot().recycle()
+            true
+        }
+    }
+
     @Test fun movingTheSameWindowNeedsANewModelScreenshotAndPasswordFieldsHideThePreview() {
         BackgroundHandsDisplay.open(context, service, fixture).use { session ->
-            session.screenshot().recycle()
+            observeFixture(session, "Moving window")
             val button = session.roots().single().findAccessibilityNodeInfosByText("Moving window").single()
             assertTrue(button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
             fun dialog(): AccessibilityWindowInfo? {
@@ -152,7 +189,7 @@ class BackgroundHandsDisplayInstrumentedTest {
                     }
             }
             until("The fixture's dialog did not appear.") { dialog() != null }
-            session.screenshot().recycle()
+            observeFixture(session, "Move dialog")
             val original = checkNotNull(dialog())
             val oldBounds = Rect().also { original.getBoundsInScreen(it) }
             val move = session.roots().single().findAccessibilityNodeInfosByText("Move dialog").single()
@@ -164,7 +201,7 @@ class BackgroundHandsDisplayInstrumentedTest {
             // Even a successful fresh preview cannot turn old model coordinates into safe input.
             until("The moved window could not be previewed.") { session.preview()?.let { it.recycle(); true } == true }
             assertThrows(IllegalStateException::class.java) { session.tap(oldBounds.centerX(), oldBounds.centerY(), 60) }
-            session.screenshot().recycle()
+            observeFixture(session, "Change form")
             val form = session.roots().single().findAccessibilityNodeInfosByText("Change form").single()
             assertTrue(form.performAction(AccessibilityNodeInfo.ACTION_CLICK))
             until("Android did not expose the private field.") {
@@ -181,7 +218,7 @@ class BackgroundHandsDisplayInstrumentedTest {
     @Test fun refusesFixtureAlreadyVisibleOnThePrimaryDisplay() {
         val before = context.getSystemService(DisplayManager::class.java).displays.map { it.displayId }.toSet()
         val command = "am start -W --display 0 -n $pkg/io.github.nanomuse.hands.HandsDisplayFixture"
-        val pfd = instrumentation.uiAutomation.executeShellCommand(command)
+        val pfd = automation.executeShellCommand(command)
         ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().use { it.readText() }
         until("The fixture did not appear on the primary display.") { pkg in primaryApps() }
         try {

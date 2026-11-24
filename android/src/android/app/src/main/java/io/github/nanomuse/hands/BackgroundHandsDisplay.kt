@@ -53,6 +53,40 @@ internal data class HandsViewport(val width: Int, val height: Int, val dpi: Int)
     val previewHeight get() = (height * previewScale).roundToInt().coerceAtLeast(1)
 }
 
+/** Limited to recoverable failures reported while requesting a new image, never while sending input. */
+internal sealed class HandsCaptureFailure(message: String) : IllegalStateException(message) {
+    class RateLimited : HandsCaptureFailure("Android rate-limited window capture.")
+    class WindowChanged : HandsCaptureFailure("The background window changed during capture.")
+}
+
+/** A starting window can be replaced by an actual activity. Re-sample its successor only after
+ * identifying it again. One window transition and one independent platform throttle are tolerated. */
+internal fun <W, T> captureHandsWindow(current: () -> W, waitForInterval: () -> Unit, capture: (W) -> T): T {
+    var window = current()
+    var changed = false
+    var waited = false
+    while (true) {
+        try {
+            return capture(window)
+        } catch (retry: HandsCaptureFailure) {
+            if (retry is HandsCaptureFailure.RateLimited) {
+                if (waited) throw retry
+                waited = true
+                waitForInterval()
+            }
+            val next = current()
+            if (next != window) {
+                if (changed) throw HandsCaptureFailure.WindowChanged()
+                changed = true
+            } else if (retry is HandsCaptureFailure.WindowChanged) {
+                // Android rejected this window ID, but we cannot confirm a replacement.
+                throw retry
+            }
+            window = next
+        }
+    }
+}
+
 /** One run owns one non-mirroring display and a fresh launcher task. */
 internal class BackgroundHandsDisplay private constructor(
     private val context: Context,
@@ -68,7 +102,6 @@ internal class BackgroundHandsDisplay private constructor(
     private val display = host.display
     private val id = display.displayId
     private data class WindowFrame(val id: Int, val bounds: Rect)
-    private class CaptureRateLimited : IllegalStateException("Android rate-limited window capture.")
 
     private val captureLock = ReentrantLock(true)
     private var lastCaptureAt = -1L
@@ -125,26 +158,24 @@ internal class BackgroundHandsDisplay private constructor(
         captureLock.lockInterruptibly()
         try {
             observation = null
-            checkRunning()
-            val target = frameOf(targetWindows().first())
-            val bitmap = try {
-                capture(target.id, 5_000)
-            } catch (_: CaptureRateLimited) {
-                // Only the documented interval error is transient. Recheck the target before retrying.
-                Thread.sleep(CAPTURE_INTERVAL_MS)
-                checkRunning()
-                check(target == frameOf(targetWindows().first())) { "The background window changed before capture." }
-                capture(target.id, 5_000)
-            }
-            var output: Bitmap? = null
-            try {
-                checkRunning()
-                check(target == frameOf(targetWindows().first())) { "The background window changed during capture." }
-                output = compose(bitmap, target.bounds, viewport.width, viewport.height)
-                observation = target
-                return output
-            } finally {
-                if (output !== bitmap) bitmap.recycle()
+            return captureHandsWindow(
+                current = {
+                    checkRunning()
+                    frameOf(targetWindows().first())
+                },
+                waitForInterval = { Thread.sleep(CAPTURE_INTERVAL_MS) },
+            ) { target ->
+                val bitmap = capture(target.id, 5_000)
+                var output: Bitmap? = null
+                try {
+                    checkRunning()
+                    if (target != frameOf(targetWindows().first())) throw HandsCaptureFailure.WindowChanged()
+                    output = compose(bitmap, target.bounds, viewport.width, viewport.height)
+                    observation = target
+                    output
+                } finally {
+                    if (output !== bitmap) bitmap.recycle()
+                }
             }
         } finally {
             captureLock.unlock()
@@ -208,7 +239,11 @@ internal class BackgroundHandsDisplay private constructor(
         val full = isFullFrame(bitmap, bounds)
         if (full && width == viewport.width && height == viewport.height) return bitmap
         check(full || (bitmap.width == bounds.width() && bitmap.height == bounds.height()
-            && Rect(0, 0, viewport.width, viewport.height).contains(bounds))) { "The app window does not match the background screen." }
+            && Rect.intersects(Rect(0, 0, viewport.width, viewport.height), bounds))) {
+            "Window image ${bitmap.width}x${bitmap.height} does not match bounds ${bounds.toShortString()} on ${viewport.width}x${viewport.height}."
+        }
+        // During an activity transition the verified window can be translated partly outside
+        // the display. Its pixels still map one-to-one to its bounds; Canvas clips the excess.
         val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         try {
             Canvas(output).apply {
@@ -245,7 +280,8 @@ internal class BackgroundHandsDisplay private constructor(
             override fun onFailure(errorCode: Int) {
                 val error = when (errorCode) {
                     AccessibilityService.ERROR_TAKE_SCREENSHOT_SECURE_WINDOW -> ProtectedScreen()
-                    AccessibilityService.ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT -> CaptureRateLimited()
+                    AccessibilityService.ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT -> HandsCaptureFailure.RateLimited()
+                    AccessibilityService.ERROR_TAKE_SCREENSHOT_INVALID_WINDOW -> HandsCaptureFailure.WindowChanged()
                     else -> IllegalStateException("Android could not capture the background app window (code $errorCode).")
                 }
                 frame.completeExceptionally(error)
