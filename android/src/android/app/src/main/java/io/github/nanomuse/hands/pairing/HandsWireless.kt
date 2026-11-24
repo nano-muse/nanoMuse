@@ -5,11 +5,12 @@ import android.net.ssl.SSLSockets
 import io.github.nanomuse.hands.HandsDisplayBridge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.IOException
@@ -72,12 +73,15 @@ object HandsWireless {
                         }
                     }
                 }
-                withTimeout(12_000) {
+                val connected = withTimeoutOrNull(12_000) {
                     while (!HandsDisplayBridge.isReady()) {
                         if (synchronized(lifetime) { current !== stream }) throw IOException("The display helper disconnected")
                         delay(80)
                     }
+                    true
                 }
+                currentCoroutineContext().ensureActive()
+                if (connected != true) throw IOException("The display helper did not connect")
             } catch (cause: Throwable) {
                 stop()
                 throw cause
