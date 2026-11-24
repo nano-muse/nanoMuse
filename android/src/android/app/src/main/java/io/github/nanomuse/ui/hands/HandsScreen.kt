@@ -42,6 +42,7 @@ import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsSwitchRow
 import io.github.nanomuse.hands.Hands
+import io.github.nanomuse.hands.HandsDisplayBridge
 import io.github.nanomuse.ui.home.MuseTones
 
 const val ROUTE_HANDS = "nanomuse/hands"
@@ -61,6 +62,8 @@ fun HandsScreen(
 ) {
     var showReplay by rememberSaveable { mutableStateOf(false) }
     if (showReplay) { HandsReplayScreen { showReplay = false }; return }
+    var showWireless by rememberSaveable { mutableStateOf(false) }
+    if (showWireless) { HandsWirelessSetup(onBack = { showWireless = false }, onOpenShizuku = onOpenShizuku); return }
     val context = LocalContext.current
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
     val config = repo?.config?.collectAsState()?.value
@@ -69,6 +72,7 @@ fun HandsScreen(
     var tick by remember { mutableIntStateOf(0) }
     val active by Hands.active.collectAsState()
     val shizuku by ShizukuManager.snapshot.collectAsState()
+    val localBridge by HandsDisplayBridge.ready.collectAsState()
 
     // Permissions are granted in other apps; re-read when the user comes back.
     val owner = LocalLifecycleOwner.current
@@ -77,7 +81,7 @@ fun HandsScreen(
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
-    val readiness = remember(tick, config, shizuku) { Hands.readiness(context) }
+    val readiness = remember(tick, config, shizuku, localBridge) { Hands.readiness(context) }
     val visionEntries = remember(config) { Hands.visionEntries(context) }
 
     SettingsScaffold(title = stringResource(R.string.nm_hands_title), onBack = onBack) {
@@ -114,6 +118,7 @@ fun HandsScreen(
                 onCheckedChange = {
                     Hands.setBackgroundScreen(context, it)
                     tick++
+                    if (it && !readiness.backgroundBridgeReady) showWireless = true
                 },
                 icon = Icons.Outlined.Layers,
                 showDivider = active,
@@ -140,18 +145,14 @@ fun HandsScreen(
             },
         ) {
             if (readiness.backgroundScreen) {
-                NeedRow(
+                SettingsRow(
+                    title = stringResource(R.string.nm_hands_wireless_title),
+                    subtitle = stringResource(
+                        if (readiness.backgroundBridgeReady) R.string.nm_hands_status_ready
+                        else R.string.nm_hands_wireless_pair,
+                    ),
                     icon = Icons.Outlined.Layers,
-                    title = stringResource(R.string.shizuku_title) + " ${Hands.BACKGROUND_MIN_SHIZUKU}+",
-                    ok = readiness.shizukuReady,
-                    okText = stringResource(R.string.nm_hands_need_granted),
-                    fixText = when (shizuku.state) {
-                        ShizukuManager.State.NOT_INSTALLED -> stringResource(R.string.shizuku_state_not_installed)
-                        ShizukuManager.State.NOT_RUNNING -> stringResource(R.string.shizuku_state_not_running)
-                        ShizukuManager.State.NEED_PERMISSION -> stringResource(R.string.shizuku_state_need_permission)
-                        ShizukuManager.State.READY -> stringResource(R.string.check_update_available_subtitle, shizuku.version.toString(), "${Hands.BACKGROUND_MIN_SHIZUKU}+")
-                    },
-                    onFix = onOpenShizuku,
+                    onClick = { showWireless = true },
                 )
             }
             NeedRow(
