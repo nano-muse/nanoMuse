@@ -41,17 +41,16 @@ import java.time.ZonedDateTime
 
 /** Local chat and calendar follow-ups share the same account, delivery budget and alarm. */
 internal object ChatCheckIns {
-    private const val ENABLED = "feed.chat.checkins"
     private const val LAST_DAY = "feed.chat.checkin_day"
     private const val CODE = 0x6E6D_4349
     private const val CHANNEL = "nanomuse_chat_checkins"
     private const val ACTION = "io.github.nanomuse.CHAT_CHECKIN"
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("nanomuse", Context.MODE_PRIVATE)
-    fun enabled(ctx: Context) = FeedChatEvidence.enabled(ctx) && prefs(ctx).getBoolean(ENABLED, false)
+    fun enabled(ctx: Context) = FeedChatEvidence.checkInsEnabled(ctx)
 
     fun configure(ctx: Context, on: Boolean) {
-        prefs(ctx).edit().putBoolean(ENABLED, on && FeedChatEvidence.enabled(ctx)).apply()
+        FeedChatEvidence.setCheckIns(ctx, on)
         reschedule(ctx)
     }
 
@@ -69,7 +68,7 @@ internal object ChatCheckIns {
 
     /** Android can batch this wakeup. No exact-alarm permission or persistent service is needed. */
     fun schedule(ctx: Context, earliest: ZonedDateTime = ZonedDateTime.now().plusSeconds(2)) {
-        if (!enabled(ctx) && !CalendarChanges.enabled(ctx)) return
+        if (!(enabled(ctx) && FeedChatEvidence.hasReferences(ctx)) && !CalendarChanges.enabled(ctx)) return
         val whenDue = if (CalendarChanges.needsBaseline(ctx)) earliest
             else nextWindow(earliest, prefs(ctx).getString(LAST_DAY, null))
         ctx.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
@@ -137,7 +136,7 @@ internal object ChatCheckIns {
                         }
                     } else null
                 } else null
-                val chatFacts = if (calNote == null && enabled(app)) due(FeedChatEvidence.facts(app, now.toLocalDate()), now) else emptyList()
+                val chatFacts = if (calNote == null && enabled(app)) due(FeedChatEvidence.facts(app, now.toLocalDate(), forCheckIn = true), now) else emptyList()
                 val note = calNote ?: commitment(app, now, chatFacts) ?: return@withTransaction if (
                     consent != null || chatFacts.isNotEmpty()) retry else tomorrow
                 fun allowed() = note.allowed() && AccountData.key(app) == owner &&

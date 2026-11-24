@@ -43,7 +43,7 @@ function resourceLines(content: string, json: boolean, scrub: (s: string) => str
 type Rpc = { id?: number; error?: unknown; result?: Record<string, unknown> }
 
 /** Use only the MCP resource methods. A resource URI is opaque to the client; never fetch it as a URL. */
-export async function resourceSession(url: string, auth: Record<string, string>, signal: AbortSignal, current: () => boolean, key?: string): Promise<{ choices: ResourceChoice[]; sample?: ResourceSnapshot }> {
+export async function resourceSession(url: string, auth: Record<string, string>, signal: AbortSignal, current: () => boolean, key?: string | { single: true }): Promise<{ choices: ResourceChoice[]; sample?: ResourceSnapshot }> {
   let session = '', protocol = '2025-06-18', sequence = 0
   const endpoint = new URL(url)
   const credentials = [...Object.values(auth), endpoint.password, ...endpoint.searchParams.values()]
@@ -96,12 +96,26 @@ export async function resourceSession(url: string, auth: Record<string, string>,
     if (typeof init.protocolVersion === 'string') protocol = init.protocolVersion
     if (!(init.capabilities as { resources?: unknown } | undefined)?.resources) return { choices: [] }
     await send('notifications/initialized', {}, true)
+    const read = async (uri: string, mimeType: unknown, choice: ResourceChoice) => {
+      const data = await send('resources/read', { uri })
+      const contents = data.contents
+      if (!Array.isArray(contents) || !contents.length || contents.some(c => !c || c.uri !== uri || typeof c.text !== 'string' || !textMime(c.mimeType))) throw new Error('Expected the selected text resource')
+      const lines = Array.from(new Set(contents.flatMap(c => resourceLines(String(c.text), /json(?:;|$)/i.test(String(c.mimeType ?? mimeType ?? '')), safeSource)).filter(l => !privateLine(l)).map(l => safeText(safeSource(l), 420)).filter(l => l.length >= 5)))
+      if (lines.length > 1200) throw new Error('Choose a smaller text resource')
+      return { choices: [choice], sample: { lines, signatures: lines.map(signature) } }
+    }
     const choices: ResourceChoice[] = []
+    // For the new-connection option we must see the end of the list before reading anything.
+    let single: { uri: string; mimeType: unknown } | undefined
     let cursor: string | undefined
     for (let page = 0; page < 4 && choices.length < 100; page++) {
       const list = await send('resources/list', cursor ? { cursor } : {})
       for (const item of Array.isArray(list.resources) ? list.resources : []) {
         if (!item || typeof item.uri !== 'string' || !item.uri || typeof item.name !== 'string' || !textMime(item.mimeType)) continue
+        if (typeof key === 'object') {
+          if (single && single.uri !== item.uri) return { choices: [] }
+          single = { uri: item.uri, mimeType: item.mimeType }
+        }
         const name = typeof item.title === 'string' ? item.title : item.name
         if (!name || name === item.uri || privateLine(name)) continue
         const label = safeText(safeSource(name), 100)
@@ -110,18 +124,17 @@ export async function resourceSession(url: string, auth: Record<string, string>,
         if (choices.some(other => other.key === choice.key)) continue
         choices.push(choice)
         if (choice.key === key) {
-          const data = await send('resources/read', { uri: item.uri })
-          const contents = data.contents
-          if (!Array.isArray(contents) || !contents.length || contents.some(c => !c || c.uri !== item.uri || typeof c.text !== 'string' || !textMime(c.mimeType))) throw new Error('Expected the selected text resource')
-          const lines = Array.from(new Set(contents.flatMap(c => resourceLines(String(c.text), /json(?:;|$)/i.test(c.mimeType ?? item.mimeType ?? ''), safeSource)).filter(l => !privateLine(l)).map(l => safeText(safeSource(l), 420)).filter(l => l.length >= 5)))
-          if (lines.length > 1200) throw new Error('Choose a smaller text resource')
-          return { choices: [choice], sample: { lines, signatures: lines.map(signature) } }
+          return await read(item.uri, item.mimeType, choice)
         }
         if (choices.length === 100) break
       }
       cursor = typeof list.nextCursor === 'string' && list.nextCursor ? list.nextCursor : undefined
-      if (!cursor) break
+      if (!cursor) {
+        if (typeof key === 'object' && single && choices.length === 1) return await read(single.uri, single.mimeType, choices[0]!)
+        break
+      }
     }
+    if (typeof key === 'object') return { choices: [] }
     if (key) throw new Error('The selected resource is no longer listed')
     return { choices }
   } finally {

@@ -46,11 +46,9 @@ test('an offline background tick delivers the due commitment in the original cha
   let now = time(7, 9)
   t.mock.method(Date, 'now', () => now)
   let rooms = host()
-  say(rooms, 'older', 'I will call the gallery tomorrow.')
+  // Fresh install: never open Feed and never set the chat follow-up switch.
   await rooms.tick()
   assert.deepEqual(rooms.checkInMessages(), [])
-  now += 1
-  await enable(rooms)
   now = time(7, 12)
   say(rooms, 'museum', 'I promised to call the museum tomorrow.')
   now += 100
@@ -127,4 +125,34 @@ test('uncertain, closed, quiet, recent, muted, archived, cleared, or updated-on-
   rooms.save = async () => {}
   await rooms.writeChatCheckIn(now)
   assert.deepEqual(rooms.checkInMessages().map(m => m.sessionId), ['eligible'])
+})
+
+test('upgrades and account switches preserve an explicit off, and resuming applies only to new commitments', async t => {
+  const home = await mkdtemp(join(tmpdir(), 'nm-checkin-upgrade-')), prev = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  t.after(async () => { if (prev) process.env.DSH_HOME = prev; else delete process.env.DSH_HOME; await rm(home, { recursive: true, force: true }) })
+  const rooms = host()
+  let now = time(7, 10)
+  t.mock.method(Date, 'now', () => now)
+  rooms.store.mailboxes.local = { enabledSince: 0, lastDay: '', messages: [] }
+  say(rooms, 'off', 'I will call the gallery tomorrow.')
+  await rooms.save()
+  const restart = host()
+  restart.store = await restart.read()
+  now = time(8, 12)
+  await restart.tick()
+  assert.equal(restart.checkInMessages().length, 0)
+  assert.equal(restart.newResourceOffer(), '')
+  await enable(restart)
+  await restart.tick()
+  assert.equal(restart.checkInMessages().length, 0)
+  restart.ctx.nanomuseCloud.feedOwner = 'account:second'
+  say(restart, 'active', 'I will contact the printer today.')
+  now += 20 * 60_000
+  await restart.tick()
+  assert.deepEqual(restart.checkInMessages().map(m => m.sessionId), ['active'])
+  restart.ctx.nanomuseCloud.feedOwner = 'local'
+  assert.equal(restart.checkInMessages().length, 0)
+  await restart.setFeedRoutine({ chatCheckIns: false, checkInScope: restart.checkInScope() })
+  assert.equal((await restart.read()).mailboxes.local.enabledSince, 0)
 })

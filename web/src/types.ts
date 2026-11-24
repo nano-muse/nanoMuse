@@ -850,6 +850,7 @@ export interface ContextResource {
 }
 
 export interface ContextWatchSettings {
+  on_connect?: { mail: boolean; calendar: boolean; mcp: boolean } | null;
   local_goals: boolean;
   checked_at: string | null;
   unavailable: boolean;

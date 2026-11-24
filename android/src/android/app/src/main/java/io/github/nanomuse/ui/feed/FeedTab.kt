@@ -546,16 +546,14 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
                         if (Build.VERSION.SDK_INT >= 33 && !NotificationManagerCompat.from(context).areNotificationsEnabled())
                             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
-                    if (chatEnabled) {
-                        var checkIns by remember(context, chatRevision) { mutableStateOf(ChatCheckIns.enabled(context)) }
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(R.string.nm_chat_checkin_setting), fontSize = 15.sp, modifier = Modifier.weight(1f))
-                            Switch(checked = checkIns, onCheckedChange = { on ->
-                                ChatCheckIns.configure(context, on)
-                                checkIns = ChatCheckIns.enabled(context)
-                                if (checkIns) offerNotifications()
-                            })
-                        }
+                    var checkIns by remember(context, chatRevision) { mutableStateOf(ChatCheckIns.enabled(context)) }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.nm_chat_checkin_setting), fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Switch(checked = checkIns, onCheckedChange = { on ->
+                            ChatCheckIns.configure(context, on)
+                            checkIns = ChatCheckIns.enabled(context)
+                            if (checkIns) offerNotifications()
+                        })
                     }
                     HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
                     val owner = AccountData.key(context)

@@ -330,8 +330,9 @@ def test_feed_posts_written_for_the_user(server):
     knows, newest first; a post can be removed; a bad model answer leaves the feed as it was."""
     client, service, llm = server
     r = client.get("/api/feed/posts")
-    # the daily routine is there from the start, at 08:00 (contract C5)
+    # The daily routine and local chat follow-ups are available without configuration.
     assert r.json() == {
+        "chat_followups": True,
         "instructions": "",
         "generated_at": None,
         "posts": [],
@@ -3758,11 +3759,11 @@ def test_due_reply_starts_a_real_chat_and_a_short_answer_settles_only_that_wait(
     monkeypatch.setattr(
         service.push, "notify", lambda *args, **kwargs: pushes.append((args, kwargs))
     )
-    service._send_chat_followup(now)
-    assert len(main.timeline.events) == 2
-    assert client.put(
-        "/api/feed/instructions", json={"chat_followups": True, "followup_push": True}
-    ).json()["chat_followups"]
+    assert client.get("/api/feed/posts").json()["chat_followups"] is True
+    assert "chat_outreach" not in service.feed_posts()
+    assert client.put("/api/feed/instructions", json={"followup_push": True}).json()[
+        "chat_followups"
+    ]
     main.busy = True
     service._send_chat_followup(now)
     main.busy = False
@@ -3810,6 +3811,10 @@ def test_chat_followup_skips_another_account_and_dismissed_or_settled_wait(serve
     main.timeline.add(
         {"type": "user", "text": "I'm waiting for the Atlas quote by today.", "ts": svc_time}
     )
+    service.set_feed_instructions(chat_followups=False)
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 1
+    assert client.get("/api/feed/posts").json()["chat_followups"] is False
     service.set_feed_instructions(chat_followups=True)
     service.sync.state["owners"]["main"] = "other"
     service._send_chat_followup(now)
@@ -3824,3 +3829,67 @@ def test_chat_followup_skips_another_account_and_dismissed_or_settled_wait(serve
     main.timeline.add({"type": "user", "text": "I received the Atlas quote.", "ts": svc_time})
     assert service.waiting_followup(now) is None
     assert "chat_outreach" not in client.get("/api/feed/posts").json()
+
+
+def test_new_connection_defaults_respect_declines_and_stale_settings(server, tmp_path):
+    client, _, _ = server
+
+    def view():
+        return client.get("/api/feed/context").json()
+
+    def choice(kind):
+        v = view()
+        return {"revision": v["revision"], "enabled": v["on_connect"][kind]}
+
+    assert choice("mail")["enabled"] and choice("calendar")["enabled"]
+    email = {
+        "enabled": True,
+        "address": "fixture",
+        "imap_host": "fixture",
+        "smtp_host": "fixture",
+        "password": "fixture",
+    }
+    client.put(
+        "/api/connections/email", json={**email, "review": choice("mail")}
+    ).raise_for_status()
+    assert view()["mail"]
+    old = choice("mail")
+    client.put(
+        "/api/feed/context",
+        json={
+            "revision": old["revision"],
+            "mail": False,
+            "calendar": False,
+            "resources": [],
+            "local_context": False,
+        },
+    ).raise_for_status()
+    assert client.put("/api/connections/email", json={**email, "review": old}).status_code == 409
+    assert not choice("mail")["enabled"] and not view()["mail"]
+    client.delete("/api/connections/email").raise_for_status()
+    assert not choice("mail")["enabled"]
+    client.put(
+        "/api/connections/email", json={**email, "review": choice("mail")}
+    ).raise_for_status()
+    assert not view()["mail"]
+    link = tmp_path / "busy.ics"
+    link.write_text("BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n")
+    body = {"name": "Desk", "url": str(link)}
+    client.post(
+        "/api/connections/calendar/feeds", json={**body, "review": choice("calendar")}
+    ).raise_for_status()
+    assert view()["calendar"] and not view()["mail"]
+    # An old client adding a link without a review choice cannot extend an old grant.
+    client.post(
+        "/api/connections/calendar/feeds", json={**body, "name": "Archive"}
+    ).raise_for_status()
+    assert not view()["calendar"] and not choice("calendar")["enabled"]
+
+
+def test_existing_unreviewed_connector_keeps_preference_on_upgrade(server):
+    client, _, _ = server
+    client.put(
+        "/api/connections/email", json={"enabled": True, "imap_host": "fixture"}
+    ).raise_for_status()
+    view = client.get("/api/feed/context").json()
+    assert view["available_mail"] and not view["mail"] and not view["on_connect"]["mail"]

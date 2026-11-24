@@ -104118,61 +104118,61 @@
         }
       }
     },
-    "Between 09:00 and 20:00, nanoMuse can check in once a day about a goal due today or a commitment from your main chat if chat preparation is on." : {
+    "Between 09:00 and 20:00, nanoMuse can ask about a goal due today or a new commitment you mentioned in your main chat. You can turn these check-ins off here." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zwischen 09:00 und 20:00 kann nanoMuse einmal täglich nach einem heute fälligen Ziel fragen. Bei aktivierter Chatvorbereitung zählen auch Zusagen im Hauptchat."
+            "value" : "Zwischen 09:00 und 20:00 kann nanoMuse nach einem heute fälligen Ziel oder einer neuen Zusage im Hauptchat fragen. Hier kannst du diese Nachfragen ausschalten."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Between 09:00 and 20:00, nanoMuse can check in once a day about a goal due today or a commitment from your main chat if chat preparation is on."
+            "value" : "Between 09:00 and 20:00, nanoMuse can ask about a goal due today or a new commitment you mentioned in your main chat. You can turn these check-ins off here."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entre las 09:00 y las 20:00, nanoMuse puede escribirte una vez al día sobre un objetivo que vence hoy o un compromiso del chat principal si activaste la preparación desde los chats."
+            "value" : "Entre las 09:00 y las 20:00, nanoMuse puede preguntarte por un objetivo que vence hoy o un compromiso nuevo que mencionaste en el chat principal. Puedes desactivar estos mensajes aquí."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entre 09:00 et 20:00, nanoMuse peut vous écrire une fois par jour au sujet d’un objectif à échéance aujourd’hui ou, si la préparation depuis les discussions est activée, d’un engagement pris dans la discussion principale."
+            "value" : "Entre 09:00 et 20:00, nanoMuse peut vous écrire au sujet d’un objectif à atteindre aujourd’hui ou d’un nouvel engagement pris dans la discussion principale. Vous pouvez désactiver ces messages ici."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "09:00から20:00までに、今日が期限の目標について1日1回まで連絡します。チャットからの準備がオンなら、メインチャットで話した今日の予定も対象です。"
+            "value" : "09:00から20:00の間、今日が期限の目標や、メインチャットで新たに話した予定について nanoMuse から連絡することがあります。ここでオフにできます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "09:00부터 20:00 사이에 오늘 마감인 목표에 관해 하루 한 번까지 연락합니다. 채팅 준비를 켜면 기본 채팅에서 약속한 일도 포함됩니다."
+            "value" : "09:00부터 20:00 사이에 nanoMuse가 오늘 마감인 목표나 기본 채팅에서 새로 언급한 할 일에 관해 물어볼 수 있습니다. 여기에서 이 기능을 끌 수 있습니다."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "С 09:00 до 20:00 nanoMuse может раз в день написать о цели со сроком на сегодня или, если включена подготовка по чатам, о вашем обещании в основном чате."
+            "value" : "С 09:00 до 20:00 nanoMuse может написать о цели со сроком на сегодня или о новой договорённости из основного чата. Здесь можно отключить такие сообщения."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当地时间 09:00 至 20:00，nanoMuse 每天最多发来一条消息，跟进今天到期的目标。开启「根据聊天提前准备」后，也能跟进你在主要聊天提过的当日待办。"
+            "value" : "当地时间 09:00 至 20:00，nanoMuse 可以跟进今天到期的目标，或你在主要聊天里新提到的待办。你可以在这里关闭主动跟进。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "當地時間 09:00 至 20:00，nanoMuse 每天最多傳來一則訊息，跟進今天到期的目標。開啟「根據聊天提前準備」後，也能跟進你在主要聊天提過的當日待辦。"
+            "value" : "當地時間 09:00 至 20:00，nanoMuse 可以跟進今天到期的目標，或你在主要聊天中剛提到的待辦事項。你可以在這裡關閉主動跟進。"
           }
         }
       }

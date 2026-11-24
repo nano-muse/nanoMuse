@@ -8,6 +8,7 @@ enum NanoMuseFeedChatContext {
         let session: String
         let message: String
         let at: Date
+        var mainOnly: Bool? = nil // Older references were explicitly selected for Feed preparation.
     }
 
     static let maxReferences = 40
@@ -203,7 +204,7 @@ enum NanoMuseFeedChatIndex {
     nonisolated static let setting = "nanomuse.feed.chat.enabled"
     private static let index = "nanomuse.feed.chat.references"
     private(set) static var epoch = UUID()
-    static var enabled: Bool { UserDefaults.standard.bool(forKey: setting) }
+    nonisolated static var enabled: Bool { UserDefaults.standard.bool(forKey: setting) }
 
     struct Ticket {
         let owner: String
@@ -217,7 +218,7 @@ enum NanoMuseFeedChatIndex {
     }
 
     static func setEnabled(_ value: Bool) {
-        guard value != enabled else { return }
+        guard value != enabled || UserDefaults.standard.object(forKey: setting) == nil else { return }
         UserDefaults.standard.set(value, forKey: setting)
         invalidate()
         if !value {
@@ -226,30 +227,60 @@ enum NanoMuseFeedChatIndex {
         }
     }
 
-    static func allows(_ session: String) -> Bool {
-        enabled && (UserDefaults.standard.object(forKey: "memory.global.enabled") as? Bool ?? true)
+    nonisolated static func allowsChatCheckIn(in defaults: UserDefaults = .standard) -> Bool {
+        NanoMuseChatOutreach.chatEnabled(in: defaults) && (defaults.object(forKey: setting) as? Bool ?? true)
+    }
+
+    private static func canUse(_ session: String) -> Bool {
+        (UserDefaults.standard.object(forKey: "memory.global.enabled") as? Bool ?? true)
             && !SessionLockStore.shared.appIsLocked && !SessionLockStore.shared.isLocked(session)
             && !NanoMuseFeedFlow.isFeedSession(session)
             && NanoMuseAccountData.shared.owner(of: session) == NanoMuseAccountData.shared.current
     }
 
+    static func allows(_ session: String) -> Bool { enabled && canUse(session) }
+
+    private static func isMain(_ session: String) -> Bool {
+        session == UserDefaults.standard.string(forKey: NanoMuseMainChat.key)
+    }
+
     static func ticket(session: String?, memory: Bool) -> Ticket? {
-        guard enabled, memory, !SessionLockStore.shared.appIsLocked, session.map(allows) != false else { return nil }
+        guard enabled || allowsChatCheckIn(), memory, !SessionLockStore.shared.appIsLocked else { return nil }
+        if let session, !canUse(session) || (!enabled && !isMain(session)) { return nil }
         return Ticket(owner: NanoMuseAccountData.shared.current, generation: epoch)
     }
 
-    static func references(now: Date) -> [NanoMuseFeedChatContext.Reference] {
-        guard enabled, !SessionLockStore.shared.appIsLocked,
-              let data = UserDefaults.standard.data(forKey: index),
+    private static func savedReferences(now: Date) -> [NanoMuseFeedChatContext.Reference] {
+        guard let data = UserDefaults.standard.data(forKey: index),
               let refs = try? JSONDecoder().decode([NanoMuseFeedChatContext.Reference].self, from: data) else { return [] }
-        return NanoMuseFeedChatContext.retained(refs, now: now).filter { allows($0.session) }
+        return NanoMuseFeedChatContext.retained(refs, now: now)
+    }
+
+    static func references(now: Date, forMainChat session: String? = nil) -> [NanoMuseFeedChatContext.Reference] {
+        if let session {
+            guard allowsChatCheckIn(), isMain(session), canUse(session) else { return [] }
+            return savedReferences(now: now).filter { $0.session == session }
+        }
+        guard enabled, !SessionLockStore.shared.appIsLocked else { return [] }
+        return savedReferences(now: now).filter { $0.mainOnly != true && canUse($0.session) }
+    }
+
+    static func clearMainOnlyReferences() {
+        epoch = UUID()
+        let remaining = savedReferences(now: Date()).filter { $0.mainOnly != true }
+        if remaining.isEmpty {
+            UserDefaults.standard.removeObject(forKey: index)
+        } else if let data = try? JSONEncoder().encode(remaining) {
+            UserDefaults.standard.set(data, forKey: index)
+        }
     }
 
     static func record(_ ticket: Ticket, session: String, message: String) {
-        guard ticket.owner == NanoMuseAccountData.shared.current, ticket.generation == epoch, allows(session) else { return }
+        guard ticket.owner == NanoMuseAccountData.shared.current, ticket.generation == epoch, canUse(session),
+              enabled || (allowsChatCheckIn() && isMain(session)) else { return }
         let now = Date()
-        var refs = references(now: now).filter { $0.message != message }
-        refs.append(.init(session: session, message: message, at: now))
+        var refs = savedReferences(now: now).filter { $0.message != message }
+        refs.append(.init(session: session, message: message, at: now, mainOnly: enabled ? nil : true))
         if let data = try? JSONEncoder().encode(Array(refs.suffix(NanoMuseFeedChatContext.maxReferences))) {
             UserDefaults.standard.set(data, forKey: index)
             NanoMuseFeedStore.shared.invalidateChatCards()

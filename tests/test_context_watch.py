@@ -169,7 +169,7 @@ def test_shared_goals_are_never_offered_to_another_cloud_account(settings, monke
         svc.hub.data["cloud"] = {"account_id": account}
         svc.sync.state["account_id"] = account
         svc.sync.state["owners"]["main"] = account
-        assert watch._scope() == f"account:{account}"
+        assert svc._chat_followup_scope() == f"account:{account}"
         assert not watch.view()["local_goals"]
         assert all(r.kind != "goal" for r in watch._local(now).values())
     monkeypatch.setattr(type(svc.hub), "signed_in", property(lambda _: False))
@@ -194,7 +194,7 @@ async def test_account_change_during_first_read_invalidates_even_a_return_to_loc
         return [], {"uid": 52}
 
     async def signed_out():
-        assert not watch._scope()
+        assert not svc._chat_followup_scope()
 
     monkeypatch.setattr(context_sources, "mail_samples", slow_read)
     monkeypatch.setattr(svc.hub.cloud, "sign_out", signed_out)
@@ -203,7 +203,7 @@ async def test_account_change_during_first_read_invalidates_even_a_return_to_loc
     await svc.hub.sign_out()
     resume.set()
     await pending
-    assert watch.view()["revision"] != before and watch._scope() == "local"
+    assert watch.view()["revision"] != before and svc._chat_followup_scope() == "local"
     assert "cursor" not in watch._load("local")
 
 
@@ -213,7 +213,7 @@ def test_disagreeing_cloud_and_synced_account_has_no_access(settings, monkeypatc
     svc.sync.state["account_id"] = "first"
     svc.sync.state["owners"]["main"] = "first"
     svc.hub.data["cloud"] = {"account_id": "second"}
-    assert not svc.context_watch._scope()
+    assert not svc._chat_followup_scope()
 
 
 async def test_each_calendar_establishes_its_own_silent_baseline(settings):

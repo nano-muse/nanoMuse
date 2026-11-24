@@ -28,7 +28,10 @@ async function fixture(t) {
     else {
       assert.equal(req.headers['mcp-session-id'], 'loopback')
       if (method === 'notifications/initialized') { res.writeHead(202).end(); return }
-      if (method === 'resources/list') result = params.cursor ? { resources: data.allowed ? [{ name: 'Production notes', mimeType: 'text/plain', uri }] : [] }
+      if (method === 'resources/list') result = params.cursor ? { resources: data.allowed ? [
+        { name: 'Production notes', mimeType: 'text/plain', uri },
+        ...(data.multiple ? [{ name: 'Other', mimeType: 'text/plain', uri: 'project:other' }] : []),
+      ] : [], ...(data.more ? { nextCursor: 'unfinished' } : {}) }
         : { resources: [{ name: 'Poster', mimeType: 'image/png', uri: 'project:poster' }], nextCursor: 'second' }
       else if (method === 'resources/read') { assert.equal(params.uri, uri); result = { contents: [{ uri: data.alias ? 'project:other' : uri, text: data.text }] } }
       else assert.fail('A resource reader cannot call ' + method)
@@ -51,9 +54,10 @@ async function fixture(t) {
     get: key => key === 'workspaceRegistry' ? { archivedSessionIds: [] } : key === 'nanomuseConnectors' ? connector : undefined }
   const make = () => { const r = new Rooms(ctx); r.broadcast = () => {}; r.syncReady = async () => false; r.store.lang = 'en'; return r }
   const rooms = make()
+  connector.ctx.get = key => key === 'nanomuseRooms' ? rooms : undefined
   let now = new Date(2026, 4, 5, 10).getTime()
   t.mock.method(Date, 'now', () => now)
-  return { data, asks, dir, rooms, cloud, connector, ctx, make, id, model(fn) { model = fn }, advance(min) { now += min * 60_000 },
+  return { data, asks, dir, rooms, cloud, connector, ctx, make, id, url, model(fn) { model = fn }, advance(min) { now += min * 60_000 },
     async enable() { const choices = await rooms.selectResource(rooms.checkInScope(), id, 1, '', false); assert.deepEqual(choices.map(c => c.label), ['Production notes']); await rooms.selectResource(rooms.checkInScope(), id, 1, choices[0].key, true); return choices[0] } }
 }
 
@@ -178,4 +182,38 @@ test('structured data retains human-facing fields and redacts addresses and conn
   f.advance(30)
   await f.rooms.checkResource(Date.now())
   assert.equal(f.asks.length, 1)
+})
+
+test('new connections can follow a single text resource only with a current offer and a complete listing', async t => {
+  const f = await fixture(t)
+  const { rooms, connector, data, cloud } = f
+  const offer = rooms.newResourceOffer()
+  assert.ok(offer)
+  let n = 0
+  const connect = followOffer => connector.finish({ id: 'new-' + n++, service: 'custom', label: 'Fixtures', serverName: 'fixtures', url: f.url, disabled: [] }, { kind: 'header', name: 'x-fixture', value: 'authorized' }, followOffer)
+  const reads = () => data.calls.filter(([method]) => method === 'resources/read').length
+  await connect('')
+  assert.equal(data.calls.some(([method]) => method === 'resources/list'), false)
+  data.multiple = true
+  await connect(offer)
+  data.multiple = false; data.more = true
+  await connect(offer)
+  data.more = false
+  cloud.feedOwner = 'account:another'
+  await connect(offer)
+  cloud.feedOwner = 'local'
+  assert.equal(reads(), 0)
+  const id = await connect(offer)
+  assert.equal(reads(), 1)
+  assert.equal(rooms.store.mailboxes.local.resource.connection, id)
+  assert.equal(f.asks.length, 0)
+  await connect(offer)  // never replace an existing resource
+  assert.equal(reads(), 1)
+  await rooms.selectResource(rooms.checkInScope(), '', 0, '', true)
+  assert.equal(rooms.newResourceOffer(), '')
+  const restarted = f.make()
+  restarted.store = await restarted.read()
+  assert.equal(restarted.newResourceOffer(), '')
+  await connect(offer)
+  assert.equal(reads(), 1)
 })

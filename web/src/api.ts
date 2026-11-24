@@ -426,8 +426,8 @@ export const api = {
   calendar: () => request<CalendarData>("/api/calendar"),
   setCalendar: (body: Record<string, unknown>) =>
     request<ConnectionsData["calendar"]>("/api/connections/calendar", { method: "PUT", body: JSON.stringify(body) }),
-  addCalendarFeed: (name: string, url: string) =>
-    request<ConnectionsData["calendar"] & { error?: string }>("/api/connections/calendar/feeds", json({ name, url })),
+  addCalendarFeed: (name: string, url: string, review?: { revision: string; enabled: boolean }) =>
+    request<ConnectionsData["calendar"] & { error?: string }>("/api/connections/calendar/feeds", json({ name, url, review })),
   removeCalendarFeed: (name: string) =>
     request<ConnectionsData["calendar"]>(`/api/connections/calendar/feeds/${encodeURIComponent(name)}`, { method: "DELETE" }),
   testCalendar: () => request<TestResult>("/api/connections/calendar/test", { method: "POST" }),

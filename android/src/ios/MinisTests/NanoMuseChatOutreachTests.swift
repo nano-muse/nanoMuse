@@ -114,6 +114,25 @@ final class NanoMuseChatOutreachTests: XCTestCase {
         XCTAssertEqual(deliver(day: "2026-11-26", calendarReceipt: "different"), "sent")
     }
 
+    func testFreshCheckInsAndSavedChoicesAfterAnUpgrade() {
+        let suite = "nanomuse-checkins-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertTrue(NanoMuseChatOutreach.chatEnabled(in: defaults))
+        XCTAssertTrue(NanoMuseFeedChatIndex.allowsChatCheckIn(in: defaults))
+        XCTAssertNil(defaults.object(forKey: NanoMuseFeedChatIndex.setting))
+        XCTAssertNil(defaults.object(forKey: NanoMuseCalendarWatch.selection))
+
+        defaults.set(false, forKey: NanoMuseFeedChatIndex.setting)
+        XCTAssertTrue(NanoMuseChatOutreach.chatEnabled(in: defaults))
+        XCTAssertFalse(NanoMuseFeedChatIndex.allowsChatCheckIn(in: defaults))
+        defaults.set(true, forKey: NanoMuseFeedChatIndex.setting)
+        defaults.set(false, forKey: NanoMuseChatOutreach.preference)
+        XCTAssertFalse(NanoMuseChatOutreach.chatEnabled(in: defaults))
+        XCTAssertFalse(NanoMuseFeedChatIndex.allowsChatCheckIn(in: defaults))
+    }
+
     func testLocalHoursAndRevocation() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!

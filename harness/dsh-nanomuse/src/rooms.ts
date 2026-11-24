@@ -323,6 +323,7 @@ export interface FeedRoutine {
   /** Scoped to the active account in the public view only. */
   chatCheckIns?: boolean
   checkInScope?: string
+  newResourceOffer?: string
   contextResource?: ResourceWatch
 }
 
@@ -336,7 +337,9 @@ interface ChatCheckIn {
   unread: boolean
 }
 interface CheckInMailbox {
-  enabledSince: number
+  allowNewResource?: boolean
+  /** Missing follows the default, zero is an explicit opt-out. */
+  enabledSince?: number
   lastDay: string
   messages: ChatCheckIn[]
   resource?: ResourceWatch & { seen: string[]; checkedAt: number }
@@ -518,6 +521,7 @@ export default class NanomuseRooms extends Service {
   private followUpNeedsSave = false
   private unpublishedCheckIn: string | undefined
   private publishingCheckIn: Promise<void> | undefined
+  private newResourceRevision = 0
   private resourceAbort: AbortController | undefined
   private resourceChoiceAbort: AbortController | undefined
   private prepAbort: AbortController | undefined
@@ -562,6 +566,7 @@ export default class NanomuseRooms extends Service {
       const owner = this.ctx.nanomuseCloud.feedOwner
       if (owner !== feedOwner) {
         feedOwner = owner
+        this.newResourceRevision++
         this.resourceAbort?.abort()
         this.resourceChoiceAbort?.abort()
         this.prepAbort?.abort()
@@ -609,7 +614,7 @@ export default class NanomuseRooms extends Service {
       ...publicStore,
       goals,
       checkIns: this.checkInMessages().map(({ id, sessionId, at, unread }) => ({ id, sessionId, at, unread })),
-      feed: { ...publicFeed, posts, routine: { ...publicFeed.routine, chatCheckIns: Boolean(box?.enabledSince), ...(contextResource ? { contextResource } : {}), checkInScope: this.checkInScope() } },
+      feed: { ...publicFeed, posts, routine: { ...publicFeed.routine, chatCheckIns: Boolean(this.ctx.nanomuseCloud.feedOwner && box?.enabledSince !== 0), newResourceOffer: this.newResourceOffer(), ...(contextResource ? { contextResource } : {}), checkInScope: this.checkInScope() } },
       ideas: { ...this.store.ideas, items: this.ideaItems() },
       activity,
       busy: { ...this.busy },
@@ -2152,6 +2157,17 @@ export default class NanomuseRooms extends Service {
     return owner ? this.store.mailboxes[owner] : undefined
   }
 
+  private ensureMailbox(owner: string): CheckInMailbox {
+    return this.store.mailboxes[owner] ??= { allowNewResource: true, lastDay: '', messages: [] }
+  }
+
+  private newResourceOffer(): string {
+    const scope = this.checkInScope(), box = this.checkInMailbox()
+    // A legacy mailbox without a current resource cannot tell us whether its owner removed one.
+    if (!scope || !this.store.feed.routine.on || box && (box.resource || box.enabledSince === 0 || box.allowNewResource !== true)) return ''
+    return scope + ':' + this.newResourceRevision
+  }
+
   /** Text is available to the originating chat only. The rooms stream carries unread IDs. */
   checkInMessages(sessionId?: string): ChatCheckIn[] {
     const box = this.checkInMailbox()
@@ -2176,8 +2192,8 @@ export default class NanomuseRooms extends Service {
     const routine = this.store.feed.routine
     const day = localDateKey(now)
     const hour = new Date(now).getHours()
-    if (!owner || !box?.enabledSince || !routine.on || hour < 9 || hour >= 20 ||
-        box.lastDay >= day || !routineDue(routine.time, 0, now)) return
+    if (!owner || box?.enabledSince === 0 || !routine.on || hour < 9 || hour >= 20 ||
+        (box?.lastDay ?? '') >= day || !routineDue(routine.time, 0, now)) return
     const access = cloud.scheduleSessionAccess('nanomuse-feed')
     const registry = this.ctx.get('workspaceRegistry') as RegistryLike | undefined
     if (!registry) return
@@ -2189,8 +2205,8 @@ export default class NanomuseRooms extends Service {
       const goal = this.store.goals.find(g => g.sessionId === sid)
       if (goal && (goal.status !== 'tracking' || goal.feedMuted)) continue
       const heldAt = record.commitments.checkInHeldAt ?? 0
-      const item = record.commitments.items.find(i => i.changedAt > heldAt && i.at >= box.enabledSince && canCheckIn(i) && i.due === day &&
-        !cloud.hasRemoteReplySince(sid, i.changedAt) && dueSoon(i, now) && !box.messages.some(m => m.sessionId === sid && m.commitmentAt === i.at))
+      const item = record.commitments.items.find(i => i.changedAt > heldAt && i.at >= (box?.enabledSince ?? 0) && canCheckIn(i) && i.due === day &&
+        !cloud.hasRemoteReplySince(sid, i.changedAt) && dueSoon(i, now) && !box?.messages.some(m => m.sessionId === sid && m.commitmentAt === i.at))
       if (!item) continue
       const quote = commitmentText(item)
       const text = /^zh/i.test(this.lang)
@@ -2199,8 +2215,9 @@ export default class NanomuseRooms extends Service {
 
 You planned this for today. Would you like help preparing the next step?`
       const msg: ChatCheckIn = { id: newId('checkin'), sessionId: sid, at: now, commitmentAt: item.at, text, unread: true }
-      box.lastDay = day
-      box.messages.push(msg)
+      const mailbox = this.ensureMailbox(owner)
+      mailbox.lastDay = day
+      mailbox.messages.push(msg)
       this.unpublishedCheckIn = msg.id
       return this.persistChatCheckIn()
     }
@@ -2210,24 +2227,34 @@ You planned this for today. Would you like help preparing the next step?`
     return this.ctx.get('nanomuseConnectors')?.resourceConnections() ?? []
   }
 
-  async selectResource(scope: string, connection: string, generation: number, key: string, save: boolean): Promise<ResourceChoice[]> {
+  async watchNewConnection(offer: string, connection: string, generation: number): Promise<void> {
+    if (!offer || offer !== this.newResourceOffer() || this.resourceChoiceAbort) return
+    await this.selectResource(this.checkInScope(), connection, generation, '', true, offer)
+  }
+
+  async selectResource(scope: string, connection: string, generation: number, key: string, save: boolean, offer?: string): Promise<ResourceChoice[]> {
     const owner = this.ctx.nanomuseCloud.feedOwner
     if (!owner || scope !== this.checkInScope()) throw new RelayError(409, 'account_changed', 'Reopen Feed settings.')
     const access = this.ctx.nanomuseCloud.scheduleSessionAccess('nanomuse-feed')
-    if (save) { this.resourceAbort?.abort(); this.resourceChoiceAbort?.abort() }
+    if (save) {
+      if (!offer) this.newResourceRevision++
+      this.resourceAbort?.abort(); this.resourceChoiceAbort?.abort()
+    }
     const abort = new AbortController()
     if (save) this.resourceChoiceAbort = abort
     const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(18_000)])
-    const current = () => !signal.aborted && scope === this.checkInScope() && access('nanomuse-feed')
+    const current = () => !signal.aborted && scope === this.checkInScope() && (!offer || offer === this.newResourceOffer()) && access('nanomuse-feed')
     try {
       const connectors = this.ctx.get('nanomuseConnectors')
       if (connection && !connectors) throw new RelayError(409, 'no_connector', 'Connector is unavailable.')
-      const result = connection ? await connectors!.inspectResource(connection, generation, signal, current, save ? key : undefined) : { choices: [] }
+      const result = connection ? await connectors!.inspectResource(connection, generation, signal, current, offer ? { single: true } : save ? key : undefined) : { choices: [] }
       if (!current()) throw new RelayError(409, 'account_changed', 'Reopen Feed settings.')
       if (!save) return result.choices
+      if (offer && !result.sample) return []
       if (connection && (!result.sample || !result.choices[0])) throw new RelayError(409, 'no_resource', 'Choose a listed text resource.')
-      const box = this.store.mailboxes[owner] ??= { enabledSince: 0, lastDay: '', messages: [] }
+      const box = this.ensureMailbox(owner)
       const previous = box.resource
+      if (!connection) box.allowNewResource = false
       if (result.sample && result.choices[0]) {
         box.resource = { connection, generation, ...result.choices[0], seen: result.sample.signatures, checkedAt: Date.now() }
       } else delete box.resource
@@ -2352,10 +2379,11 @@ You planned this for today. Would you like help preparing the next step?`
     if (typeof patch.chatCheckIns === 'boolean') {
       const owner = this.ctx.nanomuseCloud.feedOwner
       if (!owner || patch.checkInScope !== this.checkInScope()) throw new RelayError(409, 'account_changed', 'Reopen Feed settings for the current account.')
-      const box = this.store.mailboxes[owner] ??= { enabledSince: 0, lastDay: '', messages: [] }
+      const box = this.ensureMailbox(owner)
+      this.newResourceRevision++
       box.enabledSince = patch.chatCheckIns ? box.enabledSince || Date.now() : 0
     }
-    if (typeof patch.on === 'boolean') routine.on = patch.on
+    if (typeof patch.on === 'boolean' && routine.on !== patch.on) { routine.on = patch.on; this.newResourceRevision++ }
     if (typeof patch.reading === 'boolean') routine.reading = patch.reading
     if (!routine.on) this.prepAbort?.abort()
     if (typeof patch.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.time)) routine.time = patch.time

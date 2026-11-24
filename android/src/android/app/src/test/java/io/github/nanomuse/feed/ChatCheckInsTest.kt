@@ -1,5 +1,8 @@
 package io.github.nanomuse.feed
 
+import android.content.Context
+import android.content.SharedPreferences
+import org.mockito.Mockito.*
 import io.github.nanomuse.sync.LocalMessage
 import io.github.nanomuse.sync.Transcript
 import org.junit.Assert.*
@@ -16,6 +19,46 @@ class ChatCheckInsTest {
     private fun line(id: String, text: String, at: ZonedDateTime, assistant: Boolean = false) =
         ChatCommitments.Line("mine", id, !assistant, assistant, text, at.toInstant().toEpochMilli())
     private fun facts(vararg lines: ChatCommitments.Line) = ChatCommitments.facts(lines.toList(), today, "Chat", zone)
+
+    @Test fun localCheckInsDefaultOnIndependentlyOfModelAccessAndHonorSavedChoices() {
+        val ctx = mock(Context::class.java)
+        val prefs = mock(SharedPreferences::class.java)
+        val edit = mock(SharedPreferences.Editor::class.java, RETURNS_SELF)
+        `when`(ctx.getSharedPreferences("nanomuse", Context.MODE_PRIVATE)).thenReturn(prefs)
+        `when`(prefs.edit()).thenReturn(edit)
+        val saved = mutableMapOf<String, Any>()
+        `when`(prefs.contains(anyString())).thenAnswer { it.getArgument<String>(0) in saved }
+        `when`(prefs.getBoolean(anyString(), anyBoolean())).thenAnswer {
+            saved[it.getArgument<String>(0)] ?: it.getArgument<Boolean>(1)
+        }
+        `when`(edit.putBoolean(anyString(), anyBoolean())).thenAnswer {
+            saved[it.getArgument<String>(0)] = it.getArgument<Boolean>(1); edit
+        }
+        `when`(edit.putString(anyString(), anyString())).thenAnswer {
+            saved[it.getArgument<String>(0)] = it.getArgument<String>(1); edit
+        }
+        `when`(edit.remove(anyString())).thenAnswer {
+            saved.remove(it.getArgument<String>(0)); edit
+        }
+        assertTrue(ChatCheckIns.enabled(ctx))
+        assertFalse(FeedChatEvidence.enabled(ctx))
+        saved["feed.chat.rows"] = "synthetic local reference"
+        FeedChatEvidence.setCheckIns(ctx, false)
+        assertFalse(ChatCheckIns.enabled(ctx))
+        assertFalse(FeedChatEvidence.hasReferences(ctx))
+        // Earlier builds stored explicit false under this same key. It also survives Feed opt-in.
+        assertEquals(false, saved["feed.chat.checkins"])
+        FeedChatEvidence.enable(ctx, true)
+        assertTrue(FeedChatEvidence.enabled(ctx))
+        assertFalse(ChatCheckIns.enabled(ctx))
+        FeedChatEvidence.enable(ctx, false)
+        FeedChatEvidence.setCheckIns(ctx, true)
+        assertTrue(ChatCheckIns.enabled(ctx))
+        assertFalse(FeedChatEvidence.enabled(ctx))
+        saved["feed.chat.rows"] = "local-only reference before Feed consent"
+        FeedChatEvidence.enable(ctx, true)
+        assertFalse(FeedChatEvidence.hasReferences(ctx))
+    }
 
     @Test fun dateAndAgeChooseWhatMeritsAnInterruption() {
         val previous = line("pledge", request, nine.minusDays(1))

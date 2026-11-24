@@ -28,25 +28,40 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
-/** Account-scoped opt-in. Only the row identity is recorded, so edits and deletion take
- * effect on the next read. No transcript copy and no backfill of old or automated messages. */
+/** Local check-ins and optional model-assisted Feed preparation share a bounded row index.
+ * Only new composer sends are indexed; edits, deletions, locks and memory choices apply at read time. */
 object FeedChatEvidence {
     private const val SWITCH = "feed.chat.scope"
     private const val REFERENCES = "feed.chat.rows"
+    private const val CHECK_INS = "feed.chat.checkins"
+    private const val LOCAL_SCOPE = "feed.chat.local_scope"
     private const val MAX_ROWS = 64
     private fun prefs(context: Context) = context.getSharedPreferences("nanomuse", Context.MODE_PRIVATE)
     val revision = MutableStateFlow(0L)
     private var changing = false
+    private var accountEpoch = 0L
 
-    @Synchronized fun accountChange(leaving: Boolean) { changing = leaving; revision.update { it + 1 } }
+    @Synchronized fun accountChange(leaving: Boolean) { changing = leaving; accountEpoch++; revision.update { it + 1 } }
     fun enabled(context: Context): Boolean = prefs(context).contains(SWITCH)
+
+    // A saved false includes an earlier release's explicit opt-out from the parent chat setting.
+    fun checkInsEnabled(context: Context): Boolean = prefs(context).getBoolean(CHECK_INS, true)
+    fun hasReferences(context: Context): Boolean = prefs(context).contains(REFERENCES)
+
+    @Synchronized fun setCheckIns(context: Context, on: Boolean) {
+        if (changing || on == checkInsEnabled(context)) return
+        val edit = prefs(context).edit().putBoolean(CHECK_INS, on)
+        if (!enabled(context)) edit.putString(LOCAL_SCOPE, UUID.randomUUID().toString()).remove(REFERENCES)
+        edit.apply()
+        revision.update { it + 1 }
+    }
 
     @Synchronized fun enable(context: Context, value: Boolean) {
         if (changing || value == enabled(context)) return
         val edit = prefs(context).edit().remove(REFERENCES)
-        if (value) edit.putString(SWITCH, UUID.randomUUID().toString()) else edit.remove(SWITCH)
+        if (value) edit.putString(SWITCH, UUID.randomUUID().toString())
+        else edit.remove(SWITCH).putString(LOCAL_SCOPE, UUID.randomUUID().toString())
         edit.apply()
-        if (!value) ChatCheckIns.configure(context, false)
         revision.update { it + 1 }
     }
 
@@ -54,8 +69,9 @@ object FeedChatEvidence {
     @Synchronized fun scope(context: Context, session: String, memory: Boolean): String? {
         if (!memory || changing || AppAccess.locked.value || !MemoryGlobalPrefs.isGlobalEnabled(context) ||
             SessionAccess.isProtected(session)) return null
-        val nonce = prefs(context).getString(SWITCH, null) ?: return null
-        return FeedPreparation.hash(AccountData.key(context), nonce)
+        val p = prefs(context)
+        val nonce = p.getString(SWITCH, null) ?: if (checkInsEnabled(context)) p.getString(LOCAL_SCOPE, "local") else null
+        return nonce?.let { FeedPreparation.hash(AccountData.key(context), it, accountEpoch.toString()) }
     }
 
     private data class Ref(val session: String, val id: String, val textHash: String)
@@ -78,8 +94,11 @@ object FeedChatEvidence {
         revision.update { it + 1 }
     }
 
-    internal suspend fun facts(app: MinisApp, today: LocalDate): List<FeedPreparation.Fact> {
-        val receipt = scope(app, "", true) ?: return emptyList()
+    internal suspend fun facts(app: MinisApp, today: LocalDate, forCheckIn: Boolean = false): List<FeedPreparation.Fact> {
+        fun readScope(session: String) = synchronized(this) {
+            if (if (forCheckIn) checkInsEnabled(app) else enabled(app)) scope(app, session, true) else null
+        }
+        val receipt = readScope("") ?: return emptyList()
         val refs = references(app)
         if (refs.isEmpty()) return emptyList()
         val owned = SyncDatabase.get(app).dao().ownedCandidates(AccountData.key(app), refs.map { it.session }.distinct()).toHashSet()
@@ -90,7 +109,7 @@ object FeedChatEvidence {
             for ((session, markers) in eligible.groupBy { it.session }.entries.take(8)) {
                 val chat = app.chatRepository.getSession(session) ?: continue
                 if (chat.memoryEnabled == 0 || chat.source == "scheduled" || FeedFlow.isFeedSession(app, session) ||
-                    scope(app, session, true) != receipt) continue
+                    readScope(session) != receipt) continue
                 // The bounded projection avoids decoding a large tool payload or assistant trace
                 // just to determine whether a writer has already delivered a usable answer.
                 val ids = markers.associate { it.id to it.textHash }
@@ -107,7 +126,7 @@ object FeedChatEvidence {
                     val person = local && text.isNotEmpty() && FeedPreparation.hash(text) == ids[row.id]
                     ChatCommitments.Line(session, row.id, person, assistant, text, row.createdAt)
                 }
-                if (scope(app, session, true) == receipt) addAll(ChatCommitments.facts(lines, today, label))
+                if (readScope(session) == receipt) addAll(ChatCommitments.facts(lines, today, label))
             }
         }
     }

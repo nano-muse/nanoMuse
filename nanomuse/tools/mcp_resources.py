@@ -39,7 +39,7 @@ class MCPResourceReader:
         self.redact = redact
         self.timeout = max(0.1, min(cfg.call_timeout_s, 8.0))
 
-    async def listed(self) -> list[MCPResource]:
+    async def listed(self, *, single_only: bool = False) -> list[MCPResource]:
         result: dict[str, MCPResource] = {}
         cursors: set[str] = set()
         cursor: str | None = None
@@ -55,6 +55,8 @@ class MCPResourceReader:
                     )
                 else:  # earlier versions of the MCP client accept a cursor directly
                     page = await self.session.list_resources(cursor=cursor)
+                if single_only and len(page.resources) > 128:
+                    return []
                 for resource in page.resources[:128]:
                     uri = str(resource.uri)
                     mime = getattr(resource, "mime_type", None) or getattr(
@@ -74,13 +76,15 @@ class MCPResourceReader:
                     name = raw if raw != uri and not _LABEL_URL.search(raw) else ""
                     label = self.redact(f"{self.name} / {name or key[-8:]}").strip()[:180]
                     result[key] = MCPResource(key, label, uri)
+                    if single_only and len(result) > 1:
+                        return []
                     if len(result) >= 128:
                         return list(result.values())
                 cursor = getattr(page, "next_cursor", None) or getattr(page, "nextCursor", None)
                 if not cursor or cursor in cursors:
                     break
                 cursors.add(cursor)
-        return list(result.values())
+        return [] if single_only and cursor else list(result.values())
 
     async def read(self, resource: MCPResource) -> str | None:
         async with asyncio.timeout(self.timeout):

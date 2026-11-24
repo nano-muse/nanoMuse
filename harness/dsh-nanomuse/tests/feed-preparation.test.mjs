@@ -43,7 +43,7 @@ async function fixture(t) {
     },
   }
   function host() {
-    const rooms = new Rooms({ reflect: { provide() {} }, nanomuseCloud: cloud, logger: { warn() {} } })
+    const rooms = new Rooms({ reflect: { provide() {} }, get: () => undefined, nanomuseCloud: cloud, logger: { warn() {} } })
     rooms.broadcast = () => {}
     rooms.syncReady = async () => true
     return rooms

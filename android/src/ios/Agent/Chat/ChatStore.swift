@@ -2435,14 +2435,14 @@ actor ChatStore {
         let result = permit.perform(version) {
             let prefs = UserDefaults.standard
             let fromCalendar = calendarItem != nil && !NanoMuseCalendarWatch.selected.isEmpty && NanoMuseCalendarReader.readable
-            let fromChat = prefs.bool(forKey: NanoMuseChatOutreach.preference)
+            let fromChat = NanoMuseChatOutreach.chatEnabled(in: prefs)
             guard !Task.isCancelled, fromChat || fromCalendar,
                   (prefs.object(forKey: "nanomuse.shell.enabled") as? Bool ?? true),
                   prefs.string(forKey: "nanomuse.main_chat.session") == session else { return .later }
             return NanoMuseOutreachJournal.write(db: db, owner: owner, session: session, day: day, at: now, allowEmpty: fromCalendar, candidate: {
                 if fromCalendar { return calendarItem }
                 guard fromChat else { return nil }
-                if !references.isEmpty && prefs.bool(forKey: NanoMuseFeedChatIndex.setting)
+                if !references.isEmpty && NanoMuseFeedChatIndex.allowsChatCheckIn(in: prefs)
                     && (prefs.object(forKey: "memory.global.enabled") as? Bool ?? true) {
                     let turns = NanoMuseFeedChatContext.read(references, db: db)
                     if let item = NanoMuseFeedChatContext.outstanding(turns, now: now).first(where: { Calendar.current.isDate($0.due, inSameDayAs: now) }) {

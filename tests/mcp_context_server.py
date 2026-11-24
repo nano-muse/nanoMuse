@@ -16,9 +16,11 @@ def updates() -> str:
     return Path(sys.argv[1]).read_text(encoding="utf-8")
 
 
-@server.resource("board://work/unselected", name="Unselected", mime_type="text/plain")
-def unselected() -> str:
-    raise AssertionError("Reading an unselected resource is forbidden")
+if "--single" not in sys.argv:
+
+    @server.resource("board://work/unselected", name="Unselected", mime_type="text/plain")
+    def unselected() -> str:
+        raise AssertionError("Reading an unselected resource is forbidden")
 
 
 if __name__ == "__main__":

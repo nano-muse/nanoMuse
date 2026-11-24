@@ -318,7 +318,13 @@ class SearchBody(BaseModel):
     base_url: str | None = None  # SearXNG instance
 
 
+class ConnectReviewChoice(BaseModel):
+    revision: str
+    enabled: bool
+
+
 class EmailBody(BaseModel):
+    review: ConnectReviewChoice | None = None
     enabled: bool | None = None
     address: str | None = None
     password: str | None = None
@@ -334,6 +340,7 @@ class BrowserBody(BaseModel):
 
 
 class CalendarFeedBody(BaseModel):
+    review: ConnectReviewChoice | None = None
     name: str = Field(min_length=1, max_length=40)
     url: str = Field(min_length=1, max_length=2000)
 
@@ -367,6 +374,7 @@ class CalendarBody(BaseModel):
 
 
 class MCPBody(BaseModel):
+    review: ConnectReviewChoice | None = None
     name: str = Field(min_length=1, max_length=60, pattern=r"^[A-Za-z0-9_.-]+$")
     command: str | None = None
     args: list[str] = Field(default_factory=list)
@@ -1151,8 +1159,15 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     async def test_search() -> dict[str, Any]:
         return await conn.test_search()
 
+    def check_connect_review(choice: ConnectReviewChoice | None) -> None:
+        if choice is not None:
+            view = svc.context_watch.view()
+            if view["on_connect"] is None or choice.revision != view["revision"]:
+                raise HTTPException(409, "Account or review settings changed. Reopen the form.")
+
     @app.put("/api/connections/email", dependencies=dep)
     async def put_email(body: EmailBody) -> dict[str, Any]:
+        check_connect_review(body.review)
         return conn.set_email(body.model_dump(exclude_none=True))
 
     @app.delete("/api/connections/email", dependencies=dep)
@@ -1647,6 +1662,7 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.post("/api/connections/calendar/feeds", dependencies=dep)
     async def add_calendar_feed(body: CalendarFeedBody) -> dict[str, Any]:
+        check_connect_review(body.review)
         try:
             return await conn.add_calendar_feed(body.model_dump())
         except ValueError as exc:
@@ -1778,6 +1794,7 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.post("/api/connections/mcp", dependencies=dep)
     async def add_mcp(body: MCPBody) -> dict[str, Any]:
+        check_connect_review(body.review)
         try:
             return await conn.add_mcp(body.model_dump())
         except ValueError as exc:

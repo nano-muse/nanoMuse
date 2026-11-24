@@ -1103,11 +1103,14 @@ class Connections:
         self.data["email"] = email
         self._save()
         apply_app_settings(self.settings, {"email": email})
+        if body.get("review") is not None:
+            self.svc.context_watch.connection_saved("mail", body["review"]["enabled"])
         self._sync_email_tools()
         self._publish()
         return self.view()["email"]
 
     def disconnect_email(self) -> dict[str, Any]:
+        self.svc.context_watch.disconnect_mail()
         self.vault.delete(EMAIL_PASSWORD)
         self.vault.delete(EMAIL_ADDRESS)
         self.data["email"] = {**(self.data.get("email") or {}), "enabled": False}
@@ -1205,6 +1208,8 @@ class Connections:
         if not _link_or_path(url):
             raise ValueError("the link must start with https:// (or be a path to an .ics file)")
         secret = _vault_name(name)
+        if self.vault.get(secret) != url:
+            self.svc.app.calendar.states.pop(name, None)
         self.vault.set(secret, url)
         calendar = self._calendar_data()
         feeds = [f for f in calendar.get("feeds") or [] if f.get("name") != name]
@@ -1212,6 +1217,8 @@ class Connections:
         calendar["feeds"] = feeds
         calendar["enabled"] = True
         self._apply_calendar(calendar)
+        if body.get("review") is not None:
+            self.svc.context_watch.connection_saved("calendar", body["review"]["enabled"])
         status = await self.svc.app.calendar.refresh(force=True)
         state = next((f for f in status["feeds"] if f["name"] == name), None)
         if state and state.get("error"):
@@ -1766,6 +1773,8 @@ class Connections:
             raise ValueError("the server needs a name")
         if not (cfg.command or cfg.url):
             raise ValueError("give either a command to run or a URL to connect to")
+        review = body.get("review")
+        new_connection = not any(s.name == cfg.name for s in self.settings.mcp.servers)
         env: dict[str, str] = {}
         for key, value in cfg.env.items():
             if not key.strip():
@@ -1807,6 +1816,20 @@ class Connections:
             )
         self._mcp[cfg.name] = manager
         self.svc.app.tools.add(*tools)
+        watch = self.svc.context_watch
+        reader = manager.resource_readers.get(cfg.name)
+        if new_connection and review and review["revision"] == watch.view()["revision"]:
+            selected = None
+            if reader and review["enabled"]:
+                try:
+                    candidates = await reader.listed(single_only=True)
+                except Exception:
+                    candidates = []  # Discovery is optional for an otherwise working server.
+                if len(candidates) == 1:
+                    resource = candidates[0]
+                    selected = (resource.id, preview(resource.label, 180))
+            if self._mcp.get(cfg.name) is manager:
+                watch.mcp_connected(review["revision"], review["enabled"], selected)
         self._publish()
         if cfg.url:
             self._share_connectors()

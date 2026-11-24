@@ -841,8 +841,8 @@ struct NanoMuseFeedSettingsSheet: View {
     @ObservedObject private var store = NanoMuseFeedStore.shared
     @ObservedObject private var scheduler = NanoMuseScheduler.shared
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(NanoMuseChatOutreach.preference) private var chatOutreach = false
-    @AppStorage(NanoMuseFeedChatIndex.setting) private var useChat = false
+    @AppStorage(NanoMuseChatOutreach.preference) private var chatOutreach = true
+    @State private var useChat = NanoMuseFeedChatIndex.enabled
     @State private var text = ""
     @State private var time = Date()
     @ObservedObject private var deadlineAlerts = NanoMuseDeadlineNotifications.shared
@@ -884,14 +884,15 @@ struct NanoMuseFeedSettingsSheet: View {
                         get: { chatOutreach }, set: { NanoMuseChatOutreach.shared.setEnabled($0) }
                     )).tint(NanoMuseTones.action)
                 } footer: {
-                    Text(AppLocalized("Between 09:00 and 20:00, nanoMuse can check in once a day about a goal due today or a commitment from your main chat if chat preparation is on."))
+                    Text(AppLocalized("Between 09:00 and 20:00, nanoMuse can ask about a goal due today or a new commitment you mentioned in your main chat. You can turn these check-ins off here."))
                 }
                 Section {
                     NavigationLink(AppLocalized("Calendar changes in chat")) { NanoMuseCalendarWatchSettings() }
                 }
                 Section {
-                    Toggle(AppLocalized("Prepare from my chats"), isOn: Binding(get: { useChat }, set: { NanoMuseFeedChatIndex.setEnabled($0) }))
+                    Toggle(AppLocalized("Prepare from my chats"), isOn: Binding(get: { useChat }, set: { NanoMuseFeedChatIndex.setEnabled($0); useChat = $0 }))
                         .tint(NanoMuseTones.action)
+                        .onReceive(NotificationCenter.default.publisher(for: .nmFeedChatChanged)) { _ in useChat = NanoMuseFeedChatIndex.enabled }
                 } footer: {
                     Text(AppLocalized("Use new messages you send in unlocked chats with memory on to prepare for upcoming commitments. Turning this off removes their cards."))
                 }

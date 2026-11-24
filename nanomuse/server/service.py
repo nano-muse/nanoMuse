@@ -2482,8 +2482,7 @@ class MuseService:
             if k in data
         }
         chat_settings = self._chat_followup_settings(data)
-        if "enabled" in chat_settings:
-            view["chat_followups"] = chat_settings["enabled"] is True
+        view["chat_followups"] = chat_settings["enabled"] is True
         current: dict[str, bool] = {}
         if any("source_revisions" in post for post in data["posts"]):
             current = {s.revision: s.anchor for s in self._preparation_sources(data).values()}
@@ -3035,12 +3034,31 @@ class MuseService:
         )
 
     def _chat_followup_scope(self) -> str:
-        if not self.hub.signed_in:
-            return "local"
-        return f"account:{self.sync.account_id}" if self.sync.account_id else ""
+        if self.hub.account_transition.locked():
+            return ""
+        account = self.sync.account_id if self.hub.signed_in else ""
+        if self.hub.signed_in and (
+            not account or (self.hub.data.get("cloud") or {}).get("account_id") != account
+        ):
+            return ""
+        main = self.threads.get(MAIN_THREAD)
+        owner = self.sync.owner_of(MAIN_THREAD)
+        if (
+            not main
+            or main.device
+            or main.remote_from
+            or not self.sync.visible(main)
+            or (owner and owner != account)
+            or (main.main_of and main.main_of != account)
+        ):
+            return ""
+        return f"account:{account}" if account else "local"
 
     def _chat_followup_settings(self, data: dict[str, Any]) -> dict[str, Any]:
-        return dict(data.get("chat_outreach", {}).get(self._chat_followup_scope(), {}))
+        scope = self._chat_followup_scope()
+        prefs = dict(data.get("chat_outreach", {}).get(scope, {}))
+        prefs.setdefault("enabled", bool(scope))
+        return prefs
 
     def _send_chat_followup(self, now: datetime | None = None) -> None:
         """Start a real conversation only when the person was waiting for a dated reply."""
@@ -3105,7 +3123,7 @@ class MuseService:
         self._deliver_outreach(text, now, event_id, source="chat_followup", waiting_id=key)
         seen[key] = (now.date() + timedelta(days=28)).isoformat()
         prefs.update(last_day=today, sent=seen)
-        data["chat_outreach"][self._chat_followup_scope()] = prefs
+        data.setdefault("chat_outreach", {})[self._chat_followup_scope()] = prefs
         self._outreach_push(data, now, bool(chinese))
 
     def _deliver_context_message(self, event_id: str, text: str, now: datetime) -> None:

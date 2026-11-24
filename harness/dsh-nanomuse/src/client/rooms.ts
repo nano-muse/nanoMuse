@@ -137,6 +137,7 @@ export interface DocText {
 export interface FeedRoutine {
   chatCheckIns?: boolean
   checkInScope?: string
+  newResourceOffer?: string
   contextResource?: { connection: string; generation: number; key: string; label: string }
   reading?: boolean
   on: boolean

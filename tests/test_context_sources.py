@@ -134,3 +134,38 @@ def test_resource_preview_filters_json_fields_and_preserves_newest_updates():
     assert "Update number 129" in preview and "hidden" not in preview
     assert "Print (status):" in preview and "Update number 65" not in preview
     assert resource_preview("Your verification code is 000000.\nProof delayed.") == "Proof delayed."
+
+
+async def test_connecting_can_follow_only_one_resource_and_respects_removal(settings, tmp_path):
+    svc = MuseService(settings, llm=MockLLM())
+    watch = svc.context_watch
+    board = tmp_path / "board"
+    board.write_text("Draft complete.")
+    fixture = str(Path(__file__).with_name("mcp_context_server.py"))
+    cfg = {"name": "project", "command": sys.executable, "args": [fixture, str(board)]}
+
+    async def connect(single, enabled):
+        await svc.connections.add_mcp(
+            {
+                **cfg,
+                "args": [*cfg["args"], *(["--single"] if single else [])],
+                "review": {"revision": watch.view()["revision"], "enabled": enabled},
+            }
+        )
+
+    try:
+        await connect(False, True)
+        assert watch.view()["resources"] == []
+        await svc.connections.remove_mcp("project")
+        await connect(True, False)
+        assert not watch.view()["on_connect"]["mcp"]
+        assert watch.view()["resources"] == []
+        await svc.connections.remove_mcp("project")
+        await connect(True, True)
+        assert len(watch.view()["resources"]) == 1
+        watch.configure(watch.view()["revision"], False, False, [], False)
+        await svc.connections.remove_mcp("project")
+        await connect(True, True)
+        assert watch.view()["resources"] == []
+    finally:
+        await svc.connections.remove_mcp("project")

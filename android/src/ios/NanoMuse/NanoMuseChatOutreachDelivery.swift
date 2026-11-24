@@ -7,6 +7,9 @@ import UserNotifications
 final class NanoMuseChatOutreach: ObservableObject {
     static let shared = NanoMuseChatOutreach()
     nonisolated static let preference = "nanomuse.feed.chatOutreach"
+    nonisolated static func chatEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: preference) as? Bool ?? true
+    }
     nonisolated static let notificationID = "nanomuse.chat.outreach"
     private let permit = NanoMuseOutreachPermit()
     private var subscriptions = Set<AnyCancellable>()
@@ -20,7 +23,7 @@ final class NanoMuseChatOutreach: ObservableObject {
     @Published private(set) var tapRevision = 0
 
     private var enabled: Bool {
-        (UserDefaults.standard.bool(forKey: Self.preference) || !NanoMuseCalendarWatch.selected.isEmpty) &&
+        (Self.chatEnabled() || !NanoMuseCalendarWatch.selected.isEmpty) &&
         (UserDefaults.standard.object(forKey: "nanomuse.shell.enabled") as? Bool ?? true)
     }
 
@@ -38,6 +41,7 @@ final class NanoMuseChatOutreach: ObservableObject {
     func setEnabled(_ value: Bool) {
         permit.revoke()
         UserDefaults.standard.set(value, forKey: Self.preference)
+        if !value { NanoMuseFeedChatIndex.clearMainOnlyReferences() }
         if value {
             NanoMuseScheduler.shared.requestNotificationPermission()
             Task { await check() }
@@ -97,6 +101,18 @@ final class NanoMuseChatOutreach: ObservableObject {
         return calendar.nextDate(after: now, matching: DateComponents(hour: 9, minute: 0), matchingPolicy: .nextTime)
     }
 
+    private func dueGoal(on day: String, owner: String) -> NanoMuseGoal? {
+        guard UserDefaults.standard.object(forKey: NanoMuseGoalDeadline.preference) as? Bool ?? true else { return nil }
+        let excluded = SessionLockStore.shared.lockedSessionIds
+        let checked = NanoMuseScheduler.shared.checkedGoalIDs
+        let accounts = NanoMuseAccountData.shared
+        return NanoMuseGoalStore.shared.goals.filter {
+            $0.due == day && $0.canShowDeadline(excluding: excluded) && !$0.hasActiveChecks(in: checked)
+                && ($0.deadlineSnoozedUntil ?? day) <= day
+                && [$0.sourceSessionId, $0.sessionId].compactMap { $0 }.allSatisfy { accounts.owner(of: $0) == owner }
+        }.min { $0.createdAt < $1.createdAt }
+    }
+
     func check(now: Date = Date()) async {
         guard !checking, !Task.isCancelled, enabled, !switching, UIApplication.shared.isProtectedDataAvailable,
               !SessionLockStore.shared.appIsLocked else { return }
@@ -130,19 +146,12 @@ final class NanoMuseChatOutreach: ObservableObject {
             }
         }
         guard canSend, let session = sessionID, defaults.string(forKey: NanoMuseMainChat.key) == session else { return }
-        let chatEnabled = defaults.bool(forKey: Self.preference)
-        let excluded = SessionLockStore.shared.lockedSessionIds
-        let checked = NanoMuseScheduler.shared.checkedGoalIDs
-        let showGoals = UserDefaults.standard.object(forKey: NanoMuseGoalDeadline.preference) as? Bool ?? true
-        let goals = chatEnabled && showGoals ? NanoMuseGoalStore.shared.goals.filter {
-            $0.due == day && $0.canShowDeadline(excluding: excluded) && !$0.hasActiveChecks(in: checked)
-                && ($0.deadlineSnoozedUntil ?? day) <= day
-                && [$0.sourceSessionId, $0.sessionId].compactMap { $0 }.allSatisfy { accounts.owner(of: $0) == owner }
-        }.sorted { $0.createdAt < $1.createdAt } : []
-        let refs = chatEnabled ? NanoMuseFeedChatIndex.references(now: now).filter { $0.session == session } : []
-        guard calendarItem != nil || !goals.isEmpty || !refs.isEmpty else { return }
+        let chatEnabled = Self.chatEnabled(in: defaults)
+        let goal = chatEnabled ? dueGoal(on: day, owner: owner) : nil
+        let refs = chatEnabled ? NanoMuseFeedChatIndex.references(now: now, forMainChat: session) : []
+        guard calendarItem != nil || goal != nil || !refs.isEmpty else { return }
         let result = await ChatStore.shared.nmDeliverOutreach(owner: NanoMuseAccountData.dirName(owner), session: session,
-            day: day, now: now, references: refs, goal: goals.first, permit: permit, version: version, calendarItem: calendarItem)
+            day: day, now: now, references: refs, goal: goal, permit: permit, version: version, calendarItem: calendarItem)
         guard !switching, enabled, accounts.current == owner else { return }
         if let sample, permit.snapshot() == version, selection == NanoMuseCalendarWatch.selected, NanoMuseCalendarReader.readable {
             switch result {

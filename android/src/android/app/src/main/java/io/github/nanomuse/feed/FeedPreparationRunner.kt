@@ -112,8 +112,9 @@ internal object FeedPreparationRunner {
                     withTimeout(90_000L) {
                         val request = currentCoroutineContext().job
                         withContext(Dispatchers.Main.immediate) { SessionActivityTracker.setFeedPreparation { request.cancel() } }
-                        if (!permitted() || pairs.any { it.left.kind == Kind.CHAT || it.right.kind == Kind.CHAT } &&
-                            FeedPreparation.revalidate(pairs, facts()).isEmpty()) return@withTimeout "[quiet]"
+                        val chatPairs = pairs.filter { it.left.kind == Kind.CHAT || it.right.kind == Kind.CHAT }
+                        if (!permitted() || chatPairs.isNotEmpty() &&
+                            FeedPreparation.revalidate(chatPairs, facts()).size != chatPairs.size) return@withTimeout "[quiet]"
                         if (!permitted() || !sourcesVisible()) return@withTimeout "[quiet]"
                         withContext(Provenance.Session(run.session)) {
                             FeedPreparation.request(provider, pairs, instructions, language)

@@ -35,28 +35,6 @@ class ContextWatch:
         self.listed: dict[str, str] = {}
         self.listed_for: tuple[str, int] | None = None
 
-    def _scope(self) -> str:
-        svc = self.service
-        if svc.hub.account_transition.locked():
-            return ""
-        scope = svc._chat_followup_scope()
-        if svc.hub.signed_in:
-            account = (svc.hub.data.get("cloud") or {}).get("account_id")
-            if not account or scope != f"account:{account}":
-                return ""
-        main = svc.threads.get(MAIN_THREAD)
-        owner = svc.sync.owner_of(MAIN_THREAD)
-        if (
-            not main
-            or main.device
-            or main.remote_from
-            or not svc.sync.visible(main)
-            or (owner and scope != f"account:{owner}")
-            or (main.main_of and scope != f"account:{main.main_of}")
-        ):
-            return ""
-        return scope
-
     def _file(self, scope: str) -> Path:
         return self.service.data_dir / ("context-watch-" + fingerprint(scope)[:24] + ".json")
 
@@ -103,9 +81,15 @@ class ContextWatch:
         return mail, calendar
 
     def view(self) -> dict[str, Any]:
-        scope = self._scope()
+        scope = self.service._chat_followup_scope()
         state = self._load(scope)
         mail, calendar = self._bindings()
+        defaults = {"mcp": state.get("mcp_on_connect", True)}
+        for kind, binding in (("mail", mail), ("calendar", calendar)):
+            if binding:
+                defaults[kind] = state.get(kind) == binding
+            else:
+                defaults[kind] = state.get(kind + "_preference", state.get(kind) != "")
         return {
             "revision": fingerprint(
                 scope,
@@ -114,6 +98,7 @@ class ContextWatch:
                 mail,
                 calendar,
             ),
+            "on_connect": defaults if scope else None,
             "available_mail": bool(mail and scope),
             "available_calendar": bool(calendar and scope),
             "mail": bool(mail and state.get("mail") == mail),
@@ -126,12 +111,12 @@ class ContextWatch:
         }
 
     async def resources(self) -> list[dict[str, str]]:
-        scope = self._scope()
+        scope = self.service._chat_followup_scope()
         if not scope:
             return []
         epoch = self.service.hub.account_epoch
         choices = await self.service.connections.context_resources()
-        if self._scope() != scope or self.service.hub.account_epoch != epoch:
+        if self.service._chat_followup_scope() != scope or self.service.hub.account_epoch != epoch:
             return []
         self.listed_for = (scope, epoch)
         self.listed = {v["id"]: v["label"] for v in choices}
@@ -140,7 +125,7 @@ class ContextWatch:
     def configure(
         self, revision: str, mail: bool, calendar: bool, resources: list[str], local_context: bool
     ) -> dict[str, Any]:
-        scope = self._scope()
+        scope = self.service._chat_followup_scope()
         view = self.view()
         if not scope or revision != view["revision"]:
             raise ValueError("The active account or settings changed. Open the settings again.")
@@ -154,28 +139,74 @@ class ContextWatch:
         if len(resources) > 6 or any(r not in known for r in resources):
             raise ValueError("Select up to six listed resources.")
         selected = {k: known[k] for k in resources}
-        new_mail, new_cal = mb if mail else "", cb if calendar else ""
-        if state.get("mail") != new_mail:
-            state.pop("cursor", None)
-        if state.get("calendar") != new_cal:
-            state.pop("calendars_initialized", None)
-            state["calendar_seen"] = {}
-            state["calendar_facts"] = {}
+        if state.get("resources") and not selected:
+            state["mcp_on_connect"] = False
+        removed = set(state.get("removed_resources", ())) | set(state.get("resources", {}))
+        state["removed_resources"] = sorted(removed.difference(selected))
+        if mb or state.get("mail"):
+            self._set_source(state, "mail", mb, mail)
+        if cb or state.get("calendar"):
+            self._set_source(state, "calendar", cb, calendar)
         for field in ("mcp_seen", "mcp_facts"):
             state[field] = {k: v for k, v in state.get(field, {}).items() if k in selected}
-        state.update(
-            generation=uuid.uuid4().hex,
-            resources=selected,
-            local_context=local_context,
-            mail=new_mail,
-            calendar=new_cal,
-        )
+        state.update(resources=selected, local_context=local_context)
+        self._save_choices(scope, state)
+        return self.view()
+
+    @staticmethod
+    def _set_source(state: dict[str, Any], kind: str, binding: str, enabled: bool) -> None:
+        new_binding = binding if enabled else ""
+        if state.get(kind) != new_binding:
+            if kind == "mail":
+                state.pop("cursor", None)
+            else:
+                for field in ("calendars_initialized", "calendar_seen", "calendar_facts"):
+                    state.pop(field, None)
+        state[kind] = new_binding
+        state[kind + "_preference"] = enabled
+
+    def connection_saved(self, kind: str, enabled: bool) -> None:
+        # The connection form displayed this choice and its revision was checked before saving.
+        # Only rebind the changed source. In particular, never inherit another source's consent.
+        scope = self.service._chat_followup_scope()
+        if not scope:
+            return
+        mb, cb = self._bindings()
+        state = self._load(scope)
+        self._set_source(state, kind, mb if kind == "mail" else cb, enabled)
+        self._save_choices(scope, state)
+
+    def disconnect_mail(self) -> None:
+        scope = self.service._chat_followup_scope()
+        state = self._load(scope)
+        if state.get("mail"):
+            self._set_source(state, "mail", "", True)
+            self._save_choices(scope, state)
+
+    def mcp_connected(self, revision: str, enabled: bool, resource: tuple[str, str] | None) -> None:
+        scope = self.service._chat_followup_scope()
+        if not scope or revision != self.view()["revision"]:
+            return
+        state = self._load(scope)
+        selected = state.setdefault("resources", {})
+        previous = state.get("mcp_on_connect", True)
+        state["mcp_on_connect"] = enabled
+        if enabled and resource and len(selected) < 6:
+            key, label = resource
+            if key not in state.get("removed_resources", ()) and key not in selected:
+                selected[key] = label
+                self._save_choices(scope, state)
+                return
+        if enabled != previous:
+            self._save_choices(scope, state)
+
+    def _save_choices(self, scope: str, state: dict[str, Any]) -> None:
+        state["generation"] = uuid.uuid4().hex
         state.pop("checked_at", None)
         state.pop("unavailable", None)
         self._save(scope, state)
         self.next_poll = 0.0
         self.service.wake()
-        return self.view()
 
     def tick(self) -> None:
         if time.monotonic() < self.next_poll or self.task is not None and not self.task.done():
@@ -231,7 +262,7 @@ class ContextWatch:
                     break
         # Runtime goals have no Cloud account owner. The device-local scope can use them;
         # an account-backed review can only use that account's main chat.
-        if self._scope() == "local" and not svc.sync.account_id:
+        if self.service._chat_followup_scope() == "local" and not svc.sync.account_id:
             for goal in svc.app.goals.list("active")[:5]:
                 records.append(Source("goal", goal.id, goal.title[:240], False))
         return {
@@ -242,7 +273,7 @@ class ContextWatch:
     async def poll(self, now: datetime | None = None) -> None:
         """Only digests and the IMAP cursor survive a poll. A failed review retries its inputs."""
         svc = self.service
-        scope = self._scope()
+        scope = self.service._chat_followup_scope()
         state = self._load(scope)
         if (
             not scope
@@ -261,7 +292,7 @@ class ContextWatch:
 
         def current() -> bool:
             return (
-                self._scope() == scope
+                self.service._chat_followup_scope() == scope
                 and svc.hub.account_epoch == epoch
                 and self._load(scope).get("generation") == generation
                 and self._bindings() == bindings
