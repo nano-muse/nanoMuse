@@ -3,12 +3,14 @@ package io.github.nanomuse.hands.pairing
 import android.content.Context
 import android.net.ssl.SSLSockets
 import io.github.nanomuse.hands.HandsDisplayBridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.IOException
 import java.net.InetAddress
@@ -81,6 +83,23 @@ object HandsWireless {
                 throw cause
             }
         }
+    }
+
+    /** Reconnect only to this phone's advertised debugging port after an explicit screen task or settings visit. */
+    suspend fun reconnect(context: Context): Boolean {
+        if (HandsDisplayBridge.isReady()) return true
+        if (!hasIdentity(context)) return false
+        return withTimeoutOrNull(18_000L) {
+            try {
+                val port = discover(context, pairing = false).distinct().singleOrNull() ?: return@withTimeoutOrNull false
+                activate(context, port)
+                true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
+            }
+        } ?: false
     }
 
     private fun stop() = synchronized(lifetime) {
