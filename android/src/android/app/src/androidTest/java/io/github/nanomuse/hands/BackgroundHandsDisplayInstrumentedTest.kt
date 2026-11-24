@@ -17,6 +17,8 @@ import android.view.accessibility.AccessibilityWindowInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.accessibility.MinisAccessibilityService
+import io.github.nanomuse.hands.pairing.HandsWireless
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -50,6 +52,11 @@ class BackgroundHandsDisplayInstrumentedTest {
         assertTrue("Android 14 or later required", Build.VERSION.SDK_INT >= 34)
         until("Enable the accessibility service first.") { MinisAccessibilityService.getInstance() != null }
         service = checkNotNull(MinisAccessibilityService.getInstance())
+        if (!HandsDisplayHost.isReady() && HandsWireless.hasIdentity(context)) {
+            // Instrumentation starts a new app process. Reconnect only an identity the
+            // device owner previously paired, using the same bounded mobile entry point.
+            runBlocking { HandsWireless.reconnect(context) }
+        }
         until("Authorize the background screen connection first.") { HandsDisplayHost.isReady() }
         val home = automation.executeShellCommand(
             "am start -W --display 0 -a android.intent.action.MAIN -c android.intent.category.HOME"

@@ -38,7 +38,7 @@ internal fun handsDisplayLauncher(context: Context, pkg: String): ComponentName 
 /** Runs under a device-owner authorized debugging identity. Only the originating app may operate its own screen. */
 @Keep
 class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub() {
-    internal var wirelessContext: Context? = null
+    internal var wirelessAccess: HandsShellBridgeCalls? = null
     private val clientUid = context.applicationInfo.uid
     private var virtual: VirtualDisplay? = null
     private data class TargetTask(val id: Int, val pkg: String)
@@ -247,9 +247,9 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
 
     private fun enforceClient() {
         check(Binder.getCallingUid() == clientUid) { "The display belongs to a different caller." }
-        wirelessContext?.let { shell ->
+        wirelessAccess?.let { calls ->
             val identity = Binder.clearCallingIdentity()
-            try { check(HandsDisplayBridgeMain.wirelessEnabled(shell)) { "Wireless debugging was disabled." } }
+            try { check(calls.wirelessEnabled()) { "Wireless debugging was disabled." } }
             finally { Binder.restoreCallingIdentity(identity) }
         }
     }
