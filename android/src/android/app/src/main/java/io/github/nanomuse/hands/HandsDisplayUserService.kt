@@ -3,6 +3,8 @@ package io.github.nanomuse.hands
 import android.app.KeyguardManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
@@ -15,15 +17,34 @@ import android.os.UserHandle
 import android.view.Display
 import android.view.Surface
 import androidx.annotation.Keep
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.system.exitProcess
 
-/** Runs as the user's authorized Shizuku identity. Only the originating app may allocate a screen. */
+/** Check the same exported launcher in the app process and the authorized service. */
+internal fun handsDisplayLauncher(context: Context, pkg: String): ComponentName {
+    val pm = context.packageManager
+    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg)
+    val info = checkNotNull(pm.resolveActivity(intent, 0)?.activityInfo) { "No launcher activity was found." }
+    check(info.exported && info.packageName == pkg && pkg != context.packageName && info.permission.isNullOrEmpty())
+    val activity = info.targetActivity?.let { pm.getActivityInfo(ComponentName(pkg, it), 0) } ?: info
+    check(activity.launchMode in ActivityInfo.LAUNCH_MULTIPLE..ActivityInfo.LAUNCH_SINGLE_TOP &&
+        activity.flags and ActivityInfo.FLAG_ALLOW_TASK_REPARENTING == 0) {
+        "This app requires a shared task and cannot be opened safely on the background screen."
+    }
+    return ComponentName(pkg, info.name)
+}
+
+/** Runs under a device-owner authorized debugging identity. Only the originating app may operate its own screen. */
 @Keep
 class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub() {
+    internal var wirelessContext: Context? = null
     private val clientUid = context.applicationInfo.uid
     private var virtual: VirtualDisplay? = null
     private data class TargetTask(val id: Int, val pkg: String)
     private var target: TargetTask? = null
+    private var selectedPackage: String? = null
+    private val child = AtomicReference<java.lang.Process?>()
     private var profileId = -1
     private var surface: Surface? = null
     private var client: IBinder? = null
@@ -75,7 +96,7 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
         }
     }
 
-    // These system calls run under the already authorized Shizuku identity. Query only our
+    // These system calls run under the already authorized debugging identity. Query only our
     // private display. Never accept a task ID, profile or destination display from a caller.
     private val taskApi get() = Class.forName("android.app.IActivityTaskManager")
     private fun manager() = Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null)
@@ -107,6 +128,7 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
         enforceClient()
         val identity = Binder.clearCallingIdentity()
         return try {
+            if (packageName != selectedPackage) return false
             if (target == null) target = onlyTask(manager(), packageName)
             target?.pkg == packageName
         } catch (failure: ReflectiveOperationException) {
@@ -132,6 +154,88 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
         } finally { Binder.restoreCallingIdentity(identity) }
     }
 
+    @Synchronized override fun launchPackage(packageName: String): Boolean = withOwner {
+        val screen = ownDisplay() ?: return@withOwner false
+        if (selectedPackage != null || !unlocked() || packageName == context.packageName) return@withOwner false
+        val launcher = handsDisplayLauncher(context, packageName)
+        selectedPackage = packageName
+        val flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+        fixedCommand("/system/bin/am", "start", "--user", profileId.toString(), "--display", screen.displayId.toString(),
+            "-f", flags.toString(), "-a", Intent.ACTION_MAIN, "-c", Intent.CATEGORY_LAUNCHER,
+            "-n", launcher.flattenToString())
+    }
+
+    private fun ownDisplay() = virtual?.display?.takeIf { it.isValid && it.displayId > Display.DEFAULT_DISPLAY }
+    private fun unlocked() = !context.getSystemService(KeyguardManager::class.java).isDeviceLocked &&
+        context.getSystemService(PowerManager::class.java).isInteractive
+
+    private inline fun <T> withOwner(block: () -> T): T {
+        enforceClient()
+        val identity = Binder.clearCallingIdentity()
+        try { return block() } finally { Binder.restoreCallingIdentity(identity) }
+    }
+
+    private fun validInput(): Display? {
+        val screen = ownDisplay() ?: return null
+        val pinned = target ?: return null
+        return screen.takeIf { unlocked() && onlyTask(manager(), pinned.pkg) == pinned }
+    }
+
+    private fun contains(screen: Display, x: Int, y: Int): Boolean {
+        val size = Point()
+        @Suppress("DEPRECATION")
+        screen.getRealSize(size)
+        return x in 0 until size.x && y in 0 until size.y
+    }
+
+    @Synchronized override fun tap(x: Int, y: Int): Boolean = withOwner {
+        val screen = validInput() ?: return@withOwner false
+        contains(screen, x, y) && fixedCommand("/system/bin/input", "touchscreen", "-d", screen.displayId.toString(),
+            "tap", x.toString(), y.toString())
+    }
+
+    @Synchronized override fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): Boolean = withOwner {
+        val screen = validInput() ?: return@withOwner false
+        durationMs in 1..5_000 && contains(screen, x1, y1) && contains(screen, x2, y2) &&
+            fixedCommand("/system/bin/input", "touchscreen", "-d", screen.displayId.toString(), "swipe",
+                x1.toString(), y1.toString(), x2.toString(), y2.toString(), durationMs.toString())
+    }
+
+    @Synchronized override fun back(): Boolean = withOwner {
+        val screen = validInput() ?: return@withOwner false
+        fixedCommand("/system/bin/input", "keyboard", "-d", screen.displayId.toString(), "keyevent", "KEYCODE_BACK")
+    }
+
+    override fun identity(): IntArray {
+        enforceClient()
+        return intArrayOf(Process.myUid(), Process.myPid())
+    }
+
+    // Only the typed operations above construct argv. No shell interpretation or arbitrary text.
+    private fun fixedCommand(vararg argv: String): Boolean {
+        val process = ProcessBuilder(*argv).redirectErrorStream(true).start()
+        child.set(process)
+        try {
+            process.outputStream.close()
+            if (!process.waitFor(8, TimeUnit.SECONDS)) return false
+            val output = ByteArray(4097)
+            var length = 0
+            while (length < output.size) {
+                val count = process.inputStream.read(output, length, output.size - length)
+                if (count < 0) break
+                length += count
+            }
+            if (length == output.size) return false
+            val message = String(output, 0, length, Charsets.UTF_8)
+            return process.exitValue() == 0 && !message.contains("Error:", true) && !message.contains("Exception", true)
+        } finally {
+            child.compareAndSet(process, null)
+            if (process.isAlive) process.destroyForcibly()
+            process.inputStream.close()
+            process.errorStream.close()
+        }
+    }
+
     private fun hideKeyboard(id: Int) {
         val wm = Class.forName("android.view.WindowManagerGlobal").getMethod("getWindowManagerService").invoke(null)
         val api = Class.forName("android.view.IWindowManager")
@@ -143,6 +247,11 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
 
     private fun enforceClient() {
         check(Binder.getCallingUid() == clientUid) { "The display belongs to a different caller." }
+        wirelessContext?.let { shell ->
+            val identity = Binder.clearCallingIdentity()
+            try { check(HandsDisplayBridgeMain.wirelessEnabled(shell)) { "Wireless debugging was disabled." } }
+            finally { Binder.restoreCallingIdentity(identity) }
+        }
     }
 
     @Synchronized
@@ -151,19 +260,18 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
         releaseDisplay()
     }
 
-    @Synchronized
     override fun destroy() {
         val caller = Binder.getCallingUid()
         check(caller == clientUid || caller == Process.myUid() || caller == 0 || caller == 2000)
-        try {
-            releaseDisplay()
-        } finally {
-            exitProcess(0)
-        }
+        // Revocation also interrupts a gesture in progress. Binder death destroys the owned
+        // display even when another call is blocked in a platform input or launch operation.
+        child.getAndSet(null)?.destroyForcibly()
+        exitProcess(0)
     }
 
     private fun releaseDisplay() {
         target = null
+        selectedPackage = null
         profileId = -1
         client?.let { runCatching { it.unlinkToDeath(clientDied, 0) } }
         client = null

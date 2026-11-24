@@ -539,6 +539,9 @@
             android:name=".scheduled.ScheduledTaskAlarmReceiver"
             android:exported="false" />
 
+        <!-- nanoMuse: reply only to a pairing prompt opened in screen settings. -->
+        <receiver android:name="io.github.nanomuse.ui.hands.HandsPairingReplyReceiver" android:exported="false" />
+
         <!-- nanoMuse: Allow / Deny buttons on the approval notification -->
         <receiver
             android:name="io.github.nanomuse.guard.RiskApprovalReceiver"
@@ -556,6 +559,13 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- nanoMuse: the device owner's active wireless pairing can offer its dedicated display binder. -->
+        <provider
+            android:name="io.github.nanomuse.hands.HandsDisplayBridgeProvider"
+            android:authorities="${applicationId}.hands-bridge"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
 
         <!-- T322: Shizuku in-process content provider. Required by Shizuku
              SDK >=12 to host the binder receiver inside our process. Marked

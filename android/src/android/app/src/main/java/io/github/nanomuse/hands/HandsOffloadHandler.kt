@@ -47,6 +47,8 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
             .put("android_14_or_newer", r.backgroundAndroidOk)
             .put("secondary_displays", r.secondaryDisplays)
             .put("shizuku_ready", r.shizukuReady)
+            .put("background_bridge_ready", r.backgroundBridgeReady)
+            .put("can_start", r.canStart)
             .put("missing", JSONArray(r.missing()))
             .put("android_11_or_newer", r.androidOk)
             .put("accessibility_service", r.serviceOn)
@@ -78,7 +80,7 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     private fun runClaimed(task: String, args: MediaOffloadHandler.Args, sessionId: String?): NativeOffloadResult {
         val r = Hands.readiness(context)
-        if (!r.ready) return refused("not_ready", r.missing().joinToString("; ") + ".")
+        if (!r.canStart) return refused("not_ready", r.missing().joinToString("; ") + ".")
         val appHint = args.get("app")?.trim()?.takeIf { it.isNotEmpty() }
         if (r.backgroundScreen && appHint == null) {
             return NativeOffloadResult(2, "nanomuse-hands run: --app is required for a background screen task\n")

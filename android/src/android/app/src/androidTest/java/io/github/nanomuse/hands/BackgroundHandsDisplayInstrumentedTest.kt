@@ -17,7 +17,6 @@ import android.view.accessibility.AccessibilityWindowInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.accessibility.MinisAccessibilityService
-import com.openminis.app.offload.ShizukuManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -29,7 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Run on an unlocked test device with Shizuku authorized for nanoMuse and its accessibility
+ * Run on an unlocked test device with a background screen connection authorized for nanoMuse and its accessibility
  * service enabled, starting from the launcher. The fixture lives in the instrumentation APK.
  *
  * ./gradlew :app:connectedDebugAndroidTest -Pnm.abi=x86_64 \
@@ -51,7 +50,7 @@ class BackgroundHandsDisplayInstrumentedTest {
         assertTrue("Android 14 or later required", Build.VERSION.SDK_INT >= 34)
         until("Enable the accessibility service first.") { MinisAccessibilityService.getInstance() != null }
         service = checkNotNull(MinisAccessibilityService.getInstance())
-        until("Start Shizuku and grant nanoMuse access first.") { ShizukuManager.isReady() }
+        until("Authorize the background screen connection first.") { HandsDisplayHost.isReady() }
         val home = automation.executeShellCommand(
             "am start -W --display 0 -a android.intent.action.MAIN -c android.intent.category.HOME"
         )
@@ -83,6 +82,15 @@ class BackgroundHandsDisplayInstrumentedTest {
             assertTrue(message, SystemClock.elapsedRealtime() < end)
             SystemClock.sleep(100)
         }
+    }
+
+    @Test fun applicationCodeCannotRegisterAnAlternateDisplayService() {
+        val uri = android.net.Uri.parse("content://${context.packageName}.hands-bridge")
+        val extras = android.os.Bundle().apply {
+            putString("nonce", "a".repeat(43))
+            putBinder("display", android.os.Binder())
+        }
+        assertNull(context.contentResolver.call(uri, HandsDisplayBridge.METHOD, null, extras))
     }
 
     @Test fun capturesAndTapsOnlyTheNewDisplayAndRemovesIt() {

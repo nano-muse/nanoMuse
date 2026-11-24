@@ -10,6 +10,8 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Path
 import android.os.Build
+import android.os.PowerManager
+import io.github.nanomuse.hands.pairing.HandsWireless
 import android.provider.Settings
 import android.view.accessibility.AccessibilityNodeInfo
 import com.openminis.app.R
@@ -17,7 +19,6 @@ import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.ThinkingLevel
-import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.sandbox.PRootKernel
@@ -112,13 +113,15 @@ class HandsOperator(private val context: Context) {
     private val inFlightDecision = AtomicReference<Job?>(null)
     private var owner: HandsReplayAccess.Ticket? = null
 
-    private fun canInspect(): Boolean {
+    private fun canInspect(requireBridge: Boolean = true): Boolean {
         val ticket = owner ?: return false
         return !stop.get() && HandsReplayAccess.current(context, ticket) &&
             eventSession?.let(SessionAccess::isLocked) != true &&
             !context.getSystemService(KeyguardManager::class.java).isDeviceLocked &&
+            context.getSystemService(PowerManager::class.java).isInteractive &&
             Hands.enabled(context) && Hands.backgroundScreen(context) && Settings.canDrawOverlays(context) &&
-            MinisAccessibilityService.getInstance() != null && ShizukuManager.isReady()
+            MinisAccessibilityService.getInstance() != null &&
+            (!requireBridge || (if (::display.isInitialized) display.driverReady() else HandsDisplayHost.isReady()))
     }
     private val capsule = HandsCapsule(context, showStage = !background)
     private var memoryTicket: HandsRunMemory.Ticket? = null
@@ -177,12 +180,12 @@ class HandsOperator(private val context: Context) {
 
     private class RunStopped(message: String) : RuntimeException(message)
 
-    private fun checkRunning() {
+    private fun checkRunning(requireBridge: Boolean = true) {
         if (stop.get()) throw RunStopped(stopReason.get() ?: "stopped")
         if (!Hands.enabled(context) || Hands.backgroundScreen(context) != background) {
             throw RunStopped("The screen operation setting changed.")
         }
-        if (background && !canInspect()) throw RunStopped("The screen, account or permission changed.")
+        if (background && !canInspect(requireBridge)) throw RunStopped("The screen, account or permission changed.")
         if (phoneRequested.get()) throw ManualStep()
     }
 
@@ -241,7 +244,7 @@ class HandsOperator(private val context: Context) {
                 return finish(Outcome.Failed("screenshots need Android 11"), steps, runId, lastScreen, traceDir, log, model?.label)
             }
             if (model == null) return finish(Outcome.Failed("no model that can see pictures is configured"), steps, runId, lastScreen, traceDir, log, null)
-            checkRunning()
+            checkRunning(requireBridge = false)
             val app = opts.appHint?.takeIf { it.isNotBlank() }?.let(::resolveApp)
             if (background) {
                 if (app == null) {
@@ -252,17 +255,18 @@ class HandsOperator(private val context: Context) {
                 listening = true
                 // Revoke while a model request or approval is waiting. Coming back to the
                 // same account later cannot revive that run or its last visible frame.
+                val needsConnection = AtomicBoolean(!HandsDisplayHost.isReady())
                 accessMonitor = CoroutineScope(Dispatchers.Main.immediate).launch {
                     launch {
                         combine(AppAccess.locked, SessionAccess.revision, HandsReplayAccess.changes) { appLocked, _, _ ->
-                            appLocked || !canInspect()
+                            appLocked || !canInspect(requireBridge = !needsConnection.get())
                         }.collect { if (it) requestStop("The screen or account was locked or changed.") }
                     }
                     // Android can remove the Stop overlay while the model is awaiting a reply.
                     // These system permissions do not emit any of the account or lock signals.
                     while (!stop.get()) {
                         delay(500L)
-                        if (!canInspect() || MinisAccessibilityService.getInstance() !== svc) {
+                        if (!canInspect(requireBridge = !needsConnection.get()) || MinisAccessibilityService.getInstance() !== svc) {
                             requestStop("The screen or its controls are no longer available.")
                         }
                     }
@@ -277,6 +281,21 @@ class HandsOperator(private val context: Context) {
                     if (::display.isInitialized && canInspect()) display.preview() else null
                 }
                 check(capsule.showBeforeBackgroundRun()) { "The Stop control could not be shown." }
+                checkRunning(requireBridge = !needsConnection.get())
+                if (needsConnection.get()) {
+                    val connected = try {
+                        HandsWireless.hasIdentity(context) && runBlocking(checkNotNull(backgroundModelJob)) {
+                            HandsWireless.reconnect(context)
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        checkRunning(requireBridge = false)
+                        throw cancelled
+                    }
+                    checkRunning(requireBridge = false)
+                    if (!connected) return finish(Outcome.Infeasible("Open Screen Operation settings and connect the background screen."),
+                        steps, runId, lastScreen, traceDir, log, model.label)
+                    needsConnection.set(false)
+                }
                 checkRunning()
                 display = BackgroundHandsDisplay.open(context, svc, app, ::checkRunning)
                 checkRunning()

@@ -12,6 +12,7 @@ import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.offload.ShizukuManager
+import io.github.nanomuse.hands.pairing.HandsWireless
 import io.github.nanomuse.cloud.NanoMuseCloud
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -83,9 +84,13 @@ object Hands {
         val backgroundAndroidOk: Boolean,
         val secondaryDisplays: Boolean,
         val shizukuReady: Boolean,
+        val backgroundBridgeReady: Boolean = shizukuReady,
+        val wirelessPaired: Boolean = false,
     ) {
-        val ready: Boolean get() = androidOk && serviceOn && overlayOk && model != null &&
-            (!backgroundScreen || (backgroundAndroidOk && secondaryDisplays && shizukuReady))
+        private val requirementsMet get() = androidOk && serviceOn && overlayOk && model != null &&
+            (!backgroundScreen || (backgroundAndroidOk && secondaryDisplays))
+        val ready: Boolean get() = requirementsMet && (!backgroundScreen || backgroundBridgeReady)
+        val canStart: Boolean get() = ready || (requirementsMet && backgroundScreen && wirelessPaired)
 
         fun missing(): List<String> = buildList {
             if (backgroundScreen && !backgroundAndroidOk) add("background screen requires Android 14 or newer")
@@ -94,7 +99,7 @@ object Hands {
             if (!overlayOk) add("nanoMuse may not draw over other apps")
             if (model == null) add("no model that can see pictures is configured")
             if (backgroundScreen && !secondaryDisplays) add("this device does not support activities on secondary displays")
-            if (backgroundScreen && !shizukuReady) add("background screen requires a running Shizuku 13 or newer service authorized by the user")
+            if (backgroundScreen && !backgroundBridgeReady) add("authorize the background screen connection in Screen Operation settings")
         }
     }
 
@@ -107,10 +112,12 @@ object Hands {
         backgroundAndroidOk = Build.VERSION.SDK_INT >= BACKGROUND_MIN_SDK,
         secondaryDisplays = context.packageManager.hasSystemFeature(PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS),
         shizukuReady = ShizukuManager.snapshot.value.let { it.state == ShizukuManager.State.READY && it.version >= BACKGROUND_MIN_SHIZUKU },
+        backgroundBridgeReady = HandsDisplayHost.isReady(),
+        wirelessPaired = HandsWireless.hasIdentity(context),
     )
 
     /** Usable right now: switched on and every prerequisite in place. */
-    fun usable(context: Context): Boolean = enabled(context) && readiness(context).ready
+    fun usable(context: Context): Boolean = enabled(context) && readiness(context).canStart
 
     // ── the screen model ───────────────────────────────────────────────────
 
@@ -247,7 +254,7 @@ object Hands {
             append("Most everyday apps here (12306, 微信, 支付宝, 美团, 淘宝, 京东…) have no API. Climb in this order and say which rung you are on before you start: ")
             append("(1) a skill, a CLI or an MCP server; (2) the page fetched with the user's login or `browser_use`; (3) the phone's own screen, last. ")
             append("A task is rarely all screen: find the number with a command, the button with the screen, and ask before it is pressed.\n")
-            if (on && r.ready) {
+            if (on && r.canStart) {
                 val appArgument = if (r.backgroundScreen) "--app \"<app name or package>\"" else "[--app \"<app name>\"]"
                 append("The screen is available: `nanomuse-hands run --task \"<one clear task, with every detail the hands need>\" $appArgument` ")
                 append("(screen model: ${r.model?.label}). It looks at screenshots — never the accessibility tree — and taps, types and swipes; a capsule with Stop shows the user what it does. ")

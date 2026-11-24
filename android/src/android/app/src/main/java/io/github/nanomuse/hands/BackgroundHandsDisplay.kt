@@ -2,10 +2,7 @@ package io.github.nanomuse.hands
 
 import android.accessibilityservice.AccessibilityService
 import android.app.KeyguardManager
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -30,7 +27,6 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.openminis.app.accessibility.MinisAccessibilityService
-import com.openminis.app.offload.ShizukuManager
 import io.github.nanomuse.guard.TapWords
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
@@ -171,7 +167,7 @@ internal class BackgroundHandsDisplay private constructor(
     }
 
     private fun targetWindows(): List<AccessibilityWindowInfo> = try {
-        check(!closed && id > Display.DEFAULT_DISPLAY && display.isValid && ShizukuManager.isReady()) {
+        check(!closed && id > Display.DEFAULT_DISPLAY && display.isValid && host.isReady()) {
             "The background screen is unavailable."
         }
         checkUnlocked(context)
@@ -406,7 +402,7 @@ internal class BackgroundHandsDisplay private constructor(
         return if (durationMs > 150) {
             touchSwipe(x, y, x, y, durationMs)
         } else {
-            input("touchscreen", "tap", x.toString(), y.toString())
+            host.tap(x, y)
         }
     }
 
@@ -423,16 +419,14 @@ internal class BackgroundHandsDisplay private constructor(
     }
 
     private fun touchSwipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long) =
-        input("touchscreen", "swipe", x1.toString(), y1.toString(), x2.toString(), y2.toString(),
-            durationMs.coerceIn(1, 5_000).toString())
+        host.swipe(x1, y1, x2, y2, durationMs.coerceIn(1, 5_000).toInt())
 
     fun back(): Boolean {
         touchedWindow()
-        return input("keyboard", "keyevent", "KEYCODE_BACK")
+        return host.back()
     }
 
-    private fun input(source: String, vararg args: String): Boolean =
-        command("/system/bin/input", source, "-d", id.toString(), *args)
+    fun driverReady() = !closed && host.isReady()
 
     @Volatile var canHandOff = false
         private set
@@ -491,26 +485,6 @@ internal class BackgroundHandsDisplay private constructor(
             }
         }
 
-        private fun command(vararg argv: String): Boolean {
-            val result = ShizukuManager.runProcess(arrayOf(*argv), timeoutMs = 8_000)
-            return result.exitCode == 0 && listOf(result.stderr, result.stdout).none {
-                it.contains("Error:", ignoreCase = true) || it.contains("Exception")
-            }
-        }
-
-        private fun launcher(context: Context, pkg: String): ComponentName {
-            val pm = context.packageManager
-            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg)
-            val info = checkNotNull(pm.resolveActivity(intent, 0)?.activityInfo) { "No launcher activity was found." }
-            check(info.exported && info.packageName == pkg && pkg != context.packageName)
-            val activity = info.targetActivity?.let { pm.getActivityInfo(ComponentName(pkg, it), 0) } ?: info
-            check(activity.launchMode in ActivityInfo.LAUNCH_MULTIPLE..ActivityInfo.LAUNCH_SINGLE_TOP &&
-                activity.flags and ActivityInfo.FLAG_ALLOW_TASK_REPARENTING == 0) {
-                "This app requires a shared task and cannot be opened safely on the background screen."
-            }
-            return ComponentName(pkg, info.name)
-        }
-
         @JvmOverloads
         fun open(
             context: Context,
@@ -520,9 +494,9 @@ internal class BackgroundHandsDisplay private constructor(
         ): BackgroundHandsDisplay {
             check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
                 context.packageManager.hasSystemFeature(PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS) &&
-                ShizukuManager.isReady()) { "Background screens are unavailable on this device." }
+                HandsDisplayHost.isReady()) { "Background screens are unavailable on this device." }
             checkUnlocked(context)
-            val component = launcher(context, app.packageName)
+            handsDisplayLauncher(context, app.packageName)
             checkOtherScreens(svc.windowsOnAllDisplays, app.packageName, Display.INVALID_DISPLAY)
             val primary = checkNotNull(context.getSystemService(android.hardware.display.DisplayManager::class.java)
                 .getDisplay(Display.DEFAULT_DISPLAY)) { "The phone display is unavailable." }
@@ -543,13 +517,10 @@ internal class BackgroundHandsDisplay private constructor(
                 checkOtherScreens(svc.windowsOnAllDisplays, app.packageName, session.id)
                 checkUnlocked(context)
                 checkRunning()
-                val flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK or
-                    Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
-                check(command("/system/bin/am", "start", "--user", host.userId.toString(), "--display", session.id.toString(),
-                    "-f", flags.toString(), "-a", Intent.ACTION_MAIN, "-c", Intent.CATEGORY_LAUNCHER,
-                    "-n", component.flattenToString())) { "Android refused to open the app on the background screen." }
+                check(host.launch(app.packageName)) { "Android refused to open the app on the background screen." }
                 session.nextWindow(attempts = 81)
                 session.canHandOff = host.rememberTask(app.packageName)
+                check(session.canHandOff) { "Android could not verify the app's task on the background screen." }
                 return session
             } catch (failure: Throwable) {
                 session.close()

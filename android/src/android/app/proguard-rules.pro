@@ -48,3 +48,6 @@
 -keepnames class org.mozilla.javascript.ScriptableObject
 # Optional Java bean conversion is unreachable: no Java objects enter the JS scope.
 -dontwarn java.beans.BeanDescriptor
+
+# nanoMuse: the authenticated wireless-debugging transport invokes this fixed entry point by name.
+-keep class io.github.nanomuse.hands.HandsDisplayBridgeMain { public static void main(java.lang.String[]); }
