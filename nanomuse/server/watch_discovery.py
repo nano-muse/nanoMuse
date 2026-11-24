@@ -273,9 +273,10 @@ def _candidates(line: str, personal: bool) -> list[WatchCandidate]:
     line = re.sub(
         r"\[[^\]\n]{1,120}\]\((https?://[^\s<>]+?)\)(?=[\s.,;!?，。；！、？]|$)", r"\1", line
     )
-    # An unadorned login is only meaningful following an explicit GitHub label.
+    # A bare login needs a GitHub label. An existing URL must pass through unchanged;
+    # "is" before that URL is a verb, not another person's GitHub handle.
     line = re.sub(
-        rf"((?:my github (?:username|handle|login|account)(?: is)?|我的\s*github\s*(?:账号|帐号|账户|用户名)(?:是|为)?)\s*[:：]?\s*)@?({_LOGIN})(?=[\s.。！!?？]|$)",
+        rf"((?:my github (?:username|handle|login|account)(?: is)?|我的\s*github\s*(?:账号|帐号|账户|用户名)(?:是|为)?)\s*[:：]?\s*)(?!(?:is|at)\b|https?:|github\.com/)@?({_LOGIN})(?=[\s.,，。！!?？]|$)",
         r"\1https://github.com/\2",
         line,
         flags=re.I,
@@ -341,6 +342,11 @@ def _evidence_lines(text: str) -> Iterator[str]:
     fenced = False
     quoted_until = ""
     for raw in text.splitlines():
+        # Some clipboard integrations append NUL or zero-width space to a copied URL.
+        # Discard only trailing delimiters. An invisible character inside can split an ID.
+        raw = raw.rstrip(" \t\x00\u200b")
+        if "\x00" in raw or "\u200b" in raw:
+            continue
         line = " ".join(raw.split())
         if line.startswith(("\x60\x60\x60", "~~~")):
             fenced = not fenced

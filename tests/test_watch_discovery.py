@@ -27,7 +27,37 @@ SCHOLAR = "https://scholar.google.com/citations?user=aBcD_234efGH&hl=en"
         (f"I contribute to {REPO}", "github_repo", "example-org/project", False),
         (f"Your project: {REPO}", "github_repo", "example-org/project", False),
         ("我的 GitHub 用户名是 Example-Org。", "github_user", "example-org", True),
+        (
+            "我的 GitHub 账号是 https://github.com/Example-Org\x00\u200b ",
+            "github_user",
+            "example-org",
+            True,
+        ),
         ("My GitHub handle is @Example-Org.", "github_user", "example-org", True),
+        (
+            "My GitHub account is https://github.com/Example-Org.",
+            "github_user",
+            "example-org",
+            True,
+        ),
+        (
+            "My GitHub account is github.com/Example-Org, I use it for releases.",
+            "github_user",
+            "example-org",
+            True,
+        ),
+        (
+            "我的 GitHub 账号是 https://github.com/Example-Org，主要用于开源。",
+            "github_user",
+            "example-org",
+            True,
+        ),
+        (
+            "My GitHub account is @Example-Org, I maintain several repos.",
+            "github_user",
+            "example-org",
+            True,
+        ),
         ("My OpenAlex ID is A123456.", "research_author", "A123456", True),
         (
             "My ORCID is https://orcid.org/0000-0002-1825-0097",
@@ -166,6 +196,7 @@ def test_reference_is_always_pending_and_compares_distinct_turns() -> None:
         f"不再跟踪 {REPO}",
         f"Forwarded message\n{REPO}",
         "Book a room in A1022",
+        "My GitHub account is https://github.com/Exam\x00ple-Org",
         "https://example.org/first?url=https://github.com/a/b",
     ],
 )
