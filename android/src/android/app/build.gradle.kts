@@ -157,6 +157,27 @@ android {
     }
 }
 
+// nanoMuse: verify the packaged sandbox even when Gradle reuses a cached APK.
+androidComponents.onVariants { variant ->
+    if (variant.buildType == "debug" && providers.gradleProperty("nm.abi").orNull == "x86_64") {
+        return@onVariants
+    }
+    val suffix = variant.name.replaceFirstChar { it.uppercase() }
+    val apkDirectory = variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK)
+    val loader = variant.artifacts.getBuiltArtifactsLoader()
+    val verifier = rootProject.file("../../../scripts/android/verify-sandbox-apk.py")
+    val verifySandbox = tasks.register<Exec>("verify${suffix}SandboxApk") {
+        inputs.dir(apkDirectory)
+        inputs.file(verifier)
+        commandLine("python3", verifier)
+        argumentProviders.add(CommandLineArgumentProvider {
+            val built = checkNotNull(loader.load(apkDirectory.get())) { "Missing APK metadata for $suffix" }
+            listOf(built.elements.single().outputFile)
+        })
+    }
+    tasks.matching { it.name == "assemble$suffix" }.configureEach { dependsOn(verifySandbox) }
+}
+
 // [T-android-downgrade-compat] Room needs an explicit output directory once
 // `exportSchema = true`. The generated JSON is COMMITTED: it is what
 // MigrationTestHelper replays to prove every upgrade — and every no-op

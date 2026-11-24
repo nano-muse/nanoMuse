@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Fixed Android builds that could produce an arm64 APK without the PRoot executable needed for shell commands and screen tasks. Existing sandboxes also recovered missing files for the bundled Alpine shell without resetting the workspace.
+
 - Android users could pair nanoMuse directly with their phone through wireless debugging to use the background screen without installing Shizuku.
 
 - Android users could take over a background app on the same open page and open its screen replay directly from the chat. The operator also learned to align shadowed dialogs when their position could be verified.

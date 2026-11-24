@@ -1363,4 +1363,6 @@
     <string name="nm_hands_replay_type">Ввод текста</string>
     <string name="nm_hands_replay_observed">Просмотр экрана</string>
     <string name="nm_hands_replay_open">Посмотреть запись действий</string>
+    <string name="nm_sandbox_proot_missing">Исполняемый файл PRoot отсутствует. Установите полный APK для arm64 поверх текущей версии.</string>
+    <string name="nm_sandbox_proot_not_executable">Android не может запустить установленный файл PRoot. Проверьте совместимость APK с этим устройством.</string>
 </resources>

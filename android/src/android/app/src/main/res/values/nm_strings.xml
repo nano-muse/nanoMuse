@@ -1335,4 +1335,6 @@
     <string name="nm_hands_replay_type">Enter text</string>
     <string name="nm_hands_replay_observed">Screen observed</string>
     <string name="nm_hands_replay_open">View screen replay</string>
+    <string name="nm_sandbox_proot_missing">The PRoot executable is missing. Install the complete arm64 APK over this version.</string>
+    <string name="nm_sandbox_proot_not_executable">Android cannot run the installed PRoot executable. Check that the APK matches this device.</string>
 </resources>

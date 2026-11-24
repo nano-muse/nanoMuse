@@ -1355,4 +1355,6 @@
     <string name="nm_hands_replay_type">Metin gir</string>
     <string name="nm_hands_replay_observed">Ekran incelendi</string>
     <string name="nm_hands_replay_open">Ekran işlemlerini yeniden izle</string>
+    <string name="nm_sandbox_proot_missing">PRoot çalıştırılabilir dosyası eksik. Tam arm64 APK paketini mevcut sürümün üzerine kurun.</string>
+    <string name="nm_sandbox_proot_not_executable">Android yüklü PRoot dosyasını çalıştıramıyor. APK paketinin bu cihazla uyumlu olduğunu kontrol edin.</string>
 </resources>

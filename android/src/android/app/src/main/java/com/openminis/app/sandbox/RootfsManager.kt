@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import com.openminis.app.R
+import io.github.nanomuse.sandbox.AlpineShellFiles
 import java.io.File
 import java.io.FilterInputStream
 import java.io.InputStream
@@ -66,13 +68,19 @@ class RootfsManager private constructor(private val context: Context) {
      * Finalizing → Installed / Failed).
      */
     suspend fun installIfNeeded() = withContext(Dispatchers.IO) {
-        if (isInstalled) {
-            Log.d(TAG, "Rootfs already installed at $rootfsDir")
-            _installState.value = RootfsInstallState.Installed
-            return@withContext
-        }
+        // nanoMuse: terminal and chat can request the first installation or repair concurrently.
+        synchronized(this@RootfsManager) { installOrRepair() }
+    }
 
+    private fun installOrRepair() {
         try {
+            if (isInstalled) {
+                // nanoMuse: an upgrade keeps the rootfs, including a missing guest shell.
+                AlpineShellFiles.restoreMissing(rootfsDir, ::extractBundledRootfs)
+                _installState.value = RootfsInstallState.Installed
+                return
+            }
+
             _installState.value = RootfsInstallState.Preparing
             Log.i(TAG, "Installing Alpine rootfs...")
 
@@ -82,44 +90,13 @@ class RootfsManager private constructor(private val context: Context) {
             }
             rootfsDir.mkdirs()
 
-            // Extract rootfs from assets.
-            // AAPT may decompress .tar.gz → .tar automatically, so try both names.
-            val assetName = try {
-                context.assets.open(ROOTFS_ASSET).close()
-                ROOTFS_ASSET
-            } catch (_: java.io.FileNotFoundException) {
-                ROOTFS_ASSET_TAR
-            }
-
-            // Asset size for progress calculation — compressed length (for .gz)
-            // or uncompressed length (for .tar). openFd() fails for 0-length
-            // assets on some devices; fall back to 0 which disables progress.
-            val assetTotal: Long = try {
-                context.assets.openFd(assetName).use { it.length }
-            } catch (_: Exception) { 0L }
-
-            // Emit an initial 0% so the UI flips from Preparing → progress bar.
-            _installState.value = RootfsInstallState.Extracting(0f)
-
-            context.assets.open(assetName).use { rawAsset ->
-                // Wrap the ASSET stream (not the gzip stream) so progress tracks
-                // compressed bytes consumed — monotonic and matches the size we
-                // have a total for. Throttle updates to avoid flooding the StateFlow.
-                val progressStream = ProgressInputStream(rawAsset, assetTotal) { fraction ->
-                    _installState.value = RootfsInstallState.Extracting(fraction)
-                }
-                if (assetName.endsWith(".gz")) {
-                    GZIPInputStream(progressStream).use { gzipStream ->
-                        extractTar(gzipStream, rootfsDir)
-                    }
-                } else {
-                    extractTar(progressStream, rootfsDir)
-                }
-            }
+            extractBundledRootfs(rootfsDir, null)
 
             _installState.value = RootfsInstallState.Finalizing
 
-            // Write arch marker
+            // nanoMuse: the tar reader can skip a failed symlink. Verify the shell before marking
+            // this installation complete; a healthy rootfs does not open the archive again.
+            AlpineShellFiles.restoreMissing(rootfsDir, ::extractBundledRootfs)
             archFile.writeText(ARCH)
 
             // Pre-create /var/minis directories. Mirrors iOS
@@ -156,6 +133,44 @@ class RootfsManager private constructor(private val context: Context) {
         }
     }
 
+    // nanoMuse: use the same packaged tar for a first installation and a selective repair.
+    private fun extractBundledRootfs(destination: File, members: Set<String>?) {
+        // Extract rootfs from assets.
+        // AAPT may decompress .tar.gz → .tar automatically, so try both names.
+        val assetName = try {
+            context.assets.open(ROOTFS_ASSET).close()
+            ROOTFS_ASSET
+        } catch (_: java.io.FileNotFoundException) {
+            ROOTFS_ASSET_TAR
+        }
+
+        // Asset size for progress calculation — compressed length (for .gz)
+        // or uncompressed length (for .tar). openFd() fails for 0-length
+        // assets on some devices; fall back to 0 which disables progress.
+        val assetTotal: Long = try {
+            context.assets.openFd(assetName).use { it.length }
+        } catch (_: Exception) { 0L }
+
+        // Emit an initial 0% so the UI flips from Preparing → progress bar.
+        _installState.value = RootfsInstallState.Extracting(0f)
+
+        context.assets.open(assetName).use { rawAsset ->
+            // Wrap the ASSET stream (not the gzip stream) so progress tracks
+            // compressed bytes consumed — monotonic and matches the size we
+            // have a total for. Throttle updates to avoid flooding the StateFlow.
+            val progressStream = ProgressInputStream(rawAsset, assetTotal) { fraction ->
+                _installState.value = RootfsInstallState.Extracting(fraction)
+            }
+            if (assetName.endsWith(".gz")) {
+                GZIPInputStream(progressStream).use { gzipStream ->
+                    extractTar(gzipStream, destination, members)
+                }
+            } else {
+                extractTar(progressStream, destination, members)
+            }
+        }
+    }
+
     /** Directory containing extracted native libraries (read-only, executable). */
     val nativeLibDir: File = File(context.applicationInfo.nativeLibraryDir)
 
@@ -163,11 +178,12 @@ class RootfsManager private constructor(private val context: Context) {
      * Verify PRoot binary is available in the native library directory.
      */
     suspend fun installProotIfNeeded() = withContext(Dispatchers.IO) {
-        if (!prootBinary.exists() || !prootBinary.canExecute()) {
-            throw IllegalStateException(
-                "PRoot binary not found at $prootBinary. " +
-                "It should be auto-extracted from jniLibs."
-            )
+        // nanoMuse: report the native file and its execute permission separately.
+        check(prootBinary.isFile) {
+            "${context.getString(R.string.nm_sandbox_proot_missing)}\n$prootBinary"
+        }
+        check(prootBinary.canExecute()) {
+            "${context.getString(R.string.nm_sandbox_proot_not_executable)}\n$prootBinary"
         }
 
         // No libtalloc staging: deps/build_proot.sh links talloc statically
@@ -183,6 +199,11 @@ class RootfsManager private constructor(private val context: Context) {
      * Returns the backup directory if keepUserData is true, null otherwise.
      */
     suspend fun reset(keepUserData: Boolean = false): File? = withContext(Dispatchers.IO) {
+        // nanoMuse: reset shares the install lock so a shell cannot repair during replacement.
+        synchronized(this@RootfsManager) { resetRootfs(keepUserData) }
+    }
+
+    private fun resetRootfs(keepUserData: Boolean): File? {
         var backupDir: File? = null
 
         if (keepUserData) {
@@ -195,7 +216,7 @@ class RootfsManager private constructor(private val context: Context) {
         }
 
         rootfsDir.deleteRecursively()
-        installIfNeeded()
+        installOrRepair()
 
         // Restore user data
         if (backupDir != null && backupDir.exists()) {
@@ -204,7 +225,7 @@ class RootfsManager private constructor(private val context: Context) {
             backupDir.deleteRecursively()
         }
 
-        backupDir
+        return backupDir
     }
 
     /**
@@ -461,7 +482,8 @@ class RootfsManager private constructor(private val context: Context) {
      * Handles regular files, directories, and symlinks.
      * Does not depend on any external library.
      */
-    internal fun extractTar(input: InputStream, targetDir: File) {
+    // nanoMuse: a repair extracts only the requested bootstrap entries into an empty directory.
+    internal fun extractTar(input: InputStream, targetDir: File, members: Set<String>? = null) {
         val header = ByteArray(512)
 
         while (true) {
@@ -485,6 +507,11 @@ class RootfsManager private constructor(private val context: Context) {
             if (fullName.isEmpty()) break
 
             val size = sizeOctal.trim().toLongOrNull(8) ?: 0L
+            // nanoMuse: skip entries outside the repair set, including all unrelated links.
+            if (members != null && fullName.removePrefix("./") !in members) {
+                skipFully(input, (size + 511) / 512 * 512)
+                continue
+            }
             val outFile = File(targetDir, fullName)
 
             when (typeFlag) {
@@ -514,7 +541,8 @@ class RootfsManager private constructor(private val context: Context) {
                         while (remaining > 0) {
                             val toRead = minOf(buf.size.toLong(), remaining).toInt()
                             val n = input.read(buf, 0, toRead)
-                            if (n < 0) break
+                            // nanoMuse: never publish an incomplete executable from a short tar.
+                            if (n < 0) throw java.io.EOFException("Incomplete rootfs entry: $fullName")
                             output.write(buf, 0, n)
                             remaining -= n
                         }

@@ -1351,4 +1351,6 @@
     <string name="nm_hands_replay_type">Masukkan teks</string>
     <string name="nm_hands_replay_observed">Skrin diperiksa</string>
     <string name="nm_hands_replay_open">Lihat ulang tayang tindakan skrin</string>
+    <string name="nm_sandbox_proot_missing">Fail boleh laku PRoot tiada. Pasang APK arm64 yang lengkap pada versi sedia ada.</string>
+    <string name="nm_sandbox_proot_not_executable">Android tidak dapat menjalankan fail PRoot yang dipasang. Semak keserasian APK dengan peranti ini.</string>
 </resources>

@@ -1356,4 +1356,6 @@
     <string name="nm_hands_replay_type">Digitar texto</string>
     <string name="nm_hands_replay_observed">Tela observada</string>
     <string name="nm_hands_replay_open">Rever ações na tela</string>
+    <string name="nm_sandbox_proot_missing">O executável do PRoot está ausente. Instale o APK arm64 completo sobre esta versão.</string>
+    <string name="nm_sandbox_proot_not_executable">O Android não consegue executar o arquivo PRoot instalado. Verifique se o APK é compatível com este dispositivo.</string>
 </resources>

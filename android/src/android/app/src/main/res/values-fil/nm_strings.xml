@@ -1355,4 +1355,6 @@
     <string name="nm_hands_replay_type">Maglagay ng teksto</string>
     <string name="nm_hands_replay_observed">Sinuri ang screen</string>
     <string name="nm_hands_replay_open">Panoorin ang mga hakbang sa screen</string>
+    <string name="nm_sandbox_proot_missing">Nawawala ang executable ng PRoot. I-install ang buong arm64 APK sa kasalukuyang bersyon.</string>
+    <string name="nm_sandbox_proot_not_executable">Hindi mapatakbo ng Android ang naka-install na PRoot. Tiyaking tugma ang APK sa device na ito.</string>
 </resources>

@@ -22,12 +22,20 @@ ASSETS="$NM_APP_MAIN/assets"
 JNI="$NM_APP_MAIN/jniLibs/arm64-v8a"
 LIBS="$NM_GRADLE_DIR/app/libs"
 
-if [ ! -f "$NM_ANDROID/deps/proot/GNUmakefile" ] && [ ! -f "$NM_ANDROID/deps/proot/src/GNUmakefile" ]; then
-  echo "== proot submodule"
-  (cd "$NM_ROOT" && git submodule update --init android/deps/proot)
-fi
+# The fork builds both copies of PRoot. Its loaders are vendored files
+# which deps/build_proot.sh verifies but cannot generate.
+for loader in libproot-loader.so libproot-loader32.so; do
+  if [ ! -e "$JNI/$loader" ]; then
+    git -C "$NM_ROOT" checkout-index -- "${JNI#"$NM_ROOT"/}/$loader"
+  fi
+done
 
-if [ $force = 1 ] || [ ! -f "$ASSETS/proot-aarch64" ] || [ ! -f "$JNI/libproot-loader.so" ]; then
+if [ $force = 1 ] || [ ! -s "$ASSETS/proot-aarch64" ] \
+  || ! cmp -s "$ASSETS/proot-aarch64" "$JNI/libproot.so"; then
+  if [ ! -f "$NM_ANDROID/deps/proot/src/GNUmakefile" ]; then
+    echo "== proot submodule"
+    (cd "$NM_ROOT" && git submodule update --init android/deps/proot)
+  fi
   echo "== proot (NDK: ${ANDROID_NDK_HOME:-unset})"
   (cd "$NM_ANDROID" && bash deps/build_proot.sh)
 else

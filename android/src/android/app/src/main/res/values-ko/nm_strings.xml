@@ -1351,4 +1351,6 @@
     <string name="nm_hands_replay_type">텍스트 입력</string>
     <string name="nm_hands_replay_observed">화면 확인</string>
     <string name="nm_hands_replay_open">화면 조작 다시 보기</string>
+    <string name="nm_sandbox_proot_missing">PRoot 실행 파일이 없습니다. 전체 arm64 APK를 현재 버전 위에 설치하세요.</string>
+    <string name="nm_sandbox_proot_not_executable">Android가 설치된 PRoot 파일을 실행할 수 없습니다. 이 기기와 호환되는 APK인지 확인하세요.</string>
 </resources>

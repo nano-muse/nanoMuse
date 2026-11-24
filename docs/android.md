@@ -524,6 +524,8 @@ keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
 and put its four values in `android/keystore.properties` (git-ignored: `storeFile`,
 `storePassword`, `keyAlias`, `keyPassword`).
 
+The arm64 build checks the finished APK for the PRoot executable, its loaders and the Alpine root filesystem. If the check reports a missing file, run `bash scripts/android/build-natives.sh` from the repository root and assemble the APK again.
+
 The chat-only emulator build (`-Pnm.abi=x86_64`) excludes cached arm64 proot and Alpine root filesystem assets. Switching back to the default arm64 build includes those assets again; no cache deletion is needed.
 
 ### Windows with WSL {#windows-wsl}
@@ -718,6 +720,8 @@ In **Settings → Hands**, turn on **Let the agent use the screen** and select *
 To connect the built-in helper, open wireless debugging in Android Developer options while connected to Wi-Fi. Tap **Enter code from a notification** and allow notifications. In Android, select **Pair device with pairing code**. Keep that dialog open, pull down the notification and reply with the six-digit code. If discovery fails, reply with the pairing port, a space and the code. The notification accepts one reply within two minutes. You can also put nanoMuse and Android Settings in split screen and enter the port and code in the app. For the next step use the connection port shown on the main wireless debugging page. nanoMuse looks for the ports on this phone and also accepts manual entry. The code is temporary. The private pairing key stays in Android Keystore. This path works without installing Shizuku.
 
 After an app restart, a new task in the named app tries once to reconnect using your existing pairing. If Android cannot find the port, reopen wireless debugging and enter its connection port in Hands. Pair again if you removed nanoMuse from Android's paired devices. To revoke access, forget nanoMuse in Android's wireless debugging settings and clear the pairing in Hands. A stopped task needs a new request. See [Android's wireless debugging guide](https://developer.android.com/tools/adb#wireless).
+
+If several screen commands fail before an app opens, ask nanoMuse to run `nanomuse-hands status` and expand its tool result in the chat. A JSON response means the shell reached the screen operator and can report which permissions are ready. On startup, an existing Alpine sandbox can restore missing files for its bundled shell from the APK while preserving installed packages and workspace files.
 
 Choose the target by its exact package name or unique installed label with `nanomuse-hands run --app "<app>" --task "<task>"`. Use `nanomuse-hands apps` to list the choices. nanoMuse declines to open a target already visible on another display, including the main screen. Apps that require a shared task or decline to open on the separate display cannot run in this mode. The installed app shares its account and data with normal use, so changes you approve can appear on your phone.
 

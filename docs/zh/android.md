@@ -196,6 +196,8 @@ keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
 
 将四项签名配置写入已被 Git 忽略的 `android/keystore.properties`：`storeFile`、`storePassword`、`keyAlias`、`keyPassword`。
 
+arm64 构建会检查最终 APK 中的 PRoot 可执行文件、加载器和 Alpine 根文件系统。如果提示缺少文件，在仓库根目录运行 `bash scripts/android/build-natives.sh`，再重新构建 APK。
+
 使用 `-Pnm.abi=x86_64` 构建模拟器聊天测试版本时，会排除缓存里的 arm64 proot 和 Alpine 根文件系统资源。切回默认 arm64 构建会自动重新包含它们，不需要删除缓存。
 
 ### 在 Windows 上使用 WSL {#windows-wsl}
@@ -358,6 +360,8 @@ Android 等待设备任务的上限为十五分钟，与中继期限相同。发
 首次使用时，连上 Wi-Fi，在 Android「开发者选项」里打开「无线调试」。在 nanoMuse 点「在通知中输入配对码」，允许通知，再在系统里点「使用配对码配对设备」。保持系统弹窗打开，下拉通知栏，回复六位配对码。如果无法自动发现端口，可回复「配对端口 空格 六位配对码」。通知两分钟内有效，只能回复一次。也可以把系统设置和 nanoMuse 分屏打开，在应用里手动输入端口和配对码。接下来使用「无线调试」首页显示的连接端口。nanoMuse 会在本机查找端口，也可以手动填写。配对码只用一次，配对私钥保存在 Android 密钥库中。这条路径无需安装 Shizuku。
 
 重启 nanoMuse 后，向指定应用发起新任务时，助手会用原来的配对尝试重连一次。若未找到端口，可重新打开系统无线调试，在「动手操作屏幕」里输入连接端口。若已从系统的已配对设备中移除 nanoMuse，需要重新配对。要撤销授权，可在系统「无线调试」中取消 nanoMuse 的配对，再回到「动手操作屏幕」清除配对。已停止的任务需要重新发起。[Android 无线调试说明](https://developer.android.com/tools/adb?hl=zh-cn#wireless)
+
+如果连续几条屏幕命令都在打开应用前失败，可以让 nanoMuse 执行 `nanomuse-hands status`，再点开聊天里的工具记录。返回 JSON 说明沙箱已连到屏幕工具，可以查看权限状态。已有的 Alpine 沙箱启动时会从 APK 补回内置 shell 缺少的文件，保留已经安装的软件包和工作区文件。
 
 用 `nanomuse-hands apps` 查看已安装的应用，再用 `nanomuse-hands run --app "<应用>" --task "<任务>"` 指定完整包名或唯一的应用名称。如果目标应用已显示在主屏或其他屏幕上，助手会拒绝启动。要求复用已有任务，或无法在副屏打开的应用，也无法使用此模式。副屏上的应用沿用手机上原有的账号和数据，你批准的操作也会反映在平时使用的应用里。
 

@@ -1351,4 +1351,6 @@
     <string name="nm_hands_replay_type">ป้อนข้อความ</string>
     <string name="nm_hands_replay_observed">ดูหน้าจอ</string>
     <string name="nm_hands_replay_open">ดูการทำงานบนหน้าจอย้อนหลัง</string>
+    <string name="nm_sandbox_proot_missing">ไม่พบไฟล์ปฏิบัติการ PRoot โปรดติดตั้ง APK สำหรับ arm64 ฉบับเต็มทับเวอร์ชันนี้</string>
+    <string name="nm_sandbox_proot_not_executable">Android เรียกใช้ไฟล์ PRoot ที่ติดตั้งไว้ไม่ได้ โปรดตรวจสอบว่า APK รองรับอุปกรณ์นี้</string>
 </resources>
