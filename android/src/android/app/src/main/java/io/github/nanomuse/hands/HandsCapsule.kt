@@ -72,6 +72,7 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     private var pauseButton: TextView? = null
     private var controls: LinearLayout? = null
     private var paused = false
+    private var workingTitle = ""
     var previewAllowed: () -> Boolean = { false }
     var capturePreview: () -> Bitmap? = { null }
     var togglePause: () -> Boolean = { false }
@@ -109,10 +110,12 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     fun working(step: Int, detail: String) = onMain {
         ensure()
         stage?.mood(HandsStage.Mood.WORKING)
+        togglePreview?.visibility = View.VISIBLE
         pauseButton?.isEnabled = true
         ring?.turning(!paused)
-        bars?.visibility = View.VISIBLE
-        titleView?.text = context.getString(R.string.nm_hands_step, step)
+        bars?.visibility = if (paused) View.GONE else View.VISIBLE
+        workingTitle = context.getString(R.string.nm_hands_step, step)
+        titleView?.text = if (paused) context.getString(R.string.nm_goal_status_paused) else workingTitle
         detailView?.text = detail
         continueBtn?.visibility = View.GONE
         openBtn?.visibility = View.GONE
@@ -143,6 +146,7 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     fun approval(what: String, decidable: Boolean = false) = onMain {
         ensure()
         collapsePreview()
+        togglePreview?.visibility = View.GONE
         pauseButton?.isEnabled = false
         stage?.mood(HandsStage.Mood.WAITING)
         ring?.turning(false)
@@ -353,6 +357,8 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
                     paused = togglePause()
                     pauseButton?.setText(if (paused) R.string.nm_hands_preview_resume else R.string.nm_hands_preview_pause)
                     ring?.turning(!paused)
+                    bars?.visibility = if (paused) View.GONE else View.VISIBLE
+                    titleView?.text = if (paused) context.getString(R.string.nm_goal_status_paused) else workingTitle
                 }
             }
             val show = button(context.getString(R.string.nm_hands_preview_show), ACCENT) {

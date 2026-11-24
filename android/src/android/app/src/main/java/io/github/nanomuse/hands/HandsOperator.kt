@@ -99,6 +99,7 @@ class HandsOperator(private val context: Context) {
     private val backgroundModelJob = if (background) Job() else null
     private lateinit var display: BackgroundHandsDisplay
     private val inspection = HandsInspection()
+    private val inFlightDecision = AtomicReference<Job?>(null)
     private var owner: HandsReplayAccess.Ticket? = null
 
     private fun canInspect(): Boolean {
@@ -212,7 +213,9 @@ class HandsOperator(private val context: Context) {
                     IntentFilter(Intent.ACTION_SCREEN_OFF), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
                 listening = true
                 capsule.previewAllowed = ::canInspect
-                capsule.togglePause = inspection::toggle
+                capsule.togglePause = {
+                    inspection.toggle().also { paused -> if (paused) inFlightDecision.get()?.cancel() }
+                }
                 capsule.capturePreview = {
                     if (::display.isInitialized && canInspect()) display.preview() else null
                 }
@@ -293,9 +296,14 @@ class HandsOperator(private val context: Context) {
                     steps--
                     continue
                 }
+                val decisionJob = if (background) Job(backgroundModelJob) else null
+                if (decisionJob != null) {
+                    inFlightDecision.set(decisionJob)
+                    if (!inspection.current(checkNotNull(observation))) decisionJob.cancel()
+                }
                 val reply = try {
                     checkRunning()
-                    runBlocking(calling + (backgroundModelJob ?: EmptyCoroutineContext)) {
+                    runBlocking(calling + (decisionJob ?: EmptyCoroutineContext)) {
                         withTimeout(MODEL_TIMEOUT_MS) {
                             provider.sendMessage(messages, system, maxTokens = 1024, temperature = 0.0, thinkingLevel = ThinkingLevel.OFF).text
                         }
@@ -312,6 +320,9 @@ class HandsOperator(private val context: Context) {
                     steps--
                     Thread.sleep(1500)
                     continue
+                } finally {
+                    inFlightDecision.compareAndSet(decisionJob, null)
+                    decisionJob?.cancel()
                 }
                 val thoughtMs = System.currentTimeMillis() - thinkingFrom
                 checkRunning()
