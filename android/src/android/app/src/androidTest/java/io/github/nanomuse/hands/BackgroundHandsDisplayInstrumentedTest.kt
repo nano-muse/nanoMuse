@@ -18,6 +18,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.ShizukuManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -159,6 +160,7 @@ class BackgroundHandsDisplayInstrumentedTest {
             until("Android did not move the fixture window.") {
                 dialog()?.let { it.id == original.id && Rect().also { r -> it.getBoundsInScreen(r) } != oldBounds } == true
             }
+            assertFalse("An action planned for the old bounds must be discarded.", session.stillObserved())
             // Even a successful fresh preview cannot turn old model coordinates into safe input.
             until("The moved window could not be previewed.") { session.preview()?.let { it.recycle(); true } == true }
             assertThrows(IllegalStateException::class.java) { session.tap(oldBounds.centerX(), oldBounds.centerY(), 60) }

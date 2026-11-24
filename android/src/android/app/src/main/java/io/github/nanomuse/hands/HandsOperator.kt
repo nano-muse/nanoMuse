@@ -247,6 +247,7 @@ class HandsOperator(private val context: Context) {
             var formatErrors = 0
             var blackScreens = 0
             var modelErrors = 0
+            var windowChanges = 0
             // the same action on an unchanged screen: a note at the third, a stop at the sixth
             val watch = HandsLoopWatch()
             var loopNote: String? = null
@@ -346,7 +347,18 @@ class HandsOperator(private val context: Context) {
                         steps--
                         continue
                     }
-                    display.foregroundPackage()
+                    if (!display.stillObserved()) {
+                        // No input has been dispatched for this decision. A same-app dialog
+                        // gets a fresh look, while foreign and protected windows still stop the run.
+                        if (++windowChanges > 2) {
+                            return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_protected)),
+                                steps, runId, lastScreen, traceDir, log, model.label)
+                        }
+                        lastResult = "The target window changed before input. Inspect its current state."
+                        steps--
+                        continue
+                    }
+                    windowChanges = 0
                 }
                 val turn = Turn(turnText, jpeg.bytes, reply)
                 turns += turn
@@ -780,7 +792,7 @@ class HandsOperator(private val context: Context) {
     }
 
     private fun secretField(node: AccessibilityNodeInfo): Boolean {
-        if (node.isPassword) return true
+        if (node.isPassword || BackgroundHandsDisplay.isPasswordInput(node.inputType)) return true
         val hint = listOfNotNull(node.hintText?.toString(), node.contentDescription?.toString()).joinToString(" ")
         return hint.isNotBlank() && TapWords.looksSecret(hint)
     }

@@ -113,6 +113,9 @@ internal class BackgroundHandsDisplay private constructor(
         return listOf(checkNotNull(window.root?.takeIf { it.packageName == pkg && it.windowId == window.id }))
     }
 
+    /** Recheck after inference. A new dialog in the same app needs a new observation. */
+    fun stillObserved() = frameOf(targetWindows().first()) == observation
+
     fun foregroundPackage(): String {
         targetWindows()
         return pkg
