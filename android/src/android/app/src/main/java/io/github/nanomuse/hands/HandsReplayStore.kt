@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.system.Os
 import android.system.OsConstants
 import com.openminis.app.MinisApp
+import io.github.nanomuse.feed.FeedFlow
 import io.github.nanomuse.guard.SessionAccess
 import io.github.nanomuse.sync.ConversationSync
 import io.github.nanomuse.sync.SyncDatabase
@@ -16,7 +17,8 @@ import java.io.File
 
 internal object HandsReplayStore {
     private fun visible(ctx: Context, ticket: HandsReplayAccess.Ticket, session: String): Boolean =
-        HandsReplayAccess.current(ctx, ticket) && !SessionAccess.isProtected(session) && session !in ConversationSync.hidden.value
+        HandsReplayAccess.current(ctx, ticket) && !SessionAccess.isProtected(session) &&
+            session !in ConversationSync.hidden.value && session !in FeedFlow.hidden.value
 
     private suspend fun eligible(ctx: Context, ticket: HandsReplayAccess.Ticket, session: String): Boolean {
         if (!visible(ctx, ticket, session)) return false

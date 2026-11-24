@@ -67,7 +67,7 @@ internal fun HandsReplayScreen(onBack: () -> Unit) {
     }
     key(scope, protected, hidden) {
         val chats by remember(sessionRepo) {
-            sessionRepo.dao.observeSessions().map { rows -> rows.associate { it.id to it.title } }.distinctUntilChanged()
+            sessionRepo.observeSessions().map { rows -> rows.associate { it.id to it.title } }.distinctUntilChanged()
         }.collectAsState(initial = emptyMap())
         val active by Hands.active.collectAsState()
         val allowed = remember(chats, protected, hidden) { chats.filterKeys { it !in protected && it !in hidden } }
