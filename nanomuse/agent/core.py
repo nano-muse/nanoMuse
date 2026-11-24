@@ -16,6 +16,8 @@ from nanomuse.agent.context import fit_context
 from nanomuse.calendar import CalendarFeeds
 from nanomuse.config import Settings
 from nanomuse.contacts import ContactBook
+from nanomuse.cost import recording as cost_recording
+from nanomuse.cost.recording import TaskCostRecorder
 from nanomuse.goals import GoalStore
 from nanomuse.llm import budget as task_budget
 from nanomuse.llm import session as llm_session
@@ -76,6 +78,7 @@ class MuseAgent:
         skills: SkillLibrary | None = None,
         session_file: Path | None = None,
         conversation_id: str | None = None,
+        cost_recorder: TaskCostRecorder | None = None,
     ):
         self.settings = settings
         self.llm = llm
@@ -89,6 +92,11 @@ class MuseAgent:
         self.contacts = contacts
         self.skills = skills
         self.session_file = session_file
+        # The cost recorder of the app this agent belongs to, when the
+        # app built one.  It is the only recorder this agent feeds or
+        # is gated by; without one the agent falls back to the recorder
+        # installed in nanomuse.cost.recording, if any.
+        self.cost_recorder = cost_recorder
         # The conversation (thread) this agent is; approvals "for this conversation" are
         # bound to it and last as long as it does. Without one, each run stands alone.
         self.conversation_id = conversation_id
@@ -455,6 +463,13 @@ class MuseAgent:
     ) -> str:
         if self.state == AgentState.RUNNING:
             raise RuntimeError("agent is already running")
+        # The cost gate's hard mode refuses here, before any work or spend;
+        # a no-op unless this agent's recorder (or, for an agent built
+        # without one, the fallback recorder) has a hard gate.
+        if self.cost_recorder is not None:
+            self.cost_recorder.preflight()
+        else:
+            cost_recording.preflight()
         token = task_budget.begin(self.settings.agent.budget, inherit=False)
         budget = task_budget.current()
         assert budget is not None
@@ -483,6 +498,38 @@ class MuseAgent:
         finally:
             try:
                 self.last_budget = budget.snapshot()
+                # Feed the cost ledger from the real run; bookkeeping only, so a
+                # ledger failure never reaches the finished task.
+                try:
+                    # The ledger names the model that ran: the one in
+                    # the llm's own settings.  The client's ``name`` is
+                    # the wrapper's label (the prompt adapter's is
+                    # "prompt_tools"), never a model id, so it is only
+                    # a last resort: pricing by it missed every real
+                    # model and recorded zero costs.  The snapshot's
+                    # per-model split is what the recorder prices when
+                    # nested calls ran on other models; this name is
+                    # the task's own model and the fallback for a
+                    # snapshot without a split.
+                    model = str(
+                        getattr(getattr(self.llm, "settings", None), "model", None)
+                        or self.settings.llm.model
+                        or getattr(self.llm, "name", "")
+                    )
+                    if self.cost_recorder is not None:
+                        self.cost_recorder.record_finished_task(
+                            task_id=self.conversation_id or self.session_id,
+                            model=model,
+                            snapshot=self.last_budget,
+                        )
+                    else:
+                        cost_recording.record_finished_task(
+                            task_id=self.conversation_id or self.session_id,
+                            model=model,
+                            snapshot=self.last_budget,
+                        )
+                except Exception:
+                    logger.exception("cost ledger recording failed")
                 # a line in the audit log when a budget is in force or was reached; a task
                 # with no limits set leaves the log as it was
                 if budget.limited or budget.stopped:

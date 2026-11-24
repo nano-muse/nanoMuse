@@ -16,6 +16,10 @@ from nanomuse.cloud import CLOUD_KEY, DEFAULT_GUI_MODEL, model_url
 from nanomuse.computer.link import ComputerLink
 from nanomuse.config import CHATGPT_PROVIDER, PROTOCOLS, LLMSettings, ReviewSettings, Settings
 from nanomuse.contacts import ContactBook
+from nanomuse.cost.gate import MonthlyBudgetGate
+from nanomuse.cost.ledger import PriceEntry
+from nanomuse.cost.recording import TaskCostRecorder
+from nanomuse.cost.store import PersistentCostLedger
 from nanomuse.goals import GoalStore
 from nanomuse.llm import BaseLLM, catalogue, create_llm
 from nanomuse.llm.catalogue import Provider
@@ -144,6 +148,7 @@ class NanoMuseApp:
                 on_event=getattr(ui, "on_hands", None),
             )
         self.tools = self._build_tools()
+        self.cost_ledger, self.cost_recorder = self._make_cost_recorder(settings)
         self.agent = MuseAgent(
             settings=settings,
             llm=self.llm,
@@ -157,7 +162,37 @@ class NanoMuseApp:
             contacts=self.contacts,
             skills=self.skills,
             session_file=settings.data_dir / "sessions" / f"{self.session_id}.json",
+            cost_recorder=self.cost_recorder,
         )
+
+    @staticmethod
+    def _make_cost_recorder(
+        settings: Settings,
+    ) -> tuple[PersistentCostLedger | None, TaskCostRecorder | None]:
+        """Wire the cost ledger to real runs when the [cost] settings ask for it.
+
+        Needs a monthly budget or at least one price; with neither, no
+        ledger is kept and the agent loop's hooks stay no-ops.  The
+        recorder belongs to this app: it is handed to the agents this
+        app creates and is never installed process-wide, so another
+        app in the same process keeps its own ledger and gate.
+        Returns the ledger so the app can show it, with the recorder.
+        """
+        cost = settings.cost
+        if not cost.monthly_budget_usd and not cost.prices:
+            return None, None
+        prices = {
+            model: PriceEntry(model, p.input_per_million, p.output_per_million)
+            for model, p in cost.prices.items()
+        }
+        ledger = PersistentCostLedger(
+            settings.cost_ledger_file,
+            prices=prices,
+            monthly_budget_usd=cost.monthly_budget_usd or None,
+        )
+        gate = MonthlyBudgetGate(ledger, mode=cost.mode)
+        recorder = TaskCostRecorder(ledger, device_id=cost.device_id or "this-device", gate=gate)
+        return ledger, recorder
 
     def attach_embedder(self) -> None:
         """(Re)build the embedding client from the current settings and give the memory

@@ -49,6 +49,43 @@ def estimate_tokens(messages: list[Message], tools: list[dict[str, Any]] | None 
     return (size + 3) // 4 + (3 * cjk + 1) // 2 + 4096 * sum(len(m.images or []) for m in messages)
 
 
+# Client labels that are not model ids: a wrapper or a protocol name
+# must never be priced as if it were the model that made the call.
+_NOT_A_MODEL = {"", "base", "chatgpt", "openai", "openai_responses", "prompt_tools"}
+
+
+def llm_model(llm: BaseLLM) -> str:
+    """The model one call is actually made with, for cost accounting.
+
+    The client's own settings name it; a wrapper (the prompt adapter,
+    a recording client) delegates to the wrapped client's settings, so
+    unwrapping follows ``inner`` until a settings model or a direct
+    ``model`` attribute is found.  Only then does the client's
+    ``name`` count, and only when it is a model id rather than a
+    wrapper or protocol label: the prompt adapter's name, for
+    example, is never a model.
+    """
+    current: Any = llm
+    seen: set[int] = set()
+    fallback = ""
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        settings = getattr(current, "settings", None)
+        model = getattr(settings, "model", None) if settings is not None else None
+        if model:
+            return str(model)
+        direct = getattr(current, "model", None)
+        if isinstance(direct, str) and direct:
+            return direct
+        if not fallback:
+            name = str(getattr(current, "name", "") or "")
+            if name not in _NOT_A_MODEL:
+                fallback = name
+        inner = getattr(current, "inner", None)
+        current = inner if isinstance(inner, BaseLLM) else None
+    return fallback or "unknown"
+
+
 @dataclass
 class TaskBudget:
     limits: TaskBudgetSettings
@@ -59,6 +96,12 @@ class TaskBudget:
     calls: int = 0
     estimated_calls: int = 0
     stopped: str = ""
+    # Usage split by the model that actually made each call.  A task
+    # is not one model: the parent call and a nested call (a screen
+    # operator on the hands model, a tool's own call on a cheaper
+    # model) share this budget, and pricing the whole task at the
+    # parent's rates misstates both.
+    by_model: dict[str, dict[str, int]] = field(default_factory=dict)
 
     def fail(self, reason: str) -> None:
         self.stopped = reason
@@ -113,11 +156,17 @@ class TaskBudget:
             + outgoing * self.limits.output_usd_per_million
         ) / 1e6
 
-    def record(self, incoming: int, outgoing: int, estimated: bool) -> None:
+    def record(
+        self, incoming: int, outgoing: int, estimated: bool, model: str | None = None
+    ) -> None:
         self.input_tokens += incoming
         self.output_tokens += outgoing
         self.cost_usd += self.price(incoming, outgoing)
         self.estimated_calls += int(estimated)
+        if model is not None:
+            usage = self.by_model.setdefault(model, {"input_tokens": 0, "output_tokens": 0})
+            usage["input_tokens"] += incoming
+            usage["output_tokens"] += outgoing
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -129,6 +178,7 @@ class TaskBudget:
             "estimated_calls": self.estimated_calls,
             "elapsed_seconds": time.monotonic() - self.started,
             "stopped": self.stopped,
+            "by_model": {model: dict(usage) for model, usage in self.by_model.items()},
         }
 
 
@@ -181,17 +231,18 @@ async def ask(llm: BaseLLM, messages: list[Message], **kwargs: Any) -> LLMRespon
         else None
     )
     deadline = asyncio.timeout(max(0, timeout) if timeout is not None else None)
+    model = llm_model(llm)
     try:
         async with deadline:
             response = await llm.ask(messages, **kwargs)
     except TimeoutError:
-        budget.record(incoming, cap, True)
+        budget.record(incoming, cap, True, model=model)
         if deadline.expired():
             budget.fail("time")
         raise
     except BaseException:
         # A failed/aborted stream may already have been billed. Reserve its full cap.
-        budget.record(incoming, cap, True)
+        budget.record(incoming, cap, True, model=model)
         raise
     used_in = _usage(response.usage, "input_tokens", "prompt_tokens")
     used_out = _usage(response.usage, "output_tokens", "completion_tokens")
@@ -199,6 +250,7 @@ async def ask(llm: BaseLLM, messages: list[Message], **kwargs: Any) -> LLMRespon
         used_in if used_in is not None else incoming,
         used_out if used_out is not None else cap,
         used_in is None or used_out is None,
+        model=model,
     )
     return response
 
