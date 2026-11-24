@@ -1046,7 +1046,10 @@ export default class NanomuseCloud extends Service {
             }
             return rows
           },
-          lines: (sessionId) => this.sessionLines(ctx, sessionId),
+          lines: async sessionId => [
+            ...await this.sessionLines(ctx, sessionId),
+            ...(this.ctx.get('nanomuseRooms')?.publicWatchSyncLines?.(sessionId) ?? []),
+          ],
           create: (title, sessionId) => this.createSyncedSession(ctx, title, sessionId),
           rename: async (sessionId, title) => {
             await ctx.sessionController.rename({ sessionId: sessionId as SessionId, title })
@@ -2823,6 +2826,23 @@ export default class NanomuseCloud extends Service {
   syncMainSession(): string {
     const id = this.sync?.state.mainSession ?? ''
     return this.isClearedSession(id) ? '' : id
+  }
+
+  publicWatchSyncAvailable(sessionId: string): boolean {
+    const sync = this.sync, view = sync?.view()
+    return Boolean(sessionId && sync && this.state.account && !this.changingAccount && !this.state.accountTransition &&
+      sync.state.accountId === this.state.account.id && view?.enabled && view.available && !view.paused &&
+      view.mainSession === sessionId && sync.owns(sessionId))
+  }
+
+  async publicWatchSyncActive(sessionId: string): Promise<boolean> {
+    const sync = this.sync
+    return Boolean(sync && this.publicWatchSyncAvailable(sessionId) && await sync.active().catch(() => false) &&
+      this.sync === sync && this.publicWatchSyncAvailable(sessionId))
+  }
+
+  publicWatchReady(sessionId: string): void {
+    if (this.publicWatchSyncAvailable(sessionId)) this.sync?.publicLineReady(sessionId)
   }
 
   /** How many turns from the account's other devices a session here shows (C8). */

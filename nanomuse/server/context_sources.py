@@ -13,6 +13,7 @@ from typing import Any
 
 from nanomuse.calendar.feeds import CalendarFeeds
 from nanomuse.server.followups import fresh_busy_events
+from nanomuse.server.watch_discovery import WatchCandidate, reference_watches, suggest_watches
 from nanomuse.tools.email_tool import scrub_email_secrets
 from nanomuse.triggers.mail import MailWatcher
 
@@ -25,6 +26,8 @@ class ContextSample:
     text: str
     recorded_at: str = ""
     calendar: str = ""
+    candidates: tuple[WatchCandidate, ...] = ()
+    references: tuple[WatchCandidate, ...] = ()
 
 
 _URL = re.compile(r"\b[a-z][\w+.-]*://\S+", re.I)
@@ -48,7 +51,21 @@ def preview(text: str, limit: int, redact: Callable[[str], str] | None = None) -
     return " ".join(text.split())[:limit].strip()
 
 
-def resource_preview(raw: str) -> str:
+def connected_candidates(
+    text: str, redact: Callable[[str], str] | None = None
+) -> tuple[WatchCandidate, ...]:
+    if _AUTH_MAIL.search(text):
+        return ()
+    clean = scrub_email_secrets(text)
+    return tuple(suggest_watches(redact(clean) if redact else clean, personal=False))
+
+
+def resource_preview(
+    raw: str,
+    *,
+    candidates: list[WatchCandidate] | None = None,
+    references: list[WatchCandidate] | None = None,
+) -> str:
     """Preserve separate entries so a new line does not make an old item look new."""
     try:
         obj = json.loads(raw)
@@ -96,6 +113,17 @@ def resource_preview(raw: str) -> str:
                         rows.append(f"{title} ({key}): {value}" if title else f"{key}: {value}")
                 if title and len(rows) == start:
                     rows.append(title)
+    if candidates is not None:
+        for row in rows[:96]:
+            if len(candidates) >= 4:
+                break
+            candidates.extend(connected_candidates(row)[: 4 - len(candidates)])
+    if references is not None:
+        for row in rows[:96]:
+            if len(references) >= 4:
+                break
+            if not _AUTH_MAIL.search(row):
+                references.extend(reference_watches(row)[: 4 - len(references)])
     lines = [preview(row, 900) for row in rows if row.strip() and not _AUTH_MAIL.search(row)]
     if len(lines) > 96:
         lines = [*lines[:48], *lines[-48:]]
@@ -127,7 +155,19 @@ async def mail_samples(
             f"{state['mailbox']}/{state['validity']}/{mail.uid}".encode()
         ).hexdigest()
         text = f"From: {sender}\nReceived: {mail.date}\nSubject: {title}\n{body}".strip()
-        records.append(ContextSample("mail", key, title or sender, text, mail.date))
+        records.append(
+            ContextSample(
+                "mail",
+                key,
+                title or sender,
+                text,
+                mail.date,
+                candidates=connected_candidates(mail.subject + "\n" + mail.body, redact),
+                references=tuple(
+                    reference_watches((redact or str)(mail.subject + "\n" + mail.body))
+                ),
+            )
+        )
     return records, state
 
 
@@ -144,7 +184,23 @@ def calendar_samples(calendar: CalendarFeeds, now: datetime) -> list[ContextSamp
         detail = preview(event.description, 400, redact)
         key = hashlib.sha256(f"{event.calendar}\n{event.uid}\n{start}".encode()).hexdigest()
         text = f"{start} to {end}: {title}\n{location}\n{detail}".strip()
-        records.append(ContextSample("calendar", key, title, text, calendar=event.calendar))
+        records.append(
+            ContextSample(
+                "calendar",
+                key,
+                title,
+                text,
+                calendar=event.calendar,
+                references=tuple(
+                    reference_watches(
+                        (redact or str)(event.summary + "\n" + (event.description or ""))
+                    )
+                ),
+                candidates=connected_candidates(
+                    event.summary + "\n" + (event.description or ""), redact
+                ),
+            )
+        )
         if len(records) == 12:
             break
     return records

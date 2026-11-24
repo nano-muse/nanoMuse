@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added ongoing public-source follow-ups to desktop and the web runtime. nanoMuse could discover a project, researcher, topic or public feed in context and start a main-chat conversation about a new issue, paper, citation or announcement.
+
 - Enabled main-chat check-ins by default and kept earlier choices to turn them off. The web app offered background review when connecting an inbox, calendar or a new MCP server with one readable resource.
 
 - Added opt-in chat messages about changes in connected sources. The web runtime checked new email, nearby calendar events and selected MCP resources. Desktop checked a selected MCP resource. Android and iPhone compared busy times in selected calendars and offered to help with new overlaps or rescheduled events. These checks could start a conversation about something the person had never mentioned.

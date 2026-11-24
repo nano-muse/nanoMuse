@@ -32,6 +32,9 @@ import type {
   NudgesView,
   ProvidersView,
   PushInfo,
+  PublicSourceKind,
+  PublicWatchChange,
+  PublicWatchView,
   Reminder,
   ReminderKind,
   SettingsView,
@@ -304,6 +307,15 @@ export const api = {
     request<{ ok: boolean }>(`/api/feed/followups/${encodeURIComponent(id)}?choice=${choice}`, { method: "PUT" }),
   setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; chat_followups?: boolean; on_change?: boolean }) =>
     request<FeedPostsData>("/api/feed/instructions", { method: "PUT", body: JSON.stringify(body) }),
+  publicWatches: () => request<PublicWatchView>("/api/feed/watches"),
+  setPublicWatches: (revision: string, enabled: boolean) =>
+    request<PublicWatchView>("/api/feed/watches", { ...json({ revision, enabled }), method: "PUT" }),
+  sharePublicWatchUpdates: (revision: string, share_public_updates: boolean) =>
+    request<PublicWatchView>("/api/feed/watches", { ...json({ revision, share_public_updates }), method: "PUT" }),
+  addPublicWatch: (revision: string, kind: PublicSourceKind, target: string) =>
+    request<PublicWatchView>("/api/feed/watches", json({ revision, kind, target })),
+  changePublicWatch: (id: string, body: PublicWatchChange) =>
+    request<PublicWatchView>(`/api/feed/watches/${encodeURIComponent(id)}`, { ...json(body), method: "PATCH" }),
   contextWatch: () => request<ContextWatchSettings>("/api/feed/context"),
   contextResources: () => request<ContextResource[]>("/api/feed/context/resources"),
   setContextWatch: (body: Pick<ContextWatchSettings, "revision" | "mail" | "calendar" | "local_context"> & { resources: string[] }) =>

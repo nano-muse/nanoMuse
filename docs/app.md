@@ -178,6 +178,21 @@ When you connect your first inbox or calendar in the app, the form selects backg
 While the runtime is online it checks about every ten minutes, including with the browser closed. It compares new mail, the next 24 hours of busy calendar events, and changes to the selected resources. The model sees bounded excerpts and has no tools during the review. It can leave a change unmentioned. The runtime allows four model reviews per day and shares one daytime chat message with other automatic check-ins. Quiet hours and ongoing conversations take precedence. Changing the connected mailbox, calendar configuration or MCP endpoint can require choosing the source again. Automatic messages quoting connected sources stay in this runtime’s chat. Browser notifications show a generic notice. Ordinary replies follow the existing conversation sync settings. MCP servers must advertise concrete readable text resources to appear in the picker.
 
 
+### Following public sources over time
+
+If you tell nanoMuse “I maintain” followed by a GitHub repository link, it can start following new open issues there. You do not need to set a reminder. Two different messages referring to the same repository can suggest a watch. A publication or account mentioned in a connected inbox, calendar or selected MCP resource can also appear as a suggestion. Feed settings shows where the suggestion came from. You can confirm it, pause it or choose *Don’t suggest again*. Public sources are enabled by default for each account. Turning them off stops discovery and checks.
+
+| What you follow | What nanoMuse looks for |
+| --- | --- |
+| A public GitHub repository or account | Newly opened issues in the repository or the account’s public repositories. |
+| An exact ORCID or OpenAlex author ID | New papers, new publications citing one of the author’s 25 most recent works and, when their recent publications consistently share a specific topic, recent papers by other authors in that topic. |
+| A paper DOI or a research topic | Publications citing that paper or matching the topic you chose. A Google Scholar profile appears for confirmation with an author ID or DOI. These checks use OpenAlex and its publication dates. |
+| A public website, RSS or Atom URL | New entries such as exhibition announcements, community events, project releases or service updates. A site can advertise one feed on its own host. If it advertises several, enter the feed you want. |
+
+The first successful read sets a baseline. While the runtime is online, GitHub and feed watches are due every four hours and research watches daily. Busy sources are sampled, so these checks can miss individual items. If the reader is offline it retries later. A change can wait through quiet hours. The same review that handles connected sources decides whether to send a main-chat message and includes the original public link when available. Following a source grants read access only. To receive alerts from Google Scholar itself, its email alerts can go to an inbox you have enabled for review. [Google Scholar alerts](https://scholar.google.com/intl/en/scholar/help.html#alerts)
+
+To see future public-source messages on a phone, sign in to the same account, enable conversation sync and turn on *Sync public updates to my devices* in Feed settings. Only messages reviewed using public evidence are eligible. The online runtime does the checks. Your phone receives the result on its next conversation sync.
+
 The agent does things on its own, but not too many. The *Proactivity* dial in Settings sets how much:
 
 | Level | Passes | Reaches out |
@@ -225,6 +240,8 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | GET | `/api/activity` | audit tail, granted permissions (`grants[]` with `key`, `tool`, `target`, `scope`, `expires_at`), taint flag |
 | GET | `/api/feed?limit=` | *While you were away*: `{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}` newest first |
 | GET | `/api/feed/posts` | the posts written for you: `{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}` |
+| GET / PUT / POST | `/api/feed/watches` | List watches, change preferences or add a public source for this account. Writes require the current revision. |
+| PATCH | `/api/feed/watches/{id}` | Confirm, pause, resume or dismiss a watch. A suggested Scholar profile needs an exact researcher ID or paper DOI. |
 | GET / PUT | `/api/feed/context` | Read or change the selected sources for this account. Updates include the revision returned by GET. |
 | GET | `/api/feed/context/resources` | List concrete text resources advertised by connected MCP servers for the picker. |
 | PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, chat_followups?, on_change?}` | what the posts should be about (≤ 2000 characters), and the daily routine: on or off, and when (`HH:MM`, 08:00 at first) |

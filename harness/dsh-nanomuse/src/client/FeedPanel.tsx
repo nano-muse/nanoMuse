@@ -9,6 +9,7 @@ import { failureText } from './api.ts'
 import { createElement as h, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Translate } from './api.ts'
 import { IconComment, IconCopy, IconFeed, IconHeart, IconRefresh, IconSliders } from './icons.tsx'
+import { PublicWatchSettings } from './PublicWatchSettings.tsx'
 import { FEED_PANEL } from './panels.ts'
 import { setPrefs, usePrefs } from './prefs.ts'
 import { markFeedSeen, nav, roomsCall, useRooms, type FeedPost, type FeedRoutine } from './rooms.ts'
@@ -132,6 +133,7 @@ function PostCard({ t, post, lang, onDiscuss, onFail }: { t: Translate; post: Fe
 }
 
 function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefresh }: { t: Translate; instructions: string; routine: FeedRoutine; busy: boolean; ready: boolean; onClose(): void; onRefresh(): void }): ReactNode {
+  const [watchSettings, setWatchSettings] = useState(false)
   const [text, setText] = useState(instructions)
   const [on, setOn] = useState(routine.on)
   const [reading, setReading] = useState(routine.reading === true)
@@ -180,6 +182,7 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
       routineChanged ? roomsCall('feed/routine', { on, time, reading, ...(checksChanged ? { chatCheckIns: checkIns, checkInScope: routine.checkInScope } : {}) }) : Promise.resolve(undefined),
     ]).then(onClose).catch((err: unknown) => setError(failureText(t, err))).finally(() => setSaving(false))
   }
+  if (watchSettings && routine.checkInScope) return h(PublicWatchSettings, { key: routine.checkInScope, t, scope: routine.checkInScope, checksOn: routine.on && routine.chatCheckIns === true, onClose: () => setWatchSettings(false) })
   return h(Sheet, { title: t('feedSettingsTitle'), closeLabel: t('close'), onClose,
     footer: h('div', { className: 'nm-sheet-actions' },
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy || !ready, onClick: () => { onRefresh(); onClose() } }, h(IconRefresh, { size: 14 }), ' ', t('feedWriteNow')),
@@ -216,6 +219,8 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
       saved && (!selected || saved.generation !== selected.generation) && connection === saved.connection && connections.length > 0
         ? h('p', { className: 'nm-sheet-fine' }, t('feedContextReconnect')) : null,
       h('p', { className: 'nm-sheet-fine' }, t('feedContextAbout')),
+      h('div', null, h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: !routine.checkInScope,
+        onClick: () => setWatchSettings(true) }, t('watchTitle'))),
       !ready ? h('p', { className: 'nm-sheet-fine' }, t('feedRoutineNeedsModel')) : null,
       error ? h('div', { className: 'nm-room-error' }, error) : null))
 }

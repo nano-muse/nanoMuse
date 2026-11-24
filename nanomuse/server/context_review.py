@@ -20,7 +20,11 @@ from nanomuse.server.preparations import Source, fingerprint
 _SYSTEM = """Look after the person's plans. Decide whether one *new external fact* is worth
 interrupting them about now. They need not have mentioned it in chat. For example, a direct
 request in a new mail may need a decision, a project dependency can block an active goal, or a
-venue change may affect a trip already on the calendar. Read the relevant records together.
+venue change may affect a trip already on the calendar. Public watches name the repository,
+work, author, topic or feed the person follows. A new issue may need a maintainer's decision.
+A citing paper or a closely related result may change what to read or try next. A feed update
+may change plans. Skip routine issues, loose topic matches and undifferentiated announcements.
+Read the relevant records together.
 Pick the most useful change. A single specific new fact may suffice. Cite another record only
 if it helps explain what this means for this person. For a conflict cite both actual constraints.
 
@@ -33,13 +37,14 @@ Compare dates against local_time, and heed later corrections or requests to leav
 
 Return null for silence. Otherwise return exactly this JSON object:
 {"reason":"needs_reply","evidence":[{"id":"...","quote":"..."}]}
-Other allowed reasons are change_of_plans, blocker, scheduling_conflict, preparation. The
-first citation must be from the new sentences in a changed mail, calendar or MCP record.
+Other allowed reasons are change_of_plans, blocker, scheduling_conflict, preparation, triage_issue, read_research, review_update. The
+first citation must be from the new sentences in a changed mail, calendar, MCP or public watch record.
 Quote the concrete new fact verbatim, with enough context to identify the matter, preferably
 a complete short sentence from the body. Never cite mail transport headers or the subject alone.
 Up to two other records can supply short verbatim evidence. Do not write the message yourself."""
 
 _LABELS = {
+    "public_watch": ("A source you follow", "你关注的公开来源"),
     "mail": ("Your email", "邮件"),
     "calendar": ("Your calendar", "日历"),
     "mcp": ("Your connected resource", "已接入的资源"),
@@ -48,8 +53,14 @@ _LABELS = {
     "memory": ("Your saved note", "你保存的笔记"),
     "profile": ("Your preferences", "你的偏好"),
 }
-_EXTERNAL = {"mail", "calendar", "mcp"}
+_EXTERNAL = {"mail", "calendar", "mcp", "public_watch"}
 _QUESTIONS = {
+    "triage_issue": ("Would you like me to help triage this issue?", "要我帮你梳理这个 issue 吗？"),
+    "read_research": ("Would you like me to look into this paper?", "要我帮你看看这篇论文吗？"),
+    "review_update": (
+        "Shall we look at what this changes for you?",
+        "要一起看看这会影响你的哪些安排吗？",
+    ),
     "needs_reply": ("Would you like me to draft a reply?", "要我帮你起草回复吗？"),
     "change_of_plans": (
         "Shall we check what needs to change in your plans?",
@@ -197,6 +208,8 @@ async def review(
             "changed": k in fresh,
             "text": s.text[:_MAX_TEXT],
         }
+        if s.kind == "public_watch":
+            row["following"] = s.label[:160]
         if k in fresh:
             row["new_sentences"] = [line[:270] for line in fresh[k]]
         shown[k] = [
@@ -258,7 +271,7 @@ async def review(
         label = _LABELS[eligible[k].kind][int(zh)]
         source = eligible[k]
         if (
-            source.kind in ("mail", "mcp")
+            source.kind in ("mail", "mcp", "public_watch")
             and source.label
             and not (
                 _LINK.search(source.label)

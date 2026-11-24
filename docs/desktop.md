@@ -40,6 +40,12 @@ Levea is listed under **Design** in Connectors. Connect with its OAuth sign-in t
 
 On Linux and macOS, **Settings → General → About** shows the installed version and the latest published release. A local test build can be newer than the published release.
 
+## Following public sources
+
+In Feed settings, *Public sources* lists accounts, projects, researchers, topics and websites nanoMuse can check for you. For example, mentioning a repository you maintain can start a watch for issues there. Repeated references can suggest a source for confirmation. A site can advertise its own RSS or Atom feed. You can follow, pause or dismiss individual sources. The first read establishes a baseline. With desktop running, daily preparation and chat check-ins enabled, a relevant new item can start a conversation in your main chat. Read the [source coverage](app.md#following-public-sources-over-time) for the research identifiers, polling intervals and limits.
+
+To also see these updates on your phone, turn on conversation sync for both devices and enable sharing of public updates in this computer’s Feed settings. Future messages based only on public evidence can then appear in the main chat of the same account.
+
 ## Updating on Windows
 
 The Windows x64 app checks for a newer stable release after starting and every six

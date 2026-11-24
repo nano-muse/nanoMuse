@@ -166,6 +166,21 @@ nanoMuse 默认会在主要聊天里跟进你提过的待回复事项。在动�
 运行时在线时大约每十分钟检查一次，浏览器可以关闭。检查范围是新到邮件、未来 24 小时内占用时间的日程和所选资源的变化。模型只读有限的摘录，判断时不会调用工具。每天最多四次模型判断，与原有聊天跟进合计最多发一条主动消息，避开免打扰时段和正在进行的对话。更换邮箱、日历配置或 MCP 连接后，可能需要重新选择。自动引用来源的消息保存在当前运行时的聊天里，浏览器通知只提示有新消息。之后的普通对话沿用已有的同步设置。只有提供可读文本资源的 MCP 服务才会出现在选择列表。
 
 
+### 长期关注公开来源
+
+如果你说「我维护的项目是」并给出 GitHub 仓库链接，nanoMuse 就能开始关注仓库的新 issue，无需再设提醒。在不同消息里多次提到同一个仓库，会产生一条待确认的建议。已允许跟进的邮箱、日历或 MCP 资源也能提供线索。动态设置会说明建议的来由，你可以确认、暂停，或选「不再建议」。每个账号默认开启公开来源跟进，关闭后就停止发现和检查。
+
+| 关注对象 | 检查内容 |
+| --- | --- |
+| 公开 GitHub 仓库或账号 | 单个仓库或该账号名下公开仓库里新开且仍未关闭的 issue。 |
+| 有 ORCID 或 OpenAlex ID 的作者 | 新发表的论文、引用其最近 25 篇作品的新论文。如果作者近期持续发表在同一个细分主题下，还会找其他作者在该主题上刚发表的论文。 |
+| 论文 DOI 或研究方向 | 查找引用该论文的新发表作品，或匹配指定方向的论文。遇到 Google 学术主页，会请你用准确的作者 ID 或论文 DOI 确认。数据和发表日期来自 OpenAlex。 |
+| 网站、RSS 或 Atom 地址 | 检查新条目，例如展览开放报名、社区活动、软件版本或服务公告。网站在主页声明了唯一的同站订阅源时，填主页就可以。声明了多个时，可以直接填想关注的订阅源地址。 |
+
+首次成功读取只记下起点。运行时在线期间，GitHub 和订阅源每四小时到期检查，学术来源每天检查。每次读取的条数有限，更新密集时可能漏掉个别条目。遇到断网会稍后重试；免打扰期间，值得提醒的变化可以留到白天。新条目沿用已接入信息源的判断和主要聊天投递流程，提醒中会附上可用的原始链接。关注本身只会读取公开资料。如果需要 Google 学术自己的收录结果，可把它的邮件提醒发到已允许跟进的邮箱。[Google 学术邮件提醒](https://scholar.google.com/intl/en/scholar/help.html#alerts)
+
+如果希望手机也能收到，在同一账号开启对话同步，再到动态设置打开「将公开动态同步到我的设备」。只有完全依据公开资料判断的新提醒可以同步。检查由在线的运行时执行，手机下次同步对话时会在主要聊天里看到消息。
+
 设置中的「主动性」决定智能体主动推进任务和通知你的频率：
 
 | 档位 | 执行频率 | 何时通知 |
@@ -213,6 +228,8 @@ nanoMuse 默认会在主要聊天里跟进你提过的待回复事项。在动�
 | GET | `/api/activity` | 返回最新审计记录、已授予的 `grants[]`，各项含 `key`、`tool`、`target`、`scope`、`expires_at`，以及对话污染标记。 |
 | GET | `/api/feed?limit=` | 按最新在前返回「你离开期间」：`{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}`。 |
 | GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}`。 |
+| GET / PUT / POST | `/api/feed/watches` | 查看关注列表、修改偏好或添加公开来源。写入需带当前设置版本。 |
+| PATCH | `/api/feed/watches/{id}` | 确认、暂停、恢复或忽略。确认 Google 学术主页需要作者 ID 或论文 DOI。 |
 | GET / PUT | `/api/feed/context` | 读取或更新当前账号选择的信息源，保存时带上读取到的 revision。 |
 | GET | `/api/feed/context/resources` | 为选择器列出已连接的 MCP 服务提供的具体文本资源。 |
 | PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, chat_followups?, on_change?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |

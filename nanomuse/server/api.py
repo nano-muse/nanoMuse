@@ -147,6 +147,25 @@ class FeedInstructionsBody(BaseModel):
     time: str | None = None
 
 
+class PublicWatchToggle(BaseModel):
+    revision: str
+    enabled: bool | None = None
+    share_public_updates: bool | None = None
+
+
+class PublicWatchAdd(BaseModel):
+    revision: str
+    kind: str = Field(max_length=32)
+    target: str = Field(min_length=1, max_length=512)
+
+
+class PublicWatchAction(BaseModel):
+    revision: str
+    action: str = Field(max_length=16)
+    kind: str = Field("", max_length=32)
+    target: str = Field("", max_length=512)
+
+
 class ContextWatchBody(BaseModel):
     revision: str
     mail: bool
@@ -1942,6 +1961,30 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     @app.get("/api/feed/posts", dependencies=dep)
     async def feed_posts() -> dict[str, Any]:
         return svc.feed_view()
+
+    @app.get("/api/feed/watches", dependencies=dep)
+    async def public_watches() -> dict[str, Any]:
+        return svc.context_watch.watches.view()
+
+    def change_watch(body: BaseModel, watch_id: str = "") -> dict[str, Any]:
+        try:
+            return svc.context_watch.watches.configure(watch_id=watch_id, **body.model_dump())
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.put("/api/feed/watches", dependencies=dep)
+    async def toggle_watches(body: PublicWatchToggle) -> dict[str, Any]:
+        if body.enabled is None and body.share_public_updates is None:
+            raise HTTPException(400, "Choose a setting to change.")
+        return change_watch(body)
+
+    @app.post("/api/feed/watches", dependencies=dep)
+    async def add_watch(body: PublicWatchAdd) -> dict[str, Any]:
+        return change_watch(body)
+
+    @app.patch("/api/feed/watches/{watch_id}", dependencies=dep)
+    async def edit_watch(watch_id: str, body: PublicWatchAction) -> dict[str, Any]:
+        return change_watch(body, watch_id)
 
     @app.get("/api/feed/context", dependencies=dep)
     async def context_watch() -> dict[str, Any]:

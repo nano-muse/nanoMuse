@@ -17,6 +17,7 @@ from nanomuse.private import keep_private
 from nanomuse.server import context_review, context_sources
 from nanomuse.server.events import MAIN_THREAD
 from nanomuse.server.preparations import Source, fingerprint
+from nanomuse.server.public_watches import PublicWatches
 from nanomuse.server.waiting import personal_message
 from nanomuse.triggers import MailWatcher
 
@@ -30,6 +31,7 @@ REVIEWS_PER_DAY = 4
 class ContextWatch:
     def __init__(self, service: MuseService):
         self.service = service
+        self.watches = PublicWatches(self)
         self.task: asyncio.Task[None] | None = None
         self.next_poll = 0.0
         self.listed: dict[str, str] = {}
@@ -271,22 +273,27 @@ class ContextWatch:
         }
 
     async def poll(self, now: datetime | None = None) -> None:
-        """Only digests and the IMAP cursor survive a poll. A failed review retries its inputs."""
+        """Read changes, then use one shared review and chat budget for every source."""
         svc = self.service
         scope = self.service._chat_followup_scope()
         state = self._load(scope)
-        if (
-            not scope
-            or not svc.profile.proactive
-            or not (state.get("mail") or state.get("calendar") or state.get("resources"))
-        ):
+        if not scope or not svc.profile.proactive:
             return
 
         def current_time() -> datetime:
             return now or datetime.now().astimezone()
 
         start = current_time()
-        generation = state["generation"]
+        self.watches.discover(scope, start)
+        if not (
+            state.get("mail")
+            or state.get("calendar")
+            or state.get("resources")
+            or self.watches.has_active(scope)
+        ):
+            return
+        generation = state.get("generation")
+        watch_revision = self.watches.revision(scope)
         epoch = svc.hub.account_epoch
         bindings = self._bindings()
 
@@ -296,6 +303,7 @@ class ContextWatch:
                 and svc.hub.account_epoch == epoch
                 and self._load(scope).get("generation") == generation
                 and self._bindings() == bindings
+                and self.watches.revision(scope) == watch_revision
                 and svc.profile.proactive
             )
 
@@ -340,8 +348,14 @@ class ContextWatch:
         initialized = set(state.get("calendars_initialized", []))
         if fresh_feeds:
             samples.extend(context_sources.calendar_samples(calendars, start))
+        self.watches.observe_connected(scope, samples, start)
+        watch_revision = self.watches.revision(scope)
+        await self.watches.refresh(scope, start)
+        if not current():
+            return
+        public = self.watches.pending(scope, start)
         external: dict[str, Source] = {}
-        changed = set()
+        changed = set(public)
         cal_seen = state.setdefault("calendar_seen", {})
         mcp_seen = state.setdefault("mcp_seen", {})
         facts = {kind: state.setdefault(kind + "_facts", {}) for kind in ("calendar", "mcp")}
@@ -367,6 +381,8 @@ class ContextWatch:
                 cal_seen if s.source == "calendar" else mcp_seen
             ).get(s.key):
                 changed.add(key)
+        # Keep the IMAP batch first so saving its cursor never skips an unseen message.
+        external.update({key: entry[0] for key, entry in public.items()})
         if fresh_feeds:
             state["calendars_initialized"] = sorted(
                 initialized | {fingerprint(n) for n in fresh_feeds}
@@ -396,8 +412,18 @@ class ContextWatch:
         previous = {
             k: facts[src.kind].get(src.key, []) for k, src in external.items() if src.kind in facts
         }
-        local = self._local(start) if state.get("local_context") else {}
-        sources = {**external, **local}
+        # Keep private context outside the entire review that can produce a shared message.
+        # A changed private source takes the normal local-only review, even if a public source
+        # is ultimately the only citation. Never infer sharing permission from a model response.
+        share_token = (
+            self.watches.sharing_token(scope) if changed and changed <= public.keys() else ""
+        )
+        local = self._local(start) if state.get("local_context") and not share_token else {}
+        sources = (
+            {key: value[0] for key, value in public.items()}
+            if share_token
+            else {**external, **local}
+        )
         # The model cites short IDs. Stable source identities and their hashes stay local.
         keys = {f"R{n}": key for n, key in enumerate(sources, 1)}
         state["calls"] = 1 + (state.get("calls", 0) if state.get("budget_day") == today else 0)
@@ -424,6 +450,7 @@ class ContextWatch:
             cited = [keys[label] for label in finding.source_ids]
             # A calendar refresh or local edit can finish while the model is reading.
             live = self._local(end) if local else {}
+            live.update({key: entry[0] for key, entry in self.watches.pending(scope, end).items()})
             if fresh_feeds:
                 for sample in context_sources.calendar_samples(svc.app.calendar, end):
                     live[fingerprint(sample.source, sample.key)] = Source(
@@ -455,9 +482,23 @@ class ContextWatch:
             if finding.fingerprint not in recent and not svc.threads[MAIN_THREAD].timeline.get(
                 event_id
             ):
-                svc._deliver_context_message(event_id, finding.text, end)
+                text = finding.text
+                if cited and cited[0] in public and (url := public[cited[0]][1]):
+                    # The adapter supplies the link. The model only selects an evidence ID.
+                    text += "\n\n" + url
+                shared = (
+                    bool(share_token)
+                    and share_token == self.watches.sharing_token(scope)
+                    and bool(cited)
+                    and all(k in public for k in cited)
+                )
+                svc._deliver_context_message(
+                    event_id, text, end, share_token=share_token if shared else ""
+                )
                 state["last_day"] = today
                 state["sent"] = [finding.fingerprint, *recent][:100]
+        reviewed_public = set(cited) if finding else changed
+        self.watches.consume(scope, {external[k].key for k in reviewed_public if k in public})
         state["cursor"] = cursor
         for k in changed:
             record = external[k]

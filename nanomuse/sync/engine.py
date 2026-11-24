@@ -791,6 +791,7 @@ class ConversationSync:
     def _unsynced(self, thread: Thread, cid: str) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         """(event, wire message) for every user / final assistant text not yet on the relay."""
         out: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        share_token: str | None = None
         for ev in thread.timeline.events:
             kind = ev.get("type")
             if kind not in ("user", "assistant") or ev.get("synced") or ev.get("quiet"):
@@ -799,13 +800,26 @@ class ConversationSync:
             # metadata local on live pushes as well as full-history backfills.
             if ev.get("source") == "connected_context":
                 continue
+            if ev.get("source") == "shared_public_watch":
+                # Revoking sharing (or switching accounts) invalidates unsent public notices,
+                # including a full-history backfill after a later sign-in or re-enablement.
+                if share_token is None:
+                    scope = self.svc._chat_followup_scope()
+                    share_token = self.svc.context_watch.watches.sharing_token(scope)
+                if (
+                    thread.id != MAIN_THREAD
+                    or kind != "assistant"
+                    or not share_token
+                    or ev.get("share_generation") != share_token
+                ):
+                    continue
             if ev.get("via_device"):
                 # written on another device: shown here, never pushed as ours
                 continue
             if kind == "assistant" and not ev.get("final"):
                 continue
             text = str(ev.get("text") or "")
-            attachments = self._attachments(ev)
+            attachments = [] if ev.get("source") == "shared_public_watch" else self._attachments(ev)
             if not text.strip() and not attachments:
                 continue
             mid = str(ev.get("mid") or "")

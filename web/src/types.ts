@@ -844,6 +844,35 @@ export interface FeedPost {
   prompt: string;
 }
 
+export type PublicSourceKind =
+  | "github_repo" | "github_user" | "research_author" | "research_work" | "research_topic" | "feed";
+
+export interface PublicWatch {
+  origin?: "chat" | "recurring" | "connected" | "manual" | null;
+  id: string;
+  kind: PublicSourceKind | "scholar_profile";
+  target: string;
+  label: string;
+  status: "suggested" | "active" | "paused";
+  last_checked: string | null;
+  unavailable: boolean;
+}
+
+export interface PublicWatchView {
+  enabled: boolean;
+  can_share?: boolean;
+  share_public_updates?: boolean;
+  revision: string;
+  watches: PublicWatch[];
+}
+
+export interface PublicWatchChange {
+  revision: string;
+  action: "confirm" | "pause" | "dismiss" | "resume";
+  kind?: PublicSourceKind;
+  target?: string;
+}
+
 export interface ContextResource {
   id: string;
   label: string;

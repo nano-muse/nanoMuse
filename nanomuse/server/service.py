@@ -921,9 +921,9 @@ class MuseService:
                 agent.load_session(session_file)
             except (OSError, ValueError) as exc:
                 logger.warning("could not restore session for {}: {}", thread_id, exc)
-        if any(e.get("source") == "connected_context" for e in timeline.events) or any(
-            m.meta.get("connected_context") for m in agent.messages
-        ):
+        if any(
+            e.get("source") in ("connected_context", "shared_public_watch") for e in timeline.events
+        ) or any(m.meta.get("connected_context") for m in agent.messages):
             agent.sentinel.taint(thread_id)
         thread = Thread(
             id=thread_id,
@@ -1227,7 +1227,11 @@ class MuseService:
                     ),
                     None,
                 )
-                if last and last.get("source") in ("chat_followup", "connected_context"):
+                if last and last.get("source") in (
+                    "chat_followup",
+                    "connected_context",
+                    "shared_public_watch",
+                ):
                     self._remember_chat_followup(thread, last)
             event_data: dict[str, Any] = {"type": "user", "text": text, "thread": thread_id}
             if attachments:
@@ -3087,7 +3091,11 @@ class MuseService:
             (e for e in reversed(main.timeline.events) if e.get("type") in ("assistant", "user")),
             None,
         )
-        if not last or last.get("source") in ("chat_followup", "connected_context"):
+        if not last or last.get("source") in (
+            "chat_followup",
+            "connected_context",
+            "shared_public_watch",
+        ):
             return  # Give the person a chance to answer before asking another question.
         stamp = _parse_when(last.get("ts"))
         if stamp is None or now - stamp < timedelta(minutes=10):
@@ -3126,8 +3134,15 @@ class MuseService:
         data.setdefault("chat_outreach", {})[self._chat_followup_scope()] = prefs
         self._outreach_push(data, now, bool(chinese))
 
-    def _deliver_context_message(self, event_id: str, text: str, now: datetime) -> None:
-        self._deliver_outreach(text, now, event_id, source="connected_context")
+    def _deliver_context_message(
+        self, event_id: str, text: str, now: datetime, *, share_token: str = ""
+    ) -> None:
+        if share_token:
+            self._deliver_outreach(
+                text, now, event_id, source="shared_public_watch", share_generation=share_token
+            )
+        else:
+            self._deliver_outreach(text, now, event_id, source="connected_context")
         self._outreach_push(self.feed_posts(), now, bool(re.search(r"[一-鿿]", text)))
 
     def _deliver_outreach(self, text: str, now: datetime, event_id: str, **details: str) -> None:
@@ -3177,7 +3192,7 @@ class MuseService:
         if any(m.meta.get("outreach_event") == event["id"] for m in thread.agent.messages):
             return
         question = Message.assistant(event["text"])
-        if event.get("source") == "connected_context":
+        if event.get("source") in ("connected_context", "shared_public_watch"):
             thread.agent.sentinel.taint(thread.id)
             question.meta["connected_context"] = True
             question.content = (

@@ -32,7 +32,9 @@ import { DEFAULT_NUDGES, dueAsk, LEDGER_EMPTY, NUDGES_EVERY_MS, NUDGES_ORIGIN, N
 import { noteCommitment, draftDelivered, dueSoon, canCheckIn, commitmentText, type ChatCommitments } from './chat-commitments.ts'
 import { asksForDraft, canPrepare, currentFeedGoals, contextKey, parsePreparation, preparationRequest, preparationSources, type Preparation, type Source } from './feed-preparation.ts'
 import { followUpText, localDateKey, nextGoalFollowUp, validGoalDate, type GoalFollowUpReason } from './goal-follow-up.ts'
-import { changeMessage, changeRequest, matchingGoals, type ResourceChoice, type ResourceWatch } from './context-resource.ts'
+import { pendingChanges, runWatchWorker, watchView, type DiscoveryInput, type PublicLedger } from './public-watches.ts'
+import { changeMessage, changeRequest, matchingGoals, privateLine, type ResourceChoice, type ResourceWatch } from './context-resource.ts'
+import type { SessionLine } from './sync.ts'
 import type {} from './connectors.ts'
 import { homeDir, homeWorkspace } from './home.ts'
 import { packageAssetsDir } from './profile.ts'
@@ -333,10 +335,14 @@ interface ChatCheckIn {
   at: number
   commitmentAt?: number
   external?: boolean
+  /** Only a public-only review can create this distinct copy for another device. */
+  publicShare?: { grant: string; watchId: string; text: string }
   text: string
   unread: boolean
 }
 interface CheckInMailbox {
+  publicWatches?: PublicLedger
+  publicReviews?: { day: string; count: number }
   allowNewResource?: boolean
   /** Missing follows the default, zero is an explicit opt-out. */
   enabledSince?: number
@@ -521,6 +527,11 @@ export default class NanomuseRooms extends Service {
   private followUpNeedsSave = false
   private unpublishedCheckIn: string | undefined
   private publishingCheckIn: Promise<void> | undefined
+  private watchEpoch = randomBytes(12).toString('hex')
+  private watchPoll: AbortController | undefined
+  private watchEdit: AbortController | undefined
+  private watchObservedAt = 0
+  private watchInputs: Array<DiscoveryInput & { current: () => boolean }> = []
   private newResourceRevision = 0
   private resourceAbort: AbortController | undefined
   private resourceChoiceAbort: AbortController | undefined
@@ -566,6 +577,7 @@ export default class NanomuseRooms extends Service {
       const owner = this.ctx.nanomuseCloud.feedOwner
       if (owner !== feedOwner) {
         feedOwner = owner
+        this.resetWatchWork()
         this.newResourceRevision++
         this.resourceAbort?.abort()
         this.resourceChoiceAbort?.abort()
@@ -578,6 +590,7 @@ export default class NanomuseRooms extends Service {
     this.timer = setInterval(() => void this.tick().catch((error: unknown) => this.warn('tick', error)), CHECK_EVERY_MS)
     const first = setTimeout(() => void this.tick().catch((error: unknown) => this.warn('tick', error)), FIRST_CHECK_MS)
     this.ctx.effect(() => () => {
+      this.resetWatchWork()
       if (this.timer) clearInterval(this.timer)
       clearTimeout(first)
       this.resourceAbort?.abort()
@@ -867,6 +880,7 @@ export default class NanomuseRooms extends Service {
   /** Remove task records once sync has durably blocked the corresponding sessions. */
   async clearActivity(ids: string[]): Promise<void> {
     const cleared = new Set(ids)
+    this.watchPoll?.abort()
     this.store.activity = this.store.activity.filter((record) => !cleared.has(record.sessionId))
     for (const box of Object.values(this.store.mailboxes ?? {})) box.messages = box.messages.filter(m => !cleared.has(m.sessionId))
     const removedGoals = new Set(this.store.goals.filter((goal) => cleared.has(goal.sessionId)).map((goal) => goal.id))
@@ -1033,6 +1047,11 @@ export default class NanomuseRooms extends Service {
               const asked = state.items.find(item => item.at === last.commitmentAt)
               if (asked) state.focus = asked.request
             }
+            if (record.sessionId === this.watchMainSession()) {
+              const access = this.ctx.nanomuseCloud.scheduleSessionAccess(record.sessionId)
+              this.queueWatchInput(textOf(event.data.content), true, createHash('sha256').update(JSON.stringify([record.sessionId, record.turns, record.startedAt])).digest('hex'), () =>
+                owner === this.ctx.nanomuseCloud.feedOwner && record.sessionId === this.watchMainSession() && access(record.sessionId))
+            }
             noteCommitment(state, text.slice(0, 200), at, goal)
             state.turn = record.turns
             record.commitments = state
@@ -1095,6 +1114,10 @@ export default class NanomuseRooms extends Service {
         }
         this.pushStep(record, { at: Date.now(), kind: 'end', name: '', title: '', detail: reason.kind === 'error' ? String(reason.error.message ?? '') : reason.kind, result: '', callId: '' })
         this.activityChanged(record, true)
+        if (this.watchInputs.length && record.sessionId === this.watchMainSession() && Date.now() - this.watchObservedAt >= 60_000) {
+          this.watchObservedAt = Date.now()
+          void this.checkPublicWatches(Date.now(), true).catch(() => this.warn('public source discovery', 'check deferred'))
+        }
         return
       }
       default:
@@ -1237,6 +1260,7 @@ export default class NanomuseRooms extends Service {
 
   /** Muse's "reset": memory, rooms and the local profile go, the account signs out; the chats stay (dsh's). */
   async resetData(): Promise<void> {
+    this.resetWatchWork()
     for (const goal of this.store.goals) this.goalBySession.delete(goal.sessionId)
     this.store = { ...structuredClone(EMPTY), lang: this.store.lang }
     this.automations = {}
@@ -2176,10 +2200,29 @@ export default class NanomuseRooms extends Service {
     return box.messages.filter(m => m.id !== this.unpublishedCheckIn && (!sessionId || m.sessionId === sessionId) && access(m.sessionId))
   }
 
+  /** Supply a separate public-only wire message. No private check-in text or context is exported. */
+  publicWatchSyncLines(session: string): SessionLine[] {
+    const cloud = this.ctx.nanomuseCloud
+    const box = this.checkInMailbox(), ledger = box?.publicWatches
+    if (!box || !ledger?.share_generation || session !== cloud.syncMainSession() ||
+        !cloud.publicWatchSyncAvailable(session)) return []
+    const permitted = (msg: ChatCheckIn) => {
+      const share = msg.publicShare, current = this.checkInMailbox()?.publicWatches
+      return Boolean(!this.watchEdit && msg.id !== this.unpublishedCheckIn && share && box === this.checkInMailbox() &&
+        msg.sessionId === session && current?.enabled !== false && current?.share_public_updates &&
+        current.share_generation === share.grant && current.watches?.[share.watchId]?.status === 'active' &&
+        cloud.publicWatchSyncAvailable(session) && cloud.scheduleSessionAccess('nanomuse-feed')(session))
+    }
+    return box.messages.flatMap(msg => msg.publicShare && permitted(msg)
+      ? [{ id: msg.id, role: 'assistant' as const, text: msg.publicShare.text, at: msg.at, authorized: () => permitted(msg) }] : [])
+  }
+
   private persistChatCheckIn(): Promise<void> {
     // A failed write can be retried without exposing two messages or losing the daily limit.
     return this.publishingCheckIn ??= this.save(true, true).then(() => {
+      const msg = this.checkInMailbox()?.messages.find(m => m.id === this.unpublishedCheckIn)
       this.unpublishedCheckIn = undefined
+      if (msg?.publicShare) this.ctx.nanomuseCloud.publicWatchReady(msg.sessionId)
       this.broadcast()
     }).finally(() => { this.publishingCheckIn = undefined })
   }
@@ -2237,6 +2280,7 @@ You planned this for today. Would you like help preparing the next step?`
     if (!owner || scope !== this.checkInScope()) throw new RelayError(409, 'account_changed', 'Reopen Feed settings.')
     const access = this.ctx.nanomuseCloud.scheduleSessionAccess('nanomuse-feed')
     if (save) {
+      this.watchPoll?.abort()
       if (!offer) this.newResourceRevision++
       this.resourceAbort?.abort(); this.resourceChoiceAbort?.abort()
     }
@@ -2301,6 +2345,10 @@ You planned this for today. Would you like help preparing the next step?`
       if (!permitted()) return
       const sample = await read()
       if (!sample || !permitted() || !eligible(Date.now())) return
+      for (const text of sample.references ?? []) {
+        this.queueWatchInput(text, false, '', () => box === this.checkInMailbox() && watch === box.resource &&
+          this.resourceConnections().some(c => c.id === watch.connection && c.generation === watch.generation))
+      }
       const seen = new Set(watch.seen)
       const freshLines = sample.lines.filter((_, i) => !seen.has(sample.signatures[i]!))
       const changed = freshLines.slice(0, 24)
@@ -2339,8 +2387,156 @@ You planned this for today. Would you like help preparing the next step?`
     }
   }
 
+  private resetWatchWork(): void {
+    this.watchEpoch = randomBytes(12).toString('hex')
+    this.watchPoll?.abort()
+    this.watchEdit?.abort()
+    this.watchInputs = []
+  }
+
+  private watchMainSession(): string {
+    const cloud = this.ctx.nanomuseCloud
+    return cloud.syncMainSession?.() || (cloud.feedOwner === 'local' ? this.firstRun.sessionId ?? '' : '')
+  }
+
+  private queueWatchInput(text: string, personal: boolean, turn: string, current: () => boolean): void {
+    const box = this.checkInMailbox()
+    if (!this.store.feed.routine.on || box?.enabledSince === 0 || box?.publicWatches?.enabled === false ||
+        !current() || !text || !/https?:|github|openalex|orcid|scholar|research|papers?|10\.\d{4,}|长期|引用|研究|论文|订阅|学术/iu.test(text)) return
+    // Preserve quoted blocks and whole sentences for the shared offline recogniser.
+    if (text.length > 6000) text = text.slice(0, Math.max(0, text.lastIndexOf('\n', 6000)))
+    if (!text.trim() || this.watchInputs.some(input => input.text === text && input.personal === personal && input.turn === turn && input.current())) return
+    this.watchInputs.push({ text, personal, turn, at: Date.now(), current })
+    this.watchInputs = this.watchInputs.slice(-16)
+  }
+
+  private async publicWatchSettings(body: Record<string, unknown>) {
+    const scope = this.checkInScope()
+    const cloud = this.ctx.nanomuseCloud, owner = cloud.feedOwner
+    const stale = () => new RelayError(409, 'account_changed', 'Reopen Feed settings.')
+    if (!owner || !scope || body.scope !== scope) throw stale()
+    const box = this.ensureMailbox(owner)
+    const state = box.publicWatches
+    const view = watchView(state ?? {}, scope, this.watchEpoch, owner.startsWith('account:'))
+    if (Object.keys(body).every(k => k === 'scope')) return view
+    if (body.revision !== view.revision || this.watchEdit || (body.share_public_updates === true && !view.can_share)) throw stale()
+    const edit: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(body)) {
+      if (key === 'scope' || key === 'revision') continue
+      if (!['enabled', 'share_public_updates', 'kind', 'target', 'action', 'id'].includes(key)) throw stale()
+      edit[key === 'id' ? 'watch_id' : key] = value
+    }
+    this.watchPoll?.abort()
+    const abort = new AbortController()
+    this.watchEdit = abort
+    const access = cloud.scheduleSessionAccess('nanomuse-feed')
+    try {
+      const next = await this.watchWorker(state ?? {}, { op: 'edit', edit }, abort.signal)
+      if (abort.signal.aborted || box !== this.checkInMailbox() || state !== box.publicWatches || !access('nanomuse-feed')) throw stale()
+      box.publicWatches = next
+      if (typeof edit.enabled === 'boolean') this.watchInputs = []
+      try { await this.save(true, true) } catch (error) {
+        if (state) box.publicWatches = state
+        else delete box.publicWatches
+        throw error
+      }
+      if (abort.signal.aborted || box !== this.checkInMailbox() || !access('nanomuse-feed')) throw stale()
+      return watchView(next, scope, this.watchEpoch, owner.startsWith('account:'))
+    } finally { if (this.watchEdit === abort) this.watchEdit = undefined }
+  }
+
+  private watchWorker = runWatchWorker
+
+  private async checkPublicWatches(now: number, observeOnly = false): Promise<void> {
+    const cloud = this.ctx.nanomuseCloud, owner = cloud.feedOwner
+    if (!owner || !this.store.feed.routine.on || this.watchPoll || this.watchEdit || this.unpublishedCheckIn) return
+    const box = this.ensureMailbox(owner)
+    const state = box.publicWatches
+    if (state?.enabled === false || box.enabledSince === 0) return
+    const inputs = this.watchInputs.filter(input => input.at >= now - 30 * 86_400_000 && input.at <= now && input.current())
+    const due = !observeOnly && Object.values(state?.watches ?? {}).some(row => row.status === 'active' && (row.next ?? 0) * 1000 <= now)
+    const existing = pendingChanges(state ?? {}, now)
+    if (!inputs.length && !due && (observeOnly || !existing.length)) return
+    const abort = new AbortController()
+    this.watchPoll = abort
+    const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(105_000)])
+    const access = cloud.scheduleSessionAccess('nanomuse-feed')
+    const current = () => !signal.aborted && box === this.checkInMailbox() && this.store.feed.routine.on &&
+      box.publicWatches?.enabled !== false && box.enabledSince !== 0 && access('nanomuse-feed')
+    try {
+      let next = state
+      if (due || inputs.length) {
+        next = await this.watchWorker(state ?? {}, { op: observeOnly ? 'observe' : 'poll', texts: inputs.map(({ text, personal, turn, at }) => ({ text, personal, turn, at })) }, signal)
+        if (!current() || state !== box.publicWatches || !inputs.every(input => input.current())) return
+        box.publicWatches = next
+        try { await this.save(true, true) } catch (error) {
+          if (box.publicWatches === next) {
+            if (state) box.publicWatches = state
+            else delete box.publicWatches
+          }
+          throw error
+        }
+        this.watchInputs = this.watchInputs.filter(input => !inputs.includes(input))
+      }
+      if (observeOnly || !next || !current()) return
+      const day = localDateKey(now), session = this.watchMainSession()
+      const eligible = (at: number) => {
+        const hour = new Date(at).getHours()
+        const last = this.store.activity.find(r => r.sessionId === session)
+        const registry = this.ctx.get('workspaceRegistry') as RegistryLike | undefined
+        return current() && box.publicWatches === next && hour >= 9 && hour < 20 && localDateKey(at) === day &&
+          box.lastDay < day && session && this.watchMainSession() === session && registry &&
+          !registry.archivedSessionIds.includes(session) && access(session) &&
+          (!last || last.status !== 'running' && last.status !== 'waiting' && last.updatedAt <= at - 15 * 60_000) &&
+          !cloud.hasRemoteReplySince(session, at - 15 * 60_000) && !box.messages.some(m => m.sessionId === session && m.unread)
+      }
+      if (!eligible(Date.now()) || box.publicReviews?.day === day && box.publicReviews.count >= 2) return
+      const pending = pendingChanges(next, Date.now()).filter(item => !privateLine(item.change.text))
+      const row = pending[0]?.row
+      if (!row) return
+      const group = pending.filter(item => item.row === row)
+      const lines = group.map(item => item.change.text)
+      const goalsFor = () => matchingGoals(lines, this.prepSources(Date.now()).filter(s => s.kind === 'goal' &&
+        this.store.activity.some(a => a.sessionId === s.origin && a.requestOwner === owner)))
+      const goals = goalsFor(), lang = this.lang
+      box.publicReviews = { day, count: box.publicReviews?.day === day ? box.publicReviews.count + 1 : 1 }
+      await this.save(true, true)
+      if (!eligible(Date.now())) return
+      const request = changeRequest(lines, goals, now, row)
+      const answer = await cloud.prepareFeed(request.system, request.input, signal)
+      if (!eligible(Date.now()) || lang !== this.lang || goals.map(g => g.id).join() !== goalsFor().map(g => g.id).join()) return
+      const text = changeMessage(answer, row.label, lines, goals, /^zh/i.test(lang), true)
+      const decision = JSON.parse(answer.trim().replace(/^\x60{3}(?:json)?\s*|\s*\x60{3}$/g, ''))
+      if (decision.notify !== false && !text) return
+      const selected = group[Number(decision.line) - 1]
+      const url = selected?.change.url
+      // Check consent and an active sync before making anything shareable. Changes
+      // reviewed alongside a private goal keep only their existing local representation.
+      const shared = text && url && !goals.length && next.share_public_updates && next.share_generation &&
+        cloud.publicWatchSyncAvailable(session) && await cloud.publicWatchSyncActive(session)
+      if (!eligible(Date.now()) || lang !== this.lang || goals.map(g => g.id).join() !== goalsFor().map(g => g.id).join()) return
+      const reviewed = new Set(text && selected ? [selected.key] : group.map(item => item.key))
+      for (const watched of Object.values(next.watches ?? {})) {
+        for (const key of reviewed) if (watched.pending) delete watched.pending[key]
+      }
+      if (!text) { await this.save(true, true); return }
+      const at = Date.now()
+      const msg: ChatCheckIn = { id: newId('context'), sessionId: session, at, text: url ? text + '\n' + url : text, unread: true, external: true }
+      if (shared && selected && next.share_generation) {
+        // The selected reader supplied both fields. Never serialize account context,
+        // the user's topic, the model output or the local message into the sync outbox.
+        msg.publicShare = { grant: next.share_generation, watchId: row.id, text: selected.change.text.replace(/[\\*_`<>|[\]]/g, '\\$&') + '\n' + url }
+      }
+      box.lastDay = day
+      box.messages.push(msg)
+      this.unpublishedCheckIn = msg.id
+      await this.persistChatCheckIn()
+    } finally { if (this.watchPoll === abort) this.watchPoll = undefined }
+  }
+
   private async tick(): Promise<void> {
     await this.checkResource(Date.now()).catch(() => this.warn('connected resource', 'check deferred'))
+    await this.checkPublicWatches(Date.now()).catch(() => this.warn('public sources', 'check deferred'))
     await this.writeChatCheckIn(Date.now())
     await this.writeGoalFollowUp(Date.now())
     const ready = await this.syncReady()
@@ -2381,11 +2577,12 @@ You planned this for today. Would you like help preparing the next step?`
       if (!owner || patch.checkInScope !== this.checkInScope()) throw new RelayError(409, 'account_changed', 'Reopen Feed settings for the current account.')
       const box = this.ensureMailbox(owner)
       this.newResourceRevision++
+      if (!patch.chatCheckIns) { this.watchInputs = []; this.watchPoll?.abort() }
       box.enabledSince = patch.chatCheckIns ? box.enabledSince || Date.now() : 0
     }
     if (typeof patch.on === 'boolean' && routine.on !== patch.on) { routine.on = patch.on; this.newResourceRevision++ }
     if (typeof patch.reading === 'boolean') routine.reading = patch.reading
-    if (!routine.on) this.prepAbort?.abort()
+    if (!routine.on) { this.prepAbort?.abort(); this.watchPoll?.abort(); this.watchInputs = [] }
     if (typeof patch.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.time)) routine.time = patch.time
     this.store.feed.routine = routine
     await this.save()
@@ -2526,6 +2723,8 @@ You planned this for today. Would you like help preparing the next step?`
       // Imports need room for UTF-8 and JSON escaping, including a full batch of memory lines.
       const body = await json(req, route === '/library/import' ? IMPORT_MAX_BYTES * 2 + 4096 : route === '/memory/import' ? 512 * 1024 : undefined)
       switch (route) {
+        case '/feed/public-watches':
+          return send(res, 200, await this.publicWatchSettings(body))
         case '/feed/resource-connections':
           return send(res, 200, this.resourceConnections())
         case '/feed/resource-choices':

@@ -42,6 +42,7 @@ from nanomuse.search import WebSearchProvider
 from nanomuse.server.context_sources import ContextSample, preview, resource_preview
 from nanomuse.server.endpoints import Endpoints
 from nanomuse.server.failures import describe_failure
+from nanomuse.server.watch_discovery import WatchCandidate
 from nanomuse.tools import (
     Calendar,
     Contacts,
@@ -1729,11 +1730,22 @@ class Connections:
                     raw = await reader.read(resource)
                     if raw is None:
                         return None
-                    text = resource_preview(raw)
+                    candidates: list[WatchCandidate] = []
+                    references: list[WatchCandidate] = []
+                    text = resource_preview(
+                        self.svc.app.vault.redact(raw), candidates=candidates, references=references
+                    )
                 except Exception:
                     return None
                 return (
-                    ContextSample("mcp", resource.id, preview(resource.label, 180), text)
+                    ContextSample(
+                        "mcp",
+                        resource.id,
+                        preview(resource.label, 180),
+                        text,
+                        candidates=tuple(candidates),
+                        references=tuple(references),
+                    )
                     if active()
                     else None
                 )
