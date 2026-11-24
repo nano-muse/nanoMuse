@@ -17,6 +17,7 @@ import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.ThinkingLevel
+import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.sandbox.PRootKernel
@@ -37,6 +38,7 @@ import io.github.nanomuse.status.KeepAwake
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -113,7 +115,8 @@ class HandsOperator(private val context: Context) {
         return !stop.get() && HandsReplayAccess.current(context, ticket) &&
             eventSession?.let(SessionAccess::isLocked) != true &&
             !context.getSystemService(KeyguardManager::class.java).isDeviceLocked &&
-            Hands.enabled(context) && Hands.backgroundScreen(context) && Settings.canDrawOverlays(context)
+            Hands.enabled(context) && Hands.backgroundScreen(context) && Settings.canDrawOverlays(context) &&
+            MinisAccessibilityService.getInstance() != null && ShizukuManager.isReady()
     }
     private val capsule = HandsCapsule(context, showStage = !background)
     private var memoryTicket: HandsRunMemory.Ticket? = null
@@ -222,9 +225,19 @@ class HandsOperator(private val context: Context) {
                 // Revoke while a model request or approval is waiting. Coming back to the
                 // same account later cannot revive that run or its last visible frame.
                 accessMonitor = CoroutineScope(Dispatchers.Main.immediate).launch {
-                    combine(AppAccess.locked, SessionAccess.revision, HandsReplayAccess.changes) { appLocked, _, _ ->
-                        appLocked || !canInspect()
-                    }.collect { if (it) requestStop("The screen or account was locked or changed.") }
+                    launch {
+                        combine(AppAccess.locked, SessionAccess.revision, HandsReplayAccess.changes) { appLocked, _, _ ->
+                            appLocked || !canInspect()
+                        }.collect { if (it) requestStop("The screen or account was locked or changed.") }
+                    }
+                    // Android can remove the Stop overlay while the model is awaiting a reply.
+                    // These system permissions do not emit any of the account or lock signals.
+                    while (!stop.get()) {
+                        delay(500L)
+                        if (!canInspect() || MinisAccessibilityService.getInstance() !== svc) {
+                            requestStop("The screen or its controls are no longer available.")
+                        }
+                    }
                 }
                 capsule.previewAllowed = ::canInspect
                 capsule.togglePause = {
@@ -551,7 +564,7 @@ class HandsOperator(private val context: Context) {
                 if (action !is HandsAction.TakeOver) step(runId, steps, actionWord(action), if (lastResult?.contains("rejected by the system") == true) "failed" else "ok", thoughtMs)
             }
             return finish(Outcome.Infeasible("the step limit (${opts.maxSteps}) was reached before the task was done"), steps, runId, lastScreen, traceDir, log, model.label, end = "max_steps")
-        } catch (_: BackgroundHandsDisplay.ProtectedScreen) {
+        } catch (_: BackgroundHandsDisplay.NeedsUser) {
             return finish(Outcome.NeedsUser(context.getString(R.string.nm_hands_background_protected)), steps, runId, lastScreen, traceDir, log, model?.label)
         } catch (s: RunStopped) {
             return finish(Outcome.Stopped(s.message ?: "stopped"), steps, runId, lastScreen, traceDir, log, model?.label)

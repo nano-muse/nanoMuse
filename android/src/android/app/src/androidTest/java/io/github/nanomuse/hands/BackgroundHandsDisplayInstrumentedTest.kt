@@ -215,6 +215,18 @@ class BackgroundHandsDisplayInstrumentedTest {
         }
     }
 
+    @Test fun shadowInsetsWithoutAnExactMappingBlockModelPreviewAndInput() {
+        BackgroundHandsDisplay.open(context, service, fixture).use { session ->
+            observeFixture(session, "Raised window")
+            val button = session.roots().single().findAccessibilityNodeInfosByText("Raised window").single()
+            assertTrue(button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            assertThrows(BackgroundHandsDisplay.UnmappedWindow::class.java) { observeFixture(session, "Move dialog") }
+            SystemClock.sleep(600)
+            assertNull(session.preview())
+            assertThrows(IllegalStateException::class.java) { session.back() }
+        }
+    }
+
     @Test fun refusesFixtureAlreadyVisibleOnThePrimaryDisplay() {
         val before = context.getSystemService(DisplayManager::class.java).displays.map { it.displayId }.toSet()
         val command = "am start -W --display 0 -n $pkg/io.github.nanomuse.hands.HandsDisplayFixture"

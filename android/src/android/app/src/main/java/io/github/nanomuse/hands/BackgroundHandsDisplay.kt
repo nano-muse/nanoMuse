@@ -97,7 +97,9 @@ internal class BackgroundHandsDisplay private constructor(
     private val viewport: HandsViewport,
     private val checkRunning: () -> Unit,
 ) : AutoCloseable {
-    class ProtectedScreen : IllegalStateException("The background app protects this window.")
+    sealed class NeedsUser(message: String) : IllegalStateException(message)
+    class ProtectedScreen : NeedsUser("The background app protects this window.")
+    class UnmappedWindow(message: String) : NeedsUser(message)
 
     private val display = host.display
     private val id = display.displayId
@@ -233,14 +235,15 @@ internal class BackgroundHandsDisplay private constructor(
     }
 
     private fun isFullFrame(bitmap: Bitmap, bounds: Rect) =
-        bitmap.width == viewport.width && bitmap.height == viewport.height && bounds.left == 0 && bounds.top == 0
+        bitmap.width == viewport.width && bitmap.height == viewport.height && bounds == Rect(0, 0, viewport.width, viewport.height)
 
     private fun compose(bitmap: Bitmap, bounds: Rect, width: Int, height: Int): Bitmap {
         val full = isFullFrame(bitmap, bounds)
         if (full && width == viewport.width && height == viewport.height) return bitmap
-        check(full || (bitmap.width == bounds.width() && bitmap.height == bounds.height()
-            && Rect.intersects(Rect(0, 0, viewport.width, viewport.height), bounds))) {
-            "Window image ${bitmap.width}x${bitmap.height} does not match bounds ${bounds.toShortString()} on ${viewport.width}x${viewport.height}."
+        val exactWindow = bitmap.width == bounds.width() && bitmap.height == bounds.height()
+        if (!full && !(exactWindow && Rect.intersects(Rect(0, 0, viewport.width, viewport.height), bounds))) {
+            throw UnmappedWindow("The window image cannot be mapped to safe touch coordinates. " +
+                "Image ${bitmap.width}x${bitmap.height}, bounds ${bounds.toShortString()}, display ${viewport.width}x${viewport.height}.")
         }
         // During an activity transition the verified window can be translated partly outside
         // the display. Its pixels still map one-to-one to its bounds; Canvas clips the excess.

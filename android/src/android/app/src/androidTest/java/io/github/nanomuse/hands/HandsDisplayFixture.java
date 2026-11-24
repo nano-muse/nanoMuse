@@ -40,14 +40,18 @@ public final class HandsDisplayFixture extends Activity {
         content.addView(view);
         Button dialogButton = new Button(this);
         dialogButton.setText("Moving window");
-        dialogButton.setOnClickListener(v -> showMovingWindow());
+        dialogButton.setOnClickListener(v -> showMovingWindow(false));
         content.addView(dialogButton, new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT));
+        Button shadowButton = new Button(this);
+        shadowButton.setText("Raised window");
+        shadowButton.setOnClickListener(v -> showMovingWindow(true));
+        content.addView(shadowButton, new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.RIGHT));
         setContentView(content);
         // The primary-screen refusal test restores the previous app even if its runner exits.
         if (id == Display.DEFAULT_DISPLAY) view.postDelayed(this::finishAndRemoveTask, 8_000);
     }
 
-    private void showMovingWindow() {
+    private void showMovingWindow(boolean raised) {
         Dialog dialog = new Dialog(this);
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -69,6 +73,9 @@ public final class HandsDisplayFixture extends Activity {
         });
         panel.addView(password);
         dialog.setContentView(panel);
+        // Android computes surface insets from window elevation when it first attaches the decor.
+        dialog.getWindow().setElevation(raised ? 28f : 0f);
+        dialog.getWindow().setWindowAnimations(0);
         dialog.show();
         dialog.getWindow().setLayout(360, 440);
     }
