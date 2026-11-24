@@ -1,7 +1,11 @@
 package io.github.nanomuse.hands
 
 import android.accessibilityservice.AccessibilityService
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Path
@@ -94,6 +98,16 @@ class HandsOperator(private val context: Context) {
     private val background = Hands.backgroundScreen(context)
     private val backgroundModelJob = if (background) Job() else null
     private lateinit var display: BackgroundHandsDisplay
+    private val inspection = HandsInspection()
+    private var owner: HandsReplayAccess.Ticket? = null
+
+    private fun canInspect(): Boolean {
+        val ticket = owner ?: return false
+        return !stop.get() && HandsReplayAccess.current(context, ticket) &&
+            eventSession?.let(io.github.nanomuse.guard.SessionAccess::isLocked) != true &&
+            !context.getSystemService(KeyguardManager::class.java).isDeviceLocked &&
+            Hands.enabled(context) && Hands.backgroundScreen(context) && Settings.canDrawOverlays(context)
+    }
     private val capsule = HandsCapsule(context, showStage = !background)
     private var memoryTicket: HandsRunMemory.Ticket? = null
     private var memoryTask = ""
@@ -118,6 +132,7 @@ class HandsOperator(private val context: Context) {
     fun requestStop(reason: String = "the user tapped Stop") {
         stopReason.compareAndSet(null, reason)
         stop.set(true)
+        if (background) capsule.hide()
         backgroundModelJob?.cancel()
         ownPendingRequest()?.let { RiskGate.decide(it.id, RiskDecision.DENY) }
         userSignal.get()?.countDown()
@@ -130,7 +145,7 @@ class HandsOperator(private val context: Context) {
         if (!Hands.enabled(context) || Hands.backgroundScreen(context) != background) {
             throw RunStopped("The screen operation setting changed.")
         }
-        if (background && !Settings.canDrawOverlays(context)) throw RunStopped("The Stop overlay permission was removed.")
+        if (background && !canInspect()) throw RunStopped("The screen, account or permission changed.")
     }
 
     private fun roots(svc: MinisAccessibilityService): List<AccessibilityNodeInfo> =
@@ -148,7 +163,9 @@ class HandsOperator(private val context: Context) {
         memoryTicket = null
         memoryTask = opts.task
         memoryApp = null
-        val runId = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+        // The suffix separates two launches in the same second, including a restarted process.
+        val runId = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) +
+            "-" + java.util.UUID.randomUUID().toString().take(8)
         val log = mutableListOf<String>()
         // where each model call sits, for the relay (relay 0.31): this run as the trajectory, the
         // step being thought about, and the chat the task came from; one `hands.step` event per
@@ -156,6 +173,7 @@ class HandsOperator(private val context: Context) {
         val where = Provenance.Hands(runId)
         val calling = where + (opts.sessionId?.let { Provenance.Session(it) } ?: EmptyCoroutineContext)
         eventSession = opts.sessionId
+        owner = if (background) HandsReplayAccess.ticket(context) else null
         val traceDir = traceDir(opts.sessionId, runId)
         var lastScreen: String? = null
         var steps = 0
@@ -170,7 +188,13 @@ class HandsOperator(private val context: Context) {
         // and only ours (a shell or browser card of another conversation is not the capsule's to answer)
         capsule.onAllow = { ownPendingRequest()?.let { RiskGate.decide(it.id, RiskDecision.ALLOW_ONCE) } }
         capsule.onDeny = { ownPendingRequest()?.let { RiskGate.decide(it.id, RiskDecision.DENY) } }
-        val started = System.currentTimeMillis()
+        val started = android.os.SystemClock.elapsedRealtime()
+        val screenOff = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_SCREEN_OFF) requestStop("The phone was locked or turned off.")
+            }
+        }
+        var listening = false
         try {
             val svc = MinisAccessibilityService.getInstance()
                 ?: return finish(Outcome.Failed("the accessibility service is not running"), steps, runId, lastScreen, traceDir, log, model?.label)
@@ -183,6 +207,14 @@ class HandsOperator(private val context: Context) {
             if (background) {
                 if (app == null) {
                     return finish(Outcome.Infeasible("Choose one installed app for --app, using its package name or a unique exact app name."), steps, runId, lastScreen, traceDir, log, model.label)
+                }
+                androidx.core.content.ContextCompat.registerReceiver(context, screenOff,
+                    IntentFilter(Intent.ACTION_SCREEN_OFF), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+                listening = true
+                capsule.previewAllowed = ::canInspect
+                capsule.togglePause = inspection::toggle
+                capsule.capturePreview = {
+                    if (::display.isInitialized && canInspect()) display.preview() else null
                 }
                 check(capsule.showBeforeBackgroundRun()) { "The Stop control could not be shown." }
                 checkRunning()
@@ -214,8 +246,13 @@ class HandsOperator(private val context: Context) {
 
             while (opts.maxSteps <= 0 || steps < opts.maxSteps) {
                 checkRunning()
-                if (System.currentTimeMillis() - started > MAX_RUN_MS) {
+                val observation = inspection.observation()
+                if (android.os.SystemClock.elapsedRealtime() - started > MAX_RUN_MS) {
                     return finish(Outcome.Stopped("the run hit its time limit"), steps, runId, lastScreen, traceDir, log, model.label)
+                }
+                if (background && observation == null) {
+                    Thread.sleep(150)
+                    continue
                 }
                 steps++
                 if (!background) KeepAwake.a11yTouched()
@@ -252,6 +289,10 @@ class HandsOperator(private val context: Context) {
                 val messages = buildMessages(turns, turnText, jpeg.bytes)
                 where.step = steps
                 val thinkingFrom = System.currentTimeMillis()
+                if (background && !inspection.current(checkNotNull(observation))) {
+                    steps--
+                    continue
+                }
                 val reply = try {
                     checkRunning()
                     runBlocking(calling + (backgroundModelJob ?: EmptyCoroutineContext)) {
@@ -261,6 +302,10 @@ class HandsOperator(private val context: Context) {
                     }
                 } catch (t: Throwable) {
                     checkRunning()
+                    if (background && !inspection.current(checkNotNull(observation))) {
+                        steps--
+                        continue
+                    }
                     modelErrors++
                     AppLogger.warning(TAG, "model call failed: ${t.message}")
                     if (modelErrors >= 3) return finish(Outcome.Failed("the screen model failed three times: ${t.message}"), steps, runId, lastScreen, traceDir, log, model.label)
@@ -270,7 +315,14 @@ class HandsOperator(private val context: Context) {
                 }
                 val thoughtMs = System.currentTimeMillis() - thinkingFrom
                 checkRunning()
-                if (background) display.foregroundPackage()
+                if (background) {
+                    // A pause during inference invalidates the old screenshot and its decision.
+                    if (!inspection.current(checkNotNull(observation))) {
+                        steps--
+                        continue
+                    }
+                    display.foregroundPackage()
+                }
                 val turn = Turn(turnText, jpeg.bytes, reply)
                 turns += turn
                 val parsed = try {
@@ -282,6 +334,11 @@ class HandsOperator(private val context: Context) {
                     log += "step $steps: unreadable reply"
                     trace(traceDir, steps, "", reply, lastResult, lastScreen)
                     step(runId, steps, "unreadable", "failed", thoughtMs)
+                    continue
+                }
+                if (background && !inspection.current(checkNotNull(observation))) {
+                    turns.removeAt(turns.lastIndex)
+                    steps--
                     continue
                 }
                 formatErrors = 0
@@ -452,6 +509,7 @@ class HandsOperator(private val context: Context) {
             AppLogger.warning(TAG, "run failed: ${t.javaClass.simpleName} ${t.message}")
             return finish(Outcome.Failed("${t.javaClass.simpleName}: ${t.message}"), steps, runId, lastScreen, traceDir, log, model?.label)
         } finally {
+            if (listening) runCatching { context.unregisterReceiver(screenOff) }
             backgroundModelJob?.cancel()
             if (::display.isInitialized) runCatching { display.close() }.onFailure { AppLogger.warning(TAG, "closing background display: ${it.message}") }
             capsule.hide()
@@ -471,6 +529,15 @@ class HandsOperator(private val context: Context) {
             is Outcome.Failed -> "failed"
         }
         step(runId, steps, "end", word, null)
+        if (traceDir != null) runCatching {
+            val target = File(traceDir, "result.json")
+            val temporary = File.createTempFile("result-", ".tmp", traceDir)
+            try {
+                temporary.writeText(JSONObject().put("outcome", word)
+                    .put("mode", if (background) "background" else "foreground").put("steps", steps).toString())
+                temporary.renameTo(target)
+            } finally { temporary.delete() }
+        }
         val summary = when (outcome) {
             is Outcome.Done -> outcome.answer
             is Outcome.NeedsUser -> outcome.question
@@ -778,7 +845,7 @@ class HandsOperator(private val context: Context) {
         val hands = base?.let { File(it, "hands") } ?: return null
         // the person's screen is not kept without bound: older runs keep their trace and last screen
         runCatching { HandsTraces.prune(hands) }
-        return File(hands, runId).apply { mkdirs() }
+        return File(hands, runId).takeIf { it.mkdirs() }
     }
 
     private fun save(dir: File?, step: Int, jpeg: Jpeg, runId: String): String? {

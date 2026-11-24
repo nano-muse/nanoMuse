@@ -531,6 +531,11 @@
     <string name="nm_hands_intro">Para sa mga app na walang API, ginagamit nito ang telepono tulad ng ginagawa mo: isang screenshot, saka mga tap, pag-type at pag-swipe. Nauuna ang mga skill, command at ang browser; ang screen ang huling paraan. Naka-off hanggang i-on mo.</string>
     <string name="nm_hands_switch">Hayaang gamitin ng agent ang screen</string>
     <string name="nm_hands_switch_footer">Habang gumagawa ito, ipinapakita ng isang capsule sa itaas ng screen ang bawat hakbang at isang button na Itigil. Laging sa iyo ang mga login, password at code.</string>
+    <string name="nm_hands_preview_show">Tingnan</string>
+    <string name="nm_hands_preview_hide">Itago</string>
+    <string name="nm_hands_preview_pause">I-pause</string>
+    <string name="nm_hands_preview_resume">Ituloy</string>
+    <string name="nm_hands_preview_wait">Hinihintay ang screen sa background</string>
     <string name="nm_hands_background_screen">Screen sa background</string>
     <string name="nm_hands_background_detail">Gumagamit ang assistant ng isang katugmang app sa hiwalay na screen habang ginagamit mo ang telepono. Hihinto ang gawain kapag kailangan mong pumalit.</string>
     <string name="nm_hands_background_unsupported">Kailangan ng Android 14 o mas bago at teleponong kayang magbukas ng mga app sa pangalawang screen.</string>
@@ -1315,4 +1320,16 @@
     <string name="nm_public_chat">Mula sa pangunahing chat</string>
     <string name="nm_public_recurring">Ilang beses na nabanggit</string>
     <string name="nm_public_connected">Mula sa nakakonektang mapagkukunan</string>
+
+    <string name="nm_hands_replay_title">Kasaysayan ng paggamit ng screen</string>
+    <string name="nm_hands_replay_empty">Wala pang naka-save na paggamit ng screen.</string>
+    <string name="nm_hands_replay_no_steps">Walang naka-save na hakbang para dito.</string>
+    <string name="nm_hands_replay_foreground">Screen ng telepono</string>
+    <string name="nm_hands_replay_unfinished">Hindi natapos</string>
+    <string name="nm_hands_replay_no_image">Walang naka-save na screenshot sa hakbang na ito.</string>
+    <string name="nm_hands_replay_partial">Ipinapakita ang magagamit na bahagi ng tala.</string>
+    <string name="nm_hands_replay_previous">Nakaraan</string>
+    <string name="nm_hands_replay_pause">I-pause</string>
+    <string name="nm_hands_replay_type">Maglagay ng teksto</string>
+    <string name="nm_hands_replay_observed">Sinuri ang screen</string>
 </resources>

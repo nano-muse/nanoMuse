@@ -537,6 +537,11 @@
     <string name="nm_hands_intro">Для приложений без API он пользуется телефоном так же, как вы: снимок экрана, затем нажатия, ввод и свайпы. Сначала навыки, команды и браузер; экран остаётся последним средством. Выключено, пока вы не включите.</string>
     <string name="nm_hands_switch">Разрешить агенту пользоваться экраном</string>
     <string name="nm_hands_switch_footer">Пока он работает, капсула вверху экрана показывает каждый шаг и кнопку «Стоп». Входы, пароли и коды всегда остаются за вами.</string>
+    <string name="nm_hands_preview_show">Экран</string>
+    <string name="nm_hands_preview_hide">Свернуть</string>
+    <string name="nm_hands_preview_pause">Пауза</string>
+    <string name="nm_hands_preview_resume">Продолжить</string>
+    <string name="nm_hands_preview_wait">Ожидание фонового экрана</string>
     <string name="nm_hands_background_screen">Фоновый экран</string>
     <string name="nm_hands_background_detail">Помощник работает с одним совместимым приложением на отдельном экране, пока вы пользуетесь телефоном. Если потребуется ваше участие, задача завершится.</string>
     <string name="nm_hands_background_unsupported">Требуется Android 14 или новее и телефон, который может открывать приложения на дополнительном экране.</string>
@@ -1323,4 +1328,16 @@
     <string name="nm_public_chat">Из основного чата</string>
     <string name="nm_public_recurring">Несколько упоминаний</string>
     <string name="nm_public_connected">Из подключённого источника</string>
+
+    <string name="nm_hands_replay_title">История действий на экране</string>
+    <string name="nm_hands_replay_empty">Сохранённых сеансов пока нет.</string>
+    <string name="nm_hands_replay_no_steps">Для этого сеанса не сохранены шаги.</string>
+    <string name="nm_hands_replay_foreground">Экран телефона</string>
+    <string name="nm_hands_replay_unfinished">Не завершено</string>
+    <string name="nm_hands_replay_no_image">Снимок экрана для этого шага не сохранён.</string>
+    <string name="nm_hands_replay_partial">Показана доступная часть записи.</string>
+    <string name="nm_hands_replay_previous">Назад</string>
+    <string name="nm_hands_replay_pause">Пауза</string>
+    <string name="nm_hands_replay_type">Ввод текста</string>
+    <string name="nm_hands_replay_observed">Просмотр экрана</string>
 </resources>

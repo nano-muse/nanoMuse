@@ -531,6 +531,11 @@
     <string name="nm_hands_intro">Für Apps ohne API nutzt er das Telefon so wie du: ein Screenshot, dann Tippen, Eingeben und Wischen. Skills, Befehle und der Browser kommen zuerst; der Bildschirm ist der letzte Ausweg. Aus, bis du es einschaltest.</string>
     <string name="nm_hands_switch">Den Agenten den Bildschirm nutzen lassen</string>
     <string name="nm_hands_switch_footer">Während er arbeitet, zeigt eine Kapsel oben am Bildschirm jeden Schritt und einen Stopp-Knopf. Logins, Passwörter und Codes bleiben immer dir überlassen.</string>
+    <string name="nm_hands_preview_show">Ansehen</string>
+    <string name="nm_hands_preview_hide">Zuklappen</string>
+    <string name="nm_hands_preview_pause">Pausieren</string>
+    <string name="nm_hands_preview_resume">Fortsetzen</string>
+    <string name="nm_hands_preview_wait">Warte auf den Hintergrundbildschirm</string>
     <string name="nm_hands_background_screen">Hintergrundbildschirm</string>
     <string name="nm_hands_background_detail">Der Assistent bedient eine kompatible App auf einem separaten Bildschirm, während du dein Handy weiter nutzt. Sobald du übernehmen musst, endet die Aufgabe.</string>
     <string name="nm_hands_background_unsupported">Erfordert Android 14 oder neuer und ein Gerät, das Apps auf einem zweiten Bildschirm öffnen kann.</string>
@@ -1315,4 +1320,16 @@
     <string name="nm_public_chat">Aus dem Hauptchat</string>
     <string name="nm_public_recurring">Mehrmals erwähnt</string>
     <string name="nm_public_connected">Aus einer verbundenen Quelle</string>
+
+    <string name="nm_hands_replay_title">Bildschirmverlauf</string>
+    <string name="nm_hands_replay_empty">Noch keine gespeicherten Bildschirmabläufe.</string>
+    <string name="nm_hands_replay_no_steps">Für diesen Ablauf wurden keine Schritte gespeichert.</string>
+    <string name="nm_hands_replay_foreground">Telefonbildschirm</string>
+    <string name="nm_hands_replay_unfinished">Nicht abgeschlossen</string>
+    <string name="nm_hands_replay_no_image">Für diesen Schritt ist kein Bildschirmfoto gespeichert.</string>
+    <string name="nm_hands_replay_partial">Der verfügbare Teil der Aufzeichnung wird angezeigt.</string>
+    <string name="nm_hands_replay_previous">Zurück</string>
+    <string name="nm_hands_replay_pause">Pause</string>
+    <string name="nm_hands_replay_type">Text eingeben</string>
+    <string name="nm_hands_replay_observed">Bildschirm betrachtet</string>
 </resources>

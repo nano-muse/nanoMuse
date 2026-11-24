@@ -195,7 +195,7 @@ nanoMuse se apoya en el trabajo de otros; [THIRD_PARTY_NOTICES.md](../../THIRD_P
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): el agente en el dispositivo sobre el que está construida la app del teléfono, con [proot](https://github.com/nano-muse/proot) y [Alpine Linux](https://alpinelinux.org/) para el sandbox.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): el harness de agentes del que la app de escritorio es un plugin.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): el operador de las manos del escritorio es una adaptación del suyo, y los marcadores del escenario siguen su ScreenMarker.
-- [Mika](https://github.com/wangzan101/Mika), de wangzan101, nos inspiró a usar una pantalla virtual independiente para manejar aplicaciones de Android.
+- [Mika](https://github.com/wangzan101/Mika), de wangzan101, inspiró la pantalla independiente de Android, la vista previa en vivo y la reproducción de los pasos.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): el operador del teléfono, las trazas y las ideas de producto.
 
 ## Aviso

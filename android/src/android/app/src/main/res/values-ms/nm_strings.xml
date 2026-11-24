@@ -528,6 +528,11 @@
     <string name="nm_hands_intro">Untuk aplikasi tanpa API, ia menggunakan telefon seperti anda: tangkapan skrin, kemudian ketikan, taipan dan leretan. Kemahiran, perintah dan pelayar didahulukan; skrin ialah pilihan terakhir. Mati sehingga anda menghidupkannya.</string>
     <string name="nm_hands_switch">Benarkan ejen menggunakan skrin</string>
     <string name="nm_hands_switch_footer">Semasa ia bekerja, satu kapsul di bahagian atas skrin menunjukkan setiap langkah dan butang Berhenti. Log masuk, kata laluan dan kod sentiasa diserahkan kepada anda.</string>
+    <string name="nm_hands_preview_show">Lihat skrin</string>
+    <string name="nm_hands_preview_hide">Tutup</string>
+    <string name="nm_hands_preview_pause">Jeda</string>
+    <string name="nm_hands_preview_resume">Sambung</string>
+    <string name="nm_hands_preview_wait">Menunggu skrin latar belakang</string>
     <string name="nm_hands_background_screen">Skrin latar belakang</string>
     <string name="nm_hands_background_detail">Pembantu menggunakan satu aplikasi yang serasi pada skrin berasingan semasa anda terus menggunakan telefon. Tugas berhenti jika anda perlu mengambil alih.</string>
     <string name="nm_hands_background_unsupported">Memerlukan Android 14 atau lebih baharu dan telefon yang boleh membuka aplikasi pada skrin kedua.</string>
@@ -1311,4 +1316,16 @@
     <string name="nm_public_chat">Daripada sembang utama</string>
     <string name="nm_public_recurring">Disebut beberapa kali</string>
     <string name="nm_public_connected">Daripada sumber yang disambungkan</string>
+
+    <string name="nm_hands_replay_title">Sejarah penggunaan skrin</string>
+    <string name="nm_hands_replay_empty">Belum ada sesi skrin yang disimpan.</string>
+    <string name="nm_hands_replay_no_steps">Tiada langkah disimpan untuk sesi ini.</string>
+    <string name="nm_hands_replay_foreground">Skrin telefon</string>
+    <string name="nm_hands_replay_unfinished">Belum selesai</string>
+    <string name="nm_hands_replay_no_image">Tiada tangkapan skrin disimpan untuk langkah ini.</string>
+    <string name="nm_hands_replay_partial">Bahagian rakaman yang tersedia dipaparkan.</string>
+    <string name="nm_hands_replay_previous">Sebelumnya</string>
+    <string name="nm_hands_replay_pause">Jeda</string>
+    <string name="nm_hands_replay_type">Masukkan teks</string>
+    <string name="nm_hands_replay_observed">Skrin diperiksa</string>
 </resources>

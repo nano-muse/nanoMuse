@@ -518,6 +518,11 @@
     <string name="nm_hands_intro">对于没有接口的 App，它像你一样用手机：看一眼截图，然后点、输、滑。技能、命令行、浏览器能办的先用，屏幕是最后一步。默认关闭。</string>
     <string name="nm_hands_switch">允许操作屏幕</string>
     <string name="nm_hands_switch_footer">操作时屏幕顶部会有一个胶囊，显示每一步和「停止」按钮。登录、密码、验证码永远留给你自己输。</string>
+    <string name="nm_hands_preview_show">看画面</string>
+    <string name="nm_hands_preview_hide">收起</string>
+    <string name="nm_hands_preview_pause">暂停</string>
+    <string name="nm_hands_preview_resume">继续</string>
+    <string name="nm_hands_preview_wait">正在等候后台画面</string>
     <string name="nm_hands_background_screen">后台独立屏幕</string>
     <string name="nm_hands_background_detail">让助手在独立屏幕上操作一个兼容的应用，你可以继续使用手机。需要你接手时，任务会停止。</string>
     <string name="nm_hands_background_unsupported">需要 Android 14 或更高版本，且手机支持在副屏打开应用。</string>
@@ -1288,4 +1293,16 @@
     <string name="nm_public_chat">来自主对话</string>
     <string name="nm_public_recurring">在多次对话中提到</string>
     <string name="nm_public_connected">来自已连接的信息源</string>
+
+    <string name="nm_hands_replay_title">屏幕操作记录</string>
+    <string name="nm_hands_replay_empty">还没有已保存的屏幕操作记录。</string>
+    <string name="nm_hands_replay_no_steps">本次操作没有保存步骤。</string>
+    <string name="nm_hands_replay_foreground">手机屏幕</string>
+    <string name="nm_hands_replay_unfinished">未完成</string>
+    <string name="nm_hands_replay_no_image">这一步没有保留截图。</string>
+    <string name="nm_hands_replay_partial">仅显示已读取的部分记录。</string>
+    <string name="nm_hands_replay_previous">上一步</string>
+    <string name="nm_hands_replay_pause">暂停</string>
+    <string name="nm_hands_replay_type">输入文字</string>
+    <string name="nm_hands_replay_observed">查看屏幕</string>
 </resources>

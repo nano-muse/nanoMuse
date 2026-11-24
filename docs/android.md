@@ -719,6 +719,10 @@ Choose the target by its exact package name or unique installed label with `nano
 
 The operator stays in the named app. Home and switching to another app are unavailable. The main screen keeps the Stop capsule and has no tap animation. Notifications, audio and links that open other apps still follow the target app’s and Android’s settings. If the task reaches a protected screen, a password or a step you must handle, the background run ends and you can open the app yourself.
 
+Select **View screen** in the Stop capsule for a small, read-only view of the background app. It refreshes about once a second while expanded. Collapse it to stop capturing preview frames. The virtual screen takes its aspect ratio and density from the phone within a bounded image size. **Pause** lets an action already underway finish. **Resume** takes a new observation before deciding what to do. The Stop button remains available throughout.
+
+In **Settings → Hands → Screen history**, choose a recorded run to play its steps, move between them or see where a tap or swipe occurred. History uses the screenshots already retained with that conversation. Older runs may have only their last picture. The viewer shows the recorded actions for those steps.
+
 ## Continuing screen tasks {#hands-continuity}
 
 When another explicit Hands task names the same resolved app in the same conversation, Android supplies a short note from the preceding run: its task, outcome, result and last eight steps. Notes are kept in memory for at most 30 minutes, with at most 32 conversation/app pairs. They are historical observations, not permission to repeat actions or resume a stopped task; the current task and fresh screenshot take precedence. Runs without a conversation or a resolved app do not reuse notes, and a run that explicitly switches to another app does not save a shared note. Clearing, editing or deleting the conversation, syncing a replacement history, signing out or restarting discards the corresponding notes.

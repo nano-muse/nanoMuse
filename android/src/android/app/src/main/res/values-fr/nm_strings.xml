@@ -532,6 +532,11 @@
     <string name="nm_hands_intro">Pour les apps sans API, il utilise le téléphone comme vous : une capture d’écran, puis des touchers, de la saisie et des balayages. Les compétences, les commandes et le navigateur passent d’abord ; l’écran est le dernier recours. Désactivé tant que vous ne l’activez pas.</string>
     <string name="nm_hands_switch">Laisser l’agent utiliser l’écran</string>
     <string name="nm_hands_switch_footer">Pendant qu’il travaille, une capsule en haut de l’écran montre chaque étape et un bouton Stop. Les connexions, mots de passe et codes vous sont toujours laissés.</string>
+    <string name="nm_hands_preview_show">Voir</string>
+    <string name="nm_hands_preview_hide">Masquer</string>
+    <string name="nm_hands_preview_pause">Pause</string>
+    <string name="nm_hands_preview_resume">Reprendre</string>
+    <string name="nm_hands_preview_wait">En attente de l’écran en arrière-plan</string>
     <string name="nm_hands_background_screen">Écran en arrière-plan</string>
     <string name="nm_hands_background_detail">L’assistant utilise une application compatible sur un écran séparé pendant que vous utilisez votre téléphone. La tâche s’arrête si vous devez intervenir.</string>
     <string name="nm_hands_background_unsupported">Nécessite Android 14 ou une version ultérieure et un téléphone capable d’ouvrir des applications sur un écran secondaire.</string>
@@ -1316,4 +1321,16 @@
     <string name="nm_public_chat">Conversation principale</string>
     <string name="nm_public_recurring">Mentionnée plusieurs fois</string>
     <string name="nm_public_connected">Source connectée</string>
+
+    <string name="nm_hands_replay_title">Historique des actions à l’écran</string>
+    <string name="nm_hands_replay_empty">Aucune session à l’écran enregistrée.</string>
+    <string name="nm_hands_replay_no_steps">Aucune étape enregistrée pour cette session.</string>
+    <string name="nm_hands_replay_foreground">Écran du téléphone</string>
+    <string name="nm_hands_replay_unfinished">Non terminé</string>
+    <string name="nm_hands_replay_no_image">Aucune capture conservée pour cette étape.</string>
+    <string name="nm_hands_replay_partial">Seule la partie disponible de cet enregistrement est affichée.</string>
+    <string name="nm_hands_replay_previous">Précédent</string>
+    <string name="nm_hands_replay_pause">Pause</string>
+    <string name="nm_hands_replay_type">Saisir du texte</string>
+    <string name="nm_hands_replay_observed">Écran observé</string>
 </resources>

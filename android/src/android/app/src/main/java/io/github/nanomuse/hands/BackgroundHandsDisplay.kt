@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Point
 import android.graphics.Rect
@@ -19,16 +20,38 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
 import android.os.SystemClock
+import android.text.InputType
+import android.util.DisplayMetrics
 import android.view.Display
 import android.view.Surface
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.ShizukuManager
+import io.github.nanomuse.guard.TapWords
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.math.roundToInt
+
+/** Pixel dimensions and density are scaled together to preserve the Android app's dp layout. */
+internal data class HandsViewport(val width: Int, val height: Int, val dpi: Int) {
+    companion object {
+        fun fromDisplay(width: Int, height: Int, dpi: Int): HandsViewport {
+            require(width > 0 && height > 0 && dpi > 0) { "The primary display geometry is unavailable." }
+            val scale = minOf(1.0, 720.0 / minOf(width, height), 1600.0 / maxOf(width, height))
+            return HandsViewport((width * scale).roundToInt().coerceAtLeast(1),
+                (height * scale).roundToInt().coerceAtLeast(1), (dpi * scale).roundToInt().coerceIn(72, 640))
+        }
+    }
+
+    private val previewScale get() = minOf(1.0, 320.0 / width, 640.0 / height)
+    val previewWidth get() = (width * previewScale).roundToInt().coerceAtLeast(1)
+    val previewHeight get() = (height * previewScale).roundToInt().coerceAtLeast(1)
+}
 
 /** One run owns one non-mirroring display and a fresh launcher task. */
 internal class BackgroundHandsDisplay private constructor(
@@ -37,19 +60,35 @@ internal class BackgroundHandsDisplay private constructor(
     private val pkg: String,
     private val host: HandsDisplayHost.Handle,
     private val frames: Frames,
+    private val viewport: HandsViewport,
+    private val checkRunning: () -> Unit,
 ) : AutoCloseable {
     class ProtectedScreen : IllegalStateException("The background app protects this window.")
 
     private val display = host.display
     private val id = display.displayId
-    private var observedWindow: Int? = null
-    private var closed = false
+    private data class WindowFrame(val id: Int, val bounds: Rect)
+    private class CaptureRateLimited : IllegalStateException("Android rate-limited window capture.")
+
+    private val captureLock = ReentrantLock(true)
+    private var lastCaptureAt = -1L
+    @Volatile private var observation: WindowFrame? = null
+    @Volatile private var closed = false
+
+    private fun frameOf(window: AccessibilityWindowInfo) =
+        WindowFrame(window.id, Rect().also { window.getBoundsInScreen(it) })
+
+    private fun observedWindow(): AccessibilityWindowInfo {
+        val window = targetWindows().first()
+        check(frameOf(window) == observation) { "The background window changed. Take a new screenshot before acting." }
+        return window
+    }
 
     @Suppress("DEPRECATION") // getRealSize reads the logical dimensions of this specific display.
     private fun checkGeometry() {
         val size = Point()
         display.getRealSize(size)
-        check(display.rotation == Surface.ROTATION_0 && size.x == WIDTH && size.y == HEIGHT) {
+        check(display.rotation == Surface.ROTATION_0 && size.x == viewport.width && size.y == viewport.height) {
             "The background app changed the screen orientation or size."
         }
     }
@@ -70,8 +109,7 @@ internal class BackgroundHandsDisplay private constructor(
     }
 
     fun roots(): List<AccessibilityNodeInfo> {
-        val window = targetWindows().first()
-        check(observedWindow == null || observedWindow == window.id) { "The background app window changed." }
+        val window = observedWindow()
         return listOf(checkNotNull(window.root?.takeIf { it.packageName == pkg && it.windowId == window.id }))
     }
 
@@ -81,15 +119,117 @@ internal class BackgroundHandsDisplay private constructor(
     }
 
     fun screenshot(): Bitmap {
-        val window = targetWindows().first()
-        val bounds = Rect().also { window.getBoundsInScreen(it) }
+        captureLock.lockInterruptibly()
+        try {
+            observation = null
+            checkRunning()
+            val target = frameOf(targetWindows().first())
+            val bitmap = try {
+                capture(target.id, 5_000)
+            } catch (_: CaptureRateLimited) {
+                // Only the documented interval error is transient. Recheck the target before retrying.
+                Thread.sleep(CAPTURE_INTERVAL_MS)
+                checkRunning()
+                check(target == frameOf(targetWindows().first())) { "The background window changed before capture." }
+                capture(target.id, 5_000)
+            }
+            var output: Bitmap? = null
+            try {
+                checkRunning()
+                check(target == frameOf(targetWindows().first())) { "The background window changed during capture." }
+                output = compose(bitmap, target.bounds, viewport.width, viewport.height)
+                observation = target
+                return output
+            } finally {
+                if (output !== bitmap) bitmap.recycle()
+            }
+        } finally {
+            captureLock.unlock()
+        }
+    }
+
+    /** Best-effort thumbnail for the person watching. It never grants authority to act. */
+    fun preview(): Bitmap? {
+        if (closed || captureLock.hasQueuedThreads() || !captureLock.tryLock()) return null
+        try {
+            if (SystemClock.elapsedRealtime() - lastCaptureAt < CAPTURE_INTERVAL_MS) return null
+            checkRunning()
+            val window = targetWindows().first()
+            val target = frameOf(window)
+            if (!previewable(window)) return null
+            val bitmap = capture(target.id, 400)
+            var thumbnail: Bitmap? = null
+            try {
+                checkRunning()
+                val current = targetWindows().first()
+                if (frameOf(current) != target || !previewable(current)) return null
+                thumbnail = compose(bitmap, target.bounds, viewport.previewWidth, viewport.previewHeight)
+                return thumbnail
+            } finally {
+                if (thumbnail !== bitmap) bitmap.recycle()
+            }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return null
+        } catch (_: Exception) {
+            // Losing focus, a locked/secure screen or a delayed capture clears the preview.
+            return null
+        } finally {
+            captureLock.unlock()
+        }
+    }
+
+    private fun previewable(window: AccessibilityWindowInfo): Boolean {
+        val nodes = ArrayDeque<AccessibilityNodeInfo>()
+        nodes.add(window.root ?: return false)
+        var visited = 0
+        while (nodes.isNotEmpty()) {
+            val node = nodes.removeLast()
+            if (++visited > 128 || node.windowId != window.id || node.packageName != pkg) return false
+            if (node.isPassword || isPasswordInput(node.inputType)) return false
+            if (listOf(node.hintText, node.contentDescription).any {
+                    it != null && (it.length > 512 || TapWords.looksSecret(it.toString()))
+                }) return false
+            val label = node.text
+            if (!node.isEditable && label != null && label.length <= 160 && TapWords.looksSecret(label.toString())) return false
+            if (node.childCount > 128 - visited - nodes.size) return false
+            for (index in 0 until node.childCount) nodes.add(node.getChild(index) ?: return false)
+        }
+        return true
+    }
+
+    private fun isFullFrame(bitmap: Bitmap, bounds: Rect) =
+        bitmap.width == viewport.width && bitmap.height == viewport.height && bounds.left == 0 && bounds.top == 0
+
+    private fun compose(bitmap: Bitmap, bounds: Rect, width: Int, height: Int): Bitmap {
+        val full = isFullFrame(bitmap, bounds)
+        if (full && width == viewport.width && height == viewport.height) return bitmap
+        check(full || (bitmap.width == bounds.width() && bitmap.height == bounds.height()
+            && Rect(0, 0, viewport.width, viewport.height).contains(bounds))) { "The app window does not match the background screen." }
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        try {
+            Canvas(output).apply {
+                drawColor(Color.BLACK)
+                scale(width.toFloat() / viewport.width, height.toFloat() / viewport.height)
+                drawBitmap(bitmap, null, if (full) Rect(0, 0, viewport.width, viewport.height) else bounds, Paint(Paint.FILTER_BITMAP_FLAG))
+            }
+            return output
+        } catch (failure: Throwable) {
+            output.recycle()
+            throw failure
+        }
+    }
+
+    private fun capture(windowId: Int, timeoutMs: Long): Bitmap {
+        lastCaptureAt = SystemClock.elapsedRealtime()
         val frame = CompletableFuture<Bitmap>()
         // Capture the verified window itself. Display surfaces can still hold a previous
         // frame after Android changes apps or covers one with a protected window.
-        svc.takeScreenshotOfWindow(window.id, ForkJoinPool.commonPool(), object : AccessibilityService.TakeScreenshotCallback {
+        svc.takeScreenshotOfWindow(windowId, ForkJoinPool.commonPool(), object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
                 try {
                     result.hardwareBuffer.use { buffer ->
+                        if (frame.isDone) return
                         val hardware = checkNotNull(Bitmap.wrapHardwareBuffer(buffer, result.colorSpace))
                         val copy = try { checkNotNull(hardware.copy(Bitmap.Config.ARGB_8888, false)) }
                             finally { hardware.recycle() }
@@ -100,50 +240,29 @@ internal class BackgroundHandsDisplay private constructor(
                 }
             }
             override fun onFailure(errorCode: Int) {
-                val error = if (errorCode == AccessibilityService.ERROR_TAKE_SCREENSHOT_SECURE_WINDOW) ProtectedScreen()
-                    else IllegalStateException("Android could not capture the background app window (code $errorCode).")
+                val error = when (errorCode) {
+                    AccessibilityService.ERROR_TAKE_SCREENSHOT_SECURE_WINDOW -> ProtectedScreen()
+                    AccessibilityService.ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT -> CaptureRateLimited()
+                    else -> IllegalStateException("Android could not capture the background app window (code $errorCode).")
+                }
                 frame.completeExceptionally(error)
             }
         })
-        val bitmap = try {
-            frame.get(5, TimeUnit.SECONDS)
+        return try {
+            frame.get(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (failure: ExecutionException) {
             throw failure.cause ?: failure
         } catch (failure: Exception) {
             // Dispose of a callback that wins the race with a timeout.
-            if (!frame.cancel(false)) frame.getNow(null)?.recycle()
-            throw failure
-        }
-        try {
-            val current = targetWindows().first()
-            check(current.id == window.id && Rect().also { current.getBoundsInScreen(it) } == bounds) {
-                "The background app window changed during capture."
-            }
-            observedWindow = current.id
-            if (bitmap.width == WIDTH && bitmap.height == HEIGHT && bounds.left == 0 && bounds.top == 0) return bitmap
-            check(bitmap.width == bounds.width() && bitmap.height == bounds.height() &&
-                Rect(0, 0, WIDTH, HEIGHT).contains(bounds)) { "The app window does not match the background screen." }
-            val screen = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
-            Canvas(screen).apply {
-                drawColor(Color.BLACK)
-                drawBitmap(bitmap, null, bounds, null)
-            }
-            bitmap.recycle()
-            return screen
-        } catch (failure: Throwable) {
-            bitmap.recycle()
+            if (!frame.cancel(false)) frame.whenComplete { result, _ -> result?.recycle() }
             throw failure
         }
     }
 
-    private fun touchedWindow(): Rect {
-        val top = targetWindows().first()
-        check(top.id == observedWindow) { "The background app window changed. Take a new screenshot before acting." }
-        return Rect().also { top.getBoundsInScreen(it) }
-    }
+    private fun touchedWindow(): Rect = Rect().also { observedWindow().getBoundsInScreen(it) }
 
     private fun inside(x: Int, y: Int, bounds: Rect): Boolean =
-        x in 0 until WIDTH && y in 0 until HEIGHT && bounds.contains(x, y)
+        x in 0 until viewport.width && y in 0 until viewport.height && bounds.contains(x, y)
 
     fun tap(x: Int, y: Int, durationMs: Long): Boolean {
         if (!inside(x, y, touchedWindow())) return false
@@ -179,8 +298,18 @@ internal class BackgroundHandsDisplay private constructor(
     }
 
     companion object {
-        private const val WIDTH = 720
-        private const val HEIGHT = 1280
+        private const val CAPTURE_INTERVAL_MS = 550L
+        internal fun isPasswordInput(inputType: Int): Boolean {
+            val kind = inputType and InputType.TYPE_MASK_CLASS
+            val variation = inputType and InputType.TYPE_MASK_VARIATION
+            return when (kind) {
+                InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                InputType.TYPE_CLASS_TEXT -> variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                    variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+                else -> false
+            }
+        }
+
         private fun checkUnlocked(context: Context) {
             check(!context.getSystemService(KeyguardManager::class.java).isDeviceLocked &&
                 context.getSystemService(PowerManager::class.java).isInteractive) {
@@ -240,14 +369,20 @@ internal class BackgroundHandsDisplay private constructor(
             checkUnlocked(context)
             val component = launcher(context, app.packageName)
             checkOtherScreens(svc.windowsOnAllDisplays, app.packageName, Display.INVALID_DISPLAY)
-            val frames = Frames()
+            val primary = checkNotNull(context.getSystemService(android.hardware.display.DisplayManager::class.java)
+                .getDisplay(Display.DEFAULT_DISPLAY)) { "The phone display is unavailable." }
+            val windowContext = context.createWindowContext(primary, WindowManager.LayoutParams.TYPE_APPLICATION, null)
+            val metrics = windowContext.getSystemService(WindowManager::class.java).maximumWindowMetrics
+            val viewport = HandsViewport.fromDisplay(metrics.bounds.width(), metrics.bounds.height(),
+                (metrics.density * DisplayMetrics.DENSITY_DEFAULT).roundToInt())
+            val frames = Frames(viewport)
             val host = try {
-                HandsDisplayHost.open(context, frames.reader.surface, WIDTH, HEIGHT, 280)
+                HandsDisplayHost.open(context, frames.reader.surface, viewport.width, viewport.height, viewport.dpi)
             } catch (failure: Throwable) {
                 frames.close()
                 throw failure
             }
-            val session = BackgroundHandsDisplay(context, svc, app.packageName, host, frames)
+            val session = BackgroundHandsDisplay(context, svc, app.packageName, host, frames, viewport, checkRunning)
             try {
                 check(session.id > Display.DEFAULT_DISPLAY && host.display.isValid)
                 checkOtherScreens(svc.windowsOnAllDisplays, app.packageName, session.id)
@@ -275,8 +410,8 @@ internal class BackgroundHandsDisplay private constructor(
 
     // A live output surface keeps Android composing the display. Images sent to the
     // model come exclusively from takeScreenshotOfWindow above.
-    private class Frames : AutoCloseable {
-        val reader: ImageReader = ImageReader.newInstance(WIDTH, HEIGHT, PixelFormat.RGBA_8888, 2)
+    private class Frames(viewport: HandsViewport) : AutoCloseable {
+        val reader: ImageReader = ImageReader.newInstance(viewport.width, viewport.height, PixelFormat.RGBA_8888, 2)
         private val thread = HandlerThread("Hands display output").apply { start() }
         private var closed = false
 

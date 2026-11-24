@@ -528,6 +528,11 @@
     <string name="nm_hands_intro">API のないアプリでは、あなたと同じようにスマートフォンを使います: スクリーンショットを撮り、タップ、入力、スワイプをします。スキル、コマンド、ブラウザーが先で、画面は最後の手段です。オンにするまではオフです。</string>
     <string name="nm_hands_switch">エージェントに画面を使わせる</string>
     <string name="nm_hands_switch_footer">作業中は画面上部のカプセルに各ステップと停止ボタンが表示されます。ログイン、パスワード、コードは常にあなたに任されます。</string>
+    <string name="nm_hands_preview_show">画面を見る</string>
+    <string name="nm_hands_preview_hide">閉じる</string>
+    <string name="nm_hands_preview_pause">一時停止</string>
+    <string name="nm_hands_preview_resume">再開</string>
+    <string name="nm_hands_preview_wait">バックグラウンド画面を待っています</string>
     <string name="nm_hands_background_screen">バックグラウンド画面</string>
     <string name="nm_hands_background_detail">スマートフォンを使いながら、別の画面でアシスタントに対応アプリを1つ操作させます。ご自身の操作が必要になるとタスクを終了します。</string>
     <string name="nm_hands_background_unsupported">Android 14 以降で、セカンダリディスプレイにアプリを開ける端末が必要です。</string>
@@ -1311,4 +1316,16 @@
     <string name="nm_public_chat">メインチャットより</string>
     <string name="nm_public_recurring">複数回の言及</string>
     <string name="nm_public_connected">接続済みの情報源より</string>
+
+    <string name="nm_hands_replay_title">画面操作履歴</string>
+    <string name="nm_hands_replay_empty">保存済みの画面操作はまだありません。</string>
+    <string name="nm_hands_replay_no_steps">この操作には保存された手順がありません。</string>
+    <string name="nm_hands_replay_foreground">スマートフォンの画面</string>
+    <string name="nm_hands_replay_unfinished">未完了</string>
+    <string name="nm_hands_replay_no_image">この手順のスクリーンショットは保存されていません。</string>
+    <string name="nm_hands_replay_partial">読み込めた範囲の記録を表示しています。</string>
+    <string name="nm_hands_replay_previous">前へ</string>
+    <string name="nm_hands_replay_pause">一時停止</string>
+    <string name="nm_hands_replay_type">文字を入力</string>
+    <string name="nm_hands_replay_observed">画面を確認</string>
 </resources>

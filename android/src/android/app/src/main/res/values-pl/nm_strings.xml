@@ -537,6 +537,11 @@
     <string name="nm_hands_intro">W aplikacjach bez API używa telefonu tak jak ty: zrzut ekranu, potem dotknięcia, pisanie i przesunięcia. Najpierw umiejętności, polecenia i przeglądarka; ekran jest ostatecznością. Wyłączone, dopóki tego nie włączysz.</string>
     <string name="nm_hands_switch">Pozwól agentowi używać ekranu</string>
     <string name="nm_hands_switch_footer">Podczas pracy kapsuła u góry ekranu pokazuje każdy krok i przycisk Stop. Logowania, hasła i kody zawsze zostają tobie.</string>
+    <string name="nm_hands_preview_show">Pokaż</string>
+    <string name="nm_hands_preview_hide">Ukryj</string>
+    <string name="nm_hands_preview_pause">Wstrzymaj</string>
+    <string name="nm_hands_preview_resume">Wznów</string>
+    <string name="nm_hands_preview_wait">Oczekiwanie na ekran w tle</string>
     <string name="nm_hands_background_screen">Ekran w tle</string>
     <string name="nm_hands_background_detail">Asystent obsługuje jedną zgodną aplikację na osobnym ekranie, a Ty możesz nadal korzystać z telefonu. Zadanie kończy się, gdy musisz przejąć sterowanie.</string>
     <string name="nm_hands_background_unsupported">Wymaga systemu Android 14 lub nowszego oraz telefonu obsługującego aplikacje na dodatkowym ekranie.</string>
@@ -1323,4 +1328,16 @@
     <string name="nm_public_chat">Z głównej rozmowy</string>
     <string name="nm_public_recurring">Kilkukrotnie wspomniane</string>
     <string name="nm_public_connected">Z połączonego źródła</string>
+
+    <string name="nm_hands_replay_title">Historia czynności na ekranie</string>
+    <string name="nm_hands_replay_empty">Brak zapisanych sesji ekranowych.</string>
+    <string name="nm_hands_replay_no_steps">Nie zapisano kroków tej sesji.</string>
+    <string name="nm_hands_replay_foreground">Ekran telefonu</string>
+    <string name="nm_hands_replay_unfinished">Nie ukończono</string>
+    <string name="nm_hands_replay_no_image">Nie zachowano zrzutu ekranu dla tego kroku.</string>
+    <string name="nm_hands_replay_partial">Wyświetlono dostępną część nagrania.</string>
+    <string name="nm_hands_replay_previous">Wstecz</string>
+    <string name="nm_hands_replay_pause">Wstrzymaj</string>
+    <string name="nm_hands_replay_type">Wpisz tekst</string>
+    <string name="nm_hands_replay_observed">Sprawdzono ekran</string>
 </resources>

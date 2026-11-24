@@ -195,7 +195,7 @@ nanoMuse 站在別人的工作之上；條款見 [THIRD_PARTY_NOTICES.md](../../
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis)：手機 App 所基於的裝置端智慧體，沙箱來自 [proot](https://github.com/nano-muse/proot) 和 [Alpine Linux](https://alpinelinux.org/)。
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：桌面 App 作為外掛程式執行在它上面。
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop)（字節跳動）：桌面端「手」的操作器移植自它，舞台上的標記參考它的 ScreenMarker。
-- Android 在獨立虛擬螢幕上操作 App 的設計參考了 wangzan101 的 [Mika](https://github.com/wangzan101/Mika)。
+- Android 背景螢幕的獨立顯示、即時預覽及步驟回放參考了 wangzan101 的 [Mika](https://github.com/wangzan101/Mika)。
 - [MobileGym](https://github.com/Purewhiter/mobilegym)、[MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench)、[PhoneHarness](https://github.com/PhoneHarness/PhoneHarness)、[CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse)、[Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM)、[ClawGUI](https://github.com/ZJU-REAL/ClawGUI)：手機操作器、軌跡和產品思路。
 
 ## 聲明

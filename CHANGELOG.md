@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added a live preview, pause and resume to the Android background screen, adapted its viewport to the phone and added local playback of recorded screen steps.
+
 - Added independent public-source follow-ups on Android and iPhone. Each phone could discover a source in its main chat, check for changes while the computer was off, and send a relevant update with its original link.
 
 - Added ongoing public-source follow-ups to desktop and the web runtime. nanoMuse could discover a project, researcher, topic or public feed in context and start a main-chat conversation about a new issue, paper, citation or announcement.

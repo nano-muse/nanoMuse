@@ -67,6 +67,21 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     private var denyBtn: TextView? = null
     private var ring: RingView? = null
     private var bars: BarsView? = null
+    private var pane: HandsPreviewPanel? = null
+    private var togglePreview: TextView? = null
+    private var pauseButton: TextView? = null
+    private var controls: LinearLayout? = null
+    private var paused = false
+    var previewAllowed: () -> Boolean = { false }
+    var capturePreview: () -> Bitmap? = { null }
+    var togglePause: () -> Boolean = { false }
+
+    private fun collapsePreview() {
+        pane?.expanded(false)
+        controls?.visibility = View.GONE
+        togglePreview?.setText(R.string.nm_hands_preview_show)
+    }
+
 
     /** What the hands draw on the screen while they work. */
     val stage = if (showStage) HandsStage(context) else null
@@ -94,7 +109,8 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     fun working(step: Int, detail: String) = onMain {
         ensure()
         stage?.mood(HandsStage.Mood.WORKING)
-        ring?.turning(true)
+        pauseButton?.isEnabled = true
+        ring?.turning(!paused)
         bars?.visibility = View.VISIBLE
         titleView?.text = context.getString(R.string.nm_hands_step, step)
         detailView?.text = detail
@@ -126,6 +142,8 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
      */
     fun approval(what: String, decidable: Boolean = false) = onMain {
         ensure()
+        collapsePreview()
+        pauseButton?.isEnabled = false
         stage?.mood(HandsStage.Mood.WAITING)
         ring?.turning(false)
         bars?.visibility = View.GONE
@@ -138,6 +156,9 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     }
 
     fun hide() = onMain {
+        ended = true
+        collapsePreview()
+        pane = null; controls = null; togglePreview = null; pauseButton = null
         val v = root
         root = null; params = null; titleView = null; detailView = null; continueBtn = null; openBtn = null; allowBtn = null; denyBtn = null
         ring?.turning(false); ring = null
@@ -246,8 +267,10 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
         else main.post { runCatching(block).onFailure { AppLogger.warning(TAG, "capsule: ${it.message}") } }
     }
 
+    @Volatile private var ended = false
+
     private fun ensure() {
-        if (root != null) return
+        if (root != null || ended) return
         stage?.show() // first, so the capsule's window sits above it
         val radius = dp(26).toFloat()
         val pill = LinearLayout(context).apply {
@@ -315,7 +338,41 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
         val allow = button(context.getString(R.string.nm_hands_allow_once), ACCENT) { onAllow?.invoke() }.apply { visibility = View.GONE }
         val deny = button(context.getString(R.string.nm_hands_deny), STOP_RED) { onDeny?.invoke() }.apply { visibility = View.GONE }
         val stop = button(context.getString(R.string.nm_hands_stop), STOP_RED) { onStop?.invoke() }
-        pill.addView(faceBox); pill.addView(barsView); pill.addView(texts); pill.addView(cont); pill.addView(open); pill.addView(allow); pill.addView(deny); pill.addView(stop)
+        pill.addView(faceBox); pill.addView(barsView); pill.addView(texts)
+        val panelRoot = if (stage == null) {
+            val container = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                background = GradientDrawable().apply { cornerRadius = radius; setColor(INK) }
+                clipToOutline = true
+            }
+            val preview = HandsPreviewPanel(context, java.util.concurrent.ForkJoinPool.commonPool(),
+                { previewAllowed() }, { capturePreview() })
+            val actions = LinearLayout(context).apply { gravity = Gravity.CENTER; visibility = View.GONE }
+            val pause = button(context.getString(R.string.nm_hands_preview_pause), ACCENT) {
+                if (previewAllowed()) {
+                    paused = togglePause()
+                    pauseButton?.setText(if (paused) R.string.nm_hands_preview_resume else R.string.nm_hands_preview_pause)
+                    ring?.turning(!paused)
+                }
+            }
+            val show = button(context.getString(R.string.nm_hands_preview_show), ACCENT) {
+                if (preview.visibility == View.VISIBLE || !previewAllowed()) collapsePreview()
+                else {
+                    preview.expanded(true)
+                    actions.visibility = View.VISIBLE
+                    togglePreview?.setText(R.string.nm_hands_preview_hide)
+                }
+            }
+            pane = preview; controls = actions; togglePreview = show; pauseButton = pause
+            pill.addView(show)
+            actions.addView(pause)
+            container.addView(pill)
+            val height = minOf(context.resources.displayMetrics.heightPixels / 3, dp(260))
+            container.addView(preview, LinearLayout.LayoutParams(-1, height))
+            container.addView(actions)
+            container
+        } else pill
+        pill.addView(cont); pill.addView(open); pill.addView(allow); pill.addView(deny); pill.addView(stop)
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
@@ -332,7 +389,8 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
             y = statusBarHeight() + dp(6)
         }
         try {
-            wm.addView(pill, params)
+            if (stage == null) params.flags = params.flags or WindowManager.LayoutParams.FLAG_SECURE
+            wm.addView(panelRoot, params)
         } catch (t: Throwable) {
             AppLogger.warning(TAG, "addView failed: ${t.message}")
             return
@@ -340,7 +398,7 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
         pill.animate().alpha(1f).translationY(0f).scaleX(1f).scaleY(1f).setDuration(320L).setInterpolator(DecelerateInterpolator(1.6f)).start()
         ringView.turning(true)
         barsView.start()
-        root = pill; this.params = params; titleView = title; detailView = detail; continueBtn = cont; openBtn = open; allowBtn = allow; denyBtn = deny
+        root = panelRoot; this.params = params; titleView = title; detailView = detail; continueBtn = cont; openBtn = open; allowBtn = allow; denyBtn = deny
         ring = ringView; bars = barsView
     }
 

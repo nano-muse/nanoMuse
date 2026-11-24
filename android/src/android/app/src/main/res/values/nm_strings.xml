@@ -522,6 +522,11 @@
     <string name="nm_hands_intro">For apps with no API it uses the phone the way you do: a screenshot, then taps, typing and swipes. Skills, commands and the browser come first; the screen is the last resort. Off until you switch it on.</string>
     <string name="nm_hands_switch">Let the agent use the screen</string>
     <string name="nm_hands_switch_footer">While it works, a capsule at the top of the screen shows each step and a Stop button. Logins, passwords and codes are always left to you.</string>
+    <string name="nm_hands_preview_show">View screen</string>
+    <string name="nm_hands_preview_hide">Hide screen</string>
+    <string name="nm_hands_preview_pause">Pause</string>
+    <string name="nm_hands_preview_resume">Resume</string>
+    <string name="nm_hands_preview_wait">Waiting for the background screen</string>
     <string name="nm_hands_background_screen">Background screen</string>
     <string name="nm_hands_background_detail">Use one compatible app on a separate screen while you use your phone. The task stops if you need to take over.</string>
     <string name="nm_hands_background_unsupported">Requires Android 14 or later and a phone that can open apps on a secondary display.</string>
@@ -1295,4 +1300,16 @@
     <string name="nm_public_chat">From your main chat</string>
     <string name="nm_public_recurring">Mentioned in several turns</string>
     <string name="nm_public_connected">From a connected source</string>
+
+    <string name="nm_hands_replay_title">Screen history</string>
+    <string name="nm_hands_replay_empty">No saved screen runs yet.</string>
+    <string name="nm_hands_replay_no_steps">No steps were saved for this run.</string>
+    <string name="nm_hands_replay_foreground">Phone screen</string>
+    <string name="nm_hands_replay_unfinished">Not completed</string>
+    <string name="nm_hands_replay_no_image">No screenshot was saved for this step.</string>
+    <string name="nm_hands_replay_partial">Showing the available part of this recording.</string>
+    <string name="nm_hands_replay_previous">Previous</string>
+    <string name="nm_hands_replay_pause">Pause</string>
+    <string name="nm_hands_replay_type">Enter text</string>
+    <string name="nm_hands_replay_observed">Screen observed</string>
 </resources>

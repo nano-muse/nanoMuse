@@ -531,6 +531,11 @@
     <string name="nm_hands_intro">API’si olmayan uygulamalar için telefonu senin gibi kullanır: bir ekran görüntüsü, sonra dokunma, yazma ve kaydırma. Beceriler, komutlar ve tarayıcı önce gelir; ekran son çaredir. Sen açana kadar kapalıdır.</string>
     <string name="nm_hands_switch">Ajanın ekranı kullanmasına izin ver</string>
     <string name="nm_hands_switch_footer">Çalışırken ekranın üstündeki bir kapsül her adımı ve bir Durdur düğmesini gösterir. Oturum açma, parolalar ve kodlar her zaman sana bırakılır.</string>
+    <string name="nm_hands_preview_show">Göster</string>
+    <string name="nm_hands_preview_hide">Gizle</string>
+    <string name="nm_hands_preview_pause">Duraklat</string>
+    <string name="nm_hands_preview_resume">Sürdür</string>
+    <string name="nm_hands_preview_wait">Arka plan ekranı bekleniyor</string>
     <string name="nm_hands_background_screen">Arka plan ekranı</string>
     <string name="nm_hands_background_detail">Siz telefonu kullanırken asistan ayrı bir ekranda uyumlu tek bir uygulamayı kullanır. Kontrolü devralmanız gerekirse görev sona erer.</string>
     <string name="nm_hands_background_unsupported">Android 14 veya üzeri ve uygulamaları ikincil ekranda açabilen bir telefon gerekir.</string>
@@ -1315,4 +1320,16 @@
     <string name="nm_public_chat">Ana sohbetten</string>
     <string name="nm_public_recurring">Birkaç kez bahsedildi</string>
     <string name="nm_public_connected">Bağlı bir kaynaktan</string>
+
+    <string name="nm_hands_replay_title">Ekran işlemleri geçmişi</string>
+    <string name="nm_hands_replay_empty">Henüz kaydedilmiş ekran işlemi yok.</string>
+    <string name="nm_hands_replay_no_steps">Bu işlem için hiçbir adım kaydedilmedi.</string>
+    <string name="nm_hands_replay_foreground">Telefon ekranı</string>
+    <string name="nm_hands_replay_unfinished">Tamamlanmadı</string>
+    <string name="nm_hands_replay_no_image">Bu adım için ekran görüntüsü kaydedilmedi.</string>
+    <string name="nm_hands_replay_partial">Kaydın kullanılabilir kısmı gösteriliyor.</string>
+    <string name="nm_hands_replay_previous">Önceki</string>
+    <string name="nm_hands_replay_pause">Duraklat</string>
+    <string name="nm_hands_replay_type">Metin gir</string>
+    <string name="nm_hands_replay_observed">Ekran incelendi</string>
 </resources>

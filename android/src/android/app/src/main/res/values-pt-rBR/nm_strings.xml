@@ -532,6 +532,11 @@
     <string name="nm_hands_intro">Para apps sem API, ele usa o celular como você: uma captura de tela, depois toques, digitação e deslizes. Skills, comandos e o navegador vêm primeiro; a tela é o último recurso. Desligado até você ligar.</string>
     <string name="nm_hands_switch">Deixar o agente usar a tela</string>
     <string name="nm_hands_switch_footer">Enquanto trabalha, uma cápsula no topo da tela mostra cada passo e um botão Parar. Logins, senhas e códigos ficam sempre com você.</string>
+    <string name="nm_hands_preview_show">Ver tela</string>
+    <string name="nm_hands_preview_hide">Ocultar</string>
+    <string name="nm_hands_preview_pause">Pausar</string>
+    <string name="nm_hands_preview_resume">Retomar</string>
+    <string name="nm_hands_preview_wait">Aguardando a tela em segundo plano</string>
     <string name="nm_hands_background_screen">Tela em segundo plano</string>
     <string name="nm_hands_background_detail">O assistente usa um aplicativo compatível em uma tela separada enquanto você continua usando o celular. A tarefa termina se você precisar assumir o controle.</string>
     <string name="nm_hands_background_unsupported">Requer Android 14 ou posterior e um celular que abra aplicativos em uma tela secundária.</string>
@@ -1316,4 +1321,16 @@
     <string name="nm_public_chat">Da conversa principal</string>
     <string name="nm_public_recurring">Mencionada várias vezes</string>
     <string name="nm_public_connected">De uma fonte conectada</string>
+
+    <string name="nm_hands_replay_title">Histórico de ações na tela</string>
+    <string name="nm_hands_replay_empty">Ainda não há ações de tela salvas.</string>
+    <string name="nm_hands_replay_no_steps">Nenhuma etapa foi salva para esta ação.</string>
+    <string name="nm_hands_replay_foreground">Tela do telefone</string>
+    <string name="nm_hands_replay_unfinished">Não concluído</string>
+    <string name="nm_hands_replay_no_image">Nenhuma captura de tela foi salva para esta etapa.</string>
+    <string name="nm_hands_replay_partial">Mostrando a parte disponível deste registro.</string>
+    <string name="nm_hands_replay_previous">Anterior</string>
+    <string name="nm_hands_replay_pause">Pausar</string>
+    <string name="nm_hands_replay_type">Digitar texto</string>
+    <string name="nm_hands_replay_observed">Tela observada</string>
 </resources>

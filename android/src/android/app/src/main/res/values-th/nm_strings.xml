@@ -528,6 +528,11 @@
     <string name="nm_hands_intro">สำหรับแอปที่ไม่มี API มันจะใช้โทรศัพท์แบบเดียวกับคุณ: ถ่ายภาพหน้าจอ แล้วแตะ พิมพ์ และปัด ทักษะ คำสั่ง และเบราว์เซอร์มาก่อน หน้าจอเป็นทางเลือกสุดท้าย ปิดอยู่จนกว่าคุณจะเปิด</string>
     <string name="nm_hands_switch">ให้เอเจนต์ใช้หน้าจอ</string>
     <string name="nm_hands_switch_footer">ระหว่างทำงาน แคปซูลที่ด้านบนของหน้าจอจะแสดงแต่ละขั้นตอนและปุ่มหยุด การล็อกอิน รหัสผ่าน และรหัสยืนยันเป็นหน้าที่ของคุณเสมอ</string>
+    <string name="nm_hands_preview_show">ดูหน้าจอ</string>
+    <string name="nm_hands_preview_hide">ซ่อน</string>
+    <string name="nm_hands_preview_pause">หยุดชั่วคราว</string>
+    <string name="nm_hands_preview_resume">ทำต่อ</string>
+    <string name="nm_hands_preview_wait">กำลังรอหน้าจอเบื้องหลัง</string>
     <string name="nm_hands_background_screen">หน้าจอเบื้องหลัง</string>
     <string name="nm_hands_background_detail">ให้ผู้ช่วยใช้งานแอปที่รองรับหนึ่งแอปบนหน้าจอแยกขณะที่คุณใช้โทรศัพท์ต่อได้ งานจะหยุดเมื่อคุณต้องเข้ามาควบคุมเอง</string>
     <string name="nm_hands_background_unsupported">ต้องใช้ Android 14 ขึ้นไป และโทรศัพท์ที่เปิดแอปบนหน้าจอรองได้</string>
@@ -1311,4 +1316,16 @@
     <string name="nm_public_chat">จากแชทหลัก</string>
     <string name="nm_public_recurring">มีการกล่าวถึงหลายครั้ง</string>
     <string name="nm_public_connected">จากแหล่งข้อมูลที่เชื่อมต่อ</string>
+
+    <string name="nm_hands_replay_title">ประวัติการใช้งานหน้าจอ</string>
+    <string name="nm_hands_replay_empty">ยังไม่มีรายการใช้งานหน้าจอที่บันทึกไว้</string>
+    <string name="nm_hands_replay_no_steps">ไม่มีขั้นตอนที่บันทึกไว้สำหรับรายการนี้</string>
+    <string name="nm_hands_replay_foreground">หน้าจอโทรศัพท์</string>
+    <string name="nm_hands_replay_unfinished">ยังไม่เสร็จ</string>
+    <string name="nm_hands_replay_no_image">ไม่ได้เก็บภาพหน้าจอสำหรับขั้นตอนนี้</string>
+    <string name="nm_hands_replay_partial">แสดงส่วนของบันทึกที่อ่านได้</string>
+    <string name="nm_hands_replay_previous">ก่อนหน้า</string>
+    <string name="nm_hands_replay_pause">หยุดชั่วคราว</string>
+    <string name="nm_hands_replay_type">ป้อนข้อความ</string>
+    <string name="nm_hands_replay_observed">ดูหน้าจอ</string>
 </resources>

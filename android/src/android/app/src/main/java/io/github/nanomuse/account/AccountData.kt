@@ -101,6 +101,7 @@ object AccountData {
      * signed-in key, and inside `ConversationSync.exclusive` so no push sees the chats go.
      */
     suspend fun leave(context: Context, account: String, keep: Boolean) {
+        io.github.nanomuse.hands.HandsReplayAccess.accountChanging(true)
         io.github.nanomuse.feed.FeedFlow.leave(context)
         io.github.nanomuse.hands.HandsRunMemory.shared.clearAll()
         val ctx = context.applicationContext
@@ -192,6 +193,7 @@ object AccountData {
         reloadStores(ctx)
         // the feed's switch and routine are this account's now; a missing routine is made again
         runCatching { io.github.nanomuse.feed.FeedFlow.refresh(ctx) }
+        io.github.nanomuse.hands.HandsReplayAccess.accountChanging(false)
     }
 
     /** `minis-global/nanomuse/accounts/` holds something for [account]. */

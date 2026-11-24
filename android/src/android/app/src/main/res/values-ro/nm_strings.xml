@@ -534,6 +534,11 @@
     <string name="nm_hands_intro">Pentru aplicațiile fără API, folosește telefonul așa cum o faci tu: o captură de ecran, apoi atingeri, tastare și glisări. Abilitățile, comenzile și browserul vin primele; ecranul e ultima soluție. Oprit până îl pornești.</string>
     <string name="nm_hands_switch">Lasă agentul să folosească ecranul</string>
     <string name="nm_hands_switch_footer">Cât lucrează, o capsulă în partea de sus a ecranului arată fiecare pas și un buton Stop. Autentificările, parolele și codurile îți rămân întotdeauna ție.</string>
+    <string name="nm_hands_preview_show">Arată</string>
+    <string name="nm_hands_preview_hide">Ascunde</string>
+    <string name="nm_hands_preview_pause">Pauză</string>
+    <string name="nm_hands_preview_resume">Reia</string>
+    <string name="nm_hands_preview_wait">Se așteaptă ecranul din fundal</string>
     <string name="nm_hands_background_screen">Ecran în fundal</string>
     <string name="nm_hands_background_detail">Asistentul folosește o aplicație compatibilă pe un ecran separat, iar tu poți folosi în continuare telefonul. Sarcina se oprește dacă trebuie să preiei controlul.</string>
     <string name="nm_hands_background_unsupported">Necesită Android 14 sau o versiune ulterioară și un telefon care poate deschide aplicații pe un ecran secundar.</string>
@@ -1319,4 +1324,16 @@
     <string name="nm_public_chat">Din conversația principală</string>
     <string name="nm_public_recurring">Menționată de mai multe ori</string>
     <string name="nm_public_connected">Dintr-o sursă conectată</string>
+
+    <string name="nm_hands_replay_title">Istoricul acțiunilor pe ecran</string>
+    <string name="nm_hands_replay_empty">Nu există încă sesiuni pe ecran salvate.</string>
+    <string name="nm_hands_replay_no_steps">Nu s-au salvat pași pentru această sesiune.</string>
+    <string name="nm_hands_replay_foreground">Ecranul telefonului</string>
+    <string name="nm_hands_replay_unfinished">Nefinalizat</string>
+    <string name="nm_hands_replay_no_image">Nu s-a salvat nicio captură pentru acest pas.</string>
+    <string name="nm_hands_replay_partial">Se afișează partea disponibilă a înregistrării.</string>
+    <string name="nm_hands_replay_previous">Anterior</string>
+    <string name="nm_hands_replay_pause">Pauză</string>
+    <string name="nm_hands_replay_type">Introdu text</string>
+    <string name="nm_hands_replay_observed">Ecran verificat</string>
 </resources>

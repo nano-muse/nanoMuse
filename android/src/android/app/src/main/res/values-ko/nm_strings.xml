@@ -528,6 +528,11 @@
     <string name="nm_hands_intro">API가 없는 앱에서는 사람처럼 휴대전화를 씁니다. 스크린샷을 찍고, 탭하고, 입력하고, 스와이프합니다. 스킬, 명령, 브라우저가 먼저이고 화면은 마지막 수단입니다. 켜기 전까지는 꺼져 있습니다.</string>
     <string name="nm_hands_switch">에이전트가 화면을 쓰게 허용</string>
     <string name="nm_hands_switch_footer">작업하는 동안 화면 위쪽의 캡슐이 각 단계와 중지 버튼을 보여 줍니다. 로그인, 비밀번호, 인증 코드는 항상 직접 입력합니다.</string>
+    <string name="nm_hands_preview_show">화면 보기</string>
+    <string name="nm_hands_preview_hide">접기</string>
+    <string name="nm_hands_preview_pause">일시 정지</string>
+    <string name="nm_hands_preview_resume">계속</string>
+    <string name="nm_hands_preview_wait">백그라운드 화면을 기다리는 중</string>
     <string name="nm_hands_background_screen">백그라운드 화면</string>
     <string name="nm_hands_background_detail">휴대폰을 사용하는 동안 어시스턴트가 별도 화면에서 호환 앱 하나를 조작합니다. 직접 조작해야 하면 작업이 종료됩니다.</string>
     <string name="nm_hands_background_unsupported">Android 14 이상과 보조 디스플레이에서 앱을 열 수 있는 기기가 필요합니다.</string>
@@ -1311,4 +1316,16 @@
     <string name="nm_public_chat">기본 채팅에서 발견</string>
     <string name="nm_public_recurring">여러 번 언급됨</string>
     <string name="nm_public_connected">연결된 출처에서 발견</string>
+
+    <string name="nm_hands_replay_title">화면 조작 기록</string>
+    <string name="nm_hands_replay_empty">저장된 화면 조작 기록이 없습니다.</string>
+    <string name="nm_hands_replay_no_steps">이 작업에는 저장된 단계가 없습니다.</string>
+    <string name="nm_hands_replay_foreground">휴대전화 화면</string>
+    <string name="nm_hands_replay_unfinished">완료되지 않음</string>
+    <string name="nm_hands_replay_no_image">이 단계에는 저장된 스크린샷이 없습니다.</string>
+    <string name="nm_hands_replay_partial">읽을 수 있는 기록만 표시합니다.</string>
+    <string name="nm_hands_replay_previous">이전</string>
+    <string name="nm_hands_replay_pause">일시 정지</string>
+    <string name="nm_hands_replay_type">텍스트 입력</string>
+    <string name="nm_hands_replay_observed">화면 확인</string>
 </resources>

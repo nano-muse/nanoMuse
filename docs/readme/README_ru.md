@@ -195,7 +195,7 @@ nanoMuse опирается на работу других людей; усло�
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): агент на устройстве, на котором построено приложение для телефона, с [proot](https://github.com/nano-muse/proot) и [Alpine Linux](https://alpinelinux.org/) для песочницы.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): агентный harness, плагином к которому является приложение для компьютера.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): оператор рук на компьютере портирован с их кода, а маркеры сцены следуют их ScreenMarker.
-- Идею управлять приложениями Android на отдельном виртуальном дисплее мы почерпнули из проекта [Mika](https://github.com/wangzan101/Mika) автора wangzan101.
+- Идеи отдельного экрана Android, его просмотра в реальном времени и показа истории шагов мы почерпнули из проекта [Mika](https://github.com/wangzan101/Mika) автора wangzan101.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): оператор телефона, трассы и продуктовые идеи.
 
 ## Отказ от ответственности

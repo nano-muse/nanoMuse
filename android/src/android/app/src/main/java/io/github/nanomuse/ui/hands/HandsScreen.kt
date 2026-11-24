@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Visibility
@@ -18,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,6 +59,8 @@ fun HandsScreen(
     onOpenShizuku: () -> Unit,
     onOpenHandsModel: () -> Unit = onOpenProviders,
 ) {
+    var showReplay by rememberSaveable { mutableStateOf(false) }
+    if (showReplay) { HandsReplayScreen { showReplay = false }; return }
     val context = LocalContext.current
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
     val config = repo?.config?.collectAsState()?.value
@@ -195,6 +200,11 @@ fun HandsScreen(
                     showDivider = false,
                 )
             }
+        }
+
+        SettingsSection {
+            SettingsRow(title = stringResource(R.string.nm_hands_replay_title), icon = Icons.Outlined.History,
+                onClick = { showReplay = true }, showDivider = false)
         }
 
         // ── the rules ──

@@ -528,6 +528,11 @@
     <string name="nm_hands_intro">Untuk aplikasi tanpa API, ia memakai ponsel seperti kamu: tangkapan layar, lalu ketukan, ketikan dan usapan. Skill, perintah dan browser didahulukan; layar adalah pilihan terakhir. Mati sampai kamu menyalakannya.</string>
     <string name="nm_hands_switch">Izinkan agen memakai layar</string>
     <string name="nm_hands_switch_footer">Saat bekerja, kapsul di bagian atas layar menampilkan setiap langkah dan tombol Berhenti. Login, kata sandi dan kode selalu diserahkan padamu.</string>
+    <string name="nm_hands_preview_show">Lihat layar</string>
+    <string name="nm_hands_preview_hide">Tutup</string>
+    <string name="nm_hands_preview_pause">Jeda</string>
+    <string name="nm_hands_preview_resume">Lanjutkan</string>
+    <string name="nm_hands_preview_wait">Menunggu layar latar belakang</string>
     <string name="nm_hands_background_screen">Layar latar belakang</string>
     <string name="nm_hands_background_detail">Asisten menggunakan satu aplikasi yang kompatibel di layar terpisah sementara Anda tetap menggunakan ponsel. Tugas berhenti jika Anda perlu mengambil alih.</string>
     <string name="nm_hands_background_unsupported">Memerlukan Android 14 atau yang lebih baru dan ponsel yang dapat membuka aplikasi di layar sekunder.</string>
@@ -1311,4 +1316,16 @@
     <string name="nm_public_chat">Dari percakapan utama</string>
     <string name="nm_public_recurring">Disebut beberapa kali</string>
     <string name="nm_public_connected">Dari sumber terhubung</string>
+
+    <string name="nm_hands_replay_title">Riwayat pengoperasian layar</string>
+    <string name="nm_hands_replay_empty">Belum ada operasi layar yang disimpan.</string>
+    <string name="nm_hands_replay_no_steps">Tidak ada langkah yang disimpan untuk operasi ini.</string>
+    <string name="nm_hands_replay_foreground">Layar ponsel</string>
+    <string name="nm_hands_replay_unfinished">Belum selesai</string>
+    <string name="nm_hands_replay_no_image">Tidak ada tangkapan layar untuk langkah ini.</string>
+    <string name="nm_hands_replay_partial">Menampilkan bagian rekaman yang tersedia.</string>
+    <string name="nm_hands_replay_previous">Sebelumnya</string>
+    <string name="nm_hands_replay_pause">Jeda</string>
+    <string name="nm_hands_replay_type">Masukkan teks</string>
+    <string name="nm_hands_replay_observed">Layar diamati</string>
 </resources>
