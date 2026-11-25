@@ -4,6 +4,27 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Cloud
+
+### Runtime
+
+### Web
+
+### Desktop
+
+### Android
+
+### iOS
+
+### Project
+
+## [1.0.10] - 2026-11-25 · Bridge
+
+Bridge: Android background screen work now has guided local pairing, a secure floating preview
+and progress in the originating chat. The phones, desktop and runtime can follow through on due
+commitments and changed sources. The release also tightens browser, account, local-state and
+cross-device approval boundaries. The relay is 0.32.0; 1.0.9 clients remain compatible.
+
 - Fixed Android builds that could produce an arm64 APK without the PRoot executable needed for shell commands and screen tasks. Existing sandboxes also recovered missing files for the bundled Alpine shell without resetting the workspace.
 
 - Replaced the manual Android wireless debugging pairing form with a six-step guided background screen setup that watches system switches live, reads the six-digit pairing code automatically through the accessibility service when enabled, falls back to heads-up inline-reply notifications, and connects automatically across cached, property, mDNS and loopback-scanned ports.
