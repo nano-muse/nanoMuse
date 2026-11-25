@@ -1678,10 +1678,10 @@ class MuseService:
 
     def _finalize_delivery(self, delivery: Delivery) -> None:
         if delivery.kind == "reminder":
-            self.app.reminders.mark_fired(delivery.source_id)
+            self.app.reminders.mark_fired(delivery.source_id, occurrence=delivery.occurrence)
             self.bus.publish({"kind": "reminders"})
         elif delivery.kind == "goal_check":
-            self.app.goals.mark_checked_in(delivery.source_id)
+            self.app.goals.mark_checked_in(delivery.source_id, occurrence=delivery.occurrence)
         elif delivery.kind == "trigger":
             self.app.triggers.mark_fired(delivery.source_id, delivery.occurrence)
             self.bus.publish({"kind": "triggers"})
