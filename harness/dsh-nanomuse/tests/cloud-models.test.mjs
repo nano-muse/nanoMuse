@@ -692,6 +692,7 @@ test('the "Use it for" card moves the main chat to the own key too; a main chat 
 test('an unreadable account state cannot silently discard cleared-session rules', async () => {
   const out = await cloud()
   try {
+    await rm(`${out.statePath}.bak`, { force: true })
     await writeFile(out.statePath, '{invalid-json')
     await assert.rejects(out.svc.readState(), /refusing to discard saved conversation access rules/)
     assert.equal(await readFile(out.statePath, 'utf8'), '{invalid-json')

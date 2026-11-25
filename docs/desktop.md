@@ -409,7 +409,7 @@ On Windows, coding-agent `.cmd` launchers must use a supported npm shim or a pla
 
 A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
 
-Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
+Account-state saves are queued in snapshot order. Each private temporary file is flushed before replacing `cloud.json`, and the previous complete state is kept as `cloud.json.bak` with 0600 permissions. The containing directory is flushed where the platform supports it. On startup, a missing or damaged `cloud.json` is restored only from a backup that parses and passes complete state cleaning; otherwise startup stops instead of discarding the account or saved permissions.
 
 The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
 

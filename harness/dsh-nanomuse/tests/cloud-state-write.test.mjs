@@ -1,11 +1,10 @@
-// Account snapshots are replaced only after the complete temporary file is written.
-// Concurrent saves preserve invocation order; failures preserve the previous file.
+// Account snapshots are flushed before replacement and keep one complete private backup.
+// Concurrent saves preserve invocation order; failures preserve the previous recoverable state.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Service } from '@deepseek-ai/cordis'
 import NanomuseCloud, { LLM_ROW, TOKEN_REF } from '../lib/cloud.js'
 
 process.env.NANOMUSE_PY = join(tmpdir(), 'nanomuse-runtime-that-does-not-exist')
@@ -41,30 +40,48 @@ function fakeContext() {
   return { ctx }
 }
 
-async function make(state = {}) {
-  const home = await mkdtemp(join(tmpdir(), 'nm-cloud-state-'))
-  const statePath = join(home, 'cloud.json')
-  await writeFile(statePath, JSON.stringify(state))
+async function service(statePath) {
   const fake = fakeContext()
   await fake.ctx.credentials.set(TOKEN_REF, 'account-key')
   const svc = new NanomuseCloud(fake.ctx, { baseURL: 'https://relay.invalid', deviceName: 'test-desktop', statePath })
   svc.hub.start = () => undefined
   svc.refresh = async () => svc.status()
-  await svc[Service.init]()
-  return { svc, statePath, home, done: () => rm(home, { recursive: true, force: true }) }
+  return svc
 }
 
-test('the account snapshot is written whole and renamed over, leaving nothing behind', async () => {
-  const { svc, statePath, home, done } = await make({ deviceName: 'first', deviceId: 'dev-1' })
+async function make(state = {}) {
+  const home = await mkdtemp(join(tmpdir(), 'nm-cloud-state-'))
+  const statePath = join(home, 'cloud.json')
+  await writeFile(statePath, JSON.stringify(state), { mode: 0o600 })
+  const svc = await service(statePath)
+  svc.state = await svc.readState()
+  return {
+    svc,
+    statePath,
+    backupPath: `${statePath}.bak`,
+    home,
+    done: () => rm(home, { recursive: true, force: true }),
+  }
+}
+
+test('the account snapshot is replaced whole and keeps the previous private backup', async () => {
+  const { svc, statePath, backupPath, home, done } = await make({ deviceName: 'first', deviceId: 'dev-1' })
   try {
     assert.equal(svc.state.deviceName, 'first')
     svc.state.deviceName = 'renamed-desktop'
     await svc.writeState()
-    const names = (await readdir(home)).filter((n) => n !== 'cloud.json')
-    assert.deepEqual(names, [], 'a temp file was left behind')
     const raw = JSON.parse(await readFile(statePath, 'utf8'))
     assert.equal(raw.deviceName, 'renamed-desktop')
     assert.equal(raw.deviceId, 'dev-1')
+    assert.deepEqual(JSON.parse(await readFile(backupPath, 'utf8')), {
+      deviceName: 'first',
+      deviceId: 'dev-1',
+    })
+    assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
+    if (process.platform !== 'win32') {
+      assert.equal((await stat(statePath)).mode & 0o777, 0o600)
+      assert.equal((await stat(backupPath)).mode & 0o777, 0o600)
+    }
   } finally {
     await done()
   }
@@ -83,8 +100,8 @@ test('a state that cannot be serialized leaves the signed-in file as it was', as
   }
 })
 
-test('concurrent snapshot requests finish in order without sharing a temporary file', async () => {
-  const { svc, statePath, home, done } = await make({ deviceName: 'first' })
+test('concurrent snapshot requests finish in order and leave the penultimate backup', async () => {
+  const { svc, statePath, backupPath, home, done } = await make({ deviceName: 'first' })
   try {
     const writes = []
     for (let i = 0; i < 24; i++) {
@@ -93,8 +110,12 @@ test('concurrent snapshot requests finish in order without sharing a temporary f
     }
     await Promise.all(writes)
     assert.equal(JSON.parse(await readFile(statePath, 'utf8')).deviceName, 'snapshot-23')
-    assert.deepEqual(await readdir(home), ['cloud.json'])
-    if (process.platform !== 'win32') assert.equal((await stat(statePath)).mode & 0o777, 0o600)
+    assert.equal(JSON.parse(await readFile(backupPath, 'utf8')).deviceName, 'snapshot-22')
+    assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
+    if (process.platform !== 'win32') {
+      assert.equal((await stat(statePath)).mode & 0o777, 0o600)
+      assert.equal((await stat(backupPath)).mode & 0o777, 0o600)
+    }
   } finally { await done() }
 })
 
@@ -110,4 +131,100 @@ test('a failed replacement cleans its temporary file and does not block a later 
     await svc.writeState()
     assert.equal(JSON.parse(await readFile(statePath, 'utf8')).deviceName, 'recovered')
   } finally { await done() }
+})
+
+const SAVED_STATE = {
+  account: {
+    id: 'acct-1',
+    channel: 'email',
+    hint: 'saved account',
+    member: false,
+  },
+  deviceId: 'dev-saved',
+  remoteControl: true,
+  trusted: {
+    'dev-friend': { name: 'Other computer', at: 123 },
+  },
+  grants: [
+    { id: 'grant-1', target: 'computer_app:Editor', at: 456 },
+  ],
+  sync: {
+    accountId: 'acct-1',
+    cursor: 3,
+    enabled: true,
+    mainSession: 'session-main',
+    sideChats: false,
+    cids: { 'session-main': 'conversation-main' },
+    owners: { 'session-main': 'acct-1' },
+    mids: {},
+    titles: {},
+    conversations: {},
+    pulled: {},
+    hidden: [],
+    toArchive: [],
+    cleared: { 'session-cleared': 'conversation-cleared' },
+  },
+}
+
+test('a damaged primary is restored only from a fully cleaned backup', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'nm-cloud-state-'))
+  const statePath = join(home, 'cloud.json')
+  const backupPath = `${statePath}.bak`
+  try {
+    await writeFile(backupPath, JSON.stringify({ ...SAVED_STATE, ignored: 'old-field' }), { mode: 0o644 })
+    await writeFile(statePath, '{"account":', { mode: 0o644 })
+    const svc = await service(statePath)
+    const recovered = await svc.readState()
+    assert.equal(recovered.account.id, 'acct-1')
+    assert.equal(recovered.remoteControl, true)
+    assert.deepEqual(recovered.trusted, SAVED_STATE.trusted)
+    assert.deepEqual(recovered.grants, SAVED_STATE.grants)
+    assert.deepEqual(recovered.sync.cleared, SAVED_STATE.sync.cleared)
+    const restored = JSON.parse(await readFile(statePath, 'utf8'))
+    assert.equal(restored.account.id, 'acct-1')
+    assert.equal(restored.ignored, undefined, 'the restored primary must contain cleaned state')
+    assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
+    if (process.platform !== 'win32') {
+      assert.equal((await stat(statePath)).mode & 0o777, 0o600)
+      assert.equal((await stat(backupPath)).mode & 0o777, 0o600)
+    }
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
+test('a missing primary is restored from its complete backup without a temporary file', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'nm-cloud-state-'))
+  const statePath = join(home, 'cloud.json')
+  try {
+    await writeFile(`${statePath}.bak`, JSON.stringify(SAVED_STATE), { mode: 0o600 })
+    const svc = await service(statePath)
+    const recovered = await svc.readState()
+    assert.equal(recovered.deviceId, 'dev-saved')
+    assert.equal(JSON.parse(await readFile(statePath, 'utf8')).deviceId, 'dev-saved')
+    assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
+test('an invalid backup cannot silently erase account or authorization state', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'nm-cloud-state-'))
+  const statePath = join(home, 'cloud.json')
+  try {
+    await writeFile(statePath, '{broken')
+    await writeFile(`${statePath}.bak`, JSON.stringify({
+      account: { id: 42 },
+      remoteControl: true,
+      grants: SAVED_STATE.grants,
+    }))
+    const svc = await service(statePath)
+    await assert.rejects(
+      svc.readState(),
+      /refusing to discard saved conversation access rules/,
+    )
+    assert.equal(await readFile(statePath, 'utf8'), '{broken')
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
 })
