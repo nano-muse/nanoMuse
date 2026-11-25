@@ -1,0 +1,111 @@
+package io.github.nanomuse.feed
+
+import android.content.Context
+import android.content.SharedPreferences
+import org.mockito.Mockito.*
+import io.github.nanomuse.sync.LocalMessage
+import io.github.nanomuse.sync.Transcript
+import org.junit.Assert.*
+import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
+class ChatCheckInsTest {
+    private val zone = ZoneId.of("Europe/Berlin")
+    private val today = LocalDate.of(2026, 3, 29)
+    private val nine = today.atTime(9, 0).atZone(zone)
+    private val request = "I promised to email the museum tomorrow to arrange a visit."
+    private fun line(id: String, text: String, at: ZonedDateTime, assistant: Boolean = false) =
+        ChatCommitments.Line("mine", id, !assistant, assistant, text, at.toInstant().toEpochMilli())
+    private fun facts(vararg lines: ChatCommitments.Line) = ChatCommitments.facts(lines.toList(), today, "Chat", zone)
+
+    @Test fun localCheckInsDefaultOnIndependentlyOfModelAccessAndHonorSavedChoices() {
+        val ctx = mock(Context::class.java)
+        val prefs = mock(SharedPreferences::class.java)
+        val edit = mock(SharedPreferences.Editor::class.java, RETURNS_SELF)
+        `when`(ctx.getSharedPreferences("nanomuse", Context.MODE_PRIVATE)).thenReturn(prefs)
+        `when`(prefs.edit()).thenReturn(edit)
+        val saved = mutableMapOf<String, Any>()
+        `when`(prefs.contains(anyString())).thenAnswer { it.getArgument<String>(0) in saved }
+        `when`(prefs.getBoolean(anyString(), anyBoolean())).thenAnswer {
+            saved[it.getArgument<String>(0)] ?: it.getArgument<Boolean>(1)
+        }
+        `when`(edit.putBoolean(anyString(), anyBoolean())).thenAnswer {
+            saved[it.getArgument<String>(0)] = it.getArgument<Boolean>(1); edit
+        }
+        `when`(edit.putString(anyString(), anyString())).thenAnswer {
+            saved[it.getArgument<String>(0)] = it.getArgument<String>(1); edit
+        }
+        `when`(edit.remove(anyString())).thenAnswer {
+            saved.remove(it.getArgument<String>(0)); edit
+        }
+        assertTrue(ChatCheckIns.enabled(ctx))
+        assertFalse(FeedChatEvidence.enabled(ctx))
+        saved["feed.chat.rows"] = "synthetic local reference"
+        FeedChatEvidence.setCheckIns(ctx, false)
+        assertFalse(ChatCheckIns.enabled(ctx))
+        assertFalse(FeedChatEvidence.hasReferences(ctx))
+        // Earlier builds stored explicit false under this same key. It also survives Feed opt-in.
+        assertEquals(false, saved["feed.chat.checkins"])
+        FeedChatEvidence.enable(ctx, true)
+        assertTrue(FeedChatEvidence.enabled(ctx))
+        assertFalse(ChatCheckIns.enabled(ctx))
+        FeedChatEvidence.enable(ctx, false)
+        FeedChatEvidence.setCheckIns(ctx, true)
+        assertTrue(ChatCheckIns.enabled(ctx))
+        assertFalse(FeedChatEvidence.enabled(ctx))
+        saved["feed.chat.rows"] = "local-only reference before Feed consent"
+        FeedChatEvidence.enable(ctx, true)
+        assertFalse(FeedChatEvidence.hasReferences(ctx))
+    }
+
+    @Test fun dateAndAgeChooseWhatMeritsAnInterruption() {
+        val previous = line("pledge", request, nine.minusDays(1))
+        val underHour = line("typed", "I need to contact the museum today.", nine.minusMinutes(5))
+        val later = line("later", "I promised to contact the library tomorrow.", nine)
+        val undated = line("undated", "I promised to email the museum.", nine.minusDays(1))
+        val candidates = ChatCheckIns.due(facts(previous, underHour, later, undated), nine)
+        assertEquals(listOf(previous.text, underHour.text), candidates.map { it.text })
+        val first = candidates.first()
+        assertEquals("mine", first.chatSession)
+        assertTrue(ChatCheckIns.ready(first, nine))
+        assertFalse(ChatCheckIns.ready(candidates[1], nine))
+        assertTrue(ChatCheckIns.ready(candidates[1], nine.plusHours(1)))
+        assertFalse(ChatCheckIns.ready(first, nine.minusHours(1)))
+        assertFalse(ChatCheckIns.ready(first, nine.withHour(20)))
+        assertEquals(nine, ChatCheckIns.nextWindow(nine.minusHours(1), null))
+        assertEquals(nine.plusDays(1), ChatCheckIns.nextWindow(nine, today.toString()))
+        assertEquals(nine.plusDays(1), ChatCheckIns.nextWindow(nine.withHour(20), null))
+        assertEquals(ChatCheckIns.prefix("local", nine), ChatCheckIns.prefix("local", nine.plusHours(6)))
+        assertNotEquals(ChatCheckIns.prefix("local", nine), ChatCheckIns.prefix("second", nine))
+    }
+
+    @Test fun aDirectReplyResolvesOnlyTheCommitmentTheAssistantAskedAbout() {
+        val museum = line("museum", request, nine.minusDays(1))
+        val library = line("library", "I promised to review the library budget tomorrow and submit it.", nine.minusDays(1))
+        val original = facts(museum, library).first { it.text == request }
+        val messageId = ChatCheckIns.prefix("local", nine) + original.id
+        val reminder = line(messageId, "You mentioned this plan for today: $request", nine, assistant = true)
+        assertEquals(2, facts(museum, library, reminder).size)
+        for (response in listOf("done", "办完了", "发了")) {
+            val reply = line("reply", response, nine.plusMinutes(1))
+            assertTrue(ChatCommitments.relevant(response))
+            assertEquals(listOf(library.text), facts(museum, library, reminder, reply).map { it.text })
+        }
+        val updated = facts(museum, library, reminder, line("reply", "Move it to Friday", nine.plusMinutes(1)))
+        assertEquals(listOf(library.text), ChatCheckIns.due(updated, nine).map { it.text })
+        assertEquals(2, updated.size)
+        val unrelated = line("other", "We talked about moving house.", nine.plusMinutes(1))
+        assertEquals(2, facts(museum, library, reminder, unrelated, line("ambiguous", "done", nine.plusMinutes(2))).size)
+    }
+
+    @Test fun syncKeepsThePreviousAnswerAndTheCheckInAsSeparateRealMessages() {
+        fun row(id: String, role: String, body: String) = LocalMessage(id, "mine", role, Transcript.partsJson(body, emptyList()), 5)
+        val messages = listOf(row("human", "user", request), row("answer", "assistant", "Understood."),
+            row("nm-checkin-day-fact", "assistant", "How is it going?"), row("reply", "user", "I sent it."))
+        val wire = Transcript.items(messages)
+        assertEquals(listOf("human", "answer", "nm-checkin-day-fact", "reply"), wire.map { it.messageId })
+        assertEquals(listOf("user", "assistant", "assistant", "user"), wire.map { it.role })
+    }
+}

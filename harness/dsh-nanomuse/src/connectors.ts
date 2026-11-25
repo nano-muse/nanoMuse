@@ -37,6 +37,7 @@ import { dshHome, json, message, sameOrigin, send } from './cloud.ts'
 import { CATALOGUE, catalogueEntry, type CatalogueAuth } from './connectors-catalogue.ts'
 import { hasUserinfo, USERINFO_TEXT } from './providers.ts'
 import { RelayError } from './relay.ts'
+import { resourceSession } from './context-resource.ts'
 
 export const API_PREFIX = '/nanomuse/connectors'
 /** The loopback port tried first (so OAuth clients registered once keep their redirect URI); any free one otherwise. */
@@ -143,6 +144,7 @@ interface Flow {
   id: string
   state: string
   verifier: string
+  followOffer?: string
   /** The connection being (re)made. */
   base: Pick<Connection, 'id' | 'service' | 'label' | 'url' | 'serverName' | 'disabled'>
   as: AsMeta
@@ -256,6 +258,18 @@ export default class NanomuseConnectors extends Service {
     }
   }
 
+  resourceConnections(): { id: string; label: string; generation: number }[] {
+    return this.store.connections.filter(c => c.state === 'ok').map(c => ({ id: c.id, label: c.label, generation: c.version }))
+  }
+
+  async inspectResource(id: string, generation: number, signal: AbortSignal, consent: () => boolean, key?: string | { single: true }) {
+    const current = () => this.store.connections.find(c => c.id === id && c.version === generation && c.state === 'ok')
+    const c = current()
+    if (!c || !consent()) throw new Error('Resource connection changed')
+    const auth = await this.authorization(c)
+    return resourceSession(this.upstream(c), auth, signal, () => Boolean(current()) && consent(), key)
+  }
+
   // ---- connecting ----------------------------------------------------------------------
 
   /**
@@ -263,7 +277,7 @@ export default class NanomuseConnectors extends Service {
    * page should do next: open the authorization URL, ask for a key, or show the
    * connection that is already there.
    */
-  async connect(input: { service?: string; url?: string; label?: string; serverName?: string; key?: string; clientId?: string; clientSecret?: string; reconnect?: string; fresh?: boolean }): Promise<
+  async connect(input: { service?: string; url?: string; label?: string; serverName?: string; key?: string; clientId?: string; clientSecret?: string; reconnect?: string; fresh?: boolean; followOffer?: string }): Promise<
     | { kind: 'authorize'; url: string; flow: string }
     | { kind: 'key'; service: string; where: string }
     /** The service does not register clients by itself: an OAuth app made at `developer` with `redirectUri`, its client id pasted here. */
@@ -271,6 +285,7 @@ export default class NanomuseConnectors extends Service {
     | { kind: 'connected'; id: string }
   > {
     const existing = input.reconnect ? this.store.connections.find((c) => c.id === input.reconnect) : undefined
+    const followOffer = input.reconnect ? undefined : input.followOffer
     const entry = catalogueEntry(existing?.service ?? input.service ?? '')
     const url = existing?.url ?? entry?.url ?? String(input.url ?? '').trim()
     if (!/^https:\/\/[^\s/]+/.test(url) && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) throw new RelayError(400, 'bad_url', 'The server address has to be an https URL')
@@ -288,13 +303,13 @@ export default class NanomuseConnectors extends Service {
       const header = spec?.header ?? 'Authorization'
       const prefix = spec?.prefix ?? (header === 'Authorization' ? 'Bearer ' : '')
       const auth: Auth = spec?.query ? { kind: 'query', name: spec.query, value: input.key } : { kind: 'header', name: header, value: `${prefix}${input.key}` }
-      return { kind: 'connected', id: await this.finish(base, auth) }
+      return { kind: 'connected', id: await this.finish(base, auth, followOffer) }
     }
-    if (wants.kind === 'none') return { kind: 'connected', id: await this.finish(base, { kind: 'none' }) }
+    if (wants.kind === 'none') return { kind: 'connected', id: await this.finish(base, { kind: 'none' }, followOffer) }
 
     // OAuth, or find out
     const probe = await probeAuth(url)
-    if (probe.kind === 'open') return { kind: 'connected', id: await this.finish(base, { kind: 'none' }) }
+    if (probe.kind === 'open') return { kind: 'connected', id: await this.finish(base, { kind: 'none' }, followOffer) }
     if (probe.kind === 'key') return { kind: 'key', service: base.service, where: probe.hint }
     const as = probe.as
     const redirectUri = `http://127.0.0.1:${this.port}/oauth/callback`
@@ -323,6 +338,7 @@ export default class NanomuseConnectors extends Service {
       state: randomBytes(16).toString('base64url'),
       verifier: randomBytes(32).toString('base64url'),
       base,
+      ...(followOffer ? { followOffer } : {}),
       as,
       client,
       resource: probe.resource,
@@ -431,7 +447,7 @@ export default class NanomuseConnectors extends Service {
   }
 
   /** Store a connection once its credential is in hand: list its tools, keep it, tell the agent side. */
-  private async finish(base: Flow['base'], auth: Auth): Promise<string> {
+  private async finish(base: Flow['base'], auth: Auth, followOffer?: string): Promise<string> {
     const now = Date.now()
     const existing = this.store.connections.find((c) => c.id === base.id)
     const c: Connection = existing ?? { ...base, auth, connectedAt: now, updatedAt: now, version: 0, tools: [], state: 'ok', error: '' }
@@ -452,6 +468,10 @@ export default class NanomuseConnectors extends Service {
     if (!existing) this.store.connections.push(c)
     await this.save()
     this.changed()
+    if (!existing && followOffer && c.state === 'ok') {
+      // Resource discovery is optional. A service can still connect when its resource list is offline.
+      await this.ctx.get('nanomuseRooms')?.watchNewConnection(followOffer, c.id, c.version).catch(() => undefined)
+    }
     return c.id
   }
 
@@ -578,7 +598,7 @@ export default class NanomuseConnectors extends Service {
         ...(tokens.scope ?? flow.scope ? { scope: tokens.scope ?? flow.scope! } : {}),
         resource: flow.resource,
       }
-      await this.finish(flow.base, auth)
+      await this.finish(flow.base, auth, flow.followOffer)
       flow.status = 'done'
       this.changed()
       return page(res, 200, zh ? `${flow.base.label} 已连接` : `${flow.base.label} is connected`, zh ? '可以关掉这一页，回到 nanoMuse 了。' : 'You can close this page and go back to nanoMuse.')
@@ -710,6 +730,7 @@ export default class NanomuseConnectors extends Service {
             ...(typeof body.clientSecret === 'string' && body.clientSecret.trim() ? { clientSecret: body.clientSecret.trim() } : {}),
             ...(typeof body.reconnect === 'string' ? { reconnect: body.reconnect } : {}),
             ...(body.fresh === true ? { fresh: true } : {}),
+            ...(typeof body.followOffer === 'string' ? { followOffer: body.followOffer } : {}),
           }))
         case '/disconnect':
           await this.disconnect(String(body.id ?? ''))
@@ -909,6 +930,11 @@ async function listTools(url: string, auth: Record<string, string>): Promise<Too
   const session = first.headers.get('mcp-session-id')
   const sessionHeaders = session ? { 'mcp-session-id': session } : {}
   await fetch(url, { method: 'POST', headers: mcpHeaders({ ...auth, ...sessionHeaders }), body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }), redirect: 'manual', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) }).then((r) => r.body?.cancel()).catch(() => undefined)
+  const capabilities = (init?.result as { capabilities?: { tools?: unknown; resources?: unknown } } | undefined)?.capabilities
+  if (capabilities?.resources && !capabilities.tools) {
+    if (session) void fetch(url, { method: 'DELETE', headers: mcpHeaders({ ...auth, ...sessionHeaders }), redirect: 'manual', signal: AbortSignal.timeout(5000) }).then(r => r.body?.cancel()).catch(() => undefined)
+    return []
+  }
   // every page: a server with many tools hands them out a cursor at a time
   const tools: { name?: string; description?: string }[] = []
   let cursor: string | undefined

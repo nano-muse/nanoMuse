@@ -684,8 +684,10 @@ and lists the people it brought (`GET /v1/admin/invites`). Padding one's own
 pool is not worth the trouble: the bonus is paid once the invitee has
 accumulated real successful provider spend (`INVITE_SETTLE_MIN_SPENT_UY`, 200
 micro-yuan by default) from a network address different from the inviter's,
-e-mail `+tag` subaddresses and Gmail dot or `googlemail.com` aliases map to
-the same account, disposable mail domains (`DEFAULT_SIGNUP_DOMAIN_BLOCK` plus
+Gmail `+tag` and dot aliases, including `googlemail.com`, map to the same
+account. Other providers' `+tag` addresses remain distinct; an account that
+relay 0.26 had already merged under the untagged address remains reachable
+through that tagged spelling. Disposable mail domains (`DEFAULT_SIGNUP_DOMAIN_BLOCK` plus
 `SIGNUP_DOMAIN_BLOCK`) are refused, new accounts from a mail domain that is
 not a well-known provider are limited per day (`SIGNUP_PER_DOMAIN_DAY`, 5 by
 default; the refusal is `domain_limited`), and the health check raises two
@@ -834,7 +836,7 @@ POST /v1/auth/code          {identifier}                      → 204 (a disable
 POST /v1/auth/verify        {identifier, code, device, invite?, device_id?, device_kind?} → {api_key, base_url, account, tokens, models, created, region}; the optional identity binds the key to that Hub device (hub.md); 400 code_wrong | code_expired | bad_device, 403 account_disabled
 POST /v1/auth/login         {identifier, password, device, device_id?, device_kind?} → the same; 401 bad_credentials, 429 locked, 400 bad_device
 POST /v1/auth/password      Bearer  {password, current?}      → 204; "" with current removes it; 400 password_short | password_long | password_weak | password_wrong | password_required
-POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; a key that lapses on its own (90 days at most); 403 session_from_session
+POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; a key that lapses on its own (90 days at most), issued with a computer Hub reservation that its runtime may replace once with a free id; 403 session_from_session
 GET  /v1/me                 Bearer                            → {region: cn | intl | unknown, account{…, has_password, sessions, signed_in_via}, usage{today, total by kind / model}, tokens, spend{…, ways, guidance}, invite, contribute, models, defaults, base_url, clips, recent, nudges, paused[]}
 GET  /v1/me/invite          Bearer                            → {code, url, invites, bonus_cny, invitee_bonus_cny, bonus_when: "first_use", settled, pending, earned_cny, friends[]}
 GET  /v1/estimate           Bearer  ?images=5&clips=4&image_model=&video_model=&size=  → {cny, usd, parts[{kind, model, count, seconds?, cny}], left_cny, grant_cny, unlimited, affordable}; nothing charged

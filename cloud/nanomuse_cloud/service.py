@@ -33,7 +33,7 @@ from .client import client_version, platform_from, platform_of
 from .config import ModelSpec, Settings, menu_warnings
 from .controls import Controls
 from .crypto import IdentifierCrypto
-from .db import Database, now
+from .db import SESSION_HUB_RESERVATION_PREFIX, Database, now
 from .geo import Place
 from .identifiers import BadIdentifier, Identifier, parse
 from .nudges import BadNudges
@@ -1148,27 +1148,33 @@ class Cloud:
 
     SESSION_KEY_MAX_S = 90 * 86400
     #: session keys one account may mint an hour: a gateway starts a few containers a day,
-    #: and each key is a hub identity of its own (0.30)
+    #: and each key is a short-lived computer Hub identity of its own (0.30)
     SESSION_KEYS_PER_HOUR = 30
 
     def session_key(self, caller: Caller, device: str, ttl_s: int) -> tuple[str, int]:
         """A key that stops working on its own after `ttl_s` (at most 90 days), for a place
-        that should not hold a standing one — nanoMuse Web's container gets one at start and
-        the gateway keeps nothing. Issued to the account of the key making the request; the
+        that should not hold a standing one. nanoMuse Web gets one at sign-in and the
+        gateway keeps nothing. Issued to the account of the key making the request; the
         requesting key is untouched (the caller revokes it if it has no further use for it).
         A session key cannot mint another: otherwise a key that lapses in an hour could
         hand itself 90 more days, and a container that leaked one would hold the account
-        for as long as it liked. The Hub identity is not fixed here: the container's
-        runtime is a `computer` of the account with an id of its own, and binds it at its
-        first hello like any credential; what a session key can never do is take an id
-        another key holds (`Database.bind_key_to_hub_device`)."""
+        for as long as it liked. It is issued with a server-generated computer reservation.
+        The container runtime replaces that reservation with its own free computer id on
+        first hello, then the credential is fixed to that installation."""
         if caller.via == "session":
             raise CloudError(403, "session_from_session", "A session key cannot issue another session key; use the device's own key")
         if not self.session_key_pace.allow(caller.account_id):
             raise CloudError(429, "rate_limited", f"At most {self.SESSION_KEYS_PER_HOUR} session keys an hour for one account")
         ttl = max(60, min(int(ttl_s), self.SESSION_KEY_MAX_S))
         expires_at = now() + ttl
-        key, _ = self._issue_key(caller.account_id, device or "session", via="session", expires_at=expires_at)
+        key, _ = self._issue_key(
+            caller.account_id,
+            device or "session",
+            via="session",
+            expires_at=expires_at,
+            hub_device_id=SESSION_HUB_RESERVATION_PREFIX + secrets.token_hex(12),
+            hub_device_kind="computer",
+        )
         self.db.add_event(caller.account_id, "sign_in.session", (device or "session")[:60])
         return key, expires_at
 

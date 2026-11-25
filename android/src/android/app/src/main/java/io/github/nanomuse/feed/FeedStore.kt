@@ -38,7 +38,7 @@ object FeedStore {
         refreshSandbox()
     }
 
-    fun reload() {
+    @Synchronized fun reload() {
         val all = root.listFiles()?.filter(FeedPost::isDayDir)
             ?.sortedByDescending { it.name }
             ?.flatMap { day -> day.listFiles()?.mapNotNull(FeedPost::parse).orEmpty().sortedWith(DAY_ORDER) }
@@ -58,7 +58,7 @@ object FeedStore {
         _preferences.value = text.trim().ifEmpty { defaultPreferences() }
     }
 
-    fun setLiked(post: FeedPost, liked: Boolean) {
+    @Synchronized fun setLiked(post: FeedPost, liked: Boolean) {
         val updated = post.copy(liked = liked)
         runCatching { post.file.writeText(updated.serialize()) }
             .onSuccess { refreshSandbox() }
@@ -66,14 +66,14 @@ object FeedStore {
         _posts.value = _posts.value.map { if (it.file == post.file) updated else it }
     }
 
-    fun delete(post: FeedPost) {
+    @Synchronized fun delete(post: FeedPost) {
         runCatching { post.file.delete() }
             .onSuccess { refreshSandbox() }
         _posts.value = _posts.value.filterNot { it.file == post.file }
     }
 
     /** Writes a batch for today and reports posts omitted by the daily limit. */
-    fun append(drafts: List<Draft>, now: Long = System.currentTimeMillis()): AppendResult {
+    @Synchronized fun append(drafts: List<Draft>, now: Long = System.currentTimeMillis()): AppendResult {
         if (drafts.isEmpty()) return AppendResult(emptyList(), 0)
         val day = java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
         val dir = File(root, day).apply { mkdirs() }
@@ -88,6 +88,7 @@ object FeedStore {
             val post = FeedPost(
                 day = day, index = next, title = d.title.trim().take(80), type = d.type, emoji = d.emoji,
                 body = d.body.trim(), source = d.source, createdAt = now, liked = false, file = file,
+                preparation = d.preparation, goalId = d.goalId, sourceSessions = d.sourceSessions, chatBased = d.chatBased,
             )
             runCatching { file.writeText(post.serialize()) }
                 .onSuccess { written += post; next++ }
@@ -128,6 +129,10 @@ object FeedStore {
         val emoji: String,
         val body: String,
         val source: List<String>,
+        val preparation: String = "",
+        val goalId: String = "",
+        val sourceSessions: List<String> = emptyList(),
+        val chatBased: Boolean = false,
     )
 
     data class AppendResult(val written: List<FeedPost>, val droppedByLimit: Int)

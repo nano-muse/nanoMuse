@@ -249,8 +249,14 @@ def test_goal_categories_due_dates_and_check_ins(tmp_path: Path):
     now = datetime.now(UTC)
     assert store.due_check_ins(now + timedelta(days=8))[0].id == g.id
     assert store.due_check_ins(now - timedelta(days=1)) == []
-    moved = store.mark_checked_in(g.id, now=when + timedelta(minutes=1))
+    moved = store.mark_checked_in(g.id, now=when + timedelta(minutes=1), occurrence=g.next_check_in)
     assert moved.next_check_in > g.next_check_in
+    # Recovery can repeat source acknowledgement after its commit. The claimed occurrence
+    # must not skip the next check-in when the outbox finalization was interrupted.
+    replayed = store.mark_checked_in(
+        g.id, now=when + timedelta(minutes=1), occurrence=g.next_check_in
+    )
+    assert replayed.next_check_in == moved.next_check_in
     # clearing the cadence clears the schedule
     assert store.update(g.id, check_in="").next_check_in == ""
     assert store.update(g.id, due="", category="learning").category == "learning"

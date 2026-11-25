@@ -262,7 +262,14 @@ extension AIChatViewModel {
             // boundaries by id after restore.
             var agentMsg = raw.toAgentMessage(mediaResolver: resolver)
             agentMsg.dbMessageId = raw.id
-            loadedHistory.append(agentMsg)
+            // nanoMuse: a local watch offer is usable when the person replies, with external titles marked as evidence.
+            if raw.id.hasPrefix(NanoMuseOutreachJournal.localPublicPrefix) {
+                if raw.role == .assistant, raw.parts.count == 1, case .text(let display) = raw.parts.first,
+                   let context = NanoMusePublicReview.historyText(displayed: display) {
+                    agentMsg.parts = [.text(context)]
+                    loadedHistory.append(agentMsg)
+                }
+            } else { loadedHistory.append(agentMsg) }
 
             // [T-bridge-message-ui-leak] The #579 role-alternation bridge is
             // LLM-context-only: it stays in loadedHistory (appended above, so
@@ -289,6 +296,7 @@ extension AIChatViewModel {
             if raw.role == .assistant {
                 // nanoMuse: C8 — a reply that came down from another device is its own bubble; it
                 // never folds into this phone's turn (nor the other way round), so the caption is honest.
+                if raw.id.hasPrefix(NanoMuseOutreachJournal.messagePrefix) { currentAssistant = nil } // nanoMuse: a proactive check-in starts its own bubble.
                 let nmOrigin = NanoMuseSync.shared.fromDevice(mid: raw.id) // nanoMuse:
                 if let assistant = currentAssistant, assistant.nmFromDevice == nmOrigin { // nanoMuse: was `if let assistant = currentAssistant`
                     // Continuation of an agent loop — append new blocks to
@@ -1348,7 +1356,7 @@ extension AIChatViewModel {
     /// from auto-selection on a fresh install. nil modalityOverride = assume
     /// text (most models don't override, and historically text-output is the
     /// default for chat models).
-    private static func isTextOutputModel(_ model: LLMModel) -> Bool {
+    static func isTextOutputModel(_ model: LLMModel) -> Bool { // nanoMuse: shared with tool-free public source reviews.
         guard let modality = model.modalityOverride else { return true }
         if modality.contains(.imageOutput) { return false }
         if modality.contains(.audioOutput) { return false }

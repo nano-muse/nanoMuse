@@ -21,6 +21,14 @@ nanoMuse 桌面版将智能体放进一个独立窗口，基于 [DeepSeek Harnes
 
 连接器的**设计**分类提供 Levea。通过 OAuth 登录后，可剪辑视频、添加字幕并导出 MP4 文件。它的工具沿用其他 MCP 连接器的审批规则。
 
+在 Linux 和 macOS 上，「设置 → 通用 → 简介」会同时显示已安装版本和最新公开版本。本地测试版可能比公开版本更新。
+
+## 长期关注公开来源
+
+打开动态设置里的「公开来源」，可以查看 nanoMuse 关注的账号、仓库、研究者、课题和网站。比如说起自己维护的仓库，它就能开始留意新 issue。在多条消息里提到同一个对象，会产生待确认的建议。支持 RSS 或 Atom 的网站也可以关注。每个来源都可以暂停或忽略。首次读取只记下起点。桌面端运行、每日准备和聊天跟进开启时，值得提醒的新条目可以直接出现在主要聊天里。研究者标识、检查频率和覆盖范围见[长期关注公开来源](app.md#长期关注公开来源)。
+
+如果希望在手机上也看到，先在两台设备上用同一个账号开启对话同步，再到电脑的动态设置打开「将公开来源的更新同步到其他设备」。之后完全依据公开资料生成的提醒可以随主要聊天同步到手机。
+
 ## Windows 软件内更新 {#updating-on-windows}
 
 Windows x64 应用在启动后及每六小时检查一次较新的正式稳定版。设置页显示当前运行版本，与左下角菜单使用同一更新状态。点击「再查一次」可立即检查。
@@ -85,9 +93,9 @@ Electron 外壳将 dsh Host 作为子进程启动，再把 harness 的网页应�
 - **功能页面与记忆**。这里所说的「房间」是聊天以外的动态、点子、目标、资源库页面，与手机版一致。Host 将数据保存在 `nanomuse/rooms.json`，智能体在隐藏会话中生成动态和点子，在各自会话中处理目标，目标自动执行使用 harness 日程插件。资源库作品保存在 `~/nanoMuse/Library`。插件创建的所有聊天，包括用户聊天、后台批处理和其他设备交来的任务，都以 `~/nanoMuse` 为工作区，不直接使用用户主目录。在 Windows 上，若整个用户目录作为工作区，沙箱临时根目录落在其中，会导致 `workspace-write` 命令无法执行，见 [#705](https://github.com/nano-muse/nanoMuse/issues/705)。关于你的记忆也会读入每段聊天，见 [desktop-muse.md](desktop-muse.md#rail-rooms)。
 - **Reach**。本机通过 [hub](hub.md) 出现在账号设备列表。`devices`、`device_screen`、`device_shell`、`device_files`、`device_open`、`device_notify`、`delegate` 可访问手机和其他电脑。手机发来的 `delegate` 在本机创建「来自 <device>」dsh 会话，审批传回手机；请求方启用 `stream` 时，回复会随模型生成逐段返回。如果该会话此前被归档，新任务会像用户重新打开并输入一样恢复会话。`shell`、`files`、`open`、`screen` 等远程控制受开关管理。
 - **编程助手**。设置 → 编程助手先列出本机 Cursor、Codex、Claude Code、DeepSeek Harness 的聊天，再列出账号下其他电脑。记录从磁盘读取，发送消息会启动助手自己的 CLI（命令行程序），实时显示文字及工具调用，点击「停止」结束。跨设备通过本机也声明支持的 `coding.*` hub 动作完成。设备卡片的「编程助手」标签可打开那台电脑的页面，见 [coding-agents.md](coding-agents.md)。
-- **网络**。设置 → nanoMuse Cloud → 网络可配置应用对外请求的统一代理，支持 `http://host:port`、`https://`、`socks5://`、`socks5h://`，可包含 `user:pass@`，显示时会隐藏凭据。dsh Host 的自有 key 请求、ChatGPT 登录、列出模型、工具读取网页、连接器、更新检查及手的运行时都使用它，`nanomuse mcp` 会继承相同变量。nanoMuse Cloud 的中继、hub WebSocket（持续双向通信连接）、同步及本机回环不走代理。外壳将代理与登录启动选项保存在 `desktop.json`，因为地址可能含密码，权限为 0600。启动 Host 时会设置 `HTTP_PROXY`、`HTTPS_PROXY`、SOCKS 所需的 `ALL_PROXY`，以及含 `localhost,127.0.0.1,::1`、`cloud.nanomuse.cn` 和实际中继的 `NO_PROXY`，再设置 `NODE_USE_ENV_PROXY=1` 让 Node 的 fetch 使用这些变量。因此需要重启生效。该行的「立即重启」只重启 Host，窗口保持打开；如有回复、屏幕操作、远程任务或审批，会像退出时一样先询问。自建中继需在启动外壳时设置 `NANOMUSE_CLOUD_URL`，才能加入 `NO_PROXY`，插件也读取这个变量。手机的服务商表单、网页自有 key 表单及运行时的 `[llm] proxy` 提供对应设置，见 [own-key.md](own-key.md#when-the-provider-cannot-be-reached)。
+- **网络**。设置 → nanoMuse Cloud → 网络可配置应用对外请求的统一代理，支持 `http://host:port`、`https://`、`socks5://`、`socks5h://`，可包含 `user:pass@`，显示时会隐藏凭据。dsh Host 的自有 key 请求、ChatGPT 登录、列出模型、工具读取网页、连接器、更新检查及手的运行时都使用它，`nanomuse mcp` 会继承相同变量。nanoMuse Cloud 的中继、hub WebSocket（持续双向通信连接）、同步及本机回环不走代理。外壳将代理与登录启动选项保存在 `desktop.json`，因为地址可能含密码，权限为 0600。启动 Host 时会设置 `HTTP_PROXY`、`HTTPS_PROXY`、SOCKS 所需的 `ALL_PROXY`，以及含 `localhost,127.0.0.1,::1`、`cloud.nanomuse.cn` 和受信任启动参数 `NANOMUSE_CLOUD_URL` 所指定中继的 `NO_PROXY`，再设置 `NODE_USE_ENV_PROXY=1` 让 Node 的 fetch 使用这些变量。因此需要重启生效。该行的「立即重启」只重启 Host，窗口保持打开；如有回复、屏幕操作、远程任务或审批，会像退出时一样先询问。自建中继需在启动外壳时设置 `NANOMUSE_CLOUD_URL`，才能加入 `NO_PROXY`，插件也读取这个变量。手机的服务商表单、网页自有 key 表单及运行时的 `[llm] proxy` 提供对应设置，见 [own-key.md](own-key.md#when-the-provider-cannot-be-reached)。
 - **长期授权**。设置 → 权限汇总本机保存的全部授权，沿用手机的三组：「不再询问」对应远程控制开关，开启后账号下所有设备都可在本机操作；「卡片上记住的」包含远程控制卡片上总是允许的设备，以及手在某应用、某聊天或某定时任务中的授权；「先执行再告知」目前没有桌面条目。每行写明允许的操作、对象或位置、授权时间，并可「撤回」。对话级授权注明「仅对话「…」」，还会列出它覆盖的该聊天中的定时任务。任务级授权注明「仅定时任务「…」」及所属聊天，任务删除后也会标记。空列表会说明，在审批卡片选「始终」才能保存授权。电脑操作页和资料抽屉保留简短列表，范围说明相同，权限页则展示完整列表。Host 通过 `GET /nanomuse/cloud/grants` 返回列表，`POST /grants/revoke {id}` 撤回任一条。
-- **退出前保护任务**。菜单「退出」、Ctrl+Q、托盘「退出」，或没有托盘时关闭最后一个窗口，都会先询问 Host 是否正在生成回复、操作屏幕、执行其他设备任务或等待审批。确认框列出这些工作，默认「继续运行」。只有明确确认才会结束工作，等待停止后再关闭 Host。交接期间的新任务返回 busy，请求设备可稍后重发。菜单栏图标开启时，关窗口只是保留在托盘，不算退出。接口分别为汇总工作状态的 `GET /nanomuse/cloud/work`、控制交接的 `POST /work/gate {open}`、确认停止的 `POST /work/stop`。代理行「立即重启」及 macOS 录屏授权后重启应用，也使用相同确认；单独重启辅助程序不影响 Host 任务。
+- **退出前保护任务**。菜单「退出」、Ctrl+Q、托盘「退出」，或没有托盘时关闭最后一个窗口，都会先询问 Host 是否正在生成回复、操作屏幕、执行其他设备任务或等待审批。确认框列出这些工作，默认「继续运行」。只有明确确认才会结束工作，等待停止后再关闭 Host。交接期间的新任务返回 busy，请求设备可稍后重发。菜单栏图标开启时，关窗口只是保留在托盘，不算退出。接口分别为汇总工作状态的 `GET /nanomuse/cloud/work`、控制交接的 `POST /work/gate {open}`、确认停止的 `POST /work/stop`。代理行「立即重启」及 macOS 录屏授权后重启应用，也使用相同确认；单独重启辅助程序不影响 Host 任务。确认后若停止工作或重启失败，本次重启会取消，并重新开放工作入口。
 - **模型调用的来源记录**。从中继 0.31 起，每次调用都会记录其所属设备和任务。harness 适配器每次使用同一组服务商请求头，但调用来源会变化，因此 *nanoMuse Cloud* 服务商先连接插件自己的本机入口 `http://127.0.0.1:<端口>/v1`。启动时优先申请上次端口，保存在 `doorPort`，以便原配置继续有效。如果端口被占用，或配置来自 1.0.7、仍直接指向中继，Host 完成启动后才将配置改为当前本机入口。不能在插件启动阶段等待写入，否则 Host 会在公布地址前卡住，这是 1.0.8、#701 的修复。入口只转发携带本账号 key 的请求，其余返回 401，与中继相同。转发会附带设备、`X-NanoMuse-Platform: desktop` 及 `llm/stream` 钩子登记的信息：`X-NanoMuse-Run` 的 `person`、`schedule`、`goal` 或其他设备任务的 `hub`，对话轮次及步骤序号，操作本机时还包括手的运行和步骤。中继回复原样逐段返回，其轮次 id 保存在会话中。使用自有 key 的轮次也会事后上传相同字段，见 [cloud.md](cloud.md#provenance)。插件还通过 `POST /v1/events` 上传事件代码，不上传文字：每个工具调用的决定、决定来源，包括策略、长期授权、卡片或舞台上的用户、另一台设备、无人及时答复，以及最终是否执行；审批等待时间；手的动作类型、结果、耗时和运行结束方式；轮次被手动停止或出错；以及网页组件通过 `POST /nanomuse/cloud/feedback` 提交的赞踩或停止原因，格式为 `{session, vote: up | down | "", reason?, turn_no?}` 或 `{session, stop_reason, turn_no?}`。原因仅接受中继规定的值，其他返回 400。登录时每隔几秒批量上传，退出登录清空队列，见 [cloud.md](cloud.md#client-events)。
 - **回复反馈与停止原因**。登录后，每条回复末尾的引用按钮旁有赞和踩。点踩可选「答错了」「没帮上忙」「不该这么做」「太慢了」「其他原因」或「跳过」。再次点击同一按钮可撤回，给旧回复反馈时，会按上方用户消息确定其轮次。点击「停止」后，输入框上方出现「为什么停下来？」，可选「方向不对」「太慢了」「改主意了」「已经做完了」「其他原因」或「跳过」。回答、跳过、开始下一轮或等待一分半后，提示消失；`live.stopped` 保存仍在等待回答的会话。每个答案只作为一个分类词写入 `turn.feedback`、`turn.stopped`，不附带其他内容。未登录时不显示。
 
@@ -138,6 +146,8 @@ Electron 外壳将 dsh Host 作为子进程启动，再把 harness 的网页应�
 
 ## 配置与数据 {#config-and-data}
 
+在桌面版打开从手机或其他设备同步的聊天，助手回复中的 Markdown 标题、列表、表格和代码块都会排版显示。绑定设备的聊天收到完整回复后也按相同方式显示。你自己发的消息保留输入时的样子。已经同步到电脑的回复，重新打开聊天就能看到排版，无需再次同步。
+
 登录或退出前，会先暂停对话同步，再更换凭据。旧账号的响应不能修改新账号的对话、主要聊天或同步进度，也不能给新账号的模型加入上下文。旧同步请求创建的本地聊天，即使在切换账号期间才完成创建，仍归原请求的账号。已经发给中继的请求可能仍会在服务端完成。
 
 登录或退出如果中途未完成，重启后同步仍会暂停。重新成功登录后才会恢复。
@@ -164,7 +174,7 @@ Windows 上的编程助手 `.cmd` 启动脚本需要采用受支持的 npm 格�
 
 设备完成一轮时只清除自己的工作指示。较早的停止通知不能清除同一设备后来开始的工作状态。
 
-账号状态按顺序排队保存，先写私有临时文件，再替换 `cloud.json`。替换前中断，原有完整数据仍在。
+账号状态按快照顺序排队保存。每个私有临时文件在替换 `cloud.json` 前都会刷入磁盘，原有完整状态保存为权限 0600 的 `cloud.json.bak`。平台支持时还会同步所在目录。启动时若 `cloud.json` 缺失或损坏，只会从能够解析并通过主文件同一套状态清洗的备份恢复；否则停止启动，不会丢弃账号或已保存的权限。
 
 同步缓存最多保存 64 份对话日志。需要较早记录时会从磁盘重读，已保存对话仍可访问。
 
@@ -184,7 +194,7 @@ Windows 上的编程助手 `.cmd` 启动脚本需要采用受支持的 npm 格�
 
 Windows 上，设置 → 电脑操作中的检查支持通过可识别的 Node `.cmd` 脚本启动运行时，包括受支持的 npm 格式。任意批处理程序，包括直接调用 Python 的包装脚本，都会被拒绝；请使用运行时的可执行文件，或受支持的 Node 启动脚本。
 
-`desktop.json` 先写相邻临时文件再替换，上一版保存为 `desktop.json.bak`。磁盘满或崩溃导致保存失败时，仍保留最后一次有效设置，文件损坏后下次启动会从备份恢复。因为代理地址可能含密码，两份文件都仅本人可读。「下载你的智能体数据」逐个文件写入 zip，跳过链接和超过 64 MB 的文件，并删除打包副本 `desktop.json` 中代理地址的密码。
+`desktop.json` 先写相邻临时文件再替换，上一版保存为 `desktop.json.bak`。磁盘满或崩溃导致保存失败时，仍保留最后一次有效设置，文件损坏后下次启动会从备份恢复。因为代理地址可能含密码，两份文件都仅本人可读。「下载你的智能体数据」逐个文件写入 zip，跳过链接和超过 64 MB 的文件，并删除打包副本 `desktop.json` 中代理地址的密码。文件数超过 65,000 或总量超过 3 GiB 时，导出会停止，不会生成无效 zip。
 
 设置 → 插件将所选插件包保存在 `profiles/nanomuse/package.json`。启动时保留列表、顺序及启停选择。只有尚未保存过选择时才写入默认值：日程默认启用，智能体团队和自动授权审查仍由用户选择。旧版若已重置选择，需要重新开启所需插件，无法自动恢复丢失的选择。已有 `cordis.yml`、`cordis.patch.yml` 保留。
 
@@ -295,7 +305,7 @@ macOS runner 通过 `harness/desktop/mac/computer-use/build.sh` 构建 *nanoMuse
 ## Linux 注意事项 {#linux-notes}
 
 - **Debian、Ubuntu 及衍生版优先使用 `.deb`**。它安装 `/opt/nanoMuse/nanomuse-desktop`、图标和桌面入口，系统启动器可以识别。安装命令为 `sudo apt install ./nanoMuse-Desktop-<version>-linux-x64.deb`。
-- **AppImage 依赖 FUSE**，它会在启动时挂载自己。缺少 `libfuse2`，或容器、企业系统禁止 `fusermount` 时，日志可能显示 `fusermount: mount failed: Operation not permitted` 或 `Cannot mount AppImage, please check your FUSE setup`。可改为解包运行 `./nanoMuse-Desktop-<version>-linux-x64.AppImage --appimage-extract-and-run`，或下载相同应用的 **`.tar.gz`**，解压到任意位置后运行 `./nanomuse-desktop`，无需 FUSE 和 root。
+- **AppImage 依赖 FUSE**，它会在启动时挂载自己。缺少 `libfuse2`，或容器、企业系统禁止 `fusermount` 时，日志可能显示 `fusermount: mount failed: Operation not permitted` 或 `Cannot mount AppImage, please check your FUSE setup`。把 AppImage 放在这个版本专用的文件夹中，进入该目录运行一次 `./nanoMuse-Desktop-<version>-linux-x64.AppImage --appimage-extract`。以后从同一目录运行 `./squashfs-root/AppRun`，在退出应用前保留整个目录。使用临时解包模式时，第二次启动可能会移除第一个窗口仍在使用的文件。也可以下载 **`.tar.gz`**，解压后运行其中的 `./nanomuse-desktop`。
 - **点击图标没有反应**。应用只运行一个实例，第二次点击启动器会要求已有实例显示窗口。0.1.36 及以前，关闭窗口后留在托盘的实例可能不响应，0.1.37 起已能重新开窗。若旧实例仍在运行，从托盘「退出」，或运行 `pkill -f /opt/nanoMuse/nanomuse-desktop`，再点击。只有设置 → 通用 → 应用行为的菜单栏开关开启时，关闭窗口才会留在托盘；关闭该开关后，关窗口即退出。两种情况下均可在窗口按 **Ctrl+Q**，或帮助 → 退出；Alt 显示菜单栏。
 - **Ubuntu 20.04 看不到托盘图标**。GNOME 3.36 的 appindicator v33 不接受 Electron 44 包含对象路径的总线注册名，因此退回 GNOME Shell 不显示的 XEmbed 托盘。应用仍在运行，只是图标不可见。Ubuntu 22.04+ 可以显示。20.04 可用 Ctrl+Q，或关闭菜单栏选项，让关窗口就退出。
 - **使用 WebAssembly 处理图片**。harness 用 sharp 读取和缩放模型输入图及截图。sharp 原生包自带 GLib，而 Electron Linux 连接系统 GLib 并将符号暴露到同进程，见 electron/electron#46323，可能每张图都报 `GLib-GObject-CRITICAL`，部分系统首张解码就以 SIGSEGV 崩溃，读图调用无响应，轮次丢失。因此 Linux 包使用 sharp 的 WebAssembly 版本，不带原生版。单张处理时间约翻倍，2560×1440 截图约 50 毫秒，其他行为相同。1.0.1 及以前可手动修复：在 `resources/dsh/node_modules` 运行 `npm install @img/sharp-wasm32@0.35.5`，删除 `@img/sharp-linux-x64`、`@img/sharp-libvips-linux-x64`，sharp 就会使用 WebAssembly。

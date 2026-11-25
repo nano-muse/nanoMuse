@@ -8,7 +8,8 @@
 import { failureText } from './api.ts'
 import { createElement as h, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Translate } from './api.ts'
-import { IconComment, IconFeed, IconHeart, IconRefresh, IconSliders } from './icons.tsx'
+import { IconComment, IconCopy, IconFeed, IconHeart, IconRefresh, IconSliders } from './icons.tsx'
+import { PublicWatchSettings } from './PublicWatchSettings.tsx'
 import { FEED_PANEL } from './panels.ts'
 import { setPrefs, usePrefs } from './prefs.ts'
 import { markFeedSeen, nav, roomsCall, useRooms, type FeedPost, type FeedRoutine } from './rooms.ts'
@@ -18,16 +19,33 @@ export function makeFeedPanel(t: Translate) {
   return function FeedPanel(): ReactNode {
     const rooms = useRooms()
     const prefs = usePrefs()
+    const [quiet, setQuiet] = useState(false)
     const [settings, setSettings] = useState(false)
     const [error, setError] = useState<string | undefined>()
-    const posts = rooms.feed.posts
+    // An open window drops date-sensitive cards at the host's local midnight, even offline.
+    const [, setExpiryTick] = useState(0)
+    const now = Date.now()
+    const posts = rooms.feed.posts.filter((post) => (!post.preparation || post.preparation.expiresAt > now) && (!post.goalId || (post.goalExpiresAt ?? 0) > now))
     const newest = posts[0]?.at ?? 0
+    const reminder = posts.find((post) => post.goalId)
+    const expiry = posts.map(p => p.preparation?.expiresAt ?? p.goalExpiresAt).filter((at): at is number => at !== undefined).sort((a, b) => a - b)[0]
+    useEffect(() => {
+      if (!expiry) return
+      const timer = window.setTimeout(() => setExpiryTick((n) => n + 1), Math.max(0, expiry - Date.now()))
+      return () => window.clearTimeout(timer)
+    }, [expiry])
+    const displayPosts = reminder ? [reminder, ...posts.filter((post) => post.id !== reminder.id)] : posts
     useEffect(() => { if (newest) markFeedSeen() }, [newest])
     // opening the Feed makes sure the daily routine exists (C5: 08:00, once, on the host)
     useEffect(() => { roomsCall('feed/open', {}).catch(() => undefined) }, [])
     const routine = rooms.feed.routine
 
     const fail = (err: unknown) => setError(failureText(t, err))
+    const prepare = () => {
+      setQuiet(false)
+      setError(undefined)
+      roomsCall<{ status: string }>('feed/prepare', {}).then(result => setQuiet(result.status === 'quiet')).catch(fail)
+    }
     const refresh = () => { setError(undefined); roomsCall('feed/refresh', {}).catch(fail) }
     const discuss = (post: FeedPost) => {
       setError(undefined)
@@ -42,10 +60,12 @@ export function makeFeedPanel(t: Translate) {
         h('h1', { className: 'nm-room-title' }, t('railFeed')),
         h('div', { className: 'nm-room-actions' },
           rooms.busy.feed ? h('span', { className: 'nm-room-busy' }, h('span', { className: 'nm-spinner nm-spinner-sm' }), t('feedWriting')) : null,
+          rooms.ready && posts.length > 0 ? h('button', { type: 'button', className: 'nm-round-btn', title: t('feedPrepare'), 'aria-label': t('feedPrepare'), disabled: rooms.busy.feed, onClick: prepare }, h(IconRefresh, { size: 18 })) : null,
           h('button', { type: 'button', className: 'nm-round-btn', title: t('feedSettings'), 'aria-label': t('feedSettings'), onClick: () => setSettings(true) }, h(IconSliders, { size: 18 })))),
       h('div', { className: 'nm-room-body' },
         h('div', { className: 'nm-room-inner nm-feed' },
           error ? h('div', { className: 'nm-room-error' }, error) : null,
+          quiet && !rooms.busy.feed ? h('p', { role: 'status', className: 'nm-sheet-fine' }, t('feedQuiet')) : null,
           // the phone's intro card, until "Got it"
           !prefs.feedIntroSeen
             ? h('div', { className: 'nm-feed-intro', role: 'note' },
@@ -57,22 +77,24 @@ export function makeFeedPanel(t: Translate) {
             : null,
           posts.length === 0
             ? h(Empty, { icon: h(IconFeed, { size: 28 }), text: rooms.busy.feed ? t('feedWriting') : t('feedEmptyTitle') },
-                h('p', { className: 'nm-empty-sub' }, rooms.ready ? t('feedEmptyBody', { time: routine.time }) : t('feedRoutineNeedsModel')),
+                h('p', { className: 'nm-empty-sub' }, !routine.on ? t('feedPaused') : rooms.ready ? t('feedEmptyBody', { time: routine.time }) : t('feedRoutineNeedsModel')),
                 rooms.ready
                   ? h('div', { className: 'nm-feed-how' },
                       h('div', { className: 'nm-feed-how-title' }, t('feedEmptyHowTitle')),
                       h('p', null, t('feedEmptyHowBody')))
                   : null,
-                rooms.ready && !rooms.busy.feed ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: refresh }, t('feedWriteNow')) : null)
-            : posts.map((post) => h(PostCard, { key: post.id, t, post, lang: rooms.lang, onDiscuss: () => discuss(post), onFail: fail })))),
-      settings ? h(FeedSettings, { t, instructions: rooms.feed.instructions, routine, busy: rooms.busy.feed, ready: rooms.ready, onClose: () => setSettings(false), onRefresh: refresh }) : null)
+                rooms.ready && !rooms.busy.feed ? h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: prepare }, t('feedPrepare')) : null)
+            : displayPosts.map((post) => h(PostCard, { key: post.id, t, post, lang: rooms.lang, onDiscuss: () => discuss(post), onFail: fail })))),
+      settings ? h(FeedSettings, { key: routine.checkInScope, t, instructions: rooms.feed.instructions, routine, busy: rooms.busy.feed, ready: rooms.ready, onClose: () => setSettings(false), onRefresh: refresh }) : null)
   }
 }
 
 function PostCard({ t, post, lang, onDiscuss, onFail }: { t: Translate; post: FeedPost; lang: string; onDiscuss(): void; onFail(err: unknown): void }): ReactNode {
   const [hideImage, setHideImage] = useState(false)
+  const [copied, setCopied] = useState(false)
   const like = () => { roomsCall('feed/like', { id: post.id, on: !post.liked }).catch(onFail) }
   const remove = () => { roomsCall('feed/delete', { id: post.id }).catch(onFail) }
+  const discussLabel = t(post.goalId || post.preparation ? 'goalOpenChat' : 'feedDiscuss')
   const follow = () => { onDiscuss() }
   return h('article', { className: 'nm-post' },
     h('div', { className: 'nm-post-mark', 'aria-hidden': true }, post.emoji || '✦'),
@@ -81,42 +103,92 @@ function PostCard({ t, post, lang, onDiscuss, onFail }: { t: Translate; post: Fe
         h('h3', { className: 'nm-post-title' }, post.title),
         h('span', { className: 'nm-post-when' }, ago(t, post.at)),
         h(MoreButton, { label: t('more'), quiet: true, size: 26, items: [
-          { id: 'discuss', label: t('feedDiscuss'), onSelect: follow },
+          { id: 'discuss', label: discussLabel, onSelect: follow },
           ...(post.prompt ? [{ id: 'follow', label: t('feedFollowUp'), onSelect: follow }] : []),
           'sep',
+          ...(post.goalId ? [{ id: 'mute', label: t('goalFeedMute'), onSelect: () => { roomsCall('goals/update', { id: post.goalId, feedMuted: true }).catch(onFail) } }] : []),
           { id: 'delete', label: t('feedRemove'), danger: true, onSelect: remove },
         ] })),
-      h(Markdown, { text: post.body, className: 'nm-post-body' }),
+      post.preparation
+        ? h('div', { className: 'nm-post-body' },
+            h('p', { className: 'nm-sheet-fine' }, t(({ draft: 'feedDraft', checklist: 'feedChecklist', question: 'feedQuestion' } as const)[post.preparation.kind])),
+            h('p', { style: { whiteSpace: 'pre-wrap' } }, post.body),
+            h('details', null, h('summary', null, t('feedWhy')), h('p', null, post.preparation.why),
+              h('ul', null, post.preparation.sources.map(source => h('li', { key: source.id },
+                h('strong', null, t(({ goal: 'railGoals', file: 'railLibrary', memory: 'feedMemorySource', conversation: 'feedChatSource' } as const)[source.kind])), ' · ', source.title,
+                source.quote === source.title ? null : h('blockquote', null, source.quote))))))
+        : post.goalId
+        ? h('div', { className: 'nm-post-body' }, post.body.split('\n\n').map((line, i) => h('p', { key: i }, line)))
+        : h(Markdown, { text: post.body, className: 'nm-post-body' }),
       post.image && !hideImage
         ? h('div', { className: 'nm-post-images' }, h('img', { src: post.image, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer', onError: () => setHideImage(true) }))
         : null,
       h('div', { className: 'nm-post-actions' },
+        post.preparation && navigator.clipboard?.writeText ? h('button', { type: 'button', className: 'nm-post-action',
+          onClick: () => navigator.clipboard.writeText(post.body).then(() => setCopied(true)).catch(onFail) },
+          h(IconCopy, { size: 16 }), h('span', null, t(copied ? 'cnCopied' : 'cnCopy'))) : null,
         h('button', { type: 'button', className: `nm-post-action${post.liked ? ' nm-liked' : ''}`, 'aria-pressed': post.liked, 'aria-label': t('feedLike'), title: t('feedLike'), onClick: like }, h(IconHeart, { size: 18, filled: post.liked })),
-        h('button', { type: 'button', className: 'nm-post-action', onClick: onDiscuss }, h(IconComment, { size: 18 }), h('span', null, t('feedDiscuss'))),
+        h('button', { type: 'button', className: 'nm-post-action', onClick: onDiscuss }, h(IconComment, { size: 18 }), h('span', null, discussLabel)),
         h('span', { className: 'nm-post-time-full' }, new Date(post.at).toLocaleString(lang || undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })))))
 }
 
 function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefresh }: { t: Translate; instructions: string; routine: FeedRoutine; busy: boolean; ready: boolean; onClose(): void; onRefresh(): void }): ReactNode {
+  const [watchSettings, setWatchSettings] = useState(false)
   const [text, setText] = useState(instructions)
   const [on, setOn] = useState(routine.on)
+  const [reading, setReading] = useState(routine.reading === true)
+  const [checkIns, setCheckIns] = useState(routine.chatCheckIns === true)
+  const saved = routine.contextResource
+  const [connection, setConnection] = useState(saved?.connection ?? '')
+  const [connections, setConnections] = useState<{ id: string; label: string; generation: number }[]>([])
+  const [resource, setResource] = useState(saved?.key ?? '')
+  const [watchEdited, setWatchEdited] = useState(false)
+  const [choices, setChoices] = useState<{ key: string; label: string }[]>(saved ? [saved] : [])
+  const selected = connections.find(c => c.id === connection)
+  const [loading, setLoading] = useState(false)
   const [time, setTime] = useState(routine.time)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  useEffect(() => {
+    let live = true
+    roomsCall<typeof connections>('feed/resource-connections', {}).then(rows => { if (live) setConnections(rows) })
+      .catch(() => { if (live) setError(t('feedContextUnavailable')) })
+    return () => { live = false }
+  }, [])
+  useEffect(() => {
+    let live = true
+    if (!selected) return
+    setLoading(true)
+    if (saved && selected.id === saved.connection && selected.generation !== saved.generation) setResource('')
+    roomsCall<typeof choices>('feed/resource-choices', { scope: routine.checkInScope, connection: selected.id, generation: selected.generation })
+      .then(rows => { if (live) { setChoices(rows); setResource(old => rows.some(r => r.key === old) ? old : '') } })
+      .catch(() => { if (live) setError(t('feedContextUnavailable')) })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [selected, routine.checkInScope])
+  const watchChanged = watchEdited && (connection !== (saved?.connection ?? '') || resource !== (saved?.key ?? '') ||
+    Boolean(selected && saved && selected.generation !== saved.generation))
   const save = (event: FormEvent) => {
     event.preventDefault()
     setSaving(true)
-    const routineChanged = on !== routine.on || time !== routine.time
+    const checksChanged = checkIns !== (routine.chatCheckIns === true)
+    if (((checksChanged && checkIns) || (watchChanged && resource)) && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      void Notification.requestPermission().catch(() => undefined)
+    }
+    const routineChanged = checksChanged || on !== routine.on || time !== routine.time || reading !== (routine.reading === true)
     Promise.all([
       roomsCall('feed/instructions', { text }),
-      routineChanged ? roomsCall('feed/routine', { on, time }) : Promise.resolve(undefined),
+      watchChanged ? roomsCall('feed/resource-watch', { scope: routine.checkInScope, connection, generation: selected?.generation ?? 0, key: resource }) : Promise.resolve(undefined),
+      routineChanged ? roomsCall('feed/routine', { on, time, reading, ...(checksChanged ? { chatCheckIns: checkIns, checkInScope: routine.checkInScope } : {}) }) : Promise.resolve(undefined),
     ]).then(onClose).catch((err: unknown) => setError(failureText(t, err))).finally(() => setSaving(false))
   }
+  if (watchSettings && routine.checkInScope) return h(PublicWatchSettings, { key: routine.checkInScope, t, scope: routine.checkInScope, checksOn: routine.on && routine.chatCheckIns === true, onClose: () => setWatchSettings(false) })
   return h(Sheet, { title: t('feedSettingsTitle'), closeLabel: t('close'), onClose,
     footer: h('div', { className: 'nm-sheet-actions' },
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: busy || !ready, onClick: () => { onRefresh(); onClose() } }, h(IconRefresh, { size: 14 }), ' ', t('feedWriteNow')),
       h('span', { style: { flex: 1 } }),
       h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', onClick: onClose }, t('cancel')),
-      h('button', { type: 'submit', form: 'nm-feed-settings', className: 'nm-pill nm-pill-sm', disabled: saving }, t('save'))) },
+      h('button', { type: 'submit', form: 'nm-feed-settings', className: 'nm-pill nm-pill-sm', disabled: saving || Boolean(watchChanged && connection && (!resource || !selected || loading)) }, t('save'))) },
     h('form', { id: 'nm-feed-settings', onSubmit: save, className: 'nm-sheet-form' },
       h('p', { className: 'nm-sheet-lead' }, t('feedSettingsLead')),
       h('textarea', { className: 'nm-textarea', rows: 6, value: text, placeholder: t('feedSettingsPlaceholder'), maxLength: 2000, onChange: (e: FormEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value), 'data-modal-autofocus': true }),
@@ -127,6 +199,28 @@ function FeedSettings({ t, instructions, routine, busy, ready, onClose, onRefres
         h('span', { className: 'nm-feed-routine-label' }, t('feedRoutineSwitch')),
         h('span', { className: 'nm-feed-routine-time' },
           h('input', { type: 'time', className: 'nm-field nm-field-time', value: time, disabled: !on, 'aria-label': t('feedRoutineTime', { time }), onChange: (e: FormEvent<HTMLInputElement>) => { if (/^\d{2}:\d{2}$/.test(e.currentTarget.value)) setTime(e.currentTarget.value) } }))),
+      h('label', { className: 'nm-feed-routine' },
+        h('input', { type: 'checkbox', checked: reading, disabled: !on, onChange: (e: FormEvent<HTMLInputElement>) => setReading(e.currentTarget.checked) }),
+        h('span', null, t('feedReading'))),
+      h('label', { className: 'nm-feed-routine' },
+        h('input', { type: 'checkbox', checked: checkIns, disabled: !on || !routine.checkInScope, onChange: (e: FormEvent<HTMLInputElement>) => setCheckIns(e.currentTarget.checked) }),
+        h('span', null, t('feedChatCheckIns'))),
+      h('label', { className: 'nm-feed-routine' }, h('span', null, t('feedContextConnector')),
+        h('select', { className: 'nm-field', disabled: !routine.checkInScope, value: connection,
+          onChange: (e: FormEvent<HTMLSelectElement>) => { setWatchEdited(true); setConnection(e.currentTarget.value); setResource(''); setChoices([]); setLoading(false); setError(undefined) } },
+          h('option', { value: '' }, t('feedContextOff')),
+          saved && connection === saved.connection && !selected ? h('option', { value: saved.connection }, saved.label) : null,
+          ...connections.map(c => h('option', { key: c.id, value: c.id }, c.label)))),
+      connection ? h('label', { className: 'nm-feed-routine' }, h('span', null, t('feedContextResource')),
+        h('select', { className: 'nm-field', value: resource, disabled: loading || !selected, onChange: (e: FormEvent<HTMLSelectElement>) => { setWatchEdited(true); setResource(e.currentTarget.value) } },
+          h('option', { value: '' }, loading ? t('loading') : choices.length ? t('feedContextChoose') : t('feedContextNone')),
+          ...choices.map(r => h('option', { value: r.key, key: r.key }, r.label))))
+        : null,
+      saved && (!selected || saved.generation !== selected.generation) && connection === saved.connection && connections.length > 0
+        ? h('p', { className: 'nm-sheet-fine' }, t('feedContextReconnect')) : null,
+      h('p', { className: 'nm-sheet-fine' }, t('feedContextAbout')),
+      h('div', null, h('button', { type: 'button', className: 'nm-pill nm-pill-ghost nm-pill-sm', disabled: !routine.checkInScope,
+        onClick: () => setWatchSettings(true) }, t('watchTitle'))),
       !ready ? h('p', { className: 'nm-sheet-fine' }, t('feedRoutineNeedsModel')) : null,
       error ? h('div', { className: 'nm-room-error' }, error) : null))
 }

@@ -764,7 +764,7 @@ final class NanoMuseSync: ObservableObject {
 
     /// The record for a text the relay should have, or nil for what is not synced (tool steps, empties).
     private static func record(_ message: RawMessage, cid: String) -> [String: Any]? {
-        if message.isToolResultOnly || message.isInternalBridge { return nil }
+        if message.isToolResultOnly || message.isInternalBridge || message.id.hasPrefix(NanoMuseOutreachJournal.localPublicPrefix) { return nil }
         var text = ""
         var attachments: [[String: Any]] = []
         for part in message.parts {

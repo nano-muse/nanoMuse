@@ -2,11 +2,11 @@
  * The Network row on the nanoMuse Cloud page: one proxy for the model providers, kept by the
  * Electron shell (its `desktop.json`, next to *open at login*) and put on the dsh Host's
  * environment at the next start, where Node's fetch and the hands' runtime read it. Only the
- * providers go through it — the relay's host and loopback are on NO_PROXY, which the shell
- * composes from the relay this plugin talks to (`relayHost`). Outside the shell, or under a
- * shell older than 0.1.41, the row is not drawn.
+ * providers go through it. The shell derives NO_PROXY from its trusted launch configuration,
+ * never from this renderer. Outside the shell, or under a shell older than 0.1.41, the row is
+ * not drawn.
  */
-import { createElement as h, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { createElement as h, useState, type FormEvent, type ReactNode } from 'react'
 import type { Translate } from './api.ts'
 import { bridge } from './bridge.ts'
 import { IconGlobe } from './icons.tsx'
@@ -31,29 +31,13 @@ export function proxyAddress(text: string): string | undefined {
   return url.href.replace(/\/+$/, '')
 }
 
-/** The host of the relay's base URL, for the shell's NO_PROXY; '' when there is none. */
-function hostOf(baseURL: string | undefined): string {
-  if (!baseURL) return ''
-  try {
-    return new URL(baseURL).hostname
-  } catch {
-    return ''
-  }
-}
-
-export function NetworkRows({ t, relayURL }: { t: Translate; relayURL?: string | undefined }): ReactNode {
+export function NetworkRows({ t }: { t: Translate }): ReactNode {
   const b = bridge()
   const { prefs, set } = useDesktopPrefs()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [bad, setBad] = useState(false)
-  const relayHost = hostOf(relayURL)
   const proxy = prefs?.proxy
-  // the relay this plugin talks to changed since the proxy was set: tell the shell, so it stays off the proxy
-  useEffect(() => {
-    if (!prefs || !proxy || !relayHost) return
-    if ((prefs.relayHosts ?? [])[0] !== relayHost) set({ relayHosts: [relayHost] })
-  }, [prefs, proxy, relayHost, set])
   if (!b?.prefs || !prefs || proxy === undefined) return null
   const pending = prefs.proxyApplied !== undefined && prefs.proxyApplied !== proxy
   const begin = () => { setDraft(proxy); setBad(false); setEditing(true) }
@@ -61,10 +45,10 @@ export function NetworkRows({ t, relayURL }: { t: Translate; relayURL?: string |
     e?.preventDefault()
     const url = proxyAddress(draft)
     if (!url && draft.trim()) { setBad(true); return }
-    set({ proxy: url ?? '', relayHosts: relayHost ? [relayHost] : [] })
+    set({ proxy: url ?? '' })
     setEditing(false)
   }
-  const remove = () => { set({ proxy: '', relayHosts: relayHost ? [relayHost] : [] }); setEditing(false) }
+  const remove = () => { set({ proxy: '' }); setEditing(false) }
   return h('div', { className: 'nm-section nm-section-inline' },
     h('h2', null, t('nwTitle')),
     h('div', { className: 'nm-card' },

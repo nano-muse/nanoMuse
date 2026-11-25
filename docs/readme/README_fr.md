@@ -32,7 +32,7 @@
 
 **nanoMuse est un agent personnel open source pour chacun de vos appareils.** Un seul agent, avec un nom et une apparence à lui, dans l'esprit du [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) de Meta : il agit au lieu de répondre à des questions, continue de travailler quand l'app est fermée, se souvient de vous, et s'arrête pour demander avant tout ce que vous ne pourriez pas annuler.
 
-*nano* veut dire l'ensemble complet, assez petit pour que vous le fassiez tourner et le déployiez vous-même : l'app du téléphone, l'app de bureau, la console web et le relais qui les relie sont tous dans ce dépôt, sous GPL-3.0-or-later. **[Gratuit, open source, à but non lucratif. Construisons-le ensemble.](../../CONTRIBUTING.md)** Connectez-vous et vous recevez un crédit gratuit d'utilisation des modèles sur le relais de la communauté (payé par le développeur) ; quand il est épuisé, [utilisez votre propre clé](../own-key.md). Le même relais tourne sur un serveur à vous, et rien n'a besoin de sortir de chez vous. Dernière version : **1.0.9 Tiller**, [notes de version](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.9) · [essayer dans le navigateur](https://demo.nanomuse.dev/).
+*nano* veut dire l'ensemble complet, assez petit pour que vous le fassiez tourner et le déployiez vous-même : l'app du téléphone, l'app de bureau, la console web et le relais qui les relie sont tous dans ce dépôt, sous GPL-3.0-or-later. **[Gratuit, open source, à but non lucratif. Construisons-le ensemble.](../../CONTRIBUTING.md)** Connectez-vous et vous recevez un crédit gratuit d'utilisation des modèles sur le relais de la communauté (payé par le développeur) ; quand il est épuisé, [utilisez votre propre clé](../own-key.md). Le même relais tourne sur un serveur à vous, et rien n'a besoin de sortir de chez vous. Dernière version : **1.0.10 Bridge**, [notes de version](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.10) · [essayer dans le navigateur](https://demo.nanomuse.dev/).
 
 > [!NOTE]
 > **nanoMuse continue d'évoluer**
@@ -59,11 +59,11 @@ Toutes les versions : [releases](https://github.com/nano-muse/nanoMuse/releases)
 | | |
 |---|---|
 | **Navigateur** | [demo.nanomuse.dev](https://demo.nanomuse.dev/) : un nanoMuse sur un téléphone simulé, après connexion. Une démo ; les apps ci-dessous sont les vraies |
-| **Android** 8.0+, arm64 | [nanoMuse-1.0.9-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-1.0.9-arm64.apk) : chaque version est signée avec la même clé et s'installe par-dessus la précédente |
+| **Android** 8.0+, arm64 | [nanoMuse-1.0.10-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-1.0.10-arm64.apk) : chaque version est signée avec la même clé et s'installe par-dessus la précédente |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc) : une bêta validée par la revue bêta d'Apple ; le lien l'installe · [iOS](../ios.md) |
-| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-x64.dmg). Non notarisé : clic droit → *Ouvrir* la première fois |
-| **Windows** 10+ | [nanoMuse-Desktop-1.0.9-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-win-x64.exe) : cliquez une fois sur *Exécuter quand même* |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.tar.gz) |
+| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-x64.dmg). Non notarisé : clic droit → *Ouvrir* la première fois |
+| **Windows** 10+ | [nanoMuse-Desktop-1.0.10-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-win-x64.exe) : cliquez une fois sur *Exécuter quand même* |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` pour votre propre relais ; `docker compose up -d app` pour l'app web sur un serveur à vous ; voir [auto-hébergement](../self-hosting.md) |
 
 Tous les téléchargements viennent de la [dernière version](https://github.com/nano-muse/nanoMuse/releases/latest) ; les mêmes fichiers sont sur [nanomuse.cn/dl](https://nanomuse.cn/dl/) si GitHub est lent là où vous êtes. Ouvrez l'app, connectez-vous avec une adresse e-mail ou un numéro de téléphone de Chine continentale, et l'agent a un modèle pour réfléchir. Le téléphone, le bureau et le web partagent un compte et montrent les mêmes conversations.
@@ -162,7 +162,7 @@ Toutes les personnes dont un changement a été intégré dans `main`, d'après 
 <a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
 <a href="https://github.com/jperla"><img src="https://avatars.githubusercontent.com/u/3724?v=4&s=48" width="48" height="48" alt="jperla"></a>
 <a href="https://github.com/jasontospas"><img src="https://avatars.githubusercontent.com/u/79001000?v=4&s=48" width="48" height="48" alt="jasontospas"></a>
-<a href="https://github.com/PSA-Team-source"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="PSA-Team-source"></a>
+<a href="https://github.com/al-global-tech"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="al-global-tech"></a>
 <a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
 <a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
 <a href="https://github.com/brajendrak00068"><img src="https://avatars.githubusercontent.com/u/56827534?v=4&s=48" width="48" height="48" alt="brajendrak00068"></a>
@@ -195,6 +195,7 @@ nanoMuse s'appuie sur le travail d'autres personnes ; [THIRD_PARTY_NOTICES.md](.
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis) : l'agent embarqué sur lequel est bâtie l'app du téléphone, avec [proot](https://github.com/nano-muse/proot) et [Alpine Linux](https://alpinelinux.org/) pour le bac à sable.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) : le harnais d'agents dont l'app de bureau est un plugin.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance) : l'opérateur des mains du bureau est un portage du leur, et les marqueurs de la scène suivent leur ScreenMarker.
+- [Mika](https://github.com/wangzan101/Mika), de wangzan101, a inspiré l’écran Android indépendant, son aperçu en direct, la reprise en main par l’utilisateur et la relecture des étapes. Son code d’appairage pour le débogage sans fil est adapté sous licence Apache-2.0.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI) : l'opérateur du téléphone, les traces et les idées de produit.
 
 ## Avertissement

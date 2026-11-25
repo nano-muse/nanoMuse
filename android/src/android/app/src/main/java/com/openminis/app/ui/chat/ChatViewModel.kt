@@ -78,6 +78,7 @@ import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.service.SessionConcurrencyManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -3316,6 +3317,7 @@ class ChatViewModel(
      * up. Mirrors iOS `pendingSendText` / `pendingSendAttachments`.
      */
     private var pendingSendText: String? = null
+    private var nmPendingFeedScope: String? = null // nanoMuse: parked alongside the composer text.
 
     private val _showCompactBeforeSendPrompt = MutableStateFlow(false)
     val showCompactBeforeSendPrompt: StateFlow<Boolean> = _showCompactBeforeSendPrompt.asStateFlow()
@@ -3332,7 +3334,7 @@ class ChatViewModel(
         pendingSendText = null
         // nanoMuse: the outgoing-request guard performs one bounded attempt after the new
         // message is saved. A pre-send failure must not start the same attempt again (#719).
-        sendMessage(text, skipContextCheck = true)
+        sendMessage(text, skipContextCheck = true, feedScope = nmPendingFeedScope.also { nmPendingFeedScope = null }) // nanoMuse
     }
 
     /** Dialog action: send without compacting. */
@@ -3340,7 +3342,7 @@ class ChatViewModel(
         _showCompactBeforeSendPrompt.value = false
         val text = pendingSendText ?: return
         pendingSendText = null
-        sendMessage(text, skipContextCheck = true)
+        sendMessage(text, skipContextCheck = true, feedScope = nmPendingFeedScope.also { nmPendingFeedScope = null }) // nanoMuse
     }
 
     /** Dialog dismissed — restore the text to the composer so it isn't lost. */
@@ -5890,7 +5892,7 @@ class ChatViewModel(
      * current agent loop finishes, drainQueuedPrompts() consumes the queue.
      * Mirrors iOS AIChatViewModel.enqueuePrompt().
      */
-    fun enqueuePrompt(text: String) {
+    fun enqueuePrompt(text: String, feedScope: String? = null) { // nanoMuse: background callers have no Feed scope.
         val trimmed = text.trim()
         val pendingAttachments = _attachments.value
         if ((trimmed.isBlank() && pendingAttachments.isEmpty()) || !_isStreaming.value) return
@@ -5899,6 +5901,7 @@ class ChatViewModel(
             id = "queued_${System.currentTimeMillis()}_${(Math.random() * 1_000_000).toInt()}",
             text = trimmed,
             attachments = pendingAttachments,
+            feedScope = feedScope, // nanoMuse: preserve local composer origin while queued.
         )
         _promptQueue.value = _promptQueue.value + prompt
 
@@ -6051,6 +6054,7 @@ class ChatViewModel(
             bodyPartsJson = queuedPaste?.partsJson,
         )
         val userEntity = chatRepository.appendMessage(sid, "user", userPartsJson)
+        io.github.nanomuse.feed.FeedChatEvidence.recorded(context, queued.map { it.feedScope }.distinct().singleOrNull(), userEntity, _memoryEnabled.value) // nanoMuse: only wholly composer-authored turns.
         io.github.nanomuse.sync.ConversationSync.sent(sid) // nanoMuse: pushed at send (C8), then "working" (C9)
         agentHistory.add(
             LLMMessage(
@@ -6197,7 +6201,8 @@ class ChatViewModel(
                 prepared.attachedFilesXml,
                 bodyPartsJson = drainPaste?.partsJson,
             )
-            chatRepository.appendMessage(sid, "user", userPartsJson)
+            val savedUser = chatRepository.appendMessage(sid, "user", userPartsJson)
+            io.github.nanomuse.feed.FeedChatEvidence.recorded(context, queued.map { it.feedScope }.distinct().singleOrNull(), savedUser, _memoryEnabled.value) // nanoMuse
             io.github.nanomuse.sync.ConversationSync.sent(sid) // nanoMuse: pushed at send (C8), then "working" (C9)
 
             agentHistory.add(LLMMessage(
@@ -6271,14 +6276,18 @@ class ChatViewModel(
     internal fun nmCancelHeadless(turnId: String): Boolean =
         io.github.nanomuse.hub.HeadlessTurn.stop(nmHeadlessReceipt, turnId) { cancelStream() }
 
-    fun sendMessage(text: String) {
+    // nanoMuse: only a send from the local composer may nominate personal Feed material.
+    fun sendMessage(text: String) = nmRouteMessage(text, null)
+    fun nmSendComposer(text: String) = nmRouteMessage(text,
+        io.github.nanomuse.feed.FeedChatEvidence.scope(context, realSessionId.ifEmpty { sessionId }, _memoryEnabled.value))
+    private fun nmRouteMessage(text: String, feedScope: String?) {
         if (!sessionLoaded.value) return // nanoMuse: keep drafts/history intact until initial restore completes.
         // nanoMuse: explicit device work is routed before any local model or avatar action.
         if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
                 _attachments.value.isNotEmpty() || _pastedTexts.value.isNotEmpty(), _isCompacting.value)) return
-        if (_isStreaming.value) { enqueuePrompt(text); return }
+        if (_isStreaming.value) { enqueuePrompt(text, feedScope); return } // nanoMuse: carry the author through the queue.
         if (nmInterceptAvatar(text)) { nmCountableTurn = false; return }
-        sendMessage(text, skipContextCheck = false)
+        sendMessage(text, skipContextCheck = false, feedScope = feedScope) // nanoMuse: composer origin.
     }
 
     // nanoMuse: only the adapter touches upstream state; the lifecycle lives in RemoteChatBridge.
@@ -6339,7 +6348,7 @@ class ChatViewModel(
         val draft = _inputText.value
         val draftAttachments = _attachments.value
         _attachments.value = next.attachments
-        sendMessage(next.text)
+        nmRouteMessage(next.text, next.feedScope) // nanoMuse: restore the origin of this queued message.
         if (_inputText.value.isEmpty() || _inputText.value == draft) {
             _inputText.value = draft
             _attachments.value = draftAttachments
@@ -6752,7 +6761,7 @@ class ChatViewModel(
      *   re-entry with `skipCompactCheck`.
      */
     // nanoMuse: the optional receipt identifies the exact headless invocation's user row.
-    private fun sendMessage(text: String, skipContextCheck: Boolean, headless: io.github.nanomuse.hub.HeadlessTurn.Receipt? = null) {
+    private fun sendMessage(text: String, skipContextCheck: Boolean, headless: io.github.nanomuse.hub.HeadlessTurn.Receipt? = null, feedScope: String? = null) { // nanoMuse: local composer consent.
         // [T-android-paste-mediaref] `[Pasted#N]` markers are NOT expanded here
         // any more.
         //
@@ -6773,7 +6782,7 @@ class ChatViewModel(
         val trimmed = text.trim()
         // While streaming, enqueue instead of silently dropping (iOS: send vs enqueuePrompt).
         if (_isStreaming.value) {
-            enqueuePrompt(text)
+            enqueuePrompt(text, feedScope) // nanoMuse: preserve the origin if streaming started.
             return
         }
         // T180: allow attachments-only sends (no caption). Mirrors iOS, where
@@ -6795,6 +6804,7 @@ class ChatViewModel(
             when (checkContextBeforeSend()) {
                 PreSendContextAction.PROCEED -> {}
                 PreSendContextAction.COMPACT_THEN_SEND -> {
+                    nmPendingFeedScope = feedScope // nanoMuse: retain consent across pre-send compaction.
                     pendingSendText = text
                     _inputText.value = ""
                     compactAndSendPending()
@@ -6803,6 +6813,7 @@ class ChatViewModel(
                 PreSendContextAction.ASK_USER -> {
                     // Park the text on the VM (not the composer) so the dialog
                     // owns it; cancelCompactBeforeSend puts it back.
+                    nmPendingFeedScope = feedScope // nanoMuse: retain consent across pre-send compaction.
                     pendingSendText = text
                     _inputText.value = ""
                     _showCompactBeforeSendPrompt.value = true
@@ -6900,6 +6911,7 @@ class ChatViewModel(
                 bodyPartsJson = pasted?.partsJson,
             )
             val persistedUser = chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            io.github.nanomuse.feed.FeedChatEvidence.recorded(context, feedScope, persistedUser, _memoryEnabled.value) // nanoMuse: keeps only the row reference.
             headless?.saved(persistedUser.id) // nanoMuse: publish identity only after persistence.
             io.github.nanomuse.sync.ConversationSync.sent(activeSessionId) // nanoMuse: the person's line reaches the other devices at send (C8), then "working" (C9)
             io.github.nanomuse.chat.RoutineWakes.claim(activeSessionId, persistedUser.id) // nanoMuse: a routine's prompt is marked as such on its row
@@ -9261,6 +9273,8 @@ class ChatViewModel(
                     android.util.Log.d("ToolChain[VM]", "[turn=$turn] block[$blockIdx] status→$finalStatus title=${result.toolTitle} contentLen=${finalContent.length}")
                     allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(
                         toolStatus = finalStatus,
+                        handsRunId = io.github.nanomuse.hands.HandsReplay.receiptId(name, argsStr, result.output), // nanoMuse
+                        handsProgress = null, // nanoMuse: live status is not part of the saved turn.
                         content = finalContent,
                         toolTitle = result.toolTitle.ifEmpty { allToolBlocks[blockIdx].toolTitle },
                         durationMs = elapsed,
@@ -9666,6 +9680,7 @@ class ChatViewModel(
         assistantId: String,
         currentText: String,
     ): ToolExecutionResult {
+        var handsProgressJob: Job? = null
         return try {
             val args = JSONObject(argsJson)
             var command = args.optString("command", "")
@@ -9729,6 +9744,10 @@ class ChatViewModel(
             val dispatchSessionId = activeSessionId
             android.util.Log.w("ShellExecDiag",
                 "executeShell dispatch=$dispatchSessionId rawSessionId=$sessionId realSessionId=$realSessionId isDraft=$isDraft cmd=${command.take(120).replace('\n', ' ')}")
+            val isHandsRun = io.github.nanomuse.hands.HandsReplay.isRunCommand(
+                tool = "shell_execute",
+                args = argsJson,
+            )
 
             // [T-bash-on-demand] Detect busybox-ash-incompatible bash syntax and,
             // if found, transparently install + switch to bash. Install time is
@@ -9760,6 +9779,38 @@ class ChatViewModel(
                     }
                     is OnDemandBash.Outcome.Unavailable ->
                         bashReminder = BashismReminder.build(bashism.hits, outcome.reason)
+                }
+            }
+
+            if (isHandsRun) {
+                val preexistingOwner = io.github.nanomuse.hands.HandsRunProgress.state.value
+                    ?.takeIf { it.active }
+                    ?.owner
+                handsProgressJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    var acceptedRunId: String? = null
+                    io.github.nanomuse.hands.HandsRunProgress.state.collect { snapshot ->
+                        if (snapshot == null || !snapshot.background ||
+                            snapshot.sessionId != dispatchSessionId ||
+                            snapshot.owner == preexistingOwner
+                        ) {
+                            return@collect
+                        }
+                        if (acceptedRunId == null) {
+                            if (!snapshot.active) return@collect
+                            acceptedRunId = snapshot.runId
+                        }
+                        if (snapshot.runId != acceptedRunId) return@collect
+                        val idx = toolBlocks.indexOfFirst { it.id == toolId }
+                        if (idx >= 0) {
+                            toolBlocks[idx] = toolBlocks[idx].copy(
+                                handsProgress = io.github.nanomuse.hands.HandsRunProgress.describe(
+                                    context,
+                                    snapshot,
+                                ),
+                            )
+                            updateAssistantMessage(assistantId, currentText, true, toolBlocks)
+                        }
+                    }
                 }
             }
 
@@ -9853,6 +9904,8 @@ class ChatViewModel(
             )
         } catch (e: Exception) {
             ToolExecutionResult("Error: ${e.message}", false)
+        } finally {
+            handsProgressJob?.cancel()
         }
     }
 
@@ -11696,6 +11749,16 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
 
 
     fun cancelStream() {
+        // nanoMuse: the background screen runs in a native worker, outside the shell process.
+        // Stop only the run owned by this chat, including either side of a draft-id rename.
+        linkedSetOf(activeSessionId, sessionId, realSessionId)
+            .filter { it.isNotEmpty() }
+            .forEach {
+                io.github.nanomuse.hands.Hands.stopCurrentForSession(
+                    it,
+                    "stopped from this chat",
+                )
+            }
         // nanoMuse: Stop belongs to the remote call; no local shell was started.
         if (nmRemoteBridge.cancel()) return
         nmHeadlessReceipt?.requestStop() // nanoMuse: request local Stop before publishing idle.
@@ -12413,6 +12476,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                                 toolName = value.optString("name", ""),
                                 toolTitle = value.optString("description", ""),
                                 toolArgs = toolInput,
+                                handsRunId = io.github.nanomuse.hands.HandsReplay.receiptId(value.optString("name"), toolInput, result?.output), // nanoMuse
                                 content = result?.output?.lines()?.takeLast(80)?.joinToString("\n") ?: "",
                                 toolStatus = when {
                                     result == null -> ToolBlockStatus.SUCCESS
@@ -12521,7 +12585,10 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         val merged = mutableListOf<ChatMessage>()
         for (msg in messages) {
             val prev = merged.lastOrNull()
-            if (msg.role == "assistant" && prev?.role == "assistant") {
+            // nanoMuse: a local check-in or a synced final answer is a distinct incoming message.
+            if (msg.role == "assistant" && prev?.role == "assistant" &&
+                !io.github.nanomuse.feed.ChatCheckIns.isMessage(msg.id) && !io.github.nanomuse.feed.ChatCheckIns.isMessage(prev.id) &&
+                msg.id !in io.github.nanomuse.sync.ConversationSync.remoteRows.value && prev.id !in io.github.nanomuse.sync.ConversationSync.remoteRows.value) {
                 // Merge: combine tool blocks, append text, keep the last id.
                 // Deduplicate by block.id — the agent loop may persist the same tool
                 // use in multiple consecutive turns (as it carries tool state across),

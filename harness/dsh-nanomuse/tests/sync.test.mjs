@@ -1584,3 +1584,33 @@ test('C10 epoch: a host-published session stays with its original account before
   assert.equal(e.state.owners[lateId], 'acct-a')
   assert.equal(e.state.cids[lateId], undefined)
 })
+
+test('a public check-in reaches the other device once as an ordinary assistant line, with revocation checked after local persistence', async () => {
+  const relay = fakeRelay(), sending = fakeSessions(), receiving = fakeSessions()
+  sending.add('s-main', 'Main')
+  let revokeAtSave = false, allowed = true
+  const sender = engine(relay, sending, { options: { save: async () => { if (revokeAtSave) allowed = false } } }).engine
+  const receiver = engine(relay, receiving, { options: { deviceId: () => 'phone' } }).engine
+  try {
+    await sender.setMain('s-main')
+    const line = { id: 'local-alert', role: 'assistant', text: 'A public source changed.', at: Date.now(), authorized: () => allowed }
+    sending.lines.set('s-main', [line])
+    revokeAtSave = true
+    sender.publicLineReady('s-main')
+    await sender.push()
+    assert.equal(relay.msgs.size, 0)
+    revokeAtSave = false; allowed = true
+    sender.publicLineReady('s-main')
+    await sender.push()
+    await receiver.pull()
+    await sender.push()
+    await receiver.pull()
+    assert.deepEqual([...relay.msgs.values()].map(m => [m.text, m.role]), [[line.text, 'assistant']])
+    assert.equal(receiving.appended.length, 1)
+    assert.equal(receiving.appended[0][1].text, line.text)
+    assert.equal(receiving.appended[0][1].role, 'assistant')
+    assert.equal(typeof receiving.appended[0][1].mid, 'string')
+    assert.equal(sending.appended.length, 0)
+    assert.ok(relay.pushes.every(body => body.messages.every(m => !('authorized' in m))))
+  } finally { sender.stop(); receiver.stop() }
+})

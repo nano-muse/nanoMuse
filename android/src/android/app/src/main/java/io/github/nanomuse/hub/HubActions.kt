@@ -28,6 +28,7 @@ import io.github.nanomuse.guard.RiskAssessment
 import io.github.nanomuse.guard.RiskClass
 import io.github.nanomuse.guard.RiskDecision
 import io.github.nanomuse.guard.RiskGate
+import io.github.nanomuse.reach.RemoteApprovalKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -361,11 +362,27 @@ object HubActions {
             RiskGate.pending.collect { req ->
                 if (req != null && req.sessionId == sessionId && seen.add(req.id)) {
                     relayed[req.id] = call.from.optString("id")
-                    emit(
-                        JSONObject().put("stage", "approval").put("approval_id", req.id).put("preview", req.preview)
-                            .put("risk", req.assessment.riskClass.name.lowercase()).put("reason", req.assessment.reason)
-                            .put("device", Hub.name(context)).put("timeout", RiskGate.TIMEOUT_MS / 1000),
-                    )
+                    val tool = req.kind.name.lowercase()
+                    val body = JSONObject()
+                        .put("stage", "approval").put("approval_id", req.id)
+                        .put("preview", req.preview)
+                        .put("risk", req.assessment.riskClass.name.lowercase())
+                        .put("reason", req.assessment.reason)
+                        .put("device", Hub.name(context))
+                        .put("timeout", RiskGate.TIMEOUT_MS / 1000)
+                    req.canonicalAction?.takeIf {
+                        req.assessment.rememberable && req.assessment.warnings.isEmpty()
+                    }?.let { action ->
+                        body.put(
+                            "grant_key",
+                            RemoteApprovalKey.legacyKey(tool, req.assessment.target, action),
+                        )
+                        body.put(
+                            "grant_target",
+                            RemoteApprovalKey.wire(tool, req.assessment.target, action),
+                        )
+                    }
+                    emit(body)
                 }
             }
         }

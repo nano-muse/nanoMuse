@@ -45,7 +45,7 @@ nanomuse serve --port 9000 --no-qr
 
 保存模型前，「开始」不可点击；「跳过设置」始终可用，也会跳过首次对话。刷新页面会保留已完成项。之后可从形象菜单修改名称、形象、简介和语气，「设置」也提供身份表单。设置完成或已有对话后，不再显示引导。
 
-「开始」通过 `POST /api/firstrun/start` 标记设置完成，作用与 `POST /api/onboarded` 相同。如果此时已有对话，或首次对话结束，后台会生成第一天的动态内容，让你首次打开「动态」时即可阅读；其他情况下，动态先显示介绍卡并说明每日例程时间。
+「开始」通过 `POST /api/firstrun/start` 标记设置完成，作用与 `POST /api/onboarded` 相同。如果此时已有对话，或首次对话结束，后台会检查是否有值得提前准备的事项。缺少相关材料时，动态可以只显示介绍卡和每日例程时间。
 
 ## 界面与功能 {#what-is-on-the-screen}
 
@@ -65,7 +65,7 @@ nanomuse serve --port 9000 --no-qr
 
 网页画面仅保存在服务器当前会话内存中，每聊天最近约十二帧；重启后旧卡片显示占位内容。需要安装浏览器工具 `pip install "nanomuse[browser]" && playwright install chromium`，或使用 `-browser` Docker 镜像。旧版 Android 连接后也可提供自身 WebView（内嵌浏览器），卡片 `backend` 会说明实际后端。在手机上接管 WebView 时，会弹出真实网页面板，可用手机键盘和自动填充登录，再点「完成」继续。兼容性与登录限制见 [browser.md](browser.md)。
 
-**动态**。上方「动态偏好」可填写想读的内容，例如骑行、Rust 和每周一道菜谱。每天一次，或点击「写几条新的」时，智能体根据偏好、目标和记忆生成三条短文。每条「问问 {name}」会围绕该内容开启聊天。下方「你离开期间」列出后台任务结果和文件、全部聊天中待处理审批与问题、今日日历，以及显示下次时间和待推进目标的「接下来」。未读数显示在标签上。
+**动态**。每日例程或「现在准备一份」可以写出提纲、草稿、清单，或者一个有待你决定的问题。例如，明天有试点复盘，而你曾说过希望每项决策都有负责人，动态就可以提前准备会议提纲。展开「依据哪些信息」能看原始摘录。「编辑草稿」把内容放进输入框。「这件事已处理」会撤下针对这版事项的准备材料，保留原目标和日程。「你离开期间」仍会列出后台任务结果、文件和待处理审批。
 
 帖子、活动、「接下来」或日历加载失败时，只在对应区域显示错误和「重试」。重试仅请求该区域，刷新失败也保留上次成功内容，并附错误说明。
 
@@ -94,7 +94,7 @@ nanomuse serve --port 9000 --no-qr
 
 hub 自动重连时，设备触发器会保留上次观察到的在线状态。上次离线的设备若在重连后的首个设备列表中变为在线，仍会触发。退出登录、切换账号或关闭 hub 会清除这份记录，重新加入后的首个列表只记录状态，已有在线设备不会触发。
 
-**资源库**。列出工作区全部文件，最新在前，支持搜索和按页面、文档、图片、数据、代码筛选。页面可实时查看，Markdown 格式化显示，CSV 变为表格，图片和 PDF 内嵌展示。智能体生成的页面在沙箱 iframe（隔离的嵌入页面）中运行，采用 opaque origin，即不共享主页面身份，不能读取访问令牌或调用 API。每个 HTML 响应也附 `Content-Security-Policy: sandbox` 实施相同隔离。
+**资源库**。列出工作区全部文件，最新在前，支持搜索和按页面、文档、图片、数据、代码筛选。页面可实时查看，Markdown 格式化显示，CSV 变为表格，图片和 PDF 内嵌展示。智能体生成的页面在沙箱 iframe（隔离的嵌入页面）中运行，采用 opaque origin，即不共享主页面身份，不能读取访问令牌或调用 API。HTML 和 SVG 响应还带严格的内容安全策略。页面可以使用内联样式，也可以显示 data 或 blob 影音内容，但不能运行脚本、发起网络请求、提交表单、嵌入页面、启动 worker 或打开弹窗。
 
 **形象**。聊天顶部的龙下方显示当前聊天状态：正在做什么，或等待你回答。各状态图位于 `web/public/avatars/dragon-*.webp`，待命时静候，工作时戴耳机在小电脑前输入，等待时看水晶球，完成时抱星星，工具失败或拒绝时出现汗滴。点击形象也会有回应。[形象工作室](avatar.md)绘制的面孔使用相同状态；设置中可换成整体呼吸、摇摆或跳动的 emoji。Android 还可用自己的短视频作形象，仅保留在该手机，见 [avatar.md](avatar.md#your-own-clip)。开启 `prefers-reduced-motion` 后全部动画停止。
 
@@ -149,6 +149,42 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 ## 后台工作 {#background-work}
 
+打开动态，顶部最多显示一个值得跟进的目标，以及未来 24 小时内的一组日程冲突。目标按今天到期、最近七天逾期、明天到期排序。没有需要跟进的截止日时，动态会显示最近七天内待你决定的计划调整，或者被标为受阻的步骤和具体原因。这两类情况只在动态里提示。点「查看目标」可打开原目标，点「讨论时间冲突」会在主要聊天中准备一条可编辑的草稿，由你决定是否发送。「明天再提醒」和「关闭」针对当前截止日或这两场活动的时间生效。修改日期后会重新判断。
+
+这些卡片直接读取已保存的目标和最近成功更新的日历，可在未配置模型时使用。全天、已取消和标为空闲的活动不参与冲突判断。在动态设置中可以关闭卡片，也可以选择接收通知。服务器运行期间，目标跟进或两小时内的日程冲突可以触发通知，发送时段为服务器当地时间 09:00 至 20:00，并遵守免打扰设置。动态通知每天合计最多一条，锁屏只显示有更新。已设定期检查的目标沿用原来的提醒。关闭主动服务会隐藏卡片并停止对应通知。每日动态没有新依据时也可以留空。
+
+准备材料使用当前模型，生成时不调用工具。它可以参考有效目标、未来 24 小时内即将开始且缓存新鲜的忙碌日程、个人偏好、已保存的记忆和主要聊天最近的交流。引用在展示前会与本地记录核对，依据不足或已经失效时可以留空。从动态回到主要聊天编辑草稿时，输入框会保留切换前未发送的文字。开启动态设置中的「计划有变化时再看看」后，如果目标、近期日程或主要聊天里有明确时间的写作事项有变化，每天最多额外检查一次。该选项需要已开启每日例程和主动服务，并遵守免打扰设置。普通截止卡片和通知有独立开关。
+
+在主要聊天里说「我在等供应商周五下午三点发来星桥报价」，到了周五三点，动态就可以提醒你问进展。日期和时间按运行服务的当地时间计算，过期后三天内仍可跟进。卡片可展开核对原话和改期记录，说「星桥报价收到了」或明确取消后会撤下。每次最多展示一件等回复的事，可以选「明天再提醒」、关闭，或把询问放进主要聊天的输入框自行编辑。这项判断直接读取聊天记录，无需调用模型或查询邮箱。
+
+nanoMuse 默认会在主要聊天里跟进你提过的待回复事项。在动态设置关闭「到了约定时间，在主要聊天里问我」即可停止，升级会保留以前明确关闭的选择。比如今天该收到供应商的报价了，它会在主要聊天里问「现在收到了吗？」直接回「收到了」就能结束这件事，其他还在等的报价会保留。只要运行时在线，关掉浏览器也能收到聊天留言。它会等聊天空闲十分钟，避开免打扰时段，每天当地时间 09:00 到 20:00 最多主动问一次。上一条还没有回应时，它会等你回。另行开启跟进通知并允许浏览器推送后，通知可以直接打开主要聊天，锁屏只提示有新消息。
+
+### 留意已接入的信息
+
+首次在应用里连接邮箱或日历时，连接页面会默认勾选由当前模型在后台跟进。你可以在保存前取消，也可以随时到动态设置修改。已有连接保留原来的选择。新接入的 MCP 服务如果只有一项可读文本资源，连接时可以直接关注；有多项时，在动态设置里选具体资源。也可以勾选参考你最近在主要聊天里说过的话。本地模式还可以参考这台设备上进行中的目标。首次检查只记下起点，邮箱或项目看板当时为空也可以。连接表单会一并提交页面上的跟进选项和设置版本；旧客户端不提交该选项时，沿用之前的访问范围。比如印厂后来发邮件，说要等你确认封面才能开印，即使之前从没和 nanoMuse 提过这件事，它也可以在主要聊天里引用邮件，问要不要帮你起草回复。下一步由你决定。
+
+运行时在线时大约每十分钟检查一次，浏览器可以关闭。检查范围是新到邮件、未来 24 小时内占用时间的日程和所选资源的变化。模型只读有限的摘录，判断时不会调用工具。每天最多四次模型判断，与原有聊天跟进合计最多发一条主动消息，避开免打扰时段和正在进行的对话。更换邮箱、日历配置或 MCP 连接后，可能需要重新选择。自动引用来源的消息保存在当前运行时的聊天里，浏览器通知只提示有新消息。之后的普通对话沿用已有的同步设置。只有提供可读文本资源的 MCP 服务才会出现在选择列表。
+
+
+### 长期关注公开来源
+
+如果你说「我维护的项目是」并给出 GitHub 仓库链接，nanoMuse 就能开始关注仓库的新 issue，无需再设提醒。在不同消息里多次提到同一个仓库，会产生一条待确认的建议。已允许跟进的邮箱、日历或 MCP 资源也能提供线索。动态设置会说明建议的来由，你可以确认、暂停，或选「不再建议」。每个账号默认开启公开来源跟进，关闭后就停止发现和检查。
+
+| 关注对象 | 检查内容 |
+| --- | --- |
+| 公开 GitHub 仓库或账号 | 单个仓库或该账号名下公开仓库里新开且仍未关闭的 issue。 |
+| 有 ORCID 或 OpenAlex ID 的作者 | 新发表的论文、引用其最近 25 篇作品的新论文。如果作者近期持续发表在同一个细分主题下，还会找其他作者在该主题上刚发表的论文。 |
+| 论文 DOI 或研究方向 | 查找引用该论文的新发表作品，或匹配指定方向的论文。遇到 Google 学术主页，会请你用准确的作者 ID 或论文 DOI 确认。数据和发表日期来自 OpenAlex。 |
+| 网站、RSS 或 Atom 地址 | 检查新条目，例如展览开放报名、社区活动、软件版本或服务公告。网站在主页声明了唯一的同站订阅源时，填主页就可以。声明了多个时，可以直接填想关注的订阅源地址。 |
+
+首次成功读取只记下起点。运行时在线期间，GitHub 和订阅源每四小时到期检查，学术来源每天检查。每次读取的条数有限，更新密集时可能漏掉个别条目。遇到断网会稍后重试；免打扰期间，值得提醒的变化可以留到白天。新条目沿用已接入信息源的判断和主要聊天投递流程，提醒中会附上可用的原始链接。关注本身只会读取公开资料。如果需要 Google 学术自己的收录结果，可把它的邮件提醒发到已允许跟进的邮箱。[Google 学术邮件提醒](https://scholar.google.com/intl/en/scholar/help.html#alerts)
+
+Android 和 iPhone 都能自己检查这些公开来源，电脑关机也可以用。在手机的动态设置里可以查看、添加、暂停或忽略来源。主要聊天开启记忆时，新发的消息也可以提供线索。每台手机分别记录关注列表、首次读取的起点和提醒历史。应用打开时可以检查，后台检查时间由手机系统安排，错过后可在下次打开应用时补查。
+
+手机用主要聊天配置的模型判断新条目是否值得打扰你，只把候选条目的公开信息交给模型。选中的条目会连同原始链接出现在本机主要聊天里，沿用原有的跟进设置和每日提醒上限。同一来源在两台设备上分别关注时，两台设备都有可能提醒。
+
+如果还想接收桌面端或网页运行时准备的提醒，可以在同一账号开启对话同步，并在负责检查的设备打开「将公开动态同步到我的设备」。之后符合条件的公开来源提醒可以随聊天同步到手机。
+
 设置中的「主动性」决定智能体主动推进任务和通知你的频率：
 
 | 档位 | 执行频率 | 何时通知 |
@@ -195,18 +231,24 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | GET | `/api/ideas?refresh=1` | 获取已有建议，或按参数重新生成。 |
 | GET | `/api/activity` | 返回最新审计记录、已授予的 `grants[]`，各项含 `key`、`tool`、`target`、`scope`、`expires_at`，以及对话污染标记。 |
 | GET | `/api/feed?limit=` | 按最新在前返回「你离开期间」：`{id, ts, kind (background · artifact · approval · question), title, text, thread, thread_title, path}`。 |
-| GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, generated_at, posts[{id, ts, title, body, area, prompt}], error?}`。 |
-| PUT | `/api/feed/instructions` `{instructions?, daily?, time?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
-| POST | `/api/feed/posts/refresh` | 立即生成新文章；模型拒绝时通过 `error` 说明。 |
+| GET | `/api/feed/posts` | 获取动态文章：`{instructions, daily, time, followups_enabled?, followup_push?, on_change?, generated_at, posts[{id, ts, title, body, area, prompt, form?, why_now?, sources?}], error?}`。 |
+| GET / PUT / POST | `/api/feed/watches` | 查看关注列表、修改偏好或添加公开来源。写入需带当前设置版本。 |
+| PATCH | `/api/feed/watches/{id}` | 确认、暂停、恢复或忽略。确认 Google 学术主页需要作者 ID 或论文 DOI。 |
+| GET / PUT | `/api/feed/context` | 读取或更新当前账号选择的信息源，保存时带上读取到的 revision。 |
+| GET | `/api/feed/context/resources` | 为选择器列出已连接的 MCP 服务提供的具体文本资源。 |
+| PUT | `/api/feed/instructions` `{instructions?, daily?, time?, followups?, followup_push?, chat_followups?, on_change?}` | 设置文章偏好，最多 2000 字符，并配置每日例程是否开启及时间。时间格式 `HH:MM`，初始值 08:00。 |
+| PUT | `/api/feed/followups/{id}?choice=tomorrow` · `?choice=dismiss` | 明天再次显示当前跟进卡片，或隐藏该项。 |
+| PUT | `/api/feed/posts/{id}/handled` | 隐藏围绕当前事项版本的准备材料。 |
+| POST | `/api/feed/posts/refresh[?prepare_only=true]` | 传 `prepare_only=true` 时只根据已有材料准备，可返回空列表。旧版客户端仍可以手动请求阅读文章。 |
 | DELETE | `/api/feed/posts/{id}` | 删除指定文章。 |
-| GET | `/api/upcoming` | 返回 `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`。`next_wake_at` 为提醒、目标检查或后台任务中最近的待执行时间，供能够设置系统闹钟的宿主使用，见 [local-runtime.md](local-runtime.md#waking-up)。 |
+| GET | `/api/upcoming` | 返回 `{proactivity, proactive, interval_minutes, effective_interval_minutes, quiet_hours, quiet_until, next_pass_at, next_wake_at, followups[], waiting_followup, queue[{goal_id, title, category, due, overdue, next_step, progress}], check_ins[{goal_id, title, at, cadence}], reminders[], triggers{items[], available{mail, event, hook, device}, mail_checked_at, mail_error, mail_poll_minutes}, busy}`。`next_wake_at` 为提醒、目标检查或后台任务中最近的待执行时间，供能够设置系统闹钟的宿主使用，见 [local-runtime.md](local-runtime.md#waking-up)。 |
 | POST | `/api/tick` | 立即唤醒调度器，检查并执行已到期工作，返回 `{ok, next_wake_at}`。Android 的系统闹钟触发后调用此接口。 |
 | GET / POST | `/api/reminders[?all=1]` | 获取活跃提醒，带参数时获取最近全部提醒；或创建 `{text, at ("YYYY-MM-DD HH:MM") or repeat ("daily 08:00", …), kind (remind · task), thread}`。 |
 | POST / DELETE | `/api/reminders/{id}/fire`、`/api/reminders/{id}` | 立即在原聊天发送提醒；或取消该提醒。 |
 | GET / POST | `/api/triggers` | 列出触发器及各类型连接器是否可用；或创建 `{kind (mail · event · hook · device), text, match, lead_minutes, thread}`。hook 类型返回其 `url`。 |
 | POST / DELETE | `/api/triggers/{id}/fire`、`/api/triggers/{id}` | 通过样例事件立即执行触发器；或取消它。 |
 | POST | `/api/hooks/{id}?key=` | 接收 webhook，无需 App 令牌，以 key 验证，也接受 `X-Hook-Key`。请求体最多 64 KB，JSON 会格式化后作为任务背景。ID 或 key 错误都返回 404；已取消返回 409；请求过密返回 429。 |
-| GET | `/api/files` · `/api/files/{path}?download=1` | 列出或读取工作区文件。HTML、SVG 响应附 `Content-Security-Policy: sandbox`。 |
+| GET | `/api/files` · `/api/files/{path}?download=1` | 列出或读取工作区文件。HTML、SVG 响应在沙箱中运行，并通过内容安全策略限制为自包含内容。 |
 | GET | `/api/data/export` | 以 ZIP 导出智能体数据，见 [parity.md](parity.md#open-for-a-decision-the-next-next-list) 备注 37。包含配置档案、侧栏各房间、联系人、授权、`threads/`、`sessions/`、数据目录技能、上传联系人、手机与电脑轨迹、定时投递、nudges 和逐项说明的 README。不含 `vault.enc`、`vault.key`、`server_token`、`push-vapid.json`、设置文件、`logs/`、`workspace/`。数据根若为符号链接或 Windows 联接，先解析一次并固定目标；其内符号链接、硬链接、Windows 重解析点、读取时改变的文件和超过 64 MB 的文件会跳过。数据库通过运行时已打开的连接执行 SQLite 在线备份，包含已提交 WAL 事务，不重新打开源路径。缺少活跃存储、未提交事务、数据库忙碌或过大时跳过，并写入 ZIP README。备份最多重试五秒，临时输出在响应前移除。ZIP 时间戳限制于 1980-2107 年，其他文件通过已验证句柄读取，父目录同时固定。作为附件返回，并附 `Cache-Control: private, no-store`。 |
 | GET / PUT | `/api/settings` | 获取或修改 `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, sentinel_review{mode, provider, model, base_url, api_key}, show_thinking, language}`。审核模式为 `off` 或 `observe`。读取结果另含 `onboarded`、`llm_ready` 和 `sentinel.review`，只返回 `has_api_key`，不返回审核 key。 |
 | GET | `/api/connections` | 获取模型、服务商预设、邮件、浏览器、MCP、保险库名称和 `onboarded`。模型含 `key_source`，值为 vault · config · missing · none，引用接口列表时带 `endpoint`。`endpoints` 列出自定义 OpenAI 兼容接口 `{id, label, base_url, key_source, models, slots}`，不含 key。MCP 包含 `connected`、`tools`、`from_app`。 |
@@ -285,6 +327,8 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 | POST | `/api/push/subscribe` `{subscription}`、`/api/push/unsubscribe` `{endpoint}` | 注册或删除本设备 `PushSubscription`。 |
 | POST | `/api/push/test` | 向全部已订阅设备发送测试通知。 |
 | WS | `/ws` | 实时消息连接，首帧为 `{"kind": "auth", "token": …}`。 |
+
+可选字段 `waiting_followup` 在没有到期待回复事项时为 `null`。有卡片时包含 `kind`（`waiting`）、`id`、`subject`、`sender`（原话提到的对方）、`quote`、`due`（YYYY-MM-DD），以及 `time`（HH:MM）和 `correction`。未指定时间或没有改期时，对应字段为空字符串。
 
 ### WebSocket {#websocket}
 

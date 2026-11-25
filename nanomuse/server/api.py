@@ -98,6 +98,21 @@ if TYPE_CHECKING:
     from starlette.types import Scope
 
 STATIC_DIR = Path(__file__).parent / "static"
+ARTIFACT_CSP = (
+    "sandbox; "
+    "default-src 'none'; "
+    "script-src 'none'; "
+    "style-src 'unsafe-inline'; "
+    "img-src data: blob:; "
+    "font-src data:; "
+    "media-src data: blob:; "
+    "connect-src 'none'; "
+    "object-src 'none'; "
+    "frame-src 'none'; "
+    "worker-src 'none'; "
+    "form-action 'none'; "
+    "base-uri 'none'"
+)
 # Said to a client that still puts the token in the URL (taken until 0.1.32).
 LEGACY_TOKEN_MESSAGE = (
     "the token no longer travels in the URL: send it as 'Authorization: Bearer …' "
@@ -139,8 +154,39 @@ class FeedInstructionsBody(BaseModel):
     daily routine, see ``MuseService.feed_posts``)."""
 
     instructions: str | None = None
+    followups: bool | None = None
+    followup_push: bool | None = None
+    chat_followups: bool | None = None
+    on_change: bool | None = None
     daily: bool | None = None
     time: str | None = None
+
+
+class PublicWatchToggle(BaseModel):
+    revision: str
+    enabled: bool | None = None
+    share_public_updates: bool | None = None
+
+
+class PublicWatchAdd(BaseModel):
+    revision: str
+    kind: str = Field(max_length=32)
+    target: str = Field(min_length=1, max_length=512)
+
+
+class PublicWatchAction(BaseModel):
+    revision: str
+    action: str = Field(max_length=16)
+    kind: str = Field("", max_length=32)
+    target: str = Field("", max_length=512)
+
+
+class ContextWatchBody(BaseModel):
+    revision: str
+    mail: bool
+    calendar: bool
+    resources: list[str] = Field(max_length=6)
+    local_context: bool
 
 
 class ApprovalBody(BaseModel):
@@ -306,7 +352,13 @@ class SearchBody(BaseModel):
     base_url: str | None = None  # SearXNG instance
 
 
+class ConnectReviewChoice(BaseModel):
+    revision: str
+    enabled: bool
+
+
 class EmailBody(BaseModel):
+    review: ConnectReviewChoice | None = None
     enabled: bool | None = None
     address: str | None = None
     password: str | None = None
@@ -322,6 +374,7 @@ class BrowserBody(BaseModel):
 
 
 class CalendarFeedBody(BaseModel):
+    review: ConnectReviewChoice | None = None
     name: str = Field(min_length=1, max_length=40)
     url: str = Field(min_length=1, max_length=2000)
 
@@ -355,6 +408,7 @@ class CalendarBody(BaseModel):
 
 
 class MCPBody(BaseModel):
+    review: ConnectReviewChoice | None = None
     name: str = Field(min_length=1, max_length=60, pattern=r"^[A-Za-z0-9_.-]+$")
     command: str | None = None
     args: list[str] = Field(default_factory=list)
@@ -1139,8 +1193,15 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     async def test_search() -> dict[str, Any]:
         return await conn.test_search()
 
+    def check_connect_review(choice: ConnectReviewChoice | None) -> None:
+        if choice is not None:
+            view = svc.context_watch.view()
+            if view["on_connect"] is None or choice.revision != view["revision"]:
+                raise HTTPException(409, "Account or review settings changed. Reopen the form.")
+
     @app.put("/api/connections/email", dependencies=dep)
     async def put_email(body: EmailBody) -> dict[str, Any]:
+        check_connect_review(body.review)
         return conn.set_email(body.model_dump(exclude_none=True))
 
     @app.delete("/api/connections/email", dependencies=dep)
@@ -1635,6 +1696,7 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.post("/api/connections/calendar/feeds", dependencies=dep)
     async def add_calendar_feed(body: CalendarFeedBody) -> dict[str, Any]:
+        check_connect_review(body.review)
         try:
             return await conn.add_calendar_feed(body.model_dump())
         except ValueError as exc:
@@ -1766,6 +1828,7 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.post("/api/connections/mcp", dependencies=dep)
     async def add_mcp(body: MCPBody) -> dict[str, Any]:
+        check_connect_review(body.review)
         try:
             return await conn.add_mcp(body.model_dump())
         except ValueError as exc:
@@ -1912,23 +1975,82 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
 
     @app.get("/api/feed/posts", dependencies=dep)
     async def feed_posts() -> dict[str, Any]:
-        return svc.feed_posts()
+        return svc.feed_view()
+
+    @app.get("/api/feed/watches", dependencies=dep)
+    async def public_watches() -> dict[str, Any]:
+        return svc.context_watch.watches.view()
+
+    def change_watch(body: BaseModel, watch_id: str = "") -> dict[str, Any]:
+        try:
+            return svc.context_watch.watches.configure(watch_id=watch_id, **body.model_dump())
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.put("/api/feed/watches", dependencies=dep)
+    async def toggle_watches(body: PublicWatchToggle) -> dict[str, Any]:
+        if body.enabled is None and body.share_public_updates is None:
+            raise HTTPException(400, "Choose a setting to change.")
+        return change_watch(body)
+
+    @app.post("/api/feed/watches", dependencies=dep)
+    async def add_watch(body: PublicWatchAdd) -> dict[str, Any]:
+        return change_watch(body)
+
+    @app.patch("/api/feed/watches/{watch_id}", dependencies=dep)
+    async def edit_watch(watch_id: str, body: PublicWatchAction) -> dict[str, Any]:
+        return change_watch(body, watch_id)
+
+    @app.get("/api/feed/context", dependencies=dep)
+    async def context_watch() -> dict[str, Any]:
+        return svc.context_watch.view()
+
+    @app.get("/api/feed/context/resources", dependencies=dep)
+    async def context_resources() -> list[dict[str, str]]:
+        return await svc.context_watch.resources()
+
+    @app.put("/api/feed/context", dependencies=dep)
+    async def set_context_watch(body: ContextWatchBody) -> dict[str, Any]:
+        try:
+            return svc.context_watch.configure(**body.model_dump())
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.put("/api/feed/instructions", dependencies=dep)
     async def feed_instructions(body: FeedInstructionsBody) -> dict[str, Any]:
         try:
-            return svc.set_feed_instructions(body.instructions, daily=body.daily, time=body.time)
+            data = svc.set_feed_instructions(
+                body.instructions,
+                daily=body.daily,
+                time=body.time,
+                followups=body.followups,
+                followup_push=body.followup_push,
+                chat_followups=body.chat_followups,
+                on_change=body.on_change,
+            )
+            return svc.feed_view(data)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
+    @app.put("/api/feed/followups/{key}", dependencies=dep)
+    async def hide_followup(key: str, choice: Literal["tomorrow", "dismiss"]) -> dict[str, bool]:
+        svc.hide_followup(key, choice == "tomorrow")
+        return {"ok": True}
+
     @app.post("/api/feed/posts/refresh", dependencies=dep)
-    async def feed_refresh() -> dict[str, Any]:
+    async def feed_refresh(prepare_only: bool = False) -> dict[str, Any]:
         try:
-            return await svc.write_feed_posts()
+            return svc.feed_view(await svc.write_feed_posts(prepare_only=prepare_only))
         except Exception as exc:  # noqa: BLE001 — the model may be down; the app shows why
             data = svc.feed_posts()
             data["error"] = f"{type(exc).__name__}: {exc}"
-            return data
+            return svc.feed_view(data)
+
+    @app.put("/api/feed/posts/{post_id}/handled", dependencies=dep)
+    async def feed_handled(post_id: str) -> dict[str, bool]:
+        if not svc.handle_preparation(post_id):
+            raise HTTPException(404, "no such preparation")
+        return {"ok": True}
 
     @app.delete("/api/feed/posts/{post_id}", dependencies=dep)
     async def feed_delete(post_id: str) -> dict[str, Any]:
@@ -2025,8 +2147,10 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
             )
         headers: dict[str, str] = {}
         if media.startswith("text/html") or media == "image/svg+xml":
-            # Files the agent wrote never run with the app's origin: no token, no API.
-            headers["Content-Security-Policy"] = "sandbox allow-scripts allow-popups"
+            # Agent-written pages get an opaque origin and stay static: allowing script would
+            # let it exfiltrate through a self-navigation, which CSP cannot reliably block.
+            headers["Content-Security-Policy"] = ARTIFACT_CSP
+            headers["Referrer-Policy"] = "no-referrer"
         # ``filename=`` lets Starlette write the Content-Disposition header itself, which
         # encodes a name that is not ASCII (报告.txt) instead of failing on it.
         return FileResponse(

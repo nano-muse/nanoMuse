@@ -25,7 +25,7 @@
  * (`/events`) carrying the live state — registered when the web server is
  * present; the headless and SDK profiles get the service without routes.
  */
-import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ApprovalDesk, appLabel, appOf, type ApprovalScope, isOwnApp, checkForUpdate, compareVersions, DEVICE_GRANT_PREFIX, grantCovers, HoldDesk, modelFor, pickChatModel, pickHandsModel, REMOTE_CONTROL_GRANT_ID, scheduleRunIds, sharedConnectors, standingGrants, takesImages, UPDATE_RETRY_MS, updateCacheFresh, withGrant, type Grant, type Hold, type HoldTool, type PendingApproval, type StandingGrant, type UpdateInfo } from './desk.ts'
 import { arch, homedir, hostname, release, type, userInfo } from 'node:os'
@@ -559,6 +559,109 @@ function ownProvidersOf(raw: Record<string, unknown>): Record<string, OwnProvide
   return out
 }
 
+/** The one tolerant boundary for both the primary account state and its backup. */
+function cleanState(value: unknown): State {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('Desktop account state must be an object')
+  }
+  const raw = value as State
+  const account = raw.account
+  if (account !== undefined && (!account || typeof account !== 'object' || typeof account.id !== 'string' || !account.id)) {
+    throw new TypeError('Desktop account state has an invalid account')
+  }
+  return {
+    ...(raw.accountTransition === true ? { accountTransition: true as const } : {}),
+    ...(raw.account ? { account: raw.account } : {}),
+    ...(raw.models ? { models: raw.models } : {}),
+    ...(typeof raw.deviceId === 'string' && raw.deviceId ? { deviceId: raw.deviceId } : {}),
+    ...(typeof raw.deviceName === 'string' && raw.deviceName ? { deviceName: raw.deviceName } : {}),
+    ...(Number.isInteger(raw.doorPort) && (raw.doorPort as number) > 0 && (raw.doorPort as number) < 65536 ? { doorPort: raw.doorPort } : {}),
+    ...(typeof raw.handsModel === 'string' && raw.handsModel ? { handsModel: raw.handsModel } : {}),
+    // a grant 0.1.37 kept for the "app" "Done. Screen now:" (the mis-read head line) names nothing — dropped
+    ...(Array.isArray(raw.grants) ? { grants: (raw.grants as Grant[]).filter((g) => g && typeof g.id === 'string' && typeof g.target === 'string' && !MISREAD_GRANT.test(g.target) && !isOwnApp(g.target.slice('computer_app:'.length))).map((g) => ({ id: g.id, target: g.target, at: Number(g.at) || 0, ...(typeof g.sessionId === 'string' && g.sessionId ? { sessionId: g.sessionId, sessionTitle: String(g.sessionTitle ?? '') } : {}), ...(typeof g.sessionId === 'string' && g.sessionId && typeof g.scheduleId === 'string' && g.scheduleId ? { scheduleId: g.scheduleId, scheduleTitle: String(g.scheduleTitle ?? '') } : {}) })) } : {}),
+    ...(raw.update && typeof raw.update === 'object' && typeof (raw.update as UpdateInfo).checkedAt === 'number' ? { update: updateForThisVersion(raw.update as UpdateInfo) } : {}),
+    ...(raw.remoteControl === true ? { remoteControl: true } : {}),
+    ...(raw.trusted && typeof raw.trusted === 'object' ? { trusted: trustedOf(raw.trusted) } : {}),
+    ...(raw.taskSessions && typeof raw.taskSessions === 'object' ? { taskSessions: raw.taskSessions } : {}),
+    ...(raw.deviceConversations && typeof raw.deviceConversations === 'object' ? { deviceConversations: raw.deviceConversations } : {}),
+    ...(raw.sync && typeof raw.sync === 'object' ? { sync: raw.sync } : {}),
+    ...(raw.media && typeof raw.media === 'object' ? { media: raw.media } : {}),
+    ...(typeof raw.handsProvider === 'string' && raw.handsProvider ? { handsProvider: raw.handsProvider } : {}),
+    ...(raw.providers && typeof raw.providers === 'object' ? { providers: ownProvidersOf(raw.providers) } : {}),
+    ...(raw.chatgpt && typeof raw.chatgpt === 'object' && typeof (raw.chatgpt as ChatGptState).label === 'string' ? { chatgpt: { label: (raw.chatgpt as ChatGptState).label, at: Number((raw.chatgpt as ChatGptState).at) || 0 } } : {}),
+    ...(raw.cloudModelsOff === true ? { cloudModelsOff: true } : {}),
+  }
+}
+
+type StateCandidate =
+  | { kind: 'valid'; contents: string; state: State }
+  | { kind: 'missing' }
+  | { kind: 'invalid'; error: unknown }
+
+async function stateCandidate(path: string): Promise<StateCandidate> {
+  try {
+    const contents = await readFile(path, 'utf8')
+    return { kind: 'valid', contents, state: cleanState(JSON.parse(contents) as unknown) }
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ? { kind: 'missing' }
+      : { kind: 'invalid', error }
+  }
+}
+
+async function privateTemp(path: string, contents: string): Promise<string> {
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+  try {
+    const file = await open(tmp, 'wx', 0o600)
+    try {
+      await file.writeFile(contents, 'utf8')
+      await file.sync()
+    } finally {
+      await file.close()
+    }
+    await chmod(tmp, 0o600)
+    return tmp
+  } catch (error) {
+    await rm(tmp, { force: true }).catch(() => undefined)
+    throw error
+  }
+}
+
+async function replaceFile(source: string, target: string): Promise<void> {
+  try {
+    await rename(source, target)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (process.platform !== 'win32' || !['EACCES', 'EEXIST', 'EPERM'].includes(code ?? '')) throw error
+    await rm(target, { force: true })
+    await rename(source, target)
+  }
+}
+
+async function syncDirectory(path: string): Promise<void> {
+  try {
+    const directory = await open(path, 'r')
+    try {
+      await directory.sync()
+    } finally {
+      await directory.close()
+    }
+  } catch {
+    // Windows and some file systems do not let Node open or fsync a directory.
+  }
+}
+
+async function restoreStateFile(path: string, state: State): Promise<void> {
+  const tmp = await privateTemp(path, `${JSON.stringify(state, null, 2)}\n`)
+  try {
+    await replaceFile(tmp, path)
+    await chmod(path, 0o600)
+    await syncDirectory(dirname(path))
+  } finally {
+    await rm(tmp, { force: true }).catch(() => undefined)
+  }
+}
+
 /** The `confirmed` field of a hands call, when it is one (a ticket or the legacy `true`). */
 export function confirmationOf(args: unknown): string | true | undefined {
   if (!args || typeof args !== 'object' || Array.isArray(args)) return undefined
@@ -1046,7 +1149,10 @@ export default class NanomuseCloud extends Service {
             }
             return rows
           },
-          lines: (sessionId) => this.sessionLines(ctx, sessionId),
+          lines: async sessionId => [
+            ...await this.sessionLines(ctx, sessionId),
+            ...(this.ctx.get('nanomuseRooms')?.publicWatchSyncLines?.(sessionId) ?? []),
+          ],
           create: (title, sessionId) => this.createSyncedSession(ctx, title, sessionId),
           rename: async (sessionId, title) => {
             await ctx.sessionController.rename({ sessionId: sessionId as SessionId, title })
@@ -2498,6 +2604,33 @@ export default class NanomuseCloud extends Service {
     return row ? helloLlm(row.provider, chat.model) : undefined
   }
 
+  /** Desktop memory written on behalf of an account stays with that account in proactive requests. */
+  get feedOwner(): string | undefined {
+    if (this.changingAccount || this.state.accountTransition) return undefined
+    return this.state.account ? 'account:' + this.state.account.id : 'local'
+  }
+
+  async prepareFeed(system: string, input: string, signal: AbortSignal): Promise<string> {
+    const llm = this.ctx.get('llm')
+    const choice = this.defaultModelService()?.currentSelection()
+    if (!llm || !choice?.provider || !choice.model) throw new Error('No chat model is available')
+    const sessionId = ('feed-' + randomUUID()) as SessionId
+    this.provenance.setRun(sessionId, 'feed')
+    let text = '', finished = false
+    try {
+      for await (const part of llm.stream({ ...choice, system, messages: [{ role: 'user', content: [{ type: 'text', text: input }] }],
+        tools: [], maxTokens: 1600, sessionId, signal })) {
+        if (part.type === 'text-delta') text += part.text
+        if (part.type === 'tool-call-delta' || (part.type === 'block-end' && part.block.type === 'tool-call') || text.length > 16_000) throw new Error('Invalid preparation response')
+        if (part.type === 'finish') finished = part.reason.kind === 'stop'
+      }
+      if (!finished || signal.aborted) throw new Error('Preparation did not finish')
+      return text
+    } finally {
+      this.provenance.forget(sessionId)
+    }
+  }
+
   chatChoice(): { provider: string; model: string } {
     try {
       const current = this.defaultModelService()?.currentSelection()
@@ -2798,9 +2931,31 @@ export default class NanomuseCloud extends Service {
     return this.isClearedSession(id) ? '' : id
   }
 
+  publicWatchSyncAvailable(sessionId: string): boolean {
+    const sync = this.sync, view = sync?.view()
+    return Boolean(sessionId && sync && this.state.account && !this.changingAccount && !this.state.accountTransition &&
+      sync.state.accountId === this.state.account.id && view?.enabled && view.available && !view.paused &&
+      view.mainSession === sessionId && sync.owns(sessionId))
+  }
+
+  async publicWatchSyncActive(sessionId: string): Promise<boolean> {
+    const sync = this.sync
+    return Boolean(sync && this.publicWatchSyncAvailable(sessionId) && await sync.active().catch(() => false) &&
+      this.sync === sync && this.publicWatchSyncAvailable(sessionId))
+  }
+
+  publicWatchReady(sessionId: string): void {
+    if (this.publicWatchSyncAvailable(sessionId)) this.sync?.publicLineReady(sessionId)
+  }
+
   /** How many turns from the account's other devices a session here shows (C8). */
   syncRemoteLines(sessionId: string): number {
     return this.kept?.linesOf(sessionId).length ?? 0
+  }
+
+  /** A later message from another device may have cancelled or moved a local commitment. */
+  hasRemoteReplySince(sessionId: string, at: number): boolean {
+    return this.kept?.linesOf(sessionId).some(line => line.role === 'user' && (line.keptAt ?? line.at) >= at) ?? false
   }
 
   /** The main chat named by the host (the first conversation): the session it ends up in. */
@@ -4002,34 +4157,26 @@ export default class NanomuseCloud extends Service {
   }
 
   private async readState(): Promise<State> {
-    try {
-      const raw = JSON.parse(await readFile(this.statePath(), 'utf8')) as State
-      return {
-        ...(raw.accountTransition === true ? { accountTransition: true as const } : {}),
-        ...(raw.account ? { account: raw.account } : {}),
-        ...(raw.models ? { models: raw.models } : {}),
-        ...(typeof raw.deviceId === 'string' && raw.deviceId ? { deviceId: raw.deviceId } : {}),
-        ...(typeof raw.deviceName === 'string' && raw.deviceName ? { deviceName: raw.deviceName } : {}),
-        ...(Number.isInteger(raw.doorPort) && (raw.doorPort as number) > 0 && (raw.doorPort as number) < 65536 ? { doorPort: raw.doorPort } : {}),
-        ...(typeof raw.handsModel === 'string' && raw.handsModel ? { handsModel: raw.handsModel } : {}),
-        // a grant 0.1.37 kept for the "app" "Done. Screen now:" (the mis-read head line) names nothing — dropped
-        ...(Array.isArray(raw.grants) ? { grants: (raw.grants as Grant[]).filter((g) => g && typeof g.id === 'string' && typeof g.target === 'string' && !MISREAD_GRANT.test(g.target) && !isOwnApp(g.target.slice('computer_app:'.length))).map((g) => ({ id: g.id, target: g.target, at: Number(g.at) || 0, ...(typeof g.sessionId === 'string' && g.sessionId ? { sessionId: g.sessionId, sessionTitle: String(g.sessionTitle ?? '') } : {}), ...(typeof g.sessionId === 'string' && g.sessionId && typeof g.scheduleId === 'string' && g.scheduleId ? { scheduleId: g.scheduleId, scheduleTitle: String(g.scheduleTitle ?? '') } : {}) })) } : {}),
-        ...(raw.update && typeof raw.update === 'object' && typeof (raw.update as UpdateInfo).checkedAt === 'number' ? { update: updateForThisVersion(raw.update as UpdateInfo) } : {}),
-        ...(raw.remoteControl === true ? { remoteControl: true } : {}),
-        ...(raw.trusted && typeof raw.trusted === 'object' ? { trusted: trustedOf(raw.trusted) } : {}),
-        ...(raw.taskSessions && typeof raw.taskSessions === 'object' ? { taskSessions: raw.taskSessions } : {}),
-        ...(raw.deviceConversations && typeof raw.deviceConversations === 'object' ? { deviceConversations: raw.deviceConversations } : {}),
-        ...(raw.sync && typeof raw.sync === 'object' ? { sync: raw.sync } : {}),
-        ...(raw.media && typeof raw.media === 'object' ? { media: raw.media } : {}),
-        ...(typeof raw.handsProvider === 'string' && raw.handsProvider ? { handsProvider: raw.handsProvider } : {}),
-        ...(raw.providers && typeof raw.providers === 'object' ? { providers: ownProvidersOf(raw.providers) } : {}),
-        ...(raw.chatgpt && typeof raw.chatgpt === 'object' && typeof (raw.chatgpt as ChatGptState).label === 'string' ? { chatgpt: { label: (raw.chatgpt as ChatGptState).label, at: Number((raw.chatgpt as ChatGptState).at) || 0 } } : {}),
-        ...(raw.cloudModelsOff === true ? { cloudModelsOff: true } : {}),
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
-      throw new Error('Could not read desktop account state; refusing to discard saved conversation access rules', { cause: error })
+    const path = this.statePath()
+    const current = await stateCandidate(path)
+    if (current.kind === 'valid') {
+      await chmod(path, 0o600).catch(() => undefined)
+      return current.state
     }
+    const backupPath = `${path}.bak`
+    const backup = await stateCandidate(backupPath)
+    if (backup.kind === 'valid') {
+      await chmod(backupPath, 0o600).catch(() => undefined)
+      await restoreStateFile(path, backup.state).catch((error: unknown) => {
+        this.ctx.logger.warn('nanomuse: account state recovered but the primary file was not restored: %s', message(error))
+      })
+      return backup.state
+    }
+    if (current.kind === 'missing' && backup.kind === 'missing') return {}
+    const cause = current.kind === 'invalid' ? current.error
+      : backup.kind === 'invalid' ? backup.error
+        : new Error('No complete account state backup')
+    throw new Error('Could not read desktop account state; refusing to discard saved conversation access rules', { cause })
   }
 
   /** A session's cached log facts, dropped: its log changed. */
@@ -4115,8 +4262,12 @@ export default class NanomuseCloud extends Service {
   private async remoteLines(
     ctx: Context,
     sessionId: string,
+    includeRemote = true,
   ): Promise<{ lines: Array<RemoteLine & { id: string; before: string | null }>; prompts: string[] }> {
-    const lines = this.kept?.linesOf(sessionId) ?? []
+    const notes = ctx.get('nanomuseRooms')?.checkInMessages(sessionId) ?? []
+    const lines = [...(includeRemote ? this.kept?.linesOf(sessionId) ?? [] : []), ...notes.map(n => ({
+      mid: n.id, text: n.text, at: n.at, keptAt: n.at, role: 'assistant' as const, device: '', deviceName: '', localCheckIn: true,
+    }))].sort((a, b) => a.at - b.at)
     if (lines.length === 0) return { lines: [], prompts: [] }
     const entry = this.cached(sessionId)
     let prompts = entry.prompts
@@ -4177,14 +4328,35 @@ export default class NanomuseCloud extends Service {
   private async writeState(): Promise<void> {
     const path = this.statePath()
     // Capture each requested snapshot before yielding, and commit writes in that order.
-    const contents = JSON.stringify(this.state, null, 2) + '\n'
+    const contents = `${JSON.stringify(this.state, null, 2)}\n`
     const write = async (): Promise<void> => {
-      await mkdir(dirname(path), { recursive: true })
-      const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+      const dir = dirname(path)
+      const backupPath = `${path}.bak`
+      await mkdir(dir, { recursive: true })
+      const tmp = await privateTemp(path, contents)
       try {
-        await writeFile(tmp, contents, { mode: 0o600, flag: 'wx' })
-        await rename(tmp, path)
-        await chmod(path, 0o600).catch(() => undefined)
+        const current = await stateCandidate(path)
+        if (current.kind === 'valid') {
+          const backupTmp = await privateTemp(backupPath, current.contents)
+          try {
+            await replaceFile(backupTmp, backupPath)
+            await chmod(backupPath, 0o600)
+            await syncDirectory(dir)
+          } finally {
+            await rm(backupTmp, { force: true }).catch(() => undefined)
+          }
+        } else {
+          const backup = await stateCandidate(backupPath)
+          if (current.kind === 'invalid' && backup.kind !== 'valid') {
+            throw new Error('Could not preserve a complete desktop account state backup', { cause: current.error })
+          }
+          if (current.kind === 'missing' && backup.kind === 'invalid') {
+            throw new Error('Could not preserve a complete desktop account state backup', { cause: backup.error })
+          }
+        }
+        await replaceFile(tmp, path)
+        await chmod(path, 0o600)
+        await syncDirectory(dir)
       } finally {
         await rm(tmp, { force: true }).catch(() => undefined)
       }
@@ -4507,7 +4679,9 @@ export default class NanomuseCloud extends Service {
         if (req.method === 'GET' && route === '/sync/remote') {
           const sessionId = url.searchParams.get('session') ?? ''
           // another account's chat shows no bubbles and no working line (C10)
-          const remote = sessionId && sync.owns(sessionId) ? await this.remoteLines(this.ctx, sessionId) : { lines: [], prompts: [] }
+          const access = this.scheduleSessionAccess('nanomuse-feed')
+          const remote = sessionId && access(sessionId) ? await this.remoteLines(this.ctx, sessionId, sync.owns(sessionId)) : { lines: [], prompts: [] }
+          if (!access(sessionId)) return send(res, 200, { lines: [], prompts: [], hidden: [], working: null })
           return send(res, 200, { lines: remote.lines, prompts: remote.prompts, hidden: sync.view().hidden, working: sync.workingOf(sessionId) })
         }
         if (req.method === 'POST' && route === '/sync/archived') {

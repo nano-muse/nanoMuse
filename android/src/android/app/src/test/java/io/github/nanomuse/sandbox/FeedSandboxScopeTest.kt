@@ -42,6 +42,7 @@ class FeedSandboxScopeTest {
     fun `mirror copies one day level and exposes liked frontmatter`() {
         val day = File(source, "2026-10-23").apply { mkdirs() }
         File(day, "01.md").writeText("---\nliked: true\n---\n\nUseful topic\n")
+        File(day, "02.md").writeText("---\npreparation: a1\n---\nQuoted private records")
         File(day, "notes.txt").writeText("not a post")
         File(File(day, "nested").apply { mkdirs() }, "02.md").writeText("too deep")
         File(source, "not-a-day").apply { mkdirs() }.resolve("03.md").writeText("wrong dir")
@@ -50,6 +51,7 @@ class FeedSandboxScopeTest {
 
         val visible = File(mirror, "2026-10-23/01.md")
         assertTrue(visible.readText().contains("liked: true"))
+        assertFalse(File(mirror, "2026-10-23/02.md").exists())
         assertFalse(File(mirror, "2026-10-23/notes.txt").exists())
         assertFalse(File(mirror, "2026-10-23/nested/02.md").exists())
         assertFalse(File(mirror, "not-a-day/03.md").exists())

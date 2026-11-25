@@ -278,8 +278,26 @@ def test_feed_routine_is_due_at_its_time_and_the_first_day_is_written_on_onboard
 
     # the first run complete, a model there: the first feed day is written in the background
     service._save_feed({**service.feed_posts(), "posts": [], "generated_at": None})
+    service.app.goals.create("Prepare the review", steps=["Draft the agenda"])
+    service.settings.agent.user_profile = "Open each review with the decision."
     llm.script.append(
-        LLMResponse(content='[{"title": "Day one", "body": "Hello.", "area": "planning"}]')
+        LLMResponse(
+            content=json.dumps(
+                [
+                    {
+                        "title": "Day one",
+                        "body": "Agenda: open with the decision, then review the draft.",
+                        "form": "brief",
+                        "why_now": "The review needs an agenda.",
+                        "anchor": "S1",
+                        "sources": [
+                            {"id": "S1", "quote": "Draft the agenda"},
+                            {"id": "S2", "quote": "Open each review with the decision."},
+                        ],
+                    }
+                ]
+            )
+        )
     )
     r = client.post("/api/onboarded", json={"done": True})
     assert r.json() == {"onboarded": True, "feed_started": True}
@@ -302,7 +320,7 @@ def test_feed_routine_backs_off_after_a_failed_batch(server, monkeypatch):
     assert service.feed_posts_due()
     attempts = 0
 
-    async def boom(n: int = 3) -> dict:
+    async def boom(n: int = 3, *, scheduled: bool = False) -> dict:
         nonlocal attempts
         attempts += 1
         raise RuntimeError("model down")

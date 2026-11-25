@@ -1591,6 +1591,14 @@ def version() -> None:
     console.print(f"nanomuse {__version__}")
 
 
+@app.command("watch-stdio", hidden=True)
+def watch_stdio() -> None:
+    """Serve a single bounded request from the desktop public watch reader."""
+    from nanomuse.server.watch_stdio import main
+
+    main()
+
+
 @app.command()
 def mcp(config: ConfigOpt = None) -> None:
     """Serve this computer's screen and hands over MCP on stdio (for the desktop app).

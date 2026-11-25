@@ -185,12 +185,22 @@ class ReminderStore:
         self._conn.commit()
         return cur.rowcount > 0
 
-    def mark_fired(self, reminder_id: str, now: datetime | None = None) -> Reminder | None:
+    def mark_fired(
+        self,
+        reminder_id: str,
+        now: datetime | None = None,
+        *,
+        occurrence: str = "",
+    ) -> Reminder | None:
         """Called when the item was handed to the agent: a routine moves to its next
-        occurrence, a one-off is done."""
+        occurrence, a one-off is done. When ``occurrence`` is given, advancing is
+        idempotent: recovery may repeat the acknowledgement after this database committed
+        but before the delivery outbox recorded that fact."""
         item = self.get(reminder_id)
         if item is None or item.status != "active":
             return None
+        if occurrence and item.next_at != occurrence:
+            return item
         now = now or _now()
         nxt = next_check_in(item.repeat, now.astimezone()) if item.repeat else None
         self._conn.execute(

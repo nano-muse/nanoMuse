@@ -5,6 +5,7 @@ around a turn (/v1/events), the export's pseudonym and the deletions ledger."""
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 from test_cloud import sign_up
@@ -266,17 +267,19 @@ async def test_the_apps_reports_are_kept_tied_to_their_turns_and_deleted_with_th
     data = await sign_up(client, sender, identifier="prov-ev@example.com")
     headers = {"Authorization": f"Bearer {data['api_key']}", "User-Agent": "nanoMuse-iOS/1.0.8", "X-NanoMuse-Device": "iphone-1"}
     acct8 = data["account"]["id"][:8]
+    reported_at = int(time.time()) - 2
+    approved_at = reported_at + 1
     events = [
         {
             "kind": "sentinel.decision",
-            "ts": 1792800001,
+            "ts": reported_at,
             "turn": "fa96b12265d54779",
             "conversation": "c1",
             "data": {"tool": "shell", "risk": "sensitive", "decision": "ask"},
         },
         {
             "kind": "approval.result",
-            "ts": 1792800002,
+            "ts": approved_at,
             "turn": "fa96b12265d54779",
             "data": {"tool": "shell", "allow": True, "scope": "once", "by": "person"},
         },
@@ -295,10 +298,10 @@ async def test_the_apps_reports_are_kept_tied_to_their_turns_and_deleted_with_th
     assert got["total"] == 4 and "turn.feedback" in got["kinds"]
     by_kind = {e["kind"]: e for e in got["events"]}
     assert by_kind["sentinel.decision"]["data"] == {"tool": "shell", "risk": "sensitive", "decision": "ask"}
-    assert by_kind["sentinel.decision"]["ts"] == 1792800001 and by_kind["sentinel.decision"]["conversation"] == "c1"
+    assert by_kind["sentinel.decision"]["ts"] == reported_at and by_kind["sentinel.decision"]["conversation"] == "c1"
     assert by_kind["sentinel.decision"]["platform"] == "ios" and by_kind["sentinel.decision"]["device"] == "iphone-1"
     assert by_kind["approval.result"]["data"]["allow"] is True
-    assert by_kind["turn.stopped"]["turn_id"] == f"own-{acct8}-t-9" and by_kind["turn.stopped"]["ts"] > 1792800002
+    assert by_kind["turn.stopped"]["turn_id"] == f"own-{acct8}-t-9" and by_kind["turn.stopped"]["ts"] > approved_at
     assert by_kind["turn.feedback"]["data"] == {"vote": "down", "reason": "wrong"}  # the prose never arrived
     assert all(e["account_id"] == data["account"]["id"] for e in got["events"])
     # by kind, and per account

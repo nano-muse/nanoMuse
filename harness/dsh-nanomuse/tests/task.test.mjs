@@ -8,9 +8,10 @@ import { test } from 'node:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { parseGrantTarget, remoteApprovalCallId } from '../lib/approval-grants.js'
 import { PersistentTurns } from '../lib/persistent-turns.js'
 import { PersistentTaskEndpoint } from '../lib/persistent-task-endpoint.js'
-import { STREAM_INTERVAL_MS, TaskRunner, frame, grantKey, preview, textOf } from '../lib/task.js'
+import { STREAM_INTERVAL_MS, TaskRunner, frame, grantKey, grantTarget, preview, textOf } from '../lib/task.js'
 
 /** The slice of a dsh Context the runner touches. */
 function fakeContext() {
@@ -125,6 +126,29 @@ test('frame, textOf and preview', () => {
   assert.equal(grantKey('bash', JSON.stringify({ command: 'x'.repeat(300) })), `bash: ${'x'.repeat(300)}`)
   assert.equal(grantKey('bash', '{"command":"ls   -la\\n"}'), 'bash: ls -la')
   assert.equal(grantKey('noop', '{}'), 'noop')
+  const prefix = 'x'.repeat(80)
+  const one = grantTarget('bash', JSON.stringify({ step: 'shown', command: `${prefix} one` }))
+  const same = grantTarget('bash', JSON.stringify({ command: `${prefix} one`, step: 'changed' }))
+  const two = grantTarget('bash', JSON.stringify({ command: `${prefix} two` }))
+  assert.deepEqual(one, same, 'the human-facing step is not part of the action')
+  assert.equal(one.tool, 'bash')
+  assert.equal(one.resource, `${prefix} one`)
+  assert.notEqual(one.action, two.action, 'a suffix beyond the preview boundary stays distinct')
+  assert.deepEqual(parseGrantTarget(one), one)
+  assert.equal(parseGrantTarget({ tool: 'bash', resource: one.resource, action: one.action }), undefined)
+  const body = { approval_id: 'ap-1', risk: 'destructive', grant_target: one }
+  const scoped = remoteApprovalCallId('call', 'device-a', body.risk, 'session-a', body)
+  assert.notEqual(scoped, remoteApprovalCallId('call', 'device-b', body.risk, 'session-a', body))
+  assert.notEqual(scoped, remoteApprovalCallId('call', 'device-a', 'outbound', 'session-a', body))
+  assert.notEqual(scoped, remoteApprovalCallId('call', 'device-a', body.risk, 'session-b', body))
+  assert.notEqual(
+    scoped,
+    remoteApprovalCallId('call', 'device-a', body.risk, 'session-a', { ...body, approval_id: 'ap-2' }),
+  )
+  assert.equal(
+    remoteApprovalCallId('call', 'device-a', body.risk, 'session-a', { approval_id: 'legacy' }),
+    'call:remote:legacy',
+  )
 })
 
 test('a task opens a named session, streams the run and resolves with the answer', async () => {
@@ -180,6 +204,7 @@ test('an approval goes to the asker and its approve decides; stop cancels the ru
   const asked = call.events.find((e) => e.stage === 'approval')
   assert.ok(asked, 'approval relayed')
   assert.equal(asked.preview, 'bash: rm -rf /tmp/scratch')
+  assert.deepEqual(asked.grant_target, grantTarget('bash', '{"command":"rm -rf /tmp/scratch"}'))
   assert.equal(asked.reason, 'destructive command')
   assert.equal(asked.device, 'Desk')
   assert.deepEqual(await r.approve({ approval_id: 'nope', allow: true }), { ok: false })

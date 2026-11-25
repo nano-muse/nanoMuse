@@ -312,6 +312,8 @@ function toMessage(value: unknown): WireMessage {
 
 /** One message of a dsh session the engine may sync: the person's prompt or the model's final text. */
 export interface SessionLine {
+  /** A revocable public check-in must still be eligible immediately before the relay write. */
+  authorized?: () => boolean
   /** The dsh message id: stable, so a line is pushed once. */
   id: string
   role: 'user' | 'assistant'
@@ -1117,6 +1119,12 @@ export class SyncEngine {
     return this.state.sideChats || sessionId === this.state.mainSession
   }
 
+  publicLineReady(sessionId: string): void {
+    if (sessionId !== this.state.mainSession || !this.syncs(sessionId)) return
+    this.dirty.add(sessionId)
+    this.pushSoon(this.options.pushDelayMs ?? PUSH_DELAY_MS)
+  }
+
   /** A turn ended in a session here: the model's final text goes up after the debounce. */
   turnEnded(sessionId: string): void {
     this.running.delete(sessionId)
@@ -1312,6 +1320,7 @@ export class SyncEngine {
           continue
         }
         for (const line of lines) {
+          if (line.authorized && !line.authorized()) continue
           if (this.state.mids[lineKey(sessionId, line.id)] || this.state.mids[line.id]) continue
           if (messages.length >= batch) {
             again.add(sessionId)
@@ -1340,6 +1349,9 @@ export class SyncEngine {
       for (let i = conversations.length - 1; i >= 0; i--) if (clearedCids.has(String(conversations[i]!.cid))) conversations.splice(i, 1)
       for (let i = messages.length - 1; i >= 0; i--) if (clearedCids.has(String(messages[i]!.cid))) messages.splice(i, 1)
       for (let i = pending.length - 1; i >= 0; i--) if (this.isCleared(pending[i]!.sessionId)) pending.splice(i, 1)
+      const revoked = new Set(pending.filter(p => p.line.authorized && !p.line.authorized()).map(p => p.mid))
+      for (let i = messages.length - 1; i >= 0; i--) if (revoked.has(String(messages[i]!.mid))) messages.splice(i, 1)
+      for (let i = pending.length - 1; i >= 0; i--) if (revoked.has(pending[i]!.mid)) pending.splice(i, 1)
       if (conversations.length === 0 && messages.length === 0) break
       let out: PushResult
       try {

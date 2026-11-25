@@ -25,9 +25,8 @@
 # release goes out with them attached only then (scripts/update-feed-check.mjs).
 # A push that touches harness/desktop builds Linux only; "Run workflow" and the release tags
 # `v*` build all four, and a tag uploads the installers to the release of the same name (the
-# one scripts/release-apk.sh creates with the APK), retrying until it exists; the platforms
-# that built are attached even when another one failed, and the run ends red. "Run workflow"
-# with a release tag does the same for a release that already exists (a platform fixed afterwards).
+# one scripts/release-apk.sh creates with the APK), retrying until it exists. "Run workflow"
+# from a release tag rebuilds and replaces the complete installer set for that exact commit.
 name: desktop app
 
 on:
@@ -77,6 +76,15 @@ jobs:
             echo "harness/desktop/package.json says $VERSION, the release is $TAG; run the workflow from a commit of that version" >&2
             exit 1
           fi
+          if [ -n "$TAG" ]; then
+            git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+            TAG_COMMIT=$(git rev-parse "$TAG^{commit}")
+            BUILD_COMMIT=$(git rev-parse HEAD)
+            if [ "$BUILD_COMMIT" != "$TAG_COMMIT" ]; then
+              echo "this run checked out $BUILD_COMMIT, but $TAG points to $TAG_COMMIT; run the workflow from the tag itself" >&2
+              exit 1
+            fi
+          fi
       - id: pick
         shell: bash
         env:
@@ -108,13 +116,13 @@ jobs:
           cache: npm
           cache-dependency-path: harness/desktop/package-lock.json
       # pnpm comes from npm here, not from pnpm/action-setup: the action installs one pnpm and
-      # has it self-update to the newest 11, and that update insists on the platform's native
-      # binary, which pnpm stopped publishing for Intel Macs after 11.0, so the macos-x64 job
-      # died before it built anything. The pnpm package on npm is JavaScript and runs on the
-      # Node that setup-node just installed, on every platform in the matrix.
+      # has it self-update, and that update insists on the platform's native binary, which
+      # pnpm stopped publishing for Intel Macs after 11.0, so the macos-x64 job died before
+      # it built anything. The pinned pnpm package on npm is JavaScript and runs on the Node
+      # that setup-node just installed, on every platform in the matrix.
       - name: pnpm
         shell: bash
-        run: npm install --global pnpm@11
+        run: npm install --global pnpm@11.29.0
       # setup-node caches one package manager; the bundle's pnpm store is kept by hand
       - name: pnpm store path
         id: pnpm-store
@@ -266,15 +274,10 @@ jobs:
             harness/desktop/dist/*.zip
           if-no-files-found: error
 
-  # The platforms that built are attached even when another one failed: `needs.build.result`
-  # is `failure` as soon as one leg of the matrix fails, which would skip this job and hold
-  # back three good installers for the one that broke. So the job runs on `success` and on
-  # `failure` alike (not when the build was cancelled or never ran), takes what the build
-  # uploaded, and attaches it; the run still ends red through the failed build job, and
-  # "Run workflow" with the tag, once the platform is fixed, builds all four again and
-  # replaces the installers and the checksum file.
+  # Release assets are all or nothing. A failed platform leaves the existing assets untouched;
+  # after the fix, run the workflow again from the tag to replace the complete set.
   release:
-    if: always() && (startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '') && (needs.build.result == 'success' || needs.build.result == 'failure')
+    if: (startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '') && needs.build.result == 'success'
     needs: build
     runs-on: ubuntu-latest
     # waits up to fifteen minutes for the release below, then uploads
@@ -292,11 +295,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag || github.ref_name }}
           REPO: ${{ github.repository }}
-          BUILD_RESULT: ${{ needs.build.result }}
         run: |
-          if [ "$BUILD_RESULT" != "success" ]; then
-            echo "::warning::a platform's build failed; attaching the installers of the platforms that built, so the release is not left empty. SHA256SUMS-desktop.txt lists those only; fix the platform and run the workflow again with release_tag=$TAG to complete the set."
-          fi
           # the release is created by scripts/release-apk.sh right after it pushes the tag;
           # give it up to fifteen minutes
           for i in $(seq 1 90); do
@@ -304,6 +303,25 @@ jobs:
             sleep 10
           done
           gh release view "$TAG" -R "$REPO" >/dev/null
+          VERSION="${TAG#v}"
+          required=(
+            "nanoMuse-Desktop-$VERSION-win-x64.exe"
+            "nanoMuse-Desktop-$VERSION-win-x64.exe.blockmap"
+            "latest.yml"
+            "nanoMuse-Desktop-$VERSION-mac-arm64.dmg"
+            "nanoMuse-Desktop-$VERSION-mac-arm64.zip"
+            "nanoMuse-Desktop-$VERSION-mac-x64.dmg"
+            "nanoMuse-Desktop-$VERSION-mac-x64.zip"
+            "nanoMuse-Desktop-$VERSION-linux-x64.AppImage"
+            "nanoMuse-Desktop-$VERSION-linux-x64.deb"
+            "nanoMuse-Desktop-$VERSION-linux-x64.tar.gz"
+          )
+          for asset in "${required[@]}"; do
+            test -f "packages/$asset" || {
+              echo "the complete desktop release set is missing packages/$asset; nothing was uploaded" >&2
+              exit 1
+            }
+          done
           # packages/* carries the Windows update assets with the installers (latest.yml, the
           # .exe.blockmap); SHA256SUMS-desktop.txt covers them the same way
           (cd packages && sha256sum * > SHA256SUMS-desktop.txt && cat SHA256SUMS-desktop.txt)

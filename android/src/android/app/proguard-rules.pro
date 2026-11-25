@@ -26,3 +26,28 @@
 # NOTE FOR VERIFICATION: debug builds don't minify, so this bug is invisible
 # there. Any change here must be checked against an assembleRelease APK.
 -keep class io.codeconcept.realtimecutvadlibrary.** { *; }
+
+# nanoMuse: SnakeYAML uses field access on Android. Its optional desktop
+# JavaBeans introspection path references these classes from java.desktop.
+-dontwarn java.beans.BeanInfo
+-dontwarn java.beans.FeatureDescriptor
+-dontwarn java.beans.IntrospectionException
+-dontwarn java.beans.Introspector
+-dontwarn java.beans.PropertyDescriptor
+
+# nanoMuse: Rhino resolves its interpreter, VM bridge, RegExp and built-in JS
+# constructors by name. The phone uses its interpreter with safe standard objects.
+-keep class org.mozilla.javascript.Interpreter { *; }
+-keep class org.mozilla.javascript.jdk18.VMBridge_jdk18 { *; }
+-keep class org.mozilla.javascript.regexp.** { *; }
+-keep class org.mozilla.javascript.NativeContinuation { *; }
+-keep class org.mozilla.javascript.typedarrays.** { *; }
+-keepnames class org.mozilla.javascript.Context
+-keepnames class org.mozilla.javascript.ContextFactory
+-keepnames interface org.mozilla.javascript.Function
+-keepnames class org.mozilla.javascript.ScriptableObject
+# Optional Java bean conversion is unreachable: no Java objects enter the JS scope.
+-dontwarn java.beans.BeanDescriptor
+
+# nanoMuse: the authenticated wireless-debugging transport invokes this fixed entry point by name.
+-keep class io.github.nanomuse.hands.HandsDisplayBridgeMain { public static void main(java.lang.String[]); }

@@ -4,8 +4,62 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Cloud
+
+### Runtime
+
+### Web
+
+### Desktop
+
+### Android
+
+### iOS
+
+### Project
+
+## [1.0.10] - 2026-11-25 · Bridge
+
+Bridge: Android background screen work now has guided local pairing, a secure floating preview
+and progress in the originating chat. The phones, desktop and runtime can follow through on due
+commitments and changed sources. The release also tightens browser, account, local-state and
+cross-device approval boundaries. The relay is 0.32.0; 1.0.9 clients remain compatible.
+
+- Fixed Android builds that could produce an arm64 APK without the PRoot executable needed for shell commands and screen tasks. Existing sandboxes also recovered missing files for the bundled Alpine shell without resetting the workspace.
+
+- Replaced the manual Android wireless debugging pairing form with a six-step guided background screen setup that watches system switches live, reads the six-digit pairing code automatically through the accessibility service when enabled, falls back to heads-up inline-reply notifications, and connects automatically across cached, property, mDNS and loopback-scanned ports.
+
+- Changed Android background screen runs to open a draggable secure screen window automatically instead of a top capsule, kept Stop, pause and phone handover in that window, and showed safe live progress in the originating chat. Chat Stop now targets only that conversation's screen run.
+
+- Kept the previous safe frame visible while the Android background screen loads its next screenshot, without showing an intermediate waiting message.
+
+- Android users could pair nanoMuse directly with their phone through wireless debugging to use the background screen without installing Shizuku.
+
+- Android users could take over a background app on the same open page and open its screen replay directly from the chat. The operator also learned to align shadowed dialogs when their position could be verified.
+
+- Added a live preview, pause and resume to the Android background screen, adapted its viewport to the phone and added local playback of recorded screen steps.
+
+- Added independent public-source follow-ups on Android and iPhone. Each phone could discover a source in its main chat, check for changes while the computer was off, and send a relevant update with its original link.
+
+- Added ongoing public-source follow-ups to desktop and the web runtime. nanoMuse could discover a project, researcher, topic or public feed in context and start a main-chat conversation about a new issue, paper, citation or announcement.
+
+- Enabled main-chat check-ins by default and kept earlier choices to turn them off. The web app offered background review when connecting an inbox, calendar or a new MCP server with one readable resource.
+
+- Added opt-in chat messages about changes in connected sources. The web runtime checked new email, nearby calendar events and selected MCP resources. Desktop checked a selected MCP resource. Android and iPhone compared busy times in selected calendars and offered to help with new overlaps or rescheduled events. These checks could start a conversation about something the person had never mentioned.
+
+- Fixed an Android crash when returning to the home screen immediately after opening a chat notification.
+
+- Added check-ins in the conversation itself. Android, iPhone and desktop could ask about a due commitment, and the web runtime could ask whether an expected reply arrived. People could answer directly in the chat.
+
+- Added opt-in Feed preparation from new chat commitments on Android and iPhone. Desktop kept track of separate commitments across topic changes. Dated commitments mentioned the previous week could still surface near their due date. The web Feed followed expected replies, updated their dates, and prepared an editable inquiry when one came due.
+
+- Added Feed preparation with source excerpts on Android, iPhone, desktop and web. Related records can become a draft, brief, checklist or focused question. The web Feed also learned to set aside handled matters and optionally revisit changed plans.
+
+- Added deadline follow-ups to the Feed on Android, iPhone, desktop and web. The web Feed also surfaced blocked steps, pending plan changes and calendar overlaps. Android, iPhone and the web offered optional notifications with private details kept in the Feed.
+
 - Kept completed sensitive actions and file writes in view after message or token limits removed their tool exchanges, helping long tasks avoid repeats. For #938.
 - Asked before repeating an identical sensitive action in the same conversation, including concurrent calls and retries after cancellation left an unknown outcome. For #938.
+- Scoped remembered cross-device approvals to the exact device, conversation, risk class and complete action. Older or malformed approval events could still be allowed once but could not create or reuse a remembered grant, and deleting a chat or leaving an account cleared its conversation grants.
 - Added the Levea video editor to the connector catalogue for desktop and phones, with OAuth sign-in.
 
 - Kept the person's request in view during long turns with the default settings, so a task with many tool calls no longer forgets what it was asked, and the wrap-up at the step limit sees the turn's work.
@@ -29,6 +83,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Rewrote all Simplified Chinese documentation in plain language, added inline term explanations and a bilingual glossary, and clarified navigation labels, privacy and backup wording, and desktop update guidance.
 
 ### Cloud
+
+- Prevented an older unbound account key from taking over another live device identity. Short-lived Web session keys reserved a computer identity and could claim only their container's first unused computer ID, while existing Web runtimes remained callable.
 
 - Distinguished admin-token rejection from temporary service failures, preserved entered tokens during outages, and kept late rejections from locking newer sign-ins.
 
@@ -57,6 +113,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
+
+- Pinned browser connections to the public addresses that passed validation, blocking DNS rebinding to local services. Agent-written HTML and SVG files no longer ran scripts or opened network connections, and screen actions without a device-reported element required approval instead of trusting the model's label.
+
+- Kept routine and goal recovery idempotent when a restart happened between source and delivery commits, and stopped retrying current Responses API prompt, policy and image input errors as transient provider failures.
 
 - Fixed browser-enabled Docker builds failing because the Playwright driver could not load `libatomic.so.1`, and added a Chromium startup check alongside the standard image build in CI.
 
@@ -148,6 +208,16 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Protected Host restarts with the same active-work handoff used by app exits, kept relay proxy exclusions under the shell's trusted configuration, bounded remote file payloads before decoding, and removed proxy credentials from damaged settings exports.
+
+- Flushed desktop account snapshots before replacement, kept a private previous snapshot and recovered a missing or damaged primary file without discarding account, sync or approval state. State writes remained ordered, and a failed write no longer blocked the next save.
+
+- Updated Electron to a patch release that corrected its certificate validation advisory. The remaining production dependency finding is a moderate malformed-ASF loop in the image stack used by computer control, for which its upstream dependency has no compatible fix.
+
+- Rendered Markdown in assistant replies synced from other devices and in completed replies in device-bound chats.
+- Clarified the latest published version on the desktop About page when testing a newer local build.
+- Fixed the desktop setup returning signed-out users to the first task when they chose to skip model configuration.
+
 - Let the agent list accessible scheduled tasks across chats and request approval to delete one, with guidance to check existing tasks before creating another. For #905.
 
 - Documented launching the Linux AppImage with a separate self-hosted relay profile. For #895.
@@ -213,6 +283,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Prevented the Host from exiting when a sync notification or hub reconnection arrived during a conversation pull that then timed out or lost its connection. Failed follow-up pulls remained handled, and later pulls continued from the saved cursor.
 
 ### Android
+
+- Added an optional background screen on compatible Android 14 and newer phones so Hands can operate one app while your keyboard and the Stop control stay on the main screen.
+
+- Grouped the app lock and protected chat settings on one page and clarified when each lock timer starts.
 
 - Replaced Android chat history on reload instead of appending duplicates, converted persisted messages in bounded raw pages, and read only message IDs when verifying a compaction anchor. Saved messages and unsummarized model context were preserved. For #921.
 

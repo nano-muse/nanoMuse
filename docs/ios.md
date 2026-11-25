@@ -62,7 +62,21 @@ is uncertain, confirmation warns that the remote turn may still be running and t
 the chat loses this iPhone's saved recovery information. It does not stop the remote turn.
 See [the Hub protocol](hub.md#persistent-device-conversations).
 
+## Public sources on this phone
+
+Use the Feed settings to follow public sources on this iPhone. New issues, papers and feed entries can appear in your main chat. Checks run while the app is active or when iOS grants background refresh time. [Public sources and reminder settings](app.md#following-public-sources-over-time)
+
 ## What is nanoMuse here
+
+A goal can have a local deadline chosen at creation or in Goals. The Feed shows one approaching or recently missed deadline with its next unfinished step. Mark the step done there, open the goal, show it again tomorrow, or hide that deadline. The card works offline when you open the Feed. Feed settings also offer an optional on-device deadline notification. Allow notifications and turn off regular check-ins for any goal you want to use it for. iPhone schedules just the next eligible local 09:00 alert on the due date (or the day you snoozed it to). The lock screen only says to check the Feed. Completing or changing the goal updates the pending alert when the app runs. If the app stays suspended, iOS can deliver the one already scheduled.
+
+The Feed can prepare material for an open goal or an upcoming appointment recorded in a recent diary entry. A separate note or saved preference must add something relevant. Each card includes its source excerpts. An explicit cancellation or a passed appointment can rule out a diary signal. The scheduled writer has no tools.
+
+Turn on *Prepare from my chats* in Feed settings to include new text you send on this iPhone in unlocked chats with memory enabled. A commitment with a date and a separate relevant note can become a draft, even if you never created a goal. When you change the date or say you already sent the message, the Feed rechecks the source before showing the preparation. A date agreed the previous week can still surface when it draws near. Turning the setting off removes its chat-based cards.
+
+Main chat check-ins are on by default. nanoMuse can ask about an unfinished goal due today or a dated commitment in a new message you sent in your unlocked main chat with memory enabled. It checks the original message on this iPhone. Previously saved choices still apply, including a decision to exclude chat text. You can turn check-ins off under *Feed settings → Message me in my main chat*. Answer in the main chat to continue. It waits for an idle conversation and checks between 09:00 and 20:00, at most once a day per account on this device. Checks run while the app is active and when iOS grants a background refresh. Notification permission lets the app alert you when it delivers a message in the background.
+
+In Feed settings, open *Calendar changes in chat*, allow calendar access and choose individual calendars. The first read is silent. A new overlap or a start time moved by at least 15 minutes in the next 24 hours can prompt a message with the affected times, even without a prior chat request. iPhone checks timed busy events while active or during a background refresh granted by iOS. It compares times and opaque event identifiers on the device and shares the same daytime and daily message limit as chat check-ins. With conversation sync enabled, the resulting message and its times can appear on your other devices. Remove a calendar or tap *Stop watching calendars* to reset the comparison.
 
 Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pull):
 
@@ -952,6 +966,13 @@ shares the native-dependency cache with the TestFlight workflow, so let it go gr
 compile error costs minutes there, not an upload. The full `xcodebuild` log is attached to the run. The run fails
 when a warning is reported in a file under `NanoMuse/` (upstream's files are not held to this),
 so the zero-warnings rule above is checked, not just asked for.
+
+The job also executes cross-device approval grant logic as a standalone Swift program and uses
+`build-for-testing` to compile its XCTest for an iOS 16 or later device target. It cannot run
+that XCTest in Simulator yet: the bundled iSH and FFmpeg frameworks contain device-only slices,
+so the app cannot link into a Simulator test host. Simulator XCTest becomes required when those
+dependencies provide Simulator slices. The standalone check remains executable on Linux and
+macOS in the meantime.
 
 The strings catalogue has a check of its own that runs on every pull request, on Linux:
 `tests/test_ios_strings.py` parses `Localizable.xcstrings` with every key pair in hand and fails

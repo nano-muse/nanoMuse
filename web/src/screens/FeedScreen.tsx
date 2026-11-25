@@ -16,8 +16,10 @@ import {
   Sparkles,
   Webhook,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api";
+import { ConnectedContextSettings } from "../components/ConnectedContextSettings";
+import { PublicWatchSettings } from "../components/PublicWatchSettings";
 import { LoadError } from "../components/LoadError";
 import { Markdown } from "../components/Markdown";
 import { MuseRoundButton } from "../components/MuseHeader";
@@ -25,7 +27,7 @@ import { Sheet } from "../components/Sheet";
 import { TabHeader } from "../components/TabHeader";
 import { intlLocale, localLabel, t, useLocale, useT } from "../i18n";
 import { useStore } from "../store";
-import type { CalendarData, CalendarEvent, FeedItem, FeedPost, FeedPostsData, UpcomingData } from "../types";
+import type { CalendarData, CalendarEvent, FeedFollowup, WaitingFollowup, FeedItem, FeedPost, FeedPostsData, UpcomingData } from "../types";
 import { Toggle } from "../components/Form";
 import { cx, readStorage, relativeTime, timeShort, writeStorage } from "../util";
 
@@ -60,11 +62,23 @@ function FeedRequestError({ label, request }: { label: string; request: { error:
  * from background passes, files it made, cards still waiting for you.
  */
 export function FeedScreen() {
-  const { state, send, openThread, openFile, markFeedSeen, setTab, toast } = useStore();
+  const { state, send, draft, openGoal, openThread, openFile, markFeedSeen, setTab, toast } = useStore();
   const feedVersion = `${state.feedVersion}:${state.remindersVersion}`;
+  const mainMessages = state.events?.main;
+  const mainUserId = useMemo(() => mainMessages?.slice().reverse().find((e) => e.type === "user")?.id ?? "", [mainMessages]);
   const activityRequest = useFeedRequest(readActivity, feedVersion);
-  const postsRequest = useFeedRequest(api.feedPosts, feedVersion);
-  const upcomingRequest = useFeedRequest(api.upcoming, feedVersion);
+  const [clock, setClock] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const refresh = () => { if (!document.hidden) setClock((n) => n + 1); };
+    const timer = window.setInterval(refresh, 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, []);
+  const postsRequest = useFeedRequest(api.feedPosts,
+    `${feedVersion}:${mainUserId}:${state.goalsVersion}:${state.memoryVersion}:${state.calendarVersion}:${state.connectionsVersion}:${clock}`);
+  const upcomingRequest = useFeedRequest(api.upcoming,
+    `${feedVersion}:${mainUserId}:${state.goalsVersion}:${state.calendarVersion}:${state.connectionsVersion}:${state.profile?.proactive}:${postsRequest.data?.followups_enabled}:${clock}`);
   const calendarRequest = useFeedRequest(api.calendar, `${state.calendarVersion}:${state.connectionsVersion}`);
   const items = activityRequest.data;
   const { data: posts, setData: setPosts } = postsRequest;
@@ -96,6 +110,9 @@ export function FeedScreen() {
       const d = await api.refreshFeedPosts();
       setPosts(d);
       if (d.error) toast(t("Could not write posts: {error}", { error: d.error }));
+      else if (!d.posts.some((p) => !posts?.posts.some((old) => old.id === p.id))) {
+        toast(t("Nothing new to prepare from your saved information."));
+      }
     } catch (e) {
       toast((e as Error).message);
     } finally {
@@ -103,11 +120,49 @@ export function FeedScreen() {
     }
   };
   /** "Discuss" on a post: the follow-up it suggested, or the post itself, into the main chat. */
+  const handlePreparation = async (post: FeedPost) => {
+    try {
+      await api.handlePreparation(post.id);
+      setPosts((old) => old && { ...old, posts: old.posts.filter((p) => p.id !== post.id) });
+    } catch (e) { toast((e as Error).message); }
+  };
   const discuss = (p: FeedPost) => {
+    if (p.form) {
+      openThread("main");
+      draft(p.form === "draft" ? p.body : [p.prompt || p.title, p.body].join("\n\n"));
+      return;
+    }
     send("main", p.prompt || `${t("About this post from my feed:")}\n\n**${p.title}**\n\n${p.body.slice(0, 1200)}`).catch((e: Error) => toast(e.message || t("Could not send")));
     openThread("main");
   };
   const postDays = useMemo(() => groupPostsByDay(posts?.posts ?? []), [posts]);
+  const followups = state.profile?.proactive === false || posts?.followups_enabled === false ? [] : upcoming?.followups ?? [];
+  const waiting = state.profile?.proactive === false || posts?.followups_enabled === false ? null : upcoming?.waiting_followup;
+  const review = async (item: FeedFollowup | WaitingFollowup) => {
+    if (item.kind === "waiting") {
+      try {
+        const latest = await api.upcoming();
+        upcomingRequest.setData(latest);
+        if (latest.waiting_followup?.id !== item.id) {
+          toast(t("This follow-up has changed."));
+          return;
+        }
+        openThread("main");
+        draft(t("Hi, do you have an update on {subject}?", { subject: latest.waiting_followup.subject }));
+      } catch (e) { toast((e as Error).message); }
+    } else if (item.kind !== "overlap") openGoal(item.goal_id);
+    else {
+      openThread("main");
+      draft(t("Help me plan around the overlap between {first} and {second}.", { first: item.titles[0], second: item.titles[1] }));
+    }
+  };
+  const hide = async (id: string, choice: "tomorrow" | "dismiss") => {
+    try {
+      await api.hideFeedFollowup(id, choice);
+      upcomingRequest.setData((old) => old && { ...old, waiting_followup: old.waiting_followup?.id === id ? null : old.waiting_followup, followups: old.followups?.filter((x) => x.id !== id) });
+      upcomingRequest.retry();
+    } catch (e) { toast((e as Error).message); }
+  };
   const noPosts = posts !== null && posts.posts.length === 0;
 
   return (
@@ -123,6 +178,8 @@ export function FeedScreen() {
 
       <div className="flex-1 overflow-y-auto px-3.5 pb-7">
         <FeedRequestError label={t("Feed")} request={postsRequest} />
+        {followups.map((item) => <FollowupCard key={item.id} item={item} onReview={() => review(item)} onHide={(choice) => hide(item.id, choice)} />)}
+        {waiting && <FollowupCard key={waiting.id} item={waiting} onReview={() => review(waiting)} onHide={(choice) => hide(waiting.id, choice)} />}
         {/* Muse's feed: a day heading, white cards; the first card explains what drives it */}
         {postDays.length === 0 && (
           <>
@@ -132,12 +189,10 @@ export function FeedScreen() {
               <>
                 <StaticCard
                   emoji="🖼️"
-                  title={t("Nothing in the feed yet")}
-                  body={t("As we get to know each other, new posts will show up here. Every day at {time} I read what I remember about you (your memory files, the last week of diary, your goals) and write a few short posts.", {
-                    time: posts?.time ?? "08:00",
-                  })}
+                  title={t("No new posts yet")}
+                  body={t("When something in your goals, calendar or recent conversations is worth following up, a post can appear here.")}
                 />
-                <StaticCard emoji="📝" title={t("Steer it with one sentence")} body={t("Tap the sliders at the top right to tell me what you want more of, switch the daily routine off, or have me write the first day now.")} />
+                <StaticCard emoji="📝" title={t("Steer it with one sentence")} body={t("Open Feed settings to choose what to prepare and when to check.")} />
                 {state.settings && !state.settings.llm_ready && (
                   <FeedCard>
                     <button type="button" onClick={() => setTab("you")} className="flex w-full items-center gap-2 p-4 text-left text-[14px] text-muted">
@@ -153,7 +208,7 @@ export function FeedScreen() {
                       </div>
                     ) : (
                       <button type="button" onClick={() => void writeNow()} className="h-[46px] w-full rounded-full bg-accent text-[15px] font-semibold text-accent-fg">
-                        {t("Write it now")}
+                        {t("Prepare now")}
                       </button>
                     )}
                   </div>
@@ -174,7 +229,7 @@ export function FeedScreen() {
               </FeedCard>
             )}
             {list.map((p) => (
-              <PostCard key={p.id} post={p} onDiscuss={() => discuss(p)} onInfo={() => setInfoPost(p)} />
+              <PostCard key={p.id} post={p} onDiscuss={() => discuss(p)} onInfo={() => setInfoPost(p)} onHandled={() => void handlePreparation(p)} />
             ))}
           </section>
         ))}
@@ -186,7 +241,7 @@ export function FeedScreen() {
         {calendar?.configured && <TodayBlock data={calendar} onAsk={() => openThread("main")} />}
         <FeedRequestError label={t("While you were away")} request={activityRequest} />
 
-        {items && items.length === 0 && posts !== null && posts.posts.length === 0 && (
+        {items && items.length === 0 && followups.length === 0 && posts !== null && posts.posts.length === 0 && (
           <div className="py-10 text-center text-muted text-[14px] px-6">
             <Moon size={28} className="mx-auto mb-2 opacity-60" />
             {t("Nothing yet. Once {name} works on a goal in the background or needs your approval, it shows up here.", { name })}
@@ -340,7 +395,9 @@ function areaLabel(area: string): string {
 }
 
 /** Muse's post: an emoji tile, the title, the body, a footer of discuss · info. */
-function PostCard({ post, onDiscuss, onInfo }: { post: FeedPost; onDiscuss: () => void; onInfo: () => void }) {
+function PostCard({ post, onDiscuss, onInfo, onHandled }: {
+  post: FeedPost; onDiscuss: () => void; onInfo: () => void; onHandled: () => void;
+}) {
   const t = useT();
   return (
     <FeedCard>
@@ -349,15 +406,28 @@ function PostCard({ post, onDiscuss, onInfo }: { post: FeedPost; onDiscuss: () =
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-[22px] leading-none">{AREA_EMOJI[post.area] ?? "📝"}</div>
           <div className="min-w-0 flex-1">
             <h3 className="text-[16px] font-semibold leading-[22px]">{post.title}</h3>
+            {post.why_now && <p className="mt-1 text-sm text-muted">{post.why_now}</p>}
             <div className="md mt-1 text-[15px] leading-[22px] text-fg/85">
               <Markdown text={post.body} />
             </div>
+            {post.sources && post.sources.length > 0 && (
+              <details className="mt-2 text-sm text-muted">
+                <summary className="cursor-pointer">{t("What this is based on")}</summary>
+                <ul className="mt-1 space-y-1">
+                  {post.sources.map((source, i) => <li key={i}><strong>{({
+                    goal: t("Goal"), calendar: t("Calendar"), memory: t("Saved memory"),
+                    conversation: t("Your message"), profile: t("Your profile"),
+                  })[source.kind]}</strong> · {source.quote}</li>)}
+                </ul>
+              </details>
+            )}
           </div>
         </div>
         <div className="mt-1.5 flex items-center">
           <button type="button" onClick={onDiscuss} className="flex items-center gap-1.5 rounded-full px-2 py-2 text-[14px] hover:bg-surface-2">
-            <MessageCircle size={22} strokeWidth={1.8} /> {t("Discuss")}
+            <MessageCircle size={22} strokeWidth={1.8} /> {post.form === "draft" ? t("Edit draft") : post.form ? t("Prepare a follow-up") : t("Discuss")}
           </button>
+          {post.form && <button type="button" onClick={onHandled} className="rounded-full px-2 py-2 text-sm text-muted hover:bg-surface-2">{t("Already handled")}</button>}
           <button type="button" onClick={onInfo} aria-label={t("About this post")} className="ml-auto rounded-full p-2 hover:bg-surface-2">
             <Info size={22} strokeWidth={1.8} />
           </button>
@@ -374,7 +444,7 @@ function IntroCard({ instructions, onEdit, onAck }: { instructions: string; onEd
     <FeedCard>
       <div className="px-4 py-3.5">
         <div className="text-[17px] font-semibold">{t("About the feed")}</div>
-        <p className="mt-1 text-[13px] leading-[18px] text-muted">{t("Short posts your agent writes for you from what it remembers: your memory files, the last week of diary, your goals. The sentence below steers every post from now on; edit it any time.")}</p>
+        <p className="mt-1 text-[13px] leading-[18px] text-muted">{t("Your agent can turn related goals, calendar entries and things you have told it into a draft or a brief. Each preparation shows the records it used.")}</p>
       </div>
       <div className="border-t border-border/70 px-4 py-3.5">
         <p className="text-[15px] leading-[22px]">{instructions || t("Build me a feed about what I care about. Keep it short and direct, easy to skim, no clickbait.")}</p>
@@ -449,7 +519,7 @@ function FeedSettingsSheet({
     }
   };
   // the daily routine is saved as it is switched or moved — a setting, not part of the sentence
-  const routine = async (body: { daily?: boolean; time?: string }) => {
+  const routine = async (body: { daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; chat_followups?: boolean; on_change?: boolean }) => {
     try {
       onChange(await api.setFeedInstructions(body));
     } catch (e) {
@@ -471,6 +541,18 @@ function FeedSettingsSheet({
           className="w-full resize-none rounded-2xl bg-surface-2 px-3.5 py-2.5 text-[15px] leading-snug outline-none focus:ring-2 focus:ring-accent/40"
         />
         <div className="space-y-2 rounded-2xl bg-surface-2 px-3.5 py-2.5">
+          <Toggle label={t("Follow up on goals, calendar conflicts and expected replies")} checked={data?.followups_enabled !== false}
+            onChange={(v) => void routine({ followups: v })} disabled={!data} />
+          {data?.followups_enabled !== false &&
+            <Toggle label={t("Ask me in the main chat when a reply is due")}
+              hint={t("If you mentioned waiting for something, nanoMuse can check in once a day during daytime. You can reply in the chat.")}
+              checked={data?.chat_followups === true} disabled={!data}
+              onChange={(v) => void routine({ chat_followups: v })} />}
+          {data?.followups_enabled !== false &&
+            <Toggle label={t("Notify me about time-sensitive follow-ups")}
+              hint={t("On devices with notifications enabled, once a day at most between 09:00 and 20:00 server time.")}
+              checked={data?.followup_push === true} disabled={!data}
+              onChange={(v) => void routine({ followup_push: v })} />}
           <Toggle
             label={t("Write it every day")}
             hint={data?.daily === false ? undefined : t("Daily at {time}", { time: data?.time ?? "08:00" })}
@@ -478,6 +560,12 @@ function FeedSettingsSheet({
             onChange={(v) => void routine({ daily: v })}
             disabled={!data}
           />
+          {data?.daily !== false && (
+            <Toggle label={t("Revisit when plans change")}
+              hint={t("One extra model review per day at most, when a goal or upcoming event has new context. Quiet hours apply.")}
+              checked={data?.on_change === true} disabled={!data}
+              onChange={(v) => void routine({ on_change: v })} />
+          )}
           {data?.daily !== false && (
             <label className="flex items-center justify-between gap-3 text-[13px] text-muted">
               <span>{t("Time of day")}</span>
@@ -491,6 +579,10 @@ function FeedSettingsSheet({
           )}
           {!llmReady && <div className="text-[12.5px] text-muted">{t("Add a model first; the feed is written by your agent.")}</div>}
         </div>
+        {open && <Fragment key={state.hub?.account.account_id ?? state.hub?.account.hint ?? "local"}>
+          <ConnectedContextSettings />
+          <PublicWatchSettings />
+        </Fragment>}
         <button
           type="button"
           onClick={onWriteNow}
@@ -498,13 +590,71 @@ function FeedSettingsSheet({
           className="flex w-full items-center justify-center gap-2 rounded-full bg-surface-2 py-2.5 text-[15px] font-medium disabled:opacity-60"
         >
           {writing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="text-accent" />}
-          {writing ? t("Writing…") : t("Write it now")}
+          {writing ? t("Writing…") : t("Prepare now")}
         </button>
         <button type="button" onClick={() => void save()} disabled={saving} className="h-[46px] w-full rounded-full bg-accent text-[15px] font-semibold text-accent-fg disabled:opacity-60">
           {t("Save")}
         </button>
       </div>
     </Sheet>
+  );
+}
+
+function FollowupCard({ item, onReview, onHide }: {
+  item: FeedFollowup | WaitingFollowup;
+  onReview: () => void;
+  onHide: (choice: "tomorrow" | "dismiss") => Promise<void>;
+}) {
+  const t = useT();
+  const [saving, setSaving] = useState(false);
+  const hide = async (choice: "tomorrow" | "dismiss") => {
+    setSaving(true);
+    try { await onHide(choice); } finally { setSaving(false); }
+  };
+  let heading: string;
+  let title: string;
+  let detail: string | null;
+  switch (item.kind) {
+    case "waiting": {
+      const date = [item.due, item.time].filter(Boolean).join(" ");
+      heading = t("You were waiting for a reply");
+      title = item.subject;
+      detail = item.sender ? t("Expected from {sender} by {date}", { sender: item.sender, date }) : t("Expected by {date}", { date });
+      break;
+    }
+    case "overlap":
+      heading = t("Calendar overlap");
+      title = item.titles.join(" · ");
+      detail = t("{start} to {end}", { start: timeShort(item.start), end: timeShort(item.end) });
+      break;
+    case "review":
+      heading = item.reason === "proposal" ? t("Plan change to review") : t("A goal step is blocked");
+      title = item.title;
+      detail = item.detail;
+      break;
+    case "goal":
+      heading = item.days_until === 0 ? t("Due today") : item.days_until === 1
+        ? t("Due tomorrow") : t("Was due {date}", { date: item.due });
+      title = item.title;
+      detail = item.next_step && t("Next step: {step}", { step: item.next_step });
+      break;
+  }
+  return (
+    <FeedCard>
+      <article aria-label={heading} className="space-y-2 p-4">
+        <div className="flex items-center gap-2 text-sm text-muted"><CalendarClock size={16} />{heading}</div>
+        <h3 className="font-semibold">{title}</h3>
+        {detail && <p className="text-sm">{detail}</p>}
+        {item.kind === "waiting" && <details className="text-sm text-muted"><summary className="cursor-pointer">{t("What this is based on")}</summary>
+          <p className="mt-1">{item.quote}</p>{item.correction && <p className="mt-1">{item.correction}</p>}</details>}
+        {item.kind === "review" && item.note && <p className="text-sm text-muted">{item.note}</p>}
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <button type="button" onClick={onReview} className="font-medium text-accent">{item.kind === "waiting" ? t("Edit follow-up message") : item.kind === "overlap" ? t("Discuss overlap") : t("Review goal")}</button>
+          <button type="button" disabled={saving} onClick={() => void hide("tomorrow")}>{t("Remind me tomorrow")}</button>
+          <button type="button" disabled={saving} onClick={() => void hide("dismiss")}>{t("Dismiss")}</button>
+        </div>
+      </article>
+    </FeedCard>
   );
 }
 

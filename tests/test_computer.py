@@ -334,15 +334,16 @@ def test_computer_act_risk(settings: Settings, fake_screen) -> None:
     assert plain.summary == 'computer_act: click "Bookmarks" at (1,2) in Firefox (firefox)'
     unlabelled = act.assess({"action": "click", "x": 1, "y": 2})
     assert unlabelled.warnings and "no `label`" in unlabelled.warnings[0]
-    pay = act.assess({"action": "click", "x": 1, "y": 2, "label": "Confirm payment"})
-    assert pay.risk == RiskLevel.SENSITIVE and "pay" in pay.warnings[0]
-    # the label says one thing, the element under the cursor another: the stricter decides
+    claimed_pay = act.assess({"action": "click", "x": 1, "y": 2, "label": "Confirm payment"})
+    assert claimed_pay.risk == RiskLevel.MODERATE and not claimed_pay.egress
+    # The model says one thing, the element under the cursor another: the screen decides.
     dishonest = act.assess({"action": "click", "x": 100, "y": 100, "label": "View details"})
-    assert dishonest.risk == RiskLevel.SENSITIVE
+    assert dishonest.risk == RiskLevel.SENSITIVE and dishonest.egress
     assert any("pay" in warning for warning in dishonest.warnings)
-    # no element under the point: the label decides, as on a screen without a tree
+    # No element under the point: the model's label cannot make the target safe.
     bare = act.assess({"action": "click", "x": 500, "y": 500, "label": "Bookmarks"})
-    assert bare.risk == RiskLevel.MODERATE and not bare.warnings
+    assert bare.risk == RiskLevel.SENSITIVE and bare.egress
+    assert any("no element" in warning for warning in bare.warnings)
     submit = act.assess({"action": "type", "text": "hi", "submit": True})
     assert submit.risk == RiskLevel.SENSITIVE and submit.egress is True
     save = act.assess({"action": "key", "keys": ["ctrl", "s"]})
@@ -354,11 +355,10 @@ def test_computer_act_risk(settings: Settings, fake_screen) -> None:
     )
 
 
-async def test_a_screen_without_elements_is_judged_by_the_label_alone(
+async def test_a_screen_without_elements_requires_conservative_approval(
     settings: Settings, fake_screen
 ) -> None:
-    # the computer's screenshot and a WebView report no elements: a tap there is not made
-    # sensitive for that reason alone, the label decides as it always has
+    # A screenshot or WebView with no reported elements cannot verify a model-named target.
     phone_link = PhoneLink()
     FakePhone(phone_link, [PAY_SCREEN])
     await phone_link.screen()
@@ -373,8 +373,9 @@ async def test_a_screen_without_elements_is_judged_by_the_label_alone(
         {"action": "click", "x": 20, "y": 20, "label": "Harmless"}
     )
     for assessment in (phone, computer):
-        assert assessment.risk == RiskLevel.MODERATE and not assessment.egress
-        assert assessment.reads_private_data and not assessment.warnings
+        assert assessment.risk == RiskLevel.SENSITIVE and assessment.egress
+        assert assessment.reads_private_data
+        assert any("no element" in warning for warning in assessment.warnings)
 
 
 async def test_computer_tools_execute(settings: Settings, fake_screen) -> None:
@@ -432,8 +433,11 @@ async def test_operator_runs_on_the_computer(settings: Settings, fake_screen) ->
     assert hands.calls[0] == ("open", "gedit")
     assert hands.calls[1] == ("click", 959.0, 539.5, "left", 1)  # 999-grid → 1920×1080
     assert ("type", "hello from nanoMuse") in hands.calls and ("key", ("ctrl", "s")) in hands.calls
-    # the save went through the Sentinel as a sensitive step
-    assert [r.summary for r in ui.requests] == ["computer_act: press ctrl+s in Firefox (firefox)"]
+    # The screenshot-only click has no trusted node, and saving is independently sensitive.
+    assert [r.summary for r in ui.requests] == [
+        'computer_act: click "Click in the document" at (959,539.5) in Firefox (firefox)',
+        "computer_act: press ctrl+s in Firefox (firefox)",
+    ]
     report = outcome.report()
     assert report.startswith("The computer operator finished. (5 steps)")
     assert "- open gedit" in report and "- press ctrl+s in Firefox (firefox)" in report
@@ -472,7 +476,9 @@ def wait_for(pred, timeout: float = 8.0):  # noqa: ANN001
     raise AssertionError("condition not met in time")
 
 
-def test_hands_switch_adds_the_tools_and_the_card_follows_a_task(server) -> None:
+def test_hands_switch_adds_the_tools_and_the_card_follows_a_task(
+    server, fake_screen: list[dict[str, Any]]
+) -> None:
     client, service, llm = server
     view = client.get("/api/hands").json()
     assert view["enabled"] is False and view["available"] is True and view["backend"] == "fake"
@@ -502,6 +508,8 @@ def test_hands_switch_adds_the_tools_and_the_card_follows_a_task(server) -> None
     apply_app_settings(fresh, load_app_settings(service.data_dir))
     assert fresh.hands.mode == "window" and fresh.hands.enabled is True
     # the computer_act tool: a hands card for the step, the screen in the tool output
+    fake_screen[0]["nodes"] = [{"text": "File", "box": [0, 0, 1920, 1080], "clickable": True}]
+    service.app.computer.last_screen = Screen.from_device(fake_screen[0])
     service.settings.sentinel.mode = "auto"
     llm.script.append(
         LLMResponse(tool_calls=[tc("computer_act", action="click", x=5, y=5, label="File")])

@@ -69,6 +69,13 @@ struct NanoMuseGoal: Codable, Identifiable, Equatable {
     var status: NanoMuseGoalStatus = .active
     var sessionId: String? = nil
     var routineId: String? = nil
+    /// Local calendar dates travel with the account's goal file, including its Feed choices.
+    var due: String? = nil
+    var sourceSessionId: String? = nil
+    var scheduledChecks: Bool? = nil
+    var hasScheduledChecks: Bool { scheduledChecks ?? true }
+    var dismissedDeadline: String? = nil
+    var deadlineSnoozedUntil: String? = nil
     var lastNote: String? = nil
     var lastCheckedAt: Date? = nil
     var createdAt: Date = Date()
@@ -98,10 +105,12 @@ struct NanoMuseGoal: Codable, Identifiable, Equatable {
         var goal = NanoMuseGoal(title: String(title.prefix(60)))
         goal.why = (o["why"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         goal.category = .from(o["category"] as? String)
+        goal.scheduledChecks = o["scheduled_checks"] as? Bool
         goal.checkEveryHours = every
         goal.checkHour = time.hour
         goal.checkMinute = time.minute
         goal.steps = Array(steps)
+        goal.changeDue(to: o["due"] as? String)
         let first = (o["first_check"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return (goal, first)
     }
@@ -184,6 +193,20 @@ final class NanoMuseGoalStore: ObservableObject {
         save()
     }
 
+    func setDue(_ due: String?, for id: String) {
+        guard var goal = goal(id: id), goal.due != due else { return }
+        goal.changeDue(to: due)
+        upsert(goal)
+    }
+
+    func respond(to card: NanoMuseGoalDeadline, with response: NanoMuseGoalDeadline.Response) {
+        let locks = SessionLockStore.shared
+        guard !locks.appIsLocked, var goal = goal(id: card.goal.id),
+              !goal.usesProtectedSession(in: locks.lockedSessionIds),
+              goal.respond(to: card, with: response) else { return }
+        upsert(goal)
+    }
+
     func delete(_ id: String) {
         goals.removeAll { $0.id == id }
         save()
@@ -230,8 +253,11 @@ enum NanoMuseGoalFlow {
         When you have enough, reply with one warm sentence of confirmation and then EXACTLY ONE fenced
         code block tagged `nanomuse-goal` containing JSON with these keys:
         {"title": "<= 40 chars", "why": "one sentence", "category": "\(category.rawValue)",
+         "due": "YYYY-MM-DD only if the user supplied a deadline, otherwise omit this key",
+         "scheduled_checks": <false only if the user asks for no regular checks or deadline reminders only, otherwise true>,
          "check_every_hours": <integer, 0 means a daily check>, "check_time": "HH:MM" (used when check_every_hours is 0),
          "steps": ["3 to 5 short steps you will take or track"], "first_check": "what you will do at the first check"}
+        Today's local date is \(NanoMuseGoalDeadline.key(Date())). Preserve the user's stated deadline as a local calendar date; leave due out if no definite date was agreed.
         Do not describe the block or mention JSON; the app renders it as a card. Say nothing after the block.
         Later, checks for this goal will happen in their own conversation when the app is open; on the iPhone the app cannot run while it is asleep, so the person is reminded to open it.
         """
@@ -245,9 +271,11 @@ enum NanoMuseGoalFlow {
         if NanoMuseFences.contains(text, kind: blockGoal), let o = NanoMuseFences.lastObject(blockGoal, in: text) {
             if NanoMuseSessionAddenda.has(session: session, tag: addendumTag) || !alreadyCreated(from: o) {
                 if let made = NanoMuseGoal.from(block: o) {
-                    store.upsert(made.goal)
+                    var goal = made.goal
+                    goal.sourceSessionId = session
+                    store.upsert(goal)
                     let first = made.firstCheck
-                    Task { @MainActor in await setUp(made.goal, firstCheck: first) }
+                    Task { @MainActor [goal] in await setUp(goal, firstCheck: first) }
                 }
             }
             NanoMuseSessionAddenda.remove(session: session, tag: addendumTag)
@@ -271,14 +299,17 @@ enum NanoMuseGoalFlow {
     @MainActor
     static func setUp(_ goal: NanoMuseGoal, firstCheck: String) async {
         let store = NanoMuseGoalStore.shared
-        var g = store.goal(id: goal.id) ?? goal
+        guard var g = store.goal(id: goal.id) else { return }
         if g.sessionId == nil {
             let vm = ViewModelCache.shared.createDraft()
             vm.sessionSource = "nanomuse-goal"
             let sid = await vm.ensureSessionReturningId()
             await ChatStore.shared.updateSessionTitle(sid, title: String(g.title.prefix(60)))
+            // A date or a step may have changed while the chat was being created.
+            guard let current = store.goal(id: goal.id) else { return }
+            g = current
             ViewModelCache.shared.cacheDraft(vm, sessionId: sid)
-            g.sessionId = sid
+            if g.sessionId == nil { g.sessionId = sid }
         }
         if g.routineId == nil {
             var routine = NanoMuseRoutine(
@@ -288,6 +319,7 @@ enum NanoMuseGoalFlow {
                 minute: g.checkMinute
             )
             routine.hidden = true
+            routine.enabled = g.status == .active && g.hasScheduledChecks
             routine.goalId = g.id
             routine.sessionId = g.sessionId
             routine.intervalHours = g.checkEveryHours > 0 ? g.checkEveryHours : nil
@@ -295,7 +327,7 @@ enum NanoMuseGoalFlow {
             g.routineId = routine.id
         }
         store.upsert(g)
-        NanoMuseScheduler.shared.requestNotificationPermission()
+        if g.hasScheduledChecks { NanoMuseScheduler.shared.requestNotificationPermission() }
     }
 
     /// The one line each check sends into the goal's conversation.
@@ -312,12 +344,13 @@ enum NanoMuseGoalFlow {
     static func systemAddendum(session: String) -> String? {
         guard let goal = NanoMuseGoalStore.shared.forSession(session) else { return nil }
         let cadence = goal.checkEveryHours > 0 ? "every \(goal.checkEveryHours) hour(s)" : "daily at \(NanoMuseDay.clock(hour: goal.checkHour, minute: goal.checkMinute))"
-        let steps = goal.steps.isEmpty ? "(none yet)" : goal.steps.enumerated().map { "\($0.offset + 1). \($0.element.text)" }.joined(separator: "\n")
+        let steps = goal.steps.isEmpty ? "(none yet)" : goal.steps.enumerated().map { "\($0.offset + 1). [\($0.element.done ? "x" : " ")] \($0.element.text)" }.joined(separator: "\n")
         var s = "## This conversation tracks a goal (nanoMuse)\n"
         s += "Goal: \(goal.title)\n"
         if !goal.why.isEmpty { s += "Why: \(goal.why)\n" }
+        if let due = goal.due { s += "User's deadline (local date): \(due)\n" }
         s += "Steps:\n\(steps)\n"
-        s += "Checks run \(cadence); progress so far \(goal.progress)%" + (goal.lastNote.map { ", last note: \($0)" } ?? "") + ".\n\n"
+        s += (goal.hasActiveChecks(in: NanoMuseScheduler.shared.checkedGoalIDs) ? "Checks run \(cadence)" : "Scheduled checks are off") + "; progress so far \(goal.progress)%" + (goal.lastNote.map { ", last note: \($0)" } ?? "") + ".\n\n"
         s += "When a message asks you to check on the goal: find out where it stands right now with your tools "
         s += "(shell, browser, MCP servers, memory) and take the next small step if it is safe and reversible. "
         s += "Never pay, send messages or delete anything without asking. Then write the user a short update in "
@@ -328,20 +361,38 @@ enum NanoMuseGoalFlow {
     }
 
     @MainActor
+    static func setScheduledChecks(_ goal: NanoMuseGoal, _ enabled: Bool) {
+        guard var g = NanoMuseGoalStore.shared.goal(id: goal.id), g.status == .active else { return }
+        let scheduler = NanoMuseScheduler.shared
+        let existing = scheduler.forGoal(g.id)
+        g.scheduledChecks = enabled
+        if enabled && existing.isEmpty { g.routineId = nil }
+        NanoMuseGoalStore.shared.upsert(g)
+        if enabled && existing.isEmpty {
+            Task { @MainActor [g] in await setUp(g, firstCheck: "") }
+        } else {
+            for routine in existing { scheduler.setEnabled(routine.id, enabled) }
+            if enabled { scheduler.requestNotificationPermission() }
+        }
+    }
+
+    @MainActor
     static func setPaused(_ goal: NanoMuseGoal, _ paused: Bool) {
-        var g = goal
+        guard var g = NanoMuseGoalStore.shared.goal(id: goal.id) else { return }
+        if paused { g.scheduledChecks = g.hasActiveChecks(in: NanoMuseScheduler.shared.checkedGoalIDs) }
         g.status = paused ? .paused : .active
         NanoMuseGoalStore.shared.upsert(g)
-        if let rid = g.routineId { NanoMuseScheduler.shared.setEnabled(rid, !paused) }
+        if let rid = g.routineId { NanoMuseScheduler.shared.setEnabled(rid, !paused && g.hasScheduledChecks) }
     }
 
     @MainActor
     static func markDone(_ goal: NanoMuseGoal, _ done: Bool) {
-        var g = goal
+        guard var g = NanoMuseGoalStore.shared.goal(id: goal.id) else { return }
+        if done && g.status == .active { g.scheduledChecks = g.hasActiveChecks(in: NanoMuseScheduler.shared.checkedGoalIDs) }
         g.status = done ? .done : .active
         if done { g.progress = 100 }
         NanoMuseGoalStore.shared.upsert(g)
-        if let rid = g.routineId { NanoMuseScheduler.shared.setEnabled(rid, !done) }
+        if let rid = g.routineId { NanoMuseScheduler.shared.setEnabled(rid, !done && g.hasScheduledChecks) }
         if done, goal.status != .done { NanoMuseStar.shared.goalDone() } // C1: a goal reached is a moment to ask for a star
     }
 
@@ -383,6 +434,7 @@ struct NanoMuseGoalsRoom: View {
     @State private var pickedCategory: NanoMuseGoalCategory?
     @State private var deleting: NanoMuseGoal?
     @State private var editingRoutine: NanoMuseRoutine?
+    @State private var editingDeadline: NanoMuseGoal?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -410,6 +462,10 @@ struct NanoMuseGoalsRoom: View {
                 onStartGoal(category)
             }
             .presentationDetents([.medium])
+        }
+        .sheet(item: $editingDeadline) { goal in
+            NanoMuseDeadlineEditor(goal: goal)
+                .presentationDetents([.medium])
         }
         .sheet(item: $editingRoutine) { routine in
             NanoMuseRoutineEditor(routine: routine)
@@ -470,6 +526,10 @@ struct NanoMuseGoalsRoom: View {
                     .font(.body.weight(.semibold))
                     .strikethrough(goal.status == .done)
                     .foregroundStyle(goal.status == .done ? .secondary : .primary)
+                if let due = NanoMuseGoalDeadline.date(goal.due) {
+                    Text(String(format: AppLocalized("Due %@"), due.formatted(date: .abbreviated, time: .omitted)))
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 if !goal.why.isEmpty {
                     Text(goal.why).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                 }
@@ -487,7 +547,13 @@ struct NanoMuseGoalsRoom: View {
                 if let sid = goal.sessionId {
                     Button { onOpenSession(sid) } label: { Label(AppLocalized("Open conversation"), systemImage: "bubble.left") }
                 }
+                if goal.status == .active {
+                    Toggle(AppLocalized("Scheduled check-ins"), isOn: Binding(
+                        get: { goal.hasActiveChecks(in: scheduler.checkedGoalIDs) }, set: { NanoMuseGoalFlow.setScheduledChecks(goal, $0) }
+                    ))
+                }
                 if goal.status != .done {
+                    Button { editingDeadline = goal } label: { Label(AppLocalized("Due date"), systemImage: "calendar") }
                     Button { NanoMuseGoalFlow.checkNow(goal) } label: { Label(AppLocalized("Check now"), systemImage: "arrow.clockwise") }
                     Button { NanoMuseGoalFlow.setPaused(goal, goal.status != .paused) } label: {
                         Label(goal.status == .paused ? AppLocalized("Resume checks") : AppLocalized("Pause checks"), systemImage: goal.status == .paused ? "play" : "pause")
@@ -513,6 +579,7 @@ struct NanoMuseGoalsRoom: View {
         case .paused: return AppLocalized("Paused")
         case .done: return AppLocalized("Done")
         case .active:
+            if !goal.hasActiveChecks(in: scheduler.checkedGoalIDs) { return AppLocalized("Scheduled check-ins are off") }
             if goal.lastCheckedAt == nil, goal.routineId != nil { return AppLocalized("First check in about a minute") }
             return NanoMuseGoalFlow.cadenceLabel(goal)
         }

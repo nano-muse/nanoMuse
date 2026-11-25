@@ -66,7 +66,7 @@ enum NanoMuseOwnTurns {
             )
             guard await NanoMuseOwnTurns.wants() else { return upstream }
             let gathered = Gathered(
-                vendor: vendor, model: model.id, messages: messages, systemPrompt: systemPrompt,
+                vendor: vendor, model: model.id, messages: messages.filter { $0.dbMessageId?.hasPrefix(NanoMuseOutreachJournal.localPublicPrefix) != true }, systemPrompt: systemPrompt,
                 tools: tools, maxTokens: maxTokens, thinkingLevel: thinkingLevel,
                 origin: NanoMuseProvenance.current // the chat, the run and the turn this call sits in (relay 0.31)
             )

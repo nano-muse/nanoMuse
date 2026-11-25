@@ -3,7 +3,7 @@
     <!-- nanoMuse: the platform config cannot express "any private address", so the rule that
          plain http:// is for the local network only (10/8, 172.16/12, 192.168/16, 100.64/10,
          link-local, .local names) is applied in code — io.github.nanomuse.net.LanOnly — where an
-         endpoint is entered. This file stays as OpenMinis left it so those LAN endpoints work. -->
+         endpoint is entered. The base policy below also covers localhost OAuth callbacks. -->
     <!-- T354: allow cleartext HTTP globally so user-configured provider
          endpoints (private/LAN LLM servers like http://192.168.x.x:port or
          http://my-host:8080) work. Minis is a tool where the user supplies
@@ -13,10 +13,6 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <!-- Pre-T354 entry kept for explicitness; the base-config above already
-         covers localhost/127.0.0.1 (OAuth callback server). -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-    </domain-config>
+    <!-- nanoMuse: duplicate per-domain entries here also prevent Android 16 from initializing
+         the app context in a Shizuku UserService with a different default network policy. -->
 </network-security-config>

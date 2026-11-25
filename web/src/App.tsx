@@ -1,5 +1,5 @@
 import { LayoutGrid, Lightbulb, Loader2, MessageCircle, Newspaper, SquareCheckBig, WifiOff } from "lucide-react";
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, setToken } from "./api";
 import { BrandMark } from "./components/BrandMark";
 import { DesktopRemoteHint } from "./components/DesktopRemoteHint";
@@ -53,6 +53,10 @@ const TABS: Array<{ id: Tab; label: string; icon: (active: boolean) => ReactNode
 
 export default function App() {
   const { state, setTab, openFile } = useStore();
+  const account = state.hub?.account;
+  const draftScope = JSON.stringify([state.authError, account?.base_url, account?.signed_in, account?.signed_in_at, account?.hint]);
+  // Keep unsent text while moving between rooms, within this account and browser tab.
+  const composerDrafts = useMemo(() => ({ scope: draftScope, texts: new Map<string, string>() }), [draftScope]);
   const firstSignIn = useFirstSignIn();
   const t = useT();
 
@@ -145,7 +149,7 @@ export default function App() {
             a wide window has the sidebar instead and gives the room back. */}
         <main className={cx("tabbar-room mx-auto min-h-0 w-full flex-1 wide:max-w-[900px]", !state.lite && "wide:pb-0")}>
           <Suspense fallback={<Loading />}>
-            {state.tab === "chat" && <ChatScreen />}
+            {state.tab === "chat" && <ChatScreen key={composerDrafts.scope} drafts={composerDrafts.texts} />}
             {state.tab === "feed" && <FeedScreen />}
             {state.tab === "ideas" && <IdeasScreen />}
             {state.tab === "goals" && <GoalsScreen />}

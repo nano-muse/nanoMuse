@@ -57,11 +57,13 @@ object Transcript {
     }
 
     fun items(messages: List<LocalMessage>): List<TranscriptItem> {
-        val rows = messages.map(::Row)
+        val rows = messages.filterNot { io.github.nanomuse.feed.ChatCheckIns.isLocalPublicMessage(it.id) }.map(::Row)
         // segments: each starts at a message of the person; rows before the first one form their own
         val segments = mutableListOf<MutableList<Row>>()
         for (r in rows) {
-            if (r.isPersons || segments.isEmpty()) segments += mutableListOf(r) else segments.last() += r
+            // A proactive assistant message starts its own turn, preserving the previous answer.
+            val checkIn = r.isAssistant && io.github.nanomuse.feed.ChatCheckIns.isMessage(r.m.id)
+            if (checkIn || r.isPersons || segments.isEmpty()) segments += mutableListOf(r) else segments.last() += r
         }
         val out = mutableListOf<TranscriptItem>()
         segments.forEachIndexed { i, seg ->

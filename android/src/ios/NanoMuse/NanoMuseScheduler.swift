@@ -202,6 +202,8 @@ final class NanoMuseScheduler: ObservableObject {
         save()
     }
 
+    var checkedGoalIDs: Set<String> { Set(routines.compactMap { $0.enabled ? $0.goalId : nil }) }
+
     /// Routines that belong to a goal.
     func forGoal(_ goalId: String) -> [NanoMuseRoutine] { routines.filter { $0.goalId == goalId } }
 
@@ -241,28 +243,38 @@ final class NanoMuseScheduler: ObservableObject {
     }
 
     func scheduleBackgroundRefresh() {
-        guard let next = nextDue() else { return }
+        let now = Date()
+        guard let next = [nextDue(after: now)?.at, NanoMuseChatOutreach.shared.nextRefresh(after: now),
+                          NanoMusePublicWatches.shared.nextRefresh(after: now)].compactMap({ $0 }).min() else { return }
         let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskId)
-        request.earliestBeginDate = max(next.at, Date().addingTimeInterval(15 * 60))
+        request.earliestBeginDate = max(next, now.addingTimeInterval(15 * 60))
         try? BGTaskScheduler.shared.submit(request)
     }
 
     /// iOS woke us for a moment: there is no time for a model turn, so the
     /// routines that came due get a notification each, and the next refresh is asked for.
     private func handleBackgroundRefresh(_ task: BGAppRefreshTask) {
-        task.expirationHandler = { }
         let now = Date()
-        for r in routines where r.isDue(at: now) {
+        for r in routines where r.isDue(at: now) && r.id != NanoMuseFeedFlow.routineId {
             postDueNotification(r, at: now)
         }
-        scheduleBackgroundRefresh()
-        task.setTaskCompleted(success: true)
+        let work = Task { @MainActor [self] in
+            await NanoMuseChatOutreach.shared.check(now: now)
+            await NanoMusePublicWatches.shared.check(background: true)
+            scheduleBackgroundRefresh()
+            task.setTaskCompleted(success: !Task.isCancelled)
+        }
+        task.expirationHandler = { work.cancel() }
     }
 
     // MARK: Running
 
     /// Run every routine that is due, one after the other.
     func catchUp(reason: String) {
+        Task {
+            await NanoMuseChatOutreach.shared.check()
+            await NanoMusePublicWatches.shared.check(background: false)
+        }
         guard catchUpTask == nil else { return }
         let now = Date()
         let due = routines.filter { $0.isDue(at: now) && !running.contains($0.id) }
@@ -291,7 +303,13 @@ final class NanoMuseScheduler: ObservableObject {
         r.lastFiredAt = startedAt
         update(r)
 
-        let outcome = await NanoMuseHeadless.run(prompt: prompt(for: r), sessionId: r.sessionId, title: r.label, source: "nanomuse-routine", routine: r.label, run: runKind(r))
+        let outcome: NanoMuseHeadless.Outcome
+        if r.id == NanoMuseFeedFlow.routineId {
+            outcome = await NanoMuseFeedWriter.run(r, manual: trigger == "manual" || trigger == "feed-now")
+        } else {
+            outcome = await NanoMuseHeadless.run(prompt: prompt(for: r), sessionId: r.sessionId, title: r.label,
+                                                source: "nanomuse-routine", routine: r.label, run: runKind(r))
+        }
         guard var fresh = routine(id: id) else { return outcome.ok }
         if fresh.sessionId == nil, let sid = outcome.sessionId { fresh.sessionId = sid }
         fresh.runs.insert(NanoMuseRoutine.Run(at: startedAt, ok: outcome.ok, note: outcome.note), at: 0)
@@ -323,6 +341,7 @@ final class NanoMuseScheduler: ObservableObject {
             let now = Date()
             // iOS keeps 64 pending requests per app; the soonest routines get the slots.
             let soon = self.routines
+                .filter { $0.id != NanoMuseFeedFlow.routineId }
                 .compactMap { r in r.enabled ? r.nextDue(after: now).map { (r, $0) } : nil }
                 .filter { $0.1 > now.addingTimeInterval(30) }
                 .sorted { $0.1 < $1.1 }
@@ -370,6 +389,7 @@ final class NanoMuseScheduler: ObservableObject {
         Task {
             let center = UNUserNotificationCenter.current()
             let settings = await center.notificationSettings()
+            defer { NanoMuseDeadlineNotifications.shared.refresh() }
             guard settings.authorizationStatus == .notDetermined else { return }
             _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
         }

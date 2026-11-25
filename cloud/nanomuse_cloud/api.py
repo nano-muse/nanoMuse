@@ -30,7 +30,7 @@
     DELETE /v1/sync/conversations/{cid}                         → one chat tombstoned everywhere
     POST /v1/auth/sign-out                                      → 204 (revokes this key)
     POST /v1/auth/sign-out-all {all?}                           → {signed_out} (every other device; all=true takes this one too)
-    POST /v1/auth/session-key {device?, ttl_s?}                 → {api_key, expires_at} (a key that lapses on its own; nanoMuse Web's containers)
+    POST /v1/auth/session-key {device?, ttl_s?}                 → {api_key, expires_at} (a key that lapses on its own; reserved for one computer Hub identity)
     POST /v1/auth/delete                                        → 204 (the whole account, every key)
     GET  /v1/me/profile       ?face=false                       → the agent's name, look and connectors, shared by the account's devices
     PUT  /v1/me/profile       {device, name?, avatar?, face?, clips?, connectors?} → {rev, device}; partial since 0.25; clips (0.29) name files put up with PUT /v1/blobs
@@ -1030,8 +1030,9 @@ def create_app(
     @app.post("/v1/auth/session-key")
     async def session_key(request: Request, caller: Caller = Depends(caller_dep)) -> dict:
         """A key for this account that expires on its own: {"device", "ttl_s"} → {"api_key",
-        "expires_at"}. nanoMuse Web starts a person's container with one and keeps no
-        standing key of theirs (0.13)."""
+        "expires_at"}. Its Hub identity starts as a server-generated computer reservation.
+        The container runtime may claim one free computer id, then it is fixed there.
+        nanoMuse Web keeps no standing key of the person's (0.13)."""
         body = await _json(request)
         try:
             ttl_s = int(body.get("ttl_s") or 30 * 86400)

@@ -57,8 +57,11 @@ The tool's actions, identical on both backends:
 
 `navigate` accepts public HTTP and HTTPS destinations only. It checks the initial host and
 the final URL after navigation, so `localhost`, private addresses and a public URL that
-redirects into the local network are refused. The Playwright backend also repeats the check
-immediately before browser requests continue, narrowing the DNS check-to-connect window.
+redirects into the local network are refused. Playwright sends browser traffic through a
+loopback SOCKS proxy that resolves each host once, rejects the full answer when any address
+is not globally routable, and connects to the validated numeric address. Redirects and
+subresources use the same path, so DNS cannot change the destination between the check and
+the connection.
 Local file and custom browser schemes are refused before the agent reads, screenshots or
 operates the current page. Blank and inline documents (`about:blank`, `about:srcdoc`),
 data URLs and blob resources remain available. The browser's `fetch` follows HTTP(S)

@@ -2428,6 +2428,62 @@ actor ChatStore {
         listFolders().first(where: { $0.id == id })
     }
 
+    // nanoMuse: identify an exact public source update already delivered through conversation sync.
+    func nmMatchingPublicNotices(session: String, item: NanoMuseWatchItem) -> [String] {
+        NanoMuseOutreachJournal.matchingPublicNotices(db: db, session: session, item: item)
+    }
+
+    // nanoMuse: suppress paid reviews after the daily delivery even across process restarts.
+    func nmPublicReviewReady(owner: String, day: String, session: String) -> Bool {
+        NanoMuseOutreachJournal.readyForPublicReview(db: db, owner: owner, session: session, day: day, at: Date())
+    }
+
+    // nanoMuse: persist assistant outreach and its daily receipt together, then refresh live chat consumers.
+    func nmDeliverOutreach(owner: String, session: String, day: String, now: Date, references: [NanoMuseFeedChatContext.Reference],
+                           goal: NanoMuseGoal?, permit: NanoMuseOutreachPermit, version: UInt,
+                           calendarItem: NanoMuseOutreachJournal.Candidate? = nil, publicItem: NanoMuseOutreachJournal.Candidate? = nil) -> NanoMuseOutreachJournal.Result {
+        let result = permit.perform(version) {
+            let prefs = UserDefaults.standard
+            let fromCalendar = calendarItem != nil && !NanoMuseCalendarWatch.selected.isEmpty && NanoMuseCalendarReader.readable
+            let fromChat = NanoMuseChatOutreach.chatEnabled(in: prefs)
+            guard !Task.isCancelled, fromChat || fromCalendar,
+                  (prefs.object(forKey: "nanomuse.shell.enabled") as? Bool ?? true),
+                  prefs.string(forKey: "nanomuse.main_chat.session") == session else { return .later }
+            return NanoMuseOutreachJournal.write(db: db, owner: owner, session: session, day: day, at: now, allowEmpty: fromCalendar || publicItem != nil, candidate: {
+                if let publicItem { return fromChat ? publicItem : nil }
+                if fromCalendar { return calendarItem }
+                guard fromChat else { return nil }
+                if !references.isEmpty && NanoMuseFeedChatIndex.allowsChatCheckIn(in: prefs)
+                    && (prefs.object(forKey: "memory.global.enabled") as? Bool ?? true) {
+                    let turns = NanoMuseFeedChatContext.read(references, db: db)
+                    if let item = NanoMuseFeedChatContext.outstanding(turns, now: now).first(where: { Calendar.current.isDate($0.due, inSameDayAs: now) }) {
+                        let text = item.update.map { String(format: AppLocalized("You mentioned “%@” and later said “%@”. It is on your plan today. Can I help you get ready?"), item.request, $0) }
+                            ?? String(format: AppLocalized("You mentioned “%@”. It is on your plan today. Can I help you get ready?"), item.request)
+                        return .init(text: text, goalID: nil)
+                    }
+                }
+                guard let goal, prefs.object(forKey: NanoMuseGoalDeadline.preference) as? Bool ?? true else { return nil }
+                let text = goal.steps.first(where: { !$0.done }).map {
+                    String(format: AppLocalized("“%@” is due today. How is the next step, “%@”, going?"), goal.title, $0.text)
+                } ?? String(format: AppLocalized("“%@” is due today. How is it going?"), goal.title)
+                return .init(text: text, goalID: goal.id)
+            }, dirty: { id in
+                markDirty(recordType: "Message", recordId: id)
+                markDirty(recordType: "Session", recordId: session)
+            })
+        }
+        if case .delivered = result {
+            invalidateSessionListCache()
+            NotificationCenter.default.post(name: .sessionDidUpdate, object: session)
+        }
+        return result
+    }
+
+    // nanoMuse: the Feed reads a bounded set of original local composer turns using this actor's database.
+    func nmFeedTurns(_ references: [NanoMuseFeedChatContext.Reference]) -> [NanoMuseFeedChatContext.Turn] {
+        NanoMuseFeedChatContext.read(references, db: db)
+    }
+
     func getMemoryEnabled(sessionId: String) -> Bool {
         // [T-memory-global-toggle-settings-ui-ios] If the session row
         // already exists, return its stored per-session value. If no
@@ -2467,6 +2523,7 @@ actor ChatStore {
     }
 
     func setMemoryEnabled(sessionId: String, enabled: Bool) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         let sql = "UPDATE sessions SET memory_enabled = ? WHERE id = ?"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -2477,7 +2534,8 @@ actor ChatStore {
         sqlite3_finalize(stmt)
     }
 
-    func deleteSession(_ id: String) {
+    // nanoMuse: async so approval-grant invalidation completes before deletion returns.
+    func deleteSession(_ id: String) async {
         invalidateSessionListCache()
         // Queue cloud deletions BEFORE removing local rows so the SELECTs
         // below can still enumerate child ids. Peers receive op=delete
@@ -2485,7 +2543,7 @@ actor ChatStore {
         // (see TombstoneManager.applyRemoteSessionDeletion).
         markSessionForCloudDeletion(id)
 
-        deleteSessionLocalRowsOnly(id)
+        await deleteSessionLocalRowsOnly(id)
 
         // [T-icloud-deleted-session-resurrection] Record a recent-delete
         // tombstone so an inbound merge (e.g. fetchRecentV2 pulling the still-
@@ -2502,8 +2560,9 @@ actor ChatStore {
     /// cloud already has the deletion, re-queueing it would just create a
     /// noisy round-trip and risk a delete-loop with peers that haven't
     /// yet drained the same tombstone.
-    func deleteSessionLocalOnly(_ id: String) {
-        deleteSessionLocalRowsOnly(id)
+    // nanoMuse: synced deletion waits for the same approval-grant invalidation.
+    func deleteSessionLocalOnly(_ id: String) async {
+        await deleteSessionLocalRowsOnly(id)
     }
 
     /// True if a session row exists locally. Lightweight existence check
@@ -2518,7 +2577,11 @@ actor ChatStore {
         return sqlite3_step(stmt) == SQLITE_ROW
     }
 
-    private func deleteSessionLocalRowsOnly(_ id: String) {
+    // nanoMuse: the low-level delete synchronously crosses to the grant owner.
+    private func deleteSessionLocalRowsOnly(_ id: String) async {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
+        // nanoMuse: every local and synced deletion invalidates this chat's approval grants.
+        await MainActor.run { NanoMuseRemoteApprovals.shared.resetSessionGrants(for: id) }
         // [T-ios-listsessions-cache] Invalidate here (the low-level row delete)
         // so ALL callers are covered — deleteSession AND deleteSessionLocalOnly.
         invalidateSessionListCache()
@@ -3028,6 +3091,7 @@ actor ChatStore {
     }
 
     func deleteMessages(sessionId: String) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         invalidateSessionListCache()
         // Mark every message dirty for cloud deletion BEFORE the DELETE so other
         // devices remove them on next sync. Without this, Clear Chat wipes
@@ -3103,6 +3167,7 @@ actor ChatStore {
     /// keepCount-th row (ascending, 1-based), then delete strictly AFTER it.
     /// This is correct regardless of whether sort_order is dense or shifted.
     func deleteMessagesAfter(sessionId: String, keepCount: Int) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         invalidateSessionListCache()
         // DIAG: snapshot state before delete
         let beforeStats = sessionWriteStats(sessionId: sessionId)
@@ -6714,6 +6779,7 @@ extension ChatStore {
     /// Used when a remote device signals a message-level deletion (retry / manual delete)
     /// that should propagate across devices.
     func deleteLocalMessage(messageId: String) {
+        defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
         invalidateSessionListCache()
         let sql = "DELETE FROM messages WHERE id = ?"
         var stmt: OpaquePointer?

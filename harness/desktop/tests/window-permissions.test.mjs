@@ -30,6 +30,20 @@ function windowPermissions() {
   };
 }
 
+test("desktop check-in notifications are available only to the app's main frame", () => {
+  const w = windowPermissions();
+  assert.equal(w.check("notifications"), true);
+  assert.equal(w.request("notifications"), true);
+  for (const forbidden of [{ ...details, isMainFrame: false }, { ...details, requestingUrl: "https://external.example/" }]) {
+    assert.equal(w.check("notifications", forbidden), false);
+    assert.equal(w.request("notifications", forbidden), false);
+  }
+  assert.equal(w.check("notifications", details, origin, null), false);
+  w.navigate("https://external.example/");
+  assert.equal(w.check("notifications"), false);
+  assert.equal(w.request("notifications"), false);
+});
+
 test("copy buttons can write from the app's main page on both permission paths", () => {
   const w = windowPermissions();
   assert.equal(w.check("clipboard-sanitized-write"), true);

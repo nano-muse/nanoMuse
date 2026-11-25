@@ -47,7 +47,7 @@ const STEP_NEXT: Record<GoalStep["status"], GoalStep["status"]> = {
 
 export function GoalsScreen() {
   const { state, refreshGoals, send, openThread, toast } = useStore();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(state.focusedGoalId);
   const [creating, setCreating] = useState(false);
   const [sheetCategory, setSheetCategory] = useState<(typeof CATEGORIES)[number] | null>(null);
   const [allFinished, setAllFinished] = useState(false);

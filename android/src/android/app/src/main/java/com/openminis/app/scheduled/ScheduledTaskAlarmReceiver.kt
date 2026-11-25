@@ -93,6 +93,7 @@ class ScheduledTaskAlarmReceiver : BroadcastReceiver() {
                         task,
                         waitForCompletion = false,
                         firedTriggerAtMs = triggerAtMs,
+                        requireEnabledFeed = true, // nanoMuse: even alarms armed before trigger timestamps
                     )
                 }
             } catch (t: Throwable) {

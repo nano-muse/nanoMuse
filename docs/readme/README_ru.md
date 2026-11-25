@@ -32,7 +32,7 @@
 
 **nanoMuse — открытый персональный агент для всех ваших устройств.** Один агент со своим именем и обликом, того же рода, что [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) от Meta: он делает дела, а не отвечает на вопросы, продолжает работать при закрытом приложении, помнит вас и останавливается спросить перед тем, что нельзя отменить.
 
-*nano* значит полный комплект, достаточно небольшой, чтобы вы запустили и развернули его сами: приложение для телефона, приложение для компьютера, веб-консоль и реле, которое их связывает: всё это лежит в этом репозитории, под GPL-3.0-or-later. **[Бесплатно, открыто, некоммерчески. Давайте строить вместе.](../../CONTRIBUTING.md)** После входа вы получаете бесплатный лимит на модели через реле сообщества (его оплачивает разработчик); когда он кончится, [подключите свой ключ](../own-key.md). То же реле работает на вашем собственном сервере, и тогда ничего не покидает дом. Последняя версия: **1.0.9 Tiller**, [заметки о выпуске](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.9) · [попробовать в браузере](https://demo.nanomuse.dev/).
+*nano* значит полный комплект, достаточно небольшой, чтобы вы запустили и развернули его сами: приложение для телефона, приложение для компьютера, веб-консоль и реле, которое их связывает: всё это лежит в этом репозитории, под GPL-3.0-or-later. **[Бесплатно, открыто, некоммерчески. Давайте строить вместе.](../../CONTRIBUTING.md)** После входа вы получаете бесплатный лимит на модели через реле сообщества (его оплачивает разработчик); когда он кончится, [подключите свой ключ](../own-key.md). То же реле работает на вашем собственном сервере, и тогда ничего не покидает дом. Последняя версия: **1.0.10 Bridge**, [заметки о выпуске](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.10) · [попробовать в браузере](https://demo.nanomuse.dev/).
 
 > [!NOTE]
 > **nanoMuse продолжает развиваться**
@@ -59,11 +59,11 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 | | |
 |---|---|
 | **Браузер** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): nanoMuse на симулированном телефоне, после входа. Это демо; настоящие приложения ниже |
-| **Android** 8.0+, arm64 | [nanoMuse-1.0.9-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-1.0.9-arm64.apk): все версии подписаны одним ключом и ставятся поверх предыдущей |
+| **Android** 8.0+, arm64 | [nanoMuse-1.0.10-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-1.0.10-arm64.apk): все версии подписаны одним ключом и ставятся поверх предыдущей |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): бета, прошедшая бета-проверку Apple; ссылка устанавливает её · [iOS](../ios.md) |
-| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-x64.dmg). Без нотаризации: в первый раз правый клик → «Открыть» |
-| **Windows** 10+ | [nanoMuse-Desktop-1.0.9-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-win-x64.exe): один раз нажмите «Выполнить в любом случае» |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.tar.gz) |
+| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-x64.dmg). Без нотаризации: в первый раз правый клик → «Открыть» |
+| **Windows** 10+ | [nanoMuse-Desktop-1.0.10-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-win-x64.exe): один раз нажмите «Выполнить в любом случае» |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` для своего реле; `docker compose up -d app` для веб-приложения на своём сервере; см. [самостоятельный хостинг](../self-hosting.md) |
 
 Все загрузки берутся из [последнего выпуска на GitHub](https://github.com/nano-muse/nanoMuse/releases/latest); те же файлы лежат на [nanomuse.cn/dl](https://nanomuse.cn/dl/), если GitHub у вас медленный. Откройте приложение, войдите по e-mail или по номеру телефона материкового Китая, и у агента есть модель, чтобы думать. Телефон, компьютер и веб делят один аккаунт и показывают одни и те же разговоры.
@@ -162,7 +162,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 <a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
 <a href="https://github.com/jperla"><img src="https://avatars.githubusercontent.com/u/3724?v=4&s=48" width="48" height="48" alt="jperla"></a>
 <a href="https://github.com/jasontospas"><img src="https://avatars.githubusercontent.com/u/79001000?v=4&s=48" width="48" height="48" alt="jasontospas"></a>
-<a href="https://github.com/PSA-Team-source"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="PSA-Team-source"></a>
+<a href="https://github.com/al-global-tech"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="al-global-tech"></a>
 <a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
 <a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
 <a href="https://github.com/brajendrak00068"><img src="https://avatars.githubusercontent.com/u/56827534?v=4&s=48" width="48" height="48" alt="brajendrak00068"></a>
@@ -195,6 +195,7 @@ nanoMuse опирается на работу других людей; усло�
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): агент на устройстве, на котором построено приложение для телефона, с [proot](https://github.com/nano-muse/proot) и [Alpine Linux](https://alpinelinux.org/) для песочницы.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): агентный harness, плагином к которому является приложение для компьютера.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): оператор рук на компьютере портирован с их кода, а маркеры сцены следуют их ScreenMarker.
+- Идеи отдельного экрана Android, его просмотра в реальном времени, передачи управления пользователю и показа истории шагов мы почерпнули из проекта [Mika](https://github.com/wangzan101/Mika) автора wangzan101. Код сопряжения для беспроводной отладки адаптирован по лицензии Apache-2.0.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): оператор телефона, трассы и продуктовые идеи.
 
 ## Отказ от ответственности

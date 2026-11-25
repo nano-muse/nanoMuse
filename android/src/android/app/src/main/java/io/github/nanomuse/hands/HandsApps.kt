@@ -49,6 +49,13 @@ object HandsApps {
             ?: alias(lower)?.let { pkgs -> apps.firstOrNull { it.packageName in pkgs } }
     }
 
+    /** A background run is authorized for exactly one installed package. */
+    internal fun exactTarget(apps: List<App>, name: String): App? {
+        val query = name.trim()
+        return apps.firstOrNull { it.packageName == query }
+            ?: apps.singleOrNull { it.label.equals(query, ignoreCase = true) }
+    }
+
     /** A few names people use that are not the label on the icon. */
     private fun alias(lower: String): Set<String>? = when (lower) {
         "wechat", "weixin", "微信" -> setOf("com.tencent.mm")

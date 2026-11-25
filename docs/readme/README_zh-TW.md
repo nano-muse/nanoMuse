@@ -32,7 +32,7 @@
 
 **nanoMuse 是一個開源的個人智慧體，面向你的每一台裝置。** 一個有名字、有自己形象的智慧體，和 Meta 的 [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) 是同一類東西：不只回答問題，而是動手做事；App 關了也繼續做；記得你；遇到無法復原的操作會先停下來問你。
 
-*nano* 的意思是完整的一套，小到你自己就能跑、能部署：手機 App、桌面 App、網頁主控台，還有把它們連在一起的中繼，都在這個儲存庫裡，GPL-3.0-or-later。**[免費、開源、非營利。一起把它做好。](../../CONTRIBUTING.md)** 登入就有一份免費的模型額度，走社群中繼，錢是開發者出的；用完可以[換成自己的 key](../own-key.md)。同一套中繼也能跑在你自己的伺服器上，資料不必出門。最新版本：**1.0.9 Tiller**，[發行說明](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.9) · [線上體驗](https://demo.nanomuse.dev/)。
+*nano* 的意思是完整的一套，小到你自己就能跑、能部署：手機 App、桌面 App、網頁主控台，還有把它們連在一起的中繼，都在這個儲存庫裡，GPL-3.0-or-later。**[免費、開源、非營利。一起把它做好。](../../CONTRIBUTING.md)** 登入就有一份免費的模型額度，走社群中繼，錢是開發者出的；用完可以[換成自己的 key](../own-key.md)。同一套中繼也能跑在你自己的伺服器上，資料不必出門。最新版本：**1.0.10 Bridge**，[發行說明](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.10) · [線上體驗](https://demo.nanomuse.dev/)。
 
 > [!NOTE]
 > **nanoMuse 在持續進化**
@@ -59,11 +59,11 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 | | |
 |---|---|
 | **瀏覽器** | [demo.nanomuse.dev](https://demo.nanomuse.dev/)：一台模擬手機上的 nanoMuse，登入後體驗。這是示範；下面的用戶端才是正式的 |
-| **Android** 8.0 以上，arm64 | [nanoMuse-1.0.9-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-1.0.9-arm64.apk)：每個版本都用同一把金鑰簽署，直接覆蓋安裝即可升級 |
+| **Android** 8.0 以上，arm64 | [nanoMuse-1.0.10-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-1.0.10-arm64.apk)：每個版本都用同一把金鑰簽署，直接覆蓋安裝即可升級 |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc)：測試版，已通過 Apple 的 beta 審核；從這個連結安裝 · [iOS](../ios.md) |
-| **macOS** 12 以上 | [Apple 晶片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-x64.dmg)。未經公證：第一次右鍵 → 打開 |
-| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.9-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-win-x64.exe)：點一次「仍要執行」 |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.tar.gz) |
+| **macOS** 12 以上 | [Apple 晶片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-x64.dmg)。未經公證：第一次右鍵 → 打開 |
+| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.10-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-win-x64.exe)：點一次「仍要執行」 |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` 架自己的中繼；`docker compose up -d app` 在自己的伺服器上跑網頁版；見[自己部署](../self-hosting.md) |
 
 下載都來自 [GitHub 最新版本](https://github.com/nano-muse/nanoMuse/releases/latest)；GitHub 下載不順時，同樣的檔案在 [nanomuse.cn/dl](https://nanomuse.cn/dl/)。打開 App，用電子郵件或中國大陸手機號登入，它就有模型可用。手機、桌面和網頁共用一個帳號，看到的是同樣的對話。
@@ -162,7 +162,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 <a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
 <a href="https://github.com/jperla"><img src="https://avatars.githubusercontent.com/u/3724?v=4&s=48" width="48" height="48" alt="jperla"></a>
 <a href="https://github.com/jasontospas"><img src="https://avatars.githubusercontent.com/u/79001000?v=4&s=48" width="48" height="48" alt="jasontospas"></a>
-<a href="https://github.com/PSA-Team-source"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="PSA-Team-source"></a>
+<a href="https://github.com/al-global-tech"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="al-global-tech"></a>
 <a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
 <a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
 <a href="https://github.com/brajendrak00068"><img src="https://avatars.githubusercontent.com/u/56827534?v=4&s=48" width="48" height="48" alt="brajendrak00068"></a>
@@ -195,6 +195,7 @@ nanoMuse 站在別人的工作之上；條款見 [THIRD_PARTY_NOTICES.md](../../
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis)：手機 App 所基於的裝置端智慧體，沙箱來自 [proot](https://github.com/nano-muse/proot) 和 [Alpine Linux](https://alpinelinux.org/)。
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：桌面 App 作為外掛程式執行在它上面。
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop)（字節跳動）：桌面端「手」的操作器移植自它，舞台上的標記參考它的 ScreenMarker。
+- Android 背景螢幕的獨立顯示、即時預覽、任務接手及步驟回放參考了 wangzan101 的 [Mika](https://github.com/wangzan101/Mika)。無線偵錯配對程式碼依 Apache-2.0 授權改編自該專案。
 - [MobileGym](https://github.com/Purewhiter/mobilegym)、[MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench)、[PhoneHarness](https://github.com/PhoneHarness/PhoneHarness)、[CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse)、[Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM)、[ClawGUI](https://github.com/ZJU-REAL/ClawGUI)：手機操作器、軌跡和產品思路。
 
 ## 聲明

@@ -125,6 +125,7 @@ fun SettingsScreen(
     // About row below still has a TODO onClick in HEAD; future settings-bucket
     // work will wire this through.
     onAboutClick: () -> Unit = {},
+    onLockSettingsClick: () -> Unit, // nanoMuse: device-local app and chat locks
 ) {
     val context = LocalContext.current
     var showFeedbackSheet by remember { mutableStateOf(false) }
@@ -164,9 +165,6 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
-            // nanoMuse: device authentication settings are shared by both layouts.
-            io.github.nanomuse.ui.guard.AppAccessSettings()
-            io.github.nanomuse.ui.guard.SessionAccessSettings()
 
             // -- The model (Muse: the plan card) --
             io.github.nanomuse.ui.muse.MuseCard {
@@ -306,6 +304,9 @@ fun SettingsScreen(
                 io.github.nanomuse.ui.muse.MuseRowDivider()
                 // nanoMuse: data controls — the one switch over what nanoMuse Cloud keeps of the chats.
                 io.github.nanomuse.ui.muse.MuseRow(title = stringResource(R.string.nm_data_title), icon = Icons.Outlined.Storage, onClick = onDataControlsClick)
+                io.github.nanomuse.ui.muse.MuseRowDivider()
+                // nanoMuse: the app lock and per-chat protection share one settings page.
+                io.github.nanomuse.ui.muse.MuseRow(title = stringResource(R.string.nm_access_settings_title), icon = Icons.Outlined.Shield, onClick = onLockSettingsClick)
                 io.github.nanomuse.ui.muse.MuseRowDivider()
                 // nanoMuse: network — the HTTP proxy for own providers and the ChatGPT plan.
                 io.github.nanomuse.ui.muse.MuseRow(title = stringResource(R.string.nm_network_title), icon = Icons.Outlined.Language, onClick = onNetworkClick)

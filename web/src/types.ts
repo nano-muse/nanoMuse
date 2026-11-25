@@ -831,6 +831,9 @@ export interface Idea {
 }
 
 export interface FeedPost {
+  form?: "brief" | "draft" | "checklist" | "question";
+  why_now?: string;
+  sources?: { kind: "calendar" | "goal" | "memory" | "profile" | "conversation"; quote: string }[];
   id: string;
   ts: string;
   title: string;
@@ -841,7 +844,59 @@ export interface FeedPost {
   prompt: string;
 }
 
+export type PublicSourceKind =
+  | "github_repo" | "github_user" | "research_author" | "research_work" | "research_topic" | "feed";
+
+export interface PublicWatch {
+  origin?: "chat" | "recurring" | "connected" | "manual" | null;
+  id: string;
+  kind: PublicSourceKind | "scholar_profile";
+  target: string;
+  label: string;
+  status: "suggested" | "active" | "paused";
+  last_checked: string | null;
+  unavailable: boolean;
+}
+
+export interface PublicWatchView {
+  enabled: boolean;
+  can_share?: boolean;
+  share_public_updates?: boolean;
+  revision: string;
+  watches: PublicWatch[];
+}
+
+export interface PublicWatchChange {
+  revision: string;
+  action: "confirm" | "pause" | "dismiss" | "resume";
+  kind?: PublicSourceKind;
+  target?: string;
+}
+
+export interface ContextResource {
+  id: string;
+  label: string;
+}
+
+export interface ContextWatchSettings {
+  on_connect?: { mail: boolean; calendar: boolean; mcp: boolean } | null;
+  local_goals: boolean;
+  checked_at: string | null;
+  unavailable: boolean;
+  revision: string;
+  available_mail: boolean;
+  available_calendar: boolean;
+  mail: boolean;
+  calendar: boolean;
+  local_context: boolean;
+  resources: ContextResource[];
+}
+
 export interface FeedPostsData {
+  on_change?: boolean;
+  followups_enabled?: boolean;
+  followup_push?: boolean;
+  chat_followups?: boolean;
   instructions: string;
   generated_at: string | null;
   posts: FeedPost[];
@@ -1381,7 +1436,18 @@ export interface FeedItem {
   quiet?: boolean;
 }
 
+export interface WaitingFollowup {
+  kind: "waiting"; id: string; quote: string; subject: string; sender?: string; due: string; time?: string; correction: string;
+}
+
+export type FeedFollowup =
+  | { kind: "review"; id: string; goal_id: string; title: string; reason: "blocked" | "proposal"; detail: string; note: string; observed_on: string }
+  | { kind: "goal"; id: string; goal_id: string; title: string; due: string; days_until: number; next_step: string | null }
+  | { kind: "overlap"; id: string; titles: [string, string]; start: string; end: string };
+
 export interface UpcomingData {
+  followups?: FeedFollowup[];
+  waiting_followup?: WaitingFollowup | null;
   proactive: boolean;
   proactivity: Proactivity;
   interval_minutes: number;

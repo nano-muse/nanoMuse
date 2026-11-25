@@ -1,5 +1,21 @@
 import Foundation
 
+// nanoMuse: preserve the failed provider host without making this shared error type depend on
+// NanoMuseProviderReach, because the OAuth XCTest target also compiles this file directly.
+func nanoMuseProviderHostTag(_ error: Error) -> String {
+    let ns = error as NSError
+    let host: String?
+    if let url = ns.userInfo[NSURLErrorFailingURLErrorKey] as? URL {
+        host = url.host
+    } else if let value = ns.userInfo[NSURLErrorFailingURLStringErrorKey] as? String {
+        host = URL(string: value)?.host
+    } else {
+        host = nil
+    }
+    guard let normalized = host?.lowercased(), !normalized.isEmpty else { return "" }
+    return " [host: \(normalized)]"
+}
+
 enum LLMError: LocalizedError {
     case invalidAPIKey(detail: String = "")
     case networkError(underlying: Error)
@@ -17,7 +33,8 @@ enum LLMError: LocalizedError {
         case .invalidAPIKey(let detail):
             return detail.isEmpty ? "Invalid API key" : "Invalid API key: \(detail)"
         case .networkError(let error):
-            return "Network error: \(error.localizedDescription)" + NanoMuseProviderReach.hostTag(error) // nanoMuse: the host, for the chat's reach card
+            // nanoMuse: include the host for the chat's reach card.
+            return "Network error: \(error.localizedDescription)" + nanoMuseProviderHostTag(error)
         case .providerError(let message):
             return "Provider error: \(message)"
         case .transientError(let message):

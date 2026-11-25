@@ -58,6 +58,14 @@ object FeedSandboxScope {
                     ?.asSequence()
                     ?.filter { it.isFile && !Files.isSymbolicLink(it.toPath()) && POST_NAME.matches(it.name) }
                     ?.sortedBy { it.name }
+                    ?.filter { post ->
+                        // Prepared cards quote private records. Keep them in the person's Feed;
+                        // an already-running shell can outlive changes to a source chat lock.
+                        !post.bufferedReader().use { reader ->
+                            val header = reader.readLine()
+                            header == "---" && reader.lineSequence().takeWhile { it != "---" }.take(16).any { it.startsWith("preparation: ") }
+                        }
+                    }
                     ?.forEach { post ->
                         Files.copy(
                             post.toPath(),

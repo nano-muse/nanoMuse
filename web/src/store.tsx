@@ -127,6 +127,7 @@ export interface AppState {
   /** The sign-in door stepped past for a key of one's own (kept in storage): the sign-in stays an invitation under Connections. */
   signInSkipped: boolean;
   tab: Tab;
+  focusedGoalId: string | null;
   toast: string | null;
   /** The chats drawer (the phone's hamburger) is open. */
   drawer: boolean;
@@ -180,6 +181,7 @@ type Action =
   | { type: "goals"; goals: Goal[] }
   | { type: "settings"; settings: SettingsView }
   | { type: "tab"; tab: Tab }
+  | { type: "openGoal"; id: string }
   | { type: "drawer"; open: boolean }
   | { type: "feedSeen"; at: string }
   | { type: "viewer"; path: string | null }
@@ -240,6 +242,7 @@ const initial: AppState = {
   onboardingDismissed: false,
   signInSkipped: readStorage(SIGN_IN_SKIPPED_KEY) === "1",
   tab: "chat",
+  focusedGoalId: null,
   toast: null,
   drawer: false,
   finishedAt: 0,
@@ -372,7 +375,9 @@ function reducer(state: AppState, action: Action): AppState {
     case "settings":
       return { ...state, settings: action.settings, profile: action.settings.profile };
     case "tab":
-      return { ...state, tab: action.tab };
+      return { ...state, tab: action.tab, focusedGoalId: null };
+    case "openGoal":
+      return { ...state, tab: "goals", focusedGoalId: action.id };
     case "drawer":
       return { ...state, drawer: action.open };
     case "feedSeen":
@@ -591,6 +596,7 @@ interface StoreValue {
   refreshSettings: () => Promise<void>;
   refreshHub: () => Promise<void>;
   setTab: (tab: Tab) => void;
+  openGoal: (id: string) => void;
   /** Open or close the chats drawer (the phone's hamburger). */
   setDrawer: (open: boolean) => void;
   openThread: (thread: string) => void;
@@ -781,6 +787,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (state.loaded) setAppBadge(state.pendingApprovals.length);
   }, [state.loaded, state.pendingApprovals.length]);
 
+  const setTab = useCallback((tab: Tab) => dispatch({ type: "tab", tab }), []);
   const value = useMemo<StoreValue>(
     () => ({
       state,
@@ -824,7 +831,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       refreshGoals,
       refreshSettings,
       refreshHub,
-      setTab: (tab) => dispatch({ type: "tab", tab }),
+      openGoal: (id) => dispatch({ type: "openGoal", id }),
+      setTab,
       setDrawer: (open) => dispatch({ type: "drawer", open }),
       openThread: (thread) => dispatch({ type: "activeThread", thread }),
       markFeedSeen: (at) => dispatch({ type: "feedSeen", at }),
@@ -841,7 +849,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       toast: (text) => dispatch({ type: "toast", toast: t(text) }),
     }),
-    [state, loadEvents, refreshGoals, refreshSettings, refreshHub],
+    [state, setTab, loadEvents, refreshGoals, refreshSettings, refreshHub],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

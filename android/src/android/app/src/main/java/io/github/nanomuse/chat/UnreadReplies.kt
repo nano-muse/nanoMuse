@@ -10,6 +10,7 @@ class UnreadReplies(private val changed: (Set<String>) -> Unit = {}) {
         if (!running.remove(id)) return
         if (success && !visible) { ids = ids + id; changed(ids) }
     }
+    @Synchronized fun received(id: String) { ids = ids + id; changed(ids) }
     @Synchronized fun opened(id: String) { ids = ids - id; changed(ids) }
     @Synchronized fun removed(id: String) { running -= id; opened(id) }
 }

@@ -355,7 +355,7 @@ def test_the_most_recent_gui_device_is_the_phone():
 
 
 # ----------------------------------------------------------------------------- tools
-async def test_phone_act_risk_follows_the_label_under_the_finger():
+async def test_phone_act_risk_uses_only_the_reported_node_under_the_finger():
     link = PhoneLink()
     FakePhone(link, [PAY_SCREEN])
     await link.screen()
@@ -394,6 +394,10 @@ async def test_phone_act_risk_follows_the_label_under_the_finger():
     note = act.assess({"action": "tap", "x": 100, "y": 260, "label": "备注"})
     assert note.risk == RiskLevel.MODERATE and not note.warnings
 
+    # A model label is kept for the audit summary but cannot invent a sensitive target.
+    claimed_pay = act.assess({"action": "tap", "x": 100, "y": 260, "label": "确认付款"})
+    assert claimed_pay.risk == RiskLevel.MODERATE and not claimed_pay.egress
+
     # no label, but the element under the finger says 确认付款: the tree decides
     blind = act.assess({"action": "tap", "x": 195, "y": 784})
     assert blind.risk == RiskLevel.SENSITIVE and any("no `label`" in w for w in blind.warnings)
@@ -405,9 +409,10 @@ async def test_phone_act_risk_follows_the_label_under_the_finger():
     icon = act.assess({"action": "tap", "x": 30, "y": 30, "label": "支付宝"})
     assert icon.risk == RiskLevel.MODERATE  # an app's name is never a payment step
 
-    # nothing reported under the finger: the label decides, as on a screen without a tree
+    # Nothing reported under the finger: the model's label cannot make the target safe.
     bare = act.assess({"action": "tap", "x": 380, "y": 20, "label": "Settings"})
-    assert bare.risk == RiskLevel.MODERATE and not bare.egress and not bare.warnings
+    assert bare.risk == RiskLevel.SENSITIVE and bare.egress
+    assert any("no element" in warning for warning in bare.warnings)
 
     typing = act.assess({"action": "type", "text": "房租", "label": "备注"})
     assert typing.risk == RiskLevel.MODERATE and 'type "房租" into "备注"' in typing.summary

@@ -54,19 +54,30 @@ object GoalFlow {
         |When you have enough, reply with one warm sentence of confirmation and then EXACTLY ONE fenced
         |code block tagged `$BLOCK_GOAL` containing JSON with these keys:
         |{"title": "<= 40 chars", "why": "one sentence", "category": "${category.key}",
+        | "due": "YYYY-MM-DD",
         | "check_every_hours": <integer, 0 means a daily check>, "check_time": "HH:MM" (used when check_every_hours is 0),
         | "steps": ["3 to 5 short steps you will take or track"], "first_check": "what you will do at the first check"}
+        |Only include due when the user specified a deadline. For relative dates, today is ${java.time.LocalDate.now()}.
         |Do not describe the block or mention JSON — the app renders it as a card. Say nothing after the block.
         |Later, checks for this goal will happen automatically in their own conversation.
     """.trimMargin()
 
+    fun isProtectedSession(context: Context, sessionId: String, goalId: String? = null): Boolean {
+        val protected = io.github.nanomuse.guard.SessionAccess.protected.value
+        if (protected.isEmpty()) return false
+        if (sessionId in protected) return true
+        val store = GoalStore.get(context)
+        val goal = goalId?.let { store.get(it) } ?: store.forSession(sessionId)
+        return goal?.isProtectedBy(protected) == true
+    }
+
     /** Called after every completed turn; parses goal blocks in the assistant's text. */
     fun afterTurn(context: Context, sessionId: String, assistantText: String?) {
-        if (assistantText.isNullOrEmpty()) return
+        if (assistantText.isNullOrEmpty() || io.github.nanomuse.feed.FeedFlow.isFeedSession(context, sessionId)) return
         if (assistantText.contains("```$BLOCK_GOAL")) {
             goalBlock.find(assistantText)?.groupValues?.get(1)?.let { json ->
                 if (SessionAddenda.has(sessionId, ADDENDUM_TAG) || !alreadyCreatedFrom(context, json)) {
-                    createFromBlock(context, json)
+                    createFromBlock(context, sessionId, json)
                 }
                 SessionAddenda.remove(sessionId, ADDENDUM_TAG)
             }
@@ -75,7 +86,9 @@ object GoalFlow {
             updateBlock.findAll(assistantText).forEach { m ->
                 val o = runCatching { JSONObject(m.groupValues[1].trim()) }.getOrNull() ?: return@forEach
                 val store = GoalStore.get(context)
-                val goalId = o.optString("goal_id").ifEmpty { store.forSession(sessionId)?.id } ?: return@forEach
+                val current = store.forSession(sessionId) ?: return@forEach
+                val goalId = o.optString("goal_id").ifEmpty { current.id }
+                if (goalId != current.id) return@forEach
                 val status = o.stringOrNull("status")
                 val wasDone = store.all().firstOrNull { it.id == goalId }?.status == GoalStatus.DONE
                 store.applyUpdate(
@@ -83,11 +96,17 @@ object GoalFlow {
                     progress = if (o.has("progress")) o.optInt("progress") else null,
                     status = status,
                     note = o.stringOrNull("note"),
+                    completedSteps = completedSteps(o),
                 )
                 // A goal reached is a moment for the star ask; the Goals page shows it.
                 if (status == "done" && !wasDone) io.github.nanomuse.community.StarPrompt.offer(context, io.github.nanomuse.community.StarPrompt.Moment.GOAL_DONE)
             }
         }
+    }
+
+    internal fun completedSteps(update: JSONObject): Set<Int> {
+        val numbers = update.optJSONArray("completed_steps") ?: return emptySet()
+        return (0 until numbers.length()).mapNotNull { numbers.opt(it) as? Int }.toSet()
     }
 
     /** Guard against re-creating a goal when the model repeats a block it emitted earlier. */
@@ -97,7 +116,7 @@ object GoalFlow {
         return GoalStore.get(context).all().any { it.title == title }
     }
 
-    private fun createFromBlock(context: Context, json: String) {
+    private fun createFromBlock(context: Context, sourceSessionId: String, json: String) {
         val o = runCatching { JSONObject(json.trim()) }.getOrElse {
             AppLogger.warning(TAG, "goal block is not JSON: ${it.message}")
             return
@@ -116,6 +135,8 @@ object GoalFlow {
             checkHour = h,
             checkMinute = m,
             steps = steps.take(6),
+            due = GoalDeadlines.parse(o.stringOrNull("due")),
+            sourceSessionId = sourceSessionId,
         )
         val store = GoalStore.get(context)
         store.upsert(goal)
@@ -147,7 +168,15 @@ object GoalFlow {
                     intervalMinutes = if (goal.checkEveryHours > 0) goal.checkEveryHours * 60 else null,
                 ),
             )
-            GoalStore.get(context).upsert(withSession.copy(taskId = task.id))
+            val store = GoalStore.get(context)
+            synchronized(store) {
+                val current = store.get(goal.id)
+                if (current == null) ScheduledTaskManager(app).delete(task.id)
+                else {
+                    if (current.status != GoalStatus.ACTIVE) ScheduledTaskManager(app).setEnabled(task.id, false)
+                    store.update(goal.id) { it.copy(sessionId = sessionId, taskId = task.id) }
+                }
+            }
             AppLogger.info(TAG, "goal ${goal.id} '${goal.title}': session=$sessionId task=${task.id}")
         } catch (e: Exception) {
             AppLogger.warning(TAG, "goal setup failed: ${e.message}")
@@ -169,10 +198,11 @@ object GoalFlow {
         val goal = GoalStore.get(context).forSession(sessionId) ?: return null
         val cadence = if (goal.checkEveryHours > 0) "every ${goal.checkEveryHours} hour(s)"
         else "daily at %02d:%02d".format(java.util.Locale.ROOT, goal.checkHour, goal.checkMinute)
-        val steps = goal.steps.mapIndexed { i, s -> "${i + 1}. ${s.text}" }.joinToString("\n").ifEmpty { "(none yet)" }
+        val steps = goal.steps.mapIndexed { i, s -> "${i + 1}. [${if (s.done) "x" else " "}] ${s.text}" }.joinToString("\n").ifEmpty { "(none yet)" }
         return buildString {
             appendLine("## This conversation tracks a goal (nanoMuse)")
             appendLine("Goal: ${goal.title}")
+            goal.due?.let { appendLine("Deadline: $it (local date)") }
             if (goal.why.isNotBlank()) appendLine("Why: ${goal.why}")
             appendLine("Steps:")
             appendLine(steps)
@@ -184,6 +214,7 @@ object GoalFlow {
                     "Never pay, send messages or delete anything without asking. Then write the user a short update in " +
                     "their language (at most six lines) and end with EXACTLY ONE fenced code block tagged `$BLOCK_UPDATE` " +
                     "containing {\"goal_id\": \"${goal.id}\", \"progress\": <0-100>, \"status\": \"on_track|attention|done\", \"note\": \"one line\"}. " +
+                    "When there is evidence that specific steps are complete, include their 1-based numbers in an optional completed_steps array. " +
                     "In ordinary conversation here, answer normally and add that block only when the goal's progress actually changed.",
             )
         }
@@ -191,22 +222,29 @@ object GoalFlow {
 
     fun setPaused(context: Context, goal: Goal, paused: Boolean) {
         val store = GoalStore.get(context)
-        goal.taskId?.let { ScheduledTaskManager(context).setEnabled(it, !paused) }
-        store.upsert(goal.copy(status = if (paused) GoalStatus.PAUSED else GoalStatus.ACTIVE))
+        store.update(goal.id) {
+            it.taskId?.let { id -> ScheduledTaskManager(context).setEnabled(id, !paused) }
+            it.copy(status = if (paused) GoalStatus.PAUSED else GoalStatus.ACTIVE)
+        }
     }
 
     fun markDone(context: Context, goal: Goal, done: Boolean) {
         val store = GoalStore.get(context)
-        goal.taskId?.let { ScheduledTaskManager(context).setEnabled(it, !done) }
-        store.upsert(goal.copy(status = if (done) GoalStatus.DONE else GoalStatus.ACTIVE, progress = if (done) 100 else goal.progress))
+        store.update(goal.id) {
+            it.taskId?.let { id -> ScheduledTaskManager(context).setEnabled(id, !done) }
+            it.copy(status = if (done) GoalStatus.DONE else GoalStatus.ACTIVE, progress = if (done) 100 else it.progress)
+        }
         // A goal reached is a moment for the star ask (StarPrompt); the Goals page shows it.
         if (done && goal.status != GoalStatus.DONE) io.github.nanomuse.community.StarPrompt.offer(context, io.github.nanomuse.community.StarPrompt.Moment.GOAL_DONE)
     }
 
     /** Deletes the goal and its check; the goal's conversation stays (it is the user's history). */
     fun delete(context: Context, goal: Goal) {
-        goal.taskId?.let { ScheduledTaskManager(context).delete(it) }
-        GoalStore.get(context).delete(goal.id)
+        val store = GoalStore.get(context)
+        synchronized(store) {
+            store.get(goal.id)?.taskId?.let { ScheduledTaskManager(context).delete(it) }
+            store.delete(goal.id)
+        }
     }
 
     /** Runs the goal's check right now, in its session. */

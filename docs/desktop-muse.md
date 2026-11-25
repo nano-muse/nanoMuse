@@ -92,11 +92,9 @@ state in `$DSH_HOME/nanomuse/firstrun.json` (`src/firstrun.ts`): *done* once Sta
 pressed, the permissions page seen, which source answers. The pages are therefore never
 skipped on a fresh install and never shown twice:
 
-1. **Welcome**: the app's mark (the avatar comes with the conversation, on the Meet page),
-   *Welcome to nanoMuse*, the three feature rows (chat, hands, reach), the community notice,
-   one blue *Sign in* pill and *Use your own API key instead*, which goes to the models page
-   with no account (the sign-in can come later; *Skip for now* there with no key saved is
-   Welcome again). Sign-in
+1. **Choose task**. Pick a suggested task and select *Do this task* to open model setup.
+   You can sign in, add your own key, or select *Skip for now* to finish setup and explore
+   the app. Connect a model before sending the task. Sign-in
    is the phone's: *Phone number or e-mail* with the line that a mainland China number
    gets an SMS and anything else an e-mail, the code boxes that verify themselves on the
    sixth digit, *Try another way* for a password (`/v1/auth/code`, `/v1/auth/verify`,
@@ -579,12 +577,21 @@ page it opened, named for the page you came from; a pick in the sidebar starts f
 
 Wallet, secure storage and message channels are not there: the Cloud has no wallet;
 members have an allowance ([cloud.md](cloud.md#allowance)). nanoMuse keeps no
-passwords for the agent, and messages reach you through the phone app's notifications
-rather than a messenger.
+passwords for the agent. Check-ins arrive in nanoMuse chat and can appear in system notifications.
 
 <a id="rail-rooms"></a>
 
 ## The rail's other rooms: Feed, Ideas, Goals, Library
+
+Set the optional due date in Goals. While the desktop app is running and the Feed routine is enabled, it can add one local follow-up per day after the scheduled time. The card explains which deadline or recent goal check brought it up, includes a planned step when available, and opens the original conversation. You can mute an individual goal. This follow-up works without a model.
+
+The Feed can also prepare material from an unfinished goal or a recent request you wrote in a completed conversation. A separate memory, conversation or saved file label can supply a relevant constraint. For example, a promise to contact a museum and a saved accessibility requirement can become an editable booking inquiry. Expand the sources on the card to see where the information came from. The preparation call uses the current chat model without tools. Existing scheduled reading with written preferences stays available, and you can request research explicitly.
+
+A chat can hold several unfinished commitments. You can discuss something else and come back to one by name. If you say the museum visit moved to Friday, its original request stays attached to the new date. Saying that you sent the museum inquiry withdraws its preparation and leaves your other commitments alone. A date agreed the previous week stays eligible when the due date draws near. A writing request that already received a draft also stops generating one.
+
+Chat check-ins are on by default with the daily routine. While the desktop app is running, a dated commitment you mentioned can prompt a message in its original chat on the agreed day, even if you have never opened Feed. You can turn check-ins off in Feed settings. Updating the app keeps your saved choice. If you turn them back on, only commitments mentioned from that point can prompt a message. The chat is marked unread and keeps the question as context for your reply. Delivery is limited to one per day between 09:00 and 20:00. If desktop notifications are available, clicking the notification opens the chat.
+
+When adding a new MCP connection, its form offers to follow updates if the service lists exactly one readable text resource. This option starts checked and explains that your chat model can review updates. You can uncheck it before connecting. Multiple resources, a partial listing or an existing watch leave your selection alone. To select a particular resource yourself, open Feed settings, choose a connected service under *Follow updates from a connector*, and select one text resource it lists. The first read records a baseline. While the desktop is running, it checks about every thirty minutes during local daytime. Only new text and matching goal titles go to your current chat model for review. For example, if your project status changes to “The venue moved the rehearsal to a smaller room”, nanoMuse can quote the update in your main chat and offer to adjust the plan. Opening the chat lets you continue the conversation. Choose *Off* to stop monitoring. This setting works independently of the daily Feed. Resource messages and chat check-ins share the limit of one per local day between 09:00 and 20:00. This works with MCP services that publish text resources. A service offering tools alone has nothing to select.
 
 The four rooms are on the rail (Chats, Search,
 Feed, Ideas, Goals, Library, Devices), each one `main` panel of the harness's layout,

@@ -38,6 +38,14 @@ desktop, and it installs over the old one (same application id).
 
 Levea is listed under **Design** in Connectors. Connect with its OAuth sign-in to edit videos, add captions and export MP4 files. Its tools follow the same approval rules as other MCP connectors.
 
+On Linux and macOS, **Settings → General → About** shows the installed version and the latest published release. A local test build can be newer than the published release.
+
+## Following public sources
+
+In Feed settings, *Public sources* lists accounts, projects, researchers, topics and websites nanoMuse can check for you. For example, mentioning a repository you maintain can start a watch for issues there. Repeated references can suggest a source for confirmation. A site can advertise its own RSS or Atom feed. You can follow, pause or dismiss individual sources. The first read establishes a baseline. With desktop running, daily preparation and chat check-ins enabled, a relevant new item can start a conversation in your main chat. Read the [source coverage](app.md#following-public-sources-over-time) for the research identifiers, polling intervals and limits.
+
+To also see these updates on your phone, turn on conversation sync for both devices and enable sharing of public updates in this computer’s Feed settings. Future messages based only on public evidence can then appear in the main chat of the same account.
+
 ## Updating on Windows
 
 The Windows x64 app checks for a newer stable release after starting and every six
@@ -210,7 +218,8 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   do. The shell keeps it in `desktop.json` (mode 0600, since the address may carry a
   password) next to *open at login* and puts it on the dsh
   Host's environment at start (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` for SOCKS, `NO_PROXY`
-  with `localhost,127.0.0.1,::1`, `cloud.nanomuse.cn` and the relay the plugin talks to, and
+  with `localhost,127.0.0.1,::1`, `cloud.nanomuse.cn` and the relay named by the trusted
+  `NANOMUSE_CLOUD_URL` launch setting, and
   `NODE_USE_ENV_PROXY=1`, which is what makes Node's fetch read them), so it takes effect
   after a restart; *Restart now* under the row restarts the Host with the window up, and
   asks first when a reply, the hands, a task from another device or an approval is under
@@ -243,7 +252,8 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   `GET /nanomuse/cloud/work` (the aggregate), `POST /work/gate {open}` (the hand-over) and
   `POST /work/stop` (the confirmed end). *Restart now* under the proxy row and the restart
   macOS asks for after a Screen Recording grant go through the same question; the restart
-  of the helper alone does not touch the Host's work.
+  of the helper alone does not touch the Host's work. If a confirmed stop or the restart
+  fails, the restart is cancelled and the work gate is opened again.
 - **Each model call tells the account's record where it sat** (relay 0.31). The harness's
   model adapter sends a provider's headers the same on every request, and a call's
   provenance changes with each, so the `nanoMuse Cloud` provider row points at a loopback
@@ -372,6 +382,8 @@ process before removing the check's data directories.
 
 ## Config and data
 
+When you open a chat synced from your phone or another device, assistant replies display Markdown headings, lists, tables and code blocks. Completed replies in device-bound chats use the same formatting. Your own messages appear as typed. Replies already on this computer show the formatting when you reopen the chat, without syncing again.
+
 Conversation sync pauses before sign-in or sign-out changes the account credentials. Responses from the previous account cannot update the new account's conversations, main chat or sync position, or add context to its model. A local chat created by an earlier sync request remains assigned to that request's account, even if creation finishes during an account switch. Requests already sent to the relay may still finish there.
 
 If sign-in or sign-out stops partway through, sync stays paused after a restart. Sign in again successfully to resume it.
@@ -397,7 +409,7 @@ On Windows, coding-agent `.cmd` launchers must use a supported npm shim or a pla
 
 A device finishing a turn clears only its own working indicator. An older stop notification does not clear a newer indicator from that device.
 
-Account-state saves are queued in order and written to a private temporary file before replacing `cloud.json`. An interrupted write before replacement leaves the previous complete snapshot available.
+Account-state saves are queued in snapshot order. Each private temporary file is flushed before replacing `cloud.json`, and the previous complete state is kept as `cloud.json.bak` with 0600 permissions. The containing directory is flushed where the platform supports it. On startup, a missing or damaged `cloud.json` is restored only from a backup that parses and passes the same state cleaning as the primary file; otherwise startup stops instead of discarding the account or saved permissions.
 
 The desktop keeps at most 64 conversation logs in its sync cache. Older cached entries are read again from disk when needed; saved conversations remain available.
 
@@ -440,7 +452,8 @@ copy is kept as `desktop.json.bak`: a save that fails (a full disk, a crash) lea
 last good settings, and a damaged file is replaced from the copy at the next start. Both
 are readable by the owner alone, as the proxy address may carry a password. *Download your
 agent data* writes its zip one file at a time, leaves out links and anything over 64 MB,
-and removes a password from the proxy address in the `desktop.json` it packs.
+and removes a password from the proxy address in the `desktop.json` it packs. It stops
+instead of producing an invalid zip if the export exceeds 65,000 files or 3 GiB.
 
 Settings → Plugins saves the selected bundles in `profiles/nanomuse/package.json`.
 Startup preserves that list and its order, including plugins you enabled and those you
@@ -774,10 +787,11 @@ warning in the iOS app fails its build: the helper is nanoMuse code.
 - **The AppImage needs FUSE.** It mounts itself at start; when the machine has no
   `libfuse2`, or `fusermount` is not permitted (containers, some corporate images; the log
   says `fusermount: mount failed: Operation not permitted` / `Cannot mount AppImage, please
-  check your FUSE setup`), run it unpacked instead:
-  `./nanoMuse-Desktop-<version>-linux-x64.AppImage --appimage-extract-and-run`, or take the
-  **`.tar.gz`**, the same app as a plain folder: unpack it anywhere and run
-  `./nanomuse-desktop` from it (no FUSE, no root).
+  check your FUSE setup`), place the AppImage in a folder for this version. In that folder,
+  run `./nanoMuse-Desktop-<version>-linux-x64.AppImage --appimage-extract` once. Launch
+  `./squashfs-root/AppRun` each time and keep the folder while the app is open. A second
+  launch in temporary extraction mode can remove files still in use by the first window.
+  You can also unpack the **`.tar.gz`** and run `./nanomuse-desktop` from its folder.
 - **The icon does nothing.** The app allows one instance at a time: a click on the launcher
   while a copy is already running tells *that* copy to show its window. Up to 0.1.36 a copy
   whose window had been closed stayed alive for the tray and did not answer; the click
