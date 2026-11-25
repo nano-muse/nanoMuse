@@ -30,7 +30,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from nanomuse.background import spawn
 from nanomuse.logger import logger
@@ -276,7 +276,12 @@ class _PinnedPublicSocksProxy:
             type=socket.SOCK_STREAM,
             proto=socket.IPPROTO_TCP,
         )
-        endpoints: list[tuple[socket.AddressFamily, str]] = []
+        endpoints: list[
+            tuple[
+                Literal[socket.AddressFamily.AF_INET, socket.AddressFamily.AF_INET6],
+                str,
+            ]
+        ] = []
         for family, _kind, _proto, _name, sockaddr in infos:
             address = str(sockaddr[0]).split("%", 1)[0]
             ip = ipaddress.ip_address(address)
@@ -297,12 +302,12 @@ class _PinnedPublicSocksProxy:
             raise OSError(f"no address for {host}")
 
         last_error: OSError | None = None
-        for family, address in endpoints:
+        for endpoint_family, address in endpoints:
             try:
                 return await asyncio.open_connection(
                     address,
                     port,
-                    family=family,
+                    family=endpoint_family,
                     flags=socket.AI_NUMERICHOST,
                 )
             except OSError as exc:
