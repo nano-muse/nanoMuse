@@ -124,6 +124,12 @@ test('exported proxy settings remove URL userinfo', async () => {
   }))).toString())
   assert.equal(redacted.proxy, 'http://proxy.example:8080')
   assert.equal(redacted.menuBar, true)
+  assert.deepEqual(
+    JSON.parse(redactProxyUserinfo(Buffer.from('{"proxy":"http://alice:secret@","menuBar":true}')).toString()),
+    { menuBar: true },
+  )
+  assert.deepEqual(JSON.parse(redactProxyUserinfo(Buffer.from('{"proxy":"http://alice:secret@')).toString()), {})
+  assert.deepEqual(JSON.parse(redactProxyUserinfo(Buffer.from('"http://alice:secret@proxy.example"')).toString()), {})
 })
 
 test('a file name a person typed or brought in becomes one safe path segment (#689)', async () => {

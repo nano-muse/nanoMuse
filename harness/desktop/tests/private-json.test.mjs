@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -31,7 +31,12 @@ test("a partial or damaged current file is restored from the last complete backu
     const value = readPrivateJson(path, (raw) => raw && typeof raw === "object" ? raw : undefined);
     assert.deepEqual(value, { menuBar: true });
     assert.deepEqual(JSON.parse(await readFile(path, "utf8")), { menuBar: true });
-    if (process.platform !== "win32") assert.equal((await stat(path)).mode & 0o777, 0o600);
+    assert.deepEqual(JSON.parse(await readFile(`${path}.bak`, "utf8")), { menuBar: true });
+    assert.deepEqual((await readdir(dir)).sort(), ["desktop.json", "desktop.json.bak"]);
+    if (process.platform !== "win32") {
+      assert.equal((await stat(path)).mode & 0o777, 0o600);
+      assert.equal((await stat(`${path}.bak`)).mode & 0o777, 0o600);
+    }
   } finally {
     await chmod(dir, 0o700).catch(() => undefined);
     await rm(dir, { recursive: true, force: true });

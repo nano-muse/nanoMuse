@@ -23,6 +23,8 @@ import { HubError } from './hub.ts'
 export const OUTPUT_LIMIT = 200_000
 /** Bytes a file may have to travel base64 inside one hub frame. */
 export const FILE_LIMIT = 8 * 1024 * 1024
+/** Base64 characters needed for at most `FILE_LIMIT` bytes, checked before decoding. */
+export const FILE_ENCODED_LIMIT = Math.ceil(FILE_LIMIT / 3) * 4
 export const SHELL_TIMEOUT_MAX_S = 900
 /** Entries a `files` listing stops at. */
 export const ENTRY_LIMIT = 2000
@@ -248,9 +250,9 @@ export async function filePut(args: Args): Promise<Result> {
   const path = expand(args.path)
   const encoded = typeof args.data === 'string' ? args.data : ''
   // the limit is checked on the encoded text first, so an oversized frame is refused before
-  // it is decoded into memory, and on the bytes after (base64 may carry line breaks)
+  // it is decoded into memory, and on the bytes after (the final base64 block can straddle it)
   const tooLarge = () => new HubError('too_large', `the file exceeds the ${FILE_LIMIT} byte hub limit`)
-  if (encoded.length > Math.ceil(FILE_LIMIT / 3) * 4 + 4096) throw tooLarge()
+  if (encoded.length > FILE_ENCODED_LIMIT) throw tooLarge()
   const raw = Buffer.from(encoded, 'base64')
   if (raw.length > FILE_LIMIT) throw tooLarge()
   let info

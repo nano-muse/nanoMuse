@@ -116,13 +116,13 @@ jobs:
           cache: npm
           cache-dependency-path: harness/desktop/package-lock.json
       # pnpm comes from npm here, not from pnpm/action-setup: the action installs one pnpm and
-      # has it self-update to the newest 11, and that update insists on the platform's native
-      # binary, which pnpm stopped publishing for Intel Macs after 11.0, so the macos-x64 job
-      # died before it built anything. The pnpm package on npm is JavaScript and runs on the
-      # Node that setup-node just installed, on every platform in the matrix.
+      # has it self-update, and that update insists on the platform's native binary, which
+      # pnpm stopped publishing for Intel Macs after 11.0, so the macos-x64 job died before
+      # it built anything. The pinned pnpm package on npm is JavaScript and runs on the Node
+      # that setup-node just installed, on every platform in the matrix.
       - name: pnpm
         shell: bash
-        run: npm install --global pnpm@11
+        run: npm install --global pnpm@11.29.0
       # setup-node caches one package manager; the bundle's pnpm store is kept by hand
       - name: pnpm store path
         id: pnpm-store

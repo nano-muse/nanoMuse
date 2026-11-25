@@ -101,16 +101,28 @@ export interface ExportBudget {
 /** A proxy kept in desktop.json may contain credentials; exported settings never do. */
 export function redactProxyUserinfo(data: Buffer): Buffer {
   try {
-    const raw = JSON.parse(data.toString('utf8')) as Record<string, unknown>
+    const parsed: unknown = JSON.parse(data.toString('utf8'))
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return Buffer.from('{}\n')
+    const raw = parsed as Record<string, unknown>
     if (typeof raw.proxy !== 'string') return data
-    const proxy = new URL(raw.proxy)
+    let proxy: URL
+    try {
+      proxy = new URL(raw.proxy)
+    } catch {
+      // A malformed old setting is not useful in a backup and must not make a
+      // credential-shaped string escape in the export.
+      delete raw.proxy
+      return Buffer.from(`${JSON.stringify(raw, null, 2)}\n`)
+    }
     if (!proxy.username && !proxy.password) return data
     proxy.username = ''
     proxy.password = ''
     raw.proxy = proxy.href.replace(/\/$/, '')
     return Buffer.from(`${JSON.stringify(raw, null, 2)}\n`)
   } catch {
-    return data
+    // Fail closed. A damaged settings file is recoverable from desktop.json.bak,
+    // but its unparsed bytes cannot be proven free of proxy credentials.
+    return Buffer.from('{}\n')
   }
 }
 

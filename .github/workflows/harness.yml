@@ -67,11 +67,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: harness/desktop/package-lock.json
-      # pnpm comes from npm, as in desktop-app.yml: pnpm/action-setup lets its pnpm self-update
-      # to the newest 11, which wants the platform's native binary (the 1.0.4 Intel Mac build
+      # pnpm comes from npm, as in desktop-app.yml: pnpm/action-setup lets its pnpm self-update,
+      # which wants the platform's native binary (the 1.0.4 Intel Mac build
       # died on that); the package on npm is JavaScript and runs on the Node above.
       - name: pnpm
-        run: npm install --global pnpm@11
+        run: npm install --global pnpm@11.29.0
       # setup-node caches one package manager (npm, for the shell's `npm ci` below); the
       # bundle's pnpm store is kept by hand
       - name: pnpm store path
@@ -167,7 +167,7 @@ jobs:
           cache-dependency-path: harness/desktop/package-lock.json
       - name: pnpm
         shell: bash
-        run: npm install --global pnpm@11
+        run: npm install --global pnpm@11.29.0
       - name: pnpm store path
         id: pnpm-store
         shell: bash
