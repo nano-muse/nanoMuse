@@ -38,6 +38,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Kept completed sensitive actions and file writes in view after message or token limits removed their tool exchanges, helping long tasks avoid repeats. For #938.
 - Asked before repeating an identical sensitive action in the same conversation, including concurrent calls and retries after cancellation left an unknown outcome. For #938.
+- Scoped remembered cross-device approvals to the exact device, conversation, risk class and complete action. Older or malformed approval events could still be allowed once but could not create or reuse a remembered grant, and deleting a chat or leaving an account cleared its conversation grants.
 - Added the Levea video editor to the connector catalogue for desktop and phones, with OAuth sign-in.
 
 - Kept the person's request in view during long turns with the default settings, so a task with many tool calls no longer forgets what it was asked, and the wrap-up at the step limit sees the turn's work.
@@ -61,6 +62,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Rewrote all Simplified Chinese documentation in plain language, added inline term explanations and a bilingual glossary, and clarified navigation labels, privacy and backup wording, and desktop update guidance.
 
 ### Cloud
+
+- Prevented an older unbound account key from taking over another live device identity. Short-lived Web session keys reserved a computer identity and could claim only their container's first unused computer ID, while existing Web runtimes remained callable.
 
 - Distinguished admin-token rejection from temporary service failures, preserved entered tokens during outages, and kept late rejections from locking newer sign-ins.
 
@@ -89,6 +92,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
+
+- Pinned browser connections to the public addresses that passed validation, blocking DNS rebinding to local services. Agent-written HTML and SVG files no longer ran scripts or opened network connections, and screen actions without a device-reported element required approval instead of trusting the model's label.
+
+- Kept routine and goal recovery idempotent when a restart happened between source and delivery commits, and stopped retrying current Responses API prompt, policy and image input errors as transient provider failures.
 
 - Fixed browser-enabled Docker builds failing because the Playwright driver could not load `libatomic.so.1`, and added a Chromium startup check alongside the standard image build in CI.
 
@@ -179,6 +186,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A slower search answer no longer lands under a newer query.** The contacts search and the coding screen's recent-workspaces list both fired a request per query (or per picked agent) and took whatever answer arrived last: type past a slow request, or switch agents while one was still loading, and the earlier answer's results replaced the newer one's on screen. Both effects now drop answers that were superseded before they landed.
 
 ### Desktop
+
+- Protected Host restarts with the same active-work handoff used by app exits, kept relay proxy exclusions under the shell's trusted configuration, bounded remote file payloads before decoding, and removed proxy credentials from damaged settings exports.
+
+- Flushed desktop account snapshots before replacement, kept a private previous snapshot and recovered a missing or damaged primary file without discarding account, sync or approval state. State writes remained ordered, and a failed write no longer blocked the next save.
+
+- Updated Electron to a patch release that corrected its certificate validation advisory. The remaining production dependency finding is a moderate malformed-ASF loop in the image stack used by computer control, for which its upstream dependency has no compatible fix.
 
 - Rendered Markdown in assistant replies synced from other devices and in completed replies in device-bound chats.
 - Clarified the latest published version on the desktop About page when testing a newer local build.
