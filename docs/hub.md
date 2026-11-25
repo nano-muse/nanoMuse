@@ -365,11 +365,14 @@ lapsed key releases its id.
 For one compatibility release, an older client may omit both identity fields.
 Its credential binds on its first accepted `hello`, but only to an unused id.
 It cannot take an id already held by a credential that was bound when issued.
-A session key (`/v1/auth/session-key`) is issued already bound to a
-server-generated `web` id and can connect only with `device.kind: "web"`.
-That kind is never a call target or a remembered device. Existing credentials
-keep working through the first-hello path, while updated clients bind at
-sign-in.
+A session key (`/v1/auth/session-key`) is issued with a server-generated
+`computer` reservation. The nanoMuse Web gateway does not know the installation
+id that its container runtime will create, so the runtime's first `computer`
+hello atomically replaces the reservation with its id only when that id is
+unused. The credential is then fixed to that callable computer identity. It
+cannot claim an existing phone or computer. A session key issued before this
+binding existed may use the same free-id path for one compatibility release,
+but only as `computer`. No Hub id or kind environment variable is required.
 
 The agent's name and look are the account's, not a device's: `GET` / `PUT
 /v1/me/profile` on the relay keep them (the dragon, an emoji on a colour, or a

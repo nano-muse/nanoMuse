@@ -290,7 +290,7 @@ POST /v1/auth/code          {identifier}                      → 204（被停�
 POST /v1/auth/verify        {identifier, code, device, invite?, device_id?, device_kind?} → {api_key, base_url, account, tokens, models, created, region}; 可选的身份把 key 绑到那台 Hub 设备（hub.md）；400 code_wrong | code_expired | bad_device, 403 account_disabled
 POST /v1/auth/login         {identifier, password, device, device_id?, device_kind?} → the same; 401 bad_credentials, 429 locked, 400 bad_device
 POST /v1/auth/password      Bearer  {password, current?}      → 204; "" with current removes it; 400 password_short | password_long | password_weak | password_wrong | password_required
-POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; 最长 90 天，绑定到中继生成的 web Hub 身份；403 session_from_session
+POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; 最长 90 天，签发时绑定到中继生成的 computer Hub 预留身份，运行时可将它替换一次，但只能使用空闲 ID；403 session_from_session
 GET  /v1/me                 Bearer                            → {region: cn | intl | unknown, account{…, has_password, sessions, signed_in_via}, usage{today, total by kind / model}, tokens, spend{…, ways, guidance}, invite, contribute, models, defaults, base_url, clips, recent, nudges, paused[]}
 GET  /v1/me/invite          Bearer                            → {code, url, invites, bonus_cny, invitee_bonus_cny, bonus_when: "first_use", settled, pending, earned_cny, friends[]}
 GET  /v1/estimate           Bearer  ?images=5&clips=4&image_model=&video_model=&size=  → {cny, usd, parts[{kind, model, count, seconds?, cny}], left_cny, grant_cny, unlimited, affordable}; nothing charged

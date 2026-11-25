@@ -710,6 +710,7 @@ def test_sign_in_joins_hub_and_lists_devices(hub_server) -> None:
     hub = wait_for(lambda: (h := client.get("/api/hub").json())["state"] == "connected" and h)
     assert relay.hello["device"]["name"] == "Desk"
     assert relay.hello["device"]["kind"] == "computer"
+    assert relay.hello["device"]["id"] == service.hub.device_id
     assert (
         "task" in relay.hello["device"]["actions"] and "shell" in relay.hello["device"]["actions"]
     )

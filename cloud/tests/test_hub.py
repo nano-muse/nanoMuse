@@ -476,11 +476,21 @@ def test_a_revoked_owner_releases_its_device_id(client):
         assert ws.receive_json()["device_id"] == "pc-same"
 
 
-def test_a_session_key_is_bound_to_one_web_identity(client):
-    """A short-lived Web credential is bound when issued. It may reconnect as the same
-    server-assigned web presence, but it can never announce a phone, a computer or a
-    different browser id."""
-    standing = sign_up(client, "web-session@example.com", device_id="pc-mine", device_kind="computer")
+def test_a_session_key_claims_one_free_runtime_computer_identity(client):
+    """The gateway gets a bound reservation before its container has an installation id.
+    The runtime may claim one free computer id, after which only that identity reconnects."""
+    standing = sign_up(
+        client,
+        "web-session@example.com",
+        device_id="pc-mine",
+        device_kind="computer",
+    )
+    phone_key = sign_up(
+        client,
+        "web-session@example.com",
+        device_id="phone-mine",
+        device_kind="phone",
+    )
     r = client.post(
         "/v1/auth/session-key",
         headers={"Authorization": f"Bearer {standing}"},
@@ -489,24 +499,84 @@ def test_a_session_key_is_bound_to_one_web_identity(client):
     assert r.status_code == 200
     session = r.json()
     assert set(session) == {"api_key", "expires_at"}
+    issued = client.app.state.cloud.authenticate(session["api_key"])
+    assert issued.via == "session"
+    assert issued.hub_device_kind == "computer"
+    assert issued.hub_device_id.startswith("session-")
+
     with connect(client, session["api_key"]) as ws:
         ws.send_json(hello("computer", "pc-mine", "fake"))
         assert ws.receive_json()["code"] == "bad_device"
     with connect(client, session["api_key"]) as ws:
-        ws.send_json(hello("computer", "pc-container", "Web"))
+        ws.send_json(hello("phone", "phone-mine", "fake"))
         assert ws.receive_json()["code"] == "bad_device"
     with connect(client, session["api_key"]) as ws:
         ws.send_json(hello("phone", "phone-container", "Web"))
         assert ws.receive_json()["code"] == "bad_device"
     with connect(client, session["api_key"]) as ws:
-        ws.send_json(hello("web", "", "Web"))
-        web_id = ws.receive_json()["device_id"]
-        assert web_id.startswith("web-")
+        ws.send_json(hello("computer", "pc-container", "Web"))
+        assert ws.receive_json()["device_id"] == "pc-container"
+
+    claimed = client.app.state.cloud.authenticate(session["api_key"])
+    assert claimed.hub_device_id == "pc-container"
+    assert claimed.hub_device_kind == "computer"
+    with connect(client, phone_key) as phone, connect(client, session["api_key"]) as runtime:
+        phone.send_json(hello("phone", "phone-mine", "Pixel"))
+        assert phone.receive_json()["device_id"] == "phone-mine"
+        phone.receive_json()
+        runtime.send_json(hello("computer", "pc-container", "Web"))
+        assert runtime.receive_json()["device_id"] == "pc-container"
+        runtime.receive_json()
+        phone.receive_json()
+        phone.send_json(
+            {
+                "type": "call",
+                "id": "web-info",
+                "to": "pc-container",
+                "action": "info",
+                "args": {},
+            }
+        )
+        call = runtime.receive_json()
+        assert call["type"] == "call" and call["id"] == "web-info"
+        runtime.send_json({"type": "result", "id": "web-info", "ok": True, "body": {}})
+        assert phone.receive_json()["type"] == "result"
     with connect(client, session["api_key"]) as ws:
-        ws.send_json(hello("web", "", "Web"))
-        assert ws.receive_json()["device_id"] == web_id
-    with connect(client, session["api_key"]) as ws:
-        ws.send_json(hello("web", "web-someone-else", "Web"))
+        ws.send_json(hello("computer", "pc-someone-else", "Web"))
+        assert ws.receive_json()["code"] == "bad_device"
+
+
+def test_an_upgrade_session_key_can_claim_only_a_free_computer_id(client):
+    """A pre-upgrade session key has no reservation. For one compatibility release it
+    may bind once, but cannot take an existing id or announce another device kind."""
+    standing = sign_up(
+        client,
+        "legacy-web-session@example.com",
+        device_id="pc-owned",
+        device_kind="computer",
+    )
+    cloud = client.app.state.cloud
+    owner = cloud.authenticate(standing)
+    legacy, issued = cloud._issue_key(
+        owner.account_id,
+        "Web",
+        via="session",
+        expires_at=int(time.time()) + 3600,
+    )
+    assert issued.hub_device_id == "" and issued.hub_device_kind == ""
+
+    with connect(client, legacy) as ws:
+        ws.send_json(hello("computer", "pc-owned", "Web"))
+        assert ws.receive_json()["code"] == "bad_device"
+    with connect(client, legacy) as ws:
+        ws.send_json(hello("phone", "phone-free", "Web"))
+        assert ws.receive_json()["code"] == "bad_device"
+    for _ in range(2):
+        with connect(client, legacy) as ws:
+            ws.send_json(hello("computer", "pc-legacy-web", "Web"))
+            assert ws.receive_json()["device_id"] == "pc-legacy-web"
+    with connect(client, legacy) as ws:
+        ws.send_json(hello("computer", "pc-other", "Web"))
         assert ws.receive_json()["code"] == "bad_device"
 
 

@@ -49,7 +49,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from . import __version__
 from . import client as _client
-from .db import Database
+from .db import SESSION_HUB_RESERVATION_PREFIX, Database
 from .service import Caller, Cloud, CloudError, Pace
 
 log = logging.getLogger("nanomuse_cloud.hub")
@@ -496,7 +496,12 @@ class Hub:
         if kind not in KINDS:
             raise CloudError(400, "bad_device", "kind must be phone, computer or web")
         device_id = str(dev.get("id") or "")
-        if caller.hub_device_id:
+        session_reservation = (
+            caller.via == "session"
+            and caller.hub_device_kind == "computer"
+            and caller.hub_device_id.startswith(SESSION_HUB_RESERVATION_PREFIX)
+        )
+        if caller.hub_device_id and not session_reservation:
             # A credential is an installation identity, not an account-wide bearer.
             # Browser clients may continue to omit their server-assigned id on reconnect.
             if kind != caller.hub_device_kind:
@@ -509,6 +514,11 @@ class Hub:
             device_id = "web-" + uuid.uuid4().hex[:12]
         if not _ID.match(device_id):
             raise CloudError(400, "bad_device", "device id: 4–80 letters, digits, . _ : -")
+        if session_reservation and not self.db.claim_session_hub_device(caller.key_hash, caller.account_id, device_id, kind):
+            # The Web gateway does not know the installation id that its container
+            # runtime will create. Its already-bound reservation may become only that
+            # runtime's first unused computer id, never an existing phone or computer.
+            raise CloudError(400, "bad_device", "That device id belongs to another credential")
         if not caller.hub_device_id and not self.db.bind_key_to_hub_device(caller.key_hash, caller.account_id, device_id, kind):
             # An unbound credential (issued by an older relay, or to a client that does not
             # send its identity at sign-in yet) registers its identity at its first hello.
