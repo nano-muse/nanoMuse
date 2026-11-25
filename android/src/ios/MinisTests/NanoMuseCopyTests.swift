@@ -17,7 +17,7 @@ final class NanoMuseCopyTests: XCTestCase {
         var ours: Set<String> = []
     }
 
-    private static func load() throws -> Catalogue {
+    private static func loadCatalogue() throws -> Catalogue {
         let here = URL(fileURLWithPath: #filePath)
         let root = here.deletingLastPathComponent().deletingLastPathComponent()
         let data = try Data(contentsOf: root.appendingPathComponent("Localizable.xcstrings"))
@@ -58,13 +58,13 @@ final class NanoMuseCopyTests: XCTestCase {
     }
 
     func testOurKeysAreFound() throws {
-        let cat = try Self.load()
+        let cat = try Self.loadCatalogue()
         XCTAssertGreaterThan(cat.ours.count, 500, "the NanoMuse/ sources reference hundreds of keys")
         XCTAssertTrue(cat.ours.contains("Before we start, what should I call you?"))
     }
 
     func testNoDashesInOurCopy() throws {
-        let cat = try Self.load()
+        let cat = try Self.loadCatalogue()
         var offenders: [String] = []
         for key in cat.ours {
             for (lang, value) in cat.values[key] ?? [:] where value.contains("—") || value.contains("–") {
@@ -76,7 +76,7 @@ final class NanoMuseCopyTests: XCTestCase {
     }
 
     func testNoExclamationMarksInOurCopy() throws {
-        let cat = try Self.load()
+        let cat = try Self.loadCatalogue()
         var offenders: [String] = []
         for key in cat.ours {
             for (lang, value) in cat.values[key] ?? [:] where value.contains("!") || value.contains("！") {
@@ -87,7 +87,7 @@ final class NanoMuseCopyTests: XCTestCase {
     }
 
     func testTheRelayIsNanoMuseCloudInEveryLanguage() throws {
-        let cat = try Self.load()
+        let cat = try Self.loadCatalogue()
         var offenders: [String] = []
         for key in cat.ours {
             for (lang, value) in cat.values[key] ?? [:] {
@@ -103,7 +103,7 @@ final class NanoMuseCopyTests: XCTestCase {
     /// English, never 代理 where the English says agent: 代理 is the proxy), the relay is 中继 /
     /// 中繼 (not 中转), and "Hands" stays in English.
     func testChineseTermsMatchAndroid() throws {
-        let cat = try Self.load()
+        let cat = try Self.loadCatalogue()
         var offenders: [String] = []
         let agentWord = try NSRegularExpression(pattern: "(?i)\\bagents?\\b")
         for key in cat.ours {
