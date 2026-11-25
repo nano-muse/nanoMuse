@@ -550,6 +550,13 @@ internal fun mergeStreamingOverlay(
     }
 }
 
+private fun AssistantBlock.hasLiveHandsProgress(): Boolean =
+    handsProgress != null && (
+        toolStatus == ToolBlockStatus.STREAMING ||
+            toolStatus == ToolBlockStatus.PENDING ||
+            toolStatus == ToolBlockStatus.RUNNING
+        )
+
 internal fun buildFlatChatItems(
     messages: List<ChatMessage>,
     // [T-android-perf-logging] Optional — when supplied, emit a progress
@@ -667,7 +674,10 @@ internal fun buildFlatChatItems(
         // follows one keeps its header.
         val onlyHiddenSteps = !showSteps && !isSystem && stepsOnlyTurn(message)
         // nanoMuse: a replay in a tool-only turn stands on its own, without an empty assistant header.
-        if (onlyHiddenSteps && message.toolBlocks.none { it.handsRunId != null }) continue
+        if (onlyHiddenSteps && message.toolBlocks.none {
+                it.handsRunId != null || it.hasLiveHandsProgress()
+            }
+        ) continue
         val prevNonSystem = (idx - 1 downTo 0).asSequence()
             .map { messages[it] }
             .firstOrNull { it.role != "system" && (showSteps || !stepsOnlyTurn(it)) }
@@ -726,7 +736,7 @@ internal fun buildFlatChatItems(
                 "nm_avatar_share" -> out.add(dedupe(FlatChatItem.NanoMuseAvatarShare(message.id, block.content))) // nanoMuse
                 "nm_avatar_confirm" -> out.add(dedupe(FlatChatItem.NanoMuseAvatarConfirm(message.id, block.content))) // nanoMuse
                 "nm_allowance" -> out.add(dedupe(FlatChatItem.NanoMuseAllowance(message.id))) // nanoMuse
-                else -> if (showSteps) out.add(dedupe(FlatChatItem.AssistantToolUse( // nanoMuse: a step
+                else -> if (showSteps || block.hasLiveHandsProgress()) out.add(dedupe(FlatChatItem.AssistantToolUse( // nanoMuse: a step
                     messageId = message.id,
                     block = block,
                     allToolBlocks = toolPillBlocks,
@@ -759,7 +769,7 @@ internal fun buildFlatChatItems(
                 "info" -> false
                 "thinking" -> showSteps && (message.thinkingLevel?.isEnabled ?: true) // nanoMuse: hidden steps do not count
                 "text" -> it.content.isNotEmpty()
-                "tool_use" -> showSteps // pills render immediately — when the steps are shown (nanoMuse)
+                "tool_use" -> showSteps || it.hasLiveHandsProgress() // nanoMuse: live background progress stays visible
                 else -> true // the app's own cards
             }
         }

@@ -13,6 +13,41 @@ import org.junit.Test
 
 class AssistantBubbleGroupingTest {
 
+    @Test fun liveBackgroundScreenProgressStaysVisibleWhenStepsAreHidden() {
+        val block = AssistantBlock(
+            id = "call",
+            kind = "tool_use",
+            toolName = "shell_execute",
+            toolStatus = ToolBlockStatus.RUNNING,
+            handsProgress = "Step 2 · Looking",
+        )
+        val message = ChatMessage(
+            "reply",
+            "assistant",
+            "",
+            isStreaming = true,
+            toolBlocks = listOf(block),
+        )
+        val items = buildFlatChatItems(listOf(message), showSteps = false)
+        assertEquals(
+            "Step 2 · Looking",
+            items.filterIsInstance<FlatChatItem.AssistantToolUse>().single().block.handsProgress,
+        )
+        assertTrue(items.none { it is FlatChatItem.AssistantTyping })
+    }
+
+    @Test fun finishedBackgroundProgressWithoutReplayIsHiddenWithOtherSteps() {
+        val block = AssistantBlock(
+            id = "call",
+            kind = "tool_use",
+            toolName = "shell_execute",
+            toolStatus = ToolBlockStatus.SUCCESS,
+            handsProgress = "Done",
+        )
+        val message = ChatMessage("reply", "assistant", "", toolBlocks = listOf(block))
+        assertTrue(buildFlatChatItems(listOf(message), showSteps = false).isEmpty())
+    }
+
     @Test fun savedScreenReplayRemainsInTheChatWhenStepsAreHidden() {
         val block = AssistantBlock(id = "call", kind = "tool_use", toolName = "shell_execute", handsRunId = "20260112-032915")
         val message = ChatMessage("reply", "assistant", "", toolBlocks = listOf(block))

@@ -78,6 +78,7 @@ import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.service.SessionConcurrencyManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -9273,6 +9274,7 @@ class ChatViewModel(
                     allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(
                         toolStatus = finalStatus,
                         handsRunId = io.github.nanomuse.hands.HandsReplay.receiptId(name, argsStr, result.output), // nanoMuse
+                        handsProgress = null, // nanoMuse: live status is not part of the saved turn.
                         content = finalContent,
                         toolTitle = result.toolTitle.ifEmpty { allToolBlocks[blockIdx].toolTitle },
                         durationMs = elapsed,
@@ -9678,6 +9680,7 @@ class ChatViewModel(
         assistantId: String,
         currentText: String,
     ): ToolExecutionResult {
+        var handsProgressJob: Job? = null
         return try {
             val args = JSONObject(argsJson)
             var command = args.optString("command", "")
@@ -9741,6 +9744,10 @@ class ChatViewModel(
             val dispatchSessionId = activeSessionId
             android.util.Log.w("ShellExecDiag",
                 "executeShell dispatch=$dispatchSessionId rawSessionId=$sessionId realSessionId=$realSessionId isDraft=$isDraft cmd=${command.take(120).replace('\n', ' ')}")
+            val isHandsRun = io.github.nanomuse.hands.HandsReplay.isRunCommand(
+                tool = "shell_execute",
+                args = argsJson,
+            )
 
             // [T-bash-on-demand] Detect busybox-ash-incompatible bash syntax and,
             // if found, transparently install + switch to bash. Install time is
@@ -9772,6 +9779,38 @@ class ChatViewModel(
                     }
                     is OnDemandBash.Outcome.Unavailable ->
                         bashReminder = BashismReminder.build(bashism.hits, outcome.reason)
+                }
+            }
+
+            if (isHandsRun) {
+                val preexistingOwner = io.github.nanomuse.hands.HandsRunProgress.state.value
+                    ?.takeIf { it.active }
+                    ?.owner
+                handsProgressJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    var acceptedRunId: String? = null
+                    io.github.nanomuse.hands.HandsRunProgress.state.collect { snapshot ->
+                        if (snapshot == null || !snapshot.background ||
+                            snapshot.sessionId != dispatchSessionId ||
+                            snapshot.owner == preexistingOwner
+                        ) {
+                            return@collect
+                        }
+                        if (acceptedRunId == null) {
+                            if (!snapshot.active) return@collect
+                            acceptedRunId = snapshot.runId
+                        }
+                        if (snapshot.runId != acceptedRunId) return@collect
+                        val idx = toolBlocks.indexOfFirst { it.id == toolId }
+                        if (idx >= 0) {
+                            toolBlocks[idx] = toolBlocks[idx].copy(
+                                handsProgress = io.github.nanomuse.hands.HandsRunProgress.describe(
+                                    context,
+                                    snapshot,
+                                ),
+                            )
+                            updateAssistantMessage(assistantId, currentText, true, toolBlocks)
+                        }
+                    }
                 }
             }
 
@@ -9865,6 +9904,8 @@ class ChatViewModel(
             )
         } catch (e: Exception) {
             ToolExecutionResult("Error: ${e.message}", false)
+        } finally {
+            handsProgressJob?.cancel()
         }
     }
 
@@ -11708,6 +11749,16 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
 
 
     fun cancelStream() {
+        // nanoMuse: the background screen runs in a native worker, outside the shell process.
+        // Stop only the run owned by this chat, including either side of a draft-id rename.
+        linkedSetOf(activeSessionId, sessionId, realSessionId)
+            .filter { it.isNotEmpty() }
+            .forEach {
+                io.github.nanomuse.hands.Hands.stopCurrentForSession(
+                    it,
+                    "stopped from this chat",
+                )
+            }
         // nanoMuse: Stop belongs to the remote call; no local shell was started.
         if (nmRemoteBridge.cancel()) return
         nmHeadlessReceipt?.requestStop() // nanoMuse: request local Stop before publishing idle.

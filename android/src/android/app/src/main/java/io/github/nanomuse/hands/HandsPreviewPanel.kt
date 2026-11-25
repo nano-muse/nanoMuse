@@ -33,6 +33,7 @@ internal class HandsPreviewPanel(
     private var active = false
     private var serial = 0
     private var busy = false
+    private var displayed: Bitmap? = null
     private val tick = Runnable { requestFrame() }
 
     init {
@@ -52,12 +53,18 @@ internal class HandsPreviewPanel(
 
     private fun clearPicture() {
         screen.setImageDrawable(null)
+        displayed?.recycle()
+        displayed = null
         unavailable.visibility = View.VISIBLE
     }
 
     private fun requestFrame() {
         if (!active || !isAttachedToWindow || busy) return
-        if (!permitted()) { expanded(false); return }
+        if (!permitted()) {
+            clearPicture()
+            scheduleNext()
+            return
+        }
         busy = true
         val request = serial
         worker.execute {
@@ -70,12 +77,20 @@ internal class HandsPreviewPanel(
                 } else if (bitmap == null) {
                     clearPicture()
                 } else {
+                    val previous = displayed
+                    displayed = bitmap
                     screen.setImageBitmap(bitmap)
+                    previous?.takeIf { it !== bitmap }?.recycle()
                     unavailable.visibility = View.GONE
                 }
-                if (active && isAttachedToWindow) main.postDelayed(tick, 1000)
+                scheduleNext()
             }
         }
+    }
+
+    private fun scheduleNext() {
+        main.removeCallbacks(tick)
+        if (active && isAttachedToWindow) main.postDelayed(tick, 1000)
     }
 
     override fun onDetachedFromWindow() {

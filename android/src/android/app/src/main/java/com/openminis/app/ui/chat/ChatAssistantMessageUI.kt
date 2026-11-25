@@ -755,7 +755,11 @@ internal fun ToolCallPill(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = block.toolTitle.ifEmpty { block.toolName },
+                    text = if (isRunning) {
+                        block.handsProgress ?: block.toolTitle.ifEmpty { block.toolName }
+                    } else {
+                        block.toolTitle.ifEmpty { block.toolName }
+                    },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,

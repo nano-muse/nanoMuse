@@ -9,7 +9,10 @@ import io.github.nanomuse.identity.NanoMuseIdentity
 import io.github.nanomuse.media.MediaOffloadHandler
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 /**
  * `nanomuse-hands` — the phone's screen as a hand, from the sandbox shell:
@@ -71,14 +74,25 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
         if (!Hands.enabled(context)) return refused("off", "Operating the screen is switched off in Settings → Hands.")
         // Keep the selected display fixed through validation, execution and cleanup.
         if (!Hands.claim()) return refused("busy", "The hands are already working on something; wait for it to finish or stop it.")
+        val runId = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) +
+            "-" + UUID.randomUUID().toString().take(8)
+        val operator = HandsOperator(context)
+        Hands.attachCurrent(operator, sessionId, runId)
         return try {
-            runClaimed(task, args, sessionId)
+            runClaimed(task, args, sessionId, operator, runId)
         } finally {
+            Hands.releaseCurrent(operator)
             Hands.setActive(false)
         }
     }
 
-    private fun runClaimed(task: String, args: MediaOffloadHandler.Args, sessionId: String?): NativeOffloadResult {
+    private fun runClaimed(
+        task: String,
+        args: MediaOffloadHandler.Args,
+        sessionId: String?,
+        operator: HandsOperator,
+        runId: String,
+    ): NativeOffloadResult {
         val r = Hands.readiness(context)
         if (!r.canStart) return refused("not_ready", r.missing().joinToString("; ") + ".")
         val appHint = args.get("app")?.trim()?.takeIf { it.isNotEmpty() }
@@ -89,6 +103,7 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
         // stops it, or the time limit is hit.
         val maxSteps = args.get("max-steps")?.toIntOrNull()?.coerceAtLeast(0) ?: HandsOperator.DEFAULT_MAX_STEPS
         val opts = HandsOperator.Options(
+            runId = runId,
             task = task,
             appHint = appHint,
             maxSteps = maxSteps,
@@ -97,7 +112,7 @@ class HandsOffloadHandler(private val context: Context) : NativeOffloadHandler {
             language = Locale.getDefault().getDisplayLanguage(Locale.ENGLISH).ifBlank { "the user's language" },
         )
         AppLogger.info(TAG, "run: ${task.take(80)} app=${opts.appHint} maxSteps=$maxSteps")
-        val result = HandsOperator(context).run(opts)
+        val result = operator.run(opts)
         val body = JSONObject()
             .put("ok", result.outcome is HandsOperator.Outcome.Done)
             .put("outcome", result.outcome.code)

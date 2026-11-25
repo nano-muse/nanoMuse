@@ -273,6 +273,7 @@ data class AssistantBlock(
      */
     val thoughtSignature: String? = null,
     val handsRunId: String? = null, // nanoMuse: validated local screen-run receipt for the replay entry.
+    @Transient val handsProgress: String? = null, // nanoMuse: live, display-safe status; never persisted.
 ) {
     val isText: Boolean get() = kind == "text"
 }

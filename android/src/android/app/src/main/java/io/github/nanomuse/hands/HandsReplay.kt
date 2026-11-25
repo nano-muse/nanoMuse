@@ -22,19 +22,28 @@ internal object HandsReplay {
                      val start: HandsAction.Point? = null, val end: HandsAction.Point? = null, val detail: String = "")
     data class Record(val frames: List<Frame>, val partial: Boolean, val outcome: String?, val mode: String?)
 
+    /** True only when a shell segment executes `nanomuse-hands run`, not when text mentions it. */
+    fun isRunCommand(tool: String, args: String): Boolean {
+        if (tool != "shell_execute" || args.length > MAX_LINE || !args.contains("nanomuse-hands")) {
+            return false
+        }
+        return runCatching {
+            val command = JSONObject(args).optString("command")
+            ShellGuard.splitPipelines(command).any { pipeline ->
+                ShellGuard.splitPipes(pipeline).any { segment ->
+                    val words = ShellGuard.unwrap(ShellGuard.tokenize(segment))
+                    words.firstOrNull()?.substringAfterLast('/') == "nanomuse-hands" &&
+                        words.getOrNull(1) == "run"
+                }
+            }
+        }.getOrDefault(false)
+    }
+
     /** Decode the native CLI receipt before the chat truncates long shell output. Paths in it are never opened. */
     fun receiptId(tool: String, args: String, output: String?): String? {
         if (tool != "shell_execute" || output == null || output.length !in 2..MAX_TRACE ||
-            args.length > MAX_LINE || !args.contains("nanomuse-hands")) return null
+            !isRunCommand(tool, args)) return null
         return runCatching {
-            val command = JSONObject(args).optString("command")
-            val runsHands = ShellGuard.splitPipelines(command).any { pipeline ->
-                ShellGuard.splitPipes(pipeline).any { segment ->
-                    val words = ShellGuard.unwrap(ShellGuard.tokenize(segment))
-                    words.firstOrNull()?.substringAfterLast('/') == "nanomuse-hands" && words.getOrNull(1) == "run"
-                }
-            }
-            if (!runsHands) return null
             val body = JSONObject(output.trimStart())
             val id = (body.opt("run_id") as? String)?.takeIf { runId.matches(it) } ?: return null
             id.takeIf { body.opt("trace") == "/var/minis/attachments/hands/$id/trace.jsonl" }

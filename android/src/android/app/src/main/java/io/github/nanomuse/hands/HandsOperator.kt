@@ -48,12 +48,10 @@ import kotlin.coroutines.EmptyCoroutineContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -67,9 +65,10 @@ import java.util.concurrent.atomic.AtomicReference
  * Runs on the sandbox worker thread that carries the `nanomuse-hands` call, so everything here
  * blocks; the capsule's buttons arrive from the main thread through flags and latches.
  */
-class HandsOperator(private val context: Context) {
+internal class HandsOperator(private val context: Context) : HandsStopTarget {
 
     data class Options(
+        val runId: String,
         val task: String,
         val appHint: String? = null,
         /** A cap on steps for callers that want one; 0 (the default) means the run goes on until the task is done, the person stops it, or the time limit. */
@@ -112,6 +111,9 @@ class HandsOperator(private val context: Context) {
     private val inspection = HandsInspection()
     private val inFlightDecision = AtomicReference<Job?>(null)
     private var owner: HandsReplayAccess.Ticket? = null
+    @Volatile private var progressToken: HandsRunProgress.Token? = null
+    private val progressStep = AtomicInteger(0)
+    @Volatile private var progressEnd = HandsRunProgress.Phase.FAILED
 
     private fun canInspect(requireBridge: Boolean = true): Boolean {
         val ticket = owner ?: return false
@@ -144,9 +146,10 @@ class HandsOperator(private val context: Context) {
      * Ends the run after the action in flight; from the capsule, the chat or the settings page.
      * A card the run is waiting on is answered with Deny, so Stop takes effect at once.
      */
-    fun requestStop(reason: String = "the user tapped Stop") {
+    override fun requestStop(reason: String) {
         stopReason.compareAndSet(null, reason)
         stop.set(true)
+        progress(HandsRunProgress.Phase.STOPPING)
         phoneDecision.countDown()
         if (background) capsule.hide()
         backgroundModelJob?.cancel()
@@ -164,6 +167,7 @@ class HandsOperator(private val context: Context) {
     }
 
     private fun handoffOutcome(instruction: String?): Outcome {
+        progress(HandsRunProgress.Phase.WAITING_USER)
         val prompt = instruction ?: context.getString(R.string.nm_hands_background_protected)
         if (!::display.isInitialized || !display.canHandOff) return Outcome.NeedsUser(prompt)
         if (!phoneRequested.get() && canInspect()) {
@@ -179,6 +183,16 @@ class HandsOperator(private val context: Context) {
     }
 
     private class RunStopped(message: String) : RuntimeException(message)
+
+    private fun progress(
+        phase: HandsRunProgress.Phase,
+        step: Int = progressStep.get(),
+        action: HandsRunProgress.Action? = null,
+        appLabel: String? = null,
+    ) {
+        progressStep.set(step)
+        progressToken?.let { HandsRunProgress.update(it, phase, step, action, appLabel) }
+    }
 
     private fun checkRunning(requireBridge: Boolean = true) {
         if (stop.get()) throw RunStopped(stopReason.get() ?: "stopped")
@@ -204,9 +218,16 @@ class HandsOperator(private val context: Context) {
         memoryTicket = null
         memoryTask = opts.task
         memoryApp = null
-        // The suffix separates two launches in the same second, including a restarted process.
-        val runId = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) +
-            "-" + java.util.UUID.randomUUID().toString().take(8)
+        val runId = opts.runId
+        progressStep.set(0)
+        progressEnd = HandsRunProgress.Phase.FAILED
+        progressToken = HandsRunProgress.begin(
+            sessionId = opts.sessionId,
+            runId = runId,
+            background = background,
+            appLabel = null,
+        )
+        if (stop.get()) progress(HandsRunProgress.Phase.STOPPING)
         val log = mutableListOf<String>()
         // where each model call sits, for the relay (relay 0.31): this run as the trajectory, the
         // step being thought about, and the chat the task came from; one `hands.step` event per
@@ -219,10 +240,9 @@ class HandsOperator(private val context: Context) {
         var lastScreen: String? = null
         var steps = 0
         val model = Hands.screenModel(context)
-        Hands.current = this
         gateSession = opts.sessionId ?: "hands"
         SessionActivityTracker.setCameraSuppressActive(true) // one capsule at a time: ours, not OpenMinis'
-        capsule.onStop = { requestStop() }
+        capsule.onStop = { requestStop("the user tapped Stop") }
         capsule.onContinue = { userSignal.get()?.countDown() }
         capsule.onOpenApp = { capsule.bringAppToFront(opts.sessionId) }
         // the approval answered where the person is: the same request the chat card shows,
@@ -275,7 +295,14 @@ class HandsOperator(private val context: Context) {
                 capsule.canHandOff = { ::display.isInitialized && display.canHandOff && canInspect() }
                 capsule.onPhone = ::requestPhone
                 capsule.togglePause = {
-                    inspection.toggle().also { paused -> if (paused) inFlightDecision.get()?.cancel() }
+                    inspection.toggle().also { paused ->
+                        if (paused) {
+                            progress(HandsRunProgress.Phase.PAUSED)
+                            inFlightDecision.get()?.cancel()
+                        } else {
+                            progress(HandsRunProgress.Phase.LOOKING)
+                        }
+                    }
                 }
                 capsule.capturePreview = {
                     if (::display.isInitialized && canInspect()) display.preview() else null
@@ -283,6 +310,7 @@ class HandsOperator(private val context: Context) {
                 check(capsule.showBeforeBackgroundRun()) { "The Stop control could not be shown." }
                 checkRunning(requireBridge = !needsConnection.get())
                 if (needsConnection.get()) {
+                    progress(HandsRunProgress.Phase.CONNECTING)
                     val connected = try {
                         HandsWireless.hasIdentity(context) && runBlocking(checkNotNull(backgroundModelJob)) {
                             HandsWireless.reconnect(context)
@@ -299,6 +327,10 @@ class HandsOperator(private val context: Context) {
                 checkRunning()
                 display = BackgroundHandsDisplay.open(context, svc, app, ::checkRunning)
                 checkRunning()
+                progress(
+                    HandsRunProgress.Phase.STARTING,
+                    appLabel = app.label,
+                )
             }
             val provider = ProviderFactory.create(model.instance, model.apiKey, model.entry.model, context)
             val apps = if (background) listOfNotNull(app) else HandsApps.launchable(context)
@@ -317,6 +349,10 @@ class HandsOperator(private val context: Context) {
 
             // The app the caller named comes first, before the model looks.
             opts.appHint?.takeIf { it.isNotBlank() }?.let { hint ->
+                progress(
+                    HandsRunProgress.Phase.OPENING_APP,
+                    appLabel = app?.label,
+                )
                 lastResult = if (app != null && (background || HandsApps.open(context, app))) {
                     memoryApp = app.packageName
                     memoryTicket = HandsRunMemory.shared.begin(opts.sessionId, app.packageName)
@@ -336,6 +372,7 @@ class HandsOperator(private val context: Context) {
                     continue
                 }
                 steps++
+                progress(HandsRunProgress.Phase.LOOKING, step = steps)
                 if (!background) KeepAwake.a11yTouched()
                 capsule.working(steps, context.getString(com.openminis.app.R.string.nm_hands_looking))
 
@@ -463,6 +500,11 @@ class HandsOperator(private val context: Context) {
                     }
                 }
                 capsule.working(steps, parsed.thought.ifBlank { action.describe() }.take(140))
+                progress(
+                    HandsRunProgress.Phase.ACTING,
+                    step = steps,
+                    action = progressAction(action),
+                )
                 log += "step $steps: ${action.describe()}" + (parsed.thought.takeIf { it.isNotBlank() }?.let { " — ${it.take(100)}" } ?: "")
 
                 // ── the same thing again on the same screen? ──
@@ -504,6 +546,7 @@ class HandsOperator(private val context: Context) {
                         )
                     }
                     is HandsAction.AskUser -> {
+                        progress(HandsRunProgress.Phase.WAITING_USER, step = steps)
                         trace(traceDir, steps, parsed.thought, reply, "asked the user", lastScreen)
                         return finish(Outcome.NeedsUser(action.question.ifBlank { parsed.thought }), steps, runId, lastScreen, traceDir, log, model.label)
                     }
@@ -534,6 +577,11 @@ class HandsOperator(private val context: Context) {
                         // sees it in the log and tells the user where it lives.
                         gate.notice?.let { log += it }
                         if (!approvalStillCurrent()) continue
+                        progress(
+                            HandsRunProgress.Phase.ACTING,
+                            step = steps,
+                            action = progressAction(action),
+                        )
                         val ok = tapAction(svc, action, px, py, onScreen)
                         lastResult = if (ok) "${action.describe()} at ($px, $py) was performed." else "the gesture at ($px, $py) was rejected by the system; try again or another way."
                         Thread.sleep(TAP_SETTLE_MS)
@@ -576,6 +624,11 @@ class HandsOperator(private val context: Context) {
                         }
                         gate.notice?.let { log += it }
                         if (!approvalStillCurrent()) continue
+                        progress(
+                            HandsRunProgress.Phase.ACTING,
+                            step = steps,
+                            action = progressAction(action),
+                        )
                         capsule.stage?.say(fxLabel(action))
                         lastResult = if (background && focusedField(svc) != field) {
                             "the focused field changed; look at the screen again before submitting."
@@ -584,6 +637,11 @@ class HandsOperator(private val context: Context) {
                     }
                     is HandsAction.OpenApp -> {
                         val requested = resolveApp(action.appName)
+                        progress(
+                            HandsRunProgress.Phase.OPENING_APP,
+                            step = steps,
+                            appLabel = requested?.label,
+                        )
                         lastResult = if (background) {
                             if (requested?.packageName != display.foregroundPackage()) {
                                 return finish(Outcome.Infeasible("This background task is limited to its selected app."), steps, runId, lastScreen, traceDir, log, model.label)
@@ -635,18 +693,30 @@ class HandsOperator(private val context: Context) {
             AppLogger.warning(TAG, "run failed: ${t.javaClass.simpleName} ${t.message}")
             return finish(Outcome.Failed("${t.javaClass.simpleName}: ${t.message}"), steps, runId, lastScreen, traceDir, log, model?.label)
         } finally {
-            accessMonitor?.cancel()
-            if (listening) runCatching { context.unregisterReceiver(screenOff) }
-            backgroundModelJob?.cancel()
-            if (::display.isInitialized) runCatching { display.close() }.onFailure { AppLogger.warning(TAG, "closing background display: ${it.message}") }
-            capsule.hide()
-            Hands.current = null
-            SessionActivityTracker.setCameraSuppressActive(false)
-            if (!background) capsule.bringAppToFront(opts.sessionId)
+            progress(HandsRunProgress.Phase.CLEANING)
+            try {
+                accessMonitor?.cancel()
+                if (listening) runCatching { context.unregisterReceiver(screenOff) }
+                backgroundModelJob?.cancel()
+                if (::display.isInitialized) runCatching { display.close() }.onFailure { AppLogger.warning(TAG, "closing background display: ${it.message}") }
+                capsule.hide()
+                SessionActivityTracker.setCameraSuppressActive(false)
+                if (!background) capsule.bringAppToFront(opts.sessionId)
+            } finally {
+                progressToken?.let { HandsRunProgress.finish(it, progressEnd, progressStep.get()) }
+            }
         }
     }
 
     private fun finish(outcome: Outcome, steps: Int, runId: String, lastScreen: String?, traceDir: File?, log: List<String>, model: String?, end: String? = null): Result {
+        progressEnd = when (outcome) {
+            is Outcome.Done -> HandsRunProgress.Phase.DONE
+            is Outcome.NeedsUser -> HandsRunProgress.Phase.NEEDS_USER
+            is Outcome.Infeasible -> HandsRunProgress.Phase.BLOCKED
+            is Outcome.Stopped -> HandsRunProgress.Phase.STOPPED
+            is Outcome.Failed -> HandsRunProgress.Phase.FAILED
+        }
+        progressStep.set(steps)
         // the run's end for the record: `done`, `ask`, `blocked`, `stopped`, `failed`, `max_steps` (docs/cloud.md "Client events")
         val word = end ?: when (outcome) {
             is Outcome.Done -> "done"
@@ -699,17 +769,41 @@ class HandsOperator(private val context: Context) {
         is HandsAction.Status -> "status"
     }
 
+    /** The chat gets an action kind only, never model reasoning, typed text or a target label. */
+    private fun progressAction(action: HandsAction): HandsRunProgress.Action = when (action) {
+        is HandsAction.Click -> HandsRunProgress.Action.TAP
+        is HandsAction.DoubleTap -> HandsRunProgress.Action.DOUBLE_TAP
+        is HandsAction.LongPress -> HandsRunProgress.Action.HOLD
+        is HandsAction.Swipe -> HandsRunProgress.Action.SWIPE
+        is HandsAction.Scroll -> when (action.direction) {
+            "up" -> HandsRunProgress.Action.SCROLL_UP
+            "left" -> HandsRunProgress.Action.SCROLL_LEFT
+            "right" -> HandsRunProgress.Action.SCROLL_RIGHT
+            else -> HandsRunProgress.Action.SCROLL_DOWN
+        }
+        is HandsAction.InputText -> HandsRunProgress.Action.TYPE
+        HandsAction.KeyboardEnter -> HandsRunProgress.Action.ENTER
+        is HandsAction.OpenApp -> HandsRunProgress.Action.OPEN_APP
+        HandsAction.Back -> HandsRunProgress.Action.BACK
+        HandsAction.Home -> HandsRunProgress.Action.HOME
+        is HandsAction.Wait -> HandsRunProgress.Action.WAIT
+        is HandsAction.Status -> HandsRunProgress.Action.CHECK_RESULT
+        is HandsAction.TakeOver, is HandsAction.AskUser -> HandsRunProgress.Action.OTHER
+    }
+
     // ── the user's turn ────────────────────────────────────────────────────
 
     /** Shows the take-over card and waits for Continue; false when Stop was tapped or nobody came. */
     private fun waitForUser(reason: String): Boolean {
         val latch = CountDownLatch(1)
         userSignal.set(latch)
+        progress(HandsRunProgress.Phase.WAITING_USER)
         capsule.takeOver(reason)
         val came = latch.await(TAKE_OVER_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         userSignal.set(null)
         if (!came) requestStop("nobody continued within ${TAKE_OVER_TIMEOUT_MS / 60_000} minutes")
         if (stop.get()) return false
+        progress(HandsRunProgress.Phase.LOOKING)
         capsule.working(0, context.getString(com.openminis.app.R.string.nm_hands_looking))
         Thread.sleep(600)
         return true
@@ -732,6 +826,7 @@ class HandsOperator(private val context: Context) {
         val short = shown.take(40)
         val assessment = RiskAssessment(cls, TapWords.reason(cls, short, appLabel), appLabel?.let { "app:$it" })
         val decidable = cls != RiskClass.MONEY
+        progress(HandsRunProgress.Phase.WAITING_APPROVAL)
         capsule.approval(context.getString(if (decidable) com.openminis.app.R.string.nm_hands_approval_here else com.openminis.app.R.string.nm_hands_approval_detail, short), decidable)
         val outcome = runBlocking {
             RiskGate.check(sessionId ?: "hands", GuardKind.SCREEN, assessment, preview = "Tap “$short”", pageUrl = appLabel, elementText = short)
@@ -758,6 +853,7 @@ class HandsOperator(private val context: Context) {
         val appLabel = HandsApps.labelOf(context, pkg)
         val where = appLabel ?: context.getString(com.openminis.app.R.string.nm_hands_this_phone)
         val assessment = RiskAssessment(RiskClass.OUTBOUND, "presses Enter in a message field, which sends it ($where)", appLabel?.let { "app:$it" })
+        progress(HandsRunProgress.Phase.WAITING_APPROVAL)
         capsule.approval(context.getString(com.openminis.app.R.string.nm_hands_approval_here, context.getString(com.openminis.app.R.string.nm_hands_fx_enter)), decidable = true)
         val outcome = runBlocking {
             RiskGate.check(sessionId ?: "hands", GuardKind.SCREEN, assessment, preview = "Enter → send", pageUrl = appLabel, elementText = context.getString(com.openminis.app.R.string.nm_hands_fx_enter))

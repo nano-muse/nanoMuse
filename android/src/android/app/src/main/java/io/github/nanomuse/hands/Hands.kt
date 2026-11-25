@@ -21,6 +21,10 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+internal fun interface HandsStopTarget {
+    fun requestStop(reason: String)
+}
+
 /**
  * The screen as a hand (0.1.12). Off by default; when the user switches it on and the three
  * prerequisites hold, the agent gets `nanomuse-hands` — a screenshot-driven operator that taps,
@@ -229,15 +233,42 @@ object Hands {
     /**
      * Takes the hands for a run: true when they were free, false when another run holds them.
      * One atomic step, so two `nanomuse-hands run` arriving together cannot both start; the
-     * run that gets them hands them back in [HandsOperator.run]'s finish.
+     * native handler releases them after validation, execution and cleanup.
      */
     @Synchronized internal fun claim(): Boolean = _active.compareAndSet(expect = false, update = true)
 
-    /** The run in progress, so Stop can reach it from anywhere. */
-    @Volatile internal var current: HandsOperator? = null
+    private data class CurrentRun(
+        val target: HandsStopTarget,
+        val sessionId: String?,
+        val runId: String,
+    )
 
-    /** Ends the run in progress after the action in flight; a no-op when none. */
-    fun stopCurrent(reason: String = "stopped from the app") { current?.requestStop(reason) }
+    /** The owner is attached immediately after [claim], before validation or model work begins. */
+    @Volatile private var current: CurrentRun? = null
+
+    @Synchronized
+    internal fun attachCurrent(target: HandsStopTarget, sessionId: String?, runId: String) {
+        check(active.value) { "Attach a screen run only after claiming the hands." }
+        current = CurrentRun(target, sessionId, runId)
+    }
+
+    /** An old run finishing cannot detach a newer owner. */
+    @Synchronized
+    internal fun releaseCurrent(target: HandsStopTarget) {
+        if (current?.target === target) current = null
+    }
+
+    /** Ends whichever run owns the screen; used by the overlay and the settings page. */
+    fun stopCurrent(reason: String = "stopped from the app") {
+        current?.target?.requestStop(reason)
+    }
+
+    /** Chat Stop is scoped to that chat and cannot stop another session's screen run. */
+    fun stopCurrentForSession(sessionId: String, reason: String = "stopped from this chat"): Boolean {
+        val run = current?.takeIf { it.sessionId == sessionId } ?: return false
+        run.target.requestStop(reason)
+        return true
+    }
 
     // ── what the agent is told ─────────────────────────────────────────────
 
@@ -257,10 +288,12 @@ object Hands {
             if (on && r.canStart) {
                 val appArgument = if (r.backgroundScreen) "--app \"<app name or package>\"" else "[--app \"<app name>\"]"
                 append("The screen is available: `nanomuse-hands run --task \"<one clear task, with every detail the hands need>\" $appArgument` ")
-                append("(screen model: ${r.model?.label}). It looks at screenshots — never the accessibility tree — and taps, types and swipes; a capsule with Stop shows the user what it does. ")
+                append("(screen model: ${r.model?.label}). It looks at screenshots, never the accessibility tree, and taps, types and swipes. ")
                 if (r.backgroundScreen) {
-                    append("Background screen is selected. Use an exact package name or a unique installed app label from `nanomuse-hands apps`. Stay in that app and never go Home. If the user needs to act in the app, they can take over the open task using the capsule. Relay the needs_user result and wait. Never switch to the main screen or ask for a password, code or card number. ")
+                    append("A secure floating screen opens automatically with Stop, pause and phone handover; the originating chat shows safe live progress. ")
+                    append("Background screen is selected. Use an exact package name or a unique installed app label from `nanomuse-hands apps`. Stay in that app and never go Home. If the user needs to act in the app, they can take over the open task using the floating screen. Relay the needs_user result and wait. Never switch to the main screen or ask for a password, code or card number. ")
                 } else {
+                    append("A capsule with Stop shows the user what it does. ")
                     append("It never types passwords, codes or card numbers: for a login or a code it hands the phone to the user and waits. ")
                 }
                 append("Taps that pay, send, post or delete go through the same approval card as the shell and the browser. ")

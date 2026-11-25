@@ -18,7 +18,7 @@ The Android public-source reader runs its bundled rules with Mozilla Rhino 1.7.1
 
 ### Mika (Apache-2.0)
 
-The Android background screen uses pairing protocol, cryptography and local service discovery code adapted from [Mika](https://github.com/wangzan101/Mika/tree/a40f6a9873862c9a3840c345f6f64dd417ea8745), Copyright 2026 wangzan101. nanoMuse connects only to loopback, stores its signing key in Android Keystore and starts its own display helper. The APK includes [the original notice and licence](android/src/android/app/src/main/assets/nanomuse/licenses/Mika.txt).
+The Android background screen uses pairing protocol, cryptography, local service discovery, picture-in-picture positioning and parts of the run-state presentation adapted from [Mika](https://github.com/wangzan101/Mika/tree/a40f6a9873862c9a3840c345f6f64dd417ea8745), Copyright 2026 wangzan101. nanoMuse connects only to loopback, stores its signing key in Android Keystore and starts its own display helper. Its floating screen remains a secure read-only overlay, while model input continues to come from the independently captured display. The APK includes [the original notice and licence](android/src/android/app/src/main/assets/nanomuse/licenses/Mika.txt).
 
 ### OpenMinis (GPL-3.0)
 

@@ -12,6 +12,15 @@ class HandsReplayTest {
             .put("reply", "Thought: private reasoning\nAction: $action").put("result", result).put("screen", target).toString()
     private fun lines(vararg values: String): ByteArray = (values.joinToString("\n") + "\n").toByteArray()
 
+    @Test fun runCommandDetectionRequiresAnExecutedHandsRunSegment() {
+        fun args(command: String) = JSONObject().put("command", command).toString()
+        assertTrue(HandsReplay.isRunCommand("shell_execute", args("nanomuse-hands run --task test")))
+        assertTrue(HandsReplay.isRunCommand("shell_execute", args("cd /tmp && timeout 30 /usr/bin/nanomuse-hands run --task test")))
+        assertFalse(HandsReplay.isRunCommand("shell_execute", args("echo 'nanomuse-hands run --task test'")))
+        assertFalse(HandsReplay.isRunCommand("shell_execute", args("nanomuse-hands status")))
+        assertFalse(HandsReplay.isRunCommand("file_read", args("nanomuse-hands run --task test")))
+    }
+
     @Test fun onlyHandsToolReceiptsForCanonicalSavedRunsBecomeReplayEntries() {
         val args = JSONObject().put("command", "nanomuse-hands run --task 'check the screen'").toString()
         fun body(run: String, trace: String?) = JSONObject().put("run_id", run).put("trace", trace ?: JSONObject.NULL).toString()
