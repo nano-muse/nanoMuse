@@ -2056,9 +2056,16 @@ def test_html_artifacts_are_served_sandboxed(server, settings: Settings):
     for name in ("page.html", "drawing.svg"):
         r = client.get(f"/api/files/{name}")
         assert r.status_code == 200
-        # an opaque origin (no token, no API), scripts and pop-ups allowed: a page the agent
-        # wrote may still load a chart library from a CDN or ask a public API for its data
-        assert r.headers["content-security-policy"] == "sandbox allow-scripts allow-popups"
+        csp = r.headers["content-security-policy"]
+        assert "sandbox;" in csp
+        assert "default-src 'none'" in csp
+        assert "script-src 'none'" in csp
+        assert "connect-src 'none'" in csp
+        assert "form-action 'none'" in csp
+        assert "frame-src 'none'" in csp
+        assert "allow-scripts" not in csp
+        assert "allow-popups" not in csp
+        assert r.headers["referrer-policy"] == "no-referrer"
     (settings.agent.workspace / "notes.md").write_text("# hi", "utf-8")
     assert "content-security-policy" not in client.get("/api/files/notes.md").headers
 
@@ -2671,6 +2678,7 @@ async def test_browser_tool_reports_frames_and_user_takeover(
     import threading
 
     from nanomuse.tools.browser import Browser, BrowserFrame
+    from nanomuse.tools.browser_backends import PlaywrightBackend
 
     html = (
         b"<title>Login</title><h1>Sign in</h1><input id=u placeholder=User>"
@@ -2692,7 +2700,16 @@ async def test_browser_tool_reports_frames_and_user_takeover(
     page = f"http://127.0.0.1:{httpd.server_port}/"
 
     frames: list[BrowserFrame] = []
-    tool = Browser(workspace=tmp_path, on_frame=frames.append)
+    backend = PlaywrightBackend(tmp_path / "browser-profile")
+
+    async def connect_fixture(
+        host: str, port: int
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        assert host == "127.0.0.1" and port == httpd.server_port
+        return await asyncio.open_connection(host, port)
+
+    monkeypatch.setattr(backend._network_proxy, "_open_public", connect_fixture)
+    tool = Browser(workspace=tmp_path, on_frame=frames.append, backend_factory=lambda: backend)
     url_allowed = tool._url_allowed
 
     async def allow_fixture(url: str) -> bool:

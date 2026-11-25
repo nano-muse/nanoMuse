@@ -98,6 +98,21 @@ if TYPE_CHECKING:
     from starlette.types import Scope
 
 STATIC_DIR = Path(__file__).parent / "static"
+ARTIFACT_CSP = (
+    "sandbox; "
+    "default-src 'none'; "
+    "script-src 'none'; "
+    "style-src 'unsafe-inline'; "
+    "img-src data: blob:; "
+    "font-src data:; "
+    "media-src data: blob:; "
+    "connect-src 'none'; "
+    "object-src 'none'; "
+    "frame-src 'none'; "
+    "worker-src 'none'; "
+    "form-action 'none'; "
+    "base-uri 'none'"
+)
 # Said to a client that still puts the token in the URL (taken until 0.1.32).
 LEGACY_TOKEN_MESSAGE = (
     "the token no longer travels in the URL: send it as 'Authorization: Bearer …' "
@@ -2132,8 +2147,10 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
             )
         headers: dict[str, str] = {}
         if media.startswith("text/html") or media == "image/svg+xml":
-            # Files the agent wrote never run with the app's origin: no token, no API.
-            headers["Content-Security-Policy"] = "sandbox allow-scripts allow-popups"
+            # Agent-written pages get an opaque origin and stay static: allowing script would
+            # let it exfiltrate through a self-navigation, which CSP cannot reliably block.
+            headers["Content-Security-Policy"] = ARTIFACT_CSP
+            headers["Referrer-Policy"] = "no-referrer"
         # ``filename=`` lets Starlette write the Content-Disposition header itself, which
         # encodes a name that is not ASCII (报告.txt) instead of failing on it.
         return FileResponse(

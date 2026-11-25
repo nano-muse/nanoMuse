@@ -74,9 +74,9 @@ def trusted_node_words(screen: Screen | None, point: tuple[float, float] | None)
     """The words of the smallest element the screen reported whose bounds contain ``point``,
     or None when the screen reported no such element (no tree, or nothing under the point).
 
-    The model's `label` is its own word for what it is about to press; the element is the
-    screen's. The Sentinel reads both. Only reported bounds count as a hit: a centre alone
-    says nothing about an element's area."""
+    The model's `label` is its own claim and is not trusted for risk. The element is the
+    screen's evidence. Only reported bounds count as a hit: a centre alone says nothing
+    about an element's area."""
     if screen is None or point is None:
         return None
     x, y = point

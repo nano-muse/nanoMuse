@@ -94,7 +94,7 @@ nanomuse serve --port 9000 --no-qr
 
 hub 自动重连时，设备触发器会保留上次观察到的在线状态。上次离线的设备若在重连后的首个设备列表中变为在线，仍会触发。退出登录、切换账号或关闭 hub 会清除这份记录，重新加入后的首个列表只记录状态，已有在线设备不会触发。
 
-**资源库**。列出工作区全部文件，最新在前，支持搜索和按页面、文档、图片、数据、代码筛选。页面可实时查看，Markdown 格式化显示，CSV 变为表格，图片和 PDF 内嵌展示。智能体生成的页面在沙箱 iframe（隔离的嵌入页面）中运行，采用 opaque origin，即不共享主页面身份，不能读取访问令牌或调用 API。每个 HTML 响应也附 `Content-Security-Policy: sandbox` 实施相同隔离。
+**资源库**。列出工作区全部文件，最新在前，支持搜索和按页面、文档、图片、数据、代码筛选。页面可实时查看，Markdown 格式化显示，CSV 变为表格，图片和 PDF 内嵌展示。智能体生成的页面在沙箱 iframe（隔离的嵌入页面）中运行，采用 opaque origin，即不共享主页面身份，不能读取访问令牌或调用 API。HTML 和 SVG 响应还带严格的内容安全策略。页面可以使用内联样式，也可以显示 data 或 blob 影音内容，但不能运行脚本、发起网络请求、提交表单、嵌入页面、启动 worker 或打开弹窗。
 
 **形象**。聊天顶部的龙下方显示当前聊天状态：正在做什么，或等待你回答。各状态图位于 `web/public/avatars/dragon-*.webp`，待命时静候，工作时戴耳机在小电脑前输入，等待时看水晶球，完成时抱星星，工具失败或拒绝时出现汗滴。点击形象也会有回应。[形象工作室](avatar.md)绘制的面孔使用相同状态；设置中可换成整体呼吸、摇摆或跳动的 emoji。Android 还可用自己的短视频作形象，仅保留在该手机，见 [avatar.md](avatar.md#your-own-clip)。开启 `prefers-reduced-motion` 后全部动画停止。
 
@@ -248,7 +248,7 @@ Android 和 iPhone 都能自己检查这些公开来源，电脑关机也可以�
 | GET / POST | `/api/triggers` | 列出触发器及各类型连接器是否可用；或创建 `{kind (mail · event · hook · device), text, match, lead_minutes, thread}`。hook 类型返回其 `url`。 |
 | POST / DELETE | `/api/triggers/{id}/fire`、`/api/triggers/{id}` | 通过样例事件立即执行触发器；或取消它。 |
 | POST | `/api/hooks/{id}?key=` | 接收 webhook，无需 App 令牌，以 key 验证，也接受 `X-Hook-Key`。请求体最多 64 KB，JSON 会格式化后作为任务背景。ID 或 key 错误都返回 404；已取消返回 409；请求过密返回 429。 |
-| GET | `/api/files` · `/api/files/{path}?download=1` | 列出或读取工作区文件。HTML、SVG 响应附 `Content-Security-Policy: sandbox`。 |
+| GET | `/api/files` · `/api/files/{path}?download=1` | 列出或读取工作区文件。HTML、SVG 响应在沙箱中运行，并通过内容安全策略限制为自包含内容。 |
 | GET | `/api/data/export` | 以 ZIP 导出智能体数据，见 [parity.md](parity.md#open-for-a-decision-the-next-next-list) 备注 37。包含配置档案、侧栏各房间、联系人、授权、`threads/`、`sessions/`、数据目录技能、上传联系人、手机与电脑轨迹、定时投递、nudges 和逐项说明的 README。不含 `vault.enc`、`vault.key`、`server_token`、`push-vapid.json`、设置文件、`logs/`、`workspace/`。数据根若为符号链接或 Windows 联接，先解析一次并固定目标；其内符号链接、硬链接、Windows 重解析点、读取时改变的文件和超过 64 MB 的文件会跳过。数据库通过运行时已打开的连接执行 SQLite 在线备份，包含已提交 WAL 事务，不重新打开源路径。缺少活跃存储、未提交事务、数据库忙碌或过大时跳过，并写入 ZIP README。备份最多重试五秒，临时输出在响应前移除。ZIP 时间戳限制于 1980-2107 年，其他文件通过已验证句柄读取，父目录同时固定。作为附件返回，并附 `Cache-Control: private, no-store`。 |
 | GET / PUT | `/api/settings` | 获取或修改 `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, sentinel_review{mode, provider, model, base_url, api_key}, show_thinking, language}`。审核模式为 `off` 或 `observe`。读取结果另含 `onboarded`、`llm_ready` 和 `sentinel.review`，只返回 `has_api_key`，不返回审核 key。 |
 | GET | `/api/connections` | 获取模型、服务商预设、邮件、浏览器、MCP、保险库名称和 `onboarded`。模型含 `key_source`，值为 vault · config · missing · none，引用接口列表时带 `endpoint`。`endpoints` 列出自定义 OpenAI 兼容接口 `{id, label, base_url, key_source, models, slots}`，不含 key。MCP 包含 `connected`、`tools`、`from_app`。 |

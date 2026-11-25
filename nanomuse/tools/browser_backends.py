@@ -21,8 +21,11 @@ a signed-in request without driving the screen).
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import ipaddress
 import json
+import socket
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -225,6 +228,174 @@ _FILL_JS = """
 """
 
 
+class _PinnedPublicSocksProxy:
+    """A loopback SOCKS5 proxy that connects only to the public address it validated.
+
+    Chromium normally resolves a name after a route handler has approved it. A DNS answer
+    can change between those two steps. The proxy resolves once, rejects the whole answer
+    set if any address is not globally routable, then gives ``open_connection`` the numeric
+    address with ``AI_NUMERICHOST``. TLS still runs end to end in Chromium, with the original
+    host name and certificate checks intact.
+    """
+
+    def __init__(self) -> None:
+        self._server: asyncio.Server | None = None
+        self.blocked_target = ""
+
+    @property
+    def url(self) -> str:
+        sockets = self._server.sockets if self._server is not None else None
+        if not sockets:
+            raise RuntimeError("browser network proxy is not running")
+        port = int(sockets[0].getsockname()[1])
+        return f"socks5://127.0.0.1:{port}"
+
+    async def start(self) -> None:
+        if self._server is None:
+            self._server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
+
+    async def close(self) -> None:
+        if self._server is not None:
+            self._server.close()
+            await self._server.wait_closed()
+            self._server = None
+        self.blocked_target = ""
+
+    async def _open_public(
+        self, host: str, port: int
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        normalized = host.rstrip(".").lower()
+        if normalized == "localhost" or normalized.endswith((".local", ".internal", ".localhost")):
+            raise PermissionError(f"private or local address: {host}")
+
+        loop = asyncio.get_running_loop()
+        infos = await loop.getaddrinfo(
+            host,
+            port,
+            family=socket.AF_UNSPEC,
+            type=socket.SOCK_STREAM,
+            proto=socket.IPPROTO_TCP,
+        )
+        endpoints: list[tuple[socket.AddressFamily, str]] = []
+        for family, _kind, _proto, _name, sockaddr in infos:
+            address = str(sockaddr[0]).split("%", 1)[0]
+            ip = ipaddress.ip_address(address)
+            if (
+                not ip.is_global
+                or ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_reserved
+                or ip.is_multicast
+                or ip.is_unspecified
+            ):
+                raise PermissionError(f"private or local address: {host}")
+            endpoint = (family, str(ip))
+            if endpoint not in endpoints:
+                endpoints.append(endpoint)
+        if not endpoints:
+            raise OSError(f"no address for {host}")
+
+        last_error: OSError | None = None
+        for family, address in endpoints:
+            try:
+                return await asyncio.open_connection(
+                    address,
+                    port,
+                    family=family,
+                    flags=socket.AI_NUMERICHOST,
+                )
+            except OSError as exc:
+                last_error = exc
+        assert last_error is not None
+        raise last_error
+
+    @staticmethod
+    async def _reply(writer: asyncio.StreamWriter, status: int) -> None:
+        writer.write(b"\x05" + bytes([status]) + b"\x00\x01\x00\x00\x00\x00\x00\x00")
+        await writer.drain()
+
+    @staticmethod
+    async def _relay(
+        client_reader: asyncio.StreamReader,
+        client_writer: asyncio.StreamWriter,
+        remote_reader: asyncio.StreamReader,
+        remote_writer: asyncio.StreamWriter,
+    ) -> None:
+        async def copy(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+            while data := await reader.read(64 * 1024):
+                writer.write(data)
+                await writer.drain()
+
+        tasks = {
+            asyncio.create_task(copy(client_reader, remote_writer)),
+            asyncio.create_task(copy(remote_reader, client_writer)),
+        }
+        _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        remote_writer: asyncio.StreamWriter | None = None
+        try:
+            version, method_count = await asyncio.wait_for(reader.readexactly(2), timeout=10)
+            methods = await asyncio.wait_for(reader.readexactly(method_count), timeout=10)
+            if version != 5 or 0 not in methods:
+                writer.write(b"\x05\xff")
+                await writer.drain()
+                return
+            writer.write(b"\x05\x00")
+            await writer.drain()
+
+            version, command, _reserved, address_kind = await asyncio.wait_for(
+                reader.readexactly(4), timeout=10
+            )
+            if version != 5 or command != 1:
+                await self._reply(writer, 7)
+                return
+            if address_kind == 1:
+                host = str(ipaddress.ip_address(await reader.readexactly(4)))
+            elif address_kind == 3:
+                size = (await reader.readexactly(1))[0]
+                host = (await reader.readexactly(size)).decode("idna")
+            elif address_kind == 4:
+                host = str(ipaddress.ip_address(await reader.readexactly(16)))
+            else:
+                await self._reply(writer, 8)
+                return
+            port = int.from_bytes(await reader.readexactly(2), "big")
+            if not host or not port:
+                await self._reply(writer, 8)
+                return
+
+            try:
+                remote_reader, remote_writer = await self._open_public(host, port)
+            except PermissionError:
+                self.blocked_target = f"{host}:{port}"
+                await self._reply(writer, 2)
+                return
+            except OSError:
+                await self._reply(writer, 4)
+                return
+            await self._reply(writer, 0)
+            await self._relay(reader, writer, remote_reader, remote_writer)
+        except (asyncio.IncompleteReadError, ConnectionError, TimeoutError, UnicodeError):
+            return
+        finally:
+            if remote_writer is not None:
+                remote_writer.close()
+                try:
+                    await remote_writer.wait_closed()
+                except OSError:
+                    pass
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except OSError:
+                pass
+
+
 # ---------------------------------------------------------------------- playwright
 class PlaywrightBackend(BrowserBackend):
     """Chromium through Playwright, with a persistent profile so logins survive restarts."""
@@ -250,6 +421,7 @@ class PlaywrightBackend(BrowserBackend):
         self._url_guard: Callable[[str], Awaitable[bool]] | None = None
         self._guard_installed = False
         self._blocked_url = ""
+        self._network_proxy = _PinnedPublicSocksProxy()
 
     @staticmethod
     def available() -> bool:
@@ -272,16 +444,22 @@ class PlaywrightBackend(BrowserBackend):
             self._pw = await async_playwright().start()
         if self._context is None:
             self.profile_dir.mkdir(parents=True, exist_ok=True)
-            self._context = await self._pw.chromium.launch_persistent_context(
-                str(self.profile_dir),
-                headless=self.headless,
-                viewport=self.profile.viewport,
-                user_agent=self.profile.user_agent or None,
-                is_mobile=self.profile.mobile,
-                has_touch=self.profile.mobile,
-                device_scale_factor=self.profile.scale,
-                locale=None,
-            )
+            await self._network_proxy.start()
+            try:
+                self._context = await self._pw.chromium.launch_persistent_context(
+                    str(self.profile_dir),
+                    headless=self.headless,
+                    viewport=self.profile.viewport,
+                    user_agent=self.profile.user_agent or None,
+                    is_mobile=self.profile.mobile,
+                    has_touch=self.profile.mobile,
+                    device_scale_factor=self.profile.scale,
+                    locale=None,
+                    proxy={"server": self._network_proxy.url, "bypass": "<-loopback>"},
+                )
+            except Exception:
+                await self._network_proxy.close()
+                raise
             self._context.set_default_timeout(self.timeout_ms)
             await self._install_url_guard()
         pages = self._context.pages
@@ -323,12 +501,14 @@ class PlaywrightBackend(BrowserBackend):
 
     async def goto(self, url: str) -> None:
         self._blocked_url = ""
+        self._network_proxy.blocked_target = ""
         try:
             await self._page.goto(url, wait_until="domcontentloaded")
         except Exception as exc:
-            if self._blocked_url:
-                blocked = self._blocked_url
+            blocked = self._blocked_url or self._network_proxy.blocked_target
+            if blocked:
                 self._blocked_url = ""
+                self._network_proxy.blocked_target = ""
                 raise PermissionError(
                     f"refusing to navigate to a private or local address: {blocked}"
                 ) from exc
@@ -411,6 +591,7 @@ class PlaywrightBackend(BrowserBackend):
         finally:
             self._context = self._page = self._pw = None
             self._guard_installed = False
+            await self._network_proxy.close()
 
 
 # ---------------------------------------------------------------------- the phone's WebView

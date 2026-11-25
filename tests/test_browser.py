@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import socket
 import time
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,8 @@ from nanomuse.tools.browser_backends import (
     BrowserBackend,
     BrowserProfile,
     DeviceBackend,
+    PlaywrightBackend,
+    _PinnedPublicSocksProxy,
     profile_named,
 )
 
@@ -228,6 +231,69 @@ async def test_navigate_refuses_localhost_redirects_and_private_final_urls(
     monkeypatch.setattr(backend, "goto", rebound)
     final = await tool.execute(action="navigate", url="https://public.example/final")
     assert not final.ok and "127.0.0.1" in (final.error or "")
+
+
+async def test_playwright_checks_redirects_and_connects_to_the_validated_address(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = PlaywrightBackend(tmp_path / "profile")
+
+    class Context:
+        handler: Any = None
+
+        async def route(self, _pattern: str, handler: Any) -> None:
+            self.handler = handler
+
+    class Route:
+        def __init__(self, url: str) -> None:
+            self.request = type("Request", (), {"url": url})()
+            self.continued = False
+            self.aborted = False
+
+        async def continue_(self) -> None:
+            self.continued = True
+
+        async def abort(self, _reason: str) -> None:
+            self.aborted = True
+
+    context = Context()
+    backend._context = context
+
+    async def guard(url: str) -> bool:
+        return "10.0.0.8" not in url
+
+    await backend.set_url_guard(guard)
+    public = Route("https://public.example/redirect")
+    private = Route("http://10.0.0.8/secrets")
+    await context.handler(public)
+    await context.handler(private)
+    assert public.continued and not public.aborted
+    assert private.aborted and not private.continued
+
+    proxy = _PinnedPublicSocksProxy()
+    loop = asyncio.get_running_loop()
+    answers: list[tuple[Any, ...]] = [
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", 443))
+    ]
+
+    async def resolve(*_args: Any, **_kwargs: Any) -> list[tuple[Any, ...]]:
+        return answers
+
+    connections: list[tuple[str, int, int, int]] = []
+
+    async def connect(host: str, port: int, **kwargs: Any) -> tuple[Any, Any]:
+        connections.append((host, port, kwargs["family"], kwargs["flags"]))
+        return object(), object()
+
+    monkeypatch.setattr(loop, "getaddrinfo", resolve)
+    monkeypatch.setattr(asyncio, "open_connection", connect)
+    await proxy._open_public("public.example", 443)
+    assert connections == [("93.184.216.34", 443, socket.AF_INET, socket.AI_NUMERICHOST)]
+
+    answers.append((socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.0.0.8", 443)))
+    with pytest.raises(PermissionError, match="private or local"):
+        await proxy._open_public("rebound.example", 443)
+    assert len(connections) == 1
 
 
 async def test_fetch_and_profile_actions(tmp_path: Path):
