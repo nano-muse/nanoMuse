@@ -2,6 +2,7 @@ package io.github.nanomuse.hands
 
 import android.app.UiAutomation
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Point
@@ -91,6 +92,11 @@ class BackgroundHandsDisplayInstrumentedTest {
         }
     }
 
+    private fun preview(session: BackgroundHandsDisplay): Bitmap? = when (val capture = session.preview()) {
+        is PreviewCapture.Frame -> capture.value
+        PreviewCapture.Pending, PreviewCapture.Clear -> null
+    }
+
     @Test fun applicationCodeCannotRegisterAnAlternateDisplayService() {
         val uri = android.net.Uri.parse("content://${context.packageName}.hands-bridge")
         val extras = android.os.Bundle().apply {
@@ -114,7 +120,7 @@ class BackgroundHandsDisplayInstrumentedTest {
             assertTrue(id > Display.DEFAULT_DISPLAY)
             assertEquals(original, primaryApps())
             until("The preview did not show the fixture.") {
-                val preview = session.preview() ?: return@until false
+                val preview = preview(session) ?: return@until false
                 try {
                     preview.width <= 320 && preview.height <= 640 && preview.getPixel(preview.width / 2, preview.height / 2) == Color.GREEN
                 } finally { preview.recycle() }
@@ -138,7 +144,7 @@ class BackgroundHandsDisplayInstrumentedTest {
                 session.roots().any { it.findAccessibilityNodeInfosByText("Tapped on display $id").isNotEmpty() }
             }
             until("The preview did not update after input.") {
-                val preview = session.preview() ?: return@until false
+                val preview = preview(session) ?: return@until false
                 try { preview.getPixel(preview.width / 2, preview.height / 2) == Color.BLUE } finally { preview.recycle() }
             }
             // Request the model screenshot immediately after a preview, including on rate-limited devices.
@@ -157,7 +163,7 @@ class BackgroundHandsDisplayInstrumentedTest {
             }
             assertTrue(session.tap(x, y, 1100))
             assertThrows(BackgroundHandsDisplay.ProtectedScreen::class.java) { session.screenshot() }
-            assertNull(session.preview())
+            assertEquals(PreviewCapture.Clear, session.preview())
             assertThrows(IllegalStateException::class.java) { session.roots() }
             assertThrows(IllegalStateException::class.java) { session.back() }
             id
@@ -220,7 +226,7 @@ class BackgroundHandsDisplayInstrumentedTest {
             }
             assertFalse("An action planned for the old bounds must be discarded.", session.stillObserved())
             // Even a successful fresh preview cannot turn old model coordinates into safe input.
-            until("The moved window could not be previewed.") { session.preview()?.let { it.recycle(); true } == true }
+            until("The moved window could not be previewed.") { preview(session)?.let { it.recycle(); true } == true }
             assertThrows(IllegalStateException::class.java) { session.tap(oldBounds.centerX(), oldBounds.centerY(), 60) }
             observeFixture(session, "Change form")
             val form = session.roots().single().findAccessibilityNodeInfosByText("Change form").single()
@@ -232,7 +238,7 @@ class BackgroundHandsDisplayInstrumentedTest {
                 hasPassword(root)
             }
             SystemClock.sleep(600)
-            assertNull(session.preview())
+            assertEquals(PreviewCapture.Clear, session.preview())
         }
     }
 
@@ -256,7 +262,7 @@ class BackgroundHandsDisplayInstrumentedTest {
                 assertEquals(Color.CYAN, image.getPixel(form.right - 12, form.centerY()))
             } finally { image.recycle() }
             until("The raised dialog was not correctly mapped in preview.") {
-                val thumb = session.preview() ?: return@until false
+                val thumb = preview(session) ?: return@until false
                 try { thumb.getPixel((form.right - 12) * thumb.width / imageWidth,
                     form.centerY() * thumb.height / imageHeight) == Color.CYAN } finally { thumb.recycle() }
             }
@@ -277,7 +283,7 @@ class BackgroundHandsDisplayInstrumentedTest {
                     }
             }
             assertThrows(BackgroundHandsDisplay.ProtectedScreen::class.java) { session.tap(moved.centerX(), moved.centerY(), 60) }
-            assertNull(session.preview())
+            assertEquals(PreviewCapture.Clear, session.preview())
             assertThrows(BackgroundHandsDisplay.ProtectedScreen::class.java) { session.screenshot() }
             assertThrows(IllegalStateException::class.java) { session.back() }
         }
@@ -303,7 +309,7 @@ class BackgroundHandsDisplayInstrumentedTest {
                 .performAction(AccessibilityNodeInfo.ACTION_CLICK))
             assertThrows(BackgroundHandsDisplay.UnmappedWindow::class.java) { observeFixture(session, "Flat surface") }
             SystemClock.sleep(600)
-            assertNull(session.preview())
+            assertEquals(PreviewCapture.Clear, session.preview())
             assertThrows(IllegalStateException::class.java) { session.back() }
         }
     }
