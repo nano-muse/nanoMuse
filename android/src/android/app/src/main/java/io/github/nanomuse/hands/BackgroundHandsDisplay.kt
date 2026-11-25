@@ -254,31 +254,44 @@ internal class BackgroundHandsDisplay private constructor(
     }
 
     /** Best-effort thumbnail for the person watching. It never grants authority to act. */
-    fun preview(): Bitmap? {
-        if (closed || captureLock.hasQueuedThreads() || !captureLock.tryLock()) return null
+    fun preview(): PreviewCapture<Bitmap> {
+        if (closed) return PreviewCapture.Clear
+        if (captureLock.hasQueuedThreads() || !captureLock.tryLock()) return PreviewCapture.Pending
         try {
-            if (SystemClock.elapsedRealtime() - lastCaptureAt < CAPTURE_INTERVAL_MS) return null
+            if (SystemClock.elapsedRealtime() - lastCaptureAt < CAPTURE_INTERVAL_MS) {
+                return PreviewCapture.Pending
+            }
             checkRunning()
             val window = targetWindows().first()
             val target = frameOf(window)
-            if (!previewable(window)) return null
+            if (!previewable(window)) return PreviewCapture.Clear
             val bitmap = capture(target.id, 400)
             var thumbnail: Bitmap? = null
             try {
                 checkRunning()
                 val current = targetWindows().first()
-                if (frameOf(current) != target || !previewable(current)) return null
-                thumbnail = compose(bitmap, target, viewport.previewWidth, viewport.previewHeight)
-                return thumbnail
+                if (!previewable(current)) return PreviewCapture.Clear
+                if (frameOf(current) != target) return PreviewCapture.Pending
+                val composed = compose(bitmap, target, viewport.previewWidth, viewport.previewHeight)
+                thumbnail = composed
+                return PreviewCapture.Frame(composed)
             } finally {
                 if (thumbnail !== bitmap) bitmap.recycle()
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
-            return null
+            return PreviewCapture.Pending
+        } catch (_: ProtectedScreen) {
+            return PreviewCapture.Clear
+        } catch (_: UnmappedWindow) {
+            return PreviewCapture.Pending
+        } catch (_: HandsCaptureFailure) {
+            return PreviewCapture.Pending
+        } catch (_: java.util.concurrent.TimeoutException) {
+            return PreviewCapture.Pending
         } catch (_: Exception) {
-            // Losing focus, a locked/secure screen or a delayed capture clears the preview.
-            return null
+            // Losing ownership, a locked screen or a revoked permission must drop the old frame.
+            return PreviewCapture.Clear
         } finally {
             captureLock.unlock()
         }

@@ -80,7 +80,7 @@ class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     private var workingTitle = ""
     private var windowAnimator: ValueAnimator? = null
     var previewAllowed: () -> Boolean = { false }
-    var capturePreview: () -> Bitmap? = { null }
+    internal var capturePreview: () -> PreviewCapture<Bitmap> = { PreviewCapture.Pending }
     var togglePause: () -> Boolean = { false }
 
     private fun collapsePreview() {

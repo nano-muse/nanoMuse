@@ -305,7 +305,8 @@ internal class HandsOperator(private val context: Context) : HandsStopTarget {
                     }
                 }
                 capsule.capturePreview = {
-                    if (::display.isInitialized && canInspect()) display.preview() else null
+                    if (::display.isInitialized && canInspect()) display.preview()
+                    else PreviewCapture.Pending
                 }
                 check(capsule.showBeforeBackgroundRun()) { "The Stop control could not be shown." }
                 checkRunning(requireBridge = !needsConnection.get())
