@@ -25,7 +25,7 @@
  * (`/events`) carrying the live state — registered when the web server is
  * present; the headless and SDK profiles get the service without routes.
  */
-import { chmod, lstat, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ApprovalDesk, appLabel, appOf, type ApprovalScope, isOwnApp, checkForUpdate, compareVersions, DEVICE_GRANT_PREFIX, grantCovers, HoldDesk, modelFor, pickChatModel, pickHandsModel, REMOTE_CONTROL_GRANT_ID, scheduleRunIds, sharedConnectors, standingGrants, takesImages, UPDATE_RETRY_MS, updateCacheFresh, withGrant, type Grant, type Hold, type HoldTool, type PendingApproval, type StandingGrant, type UpdateInfo } from './desk.ts'
 import { arch, homedir, hostname, release, type, userInfo } from 'node:os'
@@ -559,389 +559,53 @@ function ownProvidersOf(raw: Record<string, unknown>): Record<string, OwnProvide
   return out
 }
 
+/** The one tolerant boundary for both the primary account state and its backup. */
+function cleanState(value: unknown): State {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('Desktop account state must be an object')
+  }
+  const raw = value as State
+  const account = raw.account
+  if (account !== undefined && (!account || typeof account !== 'object' || typeof account.id !== 'string' || !account.id)) {
+    throw new TypeError('Desktop account state has an invalid account')
+  }
+  return {
+    ...(raw.accountTransition === true ? { accountTransition: true as const } : {}),
+    ...(raw.account ? { account: raw.account } : {}),
+    ...(raw.models ? { models: raw.models } : {}),
+    ...(typeof raw.deviceId === 'string' && raw.deviceId ? { deviceId: raw.deviceId } : {}),
+    ...(typeof raw.deviceName === 'string' && raw.deviceName ? { deviceName: raw.deviceName } : {}),
+    ...(Number.isInteger(raw.doorPort) && (raw.doorPort as number) > 0 && (raw.doorPort as number) < 65536 ? { doorPort: raw.doorPort } : {}),
+    ...(typeof raw.handsModel === 'string' && raw.handsModel ? { handsModel: raw.handsModel } : {}),
+    // a grant 0.1.37 kept for the "app" "Done. Screen now:" (the mis-read head line) names nothing — dropped
+    ...(Array.isArray(raw.grants) ? { grants: (raw.grants as Grant[]).filter((g) => g && typeof g.id === 'string' && typeof g.target === 'string' && !MISREAD_GRANT.test(g.target) && !isOwnApp(g.target.slice('computer_app:'.length))).map((g) => ({ id: g.id, target: g.target, at: Number(g.at) || 0, ...(typeof g.sessionId === 'string' && g.sessionId ? { sessionId: g.sessionId, sessionTitle: String(g.sessionTitle ?? '') } : {}), ...(typeof g.sessionId === 'string' && g.sessionId && typeof g.scheduleId === 'string' && g.scheduleId ? { scheduleId: g.scheduleId, scheduleTitle: String(g.scheduleTitle ?? '') } : {}) })) } : {}),
+    ...(raw.update && typeof raw.update === 'object' && typeof (raw.update as UpdateInfo).checkedAt === 'number' ? { update: updateForThisVersion(raw.update as UpdateInfo) } : {}),
+    ...(raw.remoteControl === true ? { remoteControl: true } : {}),
+    ...(raw.trusted && typeof raw.trusted === 'object' ? { trusted: trustedOf(raw.trusted) } : {}),
+    ...(raw.taskSessions && typeof raw.taskSessions === 'object' ? { taskSessions: raw.taskSessions } : {}),
+    ...(raw.deviceConversations && typeof raw.deviceConversations === 'object' ? { deviceConversations: raw.deviceConversations } : {}),
+    ...(raw.sync && typeof raw.sync === 'object' ? { sync: raw.sync } : {}),
+    ...(raw.media && typeof raw.media === 'object' ? { media: raw.media } : {}),
+    ...(typeof raw.handsProvider === 'string' && raw.handsProvider ? { handsProvider: raw.handsProvider } : {}),
+    ...(raw.providers && typeof raw.providers === 'object' ? { providers: ownProvidersOf(raw.providers) } : {}),
+    ...(raw.chatgpt && typeof raw.chatgpt === 'object' && typeof (raw.chatgpt as ChatGptState).label === 'string' ? { chatgpt: { label: (raw.chatgpt as ChatGptState).label, at: Number((raw.chatgpt as ChatGptState).at) || 0 } } : {}),
+    ...(raw.cloudModelsOff === true ? { cloudModelsOff: true } : {}),
+  }
+}
+
 type StateCandidate =
   | { kind: 'valid'; contents: string; state: State }
   | { kind: 'missing' }
   | { kind: 'invalid'; error: unknown }
 
-function recordOf(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : undefined
-}
-
-function invalidState(field: string): never {
-  throw new TypeError(`Invalid desktop account state at ${field}`)
-}
-
-function stringMapOf(value: unknown, field: string): Record<string, string> {
-  const raw = recordOf(value)
-  if (!raw) return invalidState(field)
-  const out: Record<string, string> = {}
-  for (const [key, item] of Object.entries(raw)) {
-    if (typeof item !== 'string') invalidState(`${field}.${key}`)
-    out[key] = item
-  }
-  return out
-}
-
-function stringListOf(value: unknown, field: string): string[] {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
-    return invalidState(field)
-  }
-  return [...value] as string[]
-}
-
-function accountOf(value: unknown): Account {
-  const raw = recordOf(value)
-  if (!raw || typeof raw.id !== 'string' || !raw.id) return invalidState('account')
-  for (const field of ['channel', 'hint', 'region'] as const) {
-    if (raw[field] !== undefined && typeof raw[field] !== 'string') {
-      invalidState(`account.${field}`)
-    }
-  }
-  if (raw.member !== undefined && typeof raw.member !== 'boolean') {
-    invalidState('account.member')
-  }
-  for (const field of ['tokens', 'contribute', 'spend'] as const) {
-    if (raw[field] !== undefined && !recordOf(raw[field])) invalidState(`account.${field}`)
-  }
-  return { ...raw } as unknown as Account
-}
-
-function relayModelsOf(value: unknown): RelayModel[] {
-  if (!Array.isArray(value)) return invalidState('models')
-  return value.map((value, index) => {
-    const raw = recordOf(value)
-    if (!raw || typeof raw.id !== 'string' || !raw.id) {
-      return invalidState(`models.${index}`)
-    }
-    return { ...raw } as unknown as RelayModel
-  })
-}
-
-function grantsOf(input: unknown): Grant[] {
-  if (!Array.isArray(input)) return invalidState('grants')
-  const out: Grant[] = []
-  for (const [index, value] of input.entries()) {
-    const raw = recordOf(value)
-    if (!raw || typeof raw.id !== 'string' || typeof raw.target !== 'string') {
-      invalidState(`grants.${index}`)
-    }
-    if (
-      MISREAD_GRANT.test(raw.target)
-      || isOwnApp(raw.target.slice('computer_app:'.length))
-    ) {
-      continue
-    }
-    for (const field of ['sessionId', 'sessionTitle', 'scheduleId', 'scheduleTitle'] as const) {
-      if (raw[field] !== undefined && typeof raw[field] !== 'string') {
-        invalidState(`grants.${index}.${field}`)
-      }
-    }
-    out.push({
-      id: raw.id,
-      target: raw.target,
-      at: typeof raw.at === 'number' && Number.isFinite(raw.at) ? raw.at : 0,
-      ...(typeof raw.sessionId === 'string' && raw.sessionId
-        ? {
-            sessionId: raw.sessionId,
-            sessionTitle: typeof raw.sessionTitle === 'string' ? raw.sessionTitle : '',
-          }
-        : {}),
-      ...(typeof raw.sessionId === 'string' && raw.sessionId
-        && typeof raw.scheduleId === 'string' && raw.scheduleId
-        ? {
-            scheduleId: raw.scheduleId,
-            scheduleTitle: typeof raw.scheduleTitle === 'string' ? raw.scheduleTitle : '',
-          }
-        : {}),
-    })
-  }
-  return out
-}
-
-function trustedStateOf(value: unknown): Record<string, { name: string; at: number }> {
-  const raw = recordOf(value)
-  if (!raw) return invalidState('trusted')
-  for (const [id, value] of Object.entries(raw)) {
-    const item = recordOf(value)
-    if (!id || !item) invalidState(`trusted.${id}`)
-    if (item.name !== undefined && typeof item.name !== 'string') {
-      invalidState(`trusted.${id}.name`)
-    }
-    if (item.at !== undefined && typeof item.at !== 'number') {
-      invalidState(`trusted.${id}.at`)
-    }
-  }
-  return trustedOf(raw)
-}
-
-function syncStateOf(value: unknown): SyncState {
-  const raw = recordOf(value)
-  if (!raw) return invalidState('sync')
-  const out: Partial<SyncState> = {}
-  for (const field of ['accountId', 'mainSession'] as const) {
-    if (raw[field] !== undefined && typeof raw[field] !== 'string') {
-      invalidState(`sync.${field}`)
-    }
-    if (typeof raw[field] === 'string') out[field] = raw[field]
-  }
-  if (raw.cursor !== undefined) {
-    if (typeof raw.cursor !== 'number' || !Number.isFinite(raw.cursor)) {
-      invalidState('sync.cursor')
-    }
-    out.cursor = raw.cursor
-  }
-  for (const field of ['enabled', 'sideChats'] as const) {
-    if (raw[field] !== undefined && typeof raw[field] !== 'boolean') {
-      invalidState(`sync.${field}`)
-    }
-    if (typeof raw[field] === 'boolean') out[field] = raw[field]
-  }
-  for (const field of ['cids', 'owners', 'mids', 'titles', 'pulled', 'cleared'] as const) {
-    if (raw[field] !== undefined) out[field] = stringMapOf(raw[field], `sync.${field}`)
-  }
-  for (const field of ['hidden', 'toArchive'] as const) {
-    if (raw[field] !== undefined) out[field] = stringListOf(raw[field], `sync.${field}`)
-  }
-  if (raw.conversations !== undefined) {
-    const conversations = recordOf(raw.conversations)
-    if (!conversations) invalidState('sync.conversations')
-    for (const [id, value] of Object.entries(conversations)) {
-      const item = recordOf(value)
-      if (
-        !item
-        || (item.kind !== 'main' && item.kind !== 'side')
-        || typeof item.title !== 'string'
-        || typeof item.device !== 'string'
-        || typeof item.deviceName !== 'string'
-        || typeof item.createdAt !== 'number'
-        || typeof item.updatedAt !== 'number'
-      ) {
-        invalidState(`sync.conversations.${id}`)
-      }
-    }
-    out.conversations = conversations as SyncState['conversations']
-  }
-  if (raw.mirrors !== undefined) {
-    const mirrors = recordOf(raw.mirrors)
-    if (!mirrors) invalidState('sync.mirrors')
-    out.mirrors = mirrors
-  }
-  return out as SyncState
-}
-
-function deviceConversationsOf(value: unknown): Record<string, DeviceConversation[]> {
-  const raw = recordOf(value)
-  if (!raw) return invalidState('deviceConversations')
-  const out: Record<string, DeviceConversation[]> = {}
-  for (const [account, value] of Object.entries(raw)) {
-    if (!Array.isArray(value)) invalidState(`deviceConversations.${account}`)
-    out[account] = value.map((value, index) => {
-      const row = recordOf(value)
-      if (
-        !row
-        || typeof row.id !== 'string'
-        || typeof row.device !== 'string'
-        || typeof row.name !== 'string'
-        || !Array.isArray(row.turns)
-      ) {
-        return invalidState(`deviceConversations.${account}.${index}`)
-      }
-      if (row.draft !== undefined && typeof row.draft !== 'string') {
-        invalidState(`deviceConversations.${account}.${index}.draft`)
-      }
-      const turns = row.turns.map((value, turnIndex) => {
-        const turn = recordOf(value)
-        if (
-          !turn
-          || typeof turn.id !== 'string'
-          || typeof turn.text !== 'string'
-          || typeof turn.state !== 'string'
-        ) {
-          return invalidState(`deviceConversations.${account}.${index}.turns.${turnIndex}`)
-        }
-        for (const field of ['answer', 'error'] as const) {
-          if (turn[field] !== undefined && typeof turn[field] !== 'string') {
-            invalidState(
-              `deviceConversations.${account}.${index}.turns.${turnIndex}.${field}`,
-            )
-          }
-        }
-        if (
-          turn.rejectedBeforeAcceptance !== undefined
-          && typeof turn.rejectedBeforeAcceptance !== 'boolean'
-        ) {
-          invalidState(
-            `deviceConversations.${account}.${index}.turns.${turnIndex}`
-            + '.rejectedBeforeAcceptance',
-          )
-        }
-        const destination = turn.destination === undefined
-          ? undefined
-          : recordOf(turn.destination)
-        if (
-          turn.destination !== undefined
-          && (
-            !destination
-            || typeof destination.id !== 'string'
-            || typeof destination.name !== 'string'
-            || typeof destination.conversation !== 'string'
-          )
-        ) {
-          invalidState(
-            `deviceConversations.${account}.${index}.turns.${turnIndex}.destination`,
-          )
-        }
-        return {
-          id: turn.id,
-          text: turn.text,
-          state: turn.state,
-          ...(typeof turn.answer === 'string' ? { answer: turn.answer } : {}),
-          ...(typeof turn.error === 'string' ? { error: turn.error } : {}),
-          ...(turn.rejectedBeforeAcceptance === true
-            ? { rejectedBeforeAcceptance: true }
-            : {}),
-          ...(destination
-            ? {
-                destination: {
-                  id: destination.id as string,
-                  name: destination.name as string,
-                  conversation: destination.conversation as string,
-                },
-              }
-            : {}),
-        }
-      })
-      return {
-        id: row.id,
-        device: row.device,
-        name: row.name,
-        ...(typeof row.draft === 'string' ? { draft: row.draft } : {}),
-        turns,
-      }
-    })
-  }
-  return out
-}
-
-function mediaStateOf(value: unknown): MediaState {
-  const raw = recordOf(value)
-  if (!raw) return invalidState('media')
-  const out: MediaState = {}
-  for (const field of ['videoModel', 'videoProvider', 'imageModel', 'imageProvider'] as const) {
-    if (raw[field] !== undefined && typeof raw[field] !== 'string') {
-      invalidState(`media.${field}`)
-    }
-    if (typeof raw[field] === 'string' && raw[field]) out[field] = raw[field]
-  }
-  if (raw.animate !== undefined && typeof raw.animate !== 'boolean') {
-    invalidState('media.animate')
-  }
-  if (raw.animate === false) out.animate = false
-  if (raw.checked !== undefined) {
-    const checked = recordOf(raw.checked)
-    if (!checked) invalidState('media.checked')
-    out.checked = {}
-    for (const [host, value] of Object.entries(checked)) {
-      const item = recordOf(value)
-      if (!item || typeof item.at !== 'number') invalidState(`media.checked.${host}`)
-      out.checked[host] = {
-        models: stringListOf(item.models, `media.checked.${host}.models`),
-        at: item.at,
-      }
-    }
-  }
-  return out
-}
-
-function stateOf(value: unknown): State {
-  const raw = recordOf(value)
-  if (!raw) return invalidState('root')
-  const out: State = {}
-  if (raw.accountTransition !== undefined && typeof raw.accountTransition !== 'boolean') {
-    invalidState('accountTransition')
-  }
-  if (raw.accountTransition === true) out.accountTransition = true
-  if (raw.account !== undefined) out.account = accountOf(raw.account)
-  if (raw.models !== undefined) out.models = relayModelsOf(raw.models)
-  for (const field of ['deviceId', 'deviceName', 'handsModel', 'handsProvider'] as const) {
-    if (raw[field] !== undefined && typeof raw[field] !== 'string') invalidState(field)
-    if (typeof raw[field] === 'string' && raw[field]) out[field] = raw[field]
-  }
-  if (raw.doorPort !== undefined) {
-    if (
-      !Number.isInteger(raw.doorPort)
-      || (raw.doorPort as number) <= 0
-      || (raw.doorPort as number) >= 65536
-    ) {
-      invalidState('doorPort')
-    }
-    out.doorPort = raw.doorPort as number
-  }
-  if (raw.remoteControl !== undefined && typeof raw.remoteControl !== 'boolean') {
-    invalidState('remoteControl')
-  }
-  if (raw.remoteControl === true) out.remoteControl = true
-  if (raw.trusted !== undefined) out.trusted = trustedStateOf(raw.trusted)
-  if (raw.taskSessions !== undefined) {
-    out.taskSessions = stringMapOf(raw.taskSessions, 'taskSessions')
-  }
-  if (raw.deviceConversations !== undefined) {
-    out.deviceConversations = deviceConversationsOf(raw.deviceConversations)
-  }
-  if (raw.sync !== undefined) out.sync = syncStateOf(raw.sync)
-  if (raw.grants !== undefined) out.grants = grantsOf(raw.grants)
-  if (raw.update !== undefined) {
-    const update = recordOf(raw.update)
-    if (!update || typeof update.checkedAt !== 'number') invalidState('update')
-    out.update = updateForThisVersion(update as unknown as UpdateInfo)
-  }
-  if (raw.media !== undefined) out.media = mediaStateOf(raw.media)
-  if (raw.providers !== undefined) {
-    const providers = recordOf(raw.providers)
-    if (!providers) invalidState('providers')
-    const cleaned = ownProvidersOf(providers)
-    if (Object.keys(cleaned).length !== Object.keys(providers).length) {
-      invalidState('providers')
-    }
-    out.providers = cleaned
-  }
-  if (raw.chatgpt !== undefined) {
-    const chatgpt = recordOf(raw.chatgpt)
-    if (!chatgpt || typeof chatgpt.label !== 'string') invalidState('chatgpt')
-    out.chatgpt = {
-      label: chatgpt.label,
-      at: typeof chatgpt.at === 'number' && Number.isFinite(chatgpt.at) ? chatgpt.at : 0,
-    }
-  }
-  if (raw.warnedGrant !== undefined) {
-    if (typeof raw.warnedGrant !== 'number' || !Number.isFinite(raw.warnedGrant)) {
-      invalidState('warnedGrant')
-    }
-    out.warnedGrant = raw.warnedGrant
-  }
-  if (raw.cloudModelsOff !== undefined && typeof raw.cloudModelsOff !== 'boolean') {
-    invalidState('cloudModelsOff')
-  }
-  if (raw.cloudModelsOff === true) out.cloudModelsOff = true
-  return out
-}
-
 async function stateCandidate(path: string): Promise<StateCandidate> {
-  let contents: string
   try {
-    contents = await readFile(path, 'utf8')
+    const contents = await readFile(path, 'utf8')
+    return { kind: 'valid', contents, state: cleanState(JSON.parse(contents) as unknown) }
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === 'ENOENT'
       ? { kind: 'missing' }
       : { kind: 'invalid', error }
-  }
-  try {
-    return { kind: 'valid', contents, state: stateOf(JSON.parse(contents) as unknown) }
-  } catch (error) {
-    return { kind: 'invalid', error }
   }
 }
 
@@ -963,29 +627,15 @@ async function privateTemp(path: string, contents: string): Promise<string> {
   }
 }
 
-const WINDOWS_REPLACE_ERRORS = new Set(['EACCES', 'EEXIST', 'EPERM'])
-
 async function replaceFile(source: string, target: string): Promise<void> {
   try {
     await rename(source, target)
-    return
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code
-    if (process.platform !== 'win32' || !code || !WINDOWS_REPLACE_ERRORS.has(code)) {
-      throw error
-    }
-    let replaceable = false
-    try {
-      replaceable = (await lstat(target)).isFile()
-    } catch {
-      // The original rename error is more useful when the target cannot be inspected.
-    }
-    if (!replaceable) throw error
+    if (process.platform !== 'win32' || !['EACCES', 'EEXIST', 'EPERM'].includes(code ?? '')) throw error
+    await rm(target, { force: true })
+    await rename(source, target)
   }
-  // Windows does not consistently replace an existing file with rename. The private
-  // backup is already durable before a current state file reaches this fallback.
-  await rm(target, { force: true })
-  await rename(source, target)
 }
 
 async function syncDirectory(path: string): Promise<void> {
@@ -1002,13 +652,11 @@ async function syncDirectory(path: string): Promise<void> {
 }
 
 async function restoreStateFile(path: string, state: State): Promise<void> {
-  const dir = dirname(path)
-  await mkdir(dir, { recursive: true })
   const tmp = await privateTemp(path, `${JSON.stringify(state, null, 2)}\n`)
   try {
     await replaceFile(tmp, path)
     await chmod(path, 0o600)
-    await syncDirectory(dir)
+    await syncDirectory(dirname(path))
   } finally {
     await rm(tmp, { force: true }).catch(() => undefined)
   }
@@ -4520,24 +4168,15 @@ export default class NanomuseCloud extends Service {
     if (backup.kind === 'valid') {
       await chmod(backupPath, 0o600).catch(() => undefined)
       await restoreStateFile(path, backup.state).catch((error: unknown) => {
-        this.ctx.logger.warn(
-          'nanomuse: account state recovered from backup but the primary file was not restored: %s',
-          message(error),
-        )
+        this.ctx.logger.warn('nanomuse: account state recovered but the primary file was not restored: %s', message(error))
       })
-      this.ctx.logger.warn('nanomuse: account state recovered from a complete backup')
       return backup.state
     }
     if (current.kind === 'missing' && backup.kind === 'missing') return {}
-    const cause = current.kind === 'invalid'
-      ? current.error
-      : backup.kind === 'invalid'
-        ? backup.error
+    const cause = current.kind === 'invalid' ? current.error
+      : backup.kind === 'invalid' ? backup.error
         : new Error('No complete account state backup')
-    throw new Error(
-      'Could not read desktop account state; refusing to discard saved conversation access rules',
-      { cause },
-    )
+    throw new Error('Could not read desktop account state; refusing to discard saved conversation access rules', { cause })
   }
 
   /** A session's cached log facts, dropped: its log changed. */
@@ -4689,9 +4328,7 @@ export default class NanomuseCloud extends Service {
   private async writeState(): Promise<void> {
     const path = this.statePath()
     // Capture each requested snapshot before yielding, and commit writes in that order.
-    const json = JSON.stringify(this.state, null, 2)
-    if (json === undefined) throw new TypeError('Desktop account state is not serializable')
-    const contents = `${json}\n`
+    const contents = `${JSON.stringify(this.state, null, 2)}\n`
     const write = async (): Promise<void> => {
       const dir = dirname(path)
       const backupPath = `${path}.bak`
@@ -4711,14 +4348,10 @@ export default class NanomuseCloud extends Service {
         } else {
           const backup = await stateCandidate(backupPath)
           if (current.kind === 'invalid' && backup.kind !== 'valid') {
-            throw new Error('Could not preserve a complete desktop account state backup', {
-              cause: current.error,
-            })
+            throw new Error('Could not preserve a complete desktop account state backup', { cause: current.error })
           }
           if (current.kind === 'missing' && backup.kind === 'invalid') {
-            throw new Error('Could not preserve a complete desktop account state backup', {
-              cause: backup.error,
-            })
+            throw new Error('Could not preserve a complete desktop account state backup', { cause: backup.error })
           }
         }
         await replaceFile(tmp, path)

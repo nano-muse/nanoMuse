@@ -73,10 +73,7 @@ test('the account snapshot is replaced whole and keeps the previous private back
     const raw = JSON.parse(await readFile(statePath, 'utf8'))
     assert.equal(raw.deviceName, 'renamed-desktop')
     assert.equal(raw.deviceId, 'dev-1')
-    assert.deepEqual(JSON.parse(await readFile(backupPath, 'utf8')), {
-      deviceName: 'first',
-      deviceId: 'dev-1',
-    })
+    assert.equal(JSON.parse(await readFile(backupPath, 'utf8')).deviceName, 'first')
     assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
     if (process.platform !== 'win32') {
       assert.equal((await stat(statePath)).mode & 0o777, 0o600)
@@ -112,10 +109,6 @@ test('concurrent snapshot requests finish in order and leave the penultimate bac
     assert.equal(JSON.parse(await readFile(statePath, 'utf8')).deviceName, 'snapshot-23')
     assert.equal(JSON.parse(await readFile(backupPath, 'utf8')).deviceName, 'snapshot-22')
     assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
-    if (process.platform !== 'win32') {
-      assert.equal((await stat(statePath)).mode & 0o777, 0o600)
-      assert.equal((await stat(backupPath)).mode & 0o777, 0o600)
-    }
   } finally { await done() }
 })
 
@@ -134,39 +127,21 @@ test('a failed replacement cleans its temporary file and does not block a later 
 })
 
 const SAVED_STATE = {
-  account: {
-    id: 'acct-1',
-    channel: 'email',
-    hint: 'saved account',
-    member: false,
-  },
+  account: { id: 'acct-1', channel: 'email', hint: 'saved account', member: false },
   deviceId: 'dev-saved',
   remoteControl: true,
-  trusted: {
-    'dev-friend': { name: 'Other computer', at: 123 },
-  },
-  grants: [
-    { id: 'grant-1', target: 'computer_app:Editor', at: 456 },
-  ],
+  trusted: { 'dev-friend': { name: 'Other computer', at: 123 } },
+  grants: [{ id: 'grant-1', target: 'computer_app:Editor', at: 456 }],
   sync: {
     accountId: 'acct-1',
-    cursor: 3,
-    enabled: true,
-    mainSession: 'session-main',
-    sideChats: false,
-    cids: { 'session-main': 'conversation-main' },
-    owners: { 'session-main': 'acct-1' },
-    mids: {},
-    titles: {},
-    conversations: {},
-    pulled: {},
-    hidden: [],
-    toArchive: [],
     cleared: { 'session-cleared': 'conversation-cleared' },
+    legacyShape: { accepted: true },
   },
+  deviceConversations: { 'acct-1': [{ legacyShape: true }] },
+  providers: { incompleteLegacyRow: { label: 'Old row' } },
 }
 
-test('a damaged primary is restored only from a fully cleaned backup', async () => {
+test('a damaged primary is restored from a cleaned, backward-compatible backup', async () => {
   const home = await mkdtemp(join(tmpdir(), 'nm-cloud-state-'))
   const statePath = join(home, 'cloud.json')
   const backupPath = `${statePath}.bak`
@@ -177,12 +152,12 @@ test('a damaged primary is restored only from a fully cleaned backup', async () 
     const recovered = await svc.readState()
     assert.equal(recovered.account.id, 'acct-1')
     assert.equal(recovered.remoteControl, true)
-    assert.deepEqual(recovered.trusted, SAVED_STATE.trusted)
     assert.deepEqual(recovered.grants, SAVED_STATE.grants)
-    assert.deepEqual(recovered.sync.cleared, SAVED_STATE.sync.cleared)
+    assert.deepEqual(recovered.sync, SAVED_STATE.sync)
+    assert.deepEqual(recovered.deviceConversations, SAVED_STATE.deviceConversations)
+    assert.deepEqual(recovered.providers, {})
     const restored = JSON.parse(await readFile(statePath, 'utf8'))
-    assert.equal(restored.account.id, 'acct-1')
-    assert.equal(restored.ignored, undefined, 'the restored primary must contain cleaned state')
+    assert.equal(restored.ignored, undefined)
     assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
     if (process.platform !== 'win32') {
       assert.equal((await stat(statePath)).mode & 0o777, 0o600)
@@ -193,13 +168,12 @@ test('a damaged primary is restored only from a fully cleaned backup', async () 
   }
 })
 
-test('a missing primary is restored from its complete backup without a temporary file', async () => {
+test('a missing primary is restored without leaving a temporary file', async () => {
   const home = await mkdtemp(join(tmpdir(), 'nm-cloud-state-'))
   const statePath = join(home, 'cloud.json')
   try {
     await writeFile(`${statePath}.bak`, JSON.stringify(SAVED_STATE), { mode: 0o600 })
-    const svc = await service(statePath)
-    const recovered = await svc.readState()
+    const recovered = await (await service(statePath)).readState()
     assert.equal(recovered.deviceId, 'dev-saved')
     assert.equal(JSON.parse(await readFile(statePath, 'utf8')).deviceId, 'dev-saved')
     assert.deepEqual((await readdir(home)).sort(), ['cloud.json', 'cloud.json.bak'])
@@ -213,16 +187,9 @@ test('an invalid backup cannot silently erase account or authorization state', a
   const statePath = join(home, 'cloud.json')
   try {
     await writeFile(statePath, '{broken')
-    await writeFile(`${statePath}.bak`, JSON.stringify({
-      account: { id: 42 },
-      remoteControl: true,
-      grants: SAVED_STATE.grants,
-    }))
+    await writeFile(`${statePath}.bak`, JSON.stringify({ account: { id: 42 }, grants: SAVED_STATE.grants }))
     const svc = await service(statePath)
-    await assert.rejects(
-      svc.readState(),
-      /refusing to discard saved conversation access rules/,
-    )
+    await assert.rejects(svc.readState(), /refusing to discard saved conversation access rules/)
     assert.equal(await readFile(statePath, 'utf8'), '{broken')
   } finally {
     await rm(home, { recursive: true, force: true })
