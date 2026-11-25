@@ -134,6 +134,7 @@ final class NanoMuseProvenanceTests: XCTestCase {
         XCTAssertEqual(NanoMuseClientEvents.dropped, 1)
     }
 
+    @MainActor
     func testTheGatesTwoEventsFollowTheSetting() async {
         // the record hears what upstream's permission check decided, as codes; never the command's arguments
         let bypass = await NanoMuseGateEvents.events(command: "apple-healthkit", level: .bypass, asked: false, allowed: true, waited: 0)
