@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api";
 import { LoadError } from "../components/LoadError";
+import { setLocaleSetting } from "../i18n";
 import type { CalendarData, FeedItem, FeedPostsData, UpcomingData } from "../types";
 import { FeedScreen } from "./FeedScreen";
 
@@ -38,6 +39,7 @@ const owners = ["feed", "feedPosts", "upcoming", "calendar"] as const;
 let screen: ReactTestRenderer;
 
 beforeEach(() => {
+  setLocaleSetting("en");
   store.state.feedVersion = 0;
   store.state.calendarVersion = 0;
   vi.spyOn(api, "feed").mockResolvedValue(activity);
