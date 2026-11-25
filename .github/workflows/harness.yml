@@ -11,7 +11,8 @@
 # paths (a push to any other branch is left to its pull request, so one commit is built once); a
 # release tag `v*` also packs the bundle and attaches the tarball and its checksum to the release of
 # the same name (the one scripts/release-apk.sh creates with the APK), retrying until it
-# exists. "Run workflow" with a release tag does the same for a release that already exists.
+# exists. "Run workflow" from a release tag does the same for that exact commit when the release
+# already exists.
 # The bundle's version must be the tag's: the release recipe bumps harness/dsh-nanomuse/package.json.
 # The paths include the phones' copies of the catalogues and of the Ideas list: the tests
 # check that they match the desktop's (tests/fences.test.mjs, connectors-json.mjs --check).
@@ -48,6 +49,19 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify release source
+        env:
+          TAG: ${{ inputs.release_tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
+        run: |
+          if [ -n "$TAG" ]; then
+            git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+            TAG_COMMIT=$(git rev-parse "$TAG^{commit}")
+            BUILD_COMMIT=$(git rev-parse HEAD)
+            if [ "$BUILD_COMMIT" != "$TAG_COMMIT" ]; then
+              echo "this run checked out $BUILD_COMMIT, but $TAG points to $TAG_COMMIT; run the workflow from the tag itself" >&2
+              exit 1
+            fi
+          fi
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
