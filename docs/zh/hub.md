@@ -69,9 +69,9 @@ hub 传递以下请求：
 
   运行时和 iPhone 发起任务后最多等待 15 分钟，与桌面版和运行时目标的任务时限一致。本地等待超时或收到中继的 `timeout` 后，发起方会使用原始调用 ID 发送 `stop {call}`，另外最多等待 15 秒清理。运行时取消任务时也使用同一个精确调用 ID。这项清理只是尽力执行：断线目标可能收不到，因此调用方保留原始失败信息，不宣称远程工作已经停止。目标自身的任务时限仍然有效。明确指定的调用已结束时，必须返回 `{stopped: false}`，不能转而停止该对话后来的任务。这些规则不改变帧格式，旧客户端仍可使用。
 
-  执行期间，目标通过 `event` 帧的 `body.stage` 告诉调用方应显示什么，使两端能看到相同过程。工具开始时发送 `tool {id, name, summary}`，结束时发送相同 `id` 的 `tool_result {id, name, ok, summary}`；审批使用 `approval {approval_id, preview, risk, reason, device, timeout, grant_key}`，任一端决定后发送 `approval_result {approval_id, status}`。中途文字使用 `text {text, interim}`，生成内容使用 `image`、`file`，错误使用 `error`，最终答案放在 `result` 帧中。
+  执行期间，目标通过 `event` 帧的 `body.stage` 告诉调用方应显示什么，使两端能看到相同过程。工具开始时发送 `tool {id, name, summary}`，结束时发送相同 `id` 的 `tool_result {id, name, ok, summary}`；审批使用 `approval {approval_id, preview, risk, reason, device, timeout, grant_target, grant_key}`，任一端决定后发送 `approval_result {approval_id, status}`。中途文字使用 `text {text, interim}`，生成内容使用 `image`、`file`，错误使用 `error`，最终答案放在 `result` 帧中。
 
-  调用方将 `text` 替换到上一个 `tool` 之后的文字位置，因此目标可以多次发送同一消息逐渐增长的内容，界面也会逐步更新；每条消息只发送一次的目标仍正常显示。1.0.6 起的 `grant_key` 指定发起设备保存授权时的覆盖范围：运行时使用自身授权键，例如工具加目标 `shell:git`；桌面版使用工具加完整主参数。旧发送方没有该字段时，仍以 `preview` 前 60 个字符作为键，可能使开头相同的不同步骤共用一个键。
+  调用方将 `text` 替换到上一个 `tool` 之后的文字位置，因此目标可以多次发送同一消息逐渐增长的内容，界面也会逐步更新；每条消息只发送一次的目标仍正常显示。`grant_target` 指定授权覆盖范围，格式为 `{version:1, tool, resource, action}`。`resource` 是完整的 Sentinel 目标或主参数，`action` 是工具名与完整 canonical 参数的 SHA-256，使用 `sha256:` 前缀；仅用于显示的 `step` 不影响摘要。客户端校验所有字段，并同时按发送设备、风险类别和会话隔离。缺少有效 `grant_target` 的旧事件只能选择「允许一次」，不能命中已有授权，也不显示或建立会话及长期授权。新事件继续携带 `grant_key` 一个版本，供 1.0.6 客户端兼容；新客户端不再把它当作授权依据。发送方无法取得完整 canonical 参数时，会省略两个授权字段，而不是构造范围更宽的目标。
 - **编程助手请求**。`coding.agents`、`coding.sessions`、`coding.session`、`coding.send`、`coding.stop`、`coding.runs` 用于电脑上的 Cursor、Codex、Claude Code 会话。目标电脑的运行时或桌面版从磁盘读取会话，并通过相应助手的 CLI（命令行工具）控制它。`coding.send {agent, text, session_id?, workspace?, wait}` 通过 `event` 帧返回 `started`、`text`、`tool`、`done`、`error`，每条都带运行 ID，供调用方使用 `coding.stop`；最终返回完整执行结果。只有安装相关模块的电脑运行时或桌面版会声明支持这些动作，见 [coding-agents.md](coding-agents.md)。
 
 每台设备决定自己接受哪些远程操作。手机的设置 → nanoMuse Cloud → 设备中，关闭「允许其他设备操作这台手机」后，只回应 `info`，但仍可查看和控制其他设备。运行时关闭远程控制后，`info` 也只返回电脑名称和系统，不返回账号名、主目录、工作目录或 shell 信息，支持动作列表中仅保留 `info`。

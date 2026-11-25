@@ -56,6 +56,13 @@ jobs:
             tests/ios/DeviceConversationsChecks.swift -o "$RUNNER_TEMP/device-conversations-checks"
           "$RUNNER_TEMP/device-conversations-checks"
 
+      - name: Cross-device approval grant checks
+        timeout-minutes: 2
+        run: |
+          swiftc android/src/ios/NanoMuse/NanoMuseApprovalGrantTarget.swift \
+            tests/ios/ApprovalGrantChecks.swift -o "$RUNNER_TEMP/approval-grant-checks"
+          "$RUNNER_TEMP/approval-grant-checks"
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -108,6 +115,24 @@ jobs:
             2>&1 | tee build/xcodebuild.log | grep -E "error:|/NanoMuse/.*warning:|BUILD|Compiling|Linking" || true
           grep -q "\*\* BUILD SUCCEEDED \*\*" build/xcodebuild.log
 
+      # The bundled iSH and FFmpeg frameworks contain device-only slices, so the app cannot
+      # currently link into an iOS Simulator test host. Compile the XCTest against iOS 16+
+      # here; the pure Swift step above executes the same target and lifecycle key logic.
+      - name: Compile approval XCTest for iOS
+        working-directory: android/src/ios
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Minis.xcodeproj -scheme Minis -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            -only-testing:MinisTests/NanoMuseRemoteApprovalTests \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
+            -skipPackagePluginValidation -skipMacroValidation \
+            2>&1 | tee build/xcodebuild-tests.log
+          grep -q "\*\* TEST BUILD SUCCEEDED \*\*" build/xcodebuild-tests.log
+
       # docs/ios.md: the device build must finish with zero warnings in NanoMuse/. Upstream's
       # files are theirs; ours are held to the bar here, so a warning cannot sit on main unnoticed.
       - name: Zero warnings in NanoMuse/
@@ -122,6 +147,8 @@ jobs:
         if: always()
         with:
           name: ios-check-log-${{ github.run_number }}
-          path: android/src/ios/build/xcodebuild.log
+          path: |
+            android/src/ios/build/xcodebuild.log
+            android/src/ios/build/xcodebuild-tests.log
           retention-days: 7
           if-no-files-found: warn

@@ -2534,7 +2534,8 @@ actor ChatStore {
         sqlite3_finalize(stmt)
     }
 
-    func deleteSession(_ id: String) {
+    // nanoMuse: async so approval-grant invalidation completes before deletion returns.
+    func deleteSession(_ id: String) async {
         invalidateSessionListCache()
         // Queue cloud deletions BEFORE removing local rows so the SELECTs
         // below can still enumerate child ids. Peers receive op=delete
@@ -2542,7 +2543,7 @@ actor ChatStore {
         // (see TombstoneManager.applyRemoteSessionDeletion).
         markSessionForCloudDeletion(id)
 
-        deleteSessionLocalRowsOnly(id)
+        await deleteSessionLocalRowsOnly(id)
 
         // [T-icloud-deleted-session-resurrection] Record a recent-delete
         // tombstone so an inbound merge (e.g. fetchRecentV2 pulling the still-
@@ -2559,8 +2560,9 @@ actor ChatStore {
     /// cloud already has the deletion, re-queueing it would just create a
     /// noisy round-trip and risk a delete-loop with peers that haven't
     /// yet drained the same tombstone.
-    func deleteSessionLocalOnly(_ id: String) {
-        deleteSessionLocalRowsOnly(id)
+    // nanoMuse: synced deletion waits for the same approval-grant invalidation.
+    func deleteSessionLocalOnly(_ id: String) async {
+        await deleteSessionLocalRowsOnly(id)
     }
 
     /// True if a session row exists locally. Lightweight existence check
@@ -2575,8 +2577,11 @@ actor ChatStore {
         return sqlite3_step(stmt) == SQLITE_ROW
     }
 
-    private func deleteSessionLocalRowsOnly(_ id: String) {
+    // nanoMuse: the low-level delete synchronously crosses to the grant owner.
+    private func deleteSessionLocalRowsOnly(_ id: String) async {
         defer { NotificationCenter.default.post(name: .nmFeedChatChanged, object: nil) } // nanoMuse: revalidate derived cards
+        // nanoMuse: every local and synced deletion invalidates this chat's approval grants.
+        await MainActor.run { NanoMuseRemoteApprovals.shared.resetSessionGrants(for: id) }
         // [T-ios-listsessions-cache] Invalidate here (the low-level row delete)
         // so ALL callers are covered — deleteSession AND deleteSessionLocalOnly.
         invalidateSessionListCache()

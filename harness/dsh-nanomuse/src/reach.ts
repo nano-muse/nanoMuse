@@ -29,6 +29,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from './cloud.ts'
+import { remoteApprovalCallId } from './approval-grants.ts'
 import { HubError, type HubDevice } from './hub.ts'
 
 export const name = 'nanomuse-reach'
@@ -63,10 +64,10 @@ export function apply(ctx: Context): void {
   }
 
   /** Ask the person here, through the harness's approval card; without the service, the policy is to refuse. */
-  const approve = async (exec: ToolRunContext, toolName: string, reason: string, zh: string): Promise<void> => {
+  const approve = async (exec: ToolRunContext, toolName: string, reason: string, zh: string, callId: ToolRunContext['callId'] = exec.callId): Promise<void> => {
     const approval = ctx.get('approval')
     if (!approval || !exec.agent) throw new Error('Approval is not available in this session; the request was not sent.')
-    const outcome = await approval.request({ agent: exec.agent, toolName, callId: exec.callId, reason, displayReason: { en: reason, zh }, signal: exec.signal })
+    const outcome = await approval.request({ agent: exec.agent, toolName, callId, reason, displayReason: { en: reason, zh }, signal: exec.signal })
     if (outcome !== 'allowed-once') throw new Error(`The person did not approve: ${reason} (${outcome}).`)
   }
 
@@ -325,7 +326,14 @@ export function apply(ctx: Context): void {
               if (stage === 'approval') {
                 const approvalId = String(body.approval_id ?? '')
                 const preview = String(body.preview ?? '')
-                const p = approve(exec, 'delegate', `${d.name} asks: ${preview}`, `${d.name} 请求：${preview}`)
+                const approvalCallId = remoteApprovalCallId(
+                  exec.callId,
+                  d.id,
+                  String(body.risk ?? ''),
+                  String(exec.agent?.session.id ?? ''),
+                  body,
+                ) as ToolRunContext['callId']
+                const p = approve(exec, 'delegate', `${d.name} asks: ${preview}`, `${d.name} 请求：${preview}`, approvalCallId)
                   .then(() => true, () => false)
                   .then((allow) => hub.call(d.id, 'approve', { approval_id: approvalId, allow }, { timeoutMs: 30_000 }).then(() => undefined, () => undefined))
                 pending.add(p)

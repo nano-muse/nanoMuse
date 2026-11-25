@@ -72,6 +72,10 @@ data class RiskAssessment(
     val reason: String,
     val target: String? = null,
     val warnings: List<String> = emptyList(),
+    /** False for a legacy remote event that has no complete structured grant target. */
+    val rememberable: Boolean = true,
+    /** Exact remote wire class, kept only to prevent aliases from sharing a grant. */
+    val wireRisk: String? = null,
 ) {
     val needsApproval: Boolean
         get() = warnings.isNotEmpty() || riskClass == RiskClass.DESTRUCTIVE ||
@@ -87,6 +91,8 @@ data class RiskAssessment(
             return top.copy(
                 reason = reasons.take(3).joinToString("; "),
                 warnings = (a.warnings + b.warnings).distinct(),
+                rememberable = a.rememberable && b.rememberable,
+                wireRisk = a.wireRisk.takeIf { it == b.wireRisk },
             )
         }
     }

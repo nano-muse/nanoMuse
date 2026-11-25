@@ -568,7 +568,9 @@ internal class HandsOperator(private val context: Context) : HandsStopTarget {
                         // the label the model gave, read next to what the screen itself says is there
                         val target = action.tapTarget.orEmpty()
                         val onScreen = ScreenWords.at(roots(svc), px, py)
-                        val gate = approveTap(svc, opts.sessionId, target, onScreen)
+                        val gate = approveTap(
+                            svc, opts.sessionId, target, onScreen, actionWord(action), px, py,
+                        )
                         if (gate.denied != null) {
                             trace(traceDir, steps, parsed.thought, reply, "refused: ${gate.denied}", lastScreen)
                             step(runId, steps, actionWord(action), "refused", thoughtMs)
@@ -819,7 +821,15 @@ internal class HandsOperator(private val context: Context) : HandsStopTarget {
      * chat and the notification show the same request. Money needs the screen lock, which only
      * the card can ask for: the capsule then offers Open.
      */
-    private fun approveTap(svc: MinisAccessibilityService, sessionId: String?, target: String, onScreen: String?): TapGate {
+    private fun approveTap(
+        svc: MinisAccessibilityService,
+        sessionId: String?,
+        target: String,
+        onScreen: String?,
+        action: String,
+        x: Int,
+        y: Int,
+    ): TapGate {
         val shown = TapWords.shown(target, onScreen)
         val cls = TapWords.classify(target, onScreen) ?: return TapGate(shown = shown)
         val pkg = foregroundPackage(svc)
@@ -830,7 +840,17 @@ internal class HandsOperator(private val context: Context) : HandsStopTarget {
         progress(HandsRunProgress.Phase.WAITING_APPROVAL)
         capsule.approval(context.getString(if (decidable) com.openminis.app.R.string.nm_hands_approval_here else com.openminis.app.R.string.nm_hands_approval_detail, short), decidable)
         val outcome = runBlocking {
-            RiskGate.check(sessionId ?: "hands", GuardKind.SCREEN, assessment, preview = "Tap “$short”", pageUrl = appLabel, elementText = short)
+            RiskGate.check(
+                sessionId ?: "hands",
+                GuardKind.SCREEN,
+                assessment,
+                preview = "Tap “$short”",
+                pageUrl = appLabel,
+                elementText = short,
+                canonicalAction = listOf(
+                    action, pkg.orEmpty(), x.toString(), y.toString(), target, onScreen.orEmpty(),
+                ).joinToString("\u0000"),
+            )
         }
         // The user may have opened nanoMuse to answer; put the operated app back in front.
         restoreAfterApproval(svc, pkg)
@@ -857,7 +877,15 @@ internal class HandsOperator(private val context: Context) : HandsStopTarget {
         progress(HandsRunProgress.Phase.WAITING_APPROVAL)
         capsule.approval(context.getString(com.openminis.app.R.string.nm_hands_approval_here, context.getString(com.openminis.app.R.string.nm_hands_fx_enter)), decidable = true)
         val outcome = runBlocking {
-            RiskGate.check(sessionId ?: "hands", GuardKind.SCREEN, assessment, preview = "Enter → send", pageUrl = appLabel, elementText = context.getString(com.openminis.app.R.string.nm_hands_fx_enter))
+            RiskGate.check(
+                sessionId ?: "hands",
+                GuardKind.SCREEN,
+                assessment,
+                preview = "Enter → send",
+                pageUrl = appLabel,
+                elementText = context.getString(com.openminis.app.R.string.nm_hands_fx_enter),
+                canonicalAction = "enter-send\u0000${pkg.orEmpty()}\u0000$hint",
+            )
         }
         restoreAfterApproval(svc, pkg)
         capsule.working(0, context.getString(com.openminis.app.R.string.nm_hands_looking))

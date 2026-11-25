@@ -35,7 +35,7 @@ from nanomuse.hub.profile import ProfileSync
 from nanomuse.llm import session as llm_session
 from nanomuse.logger import logger
 from nanomuse.schema import RiskLevel
-from nanomuse.sentinel.grants import grant_key, normalize_scope
+from nanomuse.sentinel.grants import grant_key, normalize_scope, normalize_wire_grant_target
 from nanomuse.server.events import MAIN_THREAD, STOPPED_NOTICE, now_iso
 from nanomuse.server.webui import current_thread
 from nanomuse.telemetry import telemetry
@@ -1088,6 +1088,9 @@ class HubService:
                 key = str(ev.get("grant_key") or "").strip()
                 if key:
                     body["grant_key"] = key
+                target = normalize_wire_grant_target(ev.get("grant_target"))
+                if target is not None:
+                    body["grant_target"] = target
                 await call.event(body)
             elif status in ("approved", "denied", "expired") and not fresh:
                 # answered here (or timed out): the caller's card closes too

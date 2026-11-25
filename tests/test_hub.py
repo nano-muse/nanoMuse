@@ -28,6 +28,7 @@ from nanomuse.hub import actions
 from nanomuse.hub.client import HubClient, HubError
 from nanomuse.llm import MockLLM
 from nanomuse.schema import Function, LLMResponse, ToolCall
+from nanomuse.sentinel.grants import normalize_wire_grant_target, wire_grant_target
 from nanomuse.server import create_app
 from nanomuse.server.service import MuseService
 
@@ -51,6 +52,19 @@ def py_cmd(payload: str) -> str:
     contracts (outlive a stop, write both streams, exit with a code) unchanged under
     cmd.exe."""
     return f'"{sys.executable}" -c "{payload}"'
+
+
+def test_wire_grant_target_is_stable_and_uses_the_complete_action() -> None:
+    prefix = "x" * 80
+    one = wire_grant_target("shell", "echo", {"step": "shown", "command": prefix + " one"})
+    reordered = wire_grant_target("shell", "echo", {"command": prefix + " one", "step": "other"})
+    two = wire_grant_target("shell", "echo", {"command": prefix + " two"})
+
+    assert one == reordered
+    assert one["tool"] == "shell" and one["resource"] == "echo"
+    assert one["action"].startswith("sha256:") and one["action"] != two["action"]
+    assert normalize_wire_grant_target(one) == one
+    assert normalize_wire_grant_target({"tool": "shell", "resource": "echo"}) is None
 
 
 def wait_for(pred: Callable[[], Any], timeout: float = 8.0, interval: float = 0.03) -> Any:
@@ -1047,6 +1061,7 @@ def test_task_approval_is_relayed_and_answered_by_the_device(hub_server) -> None
     assert body["device"] == "Desk" and "echo careful" in body["preview"] and body["approval_id"]
     # what an answer remembered on the phone covers: the Sentinel's own key, not the preview
     assert body["grant_key"] == "shell:echo"
+    assert body["grant_target"] == wire_grant_target("shell", "echo", {"command": "echo careful"})
     # the card is pending here too; the phone answers it over the hub
     pending = client.get("/api/state").json()["pending_approvals"]
     assert [p["id"] for p in pending] == [body["approval_id"]]

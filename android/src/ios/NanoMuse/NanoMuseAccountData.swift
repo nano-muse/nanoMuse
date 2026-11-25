@@ -157,6 +157,7 @@ final class NanoMuseAccountData {
     /// gap as deletions and tombstones the account's chats on its other devices).
     func leave(account: String, keep: Bool) async {
         NanoMuseFeedWriter.accountChanging(true)
+        NanoMuseRemoteApprovals.shared.resetAllSessionGrants()
         NanoMuseChatOutreach.shared.changeAccount(true)
         NanoMuseDeadlineNotifications.shared.accountChanging(true)
         NanoMuseDeviceConversations.shared.suspendForAccountChange()
@@ -382,6 +383,7 @@ final class NanoMuseAccountData {
         // the account's sync table first: a push later must never read these as deletions
         NanoMuseSync.shared.dropTable(for: account)
         for id in ids {
+            NanoMuseRemoteApprovals.shared.resetSessionGrants(for: id)
             await ChatStore.shared.deleteSession(id)
             owners.removeValue(forKey: id)
         }

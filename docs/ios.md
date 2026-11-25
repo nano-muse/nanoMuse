@@ -967,6 +967,13 @@ compile error costs minutes there, not an upload. The full `xcodebuild` log is a
 when a warning is reported in a file under `NanoMuse/` (upstream's files are not held to this),
 so the zero-warnings rule above is checked, not just asked for.
 
+The job also executes cross-device approval grant logic as a standalone Swift program and uses
+`build-for-testing` to compile its XCTest for an iOS 16 or later device target. It cannot run
+that XCTest in Simulator yet: the bundled iSH and FFmpeg frameworks contain device-only slices,
+so the app cannot link into a Simulator test host. Simulator XCTest becomes required when those
+dependencies provide Simulator slices. The standalone check remains executable on Linux and
+macOS in the meantime.
+
 The strings catalogue has a check of its own that runs on every pull request, on Linux:
 `tests/test_ios_strings.py` parses `Localizable.xcstrings` with every key pair in hand and fails
 when a key is listed twice (a JSON parser keeps one of the two entries and drops the other

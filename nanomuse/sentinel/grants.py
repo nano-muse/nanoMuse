@@ -16,14 +16,16 @@ Scopes:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from nanomuse.logger import logger
+from nanomuse.schema import STEP_KEY
 
 GrantScope = Literal["once", "conversation", "session", "24h", "always"]
 SCOPES: tuple[str, ...] = ("once", "conversation", "session", "24h", "always")
@@ -74,6 +76,49 @@ def _iso(ts: float | None) -> str | None:
 
 def grant_key(tool: str, target: str | None) -> str:
     return f"{tool}:{target}" if target else tool
+
+
+def wire_grant_target(tool: str, target: str | None, args: dict[str, Any]) -> dict[str, Any]:
+    """A bounded, stable identity for a relayed approval.
+
+    ``resource`` is the Sentinel target the local grant would cover. ``action`` fingerprints
+    the complete canonical arguments, excluding the human-facing ``step`` label, so two calls
+    with the same preview prefix remain distinct without putting their full arguments on the
+    wire or in another device's grant store.
+    """
+    canonical = json.dumps(
+        {name: value for name, value in args.items() if name != STEP_KEY},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    digest = hashlib.sha256(f"{tool}\0{canonical}".encode()).hexdigest()
+    return {
+        "version": 1,
+        "tool": tool,
+        "resource": target or "",
+        "action": f"sha256:{digest}",
+    }
+
+
+def normalize_wire_grant_target(value: Any) -> dict[str, Any] | None:
+    """The supported wire shape, or ``None`` for a legacy or malformed event."""
+    if not isinstance(value, dict) or value.get("version") != 1:
+        return None
+    tool, resource, action = value.get("tool"), value.get("resource"), value.get("action")
+    if not isinstance(tool, str) or not tool.strip() or len(tool) > 200:
+        return None
+    if not isinstance(resource, str) or len(resource) > 4096:
+        return None
+    if (
+        not isinstance(action, str)
+        or len(action) != 71
+        or not action.startswith("sha256:")
+        or any(ch not in "0123456789abcdef" for ch in action[7:])
+    ):
+        return None
+    return {"version": 1, "tool": tool.strip(), "resource": resource, "action": action}
 
 
 class GrantStore:
@@ -249,5 +294,7 @@ __all__ = [
     "GrantScope",
     "GrantStore",
     "grant_key",
+    "normalize_wire_grant_target",
     "normalize_scope",
+    "wire_grant_target",
 ]
