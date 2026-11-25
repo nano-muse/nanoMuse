@@ -216,7 +216,9 @@ final class NanoMuseChatOutreach: ObservableObject {
                     content.sound = .default
                     content.userInfo = ["owner": NanoMuseAccountData.dirName(owner), "chat": session]
                     try? await UNUserNotificationCenter.current().add(.init(identifier: Self.notificationID, content: content, trigger: nil))
-                    if !enabled || switching || accounts.current != owner || unreadMain != session { clearNotification() }
+                    if !enabled || switching || NanoMuseAccountData.shared.current != owner || unreadMain != session {
+                        clearNotification()
+                    }
                 }
             }
         }
