@@ -225,7 +225,7 @@ nanoMuse 是不收费的社区项目。公共中继 `cloud.nanomuse.cn` 的开�
 
 自建中继可通过 `ALLOWANCE_CNY`、`INVITE_BONUS_CNY`、`SIGNUP_OPEN`、`ALLOWED_IDENTIFIERS` 设置不同规则。中继 0.15 起，相关三个金额可在线调整，见 [`cloud/README.md`](../../cloud/README.md)。管理页「邀请」按邀请码带来的账号数排名，同时显示实际发过请求的人数、尚未首次请求而待发奖励的人数，以及与邀请人使用相同网络地址的人数。账号页也显示邀请人和受邀者列表，接口为 `GET /v1/admin/invites`。
 
-邀请奖励需要受邀者从不同于邀请人的网络地址，累计产生至少 `INVITE_SETTLE_MIN_SPENT_UY` 的真实成功模型消费，默认 200 微元。邮箱 `+tag` 子地址、Gmail 点号和 `googlemail.com` 别名都归入同一账号。`DEFAULT_SIGNUP_DOMAIN_BLOCK` 与 `SIGNUP_DOMAIN_BLOCK` 中的一次性邮箱域名不能注册；非知名邮箱服务商域名每天最多新增 `SIGNUP_PER_DOMAIN_DAY` 个账号，默认 5，超出返回 `domain_limited`。健康检查会提示两类可疑邀请：一天带来超过十个账号，或累计至少二十个受邀者而几乎无人发过请求。
+邀请奖励需要受邀者从不同于邀请人的网络地址，累计产生至少 `INVITE_SETTLE_MIN_SPENT_UY` 的真实成功模型消费，默认 200 微元。只有 Gmail 会把 `+tag`、点号和 `googlemail.com` 别名归入同一账号，其他邮箱服务商的 `+tag` 地址保持独立。中继 0.26 已经误合并到无标签地址下的账号，仍可从原标签地址登录。`DEFAULT_SIGNUP_DOMAIN_BLOCK` 与 `SIGNUP_DOMAIN_BLOCK` 中的一次性邮箱域名不能注册；非知名邮箱服务商域名每天最多新增 `SIGNUP_PER_DOMAIN_DAY` 个账号，默认 5，超出返回 `domain_limited`。健康检查会提示两类可疑邀请：一天带来超过十个账号，或累计至少二十个受邀者而几乎无人发过请求。
 
 展开「邀请」视图中的邀请人，或查看账号页「邀请的人」卡片，可以收回未花掉的邀请奖励，并可同时停用账号、删除其邀请但从未发请求的账号，接口为 `POST /v1/admin/invites/abuse`。已消费部分不收回。
 
@@ -290,7 +290,7 @@ POST /v1/auth/code          {identifier}                      → 204（被停�
 POST /v1/auth/verify        {identifier, code, device, invite?, device_id?, device_kind?} → {api_key, base_url, account, tokens, models, created, region}; 可选的身份把 key 绑到那台 Hub 设备（hub.md）；400 code_wrong | code_expired | bad_device, 403 account_disabled
 POST /v1/auth/login         {identifier, password, device, device_id?, device_kind?} → the same; 401 bad_credentials, 429 locked, 400 bad_device
 POST /v1/auth/password      Bearer  {password, current?}      → 204; "" with current removes it; 400 password_short | password_long | password_weak | password_wrong | password_required
-POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; a key that lapses on its own (90 days at most); 403 session_from_session
+POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; 最长 90 天，绑定到中继生成的 web Hub 身份；403 session_from_session
 GET  /v1/me                 Bearer                            → {region: cn | intl | unknown, account{…, has_password, sessions, signed_in_via}, usage{today, total by kind / model}, tokens, spend{…, ways, guidance}, invite, contribute, models, defaults, base_url, clips, recent, nudges, paused[]}
 GET  /v1/me/invite          Bearer                            → {code, url, invites, bonus_cny, invitee_bonus_cny, bonus_when: "first_use", settled, pending, earned_cny, friends[]}
 GET  /v1/estimate           Bearer  ?images=5&clips=4&image_model=&video_model=&size=  → {cny, usd, parts[{kind, model, count, seconds?, cny}], left_cny, grant_cny, unlimited, affordable}; nothing charged

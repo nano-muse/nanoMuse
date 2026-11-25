@@ -357,15 +357,19 @@ From relay 0.27, a credential owns one Hub identity: its `device.id` and
 `device_kind` (`POST /v1/auth/verify` and `/login`), or else at the first
 accepted `hello` of a credential that was issued without them. The same
 credential may reconnect and replace its own older socket, but `bad_device`
-rejects another id or kind. An id a live key holds is taken over only by a key
-from a later code or password sign-in (the phone signed in again without
-signing out, the runtime's vault was reset, a sign-out that never reached the
-relay): the older key still opens the account but no longer speaks for the
-device. A revoked or lapsed key releases its id. A session key
-(`/v1/auth/session-key`, nanoMuse Web's containers) registers an id nobody
-holds and never takes one over. Existing clients keep their keys and register
-at their next connection; clients that send the identity at sign-in bind it
-there.
+rejects another id or kind. A fresh code or password sign-in that explicitly
+names the same id replaces that installation's older credential. The older key
+still opens the account but no longer speaks for the device. A revoked or
+lapsed key releases its id.
+
+For one compatibility release, an older client may omit both identity fields.
+Its credential binds on its first accepted `hello`, but only to an unused id.
+It cannot take an id already held by a credential that was bound when issued.
+A session key (`/v1/auth/session-key`) is issued already bound to a
+server-generated `web` id and can connect only with `device.kind: "web"`.
+That kind is never a call target or a remembered device. Existing credentials
+keep working through the first-hello path, while updated clients bind at
+sign-in.
 
 The agent's name and look are the account's, not a device's: `GET` / `PUT
 /v1/me/profile` on the relay keep them (the dragon, an emoji on a colour, or a

@@ -16,9 +16,10 @@ its base URL.
   `nm_…` API key. One phone/e-mail is one account with one starter grant; a
   second device signing in with the same number gets a second key, not a second
   grant. `POST /v1/auth/session-key` (0.13) turns a key into one that lapses on
-  its own (`ttl_s`, 90 days at most) — what nanoMuse Web starts a person's
-  container with, so the gateway keeps no standing key of theirs; it shows in
-  `/v1/me/sessions` with `expires_at` and `via: "session"`.
+  its own (`ttl_s`, 90 days at most). Its Hub identity is bound at issue to a
+  server-generated `web` id, so it cannot appear as a callable phone or computer.
+  nanoMuse Web uses it without leaving a standing key in the gateway; it shows
+  in `/v1/me/sessions` with `expires_at` and `via: "session"`.
 - **OpenAI-shaped chat proxy.** `GET /v1/models` and `POST /v1/chat/completions`
   (streaming or not) go to the upstream with the relay's key. The hosted menu contains
   only `Qwen/Qwen3.6-27B-FP8`, including its image-input support for chat and GUI

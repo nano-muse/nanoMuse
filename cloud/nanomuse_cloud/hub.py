@@ -512,8 +512,8 @@ class Hub:
         if not caller.hub_device_id and not self.db.bind_key_to_hub_device(caller.key_hash, caller.account_id, device_id, kind):
             # An unbound credential (issued by an older relay, or to a client that does not
             # send its identity at sign-in yet) registers its identity at its first hello.
-            # It takes an id another live key holds only when it comes from a later code or
-            # password sign-in on that installation; a session key never does.
+            # It can claim only a free id; a fresh sign-in that explicitly names an id
+            # rotates that installation's credential while the key is issued.
             raise CloudError(400, "bad_device", "That device id belongs to another credential")
         name = str(dev.get("name") or "").strip()[:60] or {"phone": "Phone", "computer": "Computer", "web": "Browser"}[kind]
         actions = [str(a)[:40] for a in dev.get("actions") or [] if isinstance(a, str)][:64]

@@ -2487,19 +2487,18 @@ class Database:
         """Bind an unbound credential to its first Hub identity.
 
         False means this key already names another identity, or a live key of the
-        account owns this device id and this key may not take it over. A revoked or
-        lapsed owner releases its id. A key from a later code or password sign-in on
-        the same installation (the phone signed in again without signing out first,
-        the runtime's vault was reset, the old sign-out never reached the relay) takes
-        the id over, since that sign-in proved the account again; the older key stays a
-        valid account key but no longer speaks for the device. A session key never
-        takes over: it may only register an id nobody holds. The unique index makes two
-        simultaneous first hellos choose one owner rather than both succeeding.
+        account owns this device id. A revoked or lapsed owner releases its id.
+        Compatibility credentials from clients that did not bind at sign-in may claim
+        only a free id, so they cannot impersonate a device whose newer credential was
+        bound when issued. A fresh code or password sign-in that supplies the id rotates
+        the owner in ``insert_key``. A legacy session key may bind only as ``web``.
+        The unique index makes two simultaneous first hellos choose one owner rather
+        than both succeeding.
         """
         t = now()
         with self.tx() as c:
             row = c.execute(
-                "SELECT rowid, hub_device_id, hub_device_kind, via, created_at FROM api_keys WHERE key_hash=? AND account_id=?",
+                "SELECT hub_device_id, hub_device_kind, via FROM api_keys WHERE key_hash=? AND account_id=?",
                 (key_hash, account_id),
             ).fetchone()
             if row is None:
@@ -2508,6 +2507,8 @@ class Database:
             bound_kind = str(row["hub_device_kind"] or "")
             if bound_id:
                 return bound_id == device_id and bound_kind == kind
+            if str(row["via"] or "code") == "session" and kind != "web":
+                return False
             # what no longer opens releases its identity
             c.execute(
                 "UPDATE api_keys SET hub_device_id='', hub_device_kind='' WHERE account_id=? AND hub_device_id=? "
@@ -2515,19 +2516,11 @@ class Database:
                 (account_id, device_id, t),
             )
             owner = c.execute(
-                "SELECT rowid, key_hash, created_at FROM api_keys WHERE account_id=? AND hub_device_id=? LIMIT 1",
+                "SELECT 1 FROM api_keys WHERE account_id=? AND hub_device_id=? LIMIT 1",
                 (account_id, device_id),
             ).fetchone()
             if owner is not None:
-                proven = str(row["via"] or "code") in ("code", "password")
-                # issue order: the second, then the row, since two keys can share a second
-                later = (int(row["created_at"]), int(row["rowid"])) > (int(owner["created_at"]), int(owner["rowid"]))
-                if not proven or not later:
-                    return False
-                c.execute(
-                    "UPDATE api_keys SET hub_device_id='', hub_device_kind='' WHERE key_hash=?",
-                    (owner["key_hash"],),
-                )
+                return False
             try:
                 cur = c.execute(
                     "UPDATE api_keys SET hub_device_id=?, hub_device_kind=? WHERE key_hash=? AND account_id=? AND hub_device_id=''",
