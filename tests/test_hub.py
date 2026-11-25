@@ -685,9 +685,14 @@ def hub_server(
     async def fake_models(self: CloudClient) -> list[dict[str, Any]]:
         return [{"id": "qwen3.8-27b"}, {"id": "other"}]
 
+    def fake_notify(text: str, title: str = "nanoMuse") -> dict[str, Any]:
+        assert text and title
+        return {"ok": True, "shown": True}
+
     monkeypatch.setattr(CloudClient, "request_code", fake_request_code)
     monkeypatch.setattr(CloudClient, "verify", fake_verify)
     monkeypatch.setattr(CloudClient, "models", fake_models)
+    monkeypatch.setattr("nanomuse.hub.actions.notify", fake_notify)
     service = MuseService(settings, llm=llm)
     app = create_app(settings, service)
     with TestClient(app) as client:
