@@ -23,8 +23,7 @@ its base URL.
   and keeps no standing key; the session appears in `/v1/me/sessions` with
   `expires_at` and `via: "session"`.
 - **OpenAI-shaped chat proxy.** `GET /v1/models` and `POST /v1/chat/completions`
-  (streaming or not) go to the upstream with the relay's key. The managed Baidu Qianfan menu offers separate models for chat, screen operation, text-to-image and character video. The relay routes saved IDs from earlier apps to the current model for the task. Accounts retain their login and balance. A streamed turn that waits for one of the relay's
-  `CHAT_CONCURRENCY` slots, or for a slow provider's first bytes, hears about it: chunks
+  (streaming or not) go to the upstream with the relay's key. The managed Baidu Qianfan menu offers separate models for chat, screen operation, text-to-image and character video. The relay routes saved IDs from earlier apps to the current model for the task. Accounts retain their login and balance. A streamed turn that waits for a slot in its provider queue, or for a slow provider's first bytes, hears about it: chunks
   with `choices: []` and a `nanomuse: {phase: queued | working, ahead, waited_ms}` field
   while it queues, SSE comment lines while the provider thinks (0.31; shapes every
   client already skips; details in [docs/cloud.md](../docs/cloud.md#protocol)).
@@ -202,7 +201,8 @@ for the full list. The ones that matter:
 | `PER_MINUTE_REQUESTS` | 30 | per account — what stops a runaway loop |
 | `MAX_IN_FLIGHT` | 4 | requests of one account under way at the same time (0 = off); each holds a reservation against the allowance while it runs — see *Money* |
 | `UPSTREAM_TIMEOUT_S` | 180 | how long one call to the provider may take (connecting has 20 s of its own); a reservation that outlives it by two minutes is dropped |
-| `CHAT_CONCURRENCY` | 12 | chat requests at the provider at once across all accounts (0 = off); the rest wait at the relay, so a burst does not overload one shared deployment |
+| `CHAT_CONCURRENCY` | 12 | simultaneous chat and screen requests across all accounts within one relay process when they use the shared queue (0 disables the limit) |
+| `CHAT_MODEL_CONCURRENCY` | unset | optional Qianfan JSON object assigning a positive integer limit to each of its two upstream models. With both limits set, each model has its own queue. Other providers keep the shared queue |
 | `CHAT_RETRIES` | 2 | retries after an upstream 429 or 5xx received before any chat output starts (0 = off; capped at 5) |
 | `CALLS_KEEP_DAYS` | 90 | how long the per-call telemetry rows (`calls`: timings, outcome, shape, platform; never content) are kept before the hourly sweep removes them (0.28) |
 | `EVENTS_KEEP_DAYS` | 365 | how long the timelines' lines (`events`: sign-ins, devices joining, errors, refusals; never content) are kept before the hourly sweep removes them; the `account.deleted` lines and the ledger are never swept (0.29) |
@@ -253,6 +253,10 @@ The project-hosted relay uses a fixed Baidu Qianfan menu.
 | Character video | `ernie-wizshot-me` |
 
 Use `UPSTREAM_BASE=https://qianfan.baidubce.com/v2` and provide `QIANFAN_API_KEY` to the relay process. Set `CLOUD_MEDIA_ENABLED=1` for pictures and clips. When changing from a custom menu, remove the old `CLOUD_MODELS`, `CLOUD_MODEL_ALIASES` and provider-specific `CHAT_DEFAULTS` overrides. Existing clients keep their Cloud credentials. Cached IDs for the retired chat model resolve to the current chat or screen model according to the request.
+
+For separate Qianfan queues, set `CHAT_MODEL_CONCURRENCY='{"deepseek-v4.1-flash-1017":60,"qwen3.5-397b-a17b":60}'`. This example lets 60 chat calls and 60 screen-operation calls run simultaneously. When all chat slots are occupied, a screen request can still use a free Qwen slot. The relay selects the queue after resolving the upstream model, so older client IDs use the same slots as current IDs. Use both upstream IDs exactly as shown. Removing this setting restores the shared `CHAT_CONCURRENCY` limit.
+
+These limits count active requests in one relay process. Other relay processes and clients that call the provider directly have separate local counts. The provider's own quotas still apply. `PER_MINUTE_REQUESTS` counts requests per account over a minute, and `MAX_IN_FLIGHT` caps the number that account can have underway across models.
 
 **Lanes (0.17).** Every chat model says what it is `for` — `chat`, `gui` or
 both — and `recommended_for` names the lane(s) it is the default pick in; both
@@ -726,8 +730,7 @@ sources). Every answer is cached by URL and refreshed in the background, so a
 page the operator has seen opens at once; the period (7 to 365 days), the
 language and the theme are remembered; every filter, tab and open drawer lives
 in the hash. The navigation is in three groups. **Insight**: *Overview*;
-*Live* (`GET /v1/admin/live`, every 3 s): the provider gate (`CHAT_CONCURRENCY`
-slots in use, how many wait), the requests under way with their phase (queued,
+*Live* (`GET /v1/admin/live`, every 3 s): provider slots in use and requests waiting (the API also lists each configured queue in `model_gates`), the requests under way with their phase (queued,
 awaiting the first token, streaming) and age, the last hour by minute with
 outcomes, latency percentiles and output tokens, the newest finished calls,
 and a verdict (smooth, busy, saturated) from the last ten minutes' queue share

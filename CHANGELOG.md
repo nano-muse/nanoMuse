@@ -6,6 +6,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Added separate concurrency limits for hosted chat and screen operation so a full chat queue can leave screen-operation slots available.
 - Corrected Cloud chat billing for empty and failed provider responses, including streams.
 - Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
 

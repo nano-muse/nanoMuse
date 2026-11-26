@@ -534,11 +534,19 @@ def create_app(
     settings = settings or Settings()
     cloud = cloud or Cloud(settings)
 
+    timeout = httpx.Timeout(settings.upstream_timeout_s, connect=20.0)
     http = httpx.AsyncClient(
-        timeout=httpx.Timeout(settings.upstream_timeout_s, connect=20.0),
+        timeout=timeout,
         transport=upstream_transport,
         follow_redirects=False,
     )
+
+    chat_http = http
+    if settings.chat_model_concurrency and upstream_transport is None:
+        # A full screen/chat pool must not compete with media downloads for httpx's
+        # default 100 connections. Injected transports manage their own connections.
+        total = sum(settings.chat_model_concurrency.values())
+        chat_http = httpx.AsyncClient(timeout=timeout, limits=httpx.Limits(max_connections=total, max_keepalive_connections=min(20, total)))
 
     # where an address is (geo.py) — the file is fetched in the background on start
     geo = Geo(settings.geoip_path, settings.geoip_url, settings.geoip_v6_url, enabled=settings.geoip_enabled)
@@ -672,6 +680,8 @@ def create_app(
             # waited for, so no cancellation lands after the database is closed
             await asyncio.gather(rules_task, video_task, analytics_task, return_exceptions=True)
             await collector.stop()
+            if chat_http is not http:
+                await chat_http.aclose()
             await http.aclose()
 
     app = FastAPI(title="nanoMuse Cloud", version=__version__, docs_url=None, redoc_url=None, lifespan=lifespan)
@@ -1285,7 +1295,21 @@ def create_app(
 
     # -- chat -----------------------------------------------------------------------------
 
-    chat_gate = UpstreamGate(settings.chat_concurrency)
+    shared_gate = UpstreamGate(settings.chat_concurrency)
+    model_gates = {model: UpstreamGate(limit) for model, limit in settings.chat_model_concurrency.items()}
+
+    def model_gate_snapshot() -> dict[str, dict[str, int]]:
+        return {model: gate.snapshot() for model, gate in model_gates.items()}
+
+    def chat_gate_snapshot() -> dict[str, int]:
+        if not model_gates:
+            return shared_gate.snapshot()
+        return {
+            "active": sum(gate.active for gate in model_gates.values()),
+            "waiting": sum(gate.waiting for gate in model_gates.values()),
+            "limit": sum(gate.limit for gate in model_gates.values()),
+        }
+
     chat_retry_limit = max(0, min(settings.chat_retries, 5))
 
     def chat_retryable(status: int) -> bool:
@@ -1299,7 +1323,7 @@ def create_app(
     # the way it ended, its shape; never its words. The live page reads the meter, the
     # drill-downs read the rows.
     meter = LiveMeter()
-    analytics = Analytics(cloud, meter, lambda: getattr(app.state, "hub", None), chat_gate.snapshot)
+    analytics = Analytics(cloud, meter, lambda: getattr(app.state, "hub", None), chat_gate_snapshot)
     app.state.analytics = analytics
     app.state.meter = meter
 
@@ -1389,14 +1413,16 @@ def create_app(
 
         task.add_done_callback(recorded)
 
-    async def chat_post(url: str, headers: dict[str, str], payload: bytes, call: InFlightCall) -> tuple[httpx.Response, int]:
+    async def chat_post(
+        url: str, headers: dict[str, str], payload: bytes, call: InFlightCall, gate: UpstreamGate
+    ) -> tuple[httpx.Response, int]:
         """One non-streaming turn, queued globally and retried before an answer exists;
         answers the response and how many times it was retried."""
-        async with chat_gate.slot():
+        async with gate.slot():
             meter.slot(call)
             attempt = 0
             while True:
-                r = await http.post(url, headers=headers, content=payload)
+                r = await chat_http.post(url, headers=headers, content=payload)
                 if not chat_retryable(r.status_code) or attempt >= chat_retry_limit:
                     return r, attempt
                 await chat_retry_pause(attempt, r.status_code)
@@ -1409,6 +1435,7 @@ def create_app(
         spec = cloud.model_for(str(body.get("model", "")), "chat", caller)
         if settings.qianfan_enabled and spec.id == QIANFAN_CHAT and (where["trajectory"] or legacy_hands_request(body.get("messages"))):
             spec = cloud.model_for(QIANFAN_GUI, "chat", caller)
+        gate = model_gates[spec.upstream] if model_gates else shared_gate
         # a relay without a key answers before anything is held: a hold taken here and never
         # settled would count against the account's in-flight limit until it timed out
         headers = upstream_headers()
@@ -1479,7 +1506,7 @@ def create_app(
             retries = 0
             try:
                 try:
-                    r, retries = await chat_post(url, headers, request_body, call)
+                    r, retries = await chat_post(url, headers, request_body, call, gate)
                 except httpx.HTTPError as e:
                     log.warning("upstream error: %s", e)
                     record_call(call, _broken_status(e), type(e).__name__, retries=retries, request_id=request_id)
@@ -1548,7 +1575,7 @@ def create_app(
             detail = ""
             called: list[str] = []
             attempt = 0
-            ticket = chat_gate.ticket()
+            ticket = gate.ticket()
             started = time.monotonic()
             try:
                 # 0.31: while the request waits for a provider slot, the app hears how many are
@@ -1569,7 +1596,7 @@ def create_app(
                     # skips) every KEEPALIVE_TICK seconds until they come: a busy endpoint takes
                     # a minute and more over a 12k-token prompt, longer than idle lines live
                     opening = asyncio.ensure_future(
-                        http.send(http.build_request("POST", url, headers=headers, content=request_body), stream=True)
+                        chat_http.send(chat_http.build_request("POST", url, headers=headers, content=request_body), stream=True)
                     )
                     try:
                         while True:
@@ -2177,7 +2204,8 @@ def create_app(
             "version": __version__,
             "time": t,
             "in_flight": {"requests": sum(in_flight.values()), "accounts": len(in_flight), "limit": cloud.in_flight.limit},
-            "chat_upstream": {**chat_gate.snapshot(), "retries": chat_retry_limit},
+            "chat_upstream": {**chat_gate_snapshot(), "retries": chat_retry_limit},
+            "model_gates": model_gate_snapshot(),
             "hub": hub.stats() if hub is not None else None,
             "last_hour": {
                 "requests": requests_hour,
@@ -2730,7 +2758,7 @@ def create_app(
         requests under way with their phase and age, the hub, per-minute throughput and
         latency for the last hour, the last ten minutes and the hour in summary, the newest
         calls. Memory only; the page polls it every few seconds."""
-        return analytics.live()
+        return {**analytics.live(), "model_gates": model_gate_snapshot()}
 
     @app.get("/v1/admin/analytics/usage", dependencies=[Depends(admin_dep)])
     async def admin_analytics_usage(days: int = 30) -> dict:

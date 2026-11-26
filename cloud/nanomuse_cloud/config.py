@@ -508,6 +508,28 @@ def _model_aliases_from_env() -> dict[str, str]:
     return {**LEGACY_MODEL_IDS, **aliases}
 
 
+def _qianfan_chat_limits(raw: str) -> dict[str, int]:
+    if not raw:
+        return {}
+    message = f"CHAT_MODEL_CONCURRENCY must map {QIANFAN_CHAT} and {QIANFAN_GUI} to positive integers"
+
+    def unique_keys(pairs: list[tuple[str, object]]) -> dict:
+        result = dict(pairs)
+        if len(result) != len(pairs):
+            raise ValueError(message)
+        return result
+
+    try:
+        limits = json.loads(raw, object_pairs_hook=unique_keys)
+    except json.JSONDecodeError as e:
+        raise ValueError(message) from e
+    if not isinstance(limits, dict) or set(limits) != {QIANFAN_CHAT, QIANFAN_GUI}:
+        raise ValueError(message)
+    if any(type(value) is not int or value <= 0 for value in limits.values()):
+        raise ValueError(message)
+    return limits
+
+
 def menu_warnings(models: tuple[ModelSpec, ...]) -> list[str]:
     """What is odd about a menu — for the log at start, not an error: the clients pick the
     recommended model of each lane as a default, so there should be exactly one."""
@@ -541,6 +563,7 @@ class Settings:
     # queue the rest in the relay; retry only a refusal received before any answer starts.
     # Zero disables either guard for an operator whose upstream already queues for itself.
     chat_concurrency: int = field(default_factory=lambda: _int("CHAT_CONCURRENCY", 12))
+    chat_model_concurrency: dict[str, int] = field(init=False, default_factory=dict)
     chat_retries: int = field(default_factory=lambda: _int("CHAT_RETRIES", 2))
     chat_retry_base_s: float = field(default_factory=lambda: float(_env("CHAT_RETRY_BASE_S", "0.5")))
     # 0.28: how long the per-request telemetry rows (`calls`: timings, how a request ended,
@@ -777,6 +800,7 @@ class Settings:
 
     def __post_init__(self) -> None:
         if self.qianfan_enabled:
+            object.__setattr__(self, "chat_model_concurrency", _qianfan_chat_limits(_env("CHAT_MODEL_CONCURRENCY")))
             # Never reuse the displaced provider's UPSTREAM_KEY. A Baidu credential
             # is valid only for the official endpoint; other relays keep their own key.
             object.__setattr__(self, "upstream_key", _env("QIANFAN_API_KEY", _env("DASHSCOPE_API_KEY")))
