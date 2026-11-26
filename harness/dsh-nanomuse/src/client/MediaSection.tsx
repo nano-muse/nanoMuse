@@ -21,7 +21,7 @@ export interface MediaView {
   imageModel: string
   /** Pictures (C11): the account, an own row with image models, or nowhere (`reason` `no_image`). Absent on an older host. */
   image?: { source: 'cloud' | 'provider' | 'none'; label: string; model: string; reason: string }
-  video: { source: 'cloud' | 'provider' | 'none'; label: string; model: string; models: { id: string; name: string }[]; off: boolean; reason: string }
+  video: { source: 'cloud' | 'provider' | 'none'; label: string; model: string; models: { id: string; name: string }[]; off: boolean; reason: string; studioUrl?: string }
   animate: boolean
   motion: LiveMotion
 }
@@ -108,7 +108,7 @@ export function makeMediaSection(t: Translate) {
     if (!view) return h('div', { className: 'nm-section' }, h('p', null, t('mdMediaLead')), error ? h('div', { style: errorStyle }, error) : null)
 
     const video = view.video
-    const videoOn = !video.off && video.source !== 'none'
+    const videoOn = !video.studioUrl && !video.off && video.source !== 'none'
     // the gate's sentences (C11): nothing configured has image / video models → who could, where the person is
     const gate = providers.view
     const noImage = gate && !gate.capabilities.includes('image') && !view.imageModel && view.image?.source !== 'provider'
@@ -141,7 +141,9 @@ export function makeMediaSection(t: Translate) {
               video.models.map((m) => h('option', { key: m.id, value: m.id }, m.name)),
             )
     const imageSelect = slots && slots.image.options.length ? h(SlotPicker, { t, slot: 'image', view: slots.image, disabled: busy !== null, ...(gate ? { catalogue: gate.catalogue } : {}), onPick: setImage }) : null
-    const videoSub: ReactNode = video.source === 'none'
+    const videoSub: ReactNode = video.studioUrl
+      ? h('a', { href: video.studioUrl, target: '_blank', rel: 'noopener noreferrer' }, t('mdWizshotStudio'))
+      : video.source === 'none'
       ? (noVideo ? h(UnavailableLine, { t, view: gate, capability: 'video', link: true, className: 'nm-wrap', tag: 'span' }) : t('mdVideoNone'))
       : video.off ? t('mdVideoModelSub') : video.reason === 'unchecked' ? t('mdVideoUnchecked') : `${t('mdVideoModelSub')} · ${video.label}`
 

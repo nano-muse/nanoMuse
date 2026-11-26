@@ -41,6 +41,10 @@ enum NanoMuseVideoGen {
         var host: String
         var apiKey: String
         var model: String
+        var studioURL: URL? {
+            guard model == NanoMuseRelayMenu.hostedVideo, !NanoMuseRelayMenu.allows(.video, at: host) else { return nil }
+            return URL(string: "/app/?video=wizshot", relativeTo: URL(string: host))?.absoluteURL
+        }
     }
 
     struct Failure: LocalizedError, Sendable {
@@ -87,7 +91,7 @@ enum NanoMuseVideoGen {
     /// Names that mean "video" in a provider's model list.
     static func looksLikeVideoModel(_ id: String) -> Bool {
         let s = id.lowercased()
-        return ["t2v", "i2v", "video", "minimax-h", "hailuo", "kling", "veo", "seedance", "sora"].contains { s.contains($0) }
+        return s == NanoMuseRelayMenu.hostedVideo || ["t2v", "i2v", "video", "minimax-h", "hailuo", "kling", "veo", "seedance", "sora"].contains { s.contains($0) }
     }
 
     private static func isWan(_ model: String) -> Bool { model.lowercased().hasPrefix("wan") }
@@ -250,6 +254,7 @@ enum NanoMuseVideoGen {
         seconds: Int = 4,
         onProgress: @escaping @Sendable (Progress) -> Void = { _ in }
     ) async throws -> Data {
+        if let url = ep.studioURL { throw Failure(message: url.absoluteString) }
         onProgress(.uploading)
         let model = Self.model(for: ep.model, fromImage: true)
         guard let png = fitFrame(image).pngData() else { throw Failure(message: AppLocalized("The picture could not be encoded.")) }
@@ -271,6 +276,7 @@ enum NanoMuseVideoGen {
         ratio: String = "1:1",
         onProgress: @escaping @Sendable (Progress) -> Void = { _ in }
     ) async throws -> Data {
+        if let url = ep.studioURL { throw Failure(message: url.absoluteString) }
         let model = Self.model(for: ep.model, fromImage: false)
         let task = try await createTask(ep, body: textToVideoBody(model: model, prompt: prompt, seconds: seconds, ratio: ratio), ossInput: false)
         onProgress(.submitted)

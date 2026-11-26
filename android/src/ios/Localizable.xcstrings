@@ -108017,65 +108017,6 @@
         }
       }
     },
-    "Qwen/Qwen3.6-27B-FP8 handles chat, image input and screen operation with an account allowance. Drawing pictures and making clips requires a provider and API key of your own." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 handles chat, image input and screen operation with an account allowance. Drawing pictures and making clips requires a provider and API key of your own."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 通过账号额度处理对话、图片输入和屏幕操作。生成图片和视频需要接入你自己的供应商和 API key。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 透過帳號額度處理對話、圖片輸入和螢幕操作。生成圖片和影片需要接入你自己的服務商和 API key。"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 はアカウント枠でチャット、画像入力、画面操作を処理します。画像や動画の生成には、自分のプロバイダーと API キーが必要です。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8은 계정 사용량으로 채팅, 이미지 입력, 화면 조작을 처리합니다. 이미지와 영상을 생성하려면 본인의 공급자와 API 키가 필요합니다."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 verarbeitet Chat, Bildeingaben und Bildschirmbedienung über das Kontoguthaben. Zum Erzeugen von Bildern und Clips brauchst du einen eigenen Anbieter und API-Schlüssel."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 gère le chat, les images reçues et l’écran avec le crédit du compte. Pour créer des images et des clips, ajoutez votre propre fournisseur et sa clé API."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 gestiona el chat, las imágenes recibidas y la pantalla con el saldo de la cuenta. Para crear imágenes y clips necesitas tu propio proveedor y clave API."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qwen/Qwen3.6-27B-FP8 работает с чатом, входными изображениями и экраном за счёт лимита аккаунта. Для создания изображений и видео нужен свой провайдер и API-ключ."
-          }
-        }
-      }
-    },
     "R/W" : {
       "localizations" : {
         "de" : {
