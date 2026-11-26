@@ -93,7 +93,7 @@ def test_uberllm_uses_openai_chat_without_advertising_unverified_capabilities():
     provider = cat.get("uberllm")
     assert provider is not None
     assert provider.auth == ["key"]
-    assert provider.key_url == "https://uberllm.dev/signup"
+    assert provider.key_url == "https://martllm.com/signup"
     assert provider.capabilities == ["chat"]
     assert provider.defaults == {"chat": "openai/gpt-5.4-mini"}
     assert provider in cat.providers_for("chat", "global")
@@ -102,7 +102,7 @@ def test_uberllm_uses_openai_chat_without_advertising_unverified_capabilities():
     assert check_provider("uberllm") == "uberllm"
     assert resolve_provider("uberllm", None) == (
         "openai",
-        "https://api.uberllm.dev/v1",
+        "https://api.martllm.com/v1",
     )
     settings = LLMSettings(provider="uberllm")
     assert settings.protocol == "openai"
