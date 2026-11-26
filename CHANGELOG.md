@@ -8,6 +8,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **SpecStream can answer web searches, with a key.** Pick *SpecStream* under *Connections → Web search* or set `provider = "specstream"` in `[connectors.search]`: each search is one request to `api.specstream.ai` with a key from [specstream.ai/workspace](https://specstream.ai/workspace), and each result's snippet is the passages of its page closest to the query rather than the page summary. The `region` is passed as country and language, the Sentinel shows `api.specstream.ai` as the destination, a key with no credit left is named in the note, and DuckDuckGo stays the default.
+
 ### Web
 
 ### Desktop

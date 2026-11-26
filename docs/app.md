@@ -117,7 +117,7 @@ Device triggers keep the last observed online state across automatic hub reconne
   blank for the endpoint's default. *Test* makes one embeddings call and, when it
   works, indexes every memory on the spot; the card says how many are indexed.
   **Web search**: DuckDuckGo (nothing to set up, but scraped and occasionally
-  rate-limited), Brave Search, Tavily or Serply with a key (vault:
+  rate-limited), Brave Search, Tavily, Serply or SpecStream with a key (vault:
   `SEARCH_API_KEY`), You.com with or without a key (100 searches a day without
   one), Parallel with or without a key (free at lower limits without one),
   Keenable with or without a key (1,000 searches an hour without one), or a
@@ -273,7 +273,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | POST | `/api/connections/endpoints/{id}/models` | ask the endpoint for its models again and save them: the entry plus `source: "live"`, or `"kept"` with `error` when it did not answer and the saved list stands |
 | PUT | `/api/connections/embeddings` `{mode, model, base_url, api_key}` | recall by meaning: `mode` auto/on/off; `base_url` `""` → the model's endpoint; `model` `""` → the endpoint's default; `api_key` set → vault (`EMBEDDINGS_API_KEY`), `""` → the model's key, omitted → unchanged. Rebuilds the embedder on the spot |
 | POST | `/api/connections/embeddings/test` | one embeddings call, then every memory indexed: `{ok, model, dims, indexed, ms}` or `{ok: false, error}` |
-| PUT | `/api/connections/search` `{provider, api_key, base_url}` | web search: `provider` duckduckgo/brave/tavily/serply/you/parallel/keenable/searxng; `api_key` set → vault (`SEARCH_API_KEY`), `""` removes it, omitted → unchanged; `base_url` the SearXNG instance. Applies to the next search |
+| PUT | `/api/connections/search` `{provider, api_key, base_url}` | web search: `provider` duckduckgo/brave/tavily/serply/you/parallel/keenable/specstream/searxng; `api_key` set → vault (`SEARCH_API_KEY`), `""` removes it, omitted → unchanged; `base_url` the SearXNG instance. Applies to the next search |
 | POST | `/api/connections/search/test` | one search against the configured provider, no fallback: `{ok, provider, results, first, ms}` or `{ok: false, error}` |
 | PUT / DELETE | `/api/connections/email` | save `{address, password, imap_host, imap_port, smtp_host, smtp_port, smtp_starttls, enabled}` (address and password go to the vault) / disconnect and forget the credentials |
 | POST | `/api/connections/email/test` | sign in to IMAP and SMTP: `{ok, inbox}` or `{ok: false, error}` |

@@ -401,14 +401,22 @@ class ContactsSettings(BaseModel):
 
 class SearchSettings(BaseModel):
     """Who answers ``web_search``. DuckDuckGo needs nothing and is the default; Brave,
-    Tavily and Serply want a key, You.com, Parallel and Keenable take one or go without,
+    Tavily, Serply and SpecStream want a key, You.com, Parallel and Keenable take one or go without,
     SearXNG wants the URL of an instance. A failed search falls back to DuckDuckGo once,
     with a note, so a lapsed key does not stop a task."""
 
     provider: Literal[
-        "duckduckgo", "brave", "tavily", "serply", "you", "parallel", "keenable", "searxng"
+        "duckduckgo",
+        "brave",
+        "tavily",
+        "serply",
+        "you",
+        "parallel",
+        "keenable",
+        "specstream",
+        "searxng",
     ] = "duckduckgo"
-    # Brave / Tavily / Serply, You.com, Parallel and Keenable optionally. May be a vault
+    # Brave / Tavily / Serply / SpecStream, You.com, Parallel and Keenable optionally. May be a vault
     # placeholder: the app stores it as {{vault:SEARCH_API_KEY}}.
     api_key: str = ""
     # SearXNG: your instance, e.g. "http://127.0.0.1:8080".
@@ -1031,6 +1039,7 @@ def apply_app_settings(settings: Settings, data: dict[str, Any]) -> None:
             "you",
             "parallel",
             "keenable",
+            "specstream",
             "searxng",
         ):
             web.provider = search["provider"]
