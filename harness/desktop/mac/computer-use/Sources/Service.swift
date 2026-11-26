@@ -48,6 +48,7 @@ final class Service {
             return execute(body)
         case ("POST", "/quit"):
             // the answer goes out first; then the run loop ends — with nothing left held down
+            Mouse.releaseAll()
             Keyboard.releaseAll()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 exit(0)

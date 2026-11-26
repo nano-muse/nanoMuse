@@ -51,6 +51,24 @@ if arguments.contains("--version") {
     exit(0)
 }
 
+// The note a `down` leaves next to the shell's token file, so the button it never lifted can
+// be lifted by the helper that comes after it (Input.swift, `Mouse.releaseStuck`).
+func markerPath() -> URL? {
+    guard let tokenFile = argument("--token-file") else { return nil }
+    return URL(fileURLWithPath: tokenFile).deletingLastPathComponent().appendingPathComponent("mouse-held")
+}
+Mouse.marker = markerPath()
+
+// `--release`: lift a button a killed helper left down, then leave. The shell calls this when
+// the helper it had is gone; it needs no token and no listener.
+if arguments.contains("--release") {
+    Mouse.releaseStuck()
+    exit(0)
+}
+
+// Buttons and keys a previous helper left down go up before this one starts serving.
+Mouse.releaseStuck()
+
 var token = ""
 if let tokenFile = argument("--token-file"), let text = try? String(contentsOfFile: tokenFile, encoding: .utf8) {
     token = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -99,12 +117,30 @@ let parentWatch: DispatchSourceTimer? = {
     timer.schedule(deadline: .now() + 2, repeating: 2)
     timer.setEventHandler {
         if kill(parent, 0) != 0 && errno == ESRCH {
+            // nothing of ours stays down when we go: the system would hold it for every app
+            Mouse.releaseAll()
+            Keyboard.releaseAll()
             exit(0)
         }
     }
     timer.resume()
     return timer
 }()
+
+// Being asked to stop (a restart in the shell, a `kill`) is still not a reason to leave a
+// button down: SIGTERM, SIGINT and SIGHUP lift what this process put down, then leave.
+// Held in a global: a source that goes away stops delivering.
+let signalSources: [DispatchSourceSignal] = [SIGTERM, SIGINT, SIGHUP].map { number in
+    signal(number, SIG_IGN)
+    let source = DispatchSource.makeSignalSource(signal: number, queue: DispatchQueue.global(qos: .utility))
+    source.setEventHandler {
+        Mouse.releaseAll()
+        Keyboard.releaseAll()
+        exit(0)
+    }
+    source.resume()
+    return source
+}
 
 // LSUIElement in Info.plist keeps us out of the Dock; the run loop is for the permission
 // dialogs and NSWorkspace. Everything else happens on the server's queue.

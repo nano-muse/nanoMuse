@@ -100,6 +100,74 @@ func pause(ms: Int) {
 }
 
 enum Mouse {
+    /// Where a `down` parks the fact that a button is still down (the shell's computer-use
+    /// directory), so a helper that never gets to post the `up` — killed, its shell gone —
+    /// leaves a note the next one can clear. Input.swift has no file paths of its own.
+    static var marker: URL?
+
+    /// The buttons this process put down and has not lifted yet.
+    private static var held: [CGMouseButton] = []
+
+    /// The marker says one line of button numbers: `0` left, `1` right, `2` center.
+    private static func note(_ button: CGMouseButton, down: Bool) {
+        if down {
+            if !held.contains(where: { $0.rawValue == button.rawValue }) {
+                held.append(button)
+            }
+        } else {
+            held.removeAll { $0.rawValue == button.rawValue }
+        }
+        guard let marker = marker else { return }
+        do {
+            if held.isEmpty {
+                try? FileManager.default.removeItem(at: marker)
+            } else {
+                let line = held.map { "\($0.rawValue)" }.joined(separator: ",") + "\n"
+                try Data(line.utf8).write(to: marker, options: .atomic)
+            }
+        } catch {
+            // the note is a courtesy; a click never fails because a file could not be written
+        }
+    }
+
+    /// Every button this process put down goes up, at the pointer's own place — called before
+    /// the process ends, so a crash or a force quit cannot leave the system holding a button.
+    static func releaseAll() {
+        guard !held.isEmpty else { return }
+        let at = CGEvent(source: nil)?.location ?? .zero
+        for button in held.reversed() {
+            post(upType(button), at: at, button: button)
+            pause(ms: 20)
+        }
+        held.removeAll()
+        if let marker = marker {
+            try? FileManager.default.removeItem(at: marker)
+        }
+    }
+
+    /// The note a previous helper left: those buttons go up now, and the note goes away.
+    /// A helper that was killed mid-drag would otherwise leave the system holding the button —
+    /// every drag and every hover in every app stops working until someone presses ESC.
+    static func releaseStuck() {
+        guard let marker = marker, let text = try? String(contentsOf: marker, encoding: .utf8) else { return }
+        let at = CGEvent(source: nil)?.location ?? .zero
+        for field in text.split(separator: ",", omittingEmptySubsequences: true) {
+            guard let raw = UInt32(field.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  raw <= 2, let button = CGMouseButton(rawValue: raw) else { continue }
+            post(upType(button), at: at, button: button)
+            pause(ms: 20)
+        }
+        try? FileManager.default.removeItem(at: marker)
+    }
+
+    private static func upType(_ button: CGMouseButton) -> CGEventType {
+        switch button {
+        case .left: return .leftMouseUp
+        case .right: return .rightMouseUp
+        default: return .otherMouseUp
+        }
+    }
+
     private static func post(_ type: CGEventType, at point: CGPoint, button: CGMouseButton, clicks: Int64 = 1) {
         guard let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: button) else { return }
         if type != .mouseMoved {
@@ -136,8 +204,10 @@ enum Mouse {
         }
         for index in 1...max(1, count) {
             post(down, at: point, button: button, clicks: Int64(index))
+            note(button, down: true)
             pause(ms: 40)
             post(up, at: point, button: button, clicks: Int64(index))
+            note(button, down: false)
             pause(ms: index < count ? 80 : 40)
         }
     }
@@ -146,6 +216,7 @@ enum Mouse {
         move(to: from)
         pause(ms: 100)
         post(.leftMouseDown, at: from, button: .left)
+        note(.left, down: true)
         pause(ms: 60)
         let steps = 12
         for index in 1...steps {
@@ -155,6 +226,7 @@ enum Mouse {
             pause(ms: 15)
         }
         post(.leftMouseUp, at: to, button: .left)
+        note(.left, down: false)
         pause(ms: 40)
     }
 
