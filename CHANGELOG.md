@@ -6,6 +6,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Corrected Cloud chat billing for empty and failed provider responses, including streams.
+- Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
+
 ### Runtime
 
 ### Web

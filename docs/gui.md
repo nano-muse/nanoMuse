@@ -12,7 +12,7 @@ Muse's abilities in the West come from services with APIs. Most of what a person
 Three things decide how this part is built:
 
 - **Local.** The brain runs where you run it (your machine, or the phone itself in the Android build) and the screen goes to the model you configured, nobody else.
-- **China first.** With a nanoMuse Cloud account the hands use the model the relay recommends for `gui` (today `Qwen/Qwen3.6-27B-FP8`); with a key of your own, the catalogue's hands model on that endpoint (阿里云百炼 `qwen3.8-27b` in mainland China, OpenRouter `qwen/qwen3.8-27b` elsewhere; the rule is under *The model that moves the finger* below). The sample tasks are 12306 and 微信, the sensitive-word list is Chinese first.
+- **China first.** With a nanoMuse Cloud account the hands use the model the relay recommends for `gui` (today `qwen3.5-397b-a17b`); with a key of your own, the catalogue's hands model on that endpoint (阿里云百炼 `qwen3.8-27b` in mainland China, OpenRouter `qwen/qwen3.8-27b` elsewhere; the rule is under *The model that moves the finger* below). The sample tasks are 12306 and 微信, the sensitive-word list is Chinese first.
 - **Any app.** The operator sees the screen as a picture and taps by position. It does not need an accessibility tree, labelled buttons or a per-app integration to run, so a new app costs nothing: the same loop that books a train reads a chat. When the device *has* a tree (the Android app), it is sent along as a second input, so small text becomes readable and a password field is known to be one. The tree also supplies the trusted target for Sentinel. A pointed action with no reported element under its coordinate is conservatively sent for approval.
 - **Last resort.** The screen is the fourth rung of a ladder (below): a skill, a command-line tool or an MCP server that does the thing exactly comes first, then a page fetched with the user's login, then the in-app browser. Every screen step is a model call and a picture; the agent climbs only when the rung below cannot do it, and says so before it starts.
 
@@ -66,8 +66,7 @@ The chat model and the hands model are two settings: *Operating the screen* on *
 - the chat model's provider, when it is a key of yours whose catalogue entry names a hands model on the same endpoint (Alibaba Cloud Bailian `qwen3.8-27b`, OpenRouter `qwen/qwen3.8-27b`); a model that is known to be blind (DeepSeek ids without `v4.1`, `vision` or `ocr`) is never offered for the hands;
 - else, with a nanoMuse Cloud account, the model the relay recommends for `gui`
   (`/v1/models` says which models are `for` and `recommended_for` `chat`, `gui` or both);
-  the hosted Cloud currently uses the same multimodal `Qwen/Qwen3.6-27B-FP8` for chat and
-  screen operation, though the two choices stay independently configurable;
+  the hosted Cloud uses `qwen3.5-397b-a17b` for the screen and `deepseek-v4.1-flash-1017` for chat;
 - else the chat model itself, which only works when it sees (the phones and the desktop try the first key of yours with a model that sees before that).
 
 A choice you made on the row always wins, and the row says what *Automatic* gives right now. When a hands model of your own fails, nothing switches by itself; the card offers *Use nanoMuse Cloud this time* for that one turn ([own-key.md](own-key.md#which-model-does-what)).

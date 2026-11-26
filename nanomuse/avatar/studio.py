@@ -46,6 +46,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -68,6 +69,8 @@ REFERENCE_PREFIX = (
     "Redraw the subject of this picture as the character described, keeping its recognisable "
     "features (species, colours, markings, hairstyle, accessories). "
 )
+HOSTED_IMAGE_MODEL = "musesteamer-air-image"
+HOSTED_VIDEO_MODEL = "ernie-wizshot-me"
 DASHSCOPE_IMAGE_MODEL = "qwen-image-3.0"
 DASHSCOPE_VIDEO_MODEL = "wan2.2-i2v-flash"
 # the moods that move; "error" stays a still, as on the phone
@@ -302,6 +305,9 @@ class Endpoint:
     @property
     def clips(self) -> bool:
         """Whether clips can be made here: a video model on a host that speaks the video API."""
+        if self.video_model == HOSTED_VIDEO_MODEL and _hosted_media(self.video_host):
+            # This model needs an authorized voice and a storyboard from the person.
+            return False
         return bool(self.video_model) and (
             self.cloud or self.video_cloud or self.dashscope or bool(self.video_base_url)
         )
@@ -319,6 +325,14 @@ class Endpoint:
         """The key the video API gets: the video host's own when it has one, else the picture
         host's."""
         return self.video_api_key or self.api_key
+
+
+def _hosted_media(base_url: str) -> bool:
+    url = urlsplit(base_url)
+    return url.scheme == "https" and url.netloc.lower() in {
+        "cloud.nanomuse.cn",
+        "cloud.nanomuse.cn:443",
+    }
 
 
 def _video_root(base_url: str) -> str:
@@ -462,6 +476,8 @@ class AvatarStudio:
             # nothing named: the chat provider's own picture model, when it has one
             image_model = self._host_default(base, "image")
         cloud_image = self._cloud_model("image")
+        if cloud and _hosted_media(relay):
+            image_model = cloud_image
         if (not base or not image_model) and not image.configured and signed_in and cloud_image:
             # the chat provider draws nothing; the account does (contract §3)
             base, key, cloud, image_model = relay, self._cloud_key(), True, cloud_image
@@ -500,6 +516,8 @@ class AvatarStudio:
             elif ep.dashscope or ep.video_base_url:
                 ep.video_model = DASHSCOPE_VIDEO_MODEL
         cloud_video = self._cloud_model("video")
+        if cloud and _hosted_media(ep.video_host):
+            ep.video_model = cloud_video
         if not ep.clips and not video.configured and signed_in and not cloud and cloud_video:
             # pictures from an own provider that makes no clips: the clips come from the
             # account (contract §3), through the relay's video API under the account key
@@ -533,7 +551,11 @@ class AvatarStudio:
     def _cloud_model(self, kind: str) -> str:
         """The relay's image or video model, from the list it sent when the account was checked."""
         hub = self.svc.hub
+        hosted = _hosted_media(hub.cloud.base_url)
+        expected = HOSTED_IMAGE_MODEL if kind == "image" else HOSTED_VIDEO_MODEL
         for m in hub.models or []:
+            if hosted and m.get("id") != expected:
+                continue
             nm = m.get("nanomuse") or {}
             arch = m.get("architecture") or {}
             if nm.get("kind") == kind or arch.get("output_modalities") == [kind]:

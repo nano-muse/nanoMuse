@@ -152,15 +152,25 @@ enum NanoMuseMediaModels {
     /// The video models of `inst` that answered the last check, recommended first; nil when it has
     /// never been checked. Model Studio does not list video models on `/models`, so this is what
     /// "which models does this key have" means for video: the known candidates, each probed once.
+    @MainActor
     static func availableVideoModels(for inst: ProviderInstance) -> [String]? {
+        if let models = hostedVideoModels(for: inst) { return models }
         guard let raw = UserDefaults.standard.string(forKey: Keys.availablePrefix + inst.id),
               let data = raw.data(using: .utf8),
               let list = (try? JSONSerialization.jsonObject(with: data)) as? [String] else { return nil }
         return list.filter { !$0.isEmpty }
     }
 
+    @MainActor
+    private static func hostedVideoModels(for inst: ProviderInstance) -> [String]? {
+        guard inst.id == NanoMuseCloud.instance?.id, !NanoMuseRelayMenu.allows(.video, at: NanoMuseCloud.baseURL) else { return nil }
+        return NanoMuseRelayMenu.models(for: .video, in: NanoMuseRelayMenu.cached).filter { NanoMuseRelayMenu.allows(.video, at: NanoMuseCloud.baseURL, model: $0) }
+    }
+
+    @MainActor
     static func videoCheckIsFresh(for inst: ProviderInstance) -> Bool {
-        Date().timeIntervalSince1970 - UserDefaults.standard.double(forKey: Keys.checkedPrefix + inst.id) < checkTTL
+        if hostedVideoModels(for: inst) != nil { return true }
+        return Date().timeIntervalSince1970 - UserDefaults.standard.double(forKey: Keys.checkedPrefix + inst.id) < checkTTL
     }
 
     /// Asks the host which of the known video models exist for this key — plus anything on the
@@ -168,6 +178,7 @@ enum NanoMuseMediaModels {
     /// models found, or nil when the host could not be reached at all.
     @MainActor
     static func checkVideoModels(for inst: ProviderInstance) async -> [String]? {
+        if let models = hostedVideoModels(for: inst) { return models }
         guard let key = ProviderKeychainHelper.loadAPIKey(instanceId: inst.id), !key.isEmpty else { return nil }
         let host = host(of: inst)
         let listed = ProviderConfigStore.shared.entries(for: inst.id)
@@ -386,7 +397,9 @@ struct NanoMuseMediaModelsView: View {
                     loadVideoModels(for: inst)
                 }
             }
-            if let inst = videoInstance {
+            if let url = NanoMuseMediaModels.videoEndpoint()?.studioURL {
+                Link(NanoMuseRelayMenu.hostedVideo, destination: url)
+            } else if let inst = videoInstance {
                 modelList(
                     header: String(format: AppLocalized("Models on %@"), inst.label),
                     models: videoModels ?? [],

@@ -2723,13 +2723,22 @@ class Database:
         request_id: str,
         cost_uy: int = 0,
         extra: str = "",
-    ) -> None:
+        *,
+        video_task_id: str | None = None,
+    ) -> bool:
         """Record one request: the tokens on the account, the line in the ledger. What the
         account has spent is always the ledger's sum, so there is nothing else to keep."""
         charged = max(0, int(charged))
         cost_uy = max(0, int(cost_uy))
         who = _client.current()
         with self.tx() as c:
+            if video_task_id is not None:
+                changed = c.execute(
+                    "UPDATE video_tasks SET charged=1, status='SUCCEEDED', cost_uy=? WHERE task_id=? AND account_id=? AND charged=0",
+                    (cost_uy, video_task_id, account_id),
+                ).rowcount
+                if not changed:
+                    return False
             c.execute("UPDATE accounts SET used=used+? WHERE id=?", (charged, account_id))
             c.execute(
                 "INSERT INTO ledger(account_id, ts, kind, model, prompt_tokens, completion_tokens, charged, request_id, cost_uy, extra, ip, ua) "
@@ -2749,6 +2758,8 @@ class Database:
                     who.ua,
                 ),
             )
+
+        return True
 
     USAGE_KINDS = ("chat", "image", "video", "realtime")
 
@@ -3145,7 +3156,7 @@ class Database:
             # a second insert for the same task (a retried poll) must not forget that it was charged
             c.execute(
                 "INSERT INTO video_tasks(task_id, account_id, model, created_at, cost_uy, probe) VALUES (?,?,?,?,?,?) "
-                "ON CONFLICT(task_id) DO UPDATE SET model=excluded.model, cost_uy=excluded.cost_uy",
+                "ON CONFLICT(task_id) DO NOTHING",
                 (task_id, account_id, model, t, max(0, int(cost_uy)), 1 if probe else 0),
             )
             c.execute("DELETE FROM video_tasks WHERE created_at < ?", (t - self.VIDEO_KEEP_S,))
@@ -3156,7 +3167,7 @@ class Database:
 
     def set_video_status(self, task_id: str, status: str) -> None:
         with self.tx() as c:
-            c.execute("UPDATE video_tasks SET status=? WHERE task_id=?", (status[:20], task_id))
+            c.execute("UPDATE video_tasks SET status=? WHERE task_id=? AND charged=0", (status[:20], task_id))
 
     def mark_video_charged(self, task_id: str) -> bool:
         """True the first time only, so a clip is charged once however often it is polled."""

@@ -133,7 +133,7 @@ def test_cloud_urls() -> None:
     assert (
         CloudClient.recommended_model([{"id": "x"}, {"id": "qwen3.8-27b"}], "gui") == "qwen3.8-27b"
     )
-    assert CloudClient.recommended_model([{"id": "x"}], "gui") == "Qwen/Qwen3.6-27B-FP8"
+    assert CloudClient.recommended_model([{"id": "x"}], "gui") == "qwen3.5-397b-a17b"
     labelled = [
         {"id": "deepseek-v4.1-flash", "for": ["chat"]},
         {"id": "qwen3.8-27b", "for": ["gui"]},

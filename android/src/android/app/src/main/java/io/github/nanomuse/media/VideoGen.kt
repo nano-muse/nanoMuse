@@ -44,6 +44,7 @@ object VideoGen {
     private const val MAX_WAIT_MS = 12 * 60_000L
 
     data class Endpoint(val instance: ProviderInstance, val apiKey: String, val model: String) {
+        val studioUrl: String? get() = if (model == RelayMediaPolicy.VIDEO && RelayMediaPolicy.isPublicCloud(host)) "$host/app/?video=wizshot" else null
         val instanceId: String get() = instance.id
         val label: String get() = instance.label
         /**
@@ -83,7 +84,7 @@ object VideoGen {
     /** Names that mean "video" in a provider's model list. */
     fun looksLikeVideoModel(id: String): Boolean {
         val s = id.lowercase()
-        return listOf("t2v", "i2v", "video", "minimax-h", "hailuo", "kling", "veo", "seedance", "sora").any { s.contains(it) }
+        return s == RelayMediaPolicy.VIDEO || listOf("t2v", "i2v", "video", "minimax-h", "hailuo", "kling", "veo", "seedance", "sora").any { s.contains(it) }
     }
 
     /**
@@ -175,6 +176,7 @@ object VideoGen {
         seconds: Int = 4,
         onProgress: (Progress) -> Unit = {},
     ): ByteArray = withContext(Dispatchers.IO) {
+        ep.studioUrl?.let { throw VideoGenException(it) }
         onProgress(Progress.Uploading)
         val model = modelFor(ep.model, fromImage = true)
         val png = pngBytes(fitFrame(image))
@@ -194,6 +196,7 @@ object VideoGen {
         ratio: String = "1:1",
         onProgress: (Progress) -> Unit = {},
     ): ByteArray = withContext(Dispatchers.IO) {
+        ep.studioUrl?.let { throw VideoGenException(it) }
         val model = modelFor(ep.model, fromImage = false)
         val task = createTask(ep, textToVideoBody(model, prompt, seconds, ratio), ossInput = false)
         onProgress(Progress.Submitted)

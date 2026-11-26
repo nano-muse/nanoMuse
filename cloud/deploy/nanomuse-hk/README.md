@@ -53,15 +53,15 @@ SMTP_PORT=465
 SMTP_USER=no-reply@mail.nanomuse.cn
 SMTP_PASSWORD=
 SMTP_FROM=nanoMuse <no-reply@mail.nanomuse.cn>
-# the 百炼 key the relay spends (public endpoints; never a private one)
-UPSTREAM_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
-DASHSCOPE_BASE=https://dashscope.aliyuncs.com/api/v1
-UPSTREAM_KEY=
+# Project-hosted inference. Existing accounts keep using this relay.
+UPSTREAM_BASE=https://qianfan.baidubce.com/v2
+QIANFAN_API_KEY=
+CLOUD_MEDIA_ENABLED=1
 EOF
 sed -n 's/^CLOUD_ADMIN_TOKEN=//p' .env > ADMIN_TOKEN.txt
 ```
 
-Fill `ALLOWED_IDENTIFIERS` and `UPSTREAM_KEY` with an editor on the box (not
+Fill `ALLOWED_IDENTIFIERS` and `QIANFAN_API_KEY` with an editor on the box (not
 over a chat, not in a shell history: `nano .env`). Then, from a checkout on
 a machine with the SSH alias:
 

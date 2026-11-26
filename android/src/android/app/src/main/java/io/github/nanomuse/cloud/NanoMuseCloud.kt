@@ -114,8 +114,8 @@ object NanoMuseCloud {
     private const val KEY_GUI_IDS = "cloud.gui_ids"
     private const val KEY_MODELS_AT = "cloud.models_at"
     /** The hosted fallback for a relay that does not mark its lanes itself. */
-    const val DEFAULT_CHAT_MODEL = "Qwen/Qwen3.6-27B-FP8"
-    const val DEFAULT_GUI_MODEL = "Qwen/Qwen3.6-27B-FP8"
+    const val DEFAULT_CHAT_MODEL = "deepseek-v4.1-flash-1017"
+    const val DEFAULT_GUI_MODEL = "qwen3.5-397b-a17b"
     private const val MODELS_FRESH_MS = 60 * 60 * 1000L
 
     /** Where the privacy policy is when the relay did not name one. */

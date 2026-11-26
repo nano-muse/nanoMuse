@@ -511,10 +511,9 @@ restarts and across later key updates instead of merging the full `/models` list
 What a row uses when you have not chosen: the provider new chats answer through, when it
 is one of your own and has a model for the job (its catalogue default); else nanoMuse
 Cloud while signed in only when its live menu offers the job; else the first of your
-providers that can. The hosted Cloud offers chat and screen operation, not media
-generation. The three rows that
+providers that can. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video. The three rows that
 follow this order have *Automatic* as their first entry, with the row saying what it gives
-right now (*Currently nanoMuse Cloud · Qwen/Qwen3.6-27B-FP8* for screen operation, say); pick it to drop a choice you
+right now (*Currently nanoMuse Cloud · qwen3.5-397b-a17b* for screen operation, say); pick it to drop a choice you
 made and let the row follow the order again. A chat pick is the default for new chats and
 moves the main chat with it (*Applies to the main chat and to new chats; a side chat keeps
 its model.*); a side chat keeps the model it was given, and the same pick twice writes
@@ -526,7 +525,7 @@ provider "custom"* on every new chat in 0.1.41. Pictures through your own key go
 native image API, OpenRouter's image API, or the OpenAI shape for the rest) and nothing
 is billed to the account; the avatar studio says so in place of the cost line. Clips come
 from Model Studio through your own Bailian key (or a self-hosted relay whose operator
-explicitly enabled its legacy media proxy), never through the public hosted account.
+explicitly enabled its legacy DashScope media proxy). Hosted character video takes a separate portrait and reference audio on the [Cloud web page](cloud.md).
 
 After you save a key, a small card asks *Use it for* with a toggle per thing the key can
 handle, all on; *Use it* switches those rows to that provider, *Not now* changes nothing.
