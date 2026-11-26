@@ -89,6 +89,26 @@ If posts, activity, *Next up* or the calendar cannot load, that section shows th
 
 The app speaks English and 简体中文. *Settings → App language* is a device setting (stored in the browser, not on the server): *Auto* follows the browser's language, otherwise pick one; dates and relative times follow it too. It is separate from *Reply language*, which is what the agent writes in. Strings live in `web/src/i18n/`: the English text is the key, `zh-CN.ts` the translation, and a unit test fails when a string in the app has no translation.
 
+### When research is blocked
+
+Web research also has a combined `web_search` and `web_fetch` budget of 8 calls per turn by default, including failed calls. Once used, both tools pause for the rest of the turn, leaving other tools available to deliver a draft. Adjust `[agent] max_web_calls` for tasks needing more sources; 0 removes this cap. The runtime reminds the model to use existing evidence, not keep researching through another tool. This is a call limit, not an elapsed-time guarantee.
+
+If `web_search` or `web_fetch` returns errors or empty search results three times in a row,
+that tool pauses for the rest of the turn. A successful result resets its failure count;
+a new user turn starts fresh. Near the step limit, the agent is prompted to stop optional
+research and deliver the result or a draft with missing details marked as unverified.
+If the limit is reached, the final reply uses the request context and this turn's tool
+results, without reinjecting unrelated saved memories or active goals. This is not a
+guarantee that live facts are available or that the model will produce a complete plan.
+
+### Questions and drafts
+
+The runtime instructs the assistant to use previous answers, applicable confirmed preferences and authorized tools before asking, and to bundle essential questions after completing independent preparation. Plain-text questions follow the same rule. Optional preferences should not hold up a reversible draft. Ordinary tasks do not need a saved goal before starting; goals are for requested persistent tracking. These instructions guide the model, rather than automatically proving each question necessary.
+
+The built-in `trip-plan` skill starts an itinerary draft from a destination and duration. Without dates it uses Day 1, Day 2 and Day 3, marks assumptions and leaves exact flights and fares out unless requested. Other draft trips are not treated as confirmed calendar commitments. It adds packing files only when requested, and budget files when a budget is requested or money is discussed. A user-owned copy of this skill keeps its own instructions.
+
+After an answered clarification, the model is reminded to continue the work instead of starting another optional questionnaire. If a question expires or receives a blank answer, the runtime withholds `ask_user` for the rest of that turn, including further calls in the same response. It directs the assistant to complete independent work and state what remains blocked. New requests and queued user messages restore the tool. Silence is never treated as missing facts or authorization, and Sentinel approvals remain separate.
+
 ### Skills
 
 A skill is a recipe: a folder with a `SKILL.md` (a name and a one-line description up top, then the steps in Markdown) in the [Agent Skills](https://agentskills.io) format, so a skill written for another agent works here and yours work there. Eleven ship with the app (`weekly-review`, `trip-plan`, `inbox-triage`, `compare-options`, `meeting-prep`, `phone-messages`, and the service skills `feishu`, `tencent-meeting`, `amap`, `kuaidi100`, `train-tickets`); yours live in `<data_dir>/skills/<name>/`, and one with the same name as a built-in replaces it.

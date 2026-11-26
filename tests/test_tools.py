@@ -9,10 +9,24 @@ import httpx
 import pytest
 
 from nanomuse.schema import RiskLevel
-from nanomuse.tools import Files, PythonExecute, Shell, Terminate
+from nanomuse.tools import AskUser, Files, PythonExecute, Shell, Terminate
 from nanomuse.tools.email_tool import scrub_email_secrets
 from nanomuse.tools.shell import code_reach, scrubbed_env
+from nanomuse.tools.terminate import UNANSWERED_QUESTION_ERROR
 from nanomuse.tools.web import fetch_public, host_of, html_to_markdown
+from nanomuse.ui import HeadlessUI
+
+
+async def test_ask_user_validates_question_and_distinguishes_no_answer() -> None:
+    ui = HeadlessUI(user_answer="")
+    tool = AskUser(ui=ui)
+    assert not (await tool.execute(question=" ")).ok
+    assert not ui.events
+    result = await tool.execute(question="Which exact date?")
+    assert not result.ok and result.error == UNANSWERED_QUESTION_ERROR
+    ui.user_answer = "Next Monday"
+    result = await tool.execute(question="Which exact date?")
+    assert result.ok and result.output == "User answered: Next Monday"
 
 
 async def test_files_workspace_scoping(tmp_path: Path):
@@ -337,6 +351,24 @@ def test_private_host_guard_refuses_every_non_global_address():
         assert _is_private_host("2130706433")
     assert not _is_private_host("93.184.216.34")
     assert not _is_private_host("2606:2800:220:1:248:1893:25c8:1946")
+
+
+async def test_virtual_dns_explains_block_without_sending_a_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *args: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("198.18.1.2", 0))],
+    )
+
+    def forbidden(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("A virtual DNS address must not receive an HTTP request")
+
+    with pytest.raises(PermissionError, match="Configure real DNS resolution"):
+        await fetch_public(
+            "https://public.example/", timeout=5, transport=httpx.MockTransport(forbidden)
+        )
 
 
 async def test_web_fetch_stops_reading_at_the_body_cap(monkeypatch: pytest.MonkeyPatch):

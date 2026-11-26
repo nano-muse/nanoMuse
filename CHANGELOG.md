@@ -10,6 +10,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Reduced draft-planning questionnaires and bounded web research.** Itinerary drafts started from a destination and duration, answered clarifications prompted continued work, and unanswered questions paused further `ask_user` calls for the turn. A configurable combined web-call budget defaulted to eight without bypassing Sentinel approvals.
+
+- **Added offline Necessary Interruption Rate evaluation.** Independently reviewed blocking questions included plain replies, approvals and handovers, with coverage, task completion, unauthorized actions and missed-question checks alongside the rate.
+
+- **Kept research failures focused on the current request.** Web tools paused after three consecutive unusable results, step-limit replies retained this turn's evidence without unrelated saved tasks, and virtual DNS refusals explained the network configuration to check.
+
 - **Stopped retrying memory writes rejected by an owner exclusion.** The first rejection ended the turn with review instructions, cancelled remaining tool calls and skipped automatic capture without changing the exclusion.
 
 - **Bound each space to its own files and command working directory.** Uploads, attachments and the file library followed the chat space, Linux commands enforced filesystem restrictions, and personal connectors and stores stayed out of non-personal chats.

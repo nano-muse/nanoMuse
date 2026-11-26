@@ -206,6 +206,8 @@ class MediaSettings(BaseModel):
 class AgentSettings(BaseModel):
     name: str = "nanoMuse"
     max_steps: int = 30
+    # Combined web_search / web_fetch dispatches per turn; 0 keeps research uncapped.
+    max_web_calls: int = Field(default=8, ge=0)
     # Where the agent's files live. A relative path is relative to the current directory, which is
     # what a terminal user expects. When nothing is configured, Settings resolves it: a `workspace/`
     # in the current directory when there is one, otherwise `<data_dir>/workspace` — so a runtime

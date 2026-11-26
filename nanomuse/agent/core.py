@@ -41,6 +41,7 @@ from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
 from nanomuse.tools.memory_tools import RETIRED_MEMORY_ERROR
+from nanomuse.tools.terminate import UNANSWERED_QUESTION_ERROR
 from nanomuse.ui import UI
 from nanomuse.vault import PLACEHOLDER_RE
 from nanomuse.workspaces import split_path
@@ -601,6 +602,55 @@ class MuseAgent:
         return len({sig(m) for m in assistants}) == 1
 
     # ------------------------------------------------------------------ main loop
+    async def wrap_up(self, task: str, turn_start: int) -> str:
+        """Finish from task evidence, without reinjecting the owner's unrelated stores."""
+        previous_requests = [
+            message.content or ""
+            for message in self.messages[:turn_start]
+            if message.role == Role.USER
+            and message.content not in (prompts.STUCK_PROMPT, prompts.MAX_STEPS_PROMPT)
+        ][-6:]
+        evidence = [
+            {
+                "tool": message.name,
+                "result": (message.content or "")[:2500],
+                "truncated": len(message.content or "") > 2500,
+            }
+            for message in self.messages[turn_start:]
+            if message.role == Role.TOOL
+        ]
+        context = [
+            Message.system(
+                prompts.WRAP_UP_SYSTEM.format(
+                    name=self.settings.agent.name, language_rule=self.language_rule(task)
+                )
+            ),
+            Message.user(
+                json.dumps(
+                    {
+                        "earlier_user_requests_for_context": previous_requests,
+                        "current_request": task,
+                        "user_inputs_this_turn": [
+                            message.content or ""
+                            for message in self.messages[turn_start:]
+                            if message.role == Role.USER
+                            and message.content
+                            not in (prompts.STUCK_PROMPT, prompts.MAX_STEPS_PROMPT)
+                            and not message.images
+                        ],
+                        "tool_results_this_turn": evidence,
+                    },
+                    ensure_ascii=False,
+                )
+            ),
+            Message.user(prompts.MAX_STEPS_PROMPT),
+        ]
+        response = await self.llm.ask(context, tools=None, on_delta=self.ui.on_text_delta)
+        # A provider ignoring tools=None must not leave unfulfilled calls in saved history.
+        self.messages.append(Message.assistant(response.content, reasoning=response.reasoning))
+        self.ui.on_assistant_message(response.content, response.reasoning)
+        return response.content or "(step limit reached)"
+
     async def run(
         self,
         user_input: str,
@@ -639,6 +689,7 @@ class MuseAgent:
             list(self._openviking_inputs) if self._openviking_inputs is not None else None
         )
         authorized_task = user_input
+        turn_start = len(self.messages)
         memory_reply = self.disabled_memory_reply(user_input) if purpose is None else None
         if self.skills is not None and "skills" in self.tools:
             # "/weekly-review …" — the skill's instructions ride along with the message
@@ -650,6 +701,13 @@ class MuseAgent:
         final: str | None = None
         step = 0
         empty_replies = 0
+        web_failures: dict[str, int] = {}
+        unavailable_web: set[str] = set()
+        web_calls = 0
+        web_limit = self.settings.agent.max_web_calls
+        web_tools = {"web_search", "web_fetch"}
+        question_unanswered = False
+        question_answered = False
         task_token = self.sentinel.begin_task(
             purpose or user_input, conversation=self.conversation_id
         )
@@ -664,15 +722,46 @@ class MuseAgent:
                     # the language rule and the memory section follow the latest message
                     latest = self.messages[-1].content or ""
                     authorized_task = latest
+                    web_failures.clear()
+                    unavailable_web.clear()
+                    web_calls = 0
+                    question_unanswered = question_answered = False
                     memory_reply = self.disabled_memory_reply(latest)
                     system_prompt = self.build_system_prompt(latest, await self.recall_for(latest))
                     system_prompt += await self._openviking_context(latest)
-                context = [Message.system(system_prompt), *self.context_messages()]
+                controls = []
+                unavailable_tools = set(unavailable_web)
+                if web_limit and web_calls >= web_limit:
+                    unavailable_tools.update(web_tools)
+                    controls.append(
+                        Message.system(prompts.WEB_BUDGET_PROMPT.format(limit=web_limit))
+                    )
+                if question_unanswered:
+                    unavailable_tools.add("ask_user")
+                    controls.append(Message.system(prompts.QUESTION_UNANSWERED_PROMPT))
+                elif question_answered:
+                    controls.append(Message.system(prompts.QUESTION_ANSWERED_PROMPT))
+                if unavailable_web:
+                    controls.append(
+                        Message.system(
+                            prompts.WEB_UNAVAILABLE_PROMPT.format(
+                                tools=", ".join(sorted(unavailable_web))
+                            )
+                        )
+                    )
+                if self.settings.agent.max_steps > 3 and step > self.settings.agent.max_steps - 3:
+                    controls.append(Message.system(prompts.FINISH_SOON_PROMPT))
+                context = [Message.system(system_prompt), *controls, *self.context_messages()]
+                available_params = [
+                    param
+                    for param in tool_params
+                    if param["function"]["name"] not in unavailable_tools
+                ]
                 response = (
                     LLMResponse(content=memory_reply)
                     if memory_reply is not None
                     else await self.llm.ask(
-                        context, tools=tool_params, on_delta=self.ui.on_text_delta
+                        context, tools=available_params, on_delta=self.ui.on_text_delta
                     )
                 )
                 if (
@@ -685,7 +774,7 @@ class MuseAgent:
                     logger.info("reply cut off before it began; asking again with more room")
                     response = await self.llm.ask(
                         context,
-                        tools=tool_params,
+                        tools=available_params,
                         on_delta=self.ui.on_text_delta,
                         max_tokens=self.llm.roomier_max_tokens(),
                     )
@@ -745,6 +834,18 @@ class MuseAgent:
                         result = ToolResult.fail(
                             "A memory exclusion stopped this turn. No further tools were run."
                         )
+                    elif call.name == "ask_user" and question_unanswered:
+                        result = ToolResult.fail(UNANSWERED_QUESTION_ERROR)
+                    elif call.name in web_tools and web_limit and web_calls >= web_limit:
+                        result = ToolResult.fail(
+                            "This turn's web research limit was reached. Use existing evidence "
+                            "to deliver useful work; do not bypass the limit through other tools."
+                        )
+                    elif call.name in unavailable_web:
+                        result = ToolResult.fail(
+                            f"{call.name} is unavailable for the rest of this turn after three "
+                            "consecutive attempts returned no usable results. Use existing evidence."
+                        )
                     elif tool is None:
                         result = ToolResult.fail(
                             f"unknown tool '{call.name}'. Available tools: {', '.join(t.name for t in self.tools)}"
@@ -762,6 +863,8 @@ class MuseAgent:
                         elif memory_write and not self._memory_writes_allowed:
                             result = ToolResult.fail("Memory writes are disabled for this task")
                         else:
+                            if call.name in web_tools:
+                                web_calls += 1
                             result = await self.sentinel.guard(
                                 call,
                                 tool,
@@ -773,6 +876,23 @@ class MuseAgent:
                             # The explicit operation owns this turn. Saving a deletion or
                             # correction request again could reintroduce the old fact.
                             self._openviking_inputs = None
+                    if call.name == "ask_user":
+                        if result.error == UNANSWERED_QUESTION_ERROR:
+                            question_unanswered = True
+                        elif result.ok:
+                            question_answered = True
+                    if (
+                        call.name in ("web_search", "web_fetch")
+                        and call.name not in unavailable_web
+                    ):
+                        no_results = call.name == "web_search" and result.output.endswith(
+                            "No results."
+                        )
+                        web_failures[call.name] = (
+                            web_failures.get(call.name, 0) + 1 if not result.ok or no_results else 0
+                        )
+                        if web_failures[call.name] >= 3:
+                            unavailable_web.add(call.name)
                     if call.name == "remember" and result.error == RETIRED_MEMORY_ERROR:
                         # Owner exclusions are final for this turn, not transient failures.
                         # Cancel sibling calls too, and do not archive rewritten evidence.
@@ -811,13 +931,7 @@ class MuseAgent:
                     logger.warning("agent seems stuck – nudging")
                     self.messages.append(Message.user(prompts.STUCK_PROMPT))
             else:
-                # Step budget exhausted: ask for a wrap-up without tools.
-                self.messages.append(Message.user(prompts.MAX_STEPS_PROMPT))
-                context = [Message.system(system_prompt), *self.context_messages()]
-                response = await self.llm.ask(context, tools=None, on_delta=self.ui.on_text_delta)
-                self.messages.append(response.to_message())
-                self.ui.on_assistant_message(response.content, response.reasoning)
-                final = response.content or "(step limit reached)"
+                final = await self.wrap_up(authorized_task, turn_start)
             self.state = AgentState.FINISHED
             if (
                 self.openviking is not None

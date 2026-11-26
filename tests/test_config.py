@@ -7,6 +7,21 @@ import pytest
 from nanomuse.config import Settings, load_settings
 
 
+def test_web_call_budget_loads_and_rejects_negative_values(tmp_path: Path) -> None:
+    from pydantic import ValidationError
+
+    from nanomuse.config import AgentSettings
+
+    assert AgentSettings().max_web_calls == 8
+    cfg = tmp_path / "budget.toml"
+    cfg.write_text("[agent]\nmax_web_calls = 0\n", encoding="utf-8")
+    assert load_settings(cfg).agent.max_web_calls == 0
+    cfg.write_text("[agent]\nmax_web_calls = 12\n", encoding="utf-8")
+    assert load_settings(cfg).agent.max_web_calls == 12
+    with pytest.raises(ValidationError):
+        AgentSettings(max_web_calls=-1)
+
+
 def test_env_expansion_and_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     cfg = tmp_path / "config.toml"
     cfg.write_text(

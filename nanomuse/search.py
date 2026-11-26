@@ -204,9 +204,18 @@ class WebSearchProvider:
     async def _ddg(query: str, max_results: int, region: str) -> list[SearchResult]:
         def _search() -> list[dict[str, Any]]:
             from ddgs import DDGS
+            from ddgs.exceptions import DDGSException
 
-            with DDGS() as ddgs:
-                return list(ddgs.text(query, region=region or "wt-wt", max_results=max_results))
+            try:
+                with DDGS() as ddgs:
+                    return list(ddgs.text(query, region=region or "wt-wt", max_results=max_results))
+            except DDGSException as exc:
+                if (
+                    type(exc) is DDGSException
+                    and str(exc).strip().rstrip(".") == "No results found"
+                ):
+                    return []
+                raise
 
         rows = await asyncio.to_thread(_search)
         return [

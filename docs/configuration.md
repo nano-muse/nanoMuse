@@ -162,7 +162,8 @@ The app layer sets the same slots: `PUT /api/connections/image` and `PUT /api/co
 ```toml
 [agent]
 name                 = "nanoMuse"      # what the agent calls itself (the app's profile overrides this)
-max_steps            = 30              # tool calls per turn before it must wrap up
+max_steps            = 30              # model steps per turn before it must wrap up
+max_web_calls        = 8               # combined web_search / web_fetch calls per turn; 0 = no cap
 # workspace          = "./workspace"   # the only directory the files tool can touch; default ./workspace if present here, else <data_dir>/workspace
 extra_roots          = []              # directories outside the workspace the files tool may read and write, e.g. ["~/Documents/notes"]; writable inside the sandbox too
 language             = "auto"          # or a fixed language: "English", "中文", ...
@@ -172,6 +173,8 @@ show_thinking        = false
 user_profile         = ""              # free text injected into the system prompt
 instructions         = ""              # extra rules appended to the system prompt
 ```
+
+`max_web_calls` limits combined `web_search` and `web_fetch` dispatches, including failed or denied calls. At the default of 8, both tools are withheld for the rest of the turn once the budget is used, and extra calls in the same model response are refused. Other tools remain available to deliver work. A fresh request or queued user message resets the budget; an answer to `ask_user` does not. Set it to 0 to remove this cap, or raise it for tasks that require more sources. This bounds calls, not elapsed time or research through other tools. Model instructions prohibit bypassing the cap through shell, browser or another service. Sentinel decisions still apply to every dispatched call.
 
 With `language = "auto"` the system prompt names the reply language and tells the model to answer in it: the language of the client's screens when the client sends one with the message (the web console does, as `language` on `POST /api/threads/{id}/send`; a `task` over the hub may), else the language of the latest user message, detected by script. A generic "reply in the user's language" instruction turned out to be unreliable with some models; naming it works. A fixed `language` wins over both.
 
@@ -639,6 +642,16 @@ fallback = true                  # false: a failed search fails instead of going
 You.com without a key goes to `api.you.com` and allows 100 searches a day per address, with no account; past that the search says so and DuckDuckGo answers once. With a key it goes to `ydc-index.io`, the keyed Search API with higher limits; the Sentinel shows whichever host the search really uses. Requests to You.com carry the user agent `youdotcom-integration/nano-muse-nanomuse`, at the vendor's request, so they can tell nanoMuse's traffic apart; nothing else is sent, and no other provider gets it.
 
 Whichever is picked, a search that fails (a lapsed key, a rate limit, an instance that is down) is answered by DuckDuckGo instead, once, with a note on top of the results saying so, so the task goes on (the query then reaches DuckDuckGo's host as well as the one you chose; set `fallback = false` under `[connectors.search]` if that must not happen); `nanomuse doctor` reports a provider that is missing what it needs. The `region` argument of the tool (`cn-zh`, `us-en`) is passed to every provider in its own terms. The provider's host is a destination you chose, so a search after private data was read does not need approval the way an unknown host would (see [taint tracking](sentinel.md#taint-tracking)); `web_fetch` of a result still does.
+
+Web tools pause for the rest of a turn after three consecutive errors or empty search
+results. The known DuckDuckGo `No results found` response is treated as an empty result,
+not proof that a flight, route or service does not exist. Transport errors stay errors.
+
+`web_fetch` checks DNS on every redirect and refuses non-public destinations, even after
+you approve a site's outbound request. A proxy returning virtual addresses from
+`198.18.0.0/15` will therefore block public pages too. The error explains this possibility.
+Configure real DNS resolution for the runtime or its proxy; keep internal-address
+protection enabled. Approving a domain does not override the DNS check.
 
 ## `[triggers]`
 

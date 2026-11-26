@@ -8,6 +8,11 @@ from nanomuse.schema import RiskLevel, ToolResult
 from nanomuse.tools.base import BaseTool
 from nanomuse.ui import UI
 
+UNANSWERED_QUESTION_ERROR = (
+    "The user did not answer. Do not ask again this turn. Complete safe independent work, "
+    "then state what remains blocked. Silence does not supply missing facts or authorization."
+)
+
 
 class Terminate(BaseTool):
     name: str = "terminate"
@@ -33,9 +38,13 @@ class Terminate(BaseTool):
 class AskUser(BaseTool):
     name: str = "ask_user"
     description: str = (
-        "Ask the user a clarifying question and wait for the answer. Use it when the request is "
-        "ambiguous, when you need a decision or missing information (never guess credentials, "
-        "addresses, amounts or dates)."
+        "Ask a necessary blocking question and wait for the answer. First use information "
+        "already supplied and authorized tools, and complete independent preparation. Ask only "
+        "for a material decision or information only the user can provide. Bundle independent "
+        "essential questions into one call. For optional preferences, deliver a reversible "
+        "draft with stated assumptions instead. Do not ask whether to start or continue work "
+        "already requested. Never guess credentials, recipients, payment details or exact "
+        "dates needed for a booking or reminder."
     )
     parameters: dict[str, Any] = {
         "type": "object",
@@ -46,13 +55,15 @@ class AskUser(BaseTool):
     ui: Any = None  # UI protocol instance
 
     async def execute(self, question: str = "", **_: Any) -> ToolResult:
+        if not isinstance(question, str) or not question.strip():
+            return ToolResult.fail("A non-empty question is required")
         if self.ui is None:
             return ToolResult.fail("no UI available to ask the user")
         ui: UI = self.ui
         answer = await ui.ask_user(question)
         if answer is None or not str(answer).strip():
-            return ToolResult(output="(the user did not answer)")
+            return ToolResult.fail(UNANSWERED_QUESTION_ERROR)
         return ToolResult(output=f"User answered: {answer}")
 
 
-__all__ = ["AskUser", "Terminate"]
+__all__ = ["AskUser", "Terminate", "UNANSWERED_QUESTION_ERROR"]

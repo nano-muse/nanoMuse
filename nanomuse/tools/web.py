@@ -33,20 +33,30 @@ def host_of(url: str) -> str | None:
     return host.lower() if host else None
 
 
-def _is_private_host(host: str) -> bool:
+def _private_host_reason(host: str) -> str | None:
     """SSRF guard: refuse every address that is not globally routable: loopback, link-local
     (the cloud metadata address among them), the private ranges, the carrier-grade NAT
     block 100.64.0.0/10 (a Tailscale or an ISP network), multicast, reserved and
     unspecified addresses, in IPv4 and IPv6 alike (IPv4-mapped addresses included). A
     name that does not resolve is left to the request, which reports the DNS error."""
+    blocked = f"refusing to fetch private/internal host '{host}'"
     if host in ("localhost",) or host.endswith((".local", ".internal", ".localhost")):
-        return True
+        return blocked
     try:
         infos = socket.getaddrinfo(host, None)
     except socket.gaierror:
-        return False  # let httpx report the DNS error
+        return None  # let httpx report the DNS error
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
+        address = ip.ipv4_mapped if isinstance(ip, ipaddress.IPv6Address) else ip
+        if isinstance(address, ipaddress.IPv4Address) and address in ipaddress.ip_network(
+            "198.18.0.0/15"
+        ):
+            return (
+                f"{blocked}. DNS returned a non-public benchmarking address, which a proxy "
+                "may use for virtual DNS. Configure real DNS resolution for this runtime; "
+                "keep internal-address protection enabled."
+            )
         if (
             not ip.is_global
             or ip.is_private
@@ -56,8 +66,12 @@ def _is_private_host(host: str) -> bool:
             or ip.is_multicast
             or ip.is_unspecified
         ):
-            return True
-    return False
+            return blocked
+    return None
+
+
+def _is_private_host(host: str) -> bool:
+    return _private_host_reason(host) is not None
 
 
 MAX_REDIRECTS = 5
@@ -86,8 +100,8 @@ async def fetch_public(
             host = host_of(url)
             if not host:
                 raise PermissionError("invalid url")
-            if await asyncio.to_thread(_is_private_host, host):
-                raise PermissionError(f"refusing to fetch private/internal host '{host}'")
+            if reason := await asyncio.to_thread(_private_host_reason, host):
+                raise PermissionError(reason)
             resp = await c.send(c.build_request("GET", url), stream=True)
             try:
                 if resp.is_redirect and "location" in resp.headers:

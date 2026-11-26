@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -10,7 +11,7 @@ from nanomuse.llm import MockLLM
 from nanomuse.memory import MemoryStore
 from nanomuse.schema import Function, LLMResponse, Message, Role, ToolCall, ToolResult
 from nanomuse.sentinel import AuditLog, Sentinel
-from nanomuse.tools import Goals, Remember, Terminate, ToolCollection
+from nanomuse.tools import AskUser, Goals, Remember, Terminate, ToolCollection
 from nanomuse.tools.base import BaseTool
 from nanomuse.ui import HeadlessUI
 
@@ -25,6 +26,14 @@ class Adder(BaseTool):
 
     async def execute(self, a: float = 0, b: float = 0, **_: Any) -> ToolResult:
         return ToolResult(output=str(a + b))
+
+
+class ScriptedWeb(BaseTool):
+    description: str = "Offline web tool for failure recovery tests"
+    outcomes: list[ToolResult]
+
+    async def execute(self, **_: Any) -> ToolResult:
+        return self.outcomes.pop(0)
 
 
 def tc(name: str, **args: Any) -> ToolCall:
@@ -67,6 +76,146 @@ async def test_plain_answer_ends_turn(settings: Settings):
     agent, llm, *_ = make_agent(settings, [LLMResponse(content="Just an answer")])
     assert await agent.run("hi") == "Just an answer"
     assert len(llm.calls) == 1
+
+
+async def test_unanswered_question_pauses_further_questions_but_allows_work(
+    settings: Settings,
+) -> None:
+    ui = HeadlessUI()
+    agent, llm, *_ = make_agent(
+        settings,
+        [
+            LLMResponse(
+                tool_calls=[
+                    tc("ask_user", question="Any essential constraint?"),
+                    tc("ask_user", question="What about a different preference?"),
+                    tc("add", a=1, b=2),
+                ]
+            ),
+            LLMResponse(tool_calls=[tc("ask_user", question="Trying again?")]),
+            LLMResponse(content="Here is the draft with assumptions; the booking is incomplete."),
+        ],
+        ui=ui,
+        extra_tools=[AskUser(ui=ui)],
+    )
+    assert "draft" in await agent.run("Prepare a draft")
+    assert len([e for e in ui.events if e[0] == "ask_user"]) == 1
+    results = [m.content for m in agent.messages if m.role == Role.TOOL]
+    assert "3" in results
+    assert "ask_user" not in {p["function"]["name"] for p in llm.calls[1]["tools"]}
+    assert any("Silence supplies neither" in (m.content or "") for m in llm.calls[1]["messages"])
+    assert not any("Silence supplies neither" in (m.content or "") for m in agent.messages)
+    # Fresh requests restore the tool, without interpreting an empty answer as permission.
+    ui.user_answer = "A real answer"
+    llm.script = [
+        LLMResponse(tool_calls=[tc("ask_user", question="Which exact reminder time?")]),
+        LLMResponse(content="Used the new answer."),
+    ]
+    await agent.run("Set a reminder")
+    assert len([e for e in ui.events if e[0] == "ask_user"]) == 2
+
+
+async def test_answered_clarifications_do_not_block_new_essential_questions(
+    settings: Settings,
+) -> None:
+    ui = HeadlessUI(user_answer="User-supplied detail")
+    agent, llm, *_ = make_agent(
+        settings,
+        [
+            LLMResponse(tool_calls=[tc("ask_user", question="Which recipient?")]),
+            LLMResponse(tool_calls=[tc("ask_user", question="Approve the prepared message?")]),
+            LLMResponse(content="Handled the requested decisions."),
+        ],
+        ui=ui,
+        extra_tools=[AskUser(ui=ui)],
+    )
+    await agent.run("Prepare a message for review")
+    assert len([e for e in ui.events if e[0] == "ask_user"]) == 2
+    assert "ask_user" in {p["function"]["name"] for p in llm.calls[1]["tools"]}
+    assert any("Use that answer" in (m.content or "") for m in llm.calls[1]["messages"])
+
+
+async def test_web_budget_combines_successes_and_failures_and_preserves_other_tools(
+    settings: Settings,
+) -> None:
+    settings.agent.max_web_calls = 2
+    search = ScriptedWeb(name="web_search", outcomes=[ToolResult(output="Found a source")])
+    fetch = ScriptedWeb(name="web_fetch", outcomes=[ToolResult.fail("timeout")])
+    agent, llm, *_ = make_agent(
+        settings,
+        [
+            LLMResponse(
+                tool_calls=[
+                    tc("web_search", query="topic"),
+                    tc("web_fetch", url="https://example.com/page"),
+                    tc("web_search", query="more research"),
+                    tc("add", a=2, b=4),
+                ]
+            ),
+            LLMResponse(content="Here is the draft based on the available source."),
+        ],
+        extra_tools=[search, fetch],
+    )
+    await agent.run("Prepare a comparison")
+    assert not search.outcomes and not fetch.outcomes
+    results = [m.content for m in agent.messages if m.role == Role.TOOL]
+    assert "research limit was reached" in results[2]
+    assert results[3] == "6"
+    schemas = {p["function"]["name"] for p in llm.calls[1]["tools"]}
+    assert "web_search" not in schemas and "web_fetch" not in schemas
+    assert "add" in schemas
+    assert any("limit of 2 combined" in (m.content or "") for m in llm.calls[1]["messages"])
+    search.outcomes = [ToolResult(output="New source")]
+    llm.script = [
+        LLMResponse(tool_calls=[tc("web_search", query="fresh task")]),
+        LLMResponse(content="Used the new source."),
+    ]
+    await agent.run("A new comparison")
+    assert not search.outcomes
+
+
+async def test_zero_web_budget_disables_the_cap(settings: Settings) -> None:
+    settings.agent.max_web_calls = 0
+    search = ScriptedWeb(
+        name="web_search", outcomes=[ToolResult(output="Source") for _ in range(10)]
+    )
+    agent, llm, *_ = make_agent(
+        settings,
+        [
+            LLMResponse(tool_calls=[tc("web_search", query=f"topic {i}") for i in range(10)]),
+            LLMResponse(content="Done."),
+        ],
+        extra_tools=[search],
+    )
+    await agent.run("Research ten topics")
+    assert not search.outcomes
+    assert "web_search" in {p["function"]["name"] for p in llm.calls[1]["tools"]}
+
+
+async def test_inbox_input_restores_question_and_web_budgets(settings: Settings) -> None:
+    settings.agent.max_web_calls = 1
+    ui = HeadlessUI()
+    search = ScriptedWeb(name="web_search", outcomes=[ToolResult(output="Source")])
+    agent, llm, *_ = make_agent(settings, [], ui=ui, extra_tools=[AskUser(ui=ui), search])
+    agent.inbox = asyncio.Queue()
+
+    def new_input(messages: list[Message]) -> LLMResponse:
+        assert agent.inbox is not None
+        agent.inbox.put_nowait("Please handle a new task with a different requirement.")
+        return LLMResponse(content="Continuing.", tool_calls=[tc("add", a=1, b=1)])
+
+    llm.script = [
+        LLMResponse(
+            tool_calls=[tc("ask_user", question="Missing detail?"), tc("web_search", query="old")]
+        ),
+        new_input,
+        LLMResponse(content="Handled the new task."),
+    ]
+    await agent.run("Prepare the first task")
+    hidden = {p["function"]["name"] for p in llm.calls[1]["tools"]}
+    restored = {p["function"]["name"] for p in llm.calls[2]["tools"]}
+    assert "ask_user" not in hidden and "web_search" not in hidden
+    assert "ask_user" in restored and "web_search" in restored
 
 
 async def test_excluded_memory_stops_rephrasing_and_sibling_storage(settings: Settings) -> None:
@@ -164,6 +313,138 @@ async def test_max_steps_wraps_up(settings: Settings):
     final = await agent.run("keep adding")
     assert final == "Summary: I added numbers."
     assert llm.calls[2]["tools"] is None  # wrap-up call is made without tools
+
+
+async def test_wrap_up_keeps_early_evidence_without_unrelated_stores(settings: Settings) -> None:
+    settings.agent.max_steps = 2
+    settings.agent.max_context_messages = 2
+    agent, llm, _, memory, goals = make_agent(
+        settings,
+        [
+            LLMResponse(tool_calls=[tc("add", a=2, b=3)]),
+            LLMResponse(tool_calls=[tc("web_search", query="later query")]),
+            LLMResponse(content="A useful partial answer", tool_calls=[tc("add", a=9, b=9)]),
+        ],
+        extra_tools=[ScriptedWeb(name="web_search", outcomes=[ToolResult.fail("network timeout")])],
+    )
+    memory.add("Synthetic private project ORCHID-6721")
+    goals.create("Synthetic unrelated hardware backlog")
+    agent.messages = [
+        Message.user("Plan a three-day trip"),
+        Message.assistant("Unrelated old assistant content"),
+    ]
+    assert await agent.run("Early December, solo, moderate budget", language="zh-CN") == (
+        "A useful partial answer"
+    )
+    context = llm.calls[-1]["messages"]
+    payload = json.loads(context[1].content)
+    assert payload["earlier_user_requests_for_context"] == ["Plan a three-day trip"]
+    assert payload["current_request"] == "Early December, solo, moderate budget"
+    assert payload["tool_results_this_turn"] == [
+        {"tool": "add", "result": "5", "truncated": False},
+        {"tool": "web_search", "result": "Error: network timeout", "truncated": False},
+    ]
+    text = "\n".join(message.content or "" for message in context)
+    assert "Chinese" in text
+    assert "ORCHID-6721" not in text and "hardware backlog" not in text
+    assert "Unrelated old assistant content" not in text
+    assert not agent.messages[-1].tool_calls
+    assert not any(m.content == context[-1].content for m in agent.messages)
+
+
+async def test_wrap_up_keeps_request_and_mid_turn_clarification(settings: Settings) -> None:
+    settings.agent.max_steps = 2
+    agent, llm, *_ = make_agent(settings, [])
+    agent.inbox = asyncio.Queue()
+
+    def clarify(messages: list[Message]) -> LLMResponse:
+        assert agent.inbox is not None
+        agent.inbox.put_nowait("Early December, solo, moderate budget")
+        return LLMResponse(tool_calls=[tc("add", a=1, b=2)])
+
+    llm.script = [
+        clarify,
+        LLMResponse(tool_calls=[tc("add", a=2, b=3)]),
+        LLMResponse(content="Here is the trip draft."),
+    ]
+    await agent.run("Plan a three-day trip")
+    payload = json.loads(llm.calls[-1]["messages"][1].content)
+    assert payload["current_request"] == "Early December, solo, moderate budget"
+    assert payload["user_inputs_this_turn"] == [
+        "Plan a three-day trip",
+        "Early December, solo, moderate budget",
+    ]
+
+
+async def test_web_failures_cancel_sibling_queries_and_reset_next_turn(settings: Settings) -> None:
+    search = ScriptedWeb(
+        name="web_search",
+        outcomes=[ToolResult.fail("TLS failed"), ToolResult(output="No results.")],
+    )
+    agent, llm, _, *_ = make_agent(
+        settings,
+        [
+            LLMResponse(
+                tool_calls=[tc("web_search", query=f"topic {index}") for index in range(4)]
+            ),
+            LLMResponse(content="I can provide a draft with live details marked unverified."),
+        ],
+        extra_tools=[search],
+    )
+    # Three real attempts, then the fourth call in the same response is cancelled.
+    search.outcomes.extend([ToolResult.fail("timeout"), ToolResult(output="Fresh evidence")])
+    await agent.run("Prepare a plan")
+    assert len(search.outcomes) == 1
+    assert "web_search" not in {item["function"]["name"] for item in llm.calls[1]["tools"]}
+    assert any("now unavailable" in (m.content or "") for m in llm.calls[1]["messages"])
+    assert (
+        "unavailable for the rest" in [m for m in agent.messages if m.role == Role.TOOL][-1].content
+    )
+    llm.script = [
+        LLMResponse(tool_calls=[tc("web_search", query="new request")]),
+        LLMResponse(content="The service answered this time."),
+    ]
+    assert await agent.run("Try again for this new request") == "The service answered this time."
+    assert not search.outcomes
+
+
+async def test_web_success_resets_consecutive_failure_count(settings: Settings) -> None:
+    search = ScriptedWeb(
+        name="web_fetch",
+        outcomes=[
+            ToolResult.fail("timeout"),
+            ToolResult.fail("timeout"),
+            ToolResult(output="Verified source"),
+            ToolResult.fail("timeout"),
+            ToolResult.fail("timeout"),
+            ToolResult(output="Another verified source"),
+        ],
+    )
+    agent, llm, *_ = make_agent(
+        settings,
+        [
+            LLMResponse(
+                tool_calls=[tc("web_fetch", url=f"https://example.com/{i}") for i in range(6)]
+            ),
+            LLMResponse(content="Used both sources."),
+        ],
+        extra_tools=[search],
+    )
+    await agent.run("Compare two topics")
+    assert not search.outcomes
+    assert "web_fetch" in {item["function"]["name"] for item in llm.calls[1]["tools"]}
+
+
+async def test_step_budget_reminder_leaves_time_for_a_deliverable(settings: Settings) -> None:
+    settings.agent.max_steps = 4
+    agent, llm, *_ = make_agent(
+        settings,
+        [LLMResponse(tool_calls=[tc("add", a=1, b=2)]), LLMResponse(content="Here is the draft.")],
+    )
+    await agent.run("Prepare a draft")
+    assert any(
+        "Only a few tool steps remain" in (m.content or "") for m in llm.calls[1]["messages"]
+    )
 
 
 async def test_stuck_detection_nudges(settings: Settings):

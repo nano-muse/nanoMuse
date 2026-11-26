@@ -162,7 +162,8 @@ api_key  = "{{vault:VIDEO_API_KEY}}"
 ```toml
 [agent]
 name                 = "nanoMuse"      # what the agent calls itself (the app's profile overrides this)
-max_steps            = 30              # tool calls per turn before it must wrap up
+max_steps            = 30              # model steps per turn before it must wrap up
+max_web_calls        = 8               # combined web_search / web_fetch calls per turn; 0 = no cap
 # workspace          = "./workspace"   # the only directory the files tool can touch; default ./workspace if present here, else <data_dir>/workspace
 extra_roots          = []              # directories outside the workspace the files tool may read and write, e.g. ["~/Documents/notes"]; writable inside the sandbox too
 language             = "auto"          # or a fixed language: "English", "中文", ...
@@ -172,6 +173,8 @@ show_thinking        = false
 user_profile         = ""              # free text injected into the system prompt
 instructions         = ""              # extra rules appended to the system prompt
 ```
+
+`max_web_calls` 限制 `web_search` 和 `web_fetch` 的合计派发次数，失败或被拒绝的调用也计入。默认是 8 次，用完后两个工具暂停到本轮结束，同一次模型回复里多出的调用也会被拒绝，其他工具仍可用于交付内容。新请求或运行中收到的排队消息会重新计数，回答 `ask_user` 不会重置预算。设为 0 可取消这个上限，需要更多来源时也可以调高。它限制的是调用次数，不是耗时，也没有给其他工具的查询设置硬上限。模型指令禁止通过命令、浏览器或其他服务绕过这个预算。每次实际派发的调用仍经过哨兵。
 
 `language = "auto"` 时，系统提示词会点明回复语言并告诉模型用它回答：客户端随消息送来了界面语言（网页控制台会送，即 `POST /api/threads/{id}/send` 的 `language`；hub 上的 `task` 也可以带）就用界面语言，否则按最近一条用户消息的文字书写系统判断。笼统的一句「用用户的语言回复」在某些模型上不可靠；点名就管用。固定的 `language` 优先于两者。
 
@@ -560,6 +563,14 @@ fallback = true                  # false：搜索失败就失败，不再转去 
 You.com 不带 key 时走 `api.you.com`，每个地址每天 100 次，不用注册；超出后搜索会说明原因，由 DuckDuckGo 补答一次。带 key 时走 `ydc-index.io`，也就是额度更高的付费 Search API；哨兵显示的是这次搜索真正去的主机。发往 You.com 的请求带 `youdotcom-integration/nano-muse-nanomuse` 这个 User-Agent，是应对方要求加的，方便他们认出来自 nanoMuse 的流量；除此之外不多发任何东西，其他服务商也不会收到它。
 
 不管选的是谁，一次失败的搜索（key 过期、被限流、实例挂了）都改由 DuckDuckGo 回答，只补这一次，并在结果顶上加一条说明，任务就能继续（这时查询词除了到你选的服务商，也会到 DuckDuckGo 的主机；不希望这样，就在 `[connectors.search]` 下设 `fallback = false`）；`nanomuse doctor` 会报告缺了必要配置的服务商。工具的 `region` 参数（`cn-zh`、`us-en`）按每家服务商自己的写法传过去。服务商的主机是你选定的目的地，所以读过私密数据之后再搜索，不像去一个陌生主机那样需要审批（见[污点追踪](sentinel.md#taint-tracking)）；对搜索结果做 `web_fetch` 仍然需要。
+
+网页工具连续三次报错或返回空搜索结果后，会暂停到本轮结束。DuckDuckGo 已知的
+`No results found` 回复按空结果处理，不能据此认定航班、路线或服务不存在。
+连接和 TLS 等传输错误仍然按错误处理。
+
+`web_fetch` 会在每次跳转时检查 DNS，拒绝非公网目标，即使你已经批准向该站点发送请求。
+如果代理返回 `198.18.0.0/15` 的虚拟地址，公网网页也会被拦截，错误信息会说明这种可能。
+请让运行时或代理使用真实 DNS 解析，保留内部地址保护。批准域名不能覆盖这项 DNS 检查。
 
 ## `[triggers]` {#triggers}
 

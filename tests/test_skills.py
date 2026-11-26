@@ -407,7 +407,7 @@ def test_skills_in_the_app(settings: Settings, tmp_path: Path):
         assert client.get("/api/skills/nope").status_code == 404
         # the system prompt carries the index, and a slash message the instructions
         prompt = service.threads["main"].agent.build_system_prompt("hi")
-        assert "## Skills" in prompt and "- trip-plan: Plan a trip" in prompt
+        assert "## Skills" in prompt and "- trip-plan: Draft a trip itinerary" in prompt
         assert "call `skills` action=use" in prompt
         # write one of yours from the app
         r = client.put("/api/skills/expense-report", json={"content": APPLE_STYLE})

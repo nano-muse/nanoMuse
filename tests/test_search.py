@@ -89,6 +89,36 @@ async def test_duckduckgo_is_the_default(ddg):
     assert ddg == [{"query": "nanomuse", "max_results": 1, "region": "cn-zh"}]
 
 
+async def test_duckduckgo_empty_response_is_not_a_transport_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ddgs.exceptions import DDGSException, TimeoutException
+
+    def empty(*args: Any, **kwargs: Any) -> None:
+        raise DDGSException("No results found.")
+
+    class OfflineDDGS:
+        def __enter__(self) -> OfflineDDGS:
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        text = staticmethod(empty)
+
+    monkeypatch.setattr("ddgs.DDGS", OfflineDDGS)
+    tool = WebSearch()
+    result = await tool.execute(query="synthetic empty query")
+    assert result.ok and result.output == "No results."
+
+    def timeout(*args: Any, **kwargs: Any) -> None:
+        raise TimeoutException("TLS timeout")
+
+    monkeypatch.setattr(OfflineDDGS, "text", staticmethod(timeout))
+    result = await tool.execute(query="synthetic unreachable query")
+    assert not result.ok and "TLS timeout" in result.error
+
+
 async def test_brave(wire: Wire, ddg):
     wire.body = {
         "web": {
