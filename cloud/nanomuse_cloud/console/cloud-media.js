@@ -1,5 +1,8 @@
 /* Optional Cloud video sheet. Keep the task ID so a reload polls the original render. */
-window.openMuseVideo = async function ({ h, api, token, current, openSheet, closeSheet, errText, zh }) {
+function mediaRequestRejected(error) {
+  return error.status >= 400 && error.status < 500 && error.status !== 408;
+}
+window.openMuseVideo = async function ({ h, api, token, session, current, openSheet, closeSheet, errText, zh }) {
   const t = zh ? {
     title: "生成人物视频", close: "关闭", prompt: "人物做什么动作？", avatar: "人物照片 HTTPS 地址",
     shot: "分镜图 HTTPS 地址（可选）", wav: "参考人声 WAV 的 HTTPS 地址", create: "生成 4 秒视频",
@@ -33,13 +36,15 @@ window.openMuseVideo = async function ({ h, api, token, current, openSheet, clos
     slot = "nm.wizshot." + me.account.id;
   } catch (e) { if (visible()) status.textContent = errText(e); return; }
 
-  function startOver() {
-    if (localStorage.getItem(slot) === "submitting" && !window.confirm(t.reset)) return;
+  const isSubmission = (id) => id === "submitting" || id?.startsWith("submitting:");
+  function startOver(expected) {
+    if (localStorage.getItem(slot) !== expected) { resume(); return; }
+    if (isSubmission(expected) && !window.confirm(t.reset)) return;
     localStorage.removeItem(slot);
     drawForm();
   }
-  function unknown() {
-    main.replaceChildren(button(t.check, resume), button(t.again, startOver));
+  function unknown(marker) {
+    main.replaceChildren(button(t.check, resume), button(t.again, () => startOver(marker)));
     status.textContent = t.unknown;
   }
   async function poll(id) {
@@ -50,23 +55,35 @@ window.openMuseVideo = async function ({ h, api, token, current, openSheet, clos
     try {
       const reply = await api("GET", "/api/v1/tasks/" + encodeURIComponent(id), null, token);
       if (!visible()) return;
+      if (localStorage.getItem(slot) !== id) { resume(); return; }
       const output = reply.output || {};
       if (output.task_status === "PENDING" || output.task_status === "RUNNING") {
         window.setTimeout(() => poll(id), 15000);
       } else if (output.task_status === "SUCCEEDED" && secure(output.video_url)) {
-        main.replaceChildren(h("a", { href: output.video_url, target: "_blank", rel: "noopener noreferrer", class: "btn" }, t.download), button(t.again, startOver));
+        main.replaceChildren(h("a", { href: output.video_url, target: "_blank", rel: "noopener noreferrer", class: "btn" }, t.download), button(t.again, () => startOver(id)));
         status.textContent = "";
       } else if (["FAILED", "CANCELED", "CANCELLED", "UNKNOWN"].includes(output.task_status)) {
         status.textContent = output.message || (output.task_status === "UNKNOWN" ? t.expired : t.failed);
-        main.replaceChildren(button(t.query, () => poll(id)), button(t.again, startOver));
+        main.replaceChildren(button(t.query, () => poll(id)), button(t.again, () => startOver(id)));
       } else { throw new Error(output.message || t.failed); }
     } catch (e) {
-      if (visible()) { status.textContent = errText(e); main.replaceChildren(button(t.query, () => poll(id)), button(t.again, startOver)); }
+      if (!visible()) return;
+      if (localStorage.getItem(slot) !== id) { resume(); return; }
+      status.textContent = errText(e);
+      main.replaceChildren(button(t.query, () => poll(id)));
+      if (e.status === 404 || e.status === 410) main.append(button(t.again, () => startOver(id)));
     }
   }
   function resume() {
     const id = localStorage.getItem(slot);
-    if (id === "submitting") unknown();
+    if (session.video && id === session.video.marker) {
+      main.replaceChildren(); status.textContent = t.sending;
+      session.video.done.then((error) => {
+        if (!visible()) return;
+        resume();
+        if (error && !localStorage.getItem(slot)) status.textContent = errText(error);
+      });
+    } else if (isSubmission(id)) unknown(id);
     else if (id) poll(id);
     else drawForm();
   }
@@ -90,31 +107,38 @@ window.openMuseVideo = async function ({ h, api, token, current, openSheet, clos
       if (!body.prompt || ![body.avatar_url, body.reference_audio_url, ...(body.shot_image ? [body.shot_image] : [])].every(secure)) {
         status.textContent = t.invalid; return;
       }
-      localStorage.setItem(slot, "submitting");
-      submit.disabled = true; status.textContent = t.sending;
-      try {
-        const response = await api("POST", "/v1/videos/generations", body, token);
-        const id = response.output && response.output.task_id;
-        if (!id || typeof id !== "string") throw new Error(t.unknown);
-        if (current()) { localStorage.setItem(slot, id); if (visible()) poll(id); }
-      } catch (e) {
-        if (!current()) return;
-        if (e.status >= 400 && e.status < 500 && e.status !== 408) {
-          localStorage.removeItem(slot); if (visible()) { submit.disabled = false; status.textContent = errText(e); }
-        } else if (visible()) unknown();
-      }
+      const marker = "submitting:" + crypto.getRandomValues(new Uint32Array(4)).join("-");
+      localStorage.setItem(slot, marker);
+      submit.disabled = true;
+      const done = (async () => {
+        try {
+          const response = await api("POST", "/v1/videos/generations", body, token);
+          const id = response.output?.task_id;
+          if (!id || typeof id !== "string") throw new Error(t.unknown);
+          if (current() && localStorage.getItem(slot) === marker) localStorage.setItem(slot, id);
+        } catch (e) {
+          if (current() && localStorage.getItem(slot) === marker && mediaRequestRejected(e)) localStorage.removeItem(slot);
+          return e;
+        } finally {
+          if (session.video?.marker === marker) session.video = null;
+        }
+      })();
+      session.video = { marker, done };
+      resume();
     });
   }
   resume();
 };
 
-window.openMuseImage = function ({ h, api, token, openSheet, closeSheet, errText, zh }) {
+window.openMuseImage = function ({ h, api, token, session, current, openSheet, closeSheet, errText, zh }) {
   const t = zh ? {
     title: "生成图片", prompt: "描述你想画的内容", create: "生成", download: "下载图片",
     close: "关闭", wait: "正在生成…", note: "提示词将发往百度千帆，生成一张图片会使用你的 Cloud 额度。", bad: "没有收到可读取的图片。",
+    uncertain: "上一次请求可能已经使用额度。请先核对账号用量。", again: "确定再次生成并使用额度？",
   } : {
     title: "Generate an image", prompt: "Describe the picture", create: "Generate", download: "Download image",
     close: "Close", wait: "Generating…", note: "Your prompt goes to Baidu Qianfan. One image uses your Cloud allowance.", bad: "No readable image was returned.",
+    uncertain: "Your last request may have used your allowance. Check your account usage.", again: "Generate again and use your allowance?",
   };
   const section = h("section", { class: "sheet" });
   const prompt = h("input", { type: "text", required: "", maxlength: 1000 });
@@ -124,23 +148,44 @@ window.openMuseImage = function ({ h, api, token, openSheet, closeSheet, errText
   const output = h("div");
   section.append(h("div", { class: "head" }, h("h2", {}, t.title), h("button", { class: "btn quiet sm", onclick: closeSheet }, t.close)), form, status, output);
   openSheet(section);
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (!prompt.value.trim() || submit.disabled) return;
-    submit.disabled = true;
-    status.textContent = t.wait;
+  const marker = "nm.image.pending";
+  const visible = () => current() && section.isConnected;
+  async function show(request) {
+    submit.disabled = true; prompt.disabled = true; prompt.value = request.prompt; status.textContent = t.wait;
     try {
-      const reply = await api("POST", "/v1/images/generations", { model: "musesteamer-air-image", prompt: prompt.value.trim(), size: "1280x720", n: 1 }, token);
-      if (!section.isConnected) return;
-      const data = reply.data?.[0]?.b64_json;
-      const mime = typeof data === "string" && (data.startsWith("/9j/") ? "jpeg" : data.startsWith("iVBOR") ? "png" : data.startsWith("UklG") ? "webp" : "");
-      if (!mime) throw new Error(t.bad);
-      const src = "data:image/" + mime + ";base64," + data;
-      const picture = h("img", { src, alt: prompt.value, style: "max-width:100%;height:auto" });
-      await picture.decode();
+      const { mime, src } = await request.result;
+      if (!visible()) return;
+      const picture = h("img", { src, alt: request.prompt, style: "max-width:100%;height:auto" });
       output.replaceChildren(picture, h("a", { class: "btn", href: src, download: "nanomuse." + mime }, t.download));
       status.textContent = "";
-    } catch (err) { status.textContent = errText(err); }
-    finally { submit.disabled = false; }
+    } catch (err) {
+      if (visible()) status.textContent = [errText(err), mediaRequestRejected(err) ? "" : t.uncertain].filter(Boolean).join(" ");
+    } finally { submit.disabled = false; prompt.disabled = false; }
+  }
+  if (session.image) show(session.image);
+  else if (sessionStorage.getItem(marker)) status.textContent = t.uncertain;
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = prompt.value.trim();
+    if (!text || submit.disabled || !visible()) return;
+    if (sessionStorage.getItem(marker) && !window.confirm(t.uncertain + " " + t.again)) return;
+    sessionStorage.setItem(marker, "1");
+    const result = (async () => {
+      try {
+        const reply = await api("POST", "/v1/images/generations", { model: "musesteamer-air-image", prompt: text, size: "1280x720", n: 1 }, token);
+        const data = reply.data?.[0]?.b64_json;
+        const mime = typeof data === "string" && (data.startsWith("/9j/") ? "jpeg" : data.startsWith("iVBOR") ? "png" : data.startsWith("UklG") ? "webp" : "");
+        if (!mime) throw new Error(t.bad);
+        const src = "data:image/" + mime + ";base64," + data;
+        await h("img", { src }).decode();
+        if (current()) sessionStorage.removeItem(marker);
+        return { mime, src };
+      } catch (err) {
+        if (current() && mediaRequestRejected(err)) sessionStorage.removeItem(marker);
+        throw err;
+      }
+    })();
+    session.image = { prompt: text, result };
+    show(session.image);
   });
 };

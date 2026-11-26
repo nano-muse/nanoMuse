@@ -289,7 +289,8 @@
   }
   function signOut(expired) {
     if (!expired && key) api("POST", "/v1/auth/sign-out", {}, key).catch(() => {});
-    key = ""; hint = "";
+    key = ""; hint = ""; mediaSession = {};
+    try { sessionStorage.removeItem("nm.image.pending"); } catch (_) { /* no saved submission */ }
     // the chats typed here, the address, the sign-in mode and a friend's invite code belong to the
     // account that just left: nothing of them stays for the next person at this browser
     chats.clear();
@@ -371,14 +372,14 @@
   }
 
   // ── main view ────────────────────────────────────────────────────
-  let els = {}, offersWizshot = false, offersMuseImage = false;
+  let els = {}, mediaSession = {}, offersWizshot = false, offersMuseImage = false;
   function openImage() {
     const token = key;
-    window.openMuseImage({ h, api, token, openSheet, closeSheet, errText, zh });
+    window.openMuseImage({ h, api, token, session: mediaSession, current: () => key === token, openSheet, closeSheet, errText, zh });
   }
   function openVideo() {
     const token = key;
-    window.openMuseVideo({ h, api, token, current: () => key === token, openSheet, closeSheet, errText, zh });
+    window.openMuseVideo({ h, api, token, session: mediaSession, current: () => key === token, openSheet, closeSheet, errText, zh });
   }
   function renderMain() {
     els = {};
@@ -388,14 +389,26 @@
     offersWizshot = offersMuseImage = false;
     drawAll();
     const token = key;
-    api("GET", "/v1/models", null, token).then((menu) => {
-      if (key !== token) return;
-      offersWizshot = (menu.data || []).some((m) => m.id === "ernie-wizshot-me" && m.nanomuse?.kind === "video");
-      offersMuseImage = (menu.data || []).some((m) => m.id === "musesteamer-air-image" && m.nanomuse?.kind === "image");
-      drawSide();
-      if (offersMuseImage && params.get("image") === "generate") openImage();
-      else if (offersWizshot && params.get("video") === "wizshot") openVideo();
-    }).catch(() => {});
+    const imageLink = params.get("image") === "generate", videoLink = params.get("video") === "wizshot";
+    async function loadMenu() {
+      try {
+        const menu = await api("GET", "/v1/models", null, token);
+        if (key !== token) return;
+        offersWizshot = (menu.data || []).some((m) => m.id === "ernie-wizshot-me" && m.nanomuse?.kind === "video");
+        offersMuseImage = (menu.data || []).some((m) => m.id === "musesteamer-air-image" && m.nanomuse?.kind === "image");
+        drawSide();
+        if (imageLink && offersMuseImage) openImage();
+        else if (videoLink && offersWizshot) openVideo();
+        else if (imageLink || videoLink) throw new Error(zh ? "此账号当前无法使用这项生成功能。" : "This generation feature is unavailable for this account.");
+      } catch (e) {
+        if (key !== token || !(imageLink || videoLink)) return;
+        if (e.status === 401) { signOut(true); return; }
+        openSheet(h("section", { class: "sheet" }, h("p", { role: "status" }, errText(e)),
+          h("button", { class: "btn", onclick: () => { closeSheet(); loadMenu(); } }, T.refresh),
+          h("button", { class: "btn quiet", onclick: closeSheet }, T.cancel)));
+      }
+    }
+    loadMenu();
   }
   function drawAll() { drawSide(); drawChatShell(); }
   function drawStatus() { const s = els.status; if (s) { s.className = "status " + (wsState === "on" ? "on" : wsState === "off" ? "off" : ""); s.title = wsState === "on" ? T.connected : wsState === "off" ? (hubPaused ? T.hubPaused : T.disconnected) : T.connecting; } }
