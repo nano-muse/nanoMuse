@@ -192,9 +192,8 @@ The relay is the code in [`cloud/`](../cloud/README.md). It stores:
 
 Message content is kept as *The record*, *Data controls* and *Conversation
 sync* below say, and not otherwise: the request is forwarded to the
-operator-configured upstream model and the reply is streamed back. The relay admits at most `CHAT_CONCURRENCY` chat requests to that shared
-deployment at once and retries a 429 or 5xx only before output starts; the
-remaining requests wait without duplicating a turn. Every response carries an
+operator-configured upstream model and the reply is streamed back. On Qianfan, the operator can set `CHAT_MODEL_CONCURRENCY` to give chat and screen operation separate queues. At 60 slots per model, 60 simultaneous chats can run while the screen model handles up to 60 requests of its own. A saved model ID uses the queue of the upstream model it resolves to. Relays without this setting and self-hosted relays using another provider keep the shared `CHAT_CONCURRENCY` limit (12 by default).
+These limits count active calls in one relay process. Each account also has its own per-minute request limit. The relay queues excess concurrent calls and retries an upstream 429 or 5xx only before output starts. Every response carries an
 `X-Nanomuse-Request` id so a problem report
 can be matched to a ledger row without any content being logged. Deleting the
 account (`POST /v1/auth/delete` with the account's key) removes all of it: the
@@ -897,7 +896,7 @@ list the switches that are off under `paused`.
 **Before the model says anything (relay 0.31).** A streamed chat turn may begin with
 chunks that have no `choices`: `{"object": "chat.completion.chunk", "model", "created",
 "choices": [], "nanomuse": {"phase", "waited_ms", "ahead"?}}`. While the request waits for
-one of the relay's provider slots (`CHAT_CONCURRENCY`), one comes every five seconds with
+a slot in its provider queue, one comes every five seconds with
 `phase: "queued"` and `ahead`, how many requests are in front of it; when its slot comes,
 one with `phase: "working"`; a request that never waited gets none. While the provider
 takes its time over the first bytes, a comment line (`: keepalive`) goes out every ten
