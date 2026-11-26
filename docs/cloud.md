@@ -884,6 +884,8 @@ with streaming, and `POST /v1/images/generations` for a single picture from text
 
 `POST /v1/videos/generations` accepts `model`, `prompt`, a portrait `avatar_url`, `reference_audio_url`, and an optional `shot_image`. The URLs must be HTTPS. With no dialogue, `duration` requests 4 to 16 seconds of silent performance. An accepted request returns `output.task_id`. Poll `GET /api/v1/tasks/{id}` with the same account until `output.task_status` is `SUCCEEDED`, then download `output.video_url`. Poll an existing task ID after a timeout. Older clients using the DashScope-shaped submit or upload calls with missing materials receive `400 wizshot_materials_required` and `error.open` for the input form. Self-hosters running the DashScope media proxy retain its original routes.
 
+A provider error or an empty chat reply costs the account nothing. A reply interrupted after delivering text, reasoning or tool calls is charged for the work delivered.
+
 Errors have the form `{"error": {"message", "type": "nanomuse_cloud", "code"}}`.
 Relay 0.22 adds the codes of the
 operator's [switches](#controls): `403 signup_closed`, `503 service_paused`,

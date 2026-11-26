@@ -324,6 +324,8 @@ Android 和打包桌面版在容量字段未手填时采用中继值；手动覆
 
 其他模型接口兼容 OpenAI API。`GET /v1/models` 包含 `architecture` 输入输出模态，用于识别图像模型，以及每模型的 `nanomuse` 信息块：`kind`、价格、`for`，表示聊天模型适用 `chat`、`gui` 或两者，以及 `recommended_for`。成员可通过 `GET /v1/models/{id}?kind=chat` 检查手动填写模型，返回 `listed`、`priced_as`。对话使用支持流式响应的 `POST /v1/chat/completions`。文生图使用 `POST /v1/images/generations`，读取单张图片 `data[0].b64_json`；托管图像模型收到 `POST /v1/images/edits` 时返回 `400 image_edit_unsupported`。
 
+服务商报错且没有生成内容，或返回空回复时，账号不会扣费。如果回复中途出错，只对已经收到的文本、推理或工具调用计费。
+
 错误格式为 `{"error": {"message", "type": "nanomuse_cloud", "code"}}`，`code` 保持稳定，由 App 转为可读说明。
 
 `POST /v1/videos/generations` 接收 `model`、`prompt`、人物照片 `avatar_url`、参考 WAV `reference_audio_url` 和可选的 `shot_image`，素材均使用 HTTPS 地址。无台词时，`duration` 可请求 4 至 16 秒的静默动作。提交后保存 `output.task_id`，用同一账号调用 `GET /api/v1/tasks/{id}` 查询。待 `output.task_status` 为 `SUCCEEDED` 后下载 `output.video_url`。查询超时可用原编号继续。旧客户端通过 DashScope 风格提交或上传但缺少素材时收到 `400 wizshot_materials_required` 和表单地址 `error.open`。自建中继仍可使用原 DashScope 媒体接口。

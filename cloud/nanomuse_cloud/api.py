@@ -291,6 +291,26 @@ async def _prepend(head: str | None, rest: AsyncIterator[str]) -> AsyncIterator[
         yield line
 
 
+def _generated_text(message: object) -> str:
+    """Generated output that can earn a charge, excluding role, finish and usage metadata."""
+    if not isinstance(message, dict):
+        return ""
+    parts = [message.get(k) for k in ("reasoning_content", "reasoning", "refusal")]
+    content = message.get("content")
+    if isinstance(content, list):
+        parts.extend(p.get("text") or p.get("refusal") for p in content if isinstance(p, dict))
+    else:
+        parts.append(content)
+    functions = [message.get("function_call")]
+    calls = message.get("tool_calls")
+    if isinstance(calls, list):
+        functions.extend(c.get("function") for c in calls if isinstance(c, dict))
+    for fn in functions:
+        if isinstance(fn, dict):
+            parts.extend((fn.get("name"), fn.get("arguments")))
+    return "".join(p for p in parts if isinstance(p, str))
+
+
 def _broken_status(e: httpx.HTTPError) -> str:
     """How a transport failure is kept in `calls`: a timeout of any kind apart from the rest
     (a connection refused, a stream cut), since the two point at different remedies."""
@@ -1481,10 +1501,19 @@ def create_app(
                 except ValueError as e:
                     record_call(call, "broken", "unreadable reply", retries=retries, request_id=request_id)
                     raise CloudError(502, "upstream", "The model provider sent an unreadable reply") from e
+                if not isinstance(obj, dict) or obj.get("error") is not None:
+                    record_call(call, "upstream_error", "invalid completion", retries=retries, request_id=request_id)
+                    raise CloudError(502, "upstream", "The model provider returned a failed completion")
+                generated = ""
+                if isinstance(choices := obj.get("choices"), list):
+                    generated = "".join(_generated_text(c.get("message")) for c in choices if isinstance(c, dict))
+                if not generated.strip():
+                    record_call(call, "broken", "empty completion", retries=retries, request_id=request_id)
+                    raise CloudError(502, "upstream", "The model provider returned an empty reply")
                 usage = usage_from_json(obj)
                 text = _reply_text(obj)
                 if usage is None:
-                    usage = Usage(fallback_prompt_tokens, estimate_tokens(text))
+                    usage = Usage(fallback_prompt_tokens, estimate_tokens(generated))
                 charged = cloud.charge_chat(caller, spec, usage.prompt, usage.completion, request_id, cached_tokens=usage.cached)
             finally:
                 cloud.settle(caller, request_id)
@@ -1510,15 +1539,9 @@ def create_app(
 
         async def gen() -> AsyncIterator[bytes]:
             usage: Usage | None = None
-            text_len = 0
-            # the assistant's words: the estimate when the provider sends no usage, and the
-            # kept turn of a contributing account; the whole message, for the record
-            reply: list[str] = []
+            generated_parts: list[str] = []
+            has_output = False
             assembler = StreamAssembler()
-            # A request the provider refused, or dropped before a single token, costs the
-            # account nothing; a stream that broke off midway is charged for what arrived.
-            failed = False
-            accepted = False
             # how it ended, for the telemetry row: set at every exit; still None in `finally`
             # when the generator was closed under us, which is the client going away
             status: str | None = None
@@ -1566,7 +1589,6 @@ def create_app(
                             else:
                                 event_kind = upstream_event_kind(r.status_code, raw)
                                 cloud.note(caller.account_id, event_kind, upstream_detail("chat", r.status_code, spec.id, raw))
-                                failed = True
                                 status = "content_rejected" if event_kind == "content.rejected" else "upstream_error"
                                 detail = str(r.status_code)
                                 err = relay_error_body(r.status_code, raw)
@@ -1576,7 +1598,6 @@ def create_app(
                                 yield b"data: [DONE]\n\n"
                                 return
                         else:
-                            accepted = True
                             lines = r.aiter_lines()
                             # the first line the same way: the headers may come well before it
                             first = asyncio.ensure_future(anext(lines, None))
@@ -1590,60 +1611,76 @@ def create_app(
                                 first.cancel()
                                 raise
                             head = first.result()
+                            done_marker = False
                             async for line in _prepend(head, lines):
                                 if line.startswith("data:"):
                                     payload = line[5:].strip()
-                                    if payload and payload != "[DONE]":
-                                        meter.first(call)
-                                        try:
-                                            obj = json.loads(payload)
-                                        except ValueError:
-                                            obj = None
-                                        if isinstance(obj, dict):
-                                            u = usage_from_json(obj)
-                                            if u is not None:
-                                                usage = u
-                                            assembler.feed(obj)
-                                            for ch in obj.get("choices") or []:
-                                                d = ch.get("delta") if isinstance(ch, dict) else None
-                                                if isinstance(d, dict) and isinstance(d.get("content"), str):
-                                                    text_len += len(d["content"])
-                                                    reply.append(d["content"])
-                                                    call.tokens_out += 1
-                                            called.extend(delta_tool_names(obj))
-                                            obj["model"] = spec.id
-                                            payload = dumps(obj)
-                                    yield f"data: {payload}\n\n".encode()
-                                elif line == "":
-                                    continue
-                                else:
+                                    if payload == "[DONE]":
+                                        done_marker = True
+                                        break
+                                    if not payload:
+                                        continue
+                                    try:
+                                        obj = json.loads(payload)
+                                    except ValueError as e:
+                                        raise CloudError(502, "upstream", "The model provider sent an unreadable reply") from e
+                                    if not isinstance(obj, dict) or obj.get("error") is not None:
+                                        raise CloudError(502, "upstream", "The model provider returned a failed completion")
+                                    choices = obj.get("choices", [])
+                                    if not isinstance(choices, list):
+                                        raise CloudError(502, "upstream", "The model provider sent an unreadable reply")
+                                    meter.first(call)
+                                    u = usage_from_json(obj)
+                                    if u is not None:
+                                        usage = u
+                                    assembler.feed(obj)
+                                    for ch in choices:
+                                        piece = _generated_text(ch.get("delta")) if isinstance(ch, dict) else ""
+                                        if piece:
+                                            generated_parts.append(piece)
+                                            has_output |= bool(piece.strip())
+                                            call.tokens_out += 1
+                                    called.extend(delta_tool_names(obj))
+                                    obj["model"] = spec.id
+                                    yield f"data: {dumps(obj)}\n\n".encode()
+                                elif line.startswith((":", "event:", "id:", "retry:")):
                                     yield (line + "\n").encode()
+                            if not has_output:
+                                raise CloudError(502, "upstream", "The model provider returned an empty reply")
+                            if not done_marker and not assembler.finish_reason:
+                                raise CloudError(502, "upstream", "The model provider stopped before finishing its reply")
                             status = "ok"
+                            yield b"data: [DONE]\n\n"
                             return
                     finally:
                         await r.aclose()
                     await chat_retry_pause(attempt, retry_status)
                     attempt += 1
                     call.retries = attempt
-            except httpx.HTTPError as e:
-                log.warning("upstream stream error: %s %s", type(e).__name__, e)
-                cloud.note(caller.account_id, "upstream.error", f"chat stream broke {spec.id}: {type(e).__name__}")
-                failed = usage is None and text_len == 0
-                status, detail = _broken_status(e), type(e).__name__
-                err = {"error": {"message": "The model provider stopped answering", "type": "nanomuse_cloud", "code": "upstream"}}
+            except (httpx.HTTPError, CloudError) as e:
+                log.warning("upstream stream error: %s", type(e).__name__)
+                if isinstance(e, CloudError):
+                    status, detail, message = "upstream_error", e.message, e.message
+                else:
+                    status, detail, message = _broken_status(e), type(e).__name__, "The model provider stopped answering"
+                cloud.note(caller.account_id, "upstream.error", f"chat stream broke {spec.id}: {detail}")
+                cloud.db.daily_add("error", "upstream")
+                err = {"error": {"message": message, "type": "nanomuse_cloud", "code": "upstream"}}
                 yield f"data: {dumps(err)}\n\n".encode()
                 yield b"data: [DONE]\n\n"
             finally:
-                if accepted and not failed:
+                if not has_output:
+                    usage = None
+                else:
                     if usage is None:
-                        usage = Usage(fallback_prompt_tokens, estimate_tokens("".join(reply)))
+                        usage = Usage(fallback_prompt_tokens, estimate_tokens("".join(generated_parts)))
                     cloud.charge_chat(caller, spec, usage.prompt, usage.completion, request_id, cached_tokens=usage.cached)
                     if sample_meta is not None:
                         cloud.keep_sample(
                             caller,
                             spec.id,
                             sample_messages,
-                            "".join(reply),
+                            "".join(assembler.content),
                             usage.prompt,
                             usage.completion,
                             sample_meta,

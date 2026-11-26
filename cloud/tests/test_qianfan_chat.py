@@ -55,7 +55,10 @@ async def test_qianfan_cached_models_and_hands_share_the_same_account(qianfan):
         usage = {"prompt_tokens": 1000, "completion_tokens": 100}
         message = {"choices": [{"message": {"content": "ok"}}], "usage": usage}
         if body.get("stream"):
-            return httpx.Response(200, content=f"data: {json.dumps({'choices': [], 'usage': usage})}\n\ndata: [DONE]\n\n")
+            answer = {"choices": [{"delta": {"content": "ok"}}]}
+            return httpx.Response(
+                200, content=f"data: {json.dumps(answer)}\n\ndata: {json.dumps({'choices': [], 'usage': usage})}\n\ndata: [DONE]\n\n"
+            )
         return httpx.Response(200, json=message)
 
     sender = LogSender()
