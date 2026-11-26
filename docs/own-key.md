@@ -145,10 +145,7 @@ model*, *Hands model*, *Making pictures* and *Making clips* cards on
 
 Each row shows `provider · model` and opens a picker. Chat and screen operation
 show the *nanoMuse Cloud* group first while signed in, with the relay's
-lane-specific recommendation marked; media rows show only providers of yours
-because the hosted Cloud does not generate pictures or clips. A self-hosted
-relay appears in a media row only when its operator explicitly enabled and
-advertised that capability. Each provider group holds only models that fit.
+lane-specific recommendation marked. Media rows list models advertised by the relay and compatible providers of your own. Each provider group holds only models that fit.
 A provider without the capability does not appear in that row at all. A row
 nothing covers shows the one sentence naming who could, and *Add a provider*.
 A chat pick is the default
@@ -174,11 +171,11 @@ chat's own picker do.
 
 **Automatic.** The screen, pictures and clips rows open with an *Automatic*
 entry that says what it gives right now (*Currently nanoMuse Cloud ·
-Qwen/Qwen3.6-27B-FP8*, say, for screen operation). Pick it and the row forgets any choice made there and
+qwen3.5-397b-a17b*, say, for screen operation). Pick it and the row forgets any choice made there and
 follows one order: the chat model's provider when it is one of yours and can do
 the job (its catalogue default), else a signed-in relay while switched on only
 when its live menu offers that job, else the first provider of yours that can.
-The hosted Cloud menu offers chat and screen operation, not media generation.
+Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video.
 A choice you made always wins; nanoMuse Cloud
 never steps in front of a provider you chose. Each device keeps its own choice,
 because keys never leave the device where they were entered.

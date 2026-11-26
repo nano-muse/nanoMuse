@@ -208,8 +208,7 @@ Ours, in `NanoMuse/`:
   GLOBAL, the diary, the feed's instruction, the routines' schedule, *Import memory* from another
   assistant), Connectors, Data controls, the two shell switches, *Show the welcome again*.
 - **Models (0.1.34)** (`NanoMuseModels.swift`): the relay's menu opens on the model marked
-  recommended *for chat*; the hosted relay currently recommends the same multimodal
-  `Qwen/Qwen3.6-27B-FP8` for chat and screen operation. A pick made in the chat's picker moves to the front of the Cloud group so new chats
+  recommended *for chat*; hosted chat uses `deepseek-v4.1-flash-1017` and screen operation on supported devices uses `qwen3.5-397b-a17b`. A pick made in the chat's picker moves to the front of the Cloud group so new chats
   follow it, as Android's `followPick`. DeepSeek ids are text-only unless they name `v4.1` or
   later, `vision` or `ocr`: a `// nanoMuse:` step at the top of `LLMModel.withInferredModality()`.
 - **Models as four slots (0.1.41)** (`NanoMuseModelSlots.swift`, `NanoMuseModelsView.swift`;
@@ -229,9 +228,7 @@ Ours, in `NanoMuse/`:
   chats; a side chat keeps its model.*; a pick made in a chat's own picker sticks the same way,
   for any provider, not only Cloud. Pictures and clips resolve in one order (your choice, else the chat
   provider's own default when it is a Model Studio key that draws, else a signed-in relay only
-  when its live menu offers the media kind, else the first key that can). The hosted Cloud
-  offers no media generation, so these rows require a key of your own; the image and video models come from the catalogue's `defaults`, not from
-  names in the code. The pictures and clips pickers open with an *Automatic* entry (*Currently
+  when its live menu offers the media kind, else the first key that can). See [Cloud media](cloud.md) for hosted pictures and character video. Own-key model defaults come from the catalogue. The pictures and clips pickers open with an *Automatic* entry (*Currently
   〈provider · model〉*) that forgets the stored choice and lets the slot follow that order
   again; the clips picker keeps *Off* under it. A group shows at most eight rows (the
   provider's catalogue default for the slot first, then the chosen model, then the rest as
@@ -401,7 +398,7 @@ Ours, in `NanoMuse/`:
   `NanoMuseMediaModels.swift`; Android `avatar/VideoGen.kt`, `avatar/AvatarMotion.kt`): a drawn
   face gets four 4-second clips (idle, working, waiting, happy) from `wan2.2-i2v-flash`
   through your own Bailian key (or a self-hosted relay whose operator explicitly enabled the
-  legacy media proxy; the public Cloud does not), the phone's prompts word for word, kept per
+  legacy DashScope media proxy), the phone's prompts word for word, kept per
   device under `avatar/motion/`; the face plays them with an `AVQueuePlayer`
   and an `AVPlayerLooper` (suspended in the background), the dragon's clips come from the bundle.
   *Image & video models* lists the models, *Animate the avatar after a change* (on by default)
@@ -1022,8 +1019,7 @@ what became of it here:
 | `hands`: the phone's own screen | No equivalent: iOS does not let an app drive another. App Intents / Shortcuts are the door there |
 | Widgets | Upstream's `AgentWidget` as it is |
 
-Still to check on a device, in order: the first run end to end with a fresh account; confirm the
-hosted account's media entry points ask for an own provider, then make a chat-driven avatar change
+Still to check on a device, in order: the first run end to end with a fresh account; check hosted picture generation and the link to the character-video page, then make a chat-driven avatar change
 through a Bailian key and the four clips it draws afterwards; a routine coming due with the app in
 the background (does iOS grant the refresh on the tester's phone, and how often); a coding session
 against a computer of the account; the connectors list after a second device signs in.

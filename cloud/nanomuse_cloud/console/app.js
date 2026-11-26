@@ -173,7 +173,7 @@
     }).catch(() => { throw { code: "offline" }; });
     if (r.status === 204) return {};
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw { ...(data.error || {}), code: (data.error && data.error.code) || `http_${r.status}`, message: (data.error && data.error.message) || "" };
+    if (!r.ok) throw { ...(data.error || {}), status: r.status, code: (data.error && data.error.code) || `http_${r.status}`, message: (data.error && data.error.message) || "" };
     return data;
   }
   const errText = (e) => { const t = T.errors[e.code]; return (typeof t === "function" ? t(e) : t) || e.message || e.code || String(e); };
@@ -371,13 +371,31 @@
   }
 
   // ── main view ────────────────────────────────────────────────────
-  let els = {};
+  let els = {}, offersWizshot = false, offersMuseImage = false;
+  function openImage() {
+    const token = key;
+    window.openMuseImage({ h, api, token, openSheet, closeSheet, errText, zh });
+  }
+  function openVideo() {
+    const token = key;
+    window.openMuseVideo({ h, api, token, current: () => key === token, openSheet, closeSheet, errText, zh });
+  }
   function renderMain() {
     els = {};
     els.side = h("aside", { class: "side" });
     els.chat = h("section", { class: "chat" });
     app.replaceChildren(h("div", { class: "main" }, els.side, els.chat));
+    offersWizshot = offersMuseImage = false;
     drawAll();
+    const token = key;
+    api("GET", "/v1/models", null, token).then((menu) => {
+      if (key !== token) return;
+      offersWizshot = (menu.data || []).some((m) => m.id === "ernie-wizshot-me" && m.nanomuse?.kind === "video");
+      offersMuseImage = (menu.data || []).some((m) => m.id === "musesteamer-air-image" && m.nanomuse?.kind === "image");
+      drawSide();
+      if (offersMuseImage && params.get("image") === "generate") openImage();
+      else if (offersWizshot && params.get("video") === "wizshot") openVideo();
+    }).catch(() => {});
   }
   function drawAll() { drawSide(); drawChatShell(); }
   function drawStatus() { const s = els.status; if (s) { s.className = "status " + (wsState === "on" ? "on" : wsState === "off" ? "off" : ""); s.title = wsState === "on" ? T.connected : wsState === "off" ? (hubPaused ? T.hubPaused : T.disconnected) : T.connecting; } }
@@ -401,6 +419,8 @@
           h("span", { class: "dot" + (d.online ? " on" : "") }),
         )) : h("div", { class: "empty" }, T.noDevices))),
       h("div", { class: "foot card" },
+        offersMuseImage ? h("button", { class: "row tap", onclick: openImage }, zh ? "生成图片" : "Generate an image") : null,
+        offersWizshot ? h("button", { class: "row tap", onclick: openVideo }, zh ? "生成人物视频" : "Generate a character video") : null,
         h("button", { class: "row tap", onclick: openAccount },
           h("span", { class: "tile grey", html: ICON.person }),
           h("div", { class: "txt" }, h("div", { class: "t" }, hint), h("div", { class: "s" }, T.account)),

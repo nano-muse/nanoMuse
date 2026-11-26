@@ -141,7 +141,7 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from . import __version__, provenance
+from . import __version__, provenance, qianfan_media
 from . import client as client_info
 from .analytics import (
     Analytics,
@@ -154,7 +154,7 @@ from .analytics import (
     request_shape,
 )
 from .catalog import Catalog
-from .config import ModelSpec, Settings
+from .config import QIANFAN_CHAT, QIANFAN_GUI, ModelSpec, Settings
 from .controls import ControlError
 from .geo import Geo, collect_ips, group_places
 from .github_stats import GitHubCollector
@@ -355,6 +355,39 @@ def apply_chat_defaults(body: dict, defaults: dict) -> None:
     effort = body.get("reasoning_effort")
     if thinking_requested(body) is False and isinstance(effort, str) and effort.strip().lower() != "none":
         body["reasoning_effort"] = "none"
+
+
+def legacy_hands_request(messages: object) -> bool:
+    """Identify the shipped operator prompt on clients predating the trajectory header."""
+    if not isinstance(messages, list) or not messages:
+        return False
+    first = messages[0]
+    if not isinstance(first, dict) or first.get("role") != "system":
+        return False
+    content = first.get("content")
+    if not isinstance(content, str):
+        return False
+    if content.startswith("You are the hands of "):
+        return ", a personal agent, on the user's own Android phone." in content[:512]
+    return (
+        content.startswith("# Tools\n\nYou may call one or more functions to assist with the user query.")
+        and "1) Thought: one concise sentence explaining the next move" in content
+        and "with action=terminate" in content
+    )
+
+
+def qianfan_chat_options(body: dict, model: str) -> None:
+    """Translate saved client reasoning choices into the selected Baidu model's dialect."""
+    enabled = bool(thinking_requested(body))
+    for name in ("enable_thinking", "chat_template_kwargs", "thinking"):
+        body.pop(name, None)
+    effort = body.pop("reasoning_effort", None)
+    if model == QIANFAN_CHAT:
+        body["thinking"] = {"type": "enabled" if enabled else "disabled"}
+        if enabled and effort in ("low", "medium", "high", "max", "xhigh"):
+            body["reasoning_effort"] = "max" if effort in ("max", "xhigh") else "high"
+    else:
+        body["enable_thinking"] = enabled
 
 
 def upstream_body(raw: bytes | str) -> dict | None:
@@ -714,6 +747,8 @@ def create_app(
         return {"Authorization": f"Bearer {settings.upstream_key}", "Content-Type": "application/json"}
 
     def dashscope_headers() -> dict[str, str]:
+        if settings.qianfan_enabled:
+            raise CloudError(503, "upstream_unconfigured", "DashScope media is unavailable on this relay")
         key = settings.dashscope_key or settings.upstream_key
         if not key:
             raise CloudError(503, "upstream_unconfigured", "nanoMuse Cloud has no media model key configured")
@@ -1173,6 +1208,7 @@ def create_app(
     )
     app.state.catalog = catalog
 
+    @app.get("/v1/models/", include_in_schema=False)
     @app.get("/v1/models")
     async def models(caller: Caller = Depends(caller_dep)) -> dict:
         """The menu — and, for a member who may name any model, the usable models under the
@@ -1208,7 +1244,7 @@ def create_app(
         out["nanomuse"]["catalog"] = {"models": added, "error": catalog.error, "probing": catalog.probing}
         return out
 
-    @app.get("/v1/models/{model_id}")
+    @app.get("/v1/models/{model_id:path}")
     async def model(model_id: str, kind: str = "", caller: Caller = Depends(caller_dep)) -> dict:
         """One model: the menu's by id; for a member, also one the menu does not carry,
         given the `kind` it is for (`?kind=chat`) — how an app checks a typed id."""
@@ -1349,7 +1385,10 @@ def create_app(
     @app.post("/v1/chat/completions")
     async def chat(request: Request, caller: Caller = Depends(caller_dep)) -> Response:
         body = await _json(request)
+        where = provenance.from_headers(request.headers)
         spec = cloud.model_for(str(body.get("model", "")), "chat", caller)
+        if settings.qianfan_enabled and spec.id == QIANFAN_CHAT and (where["trajectory"] or legacy_hands_request(body.get("messages"))):
+            spec = cloud.model_for(QIANFAN_GUI, "chat", caller)
         # a relay without a key answers before anything is held: a hold taken here and never
         # settled would count against the account's in-flight limit until it timed out
         headers = upstream_headers()
@@ -1359,7 +1398,6 @@ def create_app(
         call = meter.start(caller.account_id, spec.id, who.platform, stream, request_shape(body))
         call.family = client_info.ua_family(who.ua)
         # 0.31: who started the turn and where it sits (provenance.py), from the app's headers
-        where = provenance.from_headers(request.headers)
         call.run = where["run"]
         # 0.28 `apps_only`: the allowance is for nanoMuse; a pool worker, an SDK or another
         # app on a nanoMuse key is told where to go instead. Members are on the operator's
@@ -1382,6 +1420,8 @@ def create_app(
             raise
         body["model"] = spec.upstream
         apply_chat_defaults(body, settings.chat_defaults)
+        if settings.qianfan_enabled:
+            qianfan_chat_options(body, spec.id)
         if stream:
             opts = body.get("stream_options") if isinstance(body.get("stream_options"), dict) else {}
             opts["include_usage"] = True
@@ -1731,7 +1771,11 @@ def create_app(
             caller, minimum=spec.per_image, cost_uy=spec.image_cost_uy(size), request_id=request_id, place=client_place(request)
         )
         try:
-            png = await _dashscope_image(spec.upstream, [{"text": prompt}], params)
+            if settings.qianfan_enabled:
+                async with image_gate:
+                    png = await qianfan_media.image(http, settings.upstream_base.rstrip("/"), upstream_headers(), prompt, size)
+            else:
+                png = await _dashscope_image(spec.upstream, [{"text": prompt}], params)
             charged = cloud.charge_image(caller, spec, 1, request_id, size=size)
         finally:
             cloud.settle(caller, request_id)
@@ -1751,6 +1795,12 @@ def create_app(
         image: UploadFile = File(...),
     ) -> Response:
         spec = cloud.model_for(model, "image", caller)
+        if settings.qianfan_enabled:
+            raise CloudError(
+                400,
+                "image_edit_unsupported",
+                "This hosted image model generates pictures from text. Choose an editing provider for an existing picture.",
+            )
         if n != 1:
             raise CloudError(400, "bad_request", "nanoMuse Cloud draws one picture per request")
         # read one byte past the cap rather than the whole picture first: larger than the
@@ -1831,10 +1881,23 @@ def create_app(
             return "1080P" if short >= 1080 else "720P" if short >= 720 else "480P"
         return None
 
+    @app.post("/v1/videos/generations")
     @app.post("/api/v1" + VIDEO_PATH)
     async def video_synthesis(request: Request, caller: Caller = Depends(caller_dep)) -> Response:
         body = await _json(request)
         spec = cloud.model_for(str(body.get("model", "")), "video", caller)
+        if settings.qianfan_enabled:
+            payload, reserve_seconds = qianfan_media.video_payload(body)
+            headers = upstream_headers()
+            clip_cost = spec.video_cost_uy(reserve_seconds, "1080P")
+            request_id = uuid.uuid4().hex[:16]
+            cloud.check_budget(caller, minimum=spec.per_clip, cost_uy=clip_cost, request_id=request_id, place=client_place(request))
+            try:
+                task_id = await qianfan_media.create_video(http, settings.upstream_base.rstrip("/"), headers, payload)
+                cloud.db.insert_video_task(task_id, caller.account_id, spec.id, cost_uy=clip_cost)
+            finally:
+                cloud.settle(caller, request_id)
+            return JSONResponse({"output": {"task_id": task_id, "task_status": "PENDING"}})
         # A probe (no input) costs nothing upstream and is not priced here either.
         probe = not body.get("input")
         clip_cost = 0 if probe else spec.video_cost_uy(_clip_seconds(body, spec), _clip_resolution(body))
@@ -1867,6 +1930,17 @@ def create_app(
             cloud.settle(caller, request_id)
         return _dashscope_reply(r)
 
+    async def check_wizshot(task) -> dict:
+        output, duration, resolution = await qianfan_media.video_status(
+            http, settings.upstream_base.rstrip("/"), upstream_headers(), str(task["task_id"])
+        )
+        spec = settings.model(str(task["model"]))
+        # The hold was an upper bound. Never bill more than that bound, or charge
+        # for an estimated duration when the provider did not report usage.
+        actual = spec.video_cost_uy(duration, resolution) if duration is not None and spec is not None else 0
+        cloud.settle_video_task(task, output["task_status"], cost_uy=min(int(task["cost_uy"]), actual))
+        return output
+
     @app.get("/api/v1/tasks/{task_id}")
     async def video_task(task_id: str, caller: Caller = Depends(caller_dep)) -> Response:
         # Polling is a media route too: after hosted media is retired it must not reach the
@@ -1876,6 +1950,10 @@ def create_app(
         task = cloud.db.video_task(task_id)
         if task is None or task["account_id"] != caller.account_id:
             raise CloudError(404, "no_task", "No such task")
+        if settings.qianfan_enabled:
+            if task["model"] != qianfan_media.QIANFAN_VIDEO:
+                raise CloudError(410, "video_provider_changed", "This task belonged to the previous video provider")
+            return JSONResponse({"output": await check_wizshot(task)})
         try:
             r = await http.get(settings.dashscope_base.rstrip("/") + f"/tasks/{task_id}", headers=dashscope_headers())
         except httpx.HTTPError as e:
@@ -1904,6 +1982,19 @@ def create_app(
         done = 0
         for task in cloud.db.video_tasks_to_settle(limit):
             task_id = str(task["task_id"])
+            if settings.qianfan_enabled:
+                if task["model"] != qianfan_media.QIANFAN_VIDEO:
+                    cloud.settle_video_task(task, "UNKNOWN")
+                else:
+                    try:
+                        await check_wizshot(task)
+                    except CloudError as e:
+                        if e.code != "no_task":
+                            continue
+                        cloud.settle_video_task(task, "UNKNOWN")
+                cloud.db.note_video_check(task_id)
+                done += 1
+                continue
             try:
                 r = await http.get(settings.dashscope_base.rstrip("/") + f"/tasks/{task_id}", headers=dashscope_headers())
             except httpx.HTTPError as e:
@@ -1932,6 +2023,8 @@ def create_app(
         if request.query_params.get("action") != "getPolicy":
             raise CloudError(400, "bad_request", "action=getPolicy is the only upload call the relay makes")
         spec = cloud.model_for(request.query_params.get("model", ""), "video", caller)
+        if settings.qianfan_enabled:
+            raise CloudError(400, "wizshot_materials_required", qianfan_media.VIDEO_INPUT_HELP, {"open": "/app/?video=wizshot"})
         cloud.check_budget(caller, minimum=spec.per_clip, cost_uy=spec.video_cost_uy(spec.clip_seconds), place=client_place(request))
         try:
             r = await http.get(

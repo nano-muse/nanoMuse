@@ -82,9 +82,11 @@ class ModelSpec:
     # 2k tier for anything wider than 1k. Video: per output second.
     price_in: float = 0.0
     price_out: float = 0.0
-    # A model priced by the hour (DeepSeek on Model Studio): what a token costs in the
-    # idle hours, `idle_hours` (start, end) in Beijing time, the provider's clock — 0 means
-    # the day price all day. A request is priced at the hour it is charged (the reply in).
+    # Some models change both rates when the input crosses a token threshold.
+    long_prompt_threshold: int = 0
+    long_prompt_price_in: float = 0.0
+    long_prompt_price_out: float = 0.0
+    # For models priced by the hour, the interval uses the provider's Beijing clock.
     price_in_idle: float = 0.0
     price_out_idle: float = 0.0
     idle_hours: tuple[int, int] = (22, 8)
@@ -178,6 +180,15 @@ class ModelSpec:
                 "price_cny": {
                     "per_m_input": self.price_in,
                     "per_m_output": self.price_out,
+                    **(
+                        {
+                            "long_prompt_threshold": self.long_prompt_threshold,
+                            "per_m_long_input": self.long_prompt_price_in,
+                            "per_m_long_output": self.long_prompt_price_out,
+                        }
+                        if self.long_prompt_threshold
+                        else {}
+                    ),
                     "per_m_input_idle": self.price_in_idle,
                     "per_m_output_idle": self.price_out_idle,
                     "idle_hours": list(self.idle_hours),
@@ -219,6 +230,8 @@ class ModelSpec:
         prompt = max(0, prompt_tokens)
         cached = min(prompt, max(0, cached_tokens))
         price_in, price_out = self.chat_prices(at)
+        if self.long_prompt_threshold and prompt > self.long_prompt_threshold:
+            price_in, price_out = self.long_prompt_price_in, self.long_prompt_price_out
         fresh = (prompt - cached) * price_in + cached * price_in * self.cached_in_rate
         return round(fresh + max(0, completion_tokens) * price_out)
 
@@ -249,9 +262,7 @@ def _max_side(size: str) -> int:
     return max(parts) if parts else 0
 
 
-# The hosted menu is deliberately chat-only. The one Qwen model reads image input and
-# serves both the conversation and GUI lanes; image/video generation belongs to providers
-# and API keys configured by the person on their device.
+# Legacy self-hosted default. The Qianfan endpoint has its own menu below.
 DEFAULT_MODELS: tuple[ModelSpec, ...] = (
     ModelSpec(
         id="Qwen/Qwen3.6-27B-FP8",
@@ -266,6 +277,79 @@ DEFAULT_MODELS: tuple[ModelSpec, ...] = (
         cached_in_rate=0.2,
     ),
 )
+
+
+QIANFAN_BASE = "https://qianfan.baidubce.com/v2"
+QIANFAN_CHAT = "deepseek-v4.1-flash-1017"
+QIANFAN_GUI = "qwen3.5-397b-a17b"
+QIANFAN_IMAGE = "musesteamer-air-image"
+QIANFAN_VIDEO = "ernie-wizshot-me"
+PREVIOUS_CLOUD_MODEL = "Qwen/Qwen3.6-27B-FP8"
+
+# Public inference prices: https://cloud.baidu.com/doc/qianfan/s/wmh4sv6ya
+# Use the provider's prompt_tokens limit as the client context budget: /models
+# also includes output-only capacity in context_length, which cannot be used for input.
+QIANFAN_MODELS = (
+    ModelSpec(
+        id=QIANFAN_CHAT,
+        name="DeepSeek V4.1 Flash",
+        upstream=QIANFAN_CHAT,
+        input_modalities=("text", "image"),
+        for_=("chat",),
+        recommended=True,
+        context_length=1_048_576,
+        max_output_tokens=393_216,
+        price_in=2,
+        price_out=8,
+        price_in_idle=1,
+        price_out_idle=4,
+        cached_in_rate=0.02,
+    ),
+    ModelSpec(
+        id=QIANFAN_GUI,
+        name="Qwen 3.5 397B A17B",
+        upstream=QIANFAN_GUI,
+        input_modalities=("text", "image"),
+        for_=("gui",),
+        recommended=True,
+        context_length=260_096,
+        max_output_tokens=65_536,
+        price_in=1.2,
+        price_out=7.2,
+        long_prompt_threshold=128 * 1024,
+        long_prompt_price_in=3,
+        long_prompt_price_out=18,
+    ),
+    ModelSpec(
+        id=QIANFAN_IMAGE,
+        name="MuseSteamer Air Image",
+        upstream=QIANFAN_IMAGE,
+        kind="image",
+        output_modalities=("image",),
+        recommended=True,
+        price_image=0.05,
+    ),
+    ModelSpec(
+        id=QIANFAN_VIDEO,
+        name="ERNIE Wizshot ME",
+        upstream=QIANFAN_VIDEO,
+        kind="video",
+        input_modalities=("text", "image", "audio"),
+        output_modalities=("video",),
+        recommended=True,
+        price_second=0.7,
+    ),
+)
+QIANFAN_ALIASES = {
+    PREVIOUS_CLOUD_MODEL: QIANFAN_CHAT,
+    "deepseek-v4.1-flash": QIANFAN_CHAT,
+    "qwen3.8-27b": QIANFAN_CHAT,
+    "qwen3.8-flash": QIANFAN_CHAT,
+    "qwen-image-3.0-pro": QIANFAN_IMAGE,
+    "qwen-image-3.0": QIANFAN_IMAGE,
+    "wan2.2-i2v-flash": QIANFAN_VIDEO,
+    "wan2.2-t2v-plus": QIANFAN_VIDEO,
+}
 
 
 # Ids older app builds still send, and what answers them now. Video is not
@@ -392,6 +476,12 @@ def _int(name: str, default: int) -> int:
     return int(_env(name, str(default)))
 
 
+def _upstream_base() -> str:
+    # A real DashScope API key cannot select Baidu by accident.
+    baidu_key = _env("QIANFAN_API_KEY") or _env("DASHSCOPE_API_KEY").startswith("bce-v3/")
+    return _env("UPSTREAM_BASE", QIANFAN_BASE if baidu_key else "https://dashscope.aliyuncs.com/compatible-mode/v1")
+
+
 def _models_from_env() -> tuple[ModelSpec, ...]:
     raw = _env("CLOUD_MODELS")
     if not raw:
@@ -440,7 +530,7 @@ class Settings:
     # What the app should put in the provider's base URL, without /v1.
     public_base: str = field(default_factory=lambda: _env("PUBLIC_BASE", "http://127.0.0.1:8787"))
 
-    upstream_base: str = field(default_factory=lambda: _env("UPSTREAM_BASE", "https://dashscope.aliyuncs.com/compatible-mode/v1"))
+    upstream_base: str = field(default_factory=_upstream_base)
     upstream_key: str = field(default_factory=lambda: _env("UPSTREAM_KEY"))
     # DashScope's native host, for drawing (its OpenAI-compatible host has no
     # images endpoint). Empty keeps using UPSTREAM_KEY for backwards compatibility.
@@ -622,10 +712,13 @@ class Settings:
     aliyun_sms_api: str = field(default_factory=lambda: _env("ALIYUN_SMS_API", "dypns"))
 
     models: tuple[ModelSpec, ...] = field(default_factory=_models_from_env)
-    # Self-hosted relays may deliberately keep the historical native media proxy. The
-    # project-hosted default is off; with it off every media route returns an actionable
-    # retirement error before an upstream request or charge.
-    media_enabled: bool = field(default_factory=lambda: _env("CLOUD_MEDIA_ENABLED", "0") in ("1", "true", "yes"))
+    # Qianfan serves hosted media; other installations explicitly opt in to their
+    # native proxy. Disabling it refuses media before an upstream request or charge.
+    media_enabled: bool = field(
+        default_factory=lambda: (
+            _env("CLOUD_MEDIA_ENABLED", "1" if _upstream_base().rstrip("/") == QIANFAN_BASE else "0") in ("1", "true", "yes")
+        )
+    )
     # Old clients can keep a saved model id while an operator changes provider.
     # This JSON object is merged over the aliases built into the relay.
     model_aliases: dict[str, str] = field(default_factory=_model_aliases_from_env)
@@ -682,6 +775,26 @@ class Settings:
     # above; empty = the rule writes its audit line and the log says there was nobody to tell.
     admin_email: str = field(default_factory=lambda: _env("ADMIN_EMAIL"))
 
+    def __post_init__(self) -> None:
+        if self.qianfan_enabled:
+            # Never reuse the displaced provider's UPSTREAM_KEY. A Baidu credential
+            # is valid only for the official endpoint; other relays keep their own key.
+            object.__setattr__(self, "upstream_key", _env("QIANFAN_API_KEY", _env("DASHSCOPE_API_KEY")))
+            if self.models is DEFAULT_MODELS:
+                object.__setattr__(self, "models", QIANFAN_MODELS)
+            elif sorted((m.id, m.kind, m.upstream, m.lanes) for m in self.models) != sorted(
+                (m.id, m.kind, m.upstream, m.lanes) for m in QIANFAN_MODELS
+            ):
+                raise ValueError("Reset CLOUD_MODELS or supply the four Qianfan models with their original IDs and lanes")
+            # Paid members keep their balances and permissions. This provider serves
+            # just the configured menu; never substitute an arbitrary upstream ID.
+            object.__setattr__(self, "any_model_members", False)
+            object.__setattr__(self, "catalog_enabled", False)
+
+    @property
+    def qianfan_enabled(self) -> bool:
+        return self.upstream_base.rstrip("/") == QIANFAN_BASE
+
     @property
     def trusted_proxy_list(self) -> list[str]:
         """TRUSTED_PROXIES as a list, else the non-global networks (client.py agrees)."""
@@ -731,7 +844,7 @@ class Settings:
                 return m
         # Phones from before 0.4 still ask for the model the menu used to carry;
         # operators may also keep saved ids working after changing provider.
-        alias = self.model_aliases.get(model_id)
+        alias = (QIANFAN_ALIASES.get(model_id) if self.qianfan_enabled else None) or self.model_aliases.get(model_id)
         if alias and alias != model_id:
             return next((m for m in self.models if m.id == alias), None)
         return None
@@ -743,7 +856,7 @@ class Settings:
         operator's page errs on the high side rather than showing nothing. None when
         the id is not shaped like one, or the kind is unknown."""
         model_id = model_id.strip()
-        if kind not in _UNLISTED_MODALITIES or not MODEL_ID_RE.match(model_id):
+        if self.qianfan_enabled or kind not in _UNLISTED_MODALITIES or not MODEL_ID_RE.match(model_id):
             return None
         inputs, outputs = _UNLISTED_MODALITIES[kind]
         spec = ModelSpec(
