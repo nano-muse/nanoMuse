@@ -653,12 +653,14 @@ internal fun buildFlatChatItems(
         // the assistant header so each info block stands on its own. Mirrors
         // iOS systemDividerRow / compactDividerRow.
         val isSystem = message.role == "system"
-        val joinedMarkdown = run {
-            val parts = message.toolBlocks
-                .filter { it.kind == "text" && it.content.isNotEmpty() }
-                .joinToString("\n\n") { it.content }
-            if (parts.isNotEmpty()) parts else message.content
-        }
+        // nanoMuse: providers may send whitespace before a tool call. Only visible text
+        // gets a row, but keep the original Markdown of every block that does render.
+        val blocks = message.toolBlocks
+        val blockMarkdown = blocks.filter { it.kind == "text" && it.content.isNotBlank() }
+            .joinToString("\n\n") { it.content }
+        val hasLegacyText = blockMarkdown.isEmpty() && message.content.isNotBlank()
+        val hasReplyText = blockMarkdown.isNotEmpty() || hasLegacyText
+        val joinedMarkdown = blockMarkdown.ifEmpty { message.content }
         // T83: when Resume creates a fresh assistant bubble after the user
         // stopped a streaming turn, the previous (cancelled) assistant
         // message is right before this one in the list. Visually they should
@@ -686,7 +688,6 @@ internal fun buildFlatChatItems(
             out.add(dedupe(FlatChatItem.AssistantHeader(message.id)))
         }
 
-        val blocks = message.toolBlocks
         val toolPillBlocks = blocks.filter { it.kind == "tool_use" }
         val lastThinkingId = blocks.lastOrNull { it.kind == "thinking" }?.id
         // [T-android-thinking-auto-collapse] Id of the last block of ANY
@@ -695,7 +696,6 @@ internal fun buildFlatChatItems(
         // AssistantThinking.isLastBlockOverall KDoc.
         val lastBlockId = blocks.lastOrNull()?.id
         val lastTextIdx = blocks.indexOfLast { it.kind == "text" }
-        val hasAnyTextBlock = lastTextIdx >= 0
         // Only the last cancelled tool_use in the message gets the Retry button —
         // retryLast() re-runs the whole turn, so one button is enough.
         val lastCancelledToolId = blocks.lastOrNull { it.kind == "tool_use" && it.toolStatus == ToolBlockStatus.CANCELLED }?.id
@@ -703,7 +703,7 @@ internal fun buildFlatChatItems(
         blocks.forEachIndexed { index, block ->
             when (block.kind) {
                 "text" -> {
-                    if (block.content.isNotEmpty()) {
+                    if (block.content.isNotBlank()) { // nanoMuse: no padded bubble for tool separators
                         val isLastText = index == lastTextIdx
                         // nanoMuse: keep each assistant text block in a single markdown
                         // bubble (matching iOS) so lists, headings, paragraphs, and code
@@ -764,11 +764,10 @@ internal fun buildFlatChatItems(
         // A null thinkingLevel snapshot falls back to the chat's CURRENT
         // level in the renderer, which this pure builder can't read — treat
         // it as visible (legacy messages; conservative, old behavior).
-        val hasVisibleContent = message.content.isNotEmpty() || blocks.any {
+        val hasVisibleContent = hasReplyText || blocks.any { // nanoMuse: whitespace does not end the typing indicator
             when (it.kind) {
-                "info" -> false
+                "info", "text" -> false // nanoMuse: visible text was counted above
                 "thinking" -> showSteps && (message.thinkingLevel?.isEnabled ?: true) // nanoMuse: hidden steps do not count
-                "text" -> it.content.isNotEmpty()
                 "tool_use" -> showSteps || it.hasLiveHandsProgress() // nanoMuse: live background progress stays visible
                 else -> true // the app's own cards
             }
@@ -778,8 +777,8 @@ internal fun buildFlatChatItems(
         }
 
         // Legacy fallback: pre-migration sessions stored all text in message.content
-        // with no text-kind blocks. Render it after blocks in that case only.
-        if (!hasAnyTextBlock && message.content.isNotEmpty()) {
+        // nanoMuse: use that text when no structured block contains visible Markdown.
+        if (hasLegacyText) {
             out.add(dedupe(FlatChatItem.AssistantLegacyContent(
                 messageId = message.id,
                 content = message.content,
@@ -792,7 +791,7 @@ internal fun buildFlatChatItems(
             out.add(dedupe(FlatChatItem.AssistantError(message.id, it)))
         }
         // nanoMuse: a finished reply with words in it takes the two thumbs (drawn under the newest one only)
-        if (message.role == "assistant" && !message.isStreaming && message.error == null && (message.content.isNotEmpty() || blocks.any { it.kind == "text" && it.content.isNotEmpty() })) {
+        if (message.role == "assistant" && !message.isStreaming && message.error == null && hasReplyText) {
             out.add(dedupe(FlatChatItem.NanoMuseThumbs(message.id)))
         }
     }
@@ -801,7 +800,7 @@ internal fun buildFlatChatItems(
 
 /** nanoMuse: a finished assistant turn made of steps alone — nothing the chat would show with the steps hidden. */
 private fun stepsOnlyTurn(m: ChatMessage): Boolean =
-    m.role == "assistant" && !m.isStreaming && m.error == null && m.content.isEmpty() &&
+    m.role == "assistant" && !m.isStreaming && m.error == null && m.content.isBlank() &&
         m.toolBlocks.isNotEmpty() && m.toolBlocks.all {
-            it.kind == "tool_use" || it.kind == "thinking" || (it.kind == "text" && it.content.isEmpty())
+            it.kind == "tool_use" || it.kind == "thinking" || (it.kind == "text" && it.content.isBlank())
         }
