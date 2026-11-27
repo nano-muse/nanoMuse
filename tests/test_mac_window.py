@@ -38,6 +38,7 @@ def fake_screen(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     def capture(max_width: int = 1600) -> dict[str, Any]:
         return dict(screens[0] if len(screens) == 1 else screens.pop(0))
 
+    monkeypatch.setattr("nanomuse.computer.link.mac_frontmost_pid", lambda: 501)
     monkeypatch.setattr("nanomuse.computer.link.capture", capture)
     monkeypatch.setattr("nanomuse.computer.link.active_window", lambda: ("firefox", "Firefox"))
     monkeypatch.setattr("nanomuse.computer.link.screen_size", lambda: (1920, 1080))
@@ -614,7 +615,11 @@ async def test_the_first_action_in_an_application_asks(settings: Settings, fake_
         ]
     )
     sentinel = Sentinel(settings.sentinel, AuditLog(settings.data_dir / "audit.jsonl"), ui)
-    link = ComputerLink(HandsSettings(enabled=True, settle_s=0.0), backend=FakeHands())
+    link = ComputerLink(
+        HandsSettings(enabled=True, settle_s=0.0),
+        backend=FakeHands(),
+        shots_dir=settings.agent.workspace / "screenshots",
+    )
 
     async def gate(app_id: str, label: str) -> bool:
         return await sentinel.allow_app(app_id, label, "Nova")
