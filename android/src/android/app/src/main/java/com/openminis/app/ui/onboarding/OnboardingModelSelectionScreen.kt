@@ -155,12 +155,16 @@ fun OnboardingModelSelectionScreen(
                     for ((instanceId, entries) in grouped) {
                         val instance = config.instances.find { it.id == instanceId }
                         item(key = "header_$instanceId") {
-                            Text(
-                                instance?.label ?: instanceId,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 8.dp),
-                            )
+                            // nanoMuse: label each unavailable account catalogue in the initial picker too.
+                            Column {
+                                Text(
+                                    instance?.label ?: instanceId,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                )
+                                if (instance != null) io.github.nanomuse.ui.models.CodexCatalogueNotice(instance, providerRepository.codexCatalogues)
+                            }
                         }
                         items(entries, key = { it.id }) { entry ->
                             val isSelected = entry.id in selected

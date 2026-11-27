@@ -1439,4 +1439,6 @@
     <string name="nm_hands_wireless_notify_problem">Return to nanoMuse to see how to continue.</string>
     <string name="nm_hands_wireless_repair">Pair again</string>
     <string name="nm_hands_wireless_repair_sub">Run pairing again if Android cleared paired devices or authorization expired</string>
+    <string name="nm_codex_catalogue_fallback">Could not refresh the Codex model list. Showing saved or built-in models.</string>
+    <string name="nm_chat_setup_failed">Could not prepare this message. Check that the conversation still exists and the device has free space.</string>
 </resources>

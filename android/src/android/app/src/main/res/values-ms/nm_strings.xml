@@ -1455,4 +1455,6 @@
     <string name="nm_hands_wireless_notify_problem">Kembali ke nanoMuse untuk melihat langkah seterusnya.</string>
     <string name="nm_hands_wireless_repair">Gandingkan semula</string>
     <string name="nm_hands_wireless_repair_sub">Gandingkan semula jika Android memadam peranti digandingkan atau keizinan tamat tempoh</string>
+    <string name="nm_codex_catalogue_fallback">Senarai model Codex tidak dapat dimuat semula. Model yang disimpan atau terbina dalam dipaparkan.</string>
+    <string name="nm_chat_setup_failed">Mesej tidak dapat disediakan. Pastikan perbualan masih wujud dan peranti mempunyai ruang kosong.</string>
 </resources>

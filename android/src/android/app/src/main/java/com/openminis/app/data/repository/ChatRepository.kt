@@ -382,7 +382,6 @@ class ChatRepository(internal val dao: ChatDao) {
         reasoningContent: String? = null,
         modelSnapshot: ModelAttributionSnapshot? = null,
     ): MessageEntity {
-        val sortOrder = dao.nextSortOrder(sessionId)
         val now = System.currentTimeMillis()
         // Cap the body so a runaway tool_result (e.g. a 13 MB browser_use
         // dump — Issue #17) cannot land an oversize blob into a Room row
@@ -402,14 +401,13 @@ class ChatRepository(internal val dao: ChatDao) {
             partsJson = capped,
             createdAt = now,
             tokenUsage = tokenUsage,
-            sortOrder = sortOrder,
+            sortOrder = 0, // nanoMuse: appendWithPreview assigns the next position inside the transaction
             reasoningContent = reasoningContent,
             modelId = modelSnapshot?.modelId,
             modelDisplayName = modelSnapshot?.displayName,
             providerType = modelSnapshot?.providerTypeRaw,
             providerInstanceId = modelSnapshot?.providerInstanceId,
         )
-        dao.insertMessage(message)
         // [T-android-preview-flicker-toolresult] Only overwrite the preview
         // when this row actually yields one. A tool-result row is
         // `[{"type":"toolResult",…}]`, a shape extractTextPreview does not
@@ -422,15 +420,10 @@ class ChatRepository(internal val dao: ChatDao) {
         //
         // The row's own timestamp is still worth recording: it is what keeps
         // the session sorted as recently-active while a long tool chain runs.
-        val preview = extractTextPreview(capped)
-        if (preview != null) {
-            dao.updateLastMessage(sessionId, preview, now)
-        } else {
-            dao.touchSession(sessionId, now)
-        }
+        val stored = dao.appendWithPreview(message, extractTextPreview(capped)) // nanoMuse: one commit for row and session metadata
         // nanoMuse: a moment after the turn's last row, the chat reaches the account's other devices
         io.github.nanomuse.sync.ConversationSync.changed()
-        return message
+        return stored
     }
 
     /**

@@ -725,7 +725,7 @@ class ThinkingRulesRegressionTest {
     // nanoMuse: keep the live model catalogue and real Codex requests in sync.
     @Test
     fun `Codex OAuth requests advertise a modern client version`() {
-        assertEquals("0.162.1", OpenAIProvider.CODEX_CLIENT_VERSION)
+        assertEquals("0.171.0", OpenAIProvider.CODEX_CLIENT_VERSION)
     }
 
 

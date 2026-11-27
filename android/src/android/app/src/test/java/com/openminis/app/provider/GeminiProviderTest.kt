@@ -394,6 +394,21 @@ class GeminiProviderTest {
         throw AssertionError("Expected TransientError")
     }
 
+    // nanoMuse: both the preview and clipboard need the diagnostic after a long response prefix.
+    @Test
+    fun `400 retains nested Gemini diagnostic after first 200 characters`() = runBlocking {
+        val body = JSONObject().put("error", JSONObject().put("code", 400)
+            .put("message", "context ".repeat(75))
+            .put("details", "Expected text at parts[2]")).toString()
+        server.enqueue(MockResponse().setResponseCode(400).setBody(body))
+        try {
+            provider.sendMessage(listOf(LLMMessage(LLMMessage.Role.USER, "test")), null, 100)
+            throw AssertionError("Expected ProviderError")
+        } catch (e: LLMError.ProviderError) {
+            assertTrue(e.message.orEmpty().endsWith(body))
+        }
+    }
+
     // -- Provider metadata --
 
     @Test

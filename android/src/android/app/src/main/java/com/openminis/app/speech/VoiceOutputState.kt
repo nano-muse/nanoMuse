@@ -139,7 +139,11 @@ object VoiceOutputState {
         synchronized(players) { players.lastOrNull() === player }
 
     /** Effective gate for producing reply audio: enabled AND not muted. */
-    val canPlay: Boolean get() = _isEnabled.value && !_isMuted.value
+    val canPlay: Boolean get() = permitsPlayback(manualSelection = false)
+
+    // nanoMuse: tapping Read aloud is sufficient to request this message. Mute applies to both paths.
+    internal fun permitsPlayback(manualSelection: Boolean): Boolean =
+        !_isMuted.value && (manualSelection || _isEnabled.value)
 
     /**
      * [T-android-tts-stop-on-capture] Silence EVERY live player because the mic
