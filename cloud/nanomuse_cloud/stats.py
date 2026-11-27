@@ -37,6 +37,7 @@ API_GROUPS: tuple[tuple[str, str], ...] = (
     ("/v1/chat/", "chat"),
     ("/v1/images/", "images"),
     ("/api/v1/", "video"),
+    ("/v1/videos/", "video"),
     ("/v1/models", "models"),
     ("/v1/sync/", "sync"),
     ("/v1/devices", "devices"),

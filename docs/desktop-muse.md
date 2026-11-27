@@ -173,7 +173,7 @@ toy look by default), choose an image provider and key of your own, *Draw four*,
 and the four candidates come up in a 2×2 grid with *Option 1–4*; *This one* draws the
 other poses from the pick (working, waiting, happy, oops) and the new look is on, for
 every device of the account. The pictures go directly to the selected provider of your
-own (or to a self-hosted relay that explicitly advertises media), the browser squares each
+own, or through the relay for text-to-image generation, the browser squares each
 still to 512 px WebP, and the host writes the face to the account (`PUT /v1/me/profile`
 with the `face` map) and pulls it back under `faces/<id>/`. Signed out, the face is worn
 on this computer alone: the stills are already here, so they are kept under `faces/<id>/`
@@ -416,8 +416,7 @@ page it opened, named for the page you came from; a pick in the sidebar starts f
   provider*, which opens the ways on under Account. When you have not chosen, a row
   follows the provider new chats answer through (its catalogue default for the job) when
   that is one of your own, else nanoMuse Cloud while signed in only when its live menu
-  offers the job, else the first of your providers that can. The hosted Cloud offers
-  chat and screen operation, not media generation.
+  offers the job, else the first of your providers that can. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video.
 - **Account** (under *Advanced*), the nanoMuse account: sign in or the masked
   identifier, the allowance, the look, *Open Devices*, a line that opens Settings → Models
   with what chat and the hands use now, and the block the own keys share with the account:
@@ -445,7 +444,7 @@ page it opened, named for the page you came from; a pick in the sidebar starts f
     and a footnote says *You can change this any time under Settings › Models.*
 - **Media**, the models that draw the face and its clips: the same two pickers as
   Settings → Models' *Making pictures* and *Making clips*, each own provider's models
-  (and a self-hosted relay only when it advertises media; the video picker has *Off* too).
+  (and the relay when it advertises media; the video picker has *Off* too).
   Pictures
   through your own key go to that provider directly (Model Studio's native image API,
   OpenRouter's image API, the OpenAI shape for OpenAI, Zhipu, SiliconFlow, Volcengine and
@@ -684,8 +683,7 @@ nowhere else.
 - **Any model, your key.** The relay's models for members, a DeepSeek key, or any
   OpenAI-compatible provider the harness supports. Settings → Models shows four rows:
   **Chat** (the relay's `/v1/models` entries marked and recommended for `chat`),
-  **Operating the screen** (recommended for `gui`; hosted Cloud currently recommends
-  `Qwen/Qwen3.6-27B-FP8` for both), **Making pictures** and **Making clips**; a DeepSeek entry is shown as
+  **Operating the screen** (recommended for `gui`; hosted chat uses `deepseek-v4.1-flash-1017` and screen operation uses `qwen3.5-397b-a17b`), **Making pictures** and **Making clips**; a DeepSeek entry is shown as
   sighted only when its id says `v4.1`, `vision` or `ocr`. The hands model is written to
   `$DSH_HOME/nanomuse/hands.json` (mode 0600) and handed to `nanomuse mcp` as its
   environment by the plugin's own MCP client, which it restarts when the model changes.

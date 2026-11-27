@@ -99,14 +99,11 @@ Device triggers keep the last observed online state across automatic hub reconne
   key. What each provider covers and the ChatGPT sign-in are in [web.md](web.md);
   the key is written to the vault as `LLM_API_KEY` and swapped into every thread on
   the spot; *Test* asks the model for a one-word reply. A hosted nanoMuse Cloud
-  account offers `Qwen/Qwen3.6-27B-FP8` for chat, attached-image input and screen
-  operation. **Hands model**, **Making pictures**, **Making clips** are the other
+  account uses `deepseek-v4.1-flash-1017` for chat, including attached images, and `qwen3.5-397b-a17b` for screen operation. **Hands model**, **Making pictures**, **Making clips** are the other
   three rows of the Models page the phones and desktop have under *Settings →
   Models*, shown here as cards below the chat model. *Automatic* follows the chat
   provider when it can do the job, then a signed-in relay only when its live menu
-  offers that capability, then another provider of yours. Hosted Cloud therefore
-  appears for screen operation but never for media generation: pictures and clips
-  require your own provider and API key. Each card says *Currently provider ·
+  offers that capability, then another provider of yours. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video. Each card says *Currently provider ·
   model*. Of DeepSeek's models, only ids containing `v4.1`, `vision` or `ocr` are
   treated as seeing images.
   **Recall by meaning**: whether memories are also recalled by what they mean,
@@ -295,7 +292,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | POST | `/api/hands/stop` | *Stop* on the Hands card: the task on this computer's screen ends at its next step; `{stopped}` |
 | GET / POST | `/api/holds` · `{thread, tool (browser · computer · phone), reason?}` | the holds that are on / take over: the agent's actions of that kind in that chat wait until *Done*. Answers the hold event `{type: "hold", id, thread, tool, status, by, reason, ts}`; 404 for an unknown thread |
 | POST | `/api/holds/{id}/done` | *Done*: the hold goes off and the waiting tool looks again and continues; one that is already off comes back as it is. 404 for an unknown id |
-| GET / PUT | `/api/connections/image` · `/api/connections/video` `{provider, model, base_url, api_key}` or `{endpoint, model}` | the picture and clip slots of the avatar studio ([avatar.md](avatar.md)): `provider` a catalogue id (or `openai` / `openai_responses` with a `base_url`), `model` empty for the catalogue's default, `api_key` set → vault, `""` removes it, omitted → unchanged; all four `""` clears the slot and automatic resolution uses the chat provider, then a signed-in relay only if its live menu offers that media kind, then another provider of your own; hosted Cloud offers no media generation |
+| GET / PUT | `/api/connections/image` · `/api/connections/video` `{provider, model, base_url, api_key}` or `{endpoint, model}` | the picture and clip slots of the avatar studio ([avatar.md](avatar.md)): `provider` a catalogue id (or `openai` / `openai_responses` with a `base_url`), `model` empty for the catalogue's default, `api_key` set → vault, `""` removes it, omitted → unchanged; all four `""` clears the slot and automatic resolution uses the chat provider, then a signed-in relay only if its live menu offers that media kind, then another provider of your own |
 | GET | `/api/providers?lang=&region=` | the catalogue with what each slot uses, what that covers and one sentence per capability nothing covers (`lang`: `en` · `zh`, `region`: `cn` · `global`); what the *Add a model* sheet is drawn from |
 | POST · GET · GET · POST · POST | `/api/chatgpt/login` · `/status` · `/usage` · `/callback {url}` · `/logout` | the ChatGPT sign-in of [own-key.md](own-key.md#sign-in-with-a-plan-you-already-pay-for): start the Codex sign-in (the page to open), the token store without the tokens, what is left of the plan's usage windows, the callback address pasted from the browser (400 for another login's `state`), forget the sign-in |
 | POST · DELETE | `/api/connections/mcp` `{name, command, args[], env{}, url, risk}` · `/api/connections/mcp/{name}` | connect a server now (502 if it does not come up) / disconnect and remove one added from the app. Each `env` value goes into the vault as `MCP_<SERVER>_<KEY>` and the settings file keeps `{{vault:...}}`; a value typed as a reference is kept as typed; removing the server removes those entries. The view lists each server's `env` as `[{name, vault}]`, never a value |
@@ -324,7 +321,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | GET · DELETE | `/api/cloud/sessions` · `/api/cloud/sessions/{prefix}` | the account's sign-ins on every device / revoke one by the prefix the list shows; both answer `{sessions}` |
 | POST | `/api/cloud/sign-out` · `/api/cloud/sign-out-all` `{all}` | sign this device out / revoke every other device's sign-in (`all: true` this one too, `{signed_out}` with the account view) |
 | GET | `/api/cloud/events?limit=` | the account's activity log from the relay: `{events}`; `limit` 1 to 200, 50 by default |
-| POST | `/api/cloud/models` `{on}` | *Use nanoMuse Cloud models*: off, the account's chat and screen-operation model leaves the automatic order and providers' listing (as do any media models advertised by a self-hosted relay); the sign-in stays. 409 `chat_on_cloud` while the chat model is the account's |
+| POST | `/api/cloud/models` `{on}` | *Use nanoMuse Cloud models*: off, the account's chat and screen-operation model leaves the automatic order and providers' listing (as do the media models in its menu); the sign-in stays. 409 `chat_on_cloud` while the chat model is the account's |
 | POST | `/api/cloud/use-as-model` `{model?}` | make the account the chat model: the recommended model unless one is named, the Cloud key from the vault; switches the account's models back on. Answers the connections view's `llm` |
 | POST · DELETE | `/api/cloud/contribute` `{on}` · `/api/cloud/samples` | data controls: *Help improve nanoMuse's AI models* on or off (the relay keeps chat turns only while it is on) / delete what it kept, `{deleted}` |
 | POST | `/api/cloud/delete` | delete the account on the relay and sign out here; answers the account view |

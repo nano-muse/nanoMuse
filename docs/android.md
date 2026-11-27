@@ -50,8 +50,7 @@ update*) and offers the download.
    app ships with). Four models are set, not one, and they live on one page, **Settings →
    Models** (the card at the top of Settings opens it): **Chat**, the model that talks with
    you; **Operating the screen**, the one that looks at the screen; **Making pictures** and
-   **Making clips**. The hosted account recommends the same multimodal
-   `Qwen/Qwen3.6-27B-FP8` for the first two jobs and does not generate pictures or clips.
+   **Making clips**. The hosted chat model is `deepseek-v4.1-flash-1017` and the hands use `qwen3.5-397b-a17b`. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video.
    Each row shows `<provider> · <model>` and opens a picker: the *nanoMuse Cloud* group first
    when signed in only on rows its live menu covers, then one group per provider of your own
    with only the models that fit the row. A group shows eight models until you tap *Show N more* (the catalogue's default
@@ -62,7 +61,7 @@ update*) and offers the download.
    chat's own `•••` menu, is the default for new chats and moves the main chat
    (*Applies to the main chat and to new chats; a side chat keeps its model.*); a side
    chat already open keeps its model. The other three pickers
-   open with *Automatic* (*Currently nanoMuse Cloud · Qwen/Qwen3.6-27B-FP8* for screen
+   open with *Automatic* (*Currently nanoMuse Cloud · qwen3.5-397b-a17b* for screen
    operation, for example), which forgets a choice
    made there and lets the row follow the order below again. Signed in, the page opens with
    one switch, *Use nanoMuse Cloud models*: off, the account leaves every picker and the
@@ -98,7 +97,7 @@ The other model choices stay as they are. The page is the place to change it lat
 first provider of your own. The screen, pictures and clips follow the chat provider when it is
 a provider of your own with that capability (its catalogue default); else the relay's model
 when signed in and its live menu offers that job; else the first provider of your own that
-can. The hosted Cloud menu offers chat and screen operation, not media generation. A choice
+can. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video. A choice
 always wins, and nanoMuse Cloud never steps in front of a provider you chose. When a model of your own fails,
 nothing falls back on its own: the error card gets *Use nanoMuse Cloud this time* (signed in
 only) for a chat or screen turn, which runs that one turn on the relay's chat model and

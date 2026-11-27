@@ -109,9 +109,9 @@ hub 自动重连时，设备触发器会保留上次观察到的在线状态。�
 - 「连接」：管理模型和外部服务，以下说明各配置卡片。
 - 「设置」：名称、形象、颜色、性格、如何称呼你；哨兵模式，平衡为 `ask`、谨慎为 `strict`、放手为 `auto`；命令是否在[沙箱](sentinel.md#the-sandbox)运行；主动性、跟进间隔和免打扰，见[后台工作](#background-work)；通知；Android 旧版「保持运行」的电池、悬浮窗、闹钟权限、重启自启和日志导出，见 [archive/android-python-line.md](../archive/android-python-line.md#keeping-it-running)；「显示思考过程」、应用语言、回复语言。版本信息始终显示已安装版本和最新版本，如「最新版 0.1.x，你已经在用了」「0.1.x 已发布 · 更新」「没能检查到最新版本 · 现在检查」。先查 `nanomuse.cn/dl/index.json`，再查 GitHub。
 
-「连接」中的**模型**卡提供百炼、OpenRouter、DeepSeek、OpenAI、Ollama 及自定义 OpenAI 兼容服务商预设，设置模型名、工具调用模式和 API key。服务能力和 ChatGPT 登录见 [web.md](web.md)。key 以 `LLM_API_KEY` 写入保险库，并立即应用到所有对话。「测试」让模型返回一个词。托管 nanoMuse Cloud 的 `Qwen/Qwen3.6-27B-FP8` 支持聊天、附件图片理解和操作屏幕。
+「连接」中的**模型**卡提供百炼、OpenRouter、DeepSeek、OpenAI、Ollama 及自定义 OpenAI 兼容服务商预设，设置模型名、工具调用模式和 API key。服务能力和 ChatGPT 登录见 [web.md](web.md)。key 以 `LLM_API_KEY` 写入保险库，并立即应用到所有对话。「测试」让模型返回一个词。托管对话和附图理解使用 `deepseek-v4.1-flash-1017`，屏幕操作使用 `qwen3.5-397b-a17b`。
 
-下方「手的模型」「生成图片」「生成视频」卡片对应手机、桌面设置 → 模型中的其他三项。「自动」依次使用具备能力的聊天服务商、实际模型菜单中提供该能力的已登录中继、其他自备服务商。托管 Cloud 因而可用于屏幕操作，不能生成媒体；图片和视频需自己的服务商及 API key。卡片显示「当前为 服务商 · 模型」。DeepSeek 仅 ID 含 `v4.1`、`vision`、`ocr` 的模型视为支持图片。
+下方「手的模型」「生成图片」「生成视频」卡片对应手机、桌面设置 → 模型中的其他三项。「自动」依次使用具备能力的聊天服务商、实际模型菜单中提供该能力的已登录中继、其他自备服务商。1.0.10 可在 [Cloud 网页](cloud.md)使用托管文生图和人物视频。卡片显示「当前为 服务商 · 模型」。DeepSeek 仅 ID 含 `v4.1`、`vision`、`ocr` 的模型视为支持图片。
 
 **按含义召回**通过兼容 OpenAI 的 `/embeddings` 查找语义相关记忆。选「自动」时，有向量接口就用聊天模型接口，没有则只按关键词；也可明确开启、关闭或指定另一接口。例如 DeepSeek 没有此接口时，可搭配 Ollama `qwen3-embedding:0.6b`。key 名为 `EMBEDDINGS_API_KEY`，模型留空采用接口默认。「测试」先调用一次，成功后立即为全部记忆建立索引，并显示数量。
 
@@ -283,7 +283,7 @@ Android 和 iPhone 都能自己检查这些公开来源，电脑关机也可以�
 | POST | `/api/hands/stop` | 对应「手」卡片的「停止」，本机屏幕任务在下一步停止，返回 `{stopped}`。 |
 | GET / POST | `/api/holds` · `{thread, tool (browser · computer · phone), reason?}` | 获取当前等待用户的接管状态，或创建接管。当前聊天中相应工具动作暂停到用户点击「完成」。返回 `{type: "hold", id, thread, tool, status, by, reason, ts}`；未知对话返回 404。 |
 | POST | `/api/holds/{id}/done` | 结束接管，让等待工具重新观察并继续；已结束则返回现状。未知 ID 返回 404。 |
-| GET / PUT | `/api/connections/image` · `/api/connections/video` `{provider, model, base_url, api_key}` 或 `{endpoint, model}` | 配置[形象工作室](avatar.md)图片和视频模型。`provider` 为目录 ID，或配 `base_url` 的 `openai` / `openai_responses`；`model` 空则用目录默认。key 提供时存保险库，`""` 移除，省略保留。四字段全为 `""` 时清空该模型项，自动选择依次使用聊天服务商、实际菜单提供此媒体类型的已登录中继、其他自备服务商。托管 Cloud 不提供媒体生成。 |
+| GET / PUT | `/api/connections/image` · `/api/connections/video` `{provider, model, base_url, api_key}` 或 `{endpoint, model}` | 配置[形象工作室](avatar.md)图片和视频模型。`provider` 为目录 ID，或配 `base_url` 的 `openai` / `openai_responses`；`model` 空则用目录默认。key 提供时存保险库，`""` 移除，省略保留。四字段全为 `""` 时清空该模型项，自动选择依次使用聊天服务商、实际菜单提供此媒体类型的已登录中继、其他自备服务商。1.0.10 可在 [Cloud 网页](cloud.md)使用托管文生图和人物视频。 |
 | GET | `/api/providers?lang=&region=` | 返回服务商目录、各模型项当前选择、已覆盖能力及每项未覆盖能力的说明。`lang` 为 `en` · `zh`，`region` 为 `cn` · `global`。「添加模型」面板据此显示。 |
 | POST · GET · GET · POST · POST | `/api/chatgpt/login` · `/status` · `/usage` · `/callback {url}` · `/logout` | 提供[已有套餐登录](own-key.md#sign-in-with-a-plan-you-already-pay-for)中的 ChatGPT 流程：启动 Codex 登录并返回页面；查看不含令牌值的令牌存储状态；查看套餐用量窗口剩余量；提交从浏览器复制的回调 URL，其他登录的 `state` 返回 400；退出并删除登录状态。 |
 | POST · DELETE | `/api/connections/mcp` `{name, command, args[], env{}, url, risk}` · `/api/connections/mcp/{name}` | 立即连接 MCP 服务器，启动失败返回 502；或断开并删除从 App 添加的服务器。`env` 各值存为 `MCP_<SERVER>_<KEY>`，设置文件仅留 `{{vault:...}}`；原本填写的引用原样保留。移除服务器时删除对应凭据。返回视图中的 `env` 仅为 `[{name, vault}]`，不含值。 |
@@ -312,7 +312,7 @@ Android 和 iPhone 都能自己检查这些公开来源，电脑关机也可以�
 | GET · DELETE | `/api/cloud/sessions` · `/api/cloud/sessions/{prefix}` | 列出全部设备登录；或按显示的前缀撤销一个登录。两者都返回 `{sessions}`。 |
 | POST | `/api/cloud/sign-out` · `/api/cloud/sign-out-all` `{all}` | 退出本机；或撤销其他全部登录。`all: true` 包含本机，返回 `{signed_out}` 和账号状态。 |
 | GET | `/api/cloud/events?limit=` | 获取中继账号事件 `{events}`。`limit` 为 1 至 200，默认 50。 |
-| POST | `/api/cloud/models` `{on}` | 切换「使用 nanoMuse Cloud 模型」。关闭后，账号聊天和屏幕模型从自动选择和服务商列表退出，自建中继若声明媒体模型也一并退出，账号仍登录。聊天当前使用账号模型时返回 409 `chat_on_cloud`。 |
+| POST | `/api/cloud/models` `{on}` | 切换「使用 nanoMuse Cloud 模型」。关闭后，账号聊天和屏幕模型从自动选择和服务商列表退出，中继菜单中的媒体模型也一并退出，账号仍登录。聊天当前使用账号模型时返回 409 `chat_on_cloud`。 |
 | POST | `/api/cloud/use-as-model` `{model?}` | 将账号设为聊天模型，未指定时用推荐模型，key 来自保险库，并重新启用账号模型。返回连接配置中的 `llm`。 |
 | POST · DELETE | `/api/cloud/contribute` `{on}` · `/api/cloud/samples` | 切换「帮助改进 nanoMuse 的 AI 模型」，仅开启时保留训练视图；或删除已保留内容，返回 `{deleted}`。 |
 | POST | `/api/cloud/delete` | 删除中继账号并退出本机登录，返回账号状态。 |

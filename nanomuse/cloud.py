@@ -18,9 +18,9 @@ import httpx
 from nanomuse import __version__
 
 CLOUD_KEY = "NANOMUSE_CLOUD_KEY"
-# The hosted relay has one multimodal model for both chat and GUI operation.
-DEFAULT_CHAT_MODEL = "Qwen/Qwen3.6-27B-FP8"
-DEFAULT_GUI_MODEL = DEFAULT_CHAT_MODEL
+# Offline fallbacks until the signed-in relay supplies its own recommended lanes.
+DEFAULT_CHAT_MODEL = "deepseek-v4.1-flash-1017"
+DEFAULT_GUI_MODEL = "qwen3.5-397b-a17b"
 DEFAULT_MODEL = DEFAULT_CHAT_MODEL
 
 MESSAGES = {
@@ -37,7 +37,7 @@ MESSAGES = {
     "out_of_tokens": "This account has used its tokens.",
     "account_disabled": "This account is disabled.",
     "model_not_offered": "That model is not offered here.",
-    "hosted_media_retired": "nanoMuse Cloud no longer generates pictures or clips. Add your own image or video provider and API key under Models.",
+    "hosted_media_retired": "This relay has disabled image and video generation. Add your own image or video provider and API key under Models.",
     "rate_limited": "Too many requests; slow down a little.",
     "allowance_exhausted": "The free allowance is used up. Invite a friend (the relay adds to both your allowances) or add your own model key; your sign-in and your devices keep working either way.",
     "daily_cap": "Today's token quota is used up; it comes back tomorrow.",

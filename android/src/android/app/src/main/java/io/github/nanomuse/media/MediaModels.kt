@@ -13,17 +13,20 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 
-/** Media exposed by a relay: never from public Cloud, only from a self-hosted relay's live menu. */
+/** Only the current hosted image and video models may be selected from the relay menu. */
 object RelayMediaPolicy {
-    private fun isPublicCloud(baseUrl: String): Boolean {
+    const val IMAGE = "musesteamer-air-image"
+    const val VIDEO = "ernie-wizshot-me"
+
+    fun isPublicCloud(baseUrl: String): Boolean {
         val url = baseUrl.trim().toHttpUrlOrNull() ?: return false
         return url.scheme == "https" && url.host == "cloud.nanomuse.cn" && url.port == 443
     }
 
     fun available(baseUrl: String, menuIds: Collection<String>, candidates: Collection<String>): List<String> {
-        if (isPublicCloud(baseUrl)) return emptyList()
+        val hosted = isPublicCloud(baseUrl)
         val menu = menuIds.toSet()
-        return candidates.filter { it in menu }.distinct()
+        return candidates.filter { it in menu && (!hosted || it == IMAGE || it == VIDEO) }.distinct()
     }
 }
 
@@ -102,9 +105,14 @@ object MediaModels {
     /** True when the person switched the video model off (a choice, unlike "never chosen"). */
     fun videoSwitchedOff(context: Context): Boolean = prefs(context).getString(KEY_VIDEO_INSTANCE, null) == VIDEO_OFF
 
+    private fun hostedVideoModels(context: Context, inst: ProviderInstance): List<String>? {
+        if (inst.id != NanoMuseCloud.instance(context)?.id || !RelayMediaPolicy.isPublicCloud(NanoMuseCloud.baseUrl(context))) return null
+        return NanoMuseCloud.menuModelIds(context).filter { it == RelayMediaPolicy.VIDEO }
+    }
+
     /** The video model nanoMuse would pick for [inst]: the catalogue's `defaults.video` for its vendor, else Wan 2.2 Flash. */
     fun defaultVideoModel(context: Context, inst: ProviderInstance): String =
-        io.github.nanomuse.models.ModelSlots.defaultOf(context, inst, io.github.nanomuse.models.ModelSlots.Slot.VIDEO) ?: DEFAULT_VIDEO_MODEL
+        hostedVideoModels(context, inst)?.firstOrNull() ?: io.github.nanomuse.models.ModelSlots.defaultOf(context, inst, io.github.nanomuse.models.ModelSlots.Slot.VIDEO) ?: DEFAULT_VIDEO_MODEL
 
     /**
      * The video model, or null when there is none. The one chosen (Settings → Models, or →
@@ -132,7 +140,9 @@ object MediaModels {
             )?.value
             else -> eligible.firstOrNull { it.id == saved }
         } ?: return null
-        val model = p.getString(KEY_VIDEO_MODEL, null)?.takeIf { it.isNotBlank() && saved == inst.id } ?: defaultVideoModel(context, inst)
+        val hosted = hostedVideoModels(context, inst)
+        val model = p.getString(KEY_VIDEO_MODEL, null)?.takeIf { it.isNotBlank() && saved == inst.id && (hosted == null || it in hosted) }
+            ?: defaultVideoModel(context, inst)
         val key = repo.usableApiKey(inst) ?: return null
         return VideoGen.Endpoint(inst, key, model)
     }
@@ -186,6 +196,7 @@ object MediaModels {
      * video: the known candidates, each probed once and remembered for a day.
      */
     fun availableVideoModels(context: Context, inst: ProviderInstance): List<String>? {
+        hostedVideoModels(context, inst)?.let { return it }
         val raw = prefs(context).getString(KEY_VIDEO_AVAILABLE + inst.id, null) ?: return null
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return null
         return List(arr.length()) { arr.optString(it) }.filter { it.isNotBlank() }
@@ -197,7 +208,7 @@ object MediaModels {
      * listed on the provider. Empty only when nothing was found and nothing is listed.
      */
     fun videoChoices(context: Context, inst: ProviderInstance, found: List<String>? = availableVideoModels(context, inst)): List<String> =
-        merge(found, videoEntries(context, inst))
+        hostedVideoModels(context, inst) ?: merge(found, videoEntries(context, inst))
 
     /** The pure core of [videoChoices]: the probe's word first, the person's entries after, each once. */
     internal fun merge(found: List<String>?, listed: List<String>): List<String> = (found.orEmpty() + listed).distinct()
@@ -209,6 +220,7 @@ object MediaModels {
      * showing yesterday's list for another day (#508).
      */
     fun videoCheckIsFresh(context: Context, inst: ProviderInstance): Boolean {
+        if (hostedVideoModels(context, inst) != null) return true
         val p = prefs(context)
         return System.currentTimeMillis() - p.getLong(KEY_VIDEO_CHECKED + inst.id, 0L) < VIDEO_CHECK_TTL_MS &&
             p.getString(KEY_VIDEO_CANDIDATES + inst.id, null) == JSONArray(videoCandidates(context, inst)).toString()
@@ -220,6 +232,7 @@ object MediaModels {
      * Returns the models found, or null when the host could not be reached at all.
      */
     suspend fun checkVideoModels(context: Context, inst: ProviderInstance): List<String>? = withContext(Dispatchers.IO) {
+        hostedVideoModels(context, inst)?.let { return@withContext it }
         val app = context.applicationContext as? MinisApp ?: return@withContext null
         val repo = app.providerRepositoryOrNull ?: return@withContext null
         val key = repo.usableApiKey(inst) ?: return@withContext null
@@ -276,6 +289,7 @@ object MediaModels {
                 append("(Alibaba Cloud Bailian, OpenAI with an API key, Gemini or OpenRouter; a ChatGPT plan signed in through Codex, DeepSeek, Claude, Kimi and Groq have none), and give the link [Image & video models](")
                 append(DEEP_LINK).append(") — it opens the setting. Never pretend to have drawn something.\n")
             }
+            video?.studioUrl?.let { append("For this Cloud video model, link the user to ").append(it).append(" to provide their portrait, storyboard and WAV voice reference.\n") }
             if (video == null) {
                 append("- No video model is set: the avatar stays as still pictures, and clips cannot be made. If asked, explain that clips need a provider with video models ")
                 append("(Alibaba Cloud Bailian: a Wan video model such as wan2.2-i2v-flash, picked in the setting) and give the link [Image & video models](").append(DEEP_LINK).append(").")

@@ -43,6 +43,16 @@ export interface VideoEndpoint {
   instanceId: string
 }
 
+/** This model takes a user's portrait, storyboard and voice, outside the Wan protocol. */
+export function wizshotStudio(ep: VideoEndpoint): string | undefined {
+  return ep.instanceId === 'nanomuse' && ep.model === 'ernie-wizshot-me' ? new URL('/app/?video=wizshot', ep.host).href : undefined
+}
+
+function requireClipInputs(ep: VideoEndpoint): void {
+  const url = wizshotStudio(ep)
+  if (url) throw new VideoGenError(`Add your portrait, storyboard and WAV voice reference at ${url}`)
+}
+
 export class VideoGenError extends Error {
   constructor(message: string) {
     super(message)
@@ -226,6 +236,7 @@ export async function probe(host: string, apiKey: string, model: string, fetchIm
 
 /** A clip that starts from `frame`. Returns the MP4 bytes. */
 export async function imageToVideo(ep: VideoEndpoint, frame: Frame, prompt: string, seconds = 4, options: VideoOptions = {}): Promise<Uint8Array> {
+  requireClipInputs(ep)
   const progress = options.onProgress ?? (() => undefined)
   progress({ kind: 'uploading' })
   const model = modelFor(ep.model, true)
@@ -239,6 +250,7 @@ export async function imageToVideo(ep: VideoEndpoint, frame: Frame, prompt: stri
 
 /** A clip from words alone. `ratio` is one of 16:9, 9:16, 1:1, 4:3, 3:4, 21:9. */
 export async function textToVideo(ep: VideoEndpoint, prompt: string, seconds = 4, ratio = '1:1', options: VideoOptions = {}): Promise<Uint8Array> {
+  requireClipInputs(ep)
   const progress = options.onProgress ?? (() => undefined)
   const model = modelFor(ep.model, false)
   const task = await createTask(ep, textToVideoBody(model, prompt, seconds, ratio), false, options.fetch ?? fetch, options.signal)

@@ -78,7 +78,6 @@ object ImageGen {
         val repo = app.providerRepositoryOrNull ?: return emptyList()
         val cloudId = NanoMuseCloud.instance(context)?.id
         val relayCanDraw = cloudId != null &&
-            NanoMuseCloud.baseUrl(context) != NanoMuseCloud.DEFAULT_BASE &&
             repo.config.value.instances.firstOrNull { it.id == cloudId }
                 ?.let { availableModels(context, it).isNotEmpty() } == true
         return repo.config.value.instances.filter { inst ->
@@ -220,7 +219,7 @@ object ImageGen {
                 firstOwn = eligible.firstOrNull { it.id != cloudId },
             )?.value
             ?: return null
-        val model = prefs.getString(KEY_MODEL, null)?.takeIf { it.isNotBlank() && inst.id == savedId }
+        val model = prefs.getString(KEY_MODEL, null)?.takeIf { it.isNotBlank() && inst.id == savedId && (inst.id != cloudId || it in availableModels(context, inst)) }
             ?: suggestedModel(context, inst)
         val key = repo.usableApiKey(inst) ?: return null
         return Endpoint(inst, key, model)

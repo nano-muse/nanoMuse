@@ -18,8 +18,8 @@ import SwiftUI
 // MARK: - The relay's menu (pure, tested)
 
 enum NanoMuseModelMenu {
-    static let defaultChatModel = "Qwen/Qwen3.6-27B-FP8"
-    static let defaultGuiModel = "Qwen/Qwen3.6-27B-FP8"
+    static let defaultChatModel = "deepseek-v4.1-flash-1017"
+    static let defaultGuiModel = "qwen3.5-397b-a17b"
 
     /// The relay's `for` on a menu entry — under `nanomuse` with its other flags (relay 0.17),
     /// a top-level `for` read too; nil when it did not say (a relay from before 0.17).

@@ -1883,27 +1883,30 @@ class Cloud:
         self.settle_invite(caller.account_id)
         return charged
 
-    def settle_video_task(self, task: Any, status: str | None) -> int | None:
+    def settle_video_task(self, task: Any, status: str | None, *, cost_uy: int | None = None) -> int | None:
         """The provider's word on a clip, from the app's poll or from the relay's own check
         (0.24). One accepted task = one clip (`per_clip`), the money priced from the seconds
         asked for when the task was submitted. The row remembers the status, and the first SUCCEEDED charges the clip at the
-        price fixed when it was submitted. Idempotent: `mark_video_charged` flips once, so a
+        reserved price or the provider's reported cost. The ledger write and the task update are atomic, so a
         poll after the relay settled a task (or the other way round) charges nothing more.
         Returns what was charged (micro-yuan), 0 when a SUCCEEDED task's model is gone from
         the menu, None when nothing was charged."""
         task_id = str(task["task_id"])
-        if status and status != task["status"]:
-            self.db.set_video_status(task_id, str(status))
-        if status != "SUCCEEDED" or not self.db.mark_video_charged(task_id):
+        if status != "SUCCEEDED":
+            if status and status != task["status"]:
+                self.db.set_video_status(task_id, str(status))
             return None
         model_id = str(task["model"])
         spec = self.s.model(model_id)
         if spec is None or spec.kind != "video":
             spec = self.s.unlisted_model(model_id, "video")  # a member's own pick
         if spec is None:
-            return 0  # a model gone from the menu since the task was submitted
+            self.db.set_video_status(task_id, "SUCCEEDED")
+            return 0 if self.db.mark_video_charged(task_id) else None
         account_id = str(task["account_id"])
-        self.db.charge(account_id, "video", spec.id, 0, 0, spec.per_clip, task_id[:16], cost_uy=int(task["cost_uy"] or 0))
+        charge = int(task["cost_uy"] or 0) if cost_uy is None else cost_uy
+        if not self.db.charge(account_id, "video", spec.id, 0, 0, spec.per_clip, task_id[:16], cost_uy=charge, video_task_id=task_id):
+            return None
         self.settle_invite(account_id)
         return spec.per_clip
 
