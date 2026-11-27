@@ -24,14 +24,15 @@ the picture the model sees is that window (taken by the desktop app's helper whe
 is around, by the runtime's own Quartz call otherwise), events go to that process, the
 person keeps the cursor. ``auto`` is window mode on macOS as soon as a target application is set
 (``set_target``, the ``computer_target`` action or ``app`` on ``computer_act``), screen
-everywhere else. A window that cannot be found or captured drops back to the screen with a
-note in the observation, never an error that ends the task.
+everywhere else. When a selected window is unavailable, observations may show the screen;
+input waits for that window or for the target to be cleared.
 """
 
 from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import io
 import platform
 import socket
@@ -44,7 +45,13 @@ from nanomuse.computer import hands as hands_mod
 from nanomuse.computer import mac_window
 from nanomuse.computer import operator as operator_mod
 from nanomuse.computer.coords import Mapping
-from nanomuse.computer.screen import DEFAULT_MAX_WIDTH, active_window, capture, screen_size
+from nanomuse.computer.screen import (
+    DEFAULT_MAX_WIDTH,
+    active_window,
+    capture,
+    mac_frontmost_pid,
+    screen_size,
+)
 from nanomuse.config import HandsSettings
 from nanomuse.logger import logger
 from nanomuse.phone.link import Device, DeviceError, DeviceStopped
@@ -94,6 +101,8 @@ class ComputerLink:
         self._window_broken = ""
         # the frame the last window picture was taken in (None in screen mode)
         self.window_frame: mac_window.WindowFrame | None = None
+        self._observed_pid: int | None = None
+        self._picture_digest: bytes | None = None
         self.last_screen: Screen | None = None
         # picture pixels ↔ the hands' screen pixels for the last whole-screen picture
         self.mapping: Mapping | None = None
@@ -218,7 +227,7 @@ class ComputerLink:
     def set_target(self, app: str, title: str = "") -> None:
         """The application the hands work in from now on ("" = the whole screen again)."""
         app, title = app.strip()[:80], title.strip()[:160]
-        if (app, title) != (self.target_app, self.target_title):
+        if (app, title) != (self.target_app, self.target_title) or self._window_broken:
             self.window_frame = None
             self._window_error = ""
             self._window_broken = ""
@@ -237,8 +246,8 @@ class ComputerLink:
 
     def _window_layer_failed(self, exc: BaseException) -> None:
         """A failure inside the Quartz layer (pyobjc, the window server) rather than a
-        missing window: in `auto` mode the hands fall back to the screen for the rest of this
-        target, with one note; an explicit `window` mode keeps trying, as the person asked."""
+        missing window. Auto shows the screen until a target is selected again. Window
+        mode retries the window capture."""
         self._window_error = f"window mode failed: {exc}"
         self.window_frame = None
         if self.settings.mode == "auto":
@@ -281,15 +290,17 @@ class ComputerLink:
         if self.in_window_mode():
             raw = await asyncio.to_thread(self._capture_window)
             if raw is not None:
-                screen = Screen.from_device(raw, device=self._device, shots_dir=self.shots_dir)
-                self.last_screen = screen
-                return screen
+                self._observed_pid = None
+                return self._observe(raw)
             note = self._window_error
             if self._window_broken:
                 self._window_error = ""  # the fail-safe tripped: said once
         elif self._window_broken and self._window_error:
             # the fail-safe tripped during an action: say so once, then plain screen pictures
             note, self._window_error = self._window_error, ""
+        on_mac = platform.system() == "Darwin"
+        first_pid = await asyncio.to_thread(mac_frontmost_pid) if on_mac else None
+        self._observed_pid = None
         raw = await asyncio.to_thread(self._capture_screen)
         if raw is not None and note:
             raw["note"] = (note + "; showing the whole screen instead")[:300]
@@ -300,7 +311,23 @@ class ComputerLink:
                 "display session"
             )
         self._place(raw)
+        screen = self._observe(raw)
+        if (
+            screen.image_path
+            and first_pid is not None
+            and first_pid == await asyncio.to_thread(mac_frontmost_pid)
+        ):
+            self._observed_pid = first_pid
+        return screen
+
+    def _observe(self, raw: dict[str, Any]) -> Screen:
         screen = Screen.from_device(raw, device=self._device, shots_dir=self.shots_dir)
+        image = raw.get("screenshot")
+        self._picture_digest = (
+            hashlib.sha256(image.encode()).digest()
+            if screen.image_path and isinstance(image, str)
+            else None
+        )
         self.last_screen = screen
         return screen
 
@@ -386,6 +413,7 @@ class ComputerLink:
         if action not in ACTIONS:
             raise DeviceError(f"unknown action {action!r}")
         hands = self._hands_for(action)
+        before = self._picture_digest
         self.last_action = dict(params)
         self._emit({"event": "act", **self._where(params)})
         started = time.monotonic()
@@ -400,7 +428,7 @@ class ComputerLink:
         except mac_window.WindowLayerBroken as exc:
             self._window_layer_failed(exc)
             raise DeviceError(
-                f"{action} failed: {exc}; the hands work on the whole screen from here"
+                f"{action} failed: {exc}. Select the window again or clear the target."
             ) from exc
         except mac_window.WindowUnavailable as exc:
             # the window went away under the hands: back to the screen for the next look
@@ -415,7 +443,7 @@ class ComputerLink:
             if isinstance(hands, mac_window.MacWindowHands):
                 self._window_layer_failed(exc)
                 raise DeviceError(
-                    f"{action} failed: {exc}; the hands work on the whole screen from here"
+                    f"{action} failed: {exc}. Select the window again or clear the target."
                 ) from exc
             raise DeviceError(f"{action} failed: {exc}") from exc
         settle = max(0.0, self.settings.settle_s - (time.monotonic() - started))
@@ -426,6 +454,13 @@ class ComputerLink:
         except DeviceError as exc:
             logger.debug("no screenshot after {}: {}", action, exc)
             return {"note": note, "looked": False}
+        if (
+            action not in {"open_app", "move", "wait"}
+            and before is not None
+            and before == self._picture_digest
+        ):
+            unchanged = "The new screenshot is identical to the previous one. Verify the effect before repeating this action."
+            note = f"{note} {unchanged}".strip()
         return {"note": note, "looked": True}
 
     def _capture_window(self) -> dict[str, Any] | None:
@@ -482,12 +517,31 @@ class ComputerLink:
     def _hands_for(self, action: str) -> hands_mod.HandsBackend:
         """The hands an action goes to: the window's process in window mode (when the
         window was looked at), the system mouse otherwise."""
-        if self.in_window_mode() and self.window_frame is not None and action != "open_app":
-            return self._window_hands()
+        if (
+            self.settings.mode != "screen"
+            and self.target_app
+            and action not in {"open_app", "wait"}
+        ):
+            window_mode = self.in_window_mode()
+            if window_mode and self.window_frame is not None:
+                return self._window_hands()
+            if window_mode or self._window_broken or platform.system() == "Darwin":
+                raise DeviceError(
+                    f"No current window for {self.target_app}. Look at that window again or "
+                    "clear the target to use the whole screen."
+                )
         try:
             return self._hands()
         except hands_mod.HandsUnavailable as exc:
             raise DeviceError(str(exc)) from exc
+
+    def _check_keyboard_focus(self, hands: hands_mod.HandsBackend) -> None:
+        if platform.system() == "Darwin" and not isinstance(hands, mac_window.MacWindowHands):
+            if self._observed_pid is None or mac_frontmost_pid() != self._observed_pid:
+                raise DeviceError(
+                    "The foreground application no longer matches the last screen observation. "
+                    "Take a new screenshot or select the intended application with computer_target."
+                )
 
     def _to_hands(self, hands: hands_mod.HandsBackend, p: dict[str, Any]) -> dict[str, Any]:
         """The action's points in the hands' screen space. The model's numbers are pixels
@@ -523,14 +577,18 @@ class ComputerLink:
         elif action == "type":
             text = str(p.get("text") or "")
             if p.get("clear"):
+                self._check_keyboard_focus(hands)
                 hands.key(["command" if platform.system() == "Darwin" else "ctrl", "a"])
+            self._check_keyboard_focus(hands)
             hands.type(text)
             if p.get("submit"):
+                self._check_keyboard_focus(hands)
                 hands.key(["enter"])
         elif action == "key":
             keys = [str(k) for k in (p.get("keys") or [])]
             if not keys:
                 raise DeviceError("`key` needs `keys`")
+            self._check_keyboard_focus(hands)
             hands.key(keys)
         elif action == "open_app":
             try:

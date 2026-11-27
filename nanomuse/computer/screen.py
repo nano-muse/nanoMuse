@@ -221,6 +221,17 @@ def _png_size(data: bytes) -> tuple[int, int]:
 _WINDOW_SUFFIX = re.compile(r"\s+[-—–]\s+([^-—–]+)$")
 
 
+def mac_frontmost_pid() -> int | None:
+    """The foreground process as seen by the window server, without sending Apple Events."""
+    try:
+        from AppKit import NSWorkspace  # type: ignore[import-not-found]
+
+        app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        return int(app.processIdentifier()) if app is not None else None
+    except Exception:  # noqa: BLE001 — an unidentified destination cannot receive keyboard input
+        return None
+
+
 def active_window() -> tuple[str, str]:
     """``(app, title)`` of the window in front: the program's name as well as it can be
     told from the platform, and the full title. Empty strings when unknown."""

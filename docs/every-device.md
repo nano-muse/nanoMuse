@@ -346,12 +346,14 @@ window* / *Whole screen*; `nanomuse/computer/mac_window.py`):
 What the person sees: the Hands card says *Working in Safari's window; the
 mouse stays yours*, the desktop stage draws the cursor where the click lands
 (the hands' events carry `x`/`y` in screen pixels), and the approval cards
-name the application. A window that cannot be found, captured (the helper's
-Screen Recording row off: the operator's `403`, in its words) or driven drops
-back to the whole screen with a note in the observation; nothing stops. When
-the layer itself fails (the helper not there, pyobjc, the window server) *Auto* parks the hands on the whole
-screen for the rest of that target, says so once, and tries the window again
-when the next application is named; *One window* keeps trying, as asked.
+name the application. If the selected window disappears or its capture fails, the next
+observation can show the whole screen with the reason. Input pauses until that window
+is available again or the target is cleared. In Auto mode a failure in the window
+service pauses window capture until you select a target again. In One window mode
+each new look retries the window. Window input requires permission for the process
+that sends the events. In Whole screen mode the Mac checks that the foreground
+application still matches the last observation before typing or sending a shortcut.
+When a new screenshot is identical after an input, the result asks you to verify the effect.
 The Hands card's *Where* line shows the reason either way. Linux and Windows stay
 on the shared screen; `pip install "nanomuse[hands]"` brings the pyobjc
 frameworks on macOS only.

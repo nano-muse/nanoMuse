@@ -396,7 +396,8 @@ class ComputerAct(BaseTool):
         except DeviceError as exc:
             return ToolResult.fail(str(exc))
         said = str(raw.get("note") or "")
-        done = (note + "\n\n" if note else "") + "Done" + (f": {said}" if said else "")
+        status = "Input sent" if action not in {"open_app", "wait"} else "Done"
+        done = (note + "\n\n" if note else "") + status + (f". {said.rstrip('.')}" if said else "")
         after = self.link.last_screen
         if after is None or not raw.get("looked", True):
             return ToolResult(output=f"{done}. The screen could not be read afterwards.")
@@ -423,8 +424,7 @@ class ComputerAct(BaseTool):
             return screen_result(
                 screen,
                 COMPUTER,
-                f"Window mode is not available here ({why}); the hands work on the whole screen, "
-                f"with {app.strip()} as the application they are about. Screen now:",
+                f"Window mode is not available here ({why}). Showing the whole screen.",
             )
         try:
             screen = await self.link.screen()
@@ -438,7 +438,7 @@ class ComputerAct(BaseTool):
                 screen,
                 COMPUTER,
                 f"{app.strip()} could not be worked in as a window ({self.link.status()['window']['reason']}); "
-                "showing the whole screen instead.",
+                "showing the whole screen. Select the window again or clear the target before sending input.",
             )
         w = frame.window
         where = f"Working in the window of {w.owner}" + (f", {w.title}" if w.title else "")
