@@ -1467,4 +1467,6 @@
     <string name="nm_hands_wireless_notify_problem">Вернитесь в nanoMuse, чтобы продолжить настройку.</string>
     <string name="nm_hands_wireless_repair">Связать снова</string>
     <string name="nm_hands_wireless_repair_sub">Повторите сопряжение, если Android удалил связанные устройства или истекла авторизация</string>
+    <string name="nm_codex_catalogue_fallback">Не удалось обновить список моделей Codex. Показаны сохранённые или встроенные модели.</string>
+    <string name="nm_chat_setup_failed">Не удалось подготовить сообщение. Убедитесь, что чат ещё существует и на устройстве есть свободное место.</string>
 </resources>

@@ -112,6 +112,10 @@ Shell 进度更新若把较长内容改为较短文字，会保留未被覆盖�
 
 Claude 登录要求每次请求开头包含 Anthropic 规定的标识，该值在构建时读取 `app/provider-customization.properties`。此文件不在仓库，发布 APK 也不包含该标识。缺少它的构建不会在额度卡片或「添加服务商」显示 Claude 登录，`?preset=anthropic:oauth` 会打开 key 表单。旧构建保存的 Claude 登录在发送时会提示「这个版本不能用 Claude 账号登录。请改用 API key 添加 Anthropic。」，不会使 App 退出，代码见 `io.github.nanomuse.cloud.ClaudeSignIn`。
 
+通过 ChatGPT 登录后，模型选择页会读取当前账号的 Codex 模型列表。刷新失败时，页面会提示正在显示已保存或内置的模型。内置列表包含 GPT-6.2 Sol 和 Astra。GPT Image 2 使用 Codex 单独的图片生成工具，因此也会出现在列表里，实际可用范围取决于账号。
+
+点聊天中红色错误提示里的「详情」，可以查看、选择或复制诊断信息。Gemini 的 HTTP 错误最多保留服务商返回的 32,768 个字符。若消息未能写入本地存储，聊天会显示错误并保留未发送的草稿。
+
 **选项列表的来源**。 中继 0.21 起，`/v1/me` 通过 `spend.guidance` 返回地区服务商顺序、各能力、可登录套餐及适用客户端、本地服务、文档链接和 ChatGPT 条款说明，见 [cloud.md](cloud.md)。`cloud/Guidance.kt` 解析，`Ways.resolve` 优先采用。卡片和 设置 → nanoMuse Cloud 只在旧中继没有返回时使用打包目录，因此中继新增服务商无需等待 App 更新，移除也会当天生效。`429 allowance_exhausted` 会在用量数据旁返回同一结构。
 
 **按能力提供功能**。 `cloud/Capabilities.kt` 决定候选来源：设置 → 模型 → 生成图片、形象工作室及 `nanomuse-media image` 只选支持 `image` 的厂商；视频只选支持 `video` 且 App 已接入其 API 的厂商，目前为百炼；屏幕选择器只列支持 `vision` 的模型。Codex 登录的 ChatGPT 仅支持对话和视觉，不提供图片、视频接口，不列入绘图来源。目录未识别的网关、自建中继、nanoMuse Cloud 继续按模型自己声明的能力判断。没有配置对应能力时，页面说明「画图需要有图像模型的服务商：百炼、OpenAI、Gemini 或 OpenRouter。」，不直接报错。
@@ -131,6 +135,8 @@ Claude 登录要求每次请求开头包含 Anthropic 规定的标识，该值�
 如果流在结束原因到达前断开，即使已经收到部分文字，也会作为临时故障处理。聊天会在现有次数限制内重试当前模型请求，清除未完成的工具参数，等模型响应完整结束后才执行工具。这是重新生成当前响应，不是按 SSE 字节位置续传。所有尝试都失败时，聊天保留已收到的回复，显示错误和恢复入口；停止本轮也会取消重试。当前 OpenAI 兼容接口的套接字读取超时为 600 秒，代理或旧安装包仍可能采用更短的限制。
 
 ## 语音输入 {#voice-input}
+
+长按一条消息，选择「朗读」即可播放这条消息，关闭自动朗读回复时也可使用。开启静音或正在用麦克风录音时，朗读会暂停。
 
 语音输入、语音输出和聊天模型可以分别选择，也可以来自不同服务商。通过语音模型组或语音选择器设置即可。
 阿里云百炼的 `paraformer-realtime-v2` 使用 DashScope 原生 WebSocket 接口转写录好的语音；

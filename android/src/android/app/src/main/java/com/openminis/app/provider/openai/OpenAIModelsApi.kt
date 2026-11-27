@@ -30,6 +30,8 @@ object OpenAIModelsApi {
     // pill in chat is disabled and the user can't pick low/medium/high.
     // nanoMuse: GPT-6 series and live Codex OAuth models refresh (#475)
     private val builtInCodexOAuthModels: List<LLMModel> = listOf(
+        LLMModel("gpt-6.2-sol", "GPT-6.2 Sol", "OpenAI", supportsReasoning = true),
+        LLMModel("gpt-6.2-astra", "GPT-6.2 Astra", "OpenAI", supportsReasoning = true),
         LLMModel("gpt-6.1-sol", "GPT-6.1 Sol", "OpenAI", supportsReasoning = true),
         LLMModel("gpt-6-sol", "GPT-6 Sol", "OpenAI", supportsReasoning = true),
         LLMModel("gpt-6-luna", "GPT-6 Luna", "OpenAI", supportsReasoning = true),
@@ -63,9 +65,9 @@ object OpenAIModelsApi {
     } + codexImageModels
 
     // nanoMuse: use the same Codex client version for model discovery and responses.
-    suspend fun fetchModelsOAuth(accessToken: String?, accountId: String? = null): List<LLMModel> = withContext(Dispatchers.IO) {
+    suspend fun fetchLiveModelsOAuth(accessToken: String?, accountId: String? = null): List<LLMModel>? = withContext(Dispatchers.IO) {
         val token = accessToken?.trim().orEmpty()
-        if (token.isEmpty()) return@withContext fetchModelsOAuth()
+        if (token.isEmpty()) return@withContext null
         val live = try {
             val builder = Request.Builder()
                 .url("https://chatgpt.com/backend-api/codex/models?client_version=${OpenAIProvider.CODEX_CLIENT_VERSION}")
@@ -77,21 +79,22 @@ object OpenAIModelsApi {
             }
             client.newCall(builder.build()).execute().use { resp ->
                 val body = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful || body.isEmpty()) emptyList() else parseCodexModelsJson(body)
+                if (resp.isSuccessful) parseCodexModelsJson(body) else null
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
-            AppLogger.warning(TAG, "Codex live models fetch failed, using built-in list: ${e.message}")
-            emptyList()
-        }
-        if (live.isEmpty()) return@withContext fetchModelsOAuth()
+            AppLogger.warning(TAG, "Codex live models fetch failed: ${e.javaClass.simpleName}")
+            null
+        } ?: return@withContext null
         // nanoMuse: a live catalogue is authoritative for this account/client.
         // Do not append built-in entries that may be rejected with HTTP 400.
-        ModelsDevApi.enrichModels(live) + codexImageModels
+        ModelsDevApi.enrichModels(live.filterNot { row -> codexImageModels.any { it.id == row.id } }) + codexImageModels
     }
 
     // nanoMuse: parse `{"models":[{"slug":"gpt-6.1-sol","display_name":"...","visibility":"list"}, ...]}`
-    internal fun parseCodexModelsJson(body: String): List<LLMModel> = try {
-        val rows = JSONObject(body).optJSONArray("models") ?: JSONArray()
+    internal fun parseCodexModelsJson(body: String): List<LLMModel> {
+        val rows = JSONObject(body).getJSONArray("models")
         val out = mutableListOf<LLMModel>()
         val seen = mutableSetOf<String>()
         for (i in 0 until rows.length()) {
@@ -105,9 +108,7 @@ object OpenAIModelsApi {
             val name = title.ifEmpty { builtIn?.displayName ?: LLMModel.modelDisplayName(slug) }
             out.add(LLMModel(slug, name, "OpenAI", supportsReasoning = true))
         }
-        out
-    } catch (_: Exception) {
-        emptyList()
+        return out
     }
 
     // Chat-capable model prefixes (matching iOS)

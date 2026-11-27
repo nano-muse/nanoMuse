@@ -181,7 +181,7 @@ class OpenAIProvider private constructor(
          * identifier could be rejected even when a newer model catalogue
          * advertised the model as available.
          */
-        internal const val CODEX_CLIENT_VERSION = "0.162.1"
+        internal const val CODEX_CLIENT_VERSION = "0.171.0"
 
         /**
          * [T-android-stale-conn-retry-hang] Streaming time-to-first-byte

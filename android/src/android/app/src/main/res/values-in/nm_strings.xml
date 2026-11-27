@@ -1455,4 +1455,6 @@
     <string name="nm_hands_wireless_notify_problem">Kembali ke nanoMuse untuk melihat cara melanjutkan.</string>
     <string name="nm_hands_wireless_repair">Sandingkan ulang</string>
     <string name="nm_hands_wireless_repair_sub">Sandingkan ulang jika Android menghapus perangkat tersanding atau otorisasi kedaluwarsa</string>
+    <string name="nm_codex_catalogue_fallback">Daftar model Codex tidak dapat diperbarui. Model tersimpan atau bawaan ditampilkan.</string>
+    <string name="nm_chat_setup_failed">Pesan tidak dapat disiapkan. Pastikan percakapan masih ada dan perangkat memiliki ruang kosong.</string>
 </resources>

@@ -82,6 +82,9 @@ class ProviderRepository(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("provider_config", Context.MODE_PRIVATE)
 
+    // nanoMuse: retain the source of the Codex model menu across settings visits and restarts.
+    val codexCatalogues = io.github.nanomuse.models.CodexCatalogueState(prefs)
+
     // [T-android-provider-room-store] Per-row provider config DB. Lives in
     // its own provider.db file so a downgrade to a build that doesn't know
     // about provider tables can't crash the main minis.db open. The legacy
@@ -813,6 +816,7 @@ class ProviderRepository(private val context: Context) {
     fun removeInstance(instanceId: String): Unit = synchronized(configLock) {
         ensureConfigLoaded()
         invalidateModelCache(instanceId)
+        codexCatalogues.remove(instanceId) // nanoMuse: discard the removed provider's menu provenance
         val config = workingCopy()
         val removedEntryIds = config.modelEntries
             .filter { it.providerInstanceId == instanceId }
@@ -2200,13 +2204,28 @@ class ProviderRepository(private val context: Context) {
         if (instance.providerType == ProviderType.openAI
             && instance.credentialType == ProviderCredential.oauth
         ) {
-            // nanoMuse: query live Codex OAuth models with accountId (#475)
-            val accountId = runCatching { com.openminis.app.auth.OpenAIOAuthManager(context, instance.id).accountId }.getOrNull()
-            val models = OpenAIModelsApi.fetchModelsOAuth(apiKey, accountId)
-            if (models.isNotEmpty()) {
-                replaceEntries(instance.id, models)
-                return
+            // nanoMuse: refresh for this account without replacing a known-good menu on an outage.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val manager = com.openminis.app.auth.OpenAIOAuthManager(context, instance.id)
+                val accountId = runCatching { manager.accountId }.getOrNull()
+                val live = OpenAIModelsApi.fetchLiveModelsOAuth(apiKey, accountId)
+                synchronized(configLock) {
+                    ensureConfigLoaded()
+                    if (_config.value.instances.none { it.id == instance.id }) return@withContext
+                    val currentAccount = runCatching { manager.accountId }.getOrNull()
+                    if (currentAccount != accountId) return@withContext
+                    if (live != null) {
+                        replaceEntries(instance.id, live)
+                        codexCatalogues.recordLive(instance.id, accountId)
+                    } else {
+                        val keepSaved = codexCatalogues.hasLiveFor(instance.id, accountId) &&
+                            entriesFor(instance.id).any { !it.isCustom }
+                        if (!keepSaved) replaceEntries(instance.id, OpenAIModelsApi.fetchModelsOAuth())
+                        codexCatalogues.recordFallback(instance.id, keepSaved)
+                    }
+                }
             }
+            return
         }
 
         // Step 1: Try provider API (requires API key)

@@ -1460,4 +1460,6 @@
     <string name="nm_hands_wireless_notify_problem">Volte ao nanoMuse para ver como continuar.</string>
     <string name="nm_hands_wireless_repair">Parear novamente</string>
     <string name="nm_hands_wireless_repair_sub">Refaça o pareamento se o Android limpou os dispositivos pareados ou se a autorização expirou</string>
+    <string name="nm_codex_catalogue_fallback">Não foi possível atualizar a lista de modelos do Codex. Os modelos salvos ou integrados são exibidos.</string>
+    <string name="nm_chat_setup_failed">Não foi possível preparar a mensagem. Verifique se a conversa ainda existe e se há espaço livre no dispositivo.</string>
 </resources>

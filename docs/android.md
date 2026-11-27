@@ -295,6 +295,15 @@ opens the API key form), and a Claude sign-in saved by an earlier build answers 
 *This build cannot use a Claude sign-in. Add Anthropic with an API key instead.* rather than
 closing the app (`io.github.nanomuse.cloud.ClaudeSignIn`).
 
+When you sign in with ChatGPT, the model picker reads your account's Codex catalogue.
+If it cannot refresh, it labels the saved or built-in list. The built-in list includes
+GPT-6.2 Sol and Astra. GPT Image 2 appears separately because the Codex adapter has an
+image-generation tool for it. The account still determines which requests succeed.
+
+Tap **Details** on a red chat error banner to read, select or copy the diagnostic. For a
+Gemini HTTP error the viewer retains up to 32,768 characters returned by the service.
+If a local message cannot be saved, chat shows a setup error and restores the unsent draft.
+
 **Where the list comes from.** The relay's `/v1/me` carries `spend.guidance` (relay 0.21,
 [cloud.md](cloud.md)): the providers for the person's region in the relay's order, each with
 what it covers, the plans one can sign in with and which clients they are for, the local
@@ -387,6 +396,9 @@ started to answer but has not finished sending the response.
 A stream that ends before its terminal frame, even after text has arrived, is a transient failure. The chat retries the current model request within its existing bounded retry budget. Partial tool-call arguments are discarded before retry, and no tool runs until that model response completes. This restarts generation rather than resuming an SSE byte offset. If every attempt fails, the chat keeps the received reply and shows an error with recovery controls. Stopping the turn cancels retries. The current OpenAI-compatible socket read timeout is 600 seconds; a shorter timeout may also come from a proxy or an older installed build.
 
 ## Voice input
+
+Long-press a message and tap **Read aloud** to play that message even when automatic
+reply narration is off. Muting speech or recording with the microphone suppresses playback.
 
 You can choose voice input and voice output separately from the chat model, including
 models from different providers, using the voice groups and the voice picker.

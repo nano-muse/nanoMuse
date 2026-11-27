@@ -1463,4 +1463,6 @@
     <string name="nm_hands_wireless_notify_problem">Întoarce-te în nanoMuse pentru a continua.</string>
     <string name="nm_hands_wireless_repair">Asociază din nou</string>
     <string name="nm_hands_wireless_repair_sub">Refă asocierea dacă Android a șters dispozitivele asociate sau autorizarea a expirat</string>
+    <string name="nm_codex_catalogue_fallback">Lista modelelor Codex nu a putut fi actualizată. Sunt afișate modelele salvate sau integrate.</string>
+    <string name="nm_chat_setup_failed">Mesajul nu a putut fi pregătit. Verifică dacă mai există conversația și dacă dispozitivul are spațiu liber.</string>
 </resources>
