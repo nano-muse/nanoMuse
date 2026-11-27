@@ -49,15 +49,14 @@ object OpenAIModelsApi {
         LLMModel("gpt-5.4-mini", "GPT-5.4 Mini", "OpenAI", supportsReasoning = true),
     )
 
-    private val codexImageModels: List<LLMModel> = listOf(
-        LLMModel(
-            id = "gpt-image-2",
-            displayName = "GPT Image 2",
-            provider = "OpenAI",
-            inputModalities = listOf("text", "image"),
-            outputModalities = listOf("image"),
-        ),
-    )
+    // nanoMuse: these explicit Codex tool variants are not part of its chat-model discovery feed.
+    internal val codexImageModels = mapOf(
+        "gpt-image-2" to "GPT Image 2",
+        "gpt-image-2.5-sunburst" to "GPT Image 2.5 Sunburst",
+        "gpt-image-2.5-flare" to "GPT Image 2.5 Flare",
+    ).map { (id, name) ->
+        LLMModel(id, name, "OpenAI", inputModalities = listOf("text", "image"), outputModalities = listOf("image"))
+    }
 
     fun fetchModelsOAuth(): List<LLMModel> = builtInCodexOAuthModels.let {
         AppLogger.info(TAG, "Codex OAuth model list (${it.size} models): ${it.joinToString { m -> m.id }}")

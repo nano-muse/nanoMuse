@@ -21,7 +21,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Fixed a crash when a chat message could not be saved during send setup, and kept the unsent draft available.
 - Added a selectable, copyable details view for chat errors and preserved longer Gemini diagnostics.
 - Fixed manual Read aloud when automatic reply narration was off.
-- Updated the Codex OAuth catalogue and its GPT-6.2 fallback, kept saved models for the same account when refresh failed, and identified the fallback in the model picker.
+- Updated the Codex OAuth catalogue and its GPT-6.2 fallback, identified saved or built-in menus after a failed refresh, and added the Codex image tool variants GPT Image 2.5 Sunburst and Flare.
 
 ### iOS
 

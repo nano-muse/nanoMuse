@@ -297,8 +297,8 @@ closing the app (`io.github.nanomuse.cloud.ClaudeSignIn`).
 
 When you sign in with ChatGPT, the model picker reads your account's Codex catalogue.
 If it cannot refresh, it labels the saved or built-in list. The built-in list includes
-GPT-6.2 Sol and Astra. GPT Image 2 appears separately because the Codex adapter has an
-image-generation tool for it. The account still determines which requests succeed.
+GPT-6.2 Sol and Astra. GPT Image 2, GPT Image 2.5 Sunburst and GPT Image 2.5 Flare use
+the separate image-generation tool in Codex. The account determines which requests succeed.
 
 Tap **Details** on a red chat error banner to read, select or copy the diagnostic. For a
 Gemini HTTP error the viewer retains up to 32,768 characters returned by the service.

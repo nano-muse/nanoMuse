@@ -112,7 +112,7 @@ Shell 进度更新若把较长内容改为较短文字，会保留未被覆盖�
 
 Claude 登录要求每次请求开头包含 Anthropic 规定的标识，该值在构建时读取 `app/provider-customization.properties`。此文件不在仓库，发布 APK 也不包含该标识。缺少它的构建不会在额度卡片或「添加服务商」显示 Claude 登录，`?preset=anthropic:oauth` 会打开 key 表单。旧构建保存的 Claude 登录在发送时会提示「这个版本不能用 Claude 账号登录。请改用 API key 添加 Anthropic。」，不会使 App 退出，代码见 `io.github.nanomuse.cloud.ClaudeSignIn`。
 
-通过 ChatGPT 登录后，模型选择页会读取当前账号的 Codex 模型列表。刷新失败时，页面会提示正在显示已保存或内置的模型。内置列表包含 GPT-6.2 Sol 和 Astra。GPT Image 2 使用 Codex 单独的图片生成工具，因此也会出现在列表里，实际可用范围取决于账号。
+通过 ChatGPT 登录后，模型选择页会读取当前账号的 Codex 模型列表。刷新失败时，页面会提示正在显示已保存或内置的模型。内置列表包含 GPT-6.2 Sol 和 Astra。GPT Image 2、GPT Image 2.5 Sunburst 和 GPT Image 2.5 Flare 使用 Codex 单独的图片生成工具，因此也会出现在列表里，实际可用范围取决于账号。
 
 点聊天中红色错误提示里的「详情」，可以查看、选择或复制诊断信息。Gemini 的 HTTP 错误最多保留服务商返回的 32,768 个字符。若消息未能写入本地存储，聊天会显示错误并保留未发送的草稿。
 
