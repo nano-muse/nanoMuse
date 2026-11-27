@@ -202,6 +202,13 @@ async def test_mac_keyboard_requires_stable_foreground_through_the_last_observat
     await link.act({"action": "type", "text": "draft"})
     assert hands.calls == [("type", "draft")]
 
+    monkeypatch.setattr(link, "_capture_screen", lambda: None)
+    with pytest.raises(DeviceError, match="no screenshot"):
+        await link.screen()
+    with pytest.raises(DeviceError, match="last screen observation"):
+        await link.act({"action": "type", "text": "after failed capture"})
+    assert hands.calls == [("type", "draft")]
+
 
 async def test_link_acts_looks_again_and_reports_steps(settings: Settings, fake_screen) -> None:
     events: list[dict[str, Any]] = []

@@ -302,8 +302,6 @@ class ComputerLink:
         first_pid = await asyncio.to_thread(mac_frontmost_pid) if on_mac else None
         self._observed_pid = None
         raw = await asyncio.to_thread(self._capture_screen)
-        if first_pid is not None and first_pid == await asyncio.to_thread(mac_frontmost_pid):
-            self._observed_pid = first_pid
         if raw is not None and note:
             raw["note"] = (note + "; showing the whole screen instead")[:300]
         if raw is None:
@@ -313,14 +311,23 @@ class ComputerLink:
                 "display session"
             )
         self._place(raw)
-        return self._observe(raw)
+        screen = self._observe(raw)
+        if (
+            screen.image_path
+            and first_pid is not None
+            and first_pid == await asyncio.to_thread(mac_frontmost_pid)
+        ):
+            self._observed_pid = first_pid
+        return screen
 
     def _observe(self, raw: dict[str, Any]) -> Screen:
+        screen = Screen.from_device(raw, device=self._device, shots_dir=self.shots_dir)
         image = raw.get("screenshot")
         self._picture_digest = (
-            hashlib.sha256(image.encode()).digest() if isinstance(image, str) and image else None
+            hashlib.sha256(image.encode()).digest()
+            if screen.image_path and isinstance(image, str)
+            else None
         )
-        screen = Screen.from_device(raw, device=self._device, shots_dir=self.shots_dir)
         self.last_screen = screen
         return screen
 
