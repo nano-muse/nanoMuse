@@ -392,12 +392,21 @@ class GoalStore:
         ).fetchall()
         return [g for g in (self.get(r["id"]) for r in rows) if g]
 
-    def mark_checked_in(self, goal_id: str, now: datetime | None = None) -> Goal | None:
+    def mark_checked_in(
+        self,
+        goal_id: str,
+        now: datetime | None = None,
+        *,
+        occurrence: str = "",
+    ) -> Goal | None:
         """Move the reminder to the occurrence after the one that was due (or, for a check-in
-        sent early by hand, after the one that is scheduled)."""
+        sent early by hand, after the one that is scheduled). When ``occurrence`` is given,
+        recovery can repeat the source acknowledgement without advancing the cadence twice."""
         goal = self.get(goal_id)
         if not goal:
             return None
+        if occurrence and goal.next_check_in != occurrence:
+            return goal
         after = (now or datetime.now(UTC)).astimezone()
         if goal.next_check_in:
             scheduled = datetime.fromisoformat(goal.next_check_in).astimezone()

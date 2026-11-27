@@ -45,6 +45,9 @@ Android、iPhone 和桌面版都在 设置 → 模型 配置；网页控制台�
 | Opper | ● | | | | 海外 | [platform.opper.ai](https://platform.opper.ai) |
 | AtmoRouter | ● | | | | 海外 | [atmorouter.dev](https://atmorouter.dev/dashboard/keys) |
 | UberLLM | ● | | | | 海外 | [uberllm.dev](https://uberllm.dev/signup) |
+| TrustedRouter | ● | | | | 海外 | [trustedrouter.com](https://trustedrouter.com/console/api-keys) |
+
+| Synap | ● | | | | 海外 | [synap402.com](https://synap402.com/account.html#keys) |
 | Ollama / LM Studio / vLLM（本机） | ● | | | | 都可以 | 不需要 key |
 
 视频一栏只有百炼，是因为 nanoMuse 当前接入的是百炼视频 API（程序调用服务的接口）。其他厂商的视频模型使用各自的任务接口，本轮尚未接入。图片方面，OpenRouter 使用 Image API，例如 `openai/gpt-image-2`；Gemini 使用 `gemini-2.5-flash-image`。
@@ -75,6 +78,9 @@ Android、iPhone 和桌面版都在 设置 → 模型 配置；网页控制台�
 - **Opper**。 在 [platform.opper.ai](https://platform.opper.ai) 的「API Keys」创建 key，可按服务商原价访问 50 多家服务商的 700 多个模型，不加价，网关部署在欧盟。地址为 `https://api.opper.ai/v3/compat`。默认模型为 `claude-sonnet-4-6`，也可选择 `https://api.opper.ai/v3/compat/models` 中任意 id；使用 `anthropic/claude-sonnet-4-6` 这样的 `provider/model` id 可固定线路。此处只通过 OpenAI 格式提供对话。
 - **AtmoRouter**。 从 [atmorouter.dev/dashboard/keys](https://atmorouter.dev/dashboard/keys) 获取 key，按量访问多家模型厂商。地址为 `https://atmorouter.dev/v1`。模型 id 含线路前缀，以 `https://atmorouter.dev/v1/models` 为准，默认是 `cc/claude-sonnet-4-6`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
 - **UberLLM**。 从 [uberllm.dev/signup](https://uberllm.dev/signup) 获取 key，预付费、按量计费，5 美元起，没有月费，一把 key 访问多家模型厂商，价格通常低于官方标价（[当前价格](https://uberllm.dev/models)）。地址为 `https://api.uberllm.dev/v1`。模型 id 带厂商名，以 `https://api.uberllm.dev/v1/models` 为准，默认是 `openai/gpt-5.4-mini`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
+- **TrustedRouter**。 从 [trustedrouter.com/console/api-keys](https://trustedrouter.com/console/api-keys) 获取 key，按量计费，一把 key 访问多家模型厂商（[文档](https://trustedrouter.com/docs)）。地址为 `https://api.trustedrouter.com/v1`。模型 id 带厂商名，以 `https://api.trustedrouter.com/v1/models` 为准（公开，不需要 key），默认是 `deepseek/deepseek-v4-flash`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
+
+- **Synap**。 从 [synap402.com/account.html#keys](https://synap402.com/account.html#keys) 获取 key，按量计费，提供开放权重模型（Qwen3 Coder、Qwen3.5、GLM、DeepSeek V4、gpt-oss、Gemma 等），按 token 计的价格见公开的 `https://synap402.com/v1/models` 列表（[当前价格](https://synap402.com/pricing.html)）。地址为 `https://synap402.com/v1`。默认模型是 `qwen3-coder-30b`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
 
 **将 key 填入 nanoMuse**。
 
@@ -96,13 +102,13 @@ Android 从设置顶部卡片进入 设置 → 模型，iPhone 从设置第一�
 | 生成图片 | 形象的肖像，以及你要的图片。 | 你有图像模型的服务商 |
 | 生成视频 | 形象的短视频。 | 你有视频模型的服务商（百炼） |
 
-每行显示 `provider · model`，点开可选模型。登录后，对话和屏幕操作首先显示 nanoMuse Cloud 组，并标出中继针对该任务的推荐模型。项目托管 Cloud 不生成图片或视频，所以媒体项只列出你自己的服务商。自己部署的中继只有在运营者明确启用并声明媒体能力后，才会出现在媒体项中。每个服务商组只列出符合任务要求的模型；不支持该能力的服务商不会显示。没有可用模型时，页面会说明哪些服务商支持，并提供「添加服务商」。
+每行显示 `provider · model`，点开可选模型。登录后，对话和屏幕操作首先显示 nanoMuse Cloud 组，并标出中继针对该任务的推荐模型。媒体项会列出中继菜单声明的模型和你自己的服务商。每个服务商组只列出符合任务要求的模型；不支持该能力的服务商不会显示。没有可用模型时，页面会说明哪些服务商支持，并提供「添加服务商」。
 
 更改「对话」会同时更新主要聊天和新聊天的默认模型，已存在的旁聊继续用原模型，页面会提示「对主要聊天和新对话生效；旁聊保留自己的模型。」主要聊天是「聊天」标签页固定显示的对话，不能只靠新聊天默认值更新，否则会一直沿用最初的服务商。尚未发送消息的聊天也跟随选择，包括刚登录后账号的空主要聊天，以及新建但未使用的聊天。因此，无论之前使用套餐登录、自己的 key 还是 nanoMuse Cloud，主要聊天或新聊天的下一条消息都会用「对话」行显示的模型；登录不会覆盖你已选的模型。手机和桌面版规则相同。
 
 在聊天自己的选择器中，从 `•••` 菜单或其下模型项选择自建模型组后，该组原顺序会成为默认，主要聊天也改用该聊天实际解析出的模型。只有以服务商命名、且只包含该服务商的组，才会像模型页选择一样将选中模型移到最前。手机自建模型组还可配置默认思考等级，iPhone 入口是「全部设置 → 模型组」，Android 从聊天选择器进入「模型组」。主要聊天跟随模型选择时会一并采用该等级，与新聊天及聊天自身选择器的行为一致。
 
-**自动选择**。 操作屏幕、生成图片、生成视频的第一项是「自动」，并显示当前解析结果，例如屏幕操作的「当前为 nanoMuse Cloud · Qwen/Qwen3.6-27B-FP8」。选择它会清除该项的显式设置，按以下顺序解析：先使用你自己的对话服务商所支持的对应能力及目录默认模型；否则，在账号已登录、Cloud 模型已开启且中继实际菜单提供该能力时使用中继；再否则，使用你配置的第一家具备该能力的服务商。项目托管 Cloud 只提供对话和屏幕操作，不提供媒体生成。你明确选择的模型始终优先，Cloud 不会覆盖。各设备分别保存选择，key 也只留在录入它的设备。
+**自动选择**。 操作屏幕、生成图片、生成视频的第一项是「自动」，并显示当前解析结果，例如屏幕操作的「当前为 nanoMuse Cloud · qwen3.5-397b-a17b」。选择它会清除该项的显式设置，按以下顺序解析：先使用你自己的对话服务商所支持的对应能力及目录默认模型；否则，在账号已登录、Cloud 模型已开启且中继实际菜单提供该能力时使用中继；再否则，使用你配置的第一家具备该能力的服务商。项目1.0.10 可在 [Cloud 网页](cloud.md)使用托管文生图和人物视频。你明确选择的模型始终优先，Cloud 不会覆盖。各设备分别保存选择，key 也只留在录入它的设备。
 
 **主动点击才会执行 Cloud 重试**。 某轮请求失败后，已登录用户的错误卡片会提供「这次改用 nanoMuse Cloud」。点击后只用账号模型重跑这一轮，不修改任何模型配置。这个按钮与模型组自动路由无关，如果手机的模型组包含 Cloud 模型，组路由仍可能自动选到它。图片、视频失败没有 Cloud 重试，需要修复或更换自己的媒体服务商后重试。
 

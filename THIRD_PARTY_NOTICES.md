@@ -14,6 +14,12 @@ nanoMuse is licensed under the GNU General Public License, version 3 or later ([
 
 ## The phone apps (`android/`: Android and iOS)
 
+The Android public-source reader runs its bundled rules with Mozilla Rhino 1.7.15.1 (MPL-2.0). The phone feed readers include sax-js, with its license in [sax-LICENSE.md](android/src/shared/public-watches/vendor/sax-LICENSE.md). [Rhino source and license](https://github.com/mozilla/rhino)
+
+### Mika (Apache-2.0)
+
+The Android background screen uses pairing protocol, cryptography, local service discovery, picture-in-picture positioning and parts of the run-state presentation adapted from [Mika](https://github.com/wangzan101/Mika/tree/a40f6a9873862c9a3840c345f6f64dd417ea8745), Copyright 2026 wangzan101. nanoMuse connects only to loopback, stores its signing key in Android Keystore and starts its own display helper. Its floating screen remains a secure read-only overlay, while model input continues to come from the independently captured display. The APK includes [the original notice and licence](android/src/android/app/src/main/assets/nanomuse/licenses/Mika.txt).
+
 ### OpenMinis (GPL-3.0)
 
 The app is a modified copy of [OpenMinis](https://github.com/OpenMinis/OpenMinis) 1.13 (tag `1.13`, commit `4ef2900`), Copyright (C) the OpenMinis authors, imported with `git subtree` so that its history is in ours. Modifications since 2026-09-24 are recorded in `git log -- android/`, and every edit inside an upstream file carries a `// nanoMuse:` comment. The OpenMinis name and logo are theirs and are not used for this application. Both phone apps come from that subtree: the Android app in `android/src/android`, the iOS app in `android/src/ios`. What follows is OpenMinis's own third-party list for the parts this tree builds; upstream's full inventory with versions is [android/THIRD_PARTY_LICENSES.md](android/THIRD_PARTY_LICENSES.md).

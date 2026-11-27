@@ -35,7 +35,7 @@ from nanomuse.hub.profile import ProfileSync
 from nanomuse.llm import session as llm_session
 from nanomuse.logger import logger
 from nanomuse.schema import RiskLevel
-from nanomuse.sentinel.grants import grant_key, normalize_scope
+from nanomuse.sentinel.grants import grant_key, normalize_scope, normalize_wire_grant_target
 from nanomuse.server.events import MAIN_THREAD, STOPPED_NOTICE, now_iso
 from nanomuse.server.webui import current_thread
 from nanomuse.telemetry import telemetry
@@ -72,6 +72,8 @@ class _IncomingTask:
 class HubService:
     def __init__(self, svc: MuseService):
         self.svc = svc
+        self.account_transition = asyncio.Lock()
+        self.account_epoch = 0
         self.client: HubClient | None = None
         self.cloud = CloudClient(self.settings.cloud.base_url, self._key())
         # the relay's last /v1/me (models with prices, usage)
@@ -370,6 +372,11 @@ class HubService:
         key = str(data.get("api_key") or "")
         if not key:
             raise CloudError(502, "bad_key", "The relay returned no key.")
+        async with self.account_transition:
+            self.account_epoch += 1
+            return await self._activate_account(data, key)
+
+    async def _activate_account(self, data: dict[str, Any], key: str) -> dict[str, Any]:
         self.last_me = {k: v for k, v in data.items() if k != "api_key"}
         self.svc.app.vault.set(CLOUD_KEY, key)
         account: dict[str, Any] = data["account"] if isinstance(data.get("account"), dict) else {}
@@ -496,10 +503,13 @@ class HubService:
         if not self.signed_in:
             raise CloudError(401, "bad_key", "Not signed in.")
         self.cloud.api_key = self._key()
-        n = await self.cloud.sign_out_all(everything)
-        if everything:
+        if not everything:
+            return await self.cloud.sign_out_all(False)
+        async with self.account_transition:
+            self.account_epoch += 1
+            n = await self.cloud.sign_out_all(True)
             await self._forget_key()
-        return n
+            return n
 
     async def events(self, limit: int = 50) -> list[dict[str, Any]]:
         if not self.signed_in:
@@ -511,19 +521,23 @@ class HubService:
         """The person's own request: the relay forgets everything about them."""
         if not self.signed_in:
             raise CloudError(401, "bad_key", "Not signed in.")
-        await self.leave()
-        self.cloud.api_key = self._key()
-        try:
-            await self.cloud.delete_account()
-        finally:
-            await self._forget_key()
+        async with self.account_transition:
+            self.account_epoch += 1
+            await self.leave()
+            self.cloud.api_key = self._key()
+            try:
+                await self.cloud.delete_account()
+            finally:
+                await self._forget_key()
 
     async def sign_out(self) -> None:
-        await self.leave()
-        with contextlib.suppress(CloudError):
-            self.cloud.api_key = self._key()
-            await self.cloud.sign_out()
-        await self._forget_key()
+        async with self.account_transition:
+            self.account_epoch += 1
+            await self.leave()
+            with contextlib.suppress(CloudError):
+                self.cloud.api_key = self._key()
+                await self.cloud.sign_out()
+            await self._forget_key()
 
     async def _forget_key(self) -> None:
         was_model = self._llm_is_cloud()
@@ -1074,6 +1088,9 @@ class HubService:
                 key = str(ev.get("grant_key") or "").strip()
                 if key:
                     body["grant_key"] = key
+                target = normalize_wire_grant_target(ev.get("grant_target"))
+                if target is not None:
+                    body["grant_target"] = target
                 await call.event(body)
             elif status in ("approved", "denied", "expired") and not fresh:
                 # answered here (or timed out): the caller's card closes too

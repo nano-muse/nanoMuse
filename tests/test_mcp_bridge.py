@@ -68,7 +68,8 @@ def test_connectors_come_along_when_config_turns_them_on(settings: Settings) -> 
 def test_gate_asks_for_what_the_sentinel_would_ask(settings: Settings) -> None:
     screen, act = tools(settings)
     assert gate(screen, {}) is None
-    assert gate(act, {"action": "click", "x": 1, "y": 2, "label": "Open"}) is None
+    refused = gate(act, {"action": "click", "x": 1, "y": 2, "label": "Open"})
+    assert refused is not None and "no element" in refused and CONFIRMED in refused
     refused = gate(act, {"action": "key", "keys": ["enter"]})
     assert refused is not None and "press enter" in refused and CONFIRMED in refused
     refused = gate(act, {"action": "type", "text": "hi", "submit": True})

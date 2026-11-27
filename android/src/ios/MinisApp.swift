@@ -434,7 +434,7 @@ struct MinisApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Chat") {
-                    NotificationCenter.default.post(name: .newChatRequested, object: nil)
+                    NotificationCenter.default.post(name: .newChatRequested, object: "menu") // nanoMuse: use the destination picker for Command-N too
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }

@@ -19,6 +19,7 @@ object HomeBus {
     sealed class Request {
         data class ShowTab(val tab: HomeTab) : Request()
         data class ShowSession(val sessionId: String) : Request()
+        data class ShowDeviceConversation(val conversationId: String) : Request()
         /** Show the main chat with [text] typed into the composer and the keyboard up. */
         data class PrefillComposer(val text: String) : Request()
     }
@@ -29,6 +30,8 @@ object HomeBus {
     fun showTab(tab: HomeTab) { _requests.tryEmit(Request.ShowTab(tab)) }
 
     fun showSession(sessionId: String) { _requests.tryEmit(Request.ShowSession(sessionId)) }
+
+    fun showDeviceConversation(conversationId: String) { _requests.tryEmit(Request.ShowDeviceConversation(conversationId)) }
 
     fun prefillComposer(text: String) { _requests.tryEmit(Request.PrefillComposer(text)) }
 

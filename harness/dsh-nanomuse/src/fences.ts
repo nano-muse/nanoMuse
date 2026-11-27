@@ -12,6 +12,8 @@
  * is read here too.
  */
 
+import { validGoalDate } from './goal-follow-up.ts'
+
 export const FENCE_GOAL = 'nanomuse-goal'
 export const FENCE_GOAL_UPDATE = 'nanomuse-goal-update'
 export const FENCE_FEED = 'nanomuse-feed'
@@ -55,6 +57,7 @@ export interface GoalBlock {
   /** `HH:MM`. */
   checkTime: string
   steps: string[]
+  due?: string
   firstCheck: string
 }
 
@@ -81,6 +84,7 @@ export function parseGoalBlock(json: string): GoalBlock | undefined {
     checkEveryHours: Number.isFinite(hours) ? Math.min(24 * 7, Math.max(0, Math.round(hours))) : 0,
     checkTime: parseCheckTime(o.check_time),
     steps,
+    ...(validGoalDate(o.due) ? { due: o.due } : {}),
     firstCheck: str(o.first_check).slice(0, 300),
   }
 }
@@ -91,6 +95,7 @@ export interface GoalUpdateBlock {
   progress: number
   status: 'on_track' | 'attention' | 'done'
   note: string
+  nextStep?: string
 }
 
 export function parseGoalUpdate(json: string): GoalUpdateBlock | undefined {
@@ -103,6 +108,7 @@ export function parseGoalUpdate(json: string): GoalUpdateBlock | undefined {
     progress: Number.isFinite(p) ? Math.min(100, Math.max(-1, Math.round(p))) : -1,
     status: status === 'done' || status === 'attention' ? status : 'on_track',
     note: str(o.note).slice(0, 300),
+    ...(typeof o.next_step === 'string' ? { nextStep: o.next_step.trim().slice(0, 240) } : {}),
   }
 }
 
@@ -200,12 +206,14 @@ export function goalCreationNote(categoryKey: string, zh: boolean): string {
         `[对方刚在「目标」里选择了创建一个「${categoryKey}」分类的目标。像 Muse 一样一起把它定下来：最多问三个简短的问题，一次一个——(1) 具体想达成什么，(2) 为什么重要、到什么时候，(3) 希望多久检查一次（每 N 小时，或每天某个时间）。每条两三句话；对方已经回答过的就跳过。`,
         `信息够了以后，先用一句温暖的话确认，然后写出恰好一个标记为 \`${FENCE_GOAL}\` 的代码块，内容是 JSON，键如下：`,
         `{"title": "不超过 40 字", "why": "一句话", "category": "${categoryKey}", "check_every_hours": <整数，0 表示每天检查一次>, "check_time": "HH:MM"（check_every_hours 为 0 时使用）, "steps": ["3 到 5 个你会做或跟进的简短步骤"], "first_check": "第一次检查时你会做什么"}`,
+        `只有对方给出明确截止日期时才加上 due（本地日期，YYYY-MM-DD）。`,
         `不要描述这个代码块，也不要提 JSON——应用会把它渲染成卡片。代码块之后不要再说话。之后这个目标的检查会在它自己的对话里自动进行。]`,
       ]
     : [
         `[The person just chose to create a goal in the "${categoryKey}" category from their Goals room. Shape it together: ask at most three short questions, ONE message at a time, in the person's language: (1) what exactly they want to achieve, (2) why it matters and by when, (3) how often you should check in (every N hours, or daily at a time). Two or three sentences per message; if they already answered something, skip that question.`,
         `When you have enough, reply with one warm sentence of confirmation and then EXACTLY ONE fenced code block tagged \`${FENCE_GOAL}\` containing JSON with these keys:`,
         `{"title": "<= 40 chars", "why": "one sentence", "category": "${categoryKey}", "check_every_hours": <integer, 0 means a daily check>, "check_time": "HH:MM" (used when check_every_hours is 0), "steps": ["3 to 5 short steps you will take or track"], "first_check": "what you will do at the first check"}`,
+        `Include due (local YYYY-MM-DD) only when the person has supplied a specific deadline.`,
         `Do not describe the block or mention JSON — the app renders it as a card. Say nothing after the block. Later, checks for this goal happen automatically in their own conversation.]`,
       ]
   return lines.join('\n')
@@ -226,7 +234,7 @@ export function goalHomeNote(goal: { id: string; title: string; why: string; ste
     `[This conversation tracks a goal (nanoMuse). Goal: ${goal.title}${goal.why ? `. Why: ${goal.why}` : ''}`,
     `Steps:\n${steps}`,
     `Checks run ${cadence}.`,
-    `When a message asks you to check on the goal: find out where it stands right now with your tools (shell, browser, connectors, memory) and take the next small step if it is safe and reversible. Never pay, send messages or delete anything without asking. Then write the person a short update in ${zh ? 'Chinese' : 'their language'} (at most six lines) and end with EXACTLY ONE fenced code block tagged \`${FENCE_GOAL_UPDATE}\` containing {"goal_id": "${goal.id}", "progress": <0-100>, "status": "on_track|attention|done", "note": "one line"}. In ordinary conversation here, answer normally and add that block only when the goal's progress actually changed.]`,
+    `When a message asks you to check on the goal: find out where it stands right now with your tools (shell, browser, connectors, memory) and take the next small step if it is safe and reversible. Never pay, send messages or delete anything without asking. Then write the person a short update in ${zh ? 'Chinese' : 'their language'} (at most six lines) and end with EXACTLY ONE fenced code block tagged \`${FENCE_GOAL_UPDATE}\` containing {"goal_id": "${goal.id}", "progress": <0-100>, "status": "on_track|attention|done", "note": "one line", "next_step": "the concrete next step, or empty"}. In ordinary conversation here, answer normally and add that block only when the goal's progress actually changed.]`,
   ].join('\n')
 }
 

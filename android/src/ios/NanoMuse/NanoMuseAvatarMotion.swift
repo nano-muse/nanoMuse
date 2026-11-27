@@ -85,7 +85,7 @@ final class NanoMuseAvatarMotion: ObservableObject {
     }
 
     /// True when a video model is set and the person has not turned the animation off.
-    var enabled: Bool { NanoMuseMediaModels.animateAvatar && NanoMuseMediaModels.videoEndpoint() != nil }
+    var enabled: Bool { NanoMuseMediaModels.animateAvatar && NanoMuseMediaModels.videoEndpoint().map { $0.studioURL == nil } == true }
 
     /// A new face, or none: the old clips belonged to the old face.
     func clear() {
@@ -123,7 +123,7 @@ final class NanoMuseAvatarMotion: ObservableObject {
     /// custom face or a video model. Returns when the run is over; partial sets are fine.
     @discardableResult
     func animateAll(force: Bool = false) async -> Bool {
-        guard let ep = NanoMuseMediaModels.videoEndpoint() else { return false }
+        guard let ep = NanoMuseMediaModels.videoEndpoint(), ep.studioURL == nil else { return false }
         let store = NanoMuseFaceStore.shared
         guard store.hasCustomFace else { return false }
         if progress?.running == true { return false }

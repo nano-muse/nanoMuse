@@ -156,6 +156,11 @@ final class NanoMuseAccountData {
     /// one of them is deleted, its sync table included (so a later sign-in never reads the
     /// gap as deletions and tombstones the account's chats on its other devices).
     func leave(account: String, keep: Bool) async {
+        NanoMuseFeedWriter.accountChanging(true)
+        NanoMuseRemoteApprovals.shared.resetAllSessionGrants()
+        NanoMuseChatOutreach.shared.changeAccount(true)
+        NanoMuseDeadlineNotifications.shared.accountChanging(true)
+        NanoMuseDeviceConversations.shared.suspendForAccountChange()
         await reconcile(as: account)
         if !keep { await deleteChats(of: account) }
         let fm = FileManager.default
@@ -205,6 +210,10 @@ final class NanoMuseAccountData {
         await reconcile(as: account)
         NanoMuseScheduler.shared.reload()
         reloadStores()
+        NanoMuseFeedWriter.accountChanging(false)
+        NanoMuseChatOutreach.shared.changeAccount(false)
+        NanoMuseDeadlineNotifications.shared.accountChanging(false)
+        NanoMuseDeviceConversations.shared.resumeAfterAccountChange()
         NotificationCenter.default.post(name: .nanoMuseAccountSwitched, object: account)
         NotificationCenter.default.post(name: .sessionDidUpdate, object: nil)
         // the feed's routine and conversation are this account's now; made again when missing
@@ -306,9 +315,11 @@ final class NanoMuseAccountData {
             ("memory", NanoMuseDirs.memory),
             ("shared", AIChatViewModel.minisSharedPersistentDir),
             ("feed", NanoMuseDirs.root.appendingPathComponent("feed", isDirectory: true)),
+            ("feed-chat", NanoMuseDirs.root.appendingPathComponent("feed-chat", isDirectory: true)),
             ("feed-preferences.md", NanoMuseDirs.root.appendingPathComponent("feed-preferences.md")),
             ("goals.json", NanoMuseDirs.root.appendingPathComponent("goals.json")),
             ("routines.json", NanoMuseDirs.root.appendingPathComponent("routines.json")),
+            ("device-chats.json", NanoMuseDeviceConversations.fileURL),
             ("avatar", NanoMuseFaceStore.directory),
             ("avatar-options", NanoMuseDirs.root.appendingPathComponent("avatar-options", isDirectory: true)),
         ]
@@ -372,6 +383,7 @@ final class NanoMuseAccountData {
         // the account's sync table first: a push later must never read these as deletions
         NanoMuseSync.shared.dropTable(for: account)
         for id in ids {
+            NanoMuseRemoteApprovals.shared.resetSessionGrants(for: id)
             await ChatStore.shared.deleteSession(id)
             owners.removeValue(forKey: id)
         }

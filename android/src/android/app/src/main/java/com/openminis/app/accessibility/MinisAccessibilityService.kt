@@ -14,12 +14,16 @@ import android.os.Looper
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo // nanoMuse: default-display windows for wireless pairing code reader
 import androidx.annotation.RequiresApi
 import com.openminis.app.logging.AppLogger
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.MutableStateFlow // nanoMuse: observe accessibility connection state
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * MinisAccessibilityService — host-side AccessibilityService backing the
@@ -35,6 +39,9 @@ class MinisAccessibilityService : AccessibilityService() {
 
         @Volatile
         private var _instance: MinisAccessibilityService? = null
+
+        private val _instanceFlow = MutableStateFlow<MinisAccessibilityService?>(null) // nanoMuse: reactive service state for wireless pairing setup
+        val instanceFlow: StateFlow<MinisAccessibilityService?> = _instanceFlow.asStateFlow()
 
         fun getInstance(): MinisAccessibilityService? = _instance
     }
@@ -55,12 +62,14 @@ class MinisAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         _instance = this
+        _instanceFlow.value = this // nanoMuse: publish connected instance
         AppLogger.info(TAG, "service created")
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         _instance = this
+        _instanceFlow.value = this // nanoMuse: publish connected instance
         // [T-android-a11y-miui-service-failure] Breadcrumb on (re)bind. On OEM
         // ROMs (MIUI etc.) the system kills + rebinds this service repeatedly,
         // surfacing "此服务出现故障"; a connect log lets us correlate a degraded
@@ -102,12 +111,24 @@ class MinisAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (_instance === this) _instance = null
+        if (_instance === this) {
+            _instance = null
+            _instanceFlow.value = null // nanoMuse: clear instance state on disconnect
+        }
         eventRing.clear()
         nodeRegistry.clear()
         eventListeners.clear()
         AppLogger.info(TAG, "service destroyed")
     }
+
+    // nanoMuse: read only default-display windows so pairing auto-read never mixes secondary displays.
+    fun defaultDisplayWindows(): List<AccessibilityWindowInfo> = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            windowsOnAllDisplays.get(Display.DEFAULT_DISPLAY)?.toList() ?: windows.orEmpty()
+        } else {
+            windows.orEmpty()
+        }
+    }.getOrDefault(emptyList())
 
     fun snapshotEvents(): List<RecordedEvent> = eventRing.toList()
 

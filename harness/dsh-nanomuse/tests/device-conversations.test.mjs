@@ -77,6 +77,32 @@ test('offline or unsupported targets cannot reserve or dispatch a turn', async (
   assert.equal(service.list()[0].turns.length, 0)
 })
 
+test('an offline device can keep an independent draft without dispatching a turn', async () => {
+  let rows = []
+  const device = { id: 'desk-a', online: false, actions: ['task', 'task.status'], name: 'Desk' }
+  const service = new DeviceConversations(() => rows, async (next) => { rows = next }, () => [device],
+    async () => assert.fail('an offline draft must not dispatch'))
+  const chat = await service.create(device.id)
+  await assert.rejects(service.send(chat.id, 'keep this draft'), { code: 'device_offline' })
+  assert.deepEqual(service.list()[0].turns, [])
+})
+
+test('drafts survive service reopen independently per bound conversation', async () => {
+  let rows = []
+  const device = { id: 'desk-a', online: false, actions: ['task.status'], name: 'Desk' }
+  const service = () => new DeviceConversations(() => rows, async (next) => { rows = structuredClone(next) }, () => [device],
+    async () => assert.fail('saving a draft must not dispatch'))
+  const first = await service().create(device.id)
+  const second = await service().create(device.id)
+  await service().saveDraft(first.id, 'draft for the first chat')
+  await service().saveDraft(second.id, 'draft for the second chat')
+  assert.equal(service().list().find((row) => row.id === first.id).draft, 'draft for the first chat')
+  assert.equal(service().list().find((row) => row.id === second.id).draft, 'draft for the second chat')
+  await service().saveDraft(first.id, '')
+  assert.equal(service().list().find((row) => row.id === first.id).draft, '')
+  assert.deepEqual(service().list().flatMap((row) => row.turns), [])
+})
+
 test('caller and executor recover a turn across a dropped result and two store reopens', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'nm-device-recovery-'))
   t.after(() => rm(dir, { recursive: true, force: true }))

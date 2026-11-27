@@ -259,6 +259,7 @@ enum ChatStoreSyncHydrators {
     // MARK: - Message
 
     private static func buildMessage(id: String) async -> PortableRecord? {
+        guard !id.hasPrefix(NanoMuseOutreachJournal.localPublicPrefix) else { return nil } // nanoMuse: public watch messages are local to this phone.
         guard let msg = await ChatStore.shared.loadSingleMessage(id: id) else { return nil }
         let updatedAt = await ChatStore.shared.messageUpdatedAt(id: id)
         let synced = SyncedMessage.from(msg, updatedAt: updatedAt)

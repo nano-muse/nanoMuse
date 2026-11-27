@@ -75,6 +75,10 @@ import io.github.nanomuse.ui.chat.NmHomeChrome
 import io.github.nanomuse.goals.GoalCategory
 import io.github.nanomuse.goals.GoalFlow
 import io.github.nanomuse.home.MainChat
+import io.github.nanomuse.hub.Device
+import io.github.nanomuse.hub.DeviceConversations
+import io.github.nanomuse.hub.Hub
+import io.github.nanomuse.ui.cloud.DeviceConversationPanel
 import io.github.nanomuse.ideas.Idea
 import io.github.nanomuse.ui.avatar.rememberAgentMood
 import io.github.nanomuse.ui.feed.FeedTab
@@ -117,6 +121,10 @@ fun NanoMuseHome(
 
     var tab by rememberSaveable { mutableStateOf(HomeTab.CHAT) }
     var chatSessionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deviceChatId by rememberSaveable { mutableStateOf<String?>(null) }
+    var newChatPickerOpen by rememberSaveable { mutableStateOf(false) }
+    val hubDevices by Hub.devices.collectAsState()
+    val deviceChatTargets = remember(hubDevices) { hubDevices.filter { it.id != Hub.deviceId(context) && it.kind != "web" } }
     val mainSessionId by MainChat.sessionId.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -141,6 +149,7 @@ fun NanoMuseHome(
             if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
                 io.github.nanomuse.community.Nudges.refreshIfStale(context)
                 io.github.nanomuse.community.StarPrompt.dayOpened(context)
+                io.github.nanomuse.feed.PublicWatchJob.catchUp(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -149,7 +158,14 @@ fun NanoMuseHome(
 
     fun showSession(id: String) {
         focusManager.clearFocus(force = true)
+        deviceChatId = null
         chatSessionId = id
+        tab = HomeTab.CHAT
+    }
+
+    fun showDeviceConversation(id: String) {
+        focusManager.clearFocus(force = true)
+        deviceChatId = id
         tab = HomeTab.CHAT
     }
 
@@ -165,6 +181,7 @@ fun NanoMuseHome(
             when (req) {
                 is HomeBus.Request.ShowTab -> tab = req.tab
                 is HomeBus.Request.ShowSession -> showSession(req.sessionId)
+                is HomeBus.Request.ShowDeviceConversation -> showDeviceConversation(req.conversationId)
                 is HomeBus.Request.PrefillComposer -> {
                     showMain()
                     pendingPrefill = req.text
@@ -206,6 +223,15 @@ fun NanoMuseHome(
     // The flow flips when the sign-in lands (or the key is revoked); signed out with a key of
     // one's own the chat stays, the sign-in is an invitation under Settings.
     val signedIn by io.github.nanomuse.cloud.NanoMuseCloud.signedIn(context).collectAsState()
+    val currentCloudAccount = io.github.nanomuse.cloud.NanoMuseCloud.account(context)?.accountId
+    var routeAccount by remember { mutableStateOf(currentCloudAccount) }
+    LaunchedEffect(signedIn, currentCloudAccount) {
+        if (signedIn != true || (routeAccount != null && routeAccount != currentCloudAccount)) {
+            deviceChatId = null
+            newChatPickerOpen = false
+        }
+        routeAccount = currentCloudAccount
+    }
     val phase = when {
         !configLoaded || sessions == null || signedIn == null -> HomePhase.LOADING
         FirstRunSetup.needed(signedIn == true, hasProviders, sessions!!.isNotEmpty(), setupDone) -> HomePhase.SETUP
@@ -264,17 +290,24 @@ fun NanoMuseHome(
     val soul by SoulStore.cachedMetadata.collectAsState()
     val agentName = soul.name.trim().ifEmpty { stringResource(R.string.app_name) }
 
-    fun sendToMainChat(text: String) {
-        val vm = mainVm ?: run {
+    fun readyMainChat(): com.openminis.app.ui.chat.ChatViewModel? {
+        val vm = mainVm
+        if (vm == null || !vm.nmSessionReady) {
             Toast.makeText(context, R.string.nm_home_not_ready, Toast.LENGTH_SHORT).show()
-            return
+            return null
         }
+        return vm
+    }
+
+    fun sendToMainChat(text: String) {
+        val vm = readyMainChat() ?: return
         showMain()
         vm.nmMarkPersonTurn() // an idea or goal card the person tapped: a task for StarPrompt's count
         vm.sendMessage(text)
     }
 
     fun startGoal(category: GoalCategory, seed: String? = null) {
+        if (readyMainChat() == null) return
         val id = mainSessionId ?: return
         val opener = GoalFlow.startCreation(context, id, category)
         sendToMainChat(if (seed.isNullOrBlank()) opener else "$opener $seed")
@@ -303,12 +336,14 @@ fun NanoMuseHome(
     fun discussPost(post: io.github.nanomuse.feed.FeedPost) {
         scope.launch {
             val app = context.applicationContext as? com.openminis.app.MinisApp ?: return@launch
+            if (!io.github.nanomuse.feed.FeedPreparationRunner.mayDiscuss(app, post)) return@launch
             val id = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 io.github.nanomuse.goals.GoalSessions.create(app, post.title.take(40))
             } ?: run {
                 Toast.makeText(context, R.string.nm_feed_routine_needs_model, Toast.LENGTH_SHORT).show()
                 return@launch
             }
+            if (!io.github.nanomuse.feed.FeedPreparationRunner.mayDiscuss(app, post)) return@launch
             showSession(id)
             val opener = context.getString(R.string.nm_feed_discuss_opener, post.title, post.body.take(1200))
             com.openminis.app.debug.HeadlessChatRunner.prompt(
@@ -328,7 +363,8 @@ fun NanoMuseHome(
     val homeShown = phase == HomePhase.HOME
     BackHandler(enabled = homeShown && drawerState.isOpen) { closeDrawer() }
     BackHandler(enabled = homeShown && !drawerState.isOpen && tab != HomeTab.CHAT) { tab = HomeTab.CHAT }
-    BackHandler(enabled = homeShown && !drawerState.isOpen && tab == HomeTab.CHAT && !isMainChat && mainSessionId != null) { showMain() }
+    BackHandler(enabled = homeShown && !drawerState.isOpen && tab == HomeTab.CHAT && deviceChatId != null) { deviceChatId = null }
+    BackHandler(enabled = homeShown && !drawerState.isOpen && tab == HomeTab.CHAT && deviceChatId == null && !isMainChat && mainSessionId != null) { showMain() }
 
     // The drawer + tab shell, as a local composable so it can share every piece of state above
     // and still be one branch of the phase switch below.
@@ -349,9 +385,11 @@ fun NanoMuseHome(
                     chatRepository = chatRepository,
                     mainSessionId = mainSessionId,
                     currentSessionId = chatSessionId,
+                    currentDeviceChatId = deviceChatId,
                     onOpenMain = { closeDrawer(); showMain() },
                     onOpenSession = { id -> closeDrawer(); showSession(id) },
-                    onNewChat = { closeDrawer(); showSession("__new__${UUID.randomUUID()}") },
+                    onOpenDeviceChat = { id -> closeDrawer(); showDeviceConversation(id) },
+                    onNewChat = { closeDrawer(); newChatPickerOpen = true },
                     onAllChats = { closeDrawer(); navController.safeNavigate(ROUTE_ALL_CHATS) },
                     onSettings = { closeDrawer(); navController.safeNavigate(Routes.SETTINGS) },
                     onSetMain = { id -> MainChat.set(context, id); closeDrawer(); showSession(id) },
@@ -405,7 +443,7 @@ fun NanoMuseHome(
                         .graphicsLayer { alpha = chatAlpha },
                 ) {
                     val sid = chatSessionId
-                    if (sid != null) {
+                    if (sid != null && deviceChatId == null) {
                         ChatScreen(
                             sessionId = sid,
                             chatRepository = chatRepository,
@@ -414,7 +452,7 @@ fun NanoMuseHome(
                             skillRepository = skillRepository,
                             mcpRepository = mcpRepository,
                             onBack = { if (!isMainChat) showMain() },
-                            onNewChat = { showSession("__new__${UUID.randomUUID()}") },
+                            onNewChat = { newChatPickerOpen = true },
                             onOpenTerminal = { navController.safeNavigate(Routes.terminal(sessionId = sid)) },
                             onOpenTerminalWithCommand = { command ->
                                 navController.safeNavigate(Routes.terminal(initCommand = command, sessionId = sid))
@@ -481,6 +519,7 @@ fun NanoMuseHome(
                                 HomeTab.FEED -> FeedTab(
                                     header = header,
                                     onDiscuss = { discussPost(it) },
+                                    onOpenGoal = { goal -> goal.sessionId?.let { showSession(it) } ?: run { tab = HomeTab.GOALS } },
                                     onEditRoutine = { navController.safeNavigate(Routes.scheduledTaskEdit(it)) },
                                     bottomInset = bottom,
                                 )
@@ -541,6 +580,35 @@ fun NanoMuseHome(
             )
             HomePhase.HOME -> homeShell()
         }
+    }
+    if (deviceChatId != null && phase == HomePhase.HOME) {
+        DeviceConversationPanel(
+            devices = deviceChatTargets,
+            initialChatId = deviceChatId,
+            routeOnly = true,
+            onClose = { deviceChatId = null },
+        )
+    }
+    if (newChatPickerOpen && phase == HomePhase.HOME) {
+        DeviceChatStartDialog(
+            devices = deviceChatTargets,
+            onLocal = { newChatPickerOpen = false; showSession("__new__${UUID.randomUUID()}") },
+            onDevice = { target: Device ->
+                newChatPickerOpen = false
+                val account = io.github.nanomuse.cloud.NanoMuseCloud.account(context)?.accountId
+                if (account.isNullOrBlank()) {
+                    Toast.makeText(context, R.string.nm_hub_err_generic, Toast.LENGTH_SHORT).show()
+                } else scope.launch {
+                    runCatching {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            DeviceConversations.open(context, account).create(target)
+                        }
+                    }.onSuccess { showDeviceConversation(it.getString("id")) }
+                        .onFailure { Toast.makeText(context, R.string.nm_hub_err_generic, Toast.LENGTH_SHORT).show() }
+                }
+            },
+            onDismiss = { newChatPickerOpen = false },
+        )
     }
 }
 

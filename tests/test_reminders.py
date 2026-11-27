@@ -52,9 +52,15 @@ def test_reminders_fire_once_and_routines_repeat(tmp_path: Path):
     routine = store.create("summarise unread email", repeat="daily 08:00", kind="task")
     assert routine.repeating and routine.kind == "task"
     first = datetime.fromisoformat(routine.next_at)
-    fired = store.mark_fired(routine.id, first + timedelta(seconds=30))
+    fired = store.mark_fired(routine.id, first + timedelta(seconds=30), occurrence=routine.next_at)
     assert fired.status == "active" and fired.fired == 1
     assert datetime.fromisoformat(fired.next_at) - first == timedelta(days=1)
+    # A crash after the source update but before the outbox acknowledgement replays this
+    # call. The occurrence key keeps the cadence and count from advancing a second time.
+    replayed = store.mark_fired(
+        routine.id, first + timedelta(seconds=30), occurrence=routine.next_at
+    )
+    assert replayed.next_at == fired.next_at and replayed.fired == 1
     # "at" is ignored for routines: the cadence decides
     weekly = store.create("weekly review", at="2020-01-01 10:00", repeat="weekly mon 09:00")
     assert datetime.fromisoformat(weekly.next_at).astimezone().weekday() == 0

@@ -24,6 +24,8 @@ from typing import Any
 from . import client as _client
 from .catalog import Probe
 
+SESSION_HUB_RESERVATION_PREFIX = "session-"
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
     id            TEXT PRIMARY KEY,
@@ -2487,19 +2489,19 @@ class Database:
         """Bind an unbound credential to its first Hub identity.
 
         False means this key already names another identity, or a live key of the
-        account owns this device id and this key may not take it over. A revoked or
-        lapsed owner releases its id. A key from a later code or password sign-in on
-        the same installation (the phone signed in again without signing out first,
-        the runtime's vault was reset, the old sign-out never reached the relay) takes
-        the id over, since that sign-in proved the account again; the older key stays a
-        valid account key but no longer speaks for the device. A session key never
-        takes over: it may only register an id nobody holds. The unique index makes two
-        simultaneous first hellos choose one owner rather than both succeeding.
+        account owns this device id. A revoked or lapsed owner releases its id.
+        Compatibility credentials from clients that did not bind at sign-in may claim
+        only a free id, so they cannot impersonate a device whose newer credential was
+        bound when issued. A fresh code or password sign-in that supplies the id rotates
+        the owner in ``insert_key``. A legacy session key may bind only as ``computer``,
+        matching the nanoMuse Web runtime that received it.
+        The unique index makes two simultaneous first hellos choose one owner rather
+        than both succeeding.
         """
         t = now()
         with self.tx() as c:
             row = c.execute(
-                "SELECT rowid, hub_device_id, hub_device_kind, via, created_at FROM api_keys WHERE key_hash=? AND account_id=?",
+                "SELECT hub_device_id, hub_device_kind, via FROM api_keys WHERE key_hash=? AND account_id=?",
                 (key_hash, account_id),
             ).fetchone()
             if row is None:
@@ -2508,6 +2510,8 @@ class Database:
             bound_kind = str(row["hub_device_kind"] or "")
             if bound_id:
                 return bound_id == device_id and bound_kind == kind
+            if str(row["via"] or "code") == "session" and kind != "computer":
+                return False
             # what no longer opens releases its identity
             c.execute(
                 "UPDATE api_keys SET hub_device_id='', hub_device_kind='' WHERE account_id=? AND hub_device_id=? "
@@ -2515,23 +2519,66 @@ class Database:
                 (account_id, device_id, t),
             )
             owner = c.execute(
-                "SELECT rowid, key_hash, created_at FROM api_keys WHERE account_id=? AND hub_device_id=? LIMIT 1",
+                "SELECT 1 FROM api_keys WHERE account_id=? AND hub_device_id=? LIMIT 1",
                 (account_id, device_id),
             ).fetchone()
             if owner is not None:
-                proven = str(row["via"] or "code") in ("code", "password")
-                # issue order: the second, then the row, since two keys can share a second
-                later = (int(row["created_at"]), int(row["rowid"])) > (int(owner["created_at"]), int(owner["rowid"]))
-                if not proven or not later:
-                    return False
-                c.execute(
-                    "UPDATE api_keys SET hub_device_id='', hub_device_kind='' WHERE key_hash=?",
-                    (owner["key_hash"],),
-                )
+                return False
             try:
                 cur = c.execute(
                     "UPDATE api_keys SET hub_device_id=?, hub_device_kind=? WHERE key_hash=? AND account_id=? AND hub_device_id=''",
                     (device_id, kind, key_hash, account_id),
+                )
+            except sqlite3.IntegrityError:
+                return False
+            return cur.rowcount == 1
+
+    def claim_session_hub_device(self, key_hash: str, account_id: str, device_id: str, kind: str) -> bool:
+        """Replace a newly issued session reservation with its runtime's free computer id.
+
+        nanoMuse Web receives its session key before its container starts, while the
+        runtime creates its installation id inside that container. The key is therefore
+        issued with a private reservation and atomically fixes itself to the runtime's
+        first free id at hello. It can neither change kind nor displace another live
+        credential; after this update it follows the normal exact-id reconnect path.
+        """
+        if kind != "computer" or device_id.startswith(SESSION_HUB_RESERVATION_PREFIX):
+            return False
+        t = now()
+        with self.tx() as c:
+            row = c.execute(
+                "SELECT hub_device_id, hub_device_kind, via FROM api_keys WHERE key_hash=? AND account_id=?",
+                (key_hash, account_id),
+            ).fetchone()
+            if row is None:
+                return False
+            reservation = str(row["hub_device_id"] or "")
+            bound_kind = str(row["hub_device_kind"] or "")
+            via = str(row["via"] or "")
+            if via == "session" and reservation == device_id and bound_kind == kind:
+                # Two first connections may have authenticated before either claim
+                # committed. The later one is a legitimate reconnect of the same key.
+                return True
+            if via != "session" or bound_kind != "computer" or not reservation.startswith(SESSION_HUB_RESERVATION_PREFIX):
+                return False
+            c.execute(
+                "UPDATE api_keys SET hub_device_id='', hub_device_kind='' "
+                "WHERE account_id=? AND hub_device_id=? "
+                "AND (revoked_at IS NOT NULL OR (expires_at IS NOT NULL AND expires_at <= ?))",
+                (account_id, device_id, t),
+            )
+            owner = c.execute(
+                "SELECT 1 FROM api_keys WHERE account_id=? AND hub_device_id=? LIMIT 1",
+                (account_id, device_id),
+            ).fetchone()
+            if owner is not None:
+                return False
+            try:
+                cur = c.execute(
+                    "UPDATE api_keys SET hub_device_id=?, hub_device_kind=? "
+                    "WHERE key_hash=? AND account_id=? AND hub_device_id=? "
+                    "AND hub_device_kind='computer' AND via='session'",
+                    (device_id, kind, key_hash, account_id, reservation),
                 )
             except sqlite3.IntegrityError:
                 return False
@@ -2676,13 +2723,22 @@ class Database:
         request_id: str,
         cost_uy: int = 0,
         extra: str = "",
-    ) -> None:
+        *,
+        video_task_id: str | None = None,
+    ) -> bool:
         """Record one request: the tokens on the account, the line in the ledger. What the
         account has spent is always the ledger's sum, so there is nothing else to keep."""
         charged = max(0, int(charged))
         cost_uy = max(0, int(cost_uy))
         who = _client.current()
         with self.tx() as c:
+            if video_task_id is not None:
+                changed = c.execute(
+                    "UPDATE video_tasks SET charged=1, status='SUCCEEDED', cost_uy=? WHERE task_id=? AND account_id=? AND charged=0",
+                    (cost_uy, video_task_id, account_id),
+                ).rowcount
+                if not changed:
+                    return False
             c.execute("UPDATE accounts SET used=used+? WHERE id=?", (charged, account_id))
             c.execute(
                 "INSERT INTO ledger(account_id, ts, kind, model, prompt_tokens, completion_tokens, charged, request_id, cost_uy, extra, ip, ua) "
@@ -2702,6 +2758,8 @@ class Database:
                     who.ua,
                 ),
             )
+
+        return True
 
     USAGE_KINDS = ("chat", "image", "video", "realtime")
 
@@ -3098,7 +3156,7 @@ class Database:
             # a second insert for the same task (a retried poll) must not forget that it was charged
             c.execute(
                 "INSERT INTO video_tasks(task_id, account_id, model, created_at, cost_uy, probe) VALUES (?,?,?,?,?,?) "
-                "ON CONFLICT(task_id) DO UPDATE SET model=excluded.model, cost_uy=excluded.cost_uy",
+                "ON CONFLICT(task_id) DO NOTHING",
                 (task_id, account_id, model, t, max(0, int(cost_uy)), 1 if probe else 0),
             )
             c.execute("DELETE FROM video_tasks WHERE created_at < ?", (t - self.VIDEO_KEEP_S,))
@@ -3109,7 +3167,7 @@ class Database:
 
     def set_video_status(self, task_id: str, status: str) -> None:
         with self.tx() as c:
-            c.execute("UPDATE video_tasks SET status=? WHERE task_id=?", (status[:20], task_id))
+            c.execute("UPDATE video_tasks SET status=? WHERE task_id=? AND charged=0", (status[:20], task_id))
 
     def mark_video_charged(self, task_id: str) -> bool:
         """True the first time only, so a clip is charged once however often it is polled."""

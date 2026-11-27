@@ -2,7 +2,7 @@
  *  who is operating), one page at a time, and the account and address drawers over it. */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { actor as actorStore, ApiError, get, setLockedHandler, token } from "./lib/api";
+import { actor as actorStore, ApiError, setLockedHandler, token } from "./lib/api";
 import { clearCache, useData, useStored } from "./lib/hooks";
 import { LANG_KEY, LangContext, initialLang, tableOf } from "./lib/i18n";
 import type { Lang } from "./lib/locales";
@@ -31,7 +31,8 @@ import { Site } from "./pages/Site";
 import { StatsPage } from "./pages/Stats";
 import { Turns } from "./pages/Turns";
 import { Usage } from "./pages/Usage";
-import { Btn, DialogHost, Seg, ToastHost, cx } from "./ui/primitives";
+import { DialogHost, Seg, ToastHost, cx } from "./ui/primitives";
+import { AdminLock } from "./ui/AdminLock";
 
 export interface PageProps {
   days: number;
@@ -96,57 +97,6 @@ function Icon({ d, className }: { d: string; className?: string }) {
   );
 }
 
-function Lock({ onEnter, expired }: { onEnter: () => void; expired: boolean }) {
-  const [lang, setLang] = useState<Lang>(initialLang);
-  const T = tableOf(lang);
-  const [v, setV] = useState("");
-  const [bad, setBad] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const go = async () => {
-    if (!v.trim()) return;
-    setBusy(true);
-    token.set(v.trim());
-    try {
-      await get("/v1/admin/health");
-      setBad(false);
-      onEnter();
-    } catch {
-      token.clear();
-      setBad(true);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="flex min-h-full items-center justify-center p-6">
-      <div className="panel w-full max-w-sm p-6">
-        <div className="mb-1 flex items-center gap-2">
-          <img src="/app/icon.svg" alt="" className="h-7 w-7 rounded-lg" />
-          <div className="text-[16px] font-semibold">{T.app}</div>
-          <button
-            type="button"
-            className="ml-auto text-[12px] text-ink-3 hover:text-ink"
-            onClick={() => {
-              const l = lang === "zh" ? "en" : "zh";
-              setLang(l);
-              localStorage.setItem(LANG_KEY, l);
-            }}
-          >
-            {T.top.lang}
-          </button>
-        </div>
-        <div className="text-[14px] font-medium">{T.lock.title}</div>
-        <p className="sub mt-1 mb-4">{T.lock.hint}</p>
-        <input type="password" className="inp w-full" placeholder={T.lock.placeholder} value={v} autoFocus onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.key === "Enter" && go()} />
-        {(bad || expired) && <div className="mt-2 text-[12.5px] text-bad">{bad ? T.lock.bad : T.lock.expired}</div>}
-        <Btn variant="primary" className="mt-4 w-full justify-center" onClick={go} disabled={busy}>
-          {T.lock.enter}
-        </Btn>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   const [lang, setLangState] = useState<Lang>(initialLang);
   const setLang = useCallback((l: Lang) => {
@@ -187,7 +137,7 @@ export default function App() {
   if (!unlocked) {
     return (
       <LangContext.Provider value={ctx}>
-        <Lock
+        <AdminLock
           expired={expired}
           onEnter={() => {
             setExpired(false);

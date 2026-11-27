@@ -151,6 +151,8 @@ export const CATALOGUE: CatalogueEntry[] = [
     about: { en: 'Your boards: read, add and arrange what is on them.', zh: '你的白板：读取、添加和整理上面的内容。' } },
   { id: 'canva', name: 'Canva', category: 'design', url: 'https://mcp.canva.com/mcp', auth: { kind: 'oauth' }, docs: 'https://www.canva.dev/docs/connect/canva-mcp-server-setup/', color: '#00C4CC',
     about: { en: 'Create, search and export designs.', zh: '创建、搜索和导出设计。' } },
+  { id: 'levea', name: 'Levea', category: 'design', url: 'https://api.livecore.ai/api/v1/misc/mcp', auth: { kind: 'oauth' }, docs: 'https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/mcp-server/README.md', color: '#7C3AED',
+    about: { en: 'Edit videos, add captions and export MP4 files.', zh: '剪辑视频、添加字幕并导出 MP4 文件。' } },
   { id: 'webflow', name: 'Webflow', category: 'design', url: 'https://mcp.webflow.com/mcp', auth: { kind: 'oauth' }, docs: 'https://developers.webflow.com/data/docs/ai-tools', icon: 'webflow', color: '#146EF5',
     about: { en: 'Sites, pages and CMS collections.', zh: '站点、页面与 CMS 集合。' } },
   { id: 'wix', name: 'Wix', category: 'design', url: 'https://mcp.wix.com/mcp', auth: { kind: 'oauth' }, docs: 'https://www.wix.com/studio/developers/mcp-server', icon: 'wix', color: '#0C6EFC',

@@ -4,9 +4,77 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Cloud
+
+- Added separate concurrency limits for hosted chat and screen operation so a full chat queue can leave screen-operation slots available.
+- Corrected Cloud chat billing for empty and failed provider responses, including streams.
+- Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
+
+### Runtime
+
+### Web
+
+### Desktop
+
+### Android
+
+### iOS
+
+### Project
+
+## [1.0.10] - 2026-11-25 · Bridge
+
+Bridge: Android background screen work now has guided local pairing, a secure floating preview
+and progress in the originating chat. The phones, desktop and runtime can follow through on due
+commitments and changed sources. The release also tightens browser, account, local-state and
+cross-device approval boundaries. The relay is 0.32.0; 1.0.9 clients remain compatible.
+
+- Fixed Android builds that could produce an arm64 APK without the PRoot executable needed for shell commands and screen tasks. Existing sandboxes also recovered missing files for the bundled Alpine shell without resetting the workspace.
+
+- Replaced the manual Android wireless debugging pairing form with a six-step guided background screen setup that watches system switches live, reads the six-digit pairing code automatically through the accessibility service when enabled, falls back to heads-up inline-reply notifications, and connects automatically across cached, property, mDNS and loopback-scanned ports.
+
+- Changed Android background screen runs to open a draggable secure screen window automatically instead of a top capsule, kept Stop, pause and phone handover in that window, and showed safe live progress in the originating chat. Chat Stop now targets only that conversation's screen run.
+
+- Kept the previous safe frame visible while the Android background screen loads its next screenshot, without showing an intermediate waiting message.
+
+- Android users could pair nanoMuse directly with their phone through wireless debugging to use the background screen without installing Shizuku.
+
+- Android users could take over a background app on the same open page and open its screen replay directly from the chat. The operator also learned to align shadowed dialogs when their position could be verified.
+
+- Added a live preview, pause and resume to the Android background screen, adapted its viewport to the phone and added local playback of recorded screen steps.
+
+- Added independent public-source follow-ups on Android and iPhone. Each phone could discover a source in its main chat, check for changes while the computer was off, and send a relevant update with its original link.
+
+- Added ongoing public-source follow-ups to desktop and the web runtime. nanoMuse could discover a project, researcher, topic or public feed in context and start a main-chat conversation about a new issue, paper, citation or announcement.
+
+- Enabled main-chat check-ins by default and kept earlier choices to turn them off. The web app offered background review when connecting an inbox, calendar or a new MCP server with one readable resource.
+
+- Added opt-in chat messages about changes in connected sources. The web runtime checked new email, nearby calendar events and selected MCP resources. Desktop checked a selected MCP resource. Android and iPhone compared busy times in selected calendars and offered to help with new overlaps or rescheduled events. These checks could start a conversation about something the person had never mentioned.
+
+- Fixed an Android crash when returning to the home screen immediately after opening a chat notification.
+
+- Added check-ins in the conversation itself. Android, iPhone and desktop could ask about a due commitment, and the web runtime could ask whether an expected reply arrived. People could answer directly in the chat.
+
+- Added opt-in Feed preparation from new chat commitments on Android and iPhone. Desktop kept track of separate commitments across topic changes. Dated commitments mentioned the previous week could still surface near their due date. The web Feed followed expected replies, updated their dates, and prepared an editable inquiry when one came due.
+
+- Added Feed preparation with source excerpts on Android, iPhone, desktop and web. Related records can become a draft, brief, checklist or focused question. The web Feed also learned to set aside handled matters and optionally revisit changed plans.
+
+- Added deadline follow-ups to the Feed on Android, iPhone, desktop and web. The web Feed also surfaced blocked steps, pending plan changes and calendar overlaps. Android, iPhone and the web offered optional notifications with private details kept in the Feed.
+
+- Kept completed sensitive actions and file writes in view after message or token limits removed their tool exchanges, helping long tasks avoid repeats. For #938.
+- Asked before repeating an identical sensitive action in the same conversation, including concurrent calls and retries after cancellation left an unknown outcome. For #938.
+- Scoped remembered cross-device approvals to the exact device, conversation, risk class and complete action. Older or malformed approval events could still be allowed once but could not create or reuse a remembered grant, and deleting a chat or leaving an account cleared its conversation grants.
+- Added the Levea video editor to the connector catalogue for desktop and phones, with OAuth sign-in.
+
+- Kept the person's request in view during long turns with the default settings, so a task with many tool calls no longer forgets what it was asked, and the wrap-up at the step limit sees the turn's work.
+
+- Kept the previous request and the newest work in view in the turn after a long one, so "carry on" or "send that report" no longer arrives with no context.
+
 - Prevented failed coding runs from retrying in a new conversation after a tool had already started or returned a result.
 
 - Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
+
+- Added device-bound conversation choices to the standard new-chat flow on Android and desktop; offline or older devices keep a selectable route for drafts without local fallback or automatic resend. For #815.
 
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
 - Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
@@ -19,6 +87,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Rewrote all Simplified Chinese documentation in plain language, added inline term explanations and a bilingual glossary, and clarified navigation labels, privacy and backup wording, and desktop update guidance.
 
 ### Cloud
+
+- Prevented an older unbound account key from taking over another live device identity. Short-lived Web session keys reserved a computer identity and could claim only their container's first unused computer ID, while existing Web runtimes remained callable.
+
+- Distinguished admin-token rejection from temporary service failures, preserved entered tokens during outages, and kept late rejections from locking newer sign-ins.
 
 - Stopped scheduled relay backups before copying when free disk space was insufficient, and prevented overlapping backup runs. For #858.
 
@@ -46,11 +118,21 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Pinned browser connections to the public addresses that passed validation, blocking DNS rebinding to local services. Agent-written HTML and SVG files no longer ran scripts or opened network connections, and screen actions without a device-reported element required approval instead of trusting the model's label.
+
+- Kept routine and goal recovery idempotent when a restart happened between source and delivery commits, and stopped retrying current Responses API prompt, policy and image input errors as transient provider failures.
+
+- Fixed browser-enabled Docker builds failing because the Playwright driver could not load `libatomic.so.1`, and added a Chromium startup check alongside the standard image build in CI.
+
 - Refused local-file and custom-scheme pages before browser tool reads, screenshots and actions, limited blank-page aliases to `about:blank` and `about:srcdoc`, and kept browser fetch redirects on HTTP(S). In-memory data and blob resources and the user's take-over view remained available. For #339.
 
 - Added optional observation-only permission reviews to the Python runtime, using the active chat model or a separately configured model, with bounded requests and redacted audit records. For #724.
 
 - Preserved each conversation's tool permissions and reused them after concurrent approval waits, reducing repeated cards while keeping one-time approvals and warning checks separate. For #724.
+
+- Added TrustedRouter to the own-key catalogue: an OpenAI-compatible gateway at `https://api.trustedrouter.com/v1`, a key from [trustedrouter.com/console/api-keys](https://trustedrouter.com/console/api-keys), pay as you go; one key reaches models from several labs. Model ids carry the vendor's name as its public `/v1/models` list names them; the default model is `deepseek/deepseek-v4-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
+
+- Added Synap to the own-key catalogue: an OpenAI-compatible API for open-weight models at `https://synap402.com/v1`, a key from [synap402.com/account.html#keys](https://synap402.com/account.html#keys), pay as you go. Its public `/v1/models` list names the models that can be called now, with per-token prices; the default model is `qwen3-coder-30b`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
 
 - Added UberLLM to the own-key catalogue: an OpenAI-compatible gateway at `https://api.uberllm.dev/v1`, a key from [uberllm.dev/signup](https://uberllm.dev/signup), prepaid and pay as you go; one key reaches models from several labs. Model ids carry the vendor's name as its `/v1/models` list names them; the default model is `openai/gpt-5.4-mini`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
 
@@ -120,6 +202,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **Showed an unlisted gateway under its own host.** A vendor on a domain of its own (`openrouter.ai`, `atmorouter.dev`) stood for every host under the same top-level domain, so `gateway.example.ai` read as OpenRouter in the runtime and the console. Such a vendor now stands only for its own subdomains; regional siblings such as `dashscope-intl.aliyuncs.com` still find Bailian.
 - **Kept Daily, setup and avatar views on the newest refresh.** Overlapping loads no longer replace newer information or report old errors after leaving. Avatar refreshes preserve drafts and the current candidate choice, while a different drawing session requires a new choice.
 - **Kept skill suggestions through failed refreshes.** The chat slash menu retained its loaded skills when a reload failed and ignored superseded answers. Turning skills off also hid cached suggestions and disabled their keyboard completion.
 - **Kept the newest skills list when saves overlap.** Older responses no longer hide newly saved skills, failed refreshes keep the loaded list, and pending reads do not report errors after leaving the page.
@@ -128,6 +211,18 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A slower search answer no longer lands under a newer query.** The contacts search and the coding screen's recent-workspaces list both fired a request per query (or per picked agent) and took whatever answer arrived last: type past a slow request, or switch agents while one was still loading, and the earlier answer's results replaced the newer one's on screen. Both effects now drop answers that were superseded before they landed.
 
 ### Desktop
+
+- Protected Host restarts with the same active-work handoff used by app exits, kept relay proxy exclusions under the shell's trusted configuration, bounded remote file payloads before decoding, and removed proxy credentials from damaged settings exports.
+
+- Flushed desktop account snapshots before replacement, kept a private previous snapshot and recovered a missing or damaged primary file without discarding account, sync or approval state. State writes remained ordered, and a failed write no longer blocked the next save.
+
+- Updated Electron to a patch release that corrected its certificate validation advisory. The remaining production dependency finding is a moderate malformed-ASF loop in the image stack used by computer control, for which its upstream dependency has no compatible fix.
+
+- Rendered Markdown in assistant replies synced from other devices and in completed replies in device-bound chats.
+- Clarified the latest published version on the desktop About page when testing a newer local build.
+- Fixed the desktop setup returning signed-out users to the first task when they chose to skip model configuration.
+
+- Let the agent list accessible scheduled tasks across chats and request approval to delete one, with guidance to check existing tasks before creating another. For #905.
 
 - Documented launching the Linux AppImage with a separate self-hosted relay profile. For #895.
 
@@ -193,6 +288,16 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Added an optional background screen on compatible Android 14 and newer phones so Hands can operate one app while your keyboard and the Stop control stay on the main screen.
+
+- Grouped the app lock and protected chat settings on one page and clarified when each lock timer starts.
+
+- Replaced Android chat history on reload instead of appending duplicates, converted persisted messages in bounded raw pages, and read only message IDs when verifying a compaction anchor. Saved messages and unsummarized model context were preserved. For #921.
+
+- Retried interrupted OpenAI-compatible streams within the existing bounded model-request budget, including partial EOF, and surfaced socket failures as recoverable errors instead of cancellation. For #934.
+
+- Disclosed every enabled skill with up to 1024 Unicode description characters, preserved imported SKILL.md metadata, parsed quoted and nested frontmatter correctly, and accepted non-ASCII skill names. For #912.
+- Kept device-chat drafts edited while another turn was running, and made long device and bound-conversation lists scrollable. For #815.
 - Paused automatic following as soon as a person scrolled towards older messages, and kept new reply chunks, tool cards and keyboard layout changes from resuming it. For #898.
 - Reserved output space before summarizing long conversations, so nearly full inputs were split instead of leaving the summary only a few output tokens. For #719.
 - Added progress rings to active main and side chats in the Muse drawer, using this phone's existing task tracking while preserving unread reply markers. Approval and per-chat step indicators remain separate work. For #531.
@@ -236,6 +341,16 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Made Android summaries preserve the current task separately from completed work.** Summaries without an active task no longer describe historical requests as work to resume. Summary streams now stop after 120 seconds without activity, within a 900-second overall deadline; stopping the turn cancels the request. Qwen3.8-Max summary requests explicitly disable thinking under the default rules, and context notices follow the app language. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 
 ### iOS
+
+- Added Thinking Intensity to the iPhone Muse chat menu, with per-chat choices and a clear message for unsupported models. For #904.
+- Added a thinking shortcut to local iPhone side-chat headers, while keeping remote transcripts read-only. For #904.
+- Kept an explicit Thinking Off choice from an iPhone draft when creating its chat, instead of replacing it with the model-group default. For #904.
+
+- Added device chats to New Chat, including Command-N, and the Computers list on iPhone. Follow-ups use the selected device, and reopening a chat after a disconnect checks the original turn. For #815.
+
+- Replaced the missing Claude sign-in configuration trap with a recoverable provider error, including background title and warmup requests, while keeping API-key requests independent. For #911.
+
+- Distinguished unconfirmed exit markers from system crash diagnostics, separated report-generation times and delivery logs from incident evidence, and preserved reports delivered in the same second. For #911.
 
 - Kept iOS coding projects and session requests tied to the selected computer, and added refresh recovery for failed output and diff pages.
 

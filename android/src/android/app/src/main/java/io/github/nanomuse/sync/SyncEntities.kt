@@ -124,6 +124,9 @@ interface SyncDao {
     @Query("SELECT * FROM sync_messages WHERE sessionId = :sessionId")
     suspend fun messages(sessionId: String): List<SyncMessage>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM sync_messages WHERE messageId IN (:ids) AND sessionId = :session AND device != '')")
+    suspend fun includesPulled(session: String, ids: List<String>): Boolean
+
     @Query("SELECT * FROM sync_messages WHERE mid = :mid")
     suspend fun messageByMid(mid: String): SyncMessage?
 
@@ -161,6 +164,9 @@ interface SyncDao {
 
     @Query("SELECT sessionId FROM session_owners WHERE owner = :owner")
     suspend fun sessionsOf(owner: String): List<String>
+
+    @Query("SELECT sessionId FROM session_owners WHERE owner = :owner AND sessionId IN (:ids)")
+    suspend fun ownedCandidates(owner: String, ids: List<String>): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putOwners(list: List<SessionOwner>)

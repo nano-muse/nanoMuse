@@ -1016,6 +1016,15 @@ class BrowserUseManager(
                     preview = verdict.elementText,
                     pageUrl = target.url.ifBlank { null },
                     elementText = verdict.elementText,
+                    // nanoMuse: keep the complete action separate from the display preview.
+                    canonicalAction = listOf(
+                        input.action.name,
+                        input.selector.orEmpty(),
+                        input.coordinateX?.toString().orEmpty(),
+                        input.coordinateY?.toString().orEmpty(),
+                        target.url,
+                        verdict.elementText,
+                    ).joinToString("\u0000"),
                 )
                 when (outcome) {
                     is io.github.nanomuse.guard.GateOutcome.Allowed -> NmGate(notice = outcome.notice)

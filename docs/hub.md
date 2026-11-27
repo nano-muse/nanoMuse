@@ -8,9 +8,9 @@ with an empty `session_id` and the returned continuation as `text`.
 
 ## Persistent device conversations
 
-The local prototype for #815 opens independent conversations in **Devices** on Android and desktop. Select an online destination that advertises `task.status`, then start or reopen a conversation. Each entry remembers the device ID and its own conversation UUID. The destination uses its own model and tools. The initiator keeps the transcript locally, independently of side-chat sync.
+Android, desktop and iPhone can open independent conversations from **New chat**. The device list also offers this entry under **Devices** on Android and desktop, and under **Computers** in the iPhone chat drawer. Choose a destination by its stable device ID; its availability is shown separately. You can create a conversation while the device is offline or does not support persistent tasks, keep a draft there, and send only when it reconnects with `task.status`. It never falls back to local execution or automatically resends. Each entry remembers the device ID and its own conversation UUID. The destination uses its own model and tools. The initiator keeps the transcript locally, independently of side-chat sync.
 
-On desktop, each device conversation keeps its own draft while you switch chats. Text edited while a send is waiting stays in the composer when the send returns.
+On desktop, each device conversation keeps its own draft while you switch chats. Text edited while a send is waiting stays in the composer when the send returns. Drafts are saved in input order, and a send response clears only the draft that was sent. Android and iPhone also preserve a newer saved draft when an earlier send finishes.
 
 A message beginning with a device mention uses a separate conversation for that turn. The entry shows the one-off destination. Use `@Device Name [device-id] message` when names are ambiguous. The next ordinary message still goes to the bound device.
 
@@ -115,16 +115,22 @@ Two kinds of request travel over the hub:
   the caller what to draw, so the run reads the same in the caller's chat as in
   the target's own: `tool {id, name, summary}` when a tool starts and
   `tool_result {id, name, ok, summary}` when it ends (same `id`), `approval
-  {approval_id, preview, risk, reason, device, timeout, grant_key}` and, once decided on
+  {approval_id, preview, risk, reason, device, timeout, grant_target, grant_key}` and, once decided on
   either side, `approval_result {approval_id, status}`, `text {text, interim}`
   for what the Muse says along the way, `image` and `file` for things it made,
   `error`. The `result` frame carries the final answer. A caller draws a `text` in place of the
   text since the last `tool`, so a target may send the growing text of one message more than
   once and the caller shows it as it grows; a target that sends each message once is shown the same.
-  `grant_key` (since 1.0.6) is what an answer remembered on the asking device covers:
-  the runtime sends the key its own grants use (the tool and its target, `shell:git`),
-  the desktop the tool and its whole main argument; a sender without it is remembered
-  by the first 60 characters of `preview`, as before, which two different steps can share.
+  `grant_target` names what a remembered answer covers. It is
+  `{version:1, tool, resource, action}`, where `resource` is the complete Sentinel target or
+  main argument and `action` is `sha256:` plus the digest of the tool and complete canonical
+  arguments. Display-only fields such as `step` do not change the digest. A client validates
+  every field and uses the complete structure together with the sending device, risk class and
+  conversation. An event with no valid `grant_target` can only be allowed once: it cannot match
+  an existing grant and does not show or create conversation or standing grant choices.
+  `grant_key` remains in new events for one release so 1.0.6 clients can read them; new clients
+  never use it as authority. A sender that cannot recover complete canonical arguments omits
+  both grant fields instead of inventing a broader target.
 
 - **Coding agents.** `coding.agents`, `coding.sessions`, `coding.session`,
   `coding.send`, `coding.stop`, `coding.runs`: the Cursor / Codex / Claude Code
@@ -357,15 +363,22 @@ From relay 0.27, a credential owns one Hub identity: its `device.id` and
 `device_kind` (`POST /v1/auth/verify` and `/login`), or else at the first
 accepted `hello` of a credential that was issued without them. The same
 credential may reconnect and replace its own older socket, but `bad_device`
-rejects another id or kind. An id a live key holds is taken over only by a key
-from a later code or password sign-in (the phone signed in again without
-signing out, the runtime's vault was reset, a sign-out that never reached the
-relay): the older key still opens the account but no longer speaks for the
-device. A revoked or lapsed key releases its id. A session key
-(`/v1/auth/session-key`, nanoMuse Web's containers) registers an id nobody
-holds and never takes one over. Existing clients keep their keys and register
-at their next connection; clients that send the identity at sign-in bind it
-there.
+rejects another id or kind. A fresh code or password sign-in that explicitly
+names the same id replaces that installation's older credential. The older key
+still opens the account but no longer speaks for the device. A revoked or
+lapsed key releases its id.
+
+For one compatibility release, an older client may omit both identity fields.
+Its credential binds on its first accepted `hello`, but only to an unused id.
+It cannot take an id already held by a credential that was bound when issued.
+A session key (`/v1/auth/session-key`) is issued with a server-generated
+`computer` reservation. The nanoMuse Web gateway does not know the installation
+id that its container runtime will create, so the runtime's first `computer`
+hello atomically replaces the reservation with its id only when that id is
+unused. The credential is then fixed to that callable computer identity. It
+cannot claim an existing phone or computer. A session key issued before this
+binding existed may use the same free-id path for one compatibility release,
+but only as `computer`. No Hub id or kind environment variable is required.
 
 The agent's name and look are the account's, not a device's: `GET` / `PUT
 /v1/me/profile` on the relay keep them (the dragon, an emoji on a colour, or a

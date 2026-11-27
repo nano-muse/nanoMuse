@@ -29,9 +29,12 @@ class _Stream:
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
-        ("rate_limit", openai.RateLimitError),
+        ("rate_limit_exceeded", openai.RateLimitError),
         ("server_error", openai.InternalServerError),
-        ("bad_request", openai.BadRequestError),
+        ("vector_store_timeout", openai.InternalServerError),
+        ("invalid_prompt", openai.BadRequestError),
+        ("data_residency_mismatch", openai.BadRequestError),
+        ("invalid_image", openai.BadRequestError),
     ],
 )
 def test_response_failed_is_classified(code, expected):

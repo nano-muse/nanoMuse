@@ -73,6 +73,7 @@ object ScheduledAgentRunner {
         task: ScheduledTask,
         waitForCompletion: Boolean = true,
         firedTriggerAtMs: Long? = null,
+        requireEnabledFeed: Boolean = false, // nanoMuse: the automatic first day honors the switch too
     ): String? {
         // [T-android-scheduled-lateinit-crash-156] `as? MinisApp` only rules out
         // a null / wrong-type Application — it does NOT mean the Application is
@@ -103,10 +104,14 @@ object ScheduledAgentRunner {
             return null
         }
 
+        // nanoMuse: bind the built-in Feed run to this account before session resolution can suspend.
+        val preparation = io.github.nanomuse.feed.FeedPreparationRunner.identify(app, task)
+
         // Kick the FGS so the agent loop survives Doze / screen-off. The
         // existing service is idempotent and reused by chat UI; we pass a
         // generic status string so it shows up in the ongoing notification.
-        AgentForegroundService.startService(
+        // nanoMuse: the Feed holds its own scoped service lease only while its model is running.
+        if (preparation == null) AgentForegroundService.startService(
             context = app,
             sessionCount = 1,
             toolStatus = "Scheduled: ${task.label.ifBlank { "task" }}",
@@ -123,14 +128,15 @@ object ScheduledAgentRunner {
         )
 
         if (waitForCompletion) {
-            val result = dispatch(app, task, sessionId, wait = true)
+            val result = dispatch(app, task, sessionId, true, preparation, requireEnabledFeed || firedTriggerAtMs != null)
+            if (preparation != null && !io.github.nanomuse.feed.FeedPreparationRunner.current(app, preparation)) return sessionId
             val preview = (result.responseText ?: "").take(200).ifBlank { "(no response)" }
             val ok = result.status != "Error" && result.status != "Timeout"
             // nanoMuse: [GH#557] scheduledForMs carries the armed trigger through.
             ScheduledTaskManager(app).markFired(
                 task.id, sessionId, preview, ok = ok, scheduledForMs = firedTriggerAtMs,
             )
-            postCompletionNotification(app, task, sessionId, preview)
+            postCompletionNotification(app, task, sessionId, preview, ok, result.responseText) // nanoMuse: explicit quiet feed results
             return sessionId
         }
 
@@ -141,14 +147,15 @@ object ScheduledAgentRunner {
         // "task started" without blocking on the agent loop. Leaving the editor
         // can't cancel it because bgScope outlives the screen.
         bgScope.launch {
-            val result = dispatch(app, task, sessionId, wait = true)
+            val result = dispatch(app, task, sessionId, true, preparation, requireEnabledFeed || firedTriggerAtMs != null)
+            if (preparation != null && !io.github.nanomuse.feed.FeedPreparationRunner.current(app, preparation)) return@launch
             val preview = (result.responseText ?: "").take(200).ifBlank { "(no response)" }
             val ok = result.status != "Error" && result.status != "Timeout"
             // nanoMuse: [GH#557] scheduledForMs carries the armed trigger through.
             ScheduledTaskManager(app).markFired(
                 task.id, sessionId, preview, ok = ok, scheduledForMs = firedTriggerAtMs,
             )
-            postCompletionNotification(app, task, sessionId, preview)
+            postCompletionNotification(app, task, sessionId, preview, ok, result.responseText) // nanoMuse: explicit quiet feed results
         }
         return sessionId
     }
@@ -168,7 +175,10 @@ object ScheduledAgentRunner {
         task: ScheduledTask,
         sessionId: String,
         wait: Boolean,
+        preparation: io.github.nanomuse.feed.FeedPreparationRunner.Run?, // nanoMuse: a tool-free Feed request
+        automatic: Boolean,
     ): HeadlessChatRunner.PromptResult = runCatching {
+        if (preparation != null) return@runCatching io.github.nanomuse.feed.FeedPreparationRunner.prepare(app, preparation, task, automatic)
         val mode = task.targetMode
         if (mode is ScheduledTargetMode.RerunMessage) {
             HeadlessChatRunner.retry(
@@ -193,10 +203,14 @@ object ScheduledAgentRunner {
             )
         }
     }.getOrElse { t ->
-        AppLogger.error(TAG, "task ${task.id} dispatch failed: ${t.message}")
+        // nanoMuse: a provider error can echo a source excerpt. Feed run records and
+        // notifications carry only a generic failure, including for an own-key model.
+        val error = if (preparation != null) app.getString(R.string.scheduled_task_run_now_failed)
+            else "Error: ${t.message}"
+        AppLogger.error(TAG, "task ${task.id} dispatch failed: $error")
         HeadlessChatRunner.PromptResult(
             status = "Error",
-            responseText = "Error: ${t.message}",
+            responseText = error,
             timedOut = false,
         )
     }.also { if (it.status == "Error") io.github.nanomuse.chat.RoutineWakes.disarm(sessionId) } // nanoMuse: a prompt that never went out leaves no mark
@@ -311,9 +325,13 @@ object ScheduledAgentRunner {
         task: ScheduledTask,
         sessionId: String,
         preview: String,
+        success: Boolean, // nanoMuse: keep failed tasks visible
+        response: String?, // nanoMuse: match quiet results before preview truncation
     ) {
+        // nanoMuse: protected goals, including those created in a protected conversation, stay out of notices.
+        if (io.github.nanomuse.goals.GoalFlow.isProtectedSession(context, sessionId, task.goalId)) return
         // nanoMuse: the feed's routine tells of its posts itself (and opens the Feed, not a chat).
-        if (io.github.nanomuse.feed.FeedFlow.notifyIfFeed(context, task)) return
+        if (io.github.nanomuse.feed.FeedFlow.notifyIfFeed(context, task, success, response)) return
         val deepLink = Uri.parse("minis://session/$sessionId")
         // nanoMuse: to MainActivity by name; the manifest no longer registers the `minis` scheme
         val openIntent: Intent = io.github.nanomuse.deeplink.OwnScheme.intent(context, deepLink, flags = 0)

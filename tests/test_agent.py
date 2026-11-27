@@ -5,12 +5,13 @@ from typing import Any
 
 import pytest
 
+from nanomuse import prompts
 from nanomuse.agent import MuseAgent
 from nanomuse.config import Settings
 from nanomuse.goals import GoalStore
 from nanomuse.llm import MockLLM
 from nanomuse.memory import MemoryStore
-from nanomuse.schema import Function, LLMResponse, Message, Role, ToolCall, ToolResult
+from nanomuse.schema import Function, LLMResponse, Message, RiskLevel, Role, ToolCall, ToolResult
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.tools import Goals, Remember, Terminate, ToolCollection
 from nanomuse.tools.base import BaseTool
@@ -27,6 +28,23 @@ class Adder(BaseTool):
 
     async def execute(self, a: float = 0, b: float = 0, **_: Any) -> ToolResult:
         return ToolResult(output=str(a + b))
+
+
+class LedgerFiles(BaseTool):
+    name: str = "files"
+    description: str = "files for ledger tests"
+
+    async def execute(self, action: str = "", path: str = "", **_: Any) -> ToolResult:
+        return ToolResult.fail("failed") if path == "failed" else ToolResult(output="ok")
+
+
+class LedgerSend(BaseTool):
+    name: str = "send_email"
+    description: str = "send for ledger tests"
+    risk: RiskLevel = RiskLevel.SENSITIVE
+
+    async def execute(self, **_: Any) -> ToolResult:
+        return ToolResult(output="sent")
 
 
 def tc(name: str, **args: Any) -> ToolCall:
@@ -193,6 +211,213 @@ async def test_sentinel_denial_reaches_model(settings: Settings):
     assert "Sentinel blocked" in tool_msg.content
 
 
+class TestTaskLedger:
+    @staticmethod
+    def notes(messages: list[Message]) -> list[Message]:
+        return [m for m in messages if (m.content or "").startswith("[Runtime note,")]
+
+    @staticmethod
+    def setup_agent(settings: Settings, script: list) -> tuple[MuseAgent, MockLLM]:
+        settings.agent.max_context_messages = 4
+        agent, llm, *_ = make_agent(settings, script, extra_tools=[LedgerFiles(), LedgerSend()])
+        return agent, llm
+
+    @staticmethod
+    def first_step() -> LLMResponse:
+        return LLMResponse(
+            tool_calls=[
+                tc("send_email", subject="report"),
+                tc("files", action="read", path="report.txt"),
+                tc("files", action="write", path="draft.txt"),
+                tc("files", action="read", path="failed"),
+            ]
+        )
+
+    def check_note(self, messages: list[Message]) -> None:
+        notes = self.notes(messages)
+        assert len(notes) == 1
+        text = notes[0].content or ""
+        assert "send_email" in text and "report" in text
+        assert "draft.txt" in text
+        assert "report.txt" not in text and "failed" not in text
+
+    async def test_long_turn_and_carry_on(self, settings: Settings):
+        script = [self.first_step()]
+        script.extend(LLMResponse(tool_calls=[tc("add", a=i)]) for i in range(3))
+        script.extend([LLMResponse(content="Paused."), LLMResponse(content="Finished.")])
+        agent, llm = self.setup_agent(settings, script)
+        await agent.run("Send and read.")
+        assert not self.notes(llm.calls[1]["messages"])
+        self.check_note(llm.calls[3]["messages"])
+        await agent.run("Carry on.")
+        self.check_note(llm.calls[-1]["messages"])
+        assert not self.notes(agent.messages)
+
+    async def test_wrap_up(self, settings: Settings):
+        settings.agent.max_steps = 3
+        script = [self.first_step()]
+        script.extend(LLMResponse(tool_calls=[tc("add", a=i)]) for i in range(2))
+        script.append(LLMResponse(content="Summary."))
+        agent, llm = self.setup_agent(settings, script)
+        await agent.run("Send and read.")
+        self.check_note(llm.calls[-1]["messages"])
+        assert llm.calls[-1]["messages"][-1].content == prompts.MAX_STEPS_PROMPT
+        assert not self.notes(agent.messages)
+
+    def test_caps_and_unknown_results(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        for index in range(205):
+            calls = [tc("files", action="read", path=f"file-{index:03}")]
+            if index < 65:
+                calls.append(tc("send_email", subject=f"mail-{index:03}"))
+            agent.messages.append(Message.assistant(tool_calls=calls))
+            for call in calls:
+                result = Message.tool("ok", call.id, call.name)
+                result.meta["tool_ok"] = True
+                agent.messages.append(result)
+        unknown = tc("send_email", subject="unknown-result")
+        agent.messages.extend(
+            [Message.assistant(tool_calls=[unknown]), Message.tool("ok", unknown.id)]
+        )
+        agent.messages.append(Message.user("continue"))
+        agent.messages.extend(Message.assistant("working") for _ in range(4))
+        note = self.notes(agent._request_context("system", None))[0].content or ""
+        assert "5 older actions omitted" in note
+        assert "mail-004" not in note and "mail-005" in note and "mail-064" in note
+        assert "file-" not in note
+        assert "unknown-result" not in note
+        assert not self.notes(agent.messages)
+
+    def test_reads_missing_tools_and_token_budget(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        calls = [
+            tc("files", action="read", path="same.txt"),
+            tc("files", action="read", path="same.txt"),
+            tc("send_email", subject="important"),
+            tc("missing"),
+        ]
+        agent.messages.append(Message.assistant(tool_calls=calls))
+        for call in calls:
+            result = Message.tool("ok", call.id, call.name)
+            result.meta["tool_ok"] = True
+            agent.messages.append(result)
+        agent.messages.extend(Message.assistant("old " * 300) for _ in range(5))
+        settings.agent.max_context_tokens = 500
+        note = self.notes(agent._request_context("system", None))[0].content or ""
+        assert "same.txt" not in note
+        assert "important" in note and "missing" not in note
+
+    def test_reads_alone_add_no_note(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        read = tc("files", action="read", path="notes.txt")
+        result = Message.tool("ok", read.id, read.name)
+        result.meta["tool_ok"] = True
+        agent.messages.extend([Message.assistant(tool_calls=[read]), result])
+        agent.messages.extend(Message.assistant("working") for _ in range(5))
+        assert not self.notes(agent._request_context("system", None))
+
+    def test_token_only_trimming_keeps_completed_actions(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        settings.agent.max_context_messages = 100
+        settings.agent.max_context_tokens = 500
+        sent = tc("send_email", subject="already sent", body="large body " * 1000)
+        result = Message.tool("sent", sent.id, sent.name)
+        result.meta["tool_ok"] = True
+        agent.messages.extend(
+            [Message.assistant(tool_calls=[sent]), result, Message.user("Continue.")]
+        )
+        assert len(agent.context_messages()) == len(agent.messages)
+        request = agent._request_context("system", None)
+        assert not any(message.tool_calls for message in request)
+        assert "already sent" in (self.notes(request)[0].content or "")
+        assert not self.notes(agent.messages)
+
+    def test_ledger_accounts_for_actions_its_own_tokens_evict(self, settings: Settings):
+        agent, _ = self.setup_agent(settings, [])
+        settings.agent.max_context_tokens = 200
+        for subject in ("first", "second"):
+            sent = tc("send_email", subject=subject, body="x" * 100)
+            result = Message.tool("sent", sent.id, sent.name)
+            result.meta["tool_ok"] = True
+            agent.messages.extend([Message.assistant(tool_calls=[sent]), result])
+        agent.messages.extend([Message.assistant("working"), Message.user("Continue.")])
+        assert any(message.tool_calls for message in agent.context_messages())
+        request = agent._request_context("system", None)
+        assert not any(message.tool_calls for message in request)
+        note = self.notes(request)[0].content or ""
+        assert "first" in note and "second" in note
+        assert not self.notes(agent.messages)
+
+
+async def test_long_turn_keeps_the_request_and_its_work_in_view(settings: Settings):
+    # the defaults leave max_context_tokens at 0: the request must stay in view anyway
+    settings.agent.max_context_messages = 6
+    settings.agent.max_steps = 4
+    script = [LLMResponse(tool_calls=[tc("add", a=i, b=b) for b in (1, 2)]) for i in range(4)]
+    script.append(LLMResponse(content="Summary."))
+    agent, llm, *_ = make_agent(settings, script)
+
+    assert await agent.run("Add each pair.") == "Summary."
+    for request in llm.calls:
+        assert sum(m.content == "Add each pair." for m in request["messages"]) == 1
+    wrap_up = llm.calls[-1]["messages"]
+    assert wrap_up[-1].content == prompts.MAX_STEPS_PROMPT
+    assert sum(m.role == Role.TOOL for m in wrap_up) >= 2, "the wrap-up saw none of the work"
+
+
+async def test_the_turn_after_a_long_one_sees_its_request_and_work(settings: Settings):
+    settings.agent.max_context_messages = 6
+    script = [LLMResponse(tool_calls=[tc("add", a=i, b=b) for b in (1, 2)]) for i in range(4)]
+    script += [LLMResponse(content="Paused."), LLMResponse(content="Finished.")]
+    agent, llm, *_ = make_agent(settings, script)
+
+    await agent.run("Add each pair.")
+    assert await agent.run("Carry on with what is left.") == "Finished."
+    follow_up = llm.calls[-1]["messages"]
+    assert sum(m.content == "Add each pair." for m in follow_up) == 1
+    assert follow_up[-1].content == "Carry on with what is left."
+    assert any(m.role == Role.TOOL for m in follow_up), "the follow-up saw none of the work"
+
+
+async def test_the_turn_after_max_steps_sees_its_request_and_work(settings: Settings):
+    settings.agent.max_context_messages = 6
+    settings.agent.max_steps = 4
+    script = [LLMResponse(tool_calls=[tc("add", a=i, b=b) for b in (1, 2)]) for i in range(4)]
+    script += [LLMResponse(content="Paused."), LLMResponse(content="Finished.")]
+    agent, llm, *_ = make_agent(settings, script)
+
+    await agent.run("Add each pair.")
+    assert await agent.run("Carry on with what is left.") == "Finished."
+    follow_up = llm.calls[-1]["messages"]
+    assert sum(m.content == "Add each pair." for m in follow_up) == 1
+    assert follow_up[-1].content == "Carry on with what is left."
+    assert any(m.role == Role.TOOL for m in follow_up), "the follow-up saw none of the work"
+
+
+async def test_pinned_request_respects_max_context_images(settings: Settings):
+    settings.agent.max_context_messages = 4
+    settings.agent.max_context_images = 2
+    agent, *_ = make_agent(settings, [])
+    req = agent.user_message("look at this", [])
+    req.images = ["/workspace/user_pic.png"]
+    agent.messages = [
+        req,
+        Message.assistant("step 1"),
+        Message.tool("done", "c1", "tap"),
+        Message.user("[The screenshot...]", images=["/workspace/screen1.png"]),
+        Message.assistant("step 2"),
+        Message.tool("done", "c2", "tap"),
+        Message.user("[The screenshot...]", images=["/workspace/screen2.png"]),
+        Message.assistant("step 3"),
+        Message.tool("done", "c3", "tap"),
+        Message.user("[The screenshot...]", images=["/workspace/screen3.png"]),
+    ]
+    agent._task_start = 0
+    ctx = agent._request_context("system", None)
+    images_present = [m for m in ctx if m.images]
+    assert len(images_present) <= 2, f"too many image-bearing messages: {len(images_present)} > 2"
+
+
 async def test_memory_and_goals_injected_into_prompt(settings: Settings):
     script = [
         LLMResponse(
@@ -251,9 +476,35 @@ async def test_context_window_trims_at_user_boundary(settings: Settings):
         Message.assistant("a1"),
         Message.user("u2"),
         Message.assistant("a2"),
+        Message.user("u3"),
+        Message.assistant("a3"),
     ]
     ctx = agent.context_messages()
-    assert [m.content for m in ctx] == ["u2", "a2"]
+    assert [m.content for m in ctx] == ["u2", "a2", "u3", "a3"]
+
+
+async def test_context_window_keeps_the_work_before_the_only_boundary(settings: Settings):
+    # cutting at the newest user message would leave nothing of what came before it
+    settings.agent.max_context_messages = 4
+    agent, *_ = make_agent(settings, [])
+    from nanomuse.schema import Message
+
+    agent.messages = [
+        Message.user("u1"),
+        Message.assistant(tool_calls=[tc("add")]),
+        Message.tool("2", "x", "add"),
+        Message.assistant("a1"),
+        Message.user("u2"),
+        Message.assistant("a2"),
+    ]
+    ctx = agent.context_messages()
+    assert [m.role for m in ctx] == [
+        Role.ASSISTANT,
+        Role.TOOL,
+        Role.ASSISTANT,
+        Role.USER,
+        Role.ASSISTANT,
+    ]
 
 
 @pytest.mark.parametrize(
@@ -277,7 +528,8 @@ async def test_long_tool_turn_keeps_call_result_pairs(
     for request in llm.calls:
         history = [m for m in request["messages"] if m.role != Role.SYSTEM]
         if limit > 0:
-            assert len(history) <= limit + calls_per_step
+            # plus the current request, which stays in view when the window drops it
+            assert len(history) <= limit + calls_per_step + 1
         pending: set[str] = set()
         for message in request["messages"]:
             if message.role == Role.TOOL:

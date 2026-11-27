@@ -25,7 +25,31 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 
 仍须遵守 [CONTRIBUTING.md](../../CONTRIBUTING.md)：自有代码放入新文件，即 `NanoMuse/`；修改上游 Swift 文件时在相应位置标 `// nanoMuse:`；名称和品牌调整通过脚本生成，不手改结果。
 
+## 在手机上关注公开来源
+
+在动态设置里可以添加或管理公开来源。电脑关机时，手机也能在应用打开或系统允许后台运行时检查更新。值得跟进的新 issue、论文或订阅更新会带着原始链接出现在主要聊天里。[关注范围和提醒设置](app.md#长期关注公开来源)
+
+## 思考强度 {#thinking-intensity}
+
+在 Muse 布局的本地主要聊天中，打开**更多 → 思考强度**，可关闭思考或选择当前模型支持的强度。在本地旁聊中，点击聊天页眉的灯泡，可打开同一个选择界面。选择只作用于当前聊天，并随聊天保存；草稿创建为对话时，也会保留你明确选择的「关闭」。没有明确选择时，新对话沿用模型组默认值。不支持思考的模型会显示说明；只读的远端聊天不提供此控件。模型组默认值仍在**设置 → 模型组 → 会话默认值**中。
+
+## 设备对话 {#device-chats}
+
+在 Muse 布局中打开「新建对话」，选择同账号下的一台设备。也可以从聊天抽屉的「电脑」页面发起设备对话，再从「旁聊」打开。按 Command-N 也会打开同一个设备选择列表。后续消息会发往选定的设备，每个设备对话各有自己的上下文和草稿。目标离线时也可以创建对话，发送时目标需要在线并支持 `task.status`。
+
+在消息开头输入 `@设备名`，可以把这一轮交给另一台支持设备对话的设备。如果有重名设备，请输入 `@设备名 [设备ID]`。断线后，重新打开对话或点「刷新」可向目标设备查询原轮次的状态。iPhone 将对话记录保存在发起设备上。移除设备对话只会删除这台 iPhone 上的副本。投递状态不确定时，确认框会说明目标可能仍在运行，移除后会失去这台 iPhone 保存的恢复信息；这不会停止远端轮次。详见 [Hub 协议](hub.md#persistent-device-conversations)。
+
 ## 这里哪些是 nanoMuse 的 {#what-is-nanomuse-here}
+
+创建目标或编辑目标时可以设置截止日。打开动态后，会看到一项临近截止或最近逾期的目标，以及下一项未完成的步骤。可以直接勾选完成、打开目标、明天再看或隐藏这次截止日。卡片离线可用。动态设置中还可以单独开启本机截止通知，默认关闭。允许系统通知，并在想接收截止通知的目标菜单中关闭定期跟进后，iPhone 会为最近的一项目标安排截止日当地时间 09:00 的通知。点过稍后提醒的目标可安排到推迟后的那天。锁屏只提示查看动态。完成或改期会更新待发通知。如果应用一直挂起，系统仍可投递已安排的那一条。
+
+动态可以根据目标，也可以根据最近日记里有明确时间的约定做准备。另一篇笔记或已记录的偏好要能补充相关细节，卡片里可以核对两处原文。已取消或已过期的约定会被筛掉。定时准备只读取已有材料。
+
+在动态设置打开「根据聊天提前准备」后，你在这部 iPhone 上新发出的文字也能成为依据。对话须允许记忆且未加锁。例如，你说周五要给博物馆发参观申请，另有一条关于无台阶入口的偏好，动态就可以提前起草。后来改期或说申请已经发出，动态会重新核对。上周说好的约定到了这一周仍能跟进。关闭这个设置会移除用聊天生成的卡片。
+
+主要聊天默认开启主动跟进。nanoMuse 可以就今天到期的目标来问你，也能跟进你在主要聊天里新提到、有明确日期的待办。它在这台 iPhone 上核对原消息，只使用已启用记忆且未上锁的主要聊天。之前保存的选择继续生效，包括明确关闭聊天内容的使用。你可以在「动态设置 → 在主要聊天中主动联系我」关闭跟进。消息会留在主要聊天里，直接回复就能接着聊。它会等聊天空闲，在当地时间 09:00 到 20:00 每天每账号每设备最多主动问一次。App 打开时会检查，退到后台后要等 iOS 给予刷新机会。允许通知后，后台写入消息时可以收到提示。
+
+在动态设置里打开「在聊天中提醒日程变化」，允许读取日历，再选择具体的日历。首次读取只记录当前安排。未来 24 小时内，两个忙碌时段有了新的冲突，或者某项活动的开始时间调整了至少 15 分钟，nanoMuse 就能主动把涉及的时间发到主要聊天。即使之前没有聊过这件事，也可以直接回复。iPhone 在应用运行或 iOS 允许后台刷新时检查有具体时间的忙碌日程，在本机比对时间和事件标识，与其他主动消息共用白天时段和每日额度。开启对话同步后，这条消息和其中的时间也会显示在你的其他设备上。取消选择或点「停止查看日历」会重置比对记录。
 
 `python scripts/rebrand.py` 应用以下调整。脚本可重复执行且结果一致，每次更新上游后都应运行：
 
@@ -53,10 +77,10 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 - **目标**（0.1.34，`NanoMuseGoals.swift`，对应 Android `goals/`）。「创建目标 → 类别」向主要聊天发送开场要求，并在随后几个轮次附加系统说明。模型的 ` ```nanomuse-goal ` 块创建目标和检查例程，` ```nanomuse-goal-update ` 块更新进度。聊天显示「目标已创建」「目标进展」卡片。「目标」功能页显示进度、步骤，提供暂停、现在检查、完成、删除，下方列出例程。
 - **动态**（0.1.34，`NanoMuseFeed.swift`，对应 Android `feed/`）。每日例程根据记忆、日记、目标生成短文，写入 `feed/<day>/<n>.md`，包含 front matter，即文件开头的结构化信息，模型用 ` ```nanomuse-feed ` 块提交内容。「动态」按天显示，同日最新批次优先。「讨论」针对该内容打开旁聊，设置面板可选主题、时间、开关及「现在写一版」。「点子」除「发到聊天」外，还提供「创建例程」，按点子时间安排并打开编辑器，以及「开始这个目标」。
 - **首次引导与设置**（0.1.34，`NanoMuseFirstRun.swift`、`NanoMuseSettings.swift`、`NanoMuseCoding.swift`、`NanoMuseSystemFiles.swift`）。沿用 Android 引导的四页流程：欢迎、登录免费开始、新账号设置密码、选择回答模型、认识〈名字〉。「我有自己的 API key」打开含完整目录的自有 key 面板，详见后文。之后进行首次聊天，显示开场、询问称呼、用模型 ` ```nanomuse-naming ` 块显示名字选择，并写入 GLOBAL.md、SOUL.md。设置 → nanoMuse 包含账号、编程助手、定时任务、系统文件、连接器、数据控制、两项界面开关和「重新显示欢迎页」。编程助手通过 hub `coding.*` 访问同账号电脑的 Cursor、Codex、Claude Code 会话并可发送消息。系统文件包括 SOUL、GLOBAL、日记、动态指令、例程时间表，还支持从其他助手「导入记忆」。
-- **模型选择**（0.1.34，`NanoMuseModels.swift`）。中继菜单默认选中标为对话推荐的模型，项目托管中继为对话和屏幕操作推荐同一个多模态模型 `Qwen/Qwen3.6-27B-FP8`。聊天选择器中的选项会移到 Cloud 组首位，供新聊天沿用，与 Android `followPick` 一致。DeepSeek id 默认只视为文本模型，只有含 `v4.1` 或更高版本、`vision`、`ocr` 才视为视觉模型，该处理位于 `LLMModel.withInferredModality()` 开头带 `// nanoMuse:` 的位置。
+- **模型选择**（0.1.34，`NanoMuseModels.swift`）。中继菜单默认选中标为对话推荐的模型，托管对话使用 `deepseek-v4.1-flash-1017`，支持屏幕操作的设备使用 `qwen3.5-397b-a17b`。聊天选择器中的选项会移到 Cloud 组首位，供新聊天沿用，与 Android `followPick` 一致。DeepSeek id 默认只视为文本模型，只有含 `v4.1` 或更高版本、`vision`、`ocr` 才视为视觉模型，该处理位于 `LLMModel.withInferredModality()` 开头带 `// nanoMuse:` 的位置。
 - **四种用途分别选模型**（0.1.41，`NanoMuseModelSlots.swift`、`NanoMuseModelsView.swift`，对应 Android `ui/models/ModelsScreen.kt`）。设置 → nanoMuse 的首张「模型」卡片显示「对话」「操作屏幕」「生成图片」「生成视频」。iPhone 的屏幕项禁用，说明「不在 iPhone 上」「电脑用它自己的设置。」每行显示 `<provider> · <model>`。仅当中继实际菜单提供该项时，选择器首先列 nanoMuse Cloud 并标出「推荐」，然后按自有服务商分组，只列符合该任务的模型。空项和页面末尾均提供「添加服务商」。图片、视频下还会通过 `NanoMuseModelSlots.notDriven` 说明目录支持、但手机当前无法调用的来源，提示「此处不提供：……」及适用客户端；目前手机只接入 DashScope 主机。
 
-  更换对话模型会设置新聊天默认组，服务商专属组将所选模型置首，自建混合组则保留原顺序，并让主要聊天同步更换绑定。`NanoMuseModelSlots.mainChatFollows` 修复了 0.1.41 中主要聊天因不是新聊天而留在 Cloud、自有 key 只用于旁聊的问题。页面说明「对主要聊天和新对话生效；旁聊保留自己的模型。」聊天内部选择器也按同样规则处理所有服务商。图片、视频依次使用显式选择、对话服务商可绘图的百炼默认模型、已登录且实际声明对应媒体能力的中继、第一个可用 key。项目托管 Cloud 无媒体生成，所以需要自有 key；默认值来自目录 `defaults`，不在代码写死。「自动」显示当前解析值，并清除显式选择重新按该顺序解析；视频的「关闭」位于其后。
+  更换对话模型会设置新聊天默认组，服务商专属组将所选模型置首，自建混合组则保留原顺序，并让主要聊天同步更换绑定。`NanoMuseModelSlots.mainChatFollows` 修复了 0.1.41 中主要聊天因不是新聊天而留在 Cloud、自有 key 只用于旁聊的问题。页面说明「对主要聊天和新对话生效；旁聊保留自己的模型。」聊天内部选择器也按同样规则处理所有服务商。图片、视频依次使用显式选择、对话服务商可绘图的百炼默认模型、已登录且实际声明对应媒体能力的中继、第一个可用 key。1.0.10 可在 [Cloud 网页](cloud.md)使用托管文生图和人物视频。自有模型默认值来自目录 `defaults`。「自动」显示当前解析值，并清除显式选择重新按该顺序解析；视频的「关闭」位于其后。
 
   模型组先显示八项，依次为任务目录默认、当前选项、原列表顺序，末尾「还有 n 个」展开。总数超过八项时，「自动」下方出现「搜索模型」，按 id 或显示名即时过滤，显示全部匹配项，隐藏无匹配组，没有结果显示「没有匹配的模型」。`NanoMusePickerList` 由 `NanoMuseModelSlotsTests` 测试。保存 key 后，`NanoMuseVendorSheet` 显示「用它来做什么」，支持的用途各有默认开启的开关，图片和视频仅 DashScope 显示，iPhone 不显示操作本机屏幕。「就这样」将勾选项改用服务商默认模型，「暂不」不修改，单纯保存 key 不再切换。自有对话模型失败时，已登录用户的失败卡片及上游普通错误会增加「这次改用 nanoMuse Cloud」，由 `NanoMuseCloudOnce` 在 `resolveCurrentEntry()` 开头让本轮走中继模型，不更改任何配置。媒体失败没有 Cloud 重试。中继菜单登录时保存在本机，打开页面时刷新。「图像与视频模型」快捷入口仍保留，提供自动生成动画开关和短片按钮。
 - **共享连接器清单**（0.1.34，`NanoMuseConnectors.swift` 的 `NanoMuseSharedConnectors`）。profile 的 `connectors` 记录哪些设备连接了哪些服务，包含 id、标签、去掉查询参数的地址、登录方式、启用状态、时间、设备，不含令牌。手机上传自己的条目并获取其他设备条目，在「你的其他设备上」显示「已在〈设备〉上连接，在这台手机上登录一次，这里也能用」。账号继续使用选项按地区排列，中国大陆优先百炼，其他地区优先「使用 OpenRouter 登录」。
@@ -76,7 +100,7 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
   「使用自己的模型 key」按地区排序，大陆优先百炼，其他地区优先 OpenRouter、OpenAI，「更多服务商」每次显示三家。每行说明对话、屏幕、图片、视频能力。「获取 key」打开厂商页面，「添加」打开 `NanoMuseVendorSheet`，粘贴 key 后按厂商端点和 `/v1` 设置添加实例、获取模型，没有默认组时将同名组设为默认。「你已经在付费的套餐」提供 ChatGPT（上游 `CodexOAuthManager`）、Claude、OpenRouter、Kimi 设备码（`KimiDeviceLoginSheet`）。ChatGPT 行说明 OpenAI 条款仅覆盖自家 Codex，其他 App 曾被停止访问，例如 2026 年 1 月 OpenCode，失效后可用 API key；若中继提供文案则用中继版本。「你自己的电脑」可填写 Ollama、LM Studio、vLLM 地址。页面不对某一家单独背书。
 - **网络代理**（`NanoMuseProxy.swift`、`NanoMuseNetworkView.swift`，设置 → nanoMuse → 网络）。自有服务商 HTTP 代理可填主机、端口、可选用户名和密码，默认关闭，仅存本机。地址、用户名存 `UserDefaults`，密码存为钥匙串设备专用条目 `io.github.nanomuse.app.proxy`，规则与中继 key 相同；1.0.3 存在 `UserDefaults` 的密码首次读取时迁移。由于 `URLSession` 无逐主机代理开关，程序在 `connectionProxyDictionary` 中使用自动代理脚本：目录主机、`chatgpt.com`、`auth.openai.com`、自有服务商自定义主机走代理，中继、局域网及其他地址用 `DIRECT`。各上游服务商会话只加一行 `NanoMuseProxy.apply(to:)`，Codex 登录和模型列表用 `NanoMuseProxy.session` 替代 `URLSession.shared`。凭据放入共享 `URLCredentialStorage` 对应代理认证域。「测试」按当前代理访问 `https://chatgpt.com/`。
 - **统一界面组件**（0.1.35，`NanoMuseChrome.swift`、`NanoMuseAppearance.swift`，对应 Android `ui/chat/MuseHeader.kt`、`ui/settings`）。聊天及动态、点子、目标、资源库各页都显示形象圆盘、名称标签、实时状态、抽屉及 `•••` 圆按钮。抽屉沿用 Android 结构；`NanoMuseChatCards.swift` 的 `NanoMuseAssistantBubble` 为回复加灰色气泡，智能体页工具栏改为圆按钮。`NanoMuseSettingsHomeView` 按 Android 顺序排设置卡片：图像与视频模型、形象、电脑、外观（形象大小、名字下的模型、步骤、主题）、通知、账号、编程助手、定时任务、共享文件夹、聊天文件、系统文件、版本。`nmOnChange` 让 `onChange` 兼容最低目标 iOS 16。`•••` 的「新聊天」、⌘N、「Context Full」提示、拒绝卡片均发送上游 `.newChatRequested`，由 `NanoMuseHomeView` 创建新草稿旁聊，与抽屉一致。Muse 布局不显示上游 `ContentView`，1.0.2 因此缺少监听、入口无效，见 #392。
-- **形象短视频**（0.1.35，`NanoMuseVideoGen.swift`、`NanoMuseAvatarMotion.swift`、`NanoMuseMediaModels.swift`，对应 Android `avatar/VideoGen.kt`、`avatar/AvatarMotion.kt`）。自绘形象可经自有百炼 key 调用 `wan2.2-i2v-flash`，生成待命、干活中、等你回复、搞定四段各 4 秒短片，提示与手机端一致。自建中继明确启用旧媒体代理时也可使用，公共 Cloud 不提供。视频按设备保存在 `avatar/motion/`，通过 `AVQueuePlayer`、`AVPlayerLooper` 循环播放，后台暂停。小龙视频由安装包提供。「图像与视频模型」列模型，提供默认开启的「更换形象后生成动画」及「生成 / 重做短视频」。工作室费用估算包含短片。
+- **形象短视频**（0.1.35，`NanoMuseVideoGen.swift`、`NanoMuseAvatarMotion.swift`、`NanoMuseMediaModels.swift`，对应 Android `avatar/VideoGen.kt`、`avatar/AvatarMotion.kt`）。自绘形象可经自有百炼 key 调用 `wan2.2-i2v-flash`，生成待命、干活中、等你回复、搞定四段各 4 秒短片，提示与手机端一致。自建中继明确启用 DashScope 媒体代理时也可制作这套四段形象短片。视频按设备保存在 `avatar/motion/`，通过 `AVQueuePlayer`、`AVPlayerLooper` 循环播放，后台暂停。小龙视频由安装包提供。「图像与视频模型」列模型，提供默认开启的「更换形象后生成动画」及「生成 / 重做短视频」。工作室费用估算包含短片。
 - **版本、Star 提醒、首次动态**（0.1.35，`NanoMuseUpdateCheck.swift`、`NanoMuseNudges.swift`）。版本行显示已安装与最新版，先查 `nanomuse.cn/dl/index.json`，再查 GitHub，缓存一天，区分已是最新、有新版本、无法检查可重试。Star 提醒遵循 `/v1/nudges`、`/v1/me` 的 `nudges`，无返回时使用相同内置默认。首次聊天不提醒，之后可在第 3 / 10 / 30 个任务、第 7 / 30 天、完成目标、更换形象、登录、额度耗尽时提醒，间隔至少七天，每手机最多四次。`NanoMuseStarWatch` 把用户发起、无错误且离开 `activeSessions` 的会话计为任务。提醒固定在标题下，因为消息列表为 UICollectionView，无法插在最后一条之后。句子优先用运营控制台的 `star.text`、中文界面的 `star.text_zh`，没有则用本机对应时机文案，标题、按钮仍由 App 提供。动态页先显示介绍卡，空白时说明每日执行时间，首次聊天后写第一批内容。首次引导也增加通知页。
 - **聊天输入区**（0.1.38、0.1.40）。相关代码为 `NanoMuseShell.swift` 的 `NanoMuseHomeView.body`、`NanoMuseChatModifiers.swift`、`NanoMuseComposerField.swift`、`NanoMuseComposerWatch.swift`、`NanoMuseComposerCheck.swift`，以及 `Views/Chat/AIChatView.swift` 的 `// nanoMuse:` 改动。0.1.36、0.1.37 的维护者 iPhone 在首次命名后，以及 0.1.39 的 iPad，都反馈输入框消失。0.1.37 监视器、0.1.38 原生输入框及备用第二宿主，是依据实际上仍存在输入框的截图编写的。最终发现：首次打开时输入框可见，关闭键盘后永久被遮住；0.1.36 截图中还能看到它露在底栏上方的顶边。底栏原来是 `NavigationStack` 祖先的 `safeAreaInset`，键盘打开时隐藏；重新出现后聊天不再遵守此留白，整个聊天被放到底栏下面。输入框已经正常布局、各项监测也正常，只是被底栏盖住。
 
@@ -121,6 +145,14 @@ scripts/gen-ios-icons.py         App 图标和四款备选图标，来自 assets
 「语音提示」是 App 注册的快捷指令，位于 `NanoMuse/VoicePromptIntent.swift`，会打开 nanoMuse 并开始听写。可在「快捷指令」App 绑定到操作按钮，入口为 设置 → 操作按钮 → 快捷指令，也可绑定轻点背面或小组件。按下后，输入框进入语音模式、开启麦克风，识别结果实时写入输入框。发送仍需点发送按钮，避免识别错误因停顿就触发执行。指令可选「会话」参数，留空则用当前聊天。Muse 布局中默认打开主要聊天，若其上有旁聊会先返回。首次与麦克风按钮相同，会请求录音、语音识别权限；拒绝时面板说明，不会录音。
 
 App Intent 是系统调用快捷指令的接口，无法直接控制 SwiftUI 语音面板，冷启动时甚至还没有窗口。因此指令先在 `NanoMuseVoicePrompt` 保存请求；指定会话时，通过与通知相同的 `NotificationNavigationStore`、`.openSessionFromIntent` 跳转。`NanoMuseChatHooks` 只取属于当前聊天的请求，沿现有麦克风按钮流程打开内嵌面板，显示后调用 `VoiceInputViewModel.handleMainButtonTap` 及权限检查开始录音。录音、转写共用原流程，文字仍进入 `inputText`。超过 30 秒的请求丢弃。iOS 的 App Intent 不能接收任意自由语音，所以该指令负责进入语音输入，不能在一句唤起语中直接完成提问；录音时也会打开 App，让用户看到麦克风状态。Siri 语句保存在九种语言各自 `<lang>.lproj` 的 `AppShortcuts.strings`，因最低 iOS 16 而使用传统 `.strings`；指令自身文案在 `Localizable.xcstrings`，见 #296、#298。
+
+## 崩溃与退出诊断 {#crash-and-exit-diagnostics}
+
+构建中缺少 Claude 登录配置时，请求会返回可恢复的服务商错误，不再终止 App。API key 请求不依赖这项配置。检查也覆盖后台标题生成和预热请求，它们使用的模型可能与主要聊天不同。
+
+「设置 → 日志」中的报告会区分残留启动标记和 MetricKit 诊断。标记残留只表示没有正常退出回调将它移除，不能证明发生了崩溃、SIGKILL、看门狗终止或内存故障。其中的阶段和内存数值是最后一次记录的观察值。连续前台退出标记仍作为跳过会话恢复的保护依据，但它只是恢复时使用的判断线索。
+
+报告日期表示生成报告的时间。MetricKit 报告另列诊断覆盖时段，该时段不是事件的准确发生时间；日志尾部也会注明来自生成报告的进程。报告不会把这个进程的终端命令、信号文件或卡顿快照当作更早事件的证据，同一秒收到的报告也会分别保存。排查运行时陷阱需要系统 `.ips` 和对应构建的符号；SIGKILL 应查看系统报告中的 [Termination Reason](https://developer.apple.com/documentation/xcode/sigkill)。
 
 ## 在 Mac 上构建 {#building-on-a-mac}
 
@@ -233,6 +265,6 @@ Android 是 nanoMuse 界面与交互的参照。0.1.34 起，iPhone 在 OpenMini
 | `hands`：手机自己的屏幕 | 无对应能力，iOS 不允许 App 操作其他 App；可通过 App Intents 或快捷指令接入。 |
 | 小组件 | 直接沿用上游 `AgentWidget`。 |
 
-仍需依次在真机验证：用新账号完整走首次引导；确认项目托管账号的媒体入口要求配置自有服务商，再用百炼 key 在聊天更换形象并生成后续四段短片；App 在后台时例程到期，检查测试设备是否获 iOS 刷新机会及频率；连接同账号电脑的编程会话；第二台设备登录后查看连接器列表。
+仍需依次在真机验证：用新账号完整走首次引导；检查托管图像生成和人物视频入口，再用百炼 key 在聊天更换形象并生成后续四段短片；App 在后台时例程到期，检查测试设备是否获 iOS 刷新机会及频率；连接同账号电脑的编程会话；第二台设备登录后查看连接器列表。
 
 分发继续使用 TestFlight，包括内部组，以及通过 Apple 测试审核后的公开链接。项目不计划上架 App Store。

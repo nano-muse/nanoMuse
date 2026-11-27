@@ -49,19 +49,24 @@ class BodyHoldingServer(status: Int = 200) : AutoCloseable {
     /** Ensure cancellation happens inside the production body reader, after await resumed. */
     fun awaitBodyReader(sourceFile: String, method: String): Boolean {
         if (!headersSent.await(5, TimeUnit.SECONDS)) return false
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-        while (System.nanoTime() < deadline) {
-            if (Thread.getAllStackTraces().values.any { stack ->
-                    stack.any { it.fileName == sourceFile } &&
-                        stack.any { it.methodName == method && it.className.startsWith("okhttp3.") }
-                }) return true
-            Thread.sleep(5)
-        }
-        return false
+        return awaitBlockedBodyReader(sourceFile, method, "okhttp3.")
     }
 
     override fun close() {
         client?.close()
         server.close()
     }
+}
+
+/** Wait for a specific provider to be reading its body, so the test cannot cancel before headers. */
+internal fun awaitBlockedBodyReader(sourceFile: String, method: String, readerClassPrefix: String): Boolean {
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+    while (System.nanoTime() < deadline) {
+        if (Thread.getAllStackTraces().values.any { stack ->
+                stack.any { it.fileName == sourceFile } &&
+                    stack.any { it.methodName == method && it.className.startsWith(readerClassPrefix) }
+            }) return true
+        Thread.sleep(5)
+    }
+    return false
 }

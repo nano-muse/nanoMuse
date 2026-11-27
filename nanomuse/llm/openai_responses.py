@@ -50,6 +50,29 @@ _RETRYABLE = (
     openai.InternalServerError,
 )
 
+_BAD_RESPONSE_CODES = {
+    "bad_request",
+    "bio_policy",
+    "data_residency_mismatch",
+    "empty_image_file",
+    "failed_to_download_image",
+    "image_content_policy_violation",
+    "image_file_too_large",
+    "image_file_not_found",
+    "image_parse_error",
+    "image_too_large",
+    "image_too_small",
+    "invalid_base64_image",
+    "invalid_image",
+    "invalid_image_format",
+    "invalid_image_mode",
+    "invalid_image_url",
+    "invalid_prompt",
+    "invalid_request_error",
+    "misalignment_policy_violation",
+    "unsupported_image_media_type",
+}
+
 
 def _response_failure(error: Any) -> openai.APIError:
     """Turn a streamed Responses failure into the SDK class used by normal HTTP failures."""
@@ -61,7 +84,7 @@ def _response_failure(error: Any) -> openai.APIError:
         return openai.RateLimitError(
             message, response=_httpx.Response(429, request=request), body=body
         )
-    if code in ("bad_request", "invalid_request_error"):
+    if code in _BAD_RESPONSE_CODES:
         return openai.BadRequestError(
             message, response=_httpx.Response(400, request=request), body=body
         )

@@ -253,24 +253,40 @@ async def test_current_user_request_survives_message_count_trimming(settings: Se
         assert budgets.estimate_tokens(request["messages"], request["tools"]) <= 20000
 
 
-async def test_deadline_cancels_tool_and_keeps_history_valid(settings: Settings):
+async def test_deadline_cancels_tool_and_keeps_history_valid(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+):
+    # Arm the real timeout only after the tool starts. A 30ms wall-clock deadline
+    # can expire during local setup on a busy runner without testing tool cancellation.
+    real_timeout = asyncio.timeout
+    deadline = real_timeout(None)
+    requested_deadlines: list[float | None] = []
+
+    def controlled_timeout(delay: float | None) -> asyncio.Timeout:
+        requested_deadlines.append(delay)
+        return deadline if len(requested_deadlines) == 1 else real_timeout(delay)
+
+    monkeypatch.setattr(asyncio, "timeout", controlled_timeout)
+
     class SlowCounter(Counter):
         cancelled: bool = False
 
         async def execute(self, **kwargs: Any) -> ToolResult:
             try:
-                await asyncio.sleep(60)
+                deadline.reschedule(asyncio.get_running_loop().time())
+                await asyncio.Event().wait()
             finally:
                 self.cancelled = True
             return ToolResult(output="done")
 
-    settings.agent.budget = TaskBudgetSettings(max_seconds=0.03)
+    settings.agent.budget = TaskBudgetSettings(max_seconds=600)
     call = ToolCall(function=Function(name="counter"))
     llm = MockLLM([LLMResponse(tool_calls=[call])])
     agent, _ = make_agent(settings, llm)
     tool = SlowCounter()
     agent.tools = ToolCollection(tool)
     assert "time budget" in await agent.run("go")
+    assert requested_deadlines[0] == 600
     assert tool.cancelled and len(llm.calls) == 1
     assert any(m.tool_call_id == call.id for m in agent.messages)
 

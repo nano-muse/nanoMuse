@@ -1,5 +1,6 @@
 package com.openminis.app.provider.gemini
 
+import io.github.nanomuse.net.await // nanoMuse
 import android.util.Base64
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.AgentToolDefinition
@@ -70,11 +71,11 @@ class GeminiProvider(
             .applyUserAgentOverride(null)
             .build()
 
-        val response = client.newCall(request).execute()
-        val responseBody = response.body?.string() ?: ""
-
-        if (!response.isSuccessful) {
-            throw mapHttpError(response.code, responseBody)
+        // nanoMuse: cancelling a vision decision closes this call even while its body is being read.
+        val responseBody = client.newCall(request).await { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw mapHttpError(response.code, text)
+            text
         }
 
         val json = JSONObject(responseBody)

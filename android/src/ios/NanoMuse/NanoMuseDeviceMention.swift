@@ -27,24 +27,30 @@ enum NanoMuseDeviceMention {
     /// "@Pixel 8 open the calendar" → Pixel 8, "open the calendar".
     @MainActor
     static func parse(_ text: String) -> Hit? {
+        matches(text, devices: NanoMuseHub.shared.others).first
+    }
+
+    /// The longest device names matching the beginning of a message, ordered longest first.
+    static func matches(_ text: String, devices: [HubDevice]) -> [Hit] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("@") else { return nil }
+        guard trimmed.hasPrefix("@") else { return [] }
         let rest = String(trimmed.dropFirst())
-        guard !rest.isEmpty else { return nil }
-        let devices = NanoMuseHub.shared.others
-            .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        let ranked = devices.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
             .sorted { $0.name.count > $1.name.count }
-        for device in devices {
-            guard let range = rest.range(of: device.name, options: [.caseInsensitive, .anchored]) else { continue }
+        return ranked.compactMap { device in
+            guard let range = rest.range(of: device.name, options: [.caseInsensitive, .anchored]) else { return nil }
             // "@Mac" must not take "@Macbook …": the name ends at a word boundary.
-            if range.upperBound < rest.endIndex, rest[range.upperBound].isLetter || rest[range.upperBound].isNumber { continue }
-            var task = String(rest[range.upperBound...])
-            while let first = task.first, first == ":" || first == "," || first == "，" || first == "：" || first.isWhitespace {
-                task.removeFirst()
-            }
-            return Hit(device: device, task: task.trimmingCharacters(in: .whitespacesAndNewlines))
+            if range.upperBound < rest.endIndex, rest[range.upperBound].isLetter || rest[range.upperBound].isNumber { return nil }
+            return Hit(device: device, task: taskText(String(rest[range.upperBound...])))
         }
-        return nil
+    }
+
+    static func taskText(_ text: String) -> String {
+        var task = text
+        while let first = task.first, first == ":" || first == "," || first == "，" || first == "：" || first.isWhitespace {
+            task.removeFirst()
+        }
+        return task.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// The online devices the `@` menu offers, above the files: only when the `@` opens the

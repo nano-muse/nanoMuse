@@ -6,6 +6,7 @@ import SwiftUI
 import UIKit
 
 struct NanoMuseDevicesSection: View {
+    var onDeviceChat: ((HubDevice) -> Void)?
     @ObservedObject private var hub = NanoMuseHub.shared
     @State private var enabled = NanoMuseHub.shared.enabled
     @State private var remote = NanoMuseHub.shared.remoteControl
@@ -69,6 +70,11 @@ struct NanoMuseDevicesSection: View {
                         }
                     }
                     .accessibilityHint(d.online ? AppLocalized("Ask this device") : AppLocalized("Forget"))
+                    if let onDeviceChat {
+                        Button { onDeviceChat(d) } label: {
+                            Label(String(format: AppLocalized("Start a device chat with %@"), d.name), systemImage: "square.and.pencil")
+                        }
+                    }
                 }
             }
         } footer: {

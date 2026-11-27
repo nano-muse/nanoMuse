@@ -84,7 +84,11 @@ export function entryFor(provider: string, baseUrl: string, list: CatalogueProvi
     list.find((p) =>
       hosts(p).some((h) => {
         const dot = h.indexOf(".");
-        return dot > 0 && host.endsWith(h.slice(dot));
+        if (dot <= 0) return false;
+        // a sibling under the same parent domain; a domain of its own only for its subdomains,
+        // never for its whole top-level domain
+        const parent = h.slice(dot + 1);
+        return host.endsWith("." + (parent.includes(".") ? parent : h));
       }),
     ) ?? null
   );

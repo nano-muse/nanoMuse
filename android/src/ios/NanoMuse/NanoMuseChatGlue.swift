@@ -22,7 +22,7 @@ extension Notification.Name {
 /// What the Muse header's ••• menu can ask of the chat under it (the entries
 /// Android's ChatScreen menu has; the shell's own rows stay in the shell).
 enum NanoMuseChatAction: String {
-    case newChat, model, clearChat, terminal, browser, files, tokenUsage
+    case newChat, model, thinking, clearChat, terminal, browser, files, tokenUsage
 
     static func post(_ action: NanoMuseChatAction, session: String) {
         NotificationCenter.default.post(name: .nanoMuseChatAction, object: session, userInfo: ["action": action.rawValue])
@@ -76,7 +76,7 @@ extension AIChatViewModel {
         var parts: [String] = []
         if let user = NanoMuseSystemFiles.userPromptFragment() { parts.append(user) }
         if let goal = NanoMuseGoalFlow.systemAddendum(session: key) { parts.append(goal) }
-        if let feed = NanoMuseFeedFlow.systemAddendum(session: key) { parts.append(feed) }
+        if let feed = NanoMuseFeedFlow.systemAddendum(session: key, memoryEnabled: memoryEnabled) { parts.append(feed) }
         if let addenda = NanoMuseSessionAddenda.forPrompt(session: key) { parts.append(addenda) }
         if let naming = NanoMuseFirstConversation.shared.systemAddendum(session: key) { parts.append(naming) }
         guard !parts.isEmpty else { return "" }

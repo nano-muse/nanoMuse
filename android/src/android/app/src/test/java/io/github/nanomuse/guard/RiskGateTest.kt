@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -127,5 +128,38 @@ class RiskGateTest {
         assertEquals(RiskDecision.DENY, answer.await())
         assertNull(RiskGate.pending.value)
         assertTrue(RiskGate.recent.value.none { it.first.id == req.id })
+    }
+
+    @Test fun `a legacy remote event offers allow once only`() {
+        val req = RiskRequest(
+            sessionId = "chat",
+            kind = GuardKind.COMPUTER,
+            assessment = RiskAssessment(
+                RiskClass.DESTRUCTIVE,
+                "legacy event",
+                target = null,
+                rememberable = false,
+            ),
+            preview = "same visible prefix",
+        )
+        assertTrue(!req.canSession)
+        assertTrue(!req.canAlways)
+    }
+
+    @Test fun `remote session grants are isolated by session risk and device target`() {
+        val target = "remote:device-one|task:v1:target"
+        Grants.grantSession(RiskClass.DESTRUCTIVE, "chat-one", "step", target)
+        try {
+            assertTrue(Grants.allows(RiskClass.DESTRUCTIVE, target, "chat-one"))
+            assertFalse(Grants.allows(RiskClass.DESTRUCTIVE, target, "chat-two"))
+            assertFalse(Grants.allows(RiskClass.OUTBOUND, target, "chat-one"))
+            assertFalse(Grants.allows(
+                RiskClass.DESTRUCTIVE,
+                "remote:device-two|task:v1:target",
+                "chat-one",
+            ))
+        } finally {
+            Grants.clearSession("chat-one")
+        }
     }
 }

@@ -39,6 +39,15 @@ The stored conversation keeps the original text. Each tool-result shortening wri
 an INFO log line with the call id and before/after character counts, without any of
 the tool output, so a missing detail can be traced in the runtime log.
 
+When earlier tool calls leave the message window, the runtime adds a note to the model's
+request with the successful sensitive actions and file writes from this conversation.
+This includes calls removed by the token budget even when the message count is below
+its limit. The note is recomputed if adding it removes another exchange.
+It keeps the newest 60 actions and says how many older ones were left out. Files read are
+not listed.
+The note is not saved in the conversation. Only calls whose result is marked as a success
+are listed; a call from history without that mark is left out.
+
 `max_total_tokens` accumulates input and output across model calls in one `run()`.
 Requests reserve estimated input and reduce `max_tokens` to the remaining allowance.
 Provider-reported usage replaces the estimate when available. With neither a token nor

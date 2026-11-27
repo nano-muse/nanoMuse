@@ -8,9 +8,10 @@ dialog, a page that will not load without a real browser session.
 
 Risk is judged like the phone's: looking is safe but private; a click is *moderate* until
 the words under the cursor say pay, transfer, send, delete, confirm — then it is *sensitive*
-and asked every time. Every pointed action carries a ``label`` (the words on the button or
-field, as the screenshot shows them); the window in front is the *target* of a standing
-approval, so "always allow in Terminal" never covers the bank's site in a browser.
+and asked every time. Every pointed action carries a model ``label`` for the audit log, but
+risk comes only from the screen-reported element under the pointer; no such element means a
+conservative ask. The window in front is the *target* of a standing approval, so "always
+allow in Terminal" never covers the bank's site in a browser.
 
 Applications are asked for one by one: the first action in an application in a conversation
 asks "Let <Muse> use <App>?" (once, this conversation, always — a ``computer_app:<id>``
@@ -233,20 +234,23 @@ class ComputerAct(BaseTool):
         words = list(self.gui.sensitive_words)
         risk, warnings, egress = RiskLevel.MODERATE, [], False
         hit: list[str] = []
-        # The sensitive words are looked for in the model's `label` and, when the screen
-        # reported elements with bounds, in the words of the element under the point: the
-        # label is the model's word for what it is about to press, the element the
-        # screen's. A screen without elements (the computer's screenshot, a WebView, a
-        # game) is the common case and changes nothing here.
+        # The label is the model's claim and cannot make a coordinate safe. Only a node the
+        # screen reported under the point is trusted; without one, ask conservatively.
         pointed = (action in POINTED and action != "move") or action == "drag"
         trusted = (
             trusted_node_words(screen, self._assessment_point(args, screen)) if pointed else None
         )
-        evidence = " / ".join(part for part in (label, trusted or "") if part)
-        if pointed and evidence:
-            hit = [w for w in words if w.lower() in evidence.lower()]
+        if pointed:
+            if trusted is None:
+                risk, egress = RiskLevel.SENSITIVE, True
+                warnings.append(
+                    "the screen reported no element under the pointer; the target cannot be "
+                    "verified from the screen"
+                )
+            else:
+                hit = [w for w in words if w.lower() in trusted.lower()]
         if action in POINTED and action != "move" and not label:
-            warnings.append("a click with no `label`: nothing says what is under the cursor")
+            warnings.append("a click with no `label`: the action has no useful audit description")
         if action == "type" and args.get("submit"):
             risk, egress = RiskLevel.SENSITIVE, True
         if action == "key":
@@ -257,7 +261,7 @@ class ComputerAct(BaseTool):
                 risk = RiskLevel.SENSITIVE
                 warnings.append(_HEAVY_COMBOS[combo])
         if hit:
-            risk = RiskLevel.SENSITIVE
+            risk, egress = RiskLevel.SENSITIVE, True
             warnings.append(f"the words under the cursor say: {', '.join(hit)}")
         wanted_app = str(args.get("app") or "").strip()
         if action == "open_app" and wanted_app and not looks_like_an_application(wanted_app):

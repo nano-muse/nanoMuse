@@ -187,6 +187,7 @@ struct NanoMuseHeaderTitle: View {
     @ObservedObject var vm: AIChatViewModel
     var soulName: String
     var modelName: String
+    var isReadOnly = false
     var onTapText: () -> Void
 
     @ObservedObject private var tracker = SessionActivityTracker.shared
@@ -257,6 +258,10 @@ struct NanoMuseHeaderTitle: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
             .buttonStyle(.plain)
+
+            if !isReadOnly {
+                NanoMuseThinkingButton(vm: vm)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .nmOnChange(of: vm.isProcessing) { processing in

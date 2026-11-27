@@ -154,6 +154,29 @@ test('the public Cloud ignores retired media models left in an older local snaps
   }
 })
 
+test('public Cloud keeps current media from the menu and routes Wizshot to the material form', async () => {
+  const out = await cloud({ signedIn: true, baseURL: 'https://cloud.nanomuse.cn' })
+  try {
+    const image = 'musesteamer-air-image'
+    const video = 'ernie-wizshot-me'
+    out.svc.state.models.push({ id: image, kind: 'image' }, { id: video, kind: 'video' })
+    out.svc.state.media = { imageProvider: PROVIDER_ID, imageModel: 'qwen-image-3.0', videoProvider: PROVIDER_ID, videoModel: 'wan2.2-i2v-flash' }
+    const view = (await out.api('GET', '/models')).body
+    assert.deepEqual(view.slots.image.options.map((m) => m.id), [image])
+    assert.deepEqual(view.slots.video.options.map((m) => m.id), [video])
+    assert.equal((await out.svc.imageEndpoint()).model, image)
+    assert.equal((await out.svc.videoEndpoint()).model, video)
+    const url = 'https://cloud.nanomuse.cn/app/?video=wizshot'
+    assert.equal((await out.svc.media()).video.studioUrl, url)
+    await out.svc.profile.wearLocal({ avatar: 'face', faceId: 'abcdef' })
+    const animate = await out.api('POST', '/media/animate', { cloud: true })
+    assert.equal(animate.body.error.code, 'wizshot_materials_required')
+    assert.equal(animate.body.error.open, url)
+  } finally {
+    await out.done()
+  }
+})
+
 test('the public Cloud asks for a media provider, not an account sign-in', async () => {
   const out = await cloud({ baseURL: 'https://cloud.nanomuse.cn' })
   try {
@@ -692,6 +715,7 @@ test('the "Use it for" card moves the main chat to the own key too; a main chat 
 test('an unreadable account state cannot silently discard cleared-session rules', async () => {
   const out = await cloud()
   try {
+    await rm(`${out.statePath}.bak`, { force: true })
     await writeFile(out.statePath, '{invalid-json')
     await assert.rejects(out.svc.readState(), /refusing to discard saved conversation access rules/)
     assert.equal(await readFile(out.statePath, 'utf8'), '{invalid-json')

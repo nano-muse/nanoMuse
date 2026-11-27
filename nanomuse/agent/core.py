@@ -24,7 +24,7 @@ from nanomuse.llm.vision import keep_newest_images
 from nanomuse.logger import logger
 from nanomuse.memory import MemoryItem, MemoryStore
 from nanomuse.runtime import device
-from nanomuse.schema import AgentState, Attachment, Message, Role, ToolResult, new_id
+from nanomuse.schema import AgentState, Attachment, Message, RiskLevel, Role, ToolResult, new_id
 from nanomuse.sentinel import AuditLog, Sentinel
 from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
@@ -415,11 +415,17 @@ class MuseAgent:
         else:
             cutoff = len(msgs) - limit
             # Never start in the middle of a tool exchange: advance to the next user message.
-            while cutoff < len(msgs) and msgs[cutoff].role != Role.USER:
+            # The step-limit wrap-up prompt is not a boundary: cutting there would leave the
+            # next turn only the wrap-up, none of the work it sums up.
+            while cutoff < len(msgs) and (
+                msgs[cutoff].role != Role.USER or msgs[cutoff].meta.get("wrap_up")
+            ):
                 cutoff += 1
-            if cutoff >= len(msgs):
-                # A single long turn can fill the window. Keep the leading tool
-                # exchange whole, even if that takes a few messages over the limit.
+            if cutoff >= len(msgs) or all(m.role != Role.USER for m in msgs[cutoff + 1 :]):
+                # A single long turn can fill the window, and after one the next user
+                # message is the only boundary left: cutting there would leave the model
+                # nothing of the work before it. Keep the newest messages instead, with the
+                # leading tool exchange whole, even if that takes a few over the limit.
                 cutoff = slice(-limit, None).indices(len(msgs))[0]
                 while 0 < cutoff < len(msgs) and msgs[cutoff].role == Role.TOOL:
                     cutoff -= 1
@@ -484,20 +490,99 @@ class MuseAgent:
             finally:
                 task_budget.end(token)
 
+    def _previous_requests(self) -> list[Message]:
+        """The requests of the turn before this one. "Carry on" or "send that report" means
+        nothing once a long turn has pushed them out of the window."""
+        earlier = self.messages[: self._task_start]
+        starts = [i for i, m in enumerate(earlier) if m.meta.get("turn_start")]
+        if not starts:
+            # history saved before turns were marked: its last request
+            return [m for m in earlier if m.meta.get("user_request")][-1:]
+        return [m for m in earlier[starts[-1] :] if m.meta.get("user_request")]
+
     def _request_context(
-        self, system_prompt: str, tools: list[dict[str, Any]] | None
+        self,
+        system_prompt: str,
+        tools: list[dict[str, Any]] | None,
+        tail: Message | None = None,
     ) -> list[Message]:
         window = self.context_messages()
-        protected = [m for m in self.messages[self._task_start :] if m.meta.get("user_request")]
-        if self.settings.agent.max_context_tokens:
-            present = {m.meta.get("request_id") for m in window}
-            window = [m for m in protected if m.meta.get("request_id") not in present] + window
-        return fit_context(
+        protected = self._previous_requests() + [
+            m for m in self.messages[self._task_start :] if m.meta.get("user_request")
+        ]
+        # A long turn pushes the request out of the message window; without it the model
+        # forgets what it was asked and guesses, so it stays in view whatever the limits,
+        # and so do the previous turn's.
+        present = {m.meta.get("request_id") for m in window}
+        window = [m for m in protected if m.meta.get("request_id") not in present] + window
+        if tail:
+            window.append(tail)
+        # pinned requests may carry pictures: the cap counts them too
+        window = keep_newest_images(window, self.settings.agent.max_context_images)
+        window = fit_context(
             [Message.system(system_prompt), *window],
             tools,
             self.settings.agent.max_context_tokens,
             protected,
         )
+        while True:
+            visible = {call.id for message in window for call in message.tool_calls or []}
+            ledger = self._task_ledger(visible)
+            if ledger is None:
+                return window
+            # The note can evict another exchange. Recompute from the retained window
+            # until the action IDs stop changing; removed messages never reenter.
+            position = len(window) - 1 if tail is not None and window[-1] is tail else len(window)
+            candidate = window[:position] + [ledger] + window[position:]
+            fitted = fit_context(
+                candidate,
+                tools,
+                self.settings.agent.max_context_tokens,
+                protected + [ledger],
+            )
+            remaining = {call.id for message in fitted for call in message.tool_calls or []}
+            if remaining == visible:
+                return fitted
+            window = [message for message in fitted if message is not ledger]
+
+    def _task_ledger(self, visible: set[str]) -> Message | None:
+        """The sensitive actions and file writes whose calls are no longer in view.
+        Out of the window, the model sends the same mail again. Files
+        read are left out: listing their names did not cut rereads."""
+        pending: dict[str, tuple[int, Any]] = {}
+        succeeded: list[tuple[int, Any]] = []
+        for index, message in enumerate(self.messages):
+            if message.role == Role.ASSISTANT:
+                for call in message.tool_calls or []:
+                    pending[call.id] = (index, call)
+            elif message.role == Role.TOOL and message.tool_call_id in pending:
+                entry = pending.pop(message.tool_call_id)
+                if message.meta.get("tool_ok") is True and message.tool_call_id not in visible:
+                    succeeded.append(entry)
+
+        done: list[str] = []
+        for _, call in sorted(succeeded, key=lambda entry: entry[0]):
+            tool = self.tools.get(call.name)
+            if tool is None:
+                continue
+            args = call.arguments
+            action = args.get("action") if call.name == "files" else None
+            try:
+                assessment = tool.assess(args)
+                risk, summary = assessment.risk, assessment.summary
+            except Exception:  # noqa: BLE001
+                risk, summary = tool.risk, tool.name
+            if risk == RiskLevel.SENSITIVE or action in ("write", "append"):
+                done.append(summary)
+        if not done:
+            return None
+        lines = ["[Runtime note, not from the user] Earlier in this conversation, out of view now:"]
+        lines.append("Done:")
+        if len(done) > 60:
+            lines.append(f"({len(done) - 60} older actions omitted)")
+        lines.extend(f"- {summary}" for summary in done[-60:])
+        lines.append("Do not repeat an action listed as done unless the user asks for it again.")
+        return Message.user("\n".join(lines))
 
     async def _run(
         self,
@@ -524,7 +609,9 @@ class MuseAgent:
         if language:
             self.ui_language = language
         user_input = self._expand_skill(user_input)
-        self.messages.append(self.user_message(user_input, files))
+        request = self.user_message(user_input, files)
+        request.meta["turn_start"] = True
+        self.messages.append(request)
         attached = {"files": [a.path for a in files]} if files else {}
         self.audit.record("user_message", content=user_input, **attached)
         system_prompt = self.build_system_prompt(user_input, await self.recall_for(user_input))
@@ -632,7 +719,9 @@ class MuseAgent:
                     else:
                         result = await self.sentinel.guard(call, tool)
                     self.ui.on_tool_result(call, result)
-                    self.messages.append(Message.tool(result.for_model(), call.id, call.name))
+                    tool_message = Message.tool(result.for_model(), call.id, call.name)
+                    tool_message.meta["tool_ok"] = result.ok  # read by the task ledger
+                    self.messages.append(tool_message)
                     if result.images:
                         pictures.extend(result.images)
                     if result.stop:
@@ -658,8 +747,12 @@ class MuseAgent:
                     self.messages.append(Message.user(prompts.STUCK_PROMPT))
             else:
                 # Step budget exhausted: ask for a wrap-up without tools.
-                self.messages.append(Message.user(prompts.MAX_STEPS_PROMPT))
-                context = self._request_context(system_prompt, None)
+                # The window is taken before the prompt joins the history: as the newest
+                # user message it would be the cutoff, and the wrap-up would see no work.
+                wrap_up = Message.user(prompts.MAX_STEPS_PROMPT)
+                wrap_up.meta["wrap_up"] = True
+                context = self._request_context(system_prompt, None, wrap_up)
+                self.messages.append(wrap_up)
                 response = await task_budget.ask(
                     self.llm,
                     context,

@@ -30,6 +30,7 @@ from nanomuse.config import MCPServerSettings
 from nanomuse.logger import logger
 from nanomuse.schema import ToolResult
 from nanomuse.tools.base import BaseTool, CallAssessment
+from nanomuse.tools.mcp_resources import MCPResourceReader
 
 _NAME_RE = re.compile(r"[^a-zA-Z0-9_-]")
 #: ``?key=value`` and ``&token=value`` inside a URL quoted in an error message
@@ -145,6 +146,7 @@ class MCPManager:
         self._redact = redact
         self._stack = AsyncExitStack()
         self.tools: list[MCPTool] = []
+        self.resource_readers: dict[str, MCPResourceReader] = {}
 
     def _resolved(self, cfg: MCPServerSettings) -> MCPServerSettings:
         if self._resolve is None:
@@ -178,7 +180,7 @@ class MCPManager:
             for transport in attempts:
                 stack = AsyncExitStack()
                 try:
-                    session, listed = await self._open(resolved, transport, stack)
+                    session, listed, has_resources = await self._open(resolved, transport, stack)
                 except BaseException as exc:  # noqa: BLE001 — see the docstring
                     unwound = await _close_quietly(stack)
                     if unwound is not None:
@@ -197,6 +199,10 @@ class MCPManager:
                     continue
                 await self._stack.enter_async_context(stack)
                 if self._add_tools(cfg, session, listed):
+                    if has_resources:
+                        self.resource_readers[cfg.name] = MCPResourceReader(
+                            resolved, session, self._scrub
+                        )
                     logger.info(
                         "MCP server '{}' connected with {} tools", cfg.name, len(listed.tools)
                     )
@@ -255,7 +261,7 @@ class MCPManager:
 
     async def _open(
         self, cfg: MCPServerSettings, transport: str, stack: AsyncExitStack
-    ) -> tuple[Any, Any]:
+    ) -> tuple[Any, Any, bool]:
         """Transport, session, handshake and the tool list for one server, all on ``stack``."""
         from mcp import ClientSession
 
@@ -264,8 +270,14 @@ class MCPManager:
         async with asyncio.timeout(cfg.connect_timeout_s):
             read, write = await self._open_transport(cfg, transport, stack)
             session = await stack.enter_async_context(ClientSession(read, write))
-            await session.initialize()
-            return session, await session.list_tools()
+            hello = await session.initialize()
+            if hello.capabilities.tools is None:
+                from mcp.types import ListToolsResult
+
+                listed = ListToolsResult(tools=[])
+            else:
+                listed = await session.list_tools()
+            return session, listed, hello.capabilities.resources is not None
 
     async def _open_transport(
         self, cfg: MCPServerSettings, transport: str, stack: AsyncExitStack
@@ -301,6 +313,7 @@ class MCPManager:
         return streams[0], streams[1]
 
     async def close(self) -> None:
+        self.resource_readers.clear()
         try:
             await self._stack.aclose()
         except Exception as exc:  # noqa: BLE001

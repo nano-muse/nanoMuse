@@ -25,7 +25,7 @@
  * (`/events`) carrying the live state — registered when the web server is
  * present; the headless and SDK profiles get the service without routes.
  */
-import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { ApprovalDesk, appLabel, appOf, type ApprovalScope, isOwnApp, checkForUpdate, compareVersions, DEVICE_GRANT_PREFIX, grantCovers, HoldDesk, modelFor, pickChatModel, pickHandsModel, REMOTE_CONTROL_GRANT_ID, scheduleRunIds, sharedConnectors, standingGrants, takesImages, UPDATE_RETRY_MS, updateCacheFresh, withGrant, type Grant, type Hold, type HoldTool, type PendingApproval, type StandingGrant, type UpdateInfo } from './desk.ts'
 import { arch, homedir, hostname, release, type, userInfo } from 'node:os'
@@ -64,7 +64,7 @@ import { OwnTurns } from './record.ts'
 import { Provenance } from './provenance.ts'
 import { RelayProxy } from './relay-proxy.ts'
 import { ClientEvents } from './events.ts'
-import { DEFAULT_VIDEO_MODEL, hostOf, KNOWN_DASHSCOPE_MODELS, looksLikeVideoModel, probe as probeVideoModel, speaksDashScope, type VideoEndpoint } from './video.ts'
+import { DEFAULT_VIDEO_MODEL, hostOf, KNOWN_DASHSCOPE_MODELS, looksLikeVideoModel, probe as probeVideoModel, speaksDashScope, wizshotStudio, type VideoEndpoint } from './video.ts'
 import { PHONE_CARD_SECONDS, PhoneApprovals, type CardStatus } from './phone-approvals.ts'
 import { editImage as ownEditImage, generateImage as ownGenerateImage, imageShapeOf, type ImageEndpoint } from './images.ts'
 import { checkMove, checkScreenshot, displayInfo, isBlack, runtimeInfo, screenHead, type MoveCheck, type RuntimeInfo, type ScreenshotCheck } from './hands-check.ts'
@@ -104,13 +104,15 @@ export const STOCK_DEFAULT_MODEL = { provider: 'deepseek-official', model: 'deep
 export const IMAGE_BUDGET = { maxRequestImageBytes: 2 * 1024 * 1024, requestImagePixelBudget: 2 * 1024 * 1024 } as const
 /** Where the browser half talks to us. */
 export const API_PREFIX = '/nanomuse/cloud'
-/** The public relay no longer offers account-funded image or video generation. */
+/** The hosted Cloud origin; self-hosted relays advertise their own media models. */
 export const OFFICIAL_CLOUD_ORIGIN = 'https://cloud.nanomuse.cn'
 
-/** Self-hosted relays may still advertise media routes; the public service never does. */
-export function relayMediaEnabled(baseURL: string): boolean {
+/** A stale public menu can still contain Wan and Qwen Image after an upgrade. */
+export function relayMediaEnabled(baseURL: string, model?: Pick<RelayModel, 'kind' | 'id'>): boolean {
   try {
-    return new URL(baseURL).origin !== OFFICIAL_CLOUD_ORIGIN
+    if (new URL(baseURL).origin !== OFFICIAL_CLOUD_ORIGIN) return true
+    return (model?.kind === 'image' && model.id === 'musesteamer-air-image') ||
+      (model?.kind === 'video' && model.id === 'ernie-wizshot-me')
   } catch {
     return false
   }
@@ -485,7 +487,7 @@ export interface MediaView {
   /** Pictures (C11): where they would be drawn — the account, an own row with image models, or nowhere (`reason` `no_image`). */
   image: { source: 'cloud' | 'provider' | 'none'; label: string; model: string; reason: string }
   /** The video source: `cloud`, an own-key provider, or none (`reason`: `no_video` when nothing configured has video models). */
-  video: { source: 'cloud' | 'provider' | 'none'; label: string; model: string; models: { id: string; name: string }[]; off: boolean; reason: string }
+  video: { source: 'cloud' | 'provider' | 'none'; label: string; model: string; models: { id: string; name: string }[]; off: boolean; reason: string; studioUrl?: string }
   animate: boolean
   motion: MotionView
 }
@@ -557,6 +559,109 @@ function ownProvidersOf(raw: Record<string, unknown>): Record<string, OwnProvide
     }
   }
   return out
+}
+
+/** The one tolerant boundary for both the primary account state and its backup. */
+function cleanState(value: unknown): State {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('Desktop account state must be an object')
+  }
+  const raw = value as State
+  const account = raw.account
+  if (account !== undefined && (!account || typeof account !== 'object' || typeof account.id !== 'string' || !account.id)) {
+    throw new TypeError('Desktop account state has an invalid account')
+  }
+  return {
+    ...(raw.accountTransition === true ? { accountTransition: true as const } : {}),
+    ...(raw.account ? { account: raw.account } : {}),
+    ...(raw.models ? { models: raw.models } : {}),
+    ...(typeof raw.deviceId === 'string' && raw.deviceId ? { deviceId: raw.deviceId } : {}),
+    ...(typeof raw.deviceName === 'string' && raw.deviceName ? { deviceName: raw.deviceName } : {}),
+    ...(Number.isInteger(raw.doorPort) && (raw.doorPort as number) > 0 && (raw.doorPort as number) < 65536 ? { doorPort: raw.doorPort } : {}),
+    ...(typeof raw.handsModel === 'string' && raw.handsModel ? { handsModel: raw.handsModel } : {}),
+    // a grant 0.1.37 kept for the "app" "Done. Screen now:" (the mis-read head line) names nothing — dropped
+    ...(Array.isArray(raw.grants) ? { grants: (raw.grants as Grant[]).filter((g) => g && typeof g.id === 'string' && typeof g.target === 'string' && !MISREAD_GRANT.test(g.target) && !isOwnApp(g.target.slice('computer_app:'.length))).map((g) => ({ id: g.id, target: g.target, at: Number(g.at) || 0, ...(typeof g.sessionId === 'string' && g.sessionId ? { sessionId: g.sessionId, sessionTitle: String(g.sessionTitle ?? '') } : {}), ...(typeof g.sessionId === 'string' && g.sessionId && typeof g.scheduleId === 'string' && g.scheduleId ? { scheduleId: g.scheduleId, scheduleTitle: String(g.scheduleTitle ?? '') } : {}) })) } : {}),
+    ...(raw.update && typeof raw.update === 'object' && typeof (raw.update as UpdateInfo).checkedAt === 'number' ? { update: updateForThisVersion(raw.update as UpdateInfo) } : {}),
+    ...(raw.remoteControl === true ? { remoteControl: true } : {}),
+    ...(raw.trusted && typeof raw.trusted === 'object' ? { trusted: trustedOf(raw.trusted) } : {}),
+    ...(raw.taskSessions && typeof raw.taskSessions === 'object' ? { taskSessions: raw.taskSessions } : {}),
+    ...(raw.deviceConversations && typeof raw.deviceConversations === 'object' ? { deviceConversations: raw.deviceConversations } : {}),
+    ...(raw.sync && typeof raw.sync === 'object' ? { sync: raw.sync } : {}),
+    ...(raw.media && typeof raw.media === 'object' ? { media: raw.media } : {}),
+    ...(typeof raw.handsProvider === 'string' && raw.handsProvider ? { handsProvider: raw.handsProvider } : {}),
+    ...(raw.providers && typeof raw.providers === 'object' ? { providers: ownProvidersOf(raw.providers) } : {}),
+    ...(raw.chatgpt && typeof raw.chatgpt === 'object' && typeof (raw.chatgpt as ChatGptState).label === 'string' ? { chatgpt: { label: (raw.chatgpt as ChatGptState).label, at: Number((raw.chatgpt as ChatGptState).at) || 0 } } : {}),
+    ...(raw.cloudModelsOff === true ? { cloudModelsOff: true } : {}),
+  }
+}
+
+type StateCandidate =
+  | { kind: 'valid'; contents: string; state: State }
+  | { kind: 'missing' }
+  | { kind: 'invalid'; error: unknown }
+
+async function stateCandidate(path: string): Promise<StateCandidate> {
+  try {
+    const contents = await readFile(path, 'utf8')
+    return { kind: 'valid', contents, state: cleanState(JSON.parse(contents) as unknown) }
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ? { kind: 'missing' }
+      : { kind: 'invalid', error }
+  }
+}
+
+async function privateTemp(path: string, contents: string): Promise<string> {
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+  try {
+    const file = await open(tmp, 'wx', 0o600)
+    try {
+      await file.writeFile(contents, 'utf8')
+      await file.sync()
+    } finally {
+      await file.close()
+    }
+    await chmod(tmp, 0o600)
+    return tmp
+  } catch (error) {
+    await rm(tmp, { force: true }).catch(() => undefined)
+    throw error
+  }
+}
+
+async function replaceFile(source: string, target: string): Promise<void> {
+  try {
+    await rename(source, target)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (process.platform !== 'win32' || !['EACCES', 'EEXIST', 'EPERM'].includes(code ?? '')) throw error
+    await rm(target, { force: true })
+    await rename(source, target)
+  }
+}
+
+async function syncDirectory(path: string): Promise<void> {
+  try {
+    const directory = await open(path, 'r')
+    try {
+      await directory.sync()
+    } finally {
+      await directory.close()
+    }
+  } catch {
+    // Windows and some file systems do not let Node open or fsync a directory.
+  }
+}
+
+async function restoreStateFile(path: string, state: State): Promise<void> {
+  const tmp = await privateTemp(path, `${JSON.stringify(state, null, 2)}\n`)
+  try {
+    await replaceFile(tmp, path)
+    await chmod(path, 0o600)
+    await syncDirectory(dirname(path))
+  } finally {
+    await rm(tmp, { force: true }).catch(() => undefined)
+  }
 }
 
 /** The `confirmed` field of a hands call, when it is one (a ticket or the legacy `true`). */
@@ -757,7 +862,10 @@ export default class NanomuseCloud extends Service {
     this.profile = new ProfileStore(this.dir(), this.relay)
     this.motion = new AvatarMotion({
       dir: join(this.dir(), 'avatar', 'motion'),
-      endpoint: (viaCloud) => this.videoEndpoint({ cloud: viaCloud === true }),
+      endpoint: async (viaCloud) => {
+        const ep = await this.videoEndpoint({ cloud: viaCloud === true })
+        return ep && !wizshotStudio(ep) ? ep : undefined
+      },
       animate: () => this.state.media?.animate !== false,
       faceId: () => this.faceId(),
       still: (mood) => this.faceStill(mood),
@@ -1046,7 +1154,10 @@ export default class NanomuseCloud extends Service {
             }
             return rows
           },
-          lines: (sessionId) => this.sessionLines(ctx, sessionId),
+          lines: async sessionId => [
+            ...await this.sessionLines(ctx, sessionId),
+            ...(this.ctx.get('nanomuseRooms')?.publicWatchSyncLines?.(sessionId) ?? []),
+          ],
           create: (title, sessionId) => this.createSyncedSession(ctx, title, sessionId),
           rename: async (sessionId, title) => {
             await ctx.sessionController.rename({ sessionId: sessionId as SessionId, title })
@@ -1589,6 +1700,37 @@ export default class NanomuseCloud extends Service {
     return list?.find((r) => r.id === scheduleId)?.title.slice(0, 80) ?? ''
   }
 
+  /** A chat's title as the chats column shows it; '' when it cannot be read. */
+  async chatTitle(sessionId: string): Promise<string> {
+    const access = this.scheduleSessionAccess(sessionId)
+    if (!access(sessionId)) return ''
+    const ctx = this.sessionCtx
+    const title = ctx ? await this.sessionTitle(ctx, sessionId as SessionId, Date.now()).catch(() => '') : ''
+    return access(sessionId) ? title : ''
+  }
+
+  /** A schedule operation keeps its caller and account while it awaits storage or approval. */
+  scheduleSessionAccess(caller: string): (sessionId: string) => boolean {
+    const epoch = this.accountEpoch
+    const account = this.state.account?.id ?? ''
+    const visible = (sessionId: string): boolean => {
+      if (!sessionId || this.isClearedSession(sessionId)) return false
+      const seen = new Set<string>()
+      let id: string | undefined = sessionId
+      while (id && !seen.has(id)) {
+        seen.add(id)
+        const owner = this.state.sync?.owners?.[id]
+        if (owner && owner !== account) return false
+        const header: Session['header'] | undefined = this.sessionCtx?.sessions.get(id as SessionId)?.header
+        id = header?.origin === 'subagent' ? header.parentSession : undefined
+      }
+      return true
+    }
+    return (sessionId) => epoch === this.accountEpoch && !this.changingAccount
+      && !this.state.accountTransition && (this.state.account?.id ?? '') === account
+      && visible(caller) && visible(sessionId)
+  }
+
   async revokeGrant(id: string): Promise<boolean> {
     const before = this.state.grants?.length ?? 0
     const grants = (this.state.grants ?? []).filter((g) => g.id !== id)
@@ -1894,17 +2036,15 @@ export default class NanomuseCloud extends Service {
     return regionOf(this.state.account?.region, lang)
   }
 
-  /** What the account can do, as the relay's model list says. Public Cloud media is retired. */
+  /** What the account can do, as the relay's model list says. The public relay lists only its current media models. */
   private cloudCapabilities(): Capability[] {
     if (!this.cloudModels()) return []
     const models = this.state.models ?? []
     const out: Capability[] = []
     if (models.some((m) => modelFor(m).includes('chat'))) out.push('chat')
     if (models.some((m) => modelFor(m).includes('gui'))) out.push('vision')
-    if (relayMediaEnabled(this.relay.origin)) {
-      if (models.some((m) => m.kind === 'image')) out.push('image')
-      if (models.some((m) => m.kind === 'video')) out.push('video')
-    }
+    if (this.imageModel()) out.push('image')
+    if (this.cloudVideoModels().length) out.push('video')
     return out
   }
 
@@ -2467,6 +2607,33 @@ export default class NanomuseCloud extends Service {
     return row ? helloLlm(row.provider, chat.model) : undefined
   }
 
+  /** Desktop memory written on behalf of an account stays with that account in proactive requests. */
+  get feedOwner(): string | undefined {
+    if (this.changingAccount || this.state.accountTransition) return undefined
+    return this.state.account ? 'account:' + this.state.account.id : 'local'
+  }
+
+  async prepareFeed(system: string, input: string, signal: AbortSignal): Promise<string> {
+    const llm = this.ctx.get('llm')
+    const choice = this.defaultModelService()?.currentSelection()
+    if (!llm || !choice?.provider || !choice.model) throw new Error('No chat model is available')
+    const sessionId = ('feed-' + randomUUID()) as SessionId
+    this.provenance.setRun(sessionId, 'feed')
+    let text = '', finished = false
+    try {
+      for await (const part of llm.stream({ ...choice, system, messages: [{ role: 'user', content: [{ type: 'text', text: input }] }],
+        tools: [], maxTokens: 1600, sessionId, signal })) {
+        if (part.type === 'text-delta') text += part.text
+        if (part.type === 'tool-call-delta' || (part.type === 'block-end' && part.block.type === 'tool-call') || text.length > 16_000) throw new Error('Invalid preparation response')
+        if (part.type === 'finish') finished = part.reason.kind === 'stop'
+      }
+      if (!finished || signal.aborted) throw new Error('Preparation did not finish')
+      return text
+    } finally {
+      this.provenance.forget(sessionId)
+    }
+  }
+
   chatChoice(): { provider: string; model: string } {
     try {
       const current = this.defaultModelService()?.currentSelection()
@@ -2767,9 +2934,31 @@ export default class NanomuseCloud extends Service {
     return this.isClearedSession(id) ? '' : id
   }
 
+  publicWatchSyncAvailable(sessionId: string): boolean {
+    const sync = this.sync, view = sync?.view()
+    return Boolean(sessionId && sync && this.state.account && !this.changingAccount && !this.state.accountTransition &&
+      sync.state.accountId === this.state.account.id && view?.enabled && view.available && !view.paused &&
+      view.mainSession === sessionId && sync.owns(sessionId))
+  }
+
+  async publicWatchSyncActive(sessionId: string): Promise<boolean> {
+    const sync = this.sync
+    return Boolean(sync && this.publicWatchSyncAvailable(sessionId) && await sync.active().catch(() => false) &&
+      this.sync === sync && this.publicWatchSyncAvailable(sessionId))
+  }
+
+  publicWatchReady(sessionId: string): void {
+    if (this.publicWatchSyncAvailable(sessionId)) this.sync?.publicLineReady(sessionId)
+  }
+
   /** How many turns from the account's other devices a session here shows (C8). */
   syncRemoteLines(sessionId: string): number {
     return this.kept?.linesOf(sessionId).length ?? 0
+  }
+
+  /** A later message from another device may have cancelled or moved a local commitment. */
+  hasRemoteReplySince(sessionId: string, at: number): boolean {
+    return this.kept?.linesOf(sessionId).some(line => line.role === 'user' && (line.keptAt ?? line.at) >= at) ?? false
   }
 
   /** The main chat named by the host (the first conversation): the session it ends up in. */
@@ -2945,18 +3134,17 @@ export default class NanomuseCloud extends Service {
 
   // ---- the avatar studio: the pictures through the relay, the face onto the account ------
 
-  /** The relay's image model when a self-hosted relay explicitly lists one. */
+  /** The relay's image model when a relay explicitly lists one. */
   private imageModel(): string {
-    if (!relayMediaEnabled(this.relay.origin)) return ''
-    const models = (this.state.models ?? []).filter((m) => m.kind === 'image')
+    const models = (this.state.models ?? []).filter((m) => m.kind === 'image' && relayMediaEnabled(this.relay.origin, m))
     const pick = models.find((m) => m.recommended) ?? models[0]
     return pick ? pick.id : ''
   }
 
-  /** A self-hosted relay's image models, for the picker (recommended first). */
+  /** The relay's eligible image models, for the picker (recommended first). */
   private cloudImageOptions(): ModelOption[] {
-    if (!this.cloudModels() || !relayMediaEnabled(this.relay.origin)) return []
-    const models = (this.state.models ?? []).filter((m) => m.kind === 'image')
+    if (!this.cloudModels()) return []
+    const models = (this.state.models ?? []).filter((m) => m.kind === 'image' && relayMediaEnabled(this.relay.origin, m))
     const pick = this.imageModel()
     return models.map((m) => ({ provider: PROVIDER_ID, providerLabel: 'nanoMuse Cloud', id: m.id, name: m.name || m.id, ...(m.id === pick ? { recommended: true } : {}) })).sort((a, b) => Number(Boolean(b.recommended)) - Number(Boolean(a.recommended)))
   }
@@ -2976,9 +3164,9 @@ export default class NanomuseCloud extends Service {
   /**
    * Where a picture would be drawn (contract section 3): the person's choice when it still
    * exists; else the chat provider's `defaults.image` when new chats answer through an own row
-   * with pictures; else a self-hosted relay that lists an image model; else the first own row
+   * with pictures; else a relay that lists an eligible image model; else the first own row
    * with image models. `cloud: true` asks that relay whatever the order says. The public Cloud
-   * never returns a media endpoint. Nothing when no source has one.
+   * uses the current IDs from its menu. Nothing when no source has one.
    */
   async imageEndpoint(opts: { cloud?: boolean; auto?: boolean } = {}): Promise<ImageEndpoint | undefined> {
     const cloud = async (model = this.imageModel()): Promise<ImageEndpoint | undefined> => {
@@ -2997,7 +3185,7 @@ export default class NanomuseCloud extends Service {
     }
     if (media.imageModel && !opts.auto) {
       if (!media.imageProvider || media.imageProvider === PROVIDER_ID) {
-        if ((this.state.models ?? []).some((m) => m.kind === 'image' && m.id === media.imageModel)) {
+        if ((this.state.models ?? []).some((m) => m.kind === 'image' && m.id === media.imageModel && relayMediaEnabled(this.relay.origin, m))) {
           const ep = await cloud(media.imageModel)
           if (ep) return ep
         }
@@ -3097,7 +3285,7 @@ export default class NanomuseCloud extends Service {
   async studioEstimate(): Promise<Estimate> {
     const ep = await this.studioEndpoint()
     const video = await this.videoEndpoint()
-    const clips = video && video.instanceId === PROVIDER_ID && this.state.media?.animate !== false ? ANIMATED.length : 0
+    const clips = video && !wizshotStudio(video) && video.instanceId === PROVIDER_ID && this.state.media?.animate !== false ? ANIMATED.length : 0
     if (ep.instanceId !== PROVIDER_ID) {
       return { cny: 0, leftCny: 0, unlimited: true, affordable: true, imageModel: ep.model, clips, videoModel: clips ? (video?.model ?? '') : '', source: 'provider', label: ep.label }
     }
@@ -3183,10 +3371,9 @@ export default class NanomuseCloud extends Service {
     }
   }
 
-  /** A self-hosted relay's video models. Public Cloud media is retired. */
+  /** The relay’s video models from its menu, excluding previously retired hosted models. */
   private cloudVideoModels(): RelayModel[] {
-    if (!relayMediaEnabled(this.relay.origin)) return []
-    return (this.state.models ?? []).filter((m) => m.kind === 'video')
+    return (this.state.models ?? []).filter((m) => m.kind === 'video' && relayMediaEnabled(this.relay.origin, m))
   }
 
   /**
@@ -3305,6 +3492,8 @@ export default class NanomuseCloud extends Service {
       const known = cloud ? undefined : media.checked?.[source.host]
       const ids = cloud ? this.cloudVideoModels().map((m) => ({ id: m.id, name: m.name || m.id })) : (known && Date.now() - known.at < VIDEO_CHECK_TTL_MS ? known.models : KNOWN_DASHSCOPE_MODELS).map((id) => ({ id, name: id }))
       view.video = { source: cloud ? 'cloud' : 'provider', label: source.label, model: video?.model ?? '', models: ids, off, reason: cloud || known ? '' : 'unchecked' }
+      const studio = video && wizshotStudio(video)
+      if (studio) view.video.studioUrl = studio
       return view
     }
     // nothing configured has video models (C11): one sentence, not a call to the cloud
@@ -3971,34 +4160,26 @@ export default class NanomuseCloud extends Service {
   }
 
   private async readState(): Promise<State> {
-    try {
-      const raw = JSON.parse(await readFile(this.statePath(), 'utf8')) as State
-      return {
-        ...(raw.accountTransition === true ? { accountTransition: true as const } : {}),
-        ...(raw.account ? { account: raw.account } : {}),
-        ...(raw.models ? { models: raw.models } : {}),
-        ...(typeof raw.deviceId === 'string' && raw.deviceId ? { deviceId: raw.deviceId } : {}),
-        ...(typeof raw.deviceName === 'string' && raw.deviceName ? { deviceName: raw.deviceName } : {}),
-        ...(Number.isInteger(raw.doorPort) && (raw.doorPort as number) > 0 && (raw.doorPort as number) < 65536 ? { doorPort: raw.doorPort } : {}),
-        ...(typeof raw.handsModel === 'string' && raw.handsModel ? { handsModel: raw.handsModel } : {}),
-        // a grant 0.1.37 kept for the "app" "Done. Screen now:" (the mis-read head line) names nothing — dropped
-        ...(Array.isArray(raw.grants) ? { grants: (raw.grants as Grant[]).filter((g) => g && typeof g.id === 'string' && typeof g.target === 'string' && !MISREAD_GRANT.test(g.target) && !isOwnApp(g.target.slice('computer_app:'.length))).map((g) => ({ id: g.id, target: g.target, at: Number(g.at) || 0, ...(typeof g.sessionId === 'string' && g.sessionId ? { sessionId: g.sessionId, sessionTitle: String(g.sessionTitle ?? '') } : {}), ...(typeof g.sessionId === 'string' && g.sessionId && typeof g.scheduleId === 'string' && g.scheduleId ? { scheduleId: g.scheduleId, scheduleTitle: String(g.scheduleTitle ?? '') } : {}) })) } : {}),
-        ...(raw.update && typeof raw.update === 'object' && typeof (raw.update as UpdateInfo).checkedAt === 'number' ? { update: updateForThisVersion(raw.update as UpdateInfo) } : {}),
-        ...(raw.remoteControl === true ? { remoteControl: true } : {}),
-        ...(raw.trusted && typeof raw.trusted === 'object' ? { trusted: trustedOf(raw.trusted) } : {}),
-        ...(raw.taskSessions && typeof raw.taskSessions === 'object' ? { taskSessions: raw.taskSessions } : {}),
-        ...(raw.deviceConversations && typeof raw.deviceConversations === 'object' ? { deviceConversations: raw.deviceConversations } : {}),
-        ...(raw.sync && typeof raw.sync === 'object' ? { sync: raw.sync } : {}),
-        ...(raw.media && typeof raw.media === 'object' ? { media: raw.media } : {}),
-        ...(typeof raw.handsProvider === 'string' && raw.handsProvider ? { handsProvider: raw.handsProvider } : {}),
-        ...(raw.providers && typeof raw.providers === 'object' ? { providers: ownProvidersOf(raw.providers) } : {}),
-        ...(raw.chatgpt && typeof raw.chatgpt === 'object' && typeof (raw.chatgpt as ChatGptState).label === 'string' ? { chatgpt: { label: (raw.chatgpt as ChatGptState).label, at: Number((raw.chatgpt as ChatGptState).at) || 0 } } : {}),
-        ...(raw.cloudModelsOff === true ? { cloudModelsOff: true } : {}),
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
-      throw new Error('Could not read desktop account state; refusing to discard saved conversation access rules', { cause: error })
+    const path = this.statePath()
+    const current = await stateCandidate(path)
+    if (current.kind === 'valid') {
+      await chmod(path, 0o600).catch(() => undefined)
+      return current.state
     }
+    const backupPath = `${path}.bak`
+    const backup = await stateCandidate(backupPath)
+    if (backup.kind === 'valid') {
+      await chmod(backupPath, 0o600).catch(() => undefined)
+      await restoreStateFile(path, backup.state).catch((error: unknown) => {
+        this.ctx.logger.warn('nanomuse: account state recovered but the primary file was not restored: %s', message(error))
+      })
+      return backup.state
+    }
+    if (current.kind === 'missing' && backup.kind === 'missing') return {}
+    const cause = current.kind === 'invalid' ? current.error
+      : backup.kind === 'invalid' ? backup.error
+        : new Error('No complete account state backup')
+    throw new Error('Could not read desktop account state; refusing to discard saved conversation access rules', { cause })
   }
 
   /** A session's cached log facts, dropped: its log changed. */
@@ -4084,8 +4265,12 @@ export default class NanomuseCloud extends Service {
   private async remoteLines(
     ctx: Context,
     sessionId: string,
+    includeRemote = true,
   ): Promise<{ lines: Array<RemoteLine & { id: string; before: string | null }>; prompts: string[] }> {
-    const lines = this.kept?.linesOf(sessionId) ?? []
+    const notes = ctx.get('nanomuseRooms')?.checkInMessages(sessionId) ?? []
+    const lines = [...(includeRemote ? this.kept?.linesOf(sessionId) ?? [] : []), ...notes.map(n => ({
+      mid: n.id, text: n.text, at: n.at, keptAt: n.at, role: 'assistant' as const, device: '', deviceName: '', localCheckIn: true,
+    }))].sort((a, b) => a.at - b.at)
     if (lines.length === 0) return { lines: [], prompts: [] }
     const entry = this.cached(sessionId)
     let prompts = entry.prompts
@@ -4146,14 +4331,35 @@ export default class NanomuseCloud extends Service {
   private async writeState(): Promise<void> {
     const path = this.statePath()
     // Capture each requested snapshot before yielding, and commit writes in that order.
-    const contents = JSON.stringify(this.state, null, 2) + '\n'
+    const contents = `${JSON.stringify(this.state, null, 2)}\n`
     const write = async (): Promise<void> => {
-      await mkdir(dirname(path), { recursive: true })
-      const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
+      const dir = dirname(path)
+      const backupPath = `${path}.bak`
+      await mkdir(dir, { recursive: true })
+      const tmp = await privateTemp(path, contents)
       try {
-        await writeFile(tmp, contents, { mode: 0o600, flag: 'wx' })
-        await rename(tmp, path)
-        await chmod(path, 0o600).catch(() => undefined)
+        const current = await stateCandidate(path)
+        if (current.kind === 'valid') {
+          const backupTmp = await privateTemp(backupPath, current.contents)
+          try {
+            await replaceFile(backupTmp, backupPath)
+            await chmod(backupPath, 0o600)
+            await syncDirectory(dir)
+          } finally {
+            await rm(backupTmp, { force: true }).catch(() => undefined)
+          }
+        } else {
+          const backup = await stateCandidate(backupPath)
+          if (current.kind === 'invalid' && backup.kind !== 'valid') {
+            throw new Error('Could not preserve a complete desktop account state backup', { cause: current.error })
+          }
+          if (current.kind === 'missing' && backup.kind === 'invalid') {
+            throw new Error('Could not preserve a complete desktop account state backup', { cause: backup.error })
+          }
+        }
+        await replaceFile(tmp, path)
+        await chmod(path, 0o600)
+        await syncDirectory(dir)
       } finally {
         await rm(tmp, { force: true }).catch(() => undefined)
       }
@@ -4476,7 +4682,9 @@ export default class NanomuseCloud extends Service {
         if (req.method === 'GET' && route === '/sync/remote') {
           const sessionId = url.searchParams.get('session') ?? ''
           // another account's chat shows no bubbles and no working line (C10)
-          const remote = sessionId && sync.owns(sessionId) ? await this.remoteLines(this.ctx, sessionId) : { lines: [], prompts: [] }
+          const access = this.scheduleSessionAccess('nanomuse-feed')
+          const remote = sessionId && access(sessionId) ? await this.remoteLines(this.ctx, sessionId, sync.owns(sessionId)) : { lines: [], prompts: [] }
+          if (!access(sessionId)) return send(res, 200, { lines: [], prompts: [], hidden: [], working: null })
           return send(res, 200, { lines: remote.lines, prompts: remote.prompts, hidden: sync.view().hidden, working: sync.workingOf(sessionId) })
         }
         if (req.method === 'POST' && route === '/sync/archived') {
@@ -4491,6 +4699,7 @@ export default class NanomuseCloud extends Service {
         const chats = this.deviceConversations()
         const id = String(body.id ?? '')
         if (body.action === 'create') return send(res, 200, await chats.create(String(body.device ?? '')))
+        if (body.action === 'draft') return send(res, 200, await chats.saveDraft(id, String(body.text ?? '')))
         if (body.action === 'send') return send(res, 200, await chats.send(id, String(body.text ?? '')))
         if (body.action === 'refresh') return send(res, 200, await chats.refresh(id))
         if (body.action === 'stop') return send(res, 200, { stopped: await chats.stop(id) })
@@ -4663,7 +4872,10 @@ export default class NanomuseCloud extends Service {
         const body = await json(req)
         const viaCloud = body.cloud === true
         if (!this.faceId()) return send(res, 409, { error: { code: 'no_face', message: 'No drawn face to animate' } })
-        if (!(await this.videoEndpoint({ cloud: viaCloud }))) {
+        const video = await this.videoEndpoint({ cloud: viaCloud })
+        const materials = video && wizshotStudio(video)
+        if (materials) return send(res, 400, { error: { code: 'wizshot_materials_required', message: `Add the portrait, storyboard and voice reference at ${materials}`, open: materials } })
+        if (!video) {
           const signedOut = viaCloud && relayMediaEnabled(this.relay.origin) && (!this.signedInCache || !this.state.account)
           return send(res, signedOut ? 401 : 409, { error: { code: signedOut ? 'signed_out' : 'no_video_model', message: signedOut ? 'Sign in to use the relay' : 'No video model to draw clips with' } })
         }

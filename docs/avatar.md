@@ -11,12 +11,11 @@ not change that default. On the phone since
    phone's page: the face at the top with what it is, a description, the seven style chips,
    *Draw four*, and the rest of this list without a card in the chat (the progress comes over
    the socket as `{"kind": "studio", "current"}`). The agent is not run for it.
-2. **Your image provider.** Add an image provider and API key under *Models* first.
-   nanoMuse Cloud no longer pays for image or video generation. The studio keeps the
+2. **Your image provider.** On version 1.0.10, select a provider of your own under *Models* to draw and pose an avatar. [Hosted text-to-image](https://cloud.nanomuse.cn/app/?image=generate) draws individual pictures from a description. The four pose edits require a provider that can edit a reference image. The studio keeps the
    generated files on your device and uses the provider you selected.
    Four illustrated inspiration cards sit above the description on Android, iPhone, web
    and desktop. Tapping one fills its description and style; it does not replace the face
-   until you ask your own provider to draw and then choose a result. The examples are
+   until you ask the provider to draw and then choose a result. The examples are
    *Moss Courier*, *Tide Tinker*, *Dusk Moth* and *Copper Acorn*. Their five-state image
    sets are under `assets/avatar-presets/`; generation details and
    the non-sensitive prompts are in `source.json` there. Names, descriptions and style hints
@@ -39,8 +38,7 @@ SHA-256 and official API and terms links, but no credential, account, private ho
 or signed result URL. The manifest also records the terms distinction and the GPL contribution
 of any rights held by the API caller; it is factual project documentation, not legal advice.
 
-Where the pictures come from: the chat model's host and key. The relay speaks the OpenAI
-images API (`/v1/images/generations`, `/v1/images/edits`), as does any OpenAI-compatible
+Where the pictures come from: the chat model's host and key. The relay provides text-to-image through the OpenAI images API (`/v1/images/generations`, `/v1/images/edits`), as does any OpenAI-compatible
 provider that draws; Alibaba Cloud Model Studio's own host has neither and is called on its
 native multimodal endpoint with the same key (qwen-image-3.0 by default). Which model draws
 is the `[image]` block in `config.toml` (`[llm] image_model` still works), the *Making

@@ -215,9 +215,11 @@ test('the pages come in the phone\'s order and light the dots the same way', () 
   // a desktop with a key of its own and no account: "ready" skips the account pages
   assert.equal(stageOf({ ...base, hasModel: true }), 'source')
   assert.equal(stageOf({ ...base, hasModel: true, sourceChosen: 'own' }), 'permissions')
-  // Welcome's second door, as on the phone: the models page with no account; Skip there with no key is Welcome again
+  // A signed-out user can defer their own key and continue setup on every platform.
   assert.equal(stageOf({ ...base, sourceChosen: 'own' }), 'models')
-  assert.equal(stageOf({ ...base, sourceChosen: 'own', modelsSkipped: true }), 'welcome')
+  assert.equal(stageOf({ ...base, sourceChosen: 'own', modelsSkipped: true }), 'permissions')
+  assert.equal(stageOf({ ...base, sourceChosen: 'own', modelsSkipped: true, gated: false }), 'meet')
+  assert.equal(stageOf({ ...base, sourceChosen: 'own', modelsSkipped: true, permissionsSeen: true }), 'meet')
   assert.equal(stageOf({ ...base, sourceChosen: 'cloud' }), 'welcome')
   assert.deepEqual(['welcome', 'password', 'source', 'models', 'permissions', 'meet'].map(dotOf), [0, 0, 0, 0, 1, 2])
 })

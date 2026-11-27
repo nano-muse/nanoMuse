@@ -13,6 +13,8 @@ import type {
   CodingRun,
   CodingSession,
   ConnectionsData,
+  ContextResource,
+  ContextWatchSettings,
   CustomEndpoint,
   Contact,
   FeedItem,
@@ -30,6 +32,9 @@ import type {
   NudgesView,
   ProvidersView,
   PushInfo,
+  PublicSourceKind,
+  PublicWatchChange,
+  PublicWatchView,
   Reminder,
   ReminderKind,
   SettingsView,
@@ -298,9 +303,25 @@ export const api = {
   feed: (limit = 60) => request<FeedItem[]>(`/api/feed?limit=${limit}`),
   feedPosts: () => request<FeedPostsData>("/api/feed/posts"),
   /** The feed's preferences; only the fields given change (`daily`/`time` are the 08:00 routine). */
-  setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string }) =>
+  hideFeedFollowup: (id: string, choice: "tomorrow" | "dismiss") =>
+    request<{ ok: boolean }>(`/api/feed/followups/${encodeURIComponent(id)}?choice=${choice}`, { method: "PUT" }),
+  setFeedInstructions: (body: { instructions?: string; daily?: boolean; time?: string; followups?: boolean; followup_push?: boolean; chat_followups?: boolean; on_change?: boolean }) =>
     request<FeedPostsData>("/api/feed/instructions", { method: "PUT", body: JSON.stringify(body) }),
-  refreshFeedPosts: () => request<FeedPostsData>("/api/feed/posts/refresh", { method: "POST" }),
+  publicWatches: () => request<PublicWatchView>("/api/feed/watches"),
+  setPublicWatches: (revision: string, enabled: boolean) =>
+    request<PublicWatchView>("/api/feed/watches", { ...json({ revision, enabled }), method: "PUT" }),
+  sharePublicWatchUpdates: (revision: string, share_public_updates: boolean) =>
+    request<PublicWatchView>("/api/feed/watches", { ...json({ revision, share_public_updates }), method: "PUT" }),
+  addPublicWatch: (revision: string, kind: PublicSourceKind, target: string) =>
+    request<PublicWatchView>("/api/feed/watches", json({ revision, kind, target })),
+  changePublicWatch: (id: string, body: PublicWatchChange) =>
+    request<PublicWatchView>(`/api/feed/watches/${encodeURIComponent(id)}`, { ...json(body), method: "PATCH" }),
+  contextWatch: () => request<ContextWatchSettings>("/api/feed/context"),
+  contextResources: () => request<ContextResource[]>("/api/feed/context/resources"),
+  setContextWatch: (body: Pick<ContextWatchSettings, "revision" | "mail" | "calendar" | "local_context"> & { resources: string[] }) =>
+    request<ContextWatchSettings>("/api/feed/context", { method: "PUT", body: JSON.stringify(body) }),
+  refreshFeedPosts: () => request<FeedPostsData>("/api/feed/posts/refresh?prepare_only=true", { method: "POST" }),
+  handlePreparation: (id: string) => request<{ ok: boolean }>(`/api/feed/posts/${encodeURIComponent(id)}/handled`, { method: "PUT" }),
   deleteFeedPost: (id: string) => request<{ ok: boolean }>(`/api/feed/posts/${id}`, { method: "DELETE" }),
   upcoming: () => request<UpcomingData>("/api/upcoming"),
   reminders: (all = false) => request<Reminder[]>(`/api/reminders${all ? "?all=1" : ""}`),
@@ -417,8 +438,8 @@ export const api = {
   calendar: () => request<CalendarData>("/api/calendar"),
   setCalendar: (body: Record<string, unknown>) =>
     request<ConnectionsData["calendar"]>("/api/connections/calendar", { method: "PUT", body: JSON.stringify(body) }),
-  addCalendarFeed: (name: string, url: string) =>
-    request<ConnectionsData["calendar"] & { error?: string }>("/api/connections/calendar/feeds", json({ name, url })),
+  addCalendarFeed: (name: string, url: string, review?: { revision: string; enabled: boolean }) =>
+    request<ConnectionsData["calendar"] & { error?: string }>("/api/connections/calendar/feeds", json({ name, url, review })),
   removeCalendarFeed: (name: string) =>
     request<ConnectionsData["calendar"]>(`/api/connections/calendar/feeds/${encodeURIComponent(name)}`, { method: "DELETE" }),
   testCalendar: () => request<TestResult>("/api/connections/calendar/test", { method: "POST" }),

@@ -41,7 +41,42 @@ The rules of [CONTRIBUTING.md](../CONTRIBUTING.md) apply unchanged: new code in 
 the `NanoMuse/` folder), an edit inside an upstream Swift file carries a `// nanoMuse:` comment,
 and rebranding is the script, never a hand edit.
 
+## Thinking intensity
+
+In the Muse layout's local main chat, open **More → Thinking Intensity** to turn reasoning off or select a level supported by the current model. In a local side chat, tap the lightbulb in the chat header to open the same picker. The choice applies to this chat and is saved with it; an unsent draft keeps the choice, including Off, when its session is created. Without an explicit choice, the new chat inherits the model group's default. Models that do not support reasoning show an explanation. Read-only remote chats do not offer this control. Model-group defaults remain under **Settings → Model groups → Session Defaults**.
+
+## Device chats
+
+In the Muse layout, open **New Chat** and choose one of your account's devices. You can also
+start a device chat under **Computers** in the chat drawer. Command-N opens the same destination
+picker. Reopen a device chat from **Side chats**.
+Follow-ups go to the selected device, and each device chat has its own context and draft.
+You can create the chat while the target is offline. Sending requires the target to be online
+and support `task.status`.
+
+A leading `@Device Name` delegates that turn to another compatible device. Use
+`@Device Name [device-id]` if two devices have the same name. After a disconnect, reopening the
+chat or tapping **Refresh** checks the saved turn on the target. The iPhone keeps the transcript
+on the initiating device. Removing a device chat only removes this iPhone's copy. If delivery
+is uncertain, confirmation warns that the remote turn may still be running and that removing
+the chat loses this iPhone's saved recovery information. It does not stop the remote turn.
+See [the Hub protocol](hub.md#persistent-device-conversations).
+
+## Public sources on this phone
+
+Use the Feed settings to follow public sources on this iPhone. New issues, papers and feed entries can appear in your main chat. Checks run while the app is active or when iOS grants background refresh time. [Public sources and reminder settings](app.md#following-public-sources-over-time)
+
 ## What is nanoMuse here
+
+A goal can have a local deadline chosen at creation or in Goals. The Feed shows one approaching or recently missed deadline with its next unfinished step. Mark the step done there, open the goal, show it again tomorrow, or hide that deadline. The card works offline when you open the Feed. Feed settings also offer an optional on-device deadline notification. Allow notifications and turn off regular check-ins for any goal you want to use it for. iPhone schedules just the next eligible local 09:00 alert on the due date (or the day you snoozed it to). The lock screen only says to check the Feed. Completing or changing the goal updates the pending alert when the app runs. If the app stays suspended, iOS can deliver the one already scheduled.
+
+The Feed can prepare material for an open goal or an upcoming appointment recorded in a recent diary entry. A separate note or saved preference must add something relevant. Each card includes its source excerpts. An explicit cancellation or a passed appointment can rule out a diary signal. The scheduled writer has no tools.
+
+Turn on *Prepare from my chats* in Feed settings to include new text you send on this iPhone in unlocked chats with memory enabled. A commitment with a date and a separate relevant note can become a draft, even if you never created a goal. When you change the date or say you already sent the message, the Feed rechecks the source before showing the preparation. A date agreed the previous week can still surface when it draws near. Turning the setting off removes its chat-based cards.
+
+Main chat check-ins are on by default. nanoMuse can ask about an unfinished goal due today or a dated commitment in a new message you sent in your unlocked main chat with memory enabled. It checks the original message on this iPhone. Previously saved choices still apply, including a decision to exclude chat text. You can turn check-ins off under *Feed settings → Message me in my main chat*. Answer in the main chat to continue. It waits for an idle conversation and checks between 09:00 and 20:00, at most once a day per account on this device. Checks run while the app is active and when iOS grants a background refresh. Notification permission lets the app alert you when it delivers a message in the background.
+
+In Feed settings, open *Calendar changes in chat*, allow calendar access and choose individual calendars. The first read is silent. A new overlap or a start time moved by at least 15 minutes in the next 24 hours can prompt a message with the affected times, even without a prior chat request. iPhone checks timed busy events while active or during a background refresh granted by iOS. It compares times and opaque event identifiers on the device and shares the same daytime and daily message limit as chat check-ins. With conversation sync enabled, the resulting message and its times can appear on your other devices. Remove a calendar or tap *Stop watching calendars* to reset the comparison.
 
 Applied by `python scripts/rebrand.py` (idempotent; run after every upstream pull):
 
@@ -173,8 +208,7 @@ Ours, in `NanoMuse/`:
   GLOBAL, the diary, the feed's instruction, the routines' schedule, *Import memory* from another
   assistant), Connectors, Data controls, the two shell switches, *Show the welcome again*.
 - **Models (0.1.34)** (`NanoMuseModels.swift`): the relay's menu opens on the model marked
-  recommended *for chat*; the hosted relay currently recommends the same multimodal
-  `Qwen/Qwen3.6-27B-FP8` for chat and screen operation. A pick made in the chat's picker moves to the front of the Cloud group so new chats
+  recommended *for chat*; hosted chat uses `deepseek-v4.1-flash-1017` and screen operation on supported devices uses `qwen3.5-397b-a17b`. A pick made in the chat's picker moves to the front of the Cloud group so new chats
   follow it, as Android's `followPick`. DeepSeek ids are text-only unless they name `v4.1` or
   later, `vision` or `ocr`: a `// nanoMuse:` step at the top of `LLMModel.withInferredModality()`.
 - **Models as four slots (0.1.41)** (`NanoMuseModelSlots.swift`, `NanoMuseModelsView.swift`;
@@ -194,9 +228,7 @@ Ours, in `NanoMuse/`:
   chats; a side chat keeps its model.*; a pick made in a chat's own picker sticks the same way,
   for any provider, not only Cloud. Pictures and clips resolve in one order (your choice, else the chat
   provider's own default when it is a Model Studio key that draws, else a signed-in relay only
-  when its live menu offers the media kind, else the first key that can). The hosted Cloud
-  offers no media generation, so these rows require a key of your own; the image and video models come from the catalogue's `defaults`, not from
-  names in the code. The pictures and clips pickers open with an *Automatic* entry (*Currently
+  when its live menu offers the media kind, else the first key that can). See [Cloud media](cloud.md) for hosted pictures and character video. Own-key model defaults come from the catalogue. The pictures and clips pickers open with an *Automatic* entry (*Currently
   〈provider · model〉*) that forgets the stored choice and lets the slot follow that order
   again; the clips picker keeps *Off* under it. A group shows at most eight rows (the
   provider's catalogue default for the slot first, then the chosen model, then the rest as
@@ -366,7 +398,7 @@ Ours, in `NanoMuse/`:
   `NanoMuseMediaModels.swift`; Android `avatar/VideoGen.kt`, `avatar/AvatarMotion.kt`): a drawn
   face gets four 4-second clips (idle, working, waiting, happy) from `wan2.2-i2v-flash`
   through your own Bailian key (or a self-hosted relay whose operator explicitly enabled the
-  legacy media proxy; the public Cloud does not), the phone's prompts word for word, kept per
+  legacy DashScope media proxy), the phone's prompts word for word, kept per
   device under `avatar/motion/`; the face plays them with an `AVQueuePlayer`
   and an `AVPlayerLooper` (suspended in the background), the dragon's clips come from the bundle.
   *Image & video models* lists the models, *Animate the avatar after a change* (on by default)
@@ -760,6 +792,26 @@ opens: a microphone running with nothing on screen would read as a fault. The Si
 in the nine `AppShortcuts.strings` tables (one per `<lang>.lproj`, legacy `.strings` because the
 deployment target is iOS 16), the intent's own strings in `Localizable.xcstrings` (#296, #298).
 
+## Crash and exit diagnostics
+
+Missing Claude sign-in customization now returns a provider error instead of terminating
+the app. API-key requests do not require that customization. The check also covers
+background title generation and warmup requests, whose model can differ from the main chat.
+
+Reports in **Settings → Logs** distinguish a leftover launch marker from a MetricKit
+diagnostic. A marker means that no clean-exit callback removed it; it does not prove a
+crash, SIGKILL, watchdog termination or memory failure. Its phase and memory values are
+the last recorded observations. Session-restore protection still uses repeated foreground
+exit markers as a recovery heuristic.
+
+The report date is its generation time. MetricKit reports also name their diagnostic
+period, which is not an exact incident timestamp, and label the log tail as belonging to
+the process writing the report. They do not attach that process's shell commands, signal
+file or hang snapshot as evidence of the earlier incident. Reports delivered in the same
+second keep separate files. To diagnose a reported trap, use the system `.ips` and the
+matching build's symbols; for a SIGKILL, inspect its
+[Termination Reason](https://developer.apple.com/documentation/xcode/sigkill).
+
 ## Building on a Mac
 
 Requirements are upstream's, in [android/BUILDING.md](../android/BUILDING.md): a recent Xcode
@@ -912,6 +964,13 @@ compile error costs minutes there, not an upload. The full `xcodebuild` log is a
 when a warning is reported in a file under `NanoMuse/` (upstream's files are not held to this),
 so the zero-warnings rule above is checked, not just asked for.
 
+The job also executes cross-device approval grant logic as a standalone Swift program and uses
+`build-for-testing` to compile its XCTest for an iOS 16 or later device target. It cannot run
+that XCTest in Simulator yet: the bundled iSH and FFmpeg frameworks contain device-only slices,
+so the app cannot link into a Simulator test host. Simulator XCTest becomes required when those
+dependencies provide Simulator slices. The standalone check remains executable on Linux and
+macOS in the meantime.
+
 The strings catalogue has a check of its own that runs on every pull request, on Linux:
 `tests/test_ios_strings.py` parses `Localizable.xcstrings` with every key pair in hand and fails
 when a key is listed twice (a JSON parser keeps one of the two entries and drops the other
@@ -960,8 +1019,7 @@ what became of it here:
 | `hands`: the phone's own screen | No equivalent: iOS does not let an app drive another. App Intents / Shortcuts are the door there |
 | Widgets | Upstream's `AgentWidget` as it is |
 
-Still to check on a device, in order: the first run end to end with a fresh account; confirm the
-hosted account's media entry points ask for an own provider, then make a chat-driven avatar change
+Still to check on a device, in order: the first run end to end with a fresh account; check hosted picture generation and the link to the character-video page, then make a chat-driven avatar change
 through a Bailian key and the four clips it draws afterwards; a routine coming due with the app in
 the background (does iOS grant the refresh on the tester's phone, and how often); a coding session
 against a computer of the account; the connectors list after a second device signs in.

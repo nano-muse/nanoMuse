@@ -12,8 +12,13 @@ from __future__ import annotations
 import asyncio
 import email
 import email.message
+import email.utils
+import hashlib
 import imaplib
+import re
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from nanomuse.config import EmailSettings
 from nanomuse.vault import CredentialVault
@@ -121,6 +126,119 @@ class MailWatcher:
             return await asyncio.to_thread(_look)
         except imaplib.IMAP4.error as exc:
             raise RuntimeError(f"IMAP error: {exc}") from exc
+
+    async def context_batch(self, cursor: dict[str, Any]) -> tuple[list[NewMail], dict[str, Any]]:
+        """Read bounded previews following consent. The cursor is specific to the IMAP mailbox
+        and its UIDVALIDITY. Even an empty INBOX has a real, initialized cursor.
+        """
+        from nanomuse.tools.email_tool import IMAP_TIMEOUT_S, _body_of, _decode
+
+        address, password = self._creds()
+        host, port = self.settings.imap_host, self.settings.imap_port
+        mailbox = hashlib.sha256(f"{host}\n{port}\n{address}".encode()).hexdigest()
+        now = datetime.now(UTC)
+
+        def collect() -> tuple[list[NewMail], dict[str, Any]]:
+            with imaplib.IMAP4_SSL(host, port, timeout=IMAP_TIMEOUT_S) as imap:
+                imap.login(address, password)
+                if imap.select("INBOX", readonly=True)[0] != "OK":
+                    raise RuntimeError("cannot open INBOX")
+
+                def number(code: str) -> int:
+                    _, data = imap.response(code)
+                    if not data or not data[0] or not data[0].isdigit():
+                        raise RuntimeError("missing IMAP mailbox generation or high-water mark")
+                    return int(data[0])
+
+                validity = number("UIDVALIDITY")
+                _, announced = imap.response("UIDNEXT")
+                if announced and announced[0] and announced[0].isdigit():
+                    newest = int(announced[0]) - 1
+                else:
+                    status, info = imap.status("INBOX", "(UIDNEXT UIDVALIDITY)")
+                    fields = dict(
+                        re.findall(rb"(UIDNEXT|UIDVALIDITY) (\d+)", (info[0] or b"").upper())
+                    )
+                    if (
+                        status != "OK"
+                        or fields.get(b"UIDVALIDITY") != str(validity).encode()
+                        or not fields.get(b"UIDNEXT")
+                    ):
+                        raise RuntimeError("missing IMAP mailbox high-water mark")
+                    newest = int(fields[b"UIDNEXT"]) - 1
+                state = {"mailbox": mailbox, "validity": validity, "uid": newest}
+                last = cursor.get("uid")
+                if (
+                    cursor.get("mailbox") != mailbox
+                    or cursor.get("validity") != validity
+                    or type(last) is not int
+                    or last < 0
+                ):
+                    return [], state
+                if last >= newest:
+                    return [], cursor
+                end = min(last + 512, newest)
+                status, data = imap.uid("search", "UID", f"{last + 1}:{end}")
+                if status != "OK":
+                    raise RuntimeError("IMAP search failed")
+                uids = sorted(
+                    {
+                        int(s)
+                        for s in (data[0] or b"").split()
+                        if s.isdigit() and last < int(s) <= end
+                    }
+                )
+                batch = uids[:8]
+                out: list[NewMail] = []
+                for uid in batch:
+                    status, parts = imap.uid(
+                        "fetch", str(uid), "(UID INTERNALDATE BODY.PEEK[]<0.65536>)"
+                    )
+                    if status != "OK":
+                        raise RuntimeError("IMAP preview fetch failed")
+                    for index, part in enumerate(parts or []):
+                        if (
+                            not isinstance(part, tuple)
+                            or not isinstance(part[0], bytes)
+                            or not isinstance(part[1], bytes)
+                        ):
+                            continue  # expunged after the search
+                        # Servers may put UID and INTERNALDATE after the body literal.
+                        trailer = parts[index + 1] if index + 1 < len(parts) else b""
+                        meta = part[0] + b" " + (trailer if isinstance(trailer, bytes) else b"")
+                        if not re.search(rb"\bUID " + str(uid).encode() + rb"\b", meta, re.I):
+                            continue
+                        match = re.search(rb'INTERNALDATE "([^"]+)"', meta, re.I)
+                        if not match:
+                            continue
+                        try:
+                            received = email.utils.parsedate_to_datetime(
+                                match[1].decode("ascii").strip().replace("-", " ", 2)
+                            )
+                        except (TypeError, ValueError, UnicodeError):
+                            continue
+                        if not received.tzinfo or not now - timedelta(
+                            days=2
+                        ) <= received <= now + timedelta(minutes=5):
+                            continue
+                        msg = email.message_from_bytes(part[1][:65536])
+                        out.append(
+                            NewMail(
+                                uid,
+                                _decode(msg.get("From")),
+                                _decode(msg.get("Subject")),
+                                received.isoformat(),
+                                _body_of(msg)[:BODY_CHARS],
+                            )
+                        )
+                        break
+                state["uid"] = batch[-1] if len(uids) > len(batch) else end
+                return out, state
+
+        try:
+            return await asyncio.to_thread(collect)
+        except imaplib.IMAP4.error:
+            raise RuntimeError("cannot read the connected mailbox") from None
 
 
 __all__ = ["MailWatcher", "NewMail"]

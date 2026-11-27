@@ -1,5 +1,7 @@
 # nanoMuse Cloud
 
+The admin console distinguishes an invalid token from a service failure. Only a 401 rejects the token; network and server errors keep the entered token for retry, and a late rejection from an older request cannot lock a newer sign-in.
+
 Daily analytics labels and tooltips use the site's configured timezone offset, including UTC, regardless of the operator's browser timezone.
 Unchanged settings polls preserve unsaved allowance, invite bonus and nudge-policy edits. A changed server value still refreshes the corresponding editor.
 Switching accounts in the admin drawer clears the samples list and ignores pending sample responses and errors from the previous account.
@@ -34,16 +36,21 @@ and your devices. After the code the app has:
 
 - a provider called **nanoMuse Cloud** under *Settings → Providers*, an
   ordinary OpenAI-compatible provider whose key is the token the relay issued;
-- the chat and hands rows of *Settings → Models* (web console: *Connections*) on
-  the account's `Qwen/Qwen3.6-27B-FP8` when you had chosen none. It reads image
-  input, so pictures in chat and screenshots used for GUI operation still work.
-  The account does not provide image or video generation; those two rows require
-  a custom provider and API key on the device. A row you have not set follows one
+- the account's chat model, `deepseek-v4.1-flash-1017`, and its screen model,
+  `qwen3.5-397b-a17b`, under *Settings → Models* (web console: *Connections*).
+  The hosted relay calls Baidu Qianfan. Existing sessions and account balances carry over.
+  A row you have not set follows one
   order: the chat model's provider when it is a key of yours that can do the
   job, else nanoMuse Cloud while signed in, else the first key of yours that
   can; the *Automatic* entry of the row says what that gives right now, and a
   key you add later asks *Use it for* before any row moves
   ([own-key.md](own-key.md#which-model-does-what)).
+
+Android, iPhone and desktop 1.0.10 hide the hosted media entries in their native pickers. With those installed versions, open the [Cloud image page](https://cloud.nanomuse.cn/app/?image=generate) or [Cloud video page](https://cloud.nanomuse.cn/app/?video=wizshot) in a browser and sign in with your existing account. No reinstall or provider key is needed.
+
+For a picture from text, the account uses `musesteamer-air-image` and returns one picture per request. Editing a reference image, including redrawing an avatar in different poses, requires an image-editing provider of your own.
+
+To make a short character video, sign in to the [Cloud video page](https://cloud.nanomuse.cn/app/?video=wizshot) with the same account. Describe the action and supply accessible HTTPS links to a portrait and 10 to 60 seconds of reference speech in WAV format. An optional shot image must have a short edge of at least 720 pixels. If omitted, the portrait serves as the shot image. The page requests four seconds of silent performance from `ernie-wizshot-me`. Reopening the page in the same browser checks the same task. Download the finished clip while its link is valid. Older apps that can send only a prompt or an initial frame can use this page or their own video provider.
 
 *Settings → nanoMuse Cloud* (the *Account* screen) shows who is signed in (a
 masked hint, never the number) and since when; sets, changes or removes the
@@ -127,10 +134,7 @@ The relay is the code in [`cloud/`](../cloud/README.md). It stores:
 - a timeline of account events (signed in, failed sign-in, password set or
   changed, signed out, refused for budget, upstream error) with a
   device name, a model or an error code as the detail, never message content;
-- legacy video-task rows with their price and the provider's last word, retained
-  only for accounting cleanup and removed after three days. Hosted media is
-  fully retired, so task polling returns `410 hosted_media_retired` like every
-  other hosted media route and never reaches the provider;
+- video-task rows belonging to the account, including the reserved cost and the provider's latest status, for polling and billing;
 - the agent's name and look (`/v1/me/profile`): which face it wears (the dragon,
   an emoji on a colour, or one drawn in the avatar studio, with that face's five
   stills as small WebP pictures), so every device of the account shows the same
@@ -188,9 +192,8 @@ The relay is the code in [`cloud/`](../cloud/README.md). It stores:
 
 Message content is kept as *The record*, *Data controls* and *Conversation
 sync* below say, and not otherwise: the request is forwarded to the
-operator-configured upstream model and the reply is streamed back. The relay admits at most `CHAT_CONCURRENCY` chat requests to that shared
-deployment at once and retries a 429 or 5xx only before output starts; the
-remaining requests wait without duplicating a turn. Every response carries an
+operator-configured upstream model and the reply is streamed back. On Qianfan, the operator can set `CHAT_MODEL_CONCURRENCY` to give chat and screen operation separate queues. At 60 slots per model, 60 simultaneous chats can run while the screen model handles up to 60 requests of its own. A saved model ID uses the queue of the upstream model it resolves to. Relays without this setting and self-hosted relays using another provider keep the shared `CHAT_CONCURRENCY` limit (12 by default).
+These limits count active calls in one relay process. Each account also has its own per-minute request limit. The relay queues excess concurrent calls and retries an upstream 429 or 5xx only before output starts. Every response carries an
 `X-Nanomuse-Request` id so a problem report
 can be matched to a ledger row without any content being logged. Deleting the
 account (`POST /v1/auth/delete` with the account's key) removes all of it: the
@@ -627,19 +630,14 @@ to draw on, for its lifetime, not by the day (relay 0.5):
 | | `cloud.nanomuse.cn` |
 |---|---|
 | sign-up | open to anyone with a mainland China mobile number or an e-mail address |
-| free allowance | **¥10 per account** at the time of writing, for the hosted Qwen chat/vision/GUI model; it does not reset. The figure is the relay's to set (it can go up without an app update; the apps print what the relay says, `/v1/config`), and the account page always shows the current one |
+| free allowance | **¥10 per account** at the time of writing, for hosted chat, screen operation, picture and video generation; it does not reset. The figure is the relay's to set (it can go up without an app update; the apps print what the relay says, `/v1/config`), and the account page always shows the current one |
 | invitations | each *new* person who signs up with your code adds **¥5** (again, the relay's figure) to your pool, and the same to theirs; both sides get it after your friend's first request, not at sign-up |
 | when it is gone | bring your own key or a plan you already pay for: in mainland China, [Alibaba Cloud Bailian](own-key.md) first (one key covers chat, the hands, pictures and clips); elsewhere, [OpenRouter](https://openrouter.ai/keys) or OpenAI first (Bailian only signs up accounts from mainland China); a ChatGPT, Claude or Kimi plan signs in where the client has the flow; any OpenAI-compatible endpoint works; sign-in and your devices are unaffected |
-| members | the developer and the people they list have no limit and may name other chat models from the hosted provider; hosted image and video generation stays disabled for them too |
+| members | the developer and the people they list have no allowance limit and use the same hosted models |
 | rate | 30 requests per minute |
 | tokens | no ceiling; usage is metered and shown |
 
-Spend on `Qwen/Qwen3.6-27B-FP8` is counted at ¥3 input / ¥12 output per
-million tokens, with cached input at 20% of the input price, as reported in
-the reply's `usage`. Reasoning tokens count as output. Image input is part of
-that chat request; it is not image generation. Hosted picture and clip
-generation is not charged because it is not available: add a provider and API
-key of your own for those capabilities.
+Chat and screen calls are metered using the provider's token usage. Text-to-image calls are priced per picture. Video uses the provider's reported running time and resolution, which can differ from the requested duration. Model entries in `/v1/models` carry the relay's rates, and `/v1/estimate` previews a media request. The account keeps its existing balance when the relay changes providers.
 
 *Settings → nanoMuse Cloud* shows what was used of the pool in ¥ and $, what
 is left, and how the pool grows. At 80 % the app says so once; when the pool
@@ -682,8 +680,10 @@ and lists the people it brought (`GET /v1/admin/invites`). Padding one's own
 pool is not worth the trouble: the bonus is paid once the invitee has
 accumulated real successful provider spend (`INVITE_SETTLE_MIN_SPENT_UY`, 200
 micro-yuan by default) from a network address different from the inviter's,
-e-mail `+tag` subaddresses and Gmail dot or `googlemail.com` aliases map to
-the same account, disposable mail domains (`DEFAULT_SIGNUP_DOMAIN_BLOCK` plus
+Gmail `+tag` and dot aliases, including `googlemail.com`, map to the same
+account. Other providers' `+tag` addresses remain distinct; an account that
+relay 0.26 had already merged under the untagged address remains reachable
+through that tagged spelling. Disposable mail domains (`DEFAULT_SIGNUP_DOMAIN_BLOCK` plus
 `SIGNUP_DOMAIN_BLOCK`) are refused, new accounts from a mail domain that is
 not a well-known provider are limited per day (`SIGNUP_PER_DOMAIN_DAY`, 5 by
 default; the refusal is `domain_limited`), and the health check raises two
@@ -832,7 +832,7 @@ POST /v1/auth/code          {identifier}                      → 204 (a disable
 POST /v1/auth/verify        {identifier, code, device, invite?, device_id?, device_kind?} → {api_key, base_url, account, tokens, models, created, region}; the optional identity binds the key to that Hub device (hub.md); 400 code_wrong | code_expired | bad_device, 403 account_disabled
 POST /v1/auth/login         {identifier, password, device, device_id?, device_kind?} → the same; 401 bad_credentials, 429 locked, 400 bad_device
 POST /v1/auth/password      Bearer  {password, current?}      → 204; "" with current removes it; 400 password_short | password_long | password_weak | password_wrong | password_required
-POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; a key that lapses on its own (90 days at most); 403 session_from_session
+POST /v1/auth/session-key   Bearer  {device?, ttl_s?}         → {api_key, expires_at}; a key that lapses on its own (90 days at most), issued with a computer Hub reservation that its runtime may replace once with a free id; 403 session_from_session
 GET  /v1/me                 Bearer                            → {region: cn | intl | unknown, account{…, has_password, sessions, signed_in_via}, usage{today, total by kind / model}, tokens, spend{…, ways, guidance}, invite, contribute, models, defaults, base_url, clips, recent, nudges, paused[]}
 GET  /v1/me/invite          Bearer                            → {code, url, invites, bonus_cny, invitee_bonus_cny, bonus_when: "first_use", settled, pending, earned_cny, friends[]}
 GET  /v1/estimate           Bearer  ?images=5&clips=4&image_model=&video_model=&size=  → {cny, usd, parts[{kind, model, count, seconds?, cny}], left_cny, grant_cny, unlimited, affordable}; nothing charged
@@ -878,15 +878,15 @@ modalities so the picture model is recognisable, and a `nanomuse` block per
 model with its `kind`, prices, `for` (the lane(s) a chat model is for: `chat`
 and / or `gui`) and `recommended_for`), `GET /v1/models/{id}?kind=chat` (a
 member checks a typed id: `listed`, `priced_as`), `POST /v1/chat/completions`
-with streaming, `POST /v1/images/generations` and `/v1/images/edits`, and the
-clips under the provider's own paths (`POST
-/api/v1/services/aigc/video-generation/video-synthesis`, `GET
-/api/v1/tasks/{id}` for the account's own tasks, `GET /api/v1/uploads`). Errors
-are `{"error": {"message", "type": "nanomuse_cloud", "code"}}` with a stable
-`code` the app turns into a sentence. On the hosted service, new image/video
-requests, uploads, typed media-model lookups, media estimates and video-task
-polling return `410 hosted_media_retired` with
-`action: configure_own_provider` before any upstream request. Relay 0.22 adds the codes of the
+with streaming, and `POST /v1/images/generations` for a single picture from text (`data[0].b64_json`).
+`POST /v1/images/edits` returns `400 image_edit_unsupported` on the hosted model.
+
+`POST /v1/videos/generations` accepts `model`, `prompt`, a portrait `avatar_url`, `reference_audio_url`, and an optional `shot_image`. The URLs must be HTTPS. With no dialogue, `duration` requests 4 to 16 seconds of silent performance. An accepted request returns `output.task_id`. Poll `GET /api/v1/tasks/{id}` with the same account until `output.task_status` is `SUCCEEDED`, then download `output.video_url`. Poll an existing task ID after a timeout. Older clients using the DashScope-shaped submit or upload calls with missing materials receive `400 wizshot_materials_required` and `error.open` for the input form. Self-hosters running the DashScope media proxy retain its original routes.
+
+A provider error or an empty chat reply costs the account nothing. A reply interrupted after delivering text, reasoning or tool calls is charged for the work delivered.
+
+Errors have the form `{"error": {"message", "type": "nanomuse_cloud", "code"}}`.
+Relay 0.22 adds the codes of the
 operator's [switches](#controls): `403 signup_closed`, `503 service_paused`,
 `503 sync_paused`, `503 hub_paused` (and the hub's close code `4003
 hub_paused`), and `allowance_exhausted` with `paused: true` when the free
@@ -896,7 +896,7 @@ list the switches that are off under `paused`.
 **Before the model says anything (relay 0.31).** A streamed chat turn may begin with
 chunks that have no `choices`: `{"object": "chat.completion.chunk", "model", "created",
 "choices": [], "nanomuse": {"phase", "waited_ms", "ahead"?}}`. While the request waits for
-one of the relay's provider slots (`CHAT_CONCURRENCY`), one comes every five seconds with
+a slot in its provider queue, one comes every five seconds with
 `phase: "queued"` and `ahead`, how many requests are in front of it; when its slot comes,
 one with `phase: "working"`; a request that never waited gets none. While the provider
 takes its time over the first bytes, a comment line (`: keepalive`) goes out every ten

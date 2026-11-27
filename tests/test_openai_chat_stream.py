@@ -17,6 +17,15 @@ def _tc(index, id=None, name=None, arguments=None):
     return NS(index=index, id=id, function=NS(name=name, arguments=arguments))
 
 
+def _connection_error():
+    import httpx
+    import openai
+
+    return openai.APIConnectionError(
+        request=httpx.Request("POST", "http://localhost/chat/completions")
+    )
+
+
 class _FakeStream:
     def __init__(self, chunks):
         self.chunks = list(chunks)
@@ -154,7 +163,6 @@ async def test_a_completion_with_no_choices_is_a_provider_failure():
 
 
 async def test_visible_partial_stream_is_not_retried():
-    import openai
     import pytest
 
     from nanomuse.llm.openai_chat import PartialStreamError
@@ -167,7 +175,7 @@ async def test_visible_partial_stream_is_not_retried():
     async def fake_create(**_):
         nonlocal calls
         calls += 1
-        return _FakeStream([_chunk("visible"), openai.APIConnectionError(request=None)])
+        return _FakeStream([_chunk("visible"), _connection_error()])
 
     llm.client.chat.completions.create = fake_create  # type: ignore[method-assign]
     deltas: list[str] = []
@@ -179,7 +187,6 @@ async def test_visible_partial_stream_is_not_retried():
 async def test_thinking_shown_live_is_not_retried_but_a_hidden_tool_fragment_is():
     """What the person saw is not shown twice: a stream that broke after live reasoning
     is not retried either. A tool-call fragment nobody saw is: the retry is invisible."""
-    import openai
     import pytest
 
     from nanomuse.llm.openai_chat import PartialStreamError
@@ -192,7 +199,7 @@ async def test_thinking_shown_live_is_not_retried_but_a_hidden_tool_fragment_is(
     async def fail_after_reasoning(**_):
         nonlocal calls
         calls += 1
-        return _FakeStream([_chunk(reasoning="hmm"), openai.APIConnectionError(request=None)])
+        return _FakeStream([_chunk(reasoning="hmm"), _connection_error()])
 
     llm.client.chat.completions.create = fail_after_reasoning  # type: ignore[method-assign]
     shown: list[str] = []
@@ -211,7 +218,7 @@ async def test_thinking_shown_live_is_not_retried_but_a_hidden_tool_fragment_is(
                 [
                     _chunk(reasoning="hmm"),
                     _chunk(tool_calls=[_tc(0, id="c1", name="ls", arguments="{")]),
-                    openai.APIConnectionError(request=None),
+                    _connection_error(),
                 ]
             )
         return _FakeStream([_chunk(content="done", finish="stop")])

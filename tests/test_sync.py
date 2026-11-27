@@ -355,6 +355,37 @@ def _events(client: TestClient, thread: str) -> list[dict[str, Any]]:
 
 
 # ----------------------------------------------------------------------------- push
+def test_connected_context_stays_local_on_live_push_and_backfill(synced) -> None:
+    client, service, _, relay = synced
+    timeline = service.threads[MAIN_THREAD].timeline
+    private = timeline.add(
+        {
+            "type": "assistant",
+            "final": True,
+            "source": "connected_context",
+            "text": "Local calendar excerpt",
+            "files": [{"name": "local-notes.txt", "size": 12}],
+        }
+    )
+    timeline.add({"type": "user", "text": "Could you help me plan tomorrow?"})
+    timeline.add({"type": "assistant", "final": True, "text": "What time works?"})
+
+    def check_push() -> None:
+        client.portal.call(service.sync.push)  # type: ignore[union-attr]
+        assert {m["text"] for m in relay.msgs.values()} == {
+            "Could you help me plan tomorrow?",
+            "What time works?",
+        }
+        assert all(not row.get("attachments") for row in relay.msgs.values())
+        assert private in timeline.events and "mid" not in private
+
+    check_push()
+    assert client.put("/api/sync/state", json={"enabled": False}).is_success
+    assert not relay.msgs
+    assert client.put("/api/sync/state", json={"enabled": True}).is_success
+    check_push()
+
+
 def test_a_finished_turn_is_pushed_as_the_main_conversation(synced) -> None:
     client, service, llm, relay = synced
     llm.script.append(LLMResponse(content="Hello from the desk", finish_reason="stop"))

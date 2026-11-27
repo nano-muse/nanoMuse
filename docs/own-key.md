@@ -68,6 +68,9 @@ short videos.
 | Opper | ● | | | | outside mainland China | [platform.opper.ai](https://platform.opper.ai) |
 | AtmoRouter | ● | | | | outside mainland China | [atmorouter.dev](https://atmorouter.dev/dashboard/keys) |
 | UberLLM | ● | | | | outside mainland China | [uberllm.dev](https://uberllm.dev/signup) |
+| TrustedRouter | ● | | | | outside mainland China | [trustedrouter.com](https://trustedrouter.com/console/api-keys) |
+
+| Synap | ● | | | | outside mainland China | [synap402.com](https://synap402.com/account.html#keys) |
 | Ollama / LM Studio / vLLM (on your machine) | ● | | | | both | no key |
 
 Only Bailian has a dot under *Clips* because nanoMuse's clip generation speaks
@@ -107,6 +110,9 @@ or paste it into a chat.**
 - **Opper.** A key from *API Keys* at [platform.opper.ai](https://platform.opper.ai); one key reaches 700+ models from 50+ providers at the providers' rates, with no markup, and the gateway is hosted in the EU. Base URL `https://api.opper.ai/v3/compat`. The default model is `claude-sonnet-4-6`; any id from `https://api.opper.ai/v3/compat/models` can be set instead, and a `provider/model` id such as `anthropic/claude-sonnet-4-6` pins one route. Chat only here, on the OpenAI shape.
 - **AtmoRouter.** A key from [atmorouter.dev/dashboard/keys](https://atmorouter.dev/dashboard/keys); pay as you go, and one key reaches models from several labs. Base URL `https://atmorouter.dev/v1`. Model ids carry a route prefix, as `https://atmorouter.dev/v1/models` lists them; the default model is `cc/claude-sonnet-4-6`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
 - **UberLLM.** A key from [uberllm.dev/signup](https://uberllm.dev/signup); prepaid and pay as you go from $5, no monthly fee, and one key reaches models from several labs, usually below list price ([current prices](https://uberllm.dev/models)). Base URL `https://api.uberllm.dev/v1`. Model ids carry the vendor's name, as `https://api.uberllm.dev/v1/models` lists them; the default model is `openai/gpt-5.4-mini`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
+- **TrustedRouter.** A key from [trustedrouter.com/console/api-keys](https://trustedrouter.com/console/api-keys); pay as you go, and one key reaches models from several labs ([docs](https://trustedrouter.com/docs)). Base URL `https://api.trustedrouter.com/v1`. Model ids carry the vendor's name, as `https://api.trustedrouter.com/v1/models` lists them (public, no key needed); the default model is `deepseek/deepseek-v4-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
+
+- **Synap.** A key from [synap402.com/account.html#keys](https://synap402.com/account.html#keys); pay as you go, for open-weight models (Qwen3 Coder, Qwen3.5, GLM, DeepSeek V4, gpt-oss, Gemma and others), with per-token prices in the public `https://synap402.com/v1/models` list ([current prices](https://synap402.com/pricing.html)). Base URL `https://synap402.com/v1`. The default model is `qwen3-coder-30b`; any id from that list can be set instead. Chat only here, on the OpenAI shape.
 
 **Paste it into nanoMuse.**
 
@@ -139,10 +145,7 @@ model*, *Hands model*, *Making pictures* and *Making clips* cards on
 
 Each row shows `provider · model` and opens a picker. Chat and screen operation
 show the *nanoMuse Cloud* group first while signed in, with the relay's
-lane-specific recommendation marked; media rows show only providers of yours
-because the hosted Cloud does not generate pictures or clips. A self-hosted
-relay appears in a media row only when its operator explicitly enabled and
-advertised that capability. Each provider group holds only models that fit.
+lane-specific recommendation marked. Media rows list models advertised by the relay and compatible providers of your own. Each provider group holds only models that fit.
 A provider without the capability does not appear in that row at all. A row
 nothing covers shows the one sentence naming who could, and *Add a provider*.
 A chat pick is the default
@@ -168,11 +171,11 @@ chat's own picker do.
 
 **Automatic.** The screen, pictures and clips rows open with an *Automatic*
 entry that says what it gives right now (*Currently nanoMuse Cloud ·
-Qwen/Qwen3.6-27B-FP8*, say, for screen operation). Pick it and the row forgets any choice made there and
+qwen3.5-397b-a17b*, say, for screen operation). Pick it and the row forgets any choice made there and
 follows one order: the chat model's provider when it is one of yours and can do
 the job (its catalogue default), else a signed-in relay while switched on only
 when its live menu offers that job, else the first provider of yours that can.
-The hosted Cloud menu offers chat and screen operation, not media generation.
+Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video.
 A choice you made always wins; nanoMuse Cloud
 never steps in front of a provider you chose. Each device keeps its own choice,
 because keys never leave the device where they were entered.

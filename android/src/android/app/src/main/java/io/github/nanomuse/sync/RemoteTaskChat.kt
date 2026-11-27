@@ -50,7 +50,7 @@ class RemoteTaskChat(private val context: Context, private val device: Device, t
     }
 
     private suspend fun exchange(sessionId: String, update: () -> Unit): Unit = coroutineScope {
-        val approvals = RemoteTaskApprovals(this, sessionId, device.name, approve = { id, allow ->
+        val approvals = RemoteTaskApprovals(this, sessionId, device.id, device.name, approve = { id, allow ->
             runInterruptible(Dispatchers.IO) {
                 Hub.call(device.id, "approve", JSONObject().put("approval_id", id).put("allow", allow), 30_000)
             }

@@ -20,6 +20,7 @@ import com.openminis.app.scheduled.ScheduledTask
 import com.openminis.app.scheduled.ScheduledTaskManager
 import io.github.nanomuse.deeplink.OwnScheme
 import io.github.nanomuse.goals.GoalSessions
+import io.github.nanomuse.guard.SessionAccess
 import io.github.nanomuse.goals.GoalStore
 import io.github.nanomuse.identity.NanoMuseIdentity
 import io.github.nanomuse.sysfiles.SystemFiles
@@ -39,11 +40,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * How the feed gets written, Muse style: one built-in routine (a plain scheduled task the user
- * can switch off or re-time), which sends a one-line prompt into the feed's own conversation.
- * That conversation's system prompt carries the user's feed preferences and a digest of what the
- * agent knows (GLOBAL.md, the last seven days of diary, USER.md, goals); the model answers with
- * `nanomuse-feed` blocks, which the app turns into files under `feed/YYYY-MM-DD/` and into cards.
+ * The built-in Feed routine prepares one sourced draft using the configured model and no tools.
+ * A person can also discuss a post or explicitly request research in the Feed conversation,
+ * where a requested `nanomuse-feed` block is saved by [afterTurn].
  *
  * The conversation is the agent's workbench, not a chat of the person's: it is kept out of the
  * drawer, the chat list, the search and the main-chat fallback ([hidden]), the posts show in the
@@ -82,13 +81,35 @@ object FeedFlow {
 
     fun init(context: Context) {
         FeedStore.init(context)
+        PublicWatchJob.schedule(context)
+        io.github.nanomuse.goals.GoalFollowUps.start(context)
+        ChatCheckIns.schedule(context)
         _introAcknowledged.value = prefs(context).getBoolean(KEY_INTRO_ACK, false)
         publishSession(prefs(context).getString(KEY_SESSION, null))
         scope.launch { runCatching { ensureRoutine(context) }.onFailure { AppLogger.warning(TAG, "ensure failed: ${it.message}") } }
     }
 
+    fun leave(context: Context) {
+        FeedChatEvidence.accountChange(leaving = true)
+        PublicWatchStore.accountChange(leaving = true)
+        FeedPreparationRunner.accountChange(leaving = true)
+        io.github.nanomuse.goals.GoalFollowUps.leave(context)
+        ChatCheckIns.cancel(context)
+        lastWritten = emptyList()
+        lastDroppedByLimit = 0
+        context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+    }
+
     /** Another account's preferences and routine are in place (contract C12): read them again. */
     fun refresh(context: Context) {
+        FeedChatEvidence.accountChange(leaving = false)
+        PublicWatchStore.accountChange(leaving = false)
+        PublicWatchJob.schedule(context)
+        FeedPreparationRunner.accountChange(leaving = false)
+        io.github.nanomuse.goals.GoalFollowUps.start(context)
+        ChatCheckIns.schedule(context)
+        lastWritten = emptyList()
+        lastDroppedByLimit = 0
         _introAcknowledged.value = prefs(context).getBoolean(KEY_INTRO_ACK, false)
         publishSession(prefs(context).getString(KEY_SESSION, null))
         scope.launch { runCatching { ensureRoutine(context) }.onFailure { AppLogger.warning(TAG, "ensure failed: ${it.message}") } }
@@ -150,7 +171,7 @@ object FeedFlow {
     }
 
     /** Runs the routine right now (the "Write it now" button). */
-    fun generateNow(context: Context) = writeNow(context) {}
+    fun generateNow(context: Context) = writeNow(context, explicit = true) {}
 
     /**
      * The first feed day, written on its own right after the first conversation ends (the
@@ -159,11 +180,11 @@ object FeedFlow {
      */
     fun writeFirstDay(context: Context) {
         val p = prefs(context)
-        if (p.getBoolean(KEY_FIRST_DAY, false)) return
+        if (p.getBoolean(KEY_FIRST_DAY, false) || task(context)?.enabled == false) return
         writeNow(context) { p.edit().putBoolean(KEY_FIRST_DAY, true).apply() }
     }
 
-    private fun writeNow(context: Context, onDispatch: () -> Unit) {
+    private fun writeNow(context: Context, explicit: Boolean = false, onDispatch: () -> Unit) {
         if (_generating.value) return
         scope.launch {
             _generating.value = true
@@ -174,7 +195,13 @@ object FeedFlow {
                 }
                 onDispatch()
                 val app = context.applicationContext as MinisApp
-                ScheduledAgentRunner.run(app, task, waitForCompletion = true)
+                ScheduledAgentRunner.run(app, task, waitForCompletion = true, requireEnabledFeed = !explicit)
+                if (explicit && task(app)?.let { it.id == task.id && it.lastResultPreview == "[quiet]" } == true) {
+                    withContext(Dispatchers.Main) {
+                        if (ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+                            Toast.makeText(app, R.string.nm_feed_nothing_new, Toast.LENGTH_SHORT).show()
+                    }
+                }
             } finally {
                 _generating.value = false
             }
@@ -196,6 +223,7 @@ object FeedFlow {
      */
     fun afterTurn(context: Context, sessionId: String, assistantText: String?) {
         if (assistantText.isNullOrEmpty() || !assistantText.contains("```$BLOCK")) return
+        if (io.github.nanomuse.goals.GoalFlow.isProtectedSession(context, sessionId)) return
         val parsed = block.findAll(assistantText).mapNotNull { m -> parseDraft(m.groupValues[1]) }.toList()
         val today = FeedStore.posts.value.filter { it.day == SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
         val afterTitle = parsed.filter { d -> today.none { it.title.equals(d.title.trim().take(80), ignoreCase = true) } }
@@ -244,20 +272,28 @@ object FeedFlow {
      * completion notice over (true), so the generic "task done" with the model's raw reply never
      * shows. With the app on screen the Feed tab already shows the posts; in the background, and
      * only when the run wrote something, one notification names them and opens the Feed.
-     * When the run wrote nothing, this returns false, so the generic completion notice
-     * shows instead of silence.
+     * A deliberate quiet result is consumed. Failures still use the normal task notice.
      */
-    fun notifyIfFeed(context: Context, task: ScheduledTask): Boolean {
+    internal fun quietResult(success: Boolean, response: String?): Boolean = success && response?.trim() == "[quiet]"
+
+    fun notifyIfFeed(context: Context, task: ScheduledTask, success: Boolean = true, response: String? = null): Boolean {
         if (task.id != taskId(context)) return false
+        if (!success) return false
+        if (quietResult(success, response)) {
+            lastWritten = emptyList()
+            lastDroppedByLimit = 0
+            return true
+        }
+        val prepared = response == FeedPreparationRunner.WRITTEN
         val recentRun = System.currentTimeMillis() - lastWrittenAt < 30 * 60_000L
         val titles = lastWritten.takeIf { recentRun }.orEmpty()
         val droppedByLimit = lastDroppedByLimit.takeIf { recentRun } ?: 0
-        if (titles.isEmpty() && droppedByLimit == 0) return false
+        if (!prepared && titles.isEmpty() && droppedByLimit == 0) return false
         lastWritten = emptyList()
         lastDroppedByLimit = 0
         if (ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return true
         val titleText = titles.take(3).joinToString(" · ")
-        val body = if (droppedByLimit > 0) {
+        val body = if (prepared) context.getString(R.string.nm_deadline_notice) else if (droppedByLimit > 0) {
             val notice = context.getString(R.string.nm_feed_limit_notice, droppedByLimit)
             if (titleText.isEmpty()) notice else "$titleText · $notice"
         } else titleText
@@ -272,6 +308,7 @@ object FeedFlow {
             .setSmallIcon(R.drawable.ic_stat_nanomuse)
             .setLargeIcon(NanoMuseIdentity.face(context))
             .setContentTitle("${NanoMuseIdentity.name(context)}: ${context.getString(R.string.nm_feed_session_title)}")
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pending)
@@ -305,21 +342,26 @@ object FeedFlow {
     fun systemAddendum(context: Context, sessionId: String): String? {
         if (!isFeedSession(context, sessionId)) return null
         val digest = digest(context)
-        val recent = FeedStore.posts.value.take(24).map { it.title }
+        val goalStore = GoalStore.get(context)
+        val recent = FeedStore.posts.value.filter { !it.chatBased && it.visibleWith(SessionAccess.protected.value, goalStore.get(it.goalId)) }
+            .take(24).map { it.title }
         return buildString {
             appendLine("## This conversation writes the user's feed (nanoMuse)")
-            appendLine("The Feed tab shows short posts you write for the user, like Muse's feed. The user's standing instruction for it:")
+            appendLine("The Feed tab shows short posts for this user. Their standing instruction is:")
             appendLine("> " + FeedStore.preferences.value.replace("\n", "\n> "))
             appendLine()
             appendLine("What you know about them right now (from GLOBAL.md, the diary of the last seven days, USER.md and their goals):")
-            appendLine(digest.ifBlank { "(nothing recorded yet — write a gentle first day: what the feed is for, and three things you could start tracking or preparing if they tell you a little about themselves)" })
+            appendLine(digest.ifBlank { "(no personal evidence recorded)" })
             appendLine()
             appendLine(
-                "When a message asks you to write the feed: reply with one short line, then 3 to 6 posts, EACH as its own fenced code block tagged `$BLOCK` " +
+                "When a message asks you to write the feed: write at most three posts, EACH as its own fenced code block tagged `$BLOCK` " +
                     "containing JSON {\"emoji\": \"one emoji\", \"title\": \"<= 30 characters\", \"type\": \"brief|reminder|idea|goal|memory|note\", " +
                     "\"body\": \"2 to 6 sentences or a short bullet list, Markdown allowed\", \"source\": [\"where it came from, e.g. GLOBAL.md, diary 2026-09-24, goal: <title>\"]}. " +
+                    "Only post when you can identify a new development, a specific follow-up, or a changed fact in the sources. " +
+                    "When nothing warrants a post, return exactly [quiet] with no code block, even if the routine asks for a number of posts. " +
+                    "Dated goals already have their own deadline cards. Do not repeat their reminders. " +
                     "Write in the user's language; be concrete and useful (today's follow-ups, things they said they would do, goal progress, something they would enjoy); no clickbait, no filler, nothing you already posted. " +
-                    "Use tools only if a post needs a live fact (weather, a price, a date) — at most two quick lookups. Say nothing after the last block.",
+                    "Use at most two read-only lookups if a post needs a live fact. Never send anything or change user data for a feed post. Say nothing after the last block.",
             )
             appendLine("The feed has room for ${FeedStore.remainingCapacity()} more posts today.")
             if (recent.isNotEmpty()) appendLine("Recent titles (do not repeat): ${recent.joinToString(" · ")}")
@@ -346,7 +388,8 @@ object FeedFlow {
             if (f.exists()) add("Diary $name", runCatching { f.readText() }.getOrNull(), if (i == 0) 1500 else 600)
             cal.add(Calendar.DAY_OF_YEAR, -1)
         }
-        val goals = runCatching { GoalStore.get(context).all() }.getOrDefault(emptyList())
+        val protected = SessionAccess.protected.value
+        val goals = runCatching { GoalStore.get(context).all().filterNot { it.isProtectedBy(protected) } }.getOrDefault(emptyList())
         if (goals.isNotEmpty()) {
             sb.appendLine("### Goals")
             goals.forEach { g -> sb.appendLine("- ${g.title} — ${g.status.name.lowercase()}, ${g.progress}%" + (g.lastNote?.let { "; last: $it" } ?: "")) }

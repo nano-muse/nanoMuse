@@ -64,6 +64,9 @@ class AgentForegroundService : Service() {
 
         private const val EXTRA_SESSION_COUNT = "session_count"
         private const val EXTRA_TOOL_STATUS = "tool_status"
+        // nanoMuse: track the newest accepted launch until the service meets its foreground deadline.
+        private const val EXTRA_START_TICKET = "nm_start_ticket"
+        private val starts = io.github.nanomuse.chat.ForegroundServiceStarts()
 
         // [T-android-dynamic-island] Framework extras key read by
         // Notification.isRequestPromotedOngoing() (Android 16). Not exported as
@@ -80,10 +83,13 @@ class AgentForegroundService : Service() {
                 putExtra(EXTRA_SESSION_COUNT, sessionCount)
                 putExtra(EXTRA_TOOL_STATUS, toolStatus)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            starts.start { ticket -> // nanoMuse: a later stop must wait for this foreground launch.
+                intent.putExtra(EXTRA_START_TICKET, ticket)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             }
         }
 
@@ -92,7 +98,7 @@ class AgentForegroundService : Service() {
          */
         fun stopService(context: Context) {
             val intent = Intent(context, AgentForegroundService::class.java)
-            context.stopService(intent)
+            starts.stop { context.stopService(intent) } // nanoMuse: the chat may close before onStartCommand.
         }
     }
 
@@ -186,6 +192,7 @@ class AgentForegroundService : Service() {
         // with a stub notification, then unwind. The crash share dialog
         // owns the UX from here; running a background service in this
         // state would re-trip the lateinit access that brought us down.
+        val ticket = intent?.getLongExtra(EXTRA_START_TICKET, 0L) ?: 0L // nanoMuse
         if (com.openminis.app.crash.CrashFrequencyDetector.isSafeMode()) {
             try {
                 val stub = androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
@@ -211,7 +218,9 @@ class AgentForegroundService : Service() {
             } catch (t: Throwable) {
                 Log.w(TAG, "safe-mode stub startForeground failed: ${t.message}")
             }
-            stopSelf()
+            // nanoMuse: a newer accepted start still needs to post its own foreground notification.
+            starts.promoted(ticket) { }
+            starts.stop { stopSelfResult(startId) }
             return START_NOT_STICKY
         }
         if (intent?.action == ACTION_STOP) {
@@ -223,7 +232,7 @@ class AgentForegroundService : Service() {
             // the per-session cancel callbacks registered by each VM at
             // streamJob start.
             SessionActivityTracker.cancelAllActiveStreams()
-            stopSelf()
+            starts.stop { stopSelfResult(startId) } // nanoMuse: an overlapping status update may still be starting.
             return START_NOT_STICKY
         }
 
@@ -242,6 +251,8 @@ class AgentForegroundService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
+        // nanoMuse: leaving the last chat while starting defers its stop until promotion completes.
+        starts.promoted(ticket) { stopSelfResult(startId) }
         return START_STICKY
     }
 
@@ -278,7 +289,7 @@ class AgentForegroundService : Service() {
         SessionActivityTracker.clearPresence()
         if (SessionActivityTracker.activeSessions.value.isEmpty()) {
             Log.d(TAG, "onTaskRemoved with no active sessions, stopping self")
-            stopSelf()
+            starts.stop { stopSelf() } // nanoMuse: task removal can race with a queued cold start.
             return
         }
         Log.d(TAG, "onTaskRemoved with ${SessionActivityTracker.activeSessions.value.size} active session(s) — keeping service alive")

@@ -714,6 +714,10 @@ fun AppNavigation(
                 onSignIn = { navController.safeNavigate(io.github.nanomuse.ui.cloud.ROUTE_CLOUD_SIGN_IN) },
             )
         }
+        // nanoMuse: Settings → App and chat locks.
+        composable(io.github.nanomuse.ui.guard.ROUTE_LOCK_SETTINGS) {
+            io.github.nanomuse.ui.guard.LockSettingsScreen(onBack = { navController.safePopBackStack() })
+        }
         // nanoMuse: Settings → Network — the HTTP proxy for own providers and the ChatGPT plan.
         composable(io.github.nanomuse.ui.net.ROUTE_NETWORK) {
             io.github.nanomuse.ui.net.NetworkScreen(onBack = { navController.safePopBackStack() })
@@ -723,6 +727,7 @@ fun AppNavigation(
             io.github.nanomuse.ui.hands.HandsScreen(
                 onBack = { navController.safePopBackStack() },
                 onOpenProviders = { navController.safeNavigate(Routes.PROVIDER_LIST) },
+                onOpenShizuku = { navController.safeNavigate(Routes.SHIZUKU) }, // nanoMuse: background screen setup
                 onOpenHandsModel = { navController.safeNavigate(io.github.nanomuse.ui.models.modelPickRoute(io.github.nanomuse.models.ModelSlots.Slot.HANDS)) },
             )
         }
@@ -830,6 +835,7 @@ fun AppNavigation(
                 onCloudClick = { navController.safeNavigate(io.github.nanomuse.ui.cloud.ROUTE_CLOUD_ACCOUNT) }, // nanoMuse
                 onHandsClick = { navController.safeNavigate(io.github.nanomuse.ui.hands.ROUTE_HANDS) }, // nanoMuse
                 onDataControlsClick = { navController.safeNavigate(io.github.nanomuse.ui.cloud.ROUTE_DATA_CONTROLS) }, // nanoMuse
+                onLockSettingsClick = { navController.safeNavigate(io.github.nanomuse.ui.guard.ROUTE_LOCK_SETTINGS) }, // nanoMuse
                 onNetworkClick = { navController.safeNavigate(io.github.nanomuse.ui.net.ROUTE_NETWORK) }, // nanoMuse
                 onComputersClick = { navController.safeNavigate(io.github.nanomuse.ui.reach.ROUTE_COMPUTERS) }, // nanoMuse
                 onCodingClick = { navController.safeNavigate(io.github.nanomuse.ui.coding.ROUTE_CODING) }, // nanoMuse

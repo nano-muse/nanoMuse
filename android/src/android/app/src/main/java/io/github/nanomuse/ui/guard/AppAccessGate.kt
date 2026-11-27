@@ -9,8 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -94,39 +92,4 @@ fun AppAccessGate(content: @Composable () -> Unit) {
             }) { Text(stringResource(R.string.nm_access_unlock)) }
         }
     }
-}
-
-@Composable
-fun AppAccessSettings() {
-    var show by remember { mutableStateOf(false) }
-    var enabled by remember { mutableStateOf(AppAccess.enabled) }
-    var timeout by remember { mutableIntStateOf(AppAccess.timeout) }
-    val context = LocalContext.current
-    val authenticate = rememberAccessAuthenticator()
-    val title = stringResource(R.string.nm_access_settings)
-    TextButton(onClick = { show = true }) { Text(title) }
-    if (show) AlertDialog(onDismissRequest = { show = false }, title = { Text(title) }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
-            Text(stringResource(R.string.nm_access_hint))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = enabled, onCheckedChange = { enabled = it })
-                Text(title)
-            }
-            for (seconds in AppAccess.TIMEOUTS) Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = timeout == seconds, onClick = { timeout = seconds })
-                Text(when (seconds) {
-                    -1 -> stringResource(R.string.nm_access_on_exit)
-                    0 -> stringResource(R.string.nm_access_never)
-                    else -> stringResource(R.string.nm_access_seconds, seconds)
-                })
-            }
-            if (!AccessAuthentication.available(context)) Text(stringResource(R.string.nm_access_unavailable))
-        }
-    }, confirmButton = {
-        TextButton(enabled = AccessAuthentication.available(context), onClick = {
-            authenticate(title) { success -> if (AppAccess.configure(enabled, timeout, success)) show = false }
-        }) { Text(stringResource(android.R.string.ok)) }
-    }, dismissButton = {
-        TextButton(onClick = { show = false }) { Text(stringResource(android.R.string.cancel)) }
-    })
 }

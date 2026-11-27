@@ -27,13 +27,16 @@ def test_relay_refusals_are_named_by_code():
     assert describe_failure(exc)[0] == "allowance"
 
     # the streaming path: openai.APIError with the relay's body and no HTTP status
+    request = httpx.Request("POST", "https://relay.test/v1/responses")
     exc = openai.APIError(
-        "The relay's model provider refused its key", request=None, body={"code": "upstream_auth"}
-    )  # type: ignore[arg-type]
+        "The relay's model provider refused its key",
+        request=request,
+        body={"code": "upstream_auth"},
+    )
     code, text = describe_failure(exc)
     assert code == "relay" and "operator" in text
 
-    exc = openai.APIError("busy", request=None, body={"code": "upstream_503", "message": "x"})  # type: ignore[arg-type]
+    exc = openai.APIError("busy", request=request, body={"code": "upstream_503", "message": "x"})
     assert describe_failure(exc)[0] == "provider"
 
 

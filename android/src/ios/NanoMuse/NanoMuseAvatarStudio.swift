@@ -165,7 +165,7 @@ final class NanoMuseAvatarStudioModel: ObservableObject {
     /// Clips a new face costs from the allowance: one per animated mood when the video model is
     /// nanoMuse Cloud and animation is on; 0 when they would come from a key of your own, or not at all.
     var clipsPerFace: Int {
-        NanoMuseMediaModels.videoOnCloud && NanoMuseMediaModels.animateAvatar ? NanoMuseAvatarMotion.animated.count : 0
+        NanoMuseMediaModels.videoOnCloud && NanoMuseAvatarMotion.shared.enabled ? NanoMuseAvatarMotion.animated.count : 0
     }
 
     /// "A new face is 8 pictures" / "… and 4 short clips" — the cost sheet's first line (Android `nm_face_cost_what`).

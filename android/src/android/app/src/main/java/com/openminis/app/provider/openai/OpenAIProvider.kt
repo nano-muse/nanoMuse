@@ -22,7 +22,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.Job // nanoMuse: bind the socket to this request's producer.
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.collect
@@ -50,6 +52,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 import com.openminis.app.provider.failOnSilentEmptyCompletion
+import io.github.nanomuse.chat.failOnIncompleteCompletion // nanoMuse: a partial EOF must enter bounded retry.
 
 class OpenAIProvider private constructor(
     private val apiKey: String?,
@@ -637,7 +640,7 @@ class OpenAIProvider private constructor(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = rawStreamMessage(
         messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-    ).failOnSilentEmptyCompletion(name)
+    ).failOnSilentEmptyCompletion(name).failOnIncompleteCompletion() // nanoMuse: include partial stream drops.
 
     private fun rawStreamMessage(
         messages: List<LLMMessage>,
@@ -747,6 +750,13 @@ class OpenAIProvider private constructor(
         // (b) evict THIS ONE connection on timeout.
         val watchState = CallWatchState()
         val call = client.newCall(request.newBuilder().tag(CallWatchState::class.java, watchState).build())
+        // nanoMuse: a blocked execute()/readLine() cannot reach an awaitClose at the end of the
+        // stream. A child Job with no work completes as soon as its producer is cancelled.
+        val transport = Job(coroutineContext.job)
+        transport.invokeOnCompletion { cause -> if (cause != null) call.cancel() }
+        channel.invokeOnClose { cause ->
+            if (cause == null) transport.complete() else transport.cancel()
+        }
         // [T-android-stale-conn-retry-hang] Time-to-first-byte watchdog. A
         // request written into a dead pooled h2 tunnel (local proxy socket
         // survives a network flap) produces NO further events — no headers,
@@ -805,6 +815,7 @@ class OpenAIProvider private constructor(
         val response = try {
             call.execute()
         } catch (e: IOException) {
+            coroutineContext.ensureActive() // nanoMuse: a cancelled decision must not be retried as a network error.
             if (ttfbTimedOut.get()) {
                 throw LLMError.TransientError(
                     "no response from server (${STREAM_TTFB_TIMEOUT_MS / 1000}s TTFB) — check network/proxy",
@@ -888,10 +899,6 @@ class OpenAIProvider private constructor(
                 response.close()
             }
             channel.close()
-            awaitClose {
-                try { call.cancel() } catch (_: Exception) {}
-                try { response.close() } catch (_: Exception) {}
-            }
             return@callbackFlow
         }
 
@@ -1486,6 +1493,10 @@ class OpenAIProvider private constructor(
                 )
             }
         } catch (e: Exception) {
+            // nanoMuse: a real user cancellation stays cancellation; transport failures
+            // close the channel with an LLMError so retry/error UI can observe them.
+            if (e is CancellationException) throw e
+            coroutineContext.ensureActive() // nanoMuse: the blocked SSE read may have been released by cancellation.
             // T321: never silently swallow — log message + top-3 stack frames.
             val frames = e.stackTrace.take(3).joinToString(" | ") { "${it.className}.${it.methodName}:${it.lineNumber}" }
             com.openminis.app.logging.AppLogger.error(
@@ -1493,21 +1504,13 @@ class OpenAIProvider private constructor(
                 "[T321] stream parse exception: ${e.javaClass.simpleName}: ${e.message} @ $frames " +
                     "(events=$sseEventCount contentLen=$contentLen reasoningLen=$reasoningLen)"
             )
-            cancel("Stream error", mapError(e))
+            channel.close(mapError(e)) // nanoMuse: do not disguise network failure as cancellation.
         } finally {
-            reader.close()
-            response.close()
+            // nanoMuse: cleanup cannot replace the transport error with a raw close error.
+            runCatching { reader.close() }
+            runCatching { response.close() }
         }
         channel.close()
-        // T171: when the coroutine is cancelled (user tapped stop), the
-        // reader loop above is suspended inside the OkHttp source — only
-        // call.cancel() will tear the socket down promptly. response.close()
-        // is also explicit so connection-pool leaks are impossible if cancel
-        // races with the finally block.
-        awaitClose {
-            try { call.cancel() } catch (_: Exception) {}
-            try { response.close() } catch (_: Exception) {}
-        }
     }
 
     // MARK: - Raw Passthrough [T-android-model-use-passthrough-mode]

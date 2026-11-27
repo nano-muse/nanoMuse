@@ -2214,7 +2214,9 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
     // MARK: - Send Message
 
-    func send() {
+    func send() { send(fromFeedComposer: false) } // nanoMuse: programmatic messages never enter the personal Feed index
+
+    func send(fromFeedComposer: Bool) {
         // Read-only mode — cannot send messages
         guard remoteDeviceId == nil else { return }
 
@@ -2231,6 +2233,12 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         let pendingAttachments = attachments
+        // nanoMuse: only accept a send explicitly made from the local chat composer.
+        let feedTicket = fromFeedComposer && pendingAttachments.isEmpty && sessionSource == nil && NanoMuseFeedChatContext.textLength.contains(text.count)
+            ? NanoMuseFeedChatIndex.ticket(session: sessionId, memory: memoryEnabled) : nil
+        // nanoMuse: source discovery uses only direct composer text in the current local main chat.
+        let watchTicket = fromFeedComposer && pendingAttachments.isEmpty && sessionSource == nil && (2...6000).contains(text.count)
+            ? NanoMusePublicWatches.shared.captureTicket(session: sessionId, memory: memoryEnabled) : nil
         #if DEBUG
         logger.info("🔑DRAFT [vm=\(self.vmInstanceId)] send() text=\(text.count)ch attachments=\(pendingAttachments.count) isProcessing=\(self.isProcessing) sessionId=\(self.sessionId ?? "nil") draftId=\(self.draftId ?? "nil") inputText='\(String(self.inputText.prefix(30)))'")
         #else
@@ -2652,6 +2660,13 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             // compact can later resolve boundaries by id.
             if let persistedId = await self.persistAgentMessage(userMessage), userIdx < self.agentHistory.count {
                 self.agentHistory[userIdx].dbMessageId = persistedId
+                // nanoMuse: retain only an opaque pointer, recheck the original row when preparing a card.
+                if let feedTicket, let sid = self.sessionId, userMsg.nmRoutine == nil {
+                    NanoMuseFeedChatIndex.record(feedTicket, session: sid, message: persistedId)
+                }
+                if let watchTicket, let sid = self.sessionId, userMsg.nmRoutine == nil { // nanoMuse: observe only after the user's turn is safely stored.
+                    NanoMusePublicWatches.shared.observe(watchTicket, session: sid, id: persistedId, text: text, memory: self.memoryEnabled)
+                }
             }
             if let sid = self.sessionId { NanoMuseSync.shared.userMessageSent(session: sid) } // nanoMuse: C8 — the person's line goes up now, the reply when the turn ends
             if let wake = userMsg.nmRoutine, userIdx < self.agentHistory.count, let mid = self.agentHistory[userIdx].dbMessageId { NanoMuseRoutineWakes.shared.record(mid: mid, label: wake.label, at: wake.at) } // nanoMuse: a routine's row keeps its mark across reloads
@@ -6451,14 +6466,10 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// Returns `true` if a user-chosen level was written, so the caller can
     /// keep the group-default seeding (createInitialBinding) from clobbering it.
     ///
-    /// [T-first-msg-thinking-level-clobber] Note the `pending != .off` guard:
-    /// `.off` is indistinguishable from "unset" in SessionInferenceConfig, so a
-    /// user who explicitly picks Off before the first send still inherits the
-    /// group default. That pre-existing limitation is unchanged here — this fix
-    /// only stops a real (enabled) override from being overwritten.
+    // nanoMuse: nil means no choice; an explicit Off must also survive the group-default seed.
     @discardableResult
     func flushPendingThinkingLevel() -> Bool {
-        guard let pending = pendingThinkingLevel, pending != .off, let sid = sessionId else { return false }
+        guard let pending = pendingThinkingLevel, let sid = sessionId else { return false }
         var cfg = ProviderConfigStore.shared.inferenceConfig(for: sid) ?? SessionInferenceConfig()
         cfg.thinkingLevel = pending
         ProviderConfigStore.shared.setInferenceConfig(cfg, for: sid)

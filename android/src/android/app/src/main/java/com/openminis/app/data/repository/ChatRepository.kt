@@ -264,6 +264,17 @@ class ChatRepository(internal val dao: ChatDao) {
      * are prevented by the cap in [appendMessage].
      */
     suspend fun loadMessages(sessionId: String): List<MessageEntity> {
+        // nanoMuse: callers needing a full raw list share the same bounded reader.
+        val out = ArrayList<MessageEntity>()
+        visitMessagePages(sessionId) { out.addAll(it) }
+        return out
+    }
+
+    // nanoMuse: restore can convert each bounded page without retaining the entire raw transcript.
+    suspend fun visitMessagePages(
+        sessionId: String,
+        consume: suspend (List<MessageEntity>) -> Unit,
+    ) {
         // T-android-crash-safe-mode-v2: defensive guard. ChatViewModel.loadSession
         // is already gated upstream, but loadMessages has other call sites
         // (compaction, fork, regenerate-title, debug menu) that could fire
@@ -275,11 +286,10 @@ class ChatRepository(internal val dao: ChatDao) {
                 "ChatRepository",
                 "loadMessages: safe-mode active, skipping (sessionId=$sessionId)",
             )
-            return emptyList()
+            return
         }
         val total = dao.messageCountForSession(sessionId)
-        if (total == 0) return emptyList()
-        val out = ArrayList<MessageEntity>(total)
+        if (total == 0) return
         var offset = 0
         while (offset < total) {
             val limit = LOAD_PAGE_SIZE
@@ -300,10 +310,9 @@ class ChatRepository(internal val dao: ChatDao) {
                 }
             }
             if (page.isEmpty()) break
-            out.addAll(page)
+            consume(page)
             offset += limit
         }
-        return out
     }
 
     private suspend fun loadPageRowByRow(

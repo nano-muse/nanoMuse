@@ -28,6 +28,7 @@ from nanomuse.hub import actions
 from nanomuse.hub.client import HubClient, HubError
 from nanomuse.llm import MockLLM
 from nanomuse.schema import Function, LLMResponse, ToolCall
+from nanomuse.sentinel.grants import normalize_wire_grant_target, wire_grant_target
 from nanomuse.server import create_app
 from nanomuse.server.service import MuseService
 
@@ -51,6 +52,19 @@ def py_cmd(payload: str) -> str:
     contracts (outlive a stop, write both streams, exit with a code) unchanged under
     cmd.exe."""
     return f'"{sys.executable}" -c "{payload}"'
+
+
+def test_wire_grant_target_is_stable_and_uses_the_complete_action() -> None:
+    prefix = "x" * 80
+    one = wire_grant_target("shell", "echo", {"step": "shown", "command": prefix + " one"})
+    reordered = wire_grant_target("shell", "echo", {"command": prefix + " one", "step": "other"})
+    two = wire_grant_target("shell", "echo", {"command": prefix + " two"})
+
+    assert one == reordered
+    assert one["tool"] == "shell" and one["resource"] == "echo"
+    assert one["action"].startswith("sha256:") and one["action"] != two["action"]
+    assert normalize_wire_grant_target(one) == one
+    assert normalize_wire_grant_target({"tool": "shell", "resource": "echo"}) is None
 
 
 def wait_for(pred: Callable[[], Any], timeout: float = 8.0, interval: float = 0.03) -> Any:
@@ -119,7 +133,7 @@ def test_cloud_urls() -> None:
     assert (
         CloudClient.recommended_model([{"id": "x"}, {"id": "qwen3.8-27b"}], "gui") == "qwen3.8-27b"
     )
-    assert CloudClient.recommended_model([{"id": "x"}], "gui") == "Qwen/Qwen3.6-27B-FP8"
+    assert CloudClient.recommended_model([{"id": "x"}], "gui") == "qwen3.5-397b-a17b"
     labelled = [
         {"id": "deepseek-v4.1-flash", "for": ["chat"]},
         {"id": "qwen3.8-27b", "for": ["gui"]},
@@ -671,9 +685,14 @@ def hub_server(
     async def fake_models(self: CloudClient) -> list[dict[str, Any]]:
         return [{"id": "qwen3.8-27b"}, {"id": "other"}]
 
+    def fake_notify(text: str, title: str = "nanoMuse") -> dict[str, Any]:
+        assert text and title
+        return {"ok": True, "shown": True}
+
     monkeypatch.setattr(CloudClient, "request_code", fake_request_code)
     monkeypatch.setattr(CloudClient, "verify", fake_verify)
     monkeypatch.setattr(CloudClient, "models", fake_models)
+    monkeypatch.setattr("nanomuse.hub.actions.notify", fake_notify)
     service = MuseService(settings, llm=llm)
     app = create_app(settings, service)
     with TestClient(app) as client:
@@ -710,6 +729,7 @@ def test_sign_in_joins_hub_and_lists_devices(hub_server) -> None:
     hub = wait_for(lambda: (h := client.get("/api/hub").json())["state"] == "connected" and h)
     assert relay.hello["device"]["name"] == "Desk"
     assert relay.hello["device"]["kind"] == "computer"
+    assert relay.hello["device"]["id"] == service.hub.device_id
     assert (
         "task" in relay.hello["device"]["actions"] and "shell" in relay.hello["device"]["actions"]
     )
@@ -1046,6 +1066,7 @@ def test_task_approval_is_relayed_and_answered_by_the_device(hub_server) -> None
     assert body["device"] == "Desk" and "echo careful" in body["preview"] and body["approval_id"]
     # what an answer remembered on the phone covers: the Sentinel's own key, not the preview
     assert body["grant_key"] == "shell:echo"
+    assert body["grant_target"] == wire_grant_target("shell", "echo", {"command": "echo careful"})
     # the card is pending here too; the phone answers it over the hub
     pending = client.get("/api/state").json()["pending_approvals"]
     assert [p["id"] for p in pending] == [body["approval_id"]]

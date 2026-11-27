@@ -32,7 +32,7 @@
 
 **nanoMuse adalah agen pribadi sumber terbuka untuk setiap perangkat yang kamu miliki.** Satu agen dengan nama dan rupa sendiri, seperti [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) dari Meta: ia mengerjakan sesuatu alih-alih sekadar menjawab pertanyaan, terus bekerja saat aplikasinya ditutup, mengingatmu, dan berhenti untuk bertanya sebelum melakukan apa pun yang tidak bisa kamu batalkan.
 
-*nano* berarti satu paket lengkap yang cukup kecil untuk kamu jalankan dan pasang sendiri: aplikasi ponsel, aplikasi desktop, konsol web, dan relay yang menghubungkan semuanya ada di repositori ini, di bawah GPL-3.0-or-later. **[Gratis, sumber terbuka, nirlaba. Mari bangun bersama.](../../CONTRIBUTING.md)** Masuk dan kamu mendapat jatah gratis pemakaian model di relay komunitas (pengembang yang membayarnya); kalau habis, [pakai kunci sendiri](../own-key.md). Relay yang sama bisa berjalan di servermu, jadi tidak ada data yang harus keluar dari rumahmu. Versi terbaru: **1.0.9 Tiller**, [catatan rilis](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.9) · [coba di browser](https://demo.nanomuse.dev/).
+*nano* berarti satu paket lengkap yang cukup kecil untuk kamu jalankan dan pasang sendiri: aplikasi ponsel, aplikasi desktop, konsol web, dan relay yang menghubungkan semuanya ada di repositori ini, di bawah GPL-3.0-or-later. **[Gratis, sumber terbuka, nirlaba. Mari bangun bersama.](../../CONTRIBUTING.md)** Masuk dan kamu mendapat jatah gratis pemakaian model di relay komunitas (pengembang yang membayarnya); kalau habis, [pakai kunci sendiri](../own-key.md). Relay yang sama bisa berjalan di servermu, jadi tidak ada data yang harus keluar dari rumahmu. Versi terbaru: **1.0.10 Bridge**, [catatan rilis](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.10) · [coba di browser](https://demo.nanomuse.dev/).
 
 > [!NOTE]
 > **nanoMuse terus berkembang**
@@ -59,11 +59,11 @@ Semua versi: [releases](https://github.com/nano-muse/nanoMuse/releases).
 | | |
 |---|---|
 | **Browser** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): sebuah nanoMuse di ponsel simulasi, setelah masuk. Ini demo; aplikasi di bawah inilah yang sebenarnya |
-| **Android** 8.0+, arm64 | [nanoMuse-1.0.9-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-1.0.9-arm64.apk): setiap versi ditandatangani dengan kunci yang sama dan dipasang menimpa versi sebelumnya |
+| **Android** 8.0+, arm64 | [nanoMuse-1.0.10-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-1.0.10-arm64.apk): setiap versi ditandatangani dengan kunci yang sama dan dipasang menimpa versi sebelumnya |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): versi beta yang sudah lolos tinjauan beta Apple; pasang dari tautan ini · [iOS](../ios.md) |
-| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-x64.dmg). Belum dinotarisasi: klik kanan → *Open* saat pertama kali |
-| **Windows** 10+ | [nanoMuse-Desktop-1.0.9-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-win-x64.exe): klik *Run anyway* sekali |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.tar.gz) |
+| **macOS** 12+ | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-x64.dmg). Belum dinotarisasi: klik kanan → *Open* saat pertama kali |
+| **Windows** 10+ | [nanoMuse-Desktop-1.0.10-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-win-x64.exe): klik *Run anyway* sekali |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` untuk relay sendiri; `docker compose up -d app` untuk aplikasi web di servermu; lihat [self-hosting](../self-hosting.md) |
 
 Semua unduhan berasal dari [rilis terbaru](https://github.com/nano-muse/nanoMuse/releases/latest); berkas yang sama ada di [nanomuse.cn/dl](https://nanomuse.cn/dl/) kalau GitHub lambat di tempatmu. Buka aplikasinya, masuk dengan e-mail atau nomor ponsel Tiongkok daratan, dan agen langsung punya model untuk berpikir. Ponsel, desktop, dan web memakai satu akun dan menampilkan percakapan yang sama.
@@ -85,7 +85,7 @@ Semua unduhan berasal dari [rilis terbaru](https://github.com/nano-muse/nanoMuse
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Rupa sendiri.</b><br>Gambarkan rupa yang kamu mau, model gambarmu melukisnya, model video membuatnya bergerak. Seekor naga kecil sebagai bawaan.</td>
-    <td width="50%" valign="top"><b>Model apa saja.</b><br>Kuota relay, kunci milikmu sendiri di salah satu dari dua puluh enam penyedia (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek, dan lainnya), atau paket yang sudah kamu bayar: ChatGPT, Claude, Kimi. Kalau penyedia tidak punya model gambar atau video, dua fitur itu dimatikan, dan aplikasi memberi tahu.</td>
+    <td width="50%" valign="top"><b>Model apa saja.</b><br>Kuota relay, kunci milikmu sendiri di salah satu dari dua puluh delapan penyedia (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek, dan lainnya), atau paket yang sudah kamu bayar: ChatGPT, Claude, Kimi. Kalau penyedia tidak punya model gambar atau video, dua fitur itu dimatikan, dan aplikasi memberi tahu.</td>
   </tr>
 </table>
 
@@ -143,28 +143,32 @@ Semua orang yang perubahannya sudah masuk ke `main`, dari daftar kontributor Git
 <a href="https://github.com/Longfellow1"><img src="https://avatars.githubusercontent.com/u/53395614?v=4&s=48" width="48" height="48" alt="Longfellow1"></a>
 <a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
 <a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
-<a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
-<a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
-<a href="https://github.com/fenghaofenghao-ctrl"><img src="https://avatars.githubusercontent.com/u/306929974?v=4&s=48" width="48" height="48" alt="fenghaofenghao-ctrl"></a>
-<a href="https://github.com/Yicheng-1218"><img src="https://avatars.githubusercontent.com/u/72242651?v=4&s=48" width="48" height="48" alt="Yicheng-1218"></a>
-<a href="https://github.com/PovedaAqui"><img src="https://avatars.githubusercontent.com/u/9494679?v=4&s=48" width="48" height="48" alt="PovedaAqui"></a>
+<a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/Battleplus"><img src="https://avatars.githubusercontent.com/u/121445871?v=4&s=48" width="48" height="48" alt="Battleplus"></a>
-<a href="https://github.com/Ichiro786"><img src="https://avatars.githubusercontent.com/u/158778170?v=4&s=48" width="48" height="48" alt="Ichiro786"></a>
-<a href="https://github.com/yatping"><img src="https://avatars.githubusercontent.com/u/15101928?v=4&s=48" width="48" height="48" alt="yatping"></a>
-<a href="https://github.com/ZxlDragonDoctor"><img src="https://avatars.githubusercontent.com/u/152901610?v=4&s=48" width="48" height="48" alt="ZxlDragonDoctor"></a>
-<a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/PovedaAqui"><img src="https://avatars.githubusercontent.com/u/9494679?v=4&s=48" width="48" height="48" alt="PovedaAqui"></a>
+<a href="https://github.com/Yicheng-1218"><img src="https://avatars.githubusercontent.com/u/72242651?v=4&s=48" width="48" height="48" alt="Yicheng-1218"></a>
+<a href="https://github.com/fenghaofenghao-ctrl"><img src="https://avatars.githubusercontent.com/u/306929974?v=4&s=48" width="48" height="48" alt="fenghaofenghao-ctrl"></a>
+<a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
+<a href="https://github.com/weare-linkrra"><img src="https://avatars.githubusercontent.com/u/355012752?v=4&s=48" width="48" height="48" alt="weare-linkrra"></a>
 <a href="https://github.com/DennyHo0917"><img src="https://avatars.githubusercontent.com/u/149746199?v=4&s=48" width="48" height="48" alt="DennyHo0917"></a>
-<a href="https://github.com/maidivh"><img src="https://avatars.githubusercontent.com/u/22905321?v=4&s=48" width="48" height="48" alt="maidivh"></a>
-<a href="https://github.com/jtboy80826"><img src="https://avatars.githubusercontent.com/u/243465398?v=4&s=48" width="48" height="48" alt="jtboy80826"></a>
-<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
-<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
-<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
-<a href="https://github.com/jasontospas"><img src="https://avatars.githubusercontent.com/u/79001000?v=4&s=48" width="48" height="48" alt="jasontospas"></a>
-<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
-<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
-<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
+<a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/ZxlDragonDoctor"><img src="https://avatars.githubusercontent.com/u/152901610?v=4&s=48" width="48" height="48" alt="ZxlDragonDoctor"></a>
+<a href="https://github.com/yatping"><img src="https://avatars.githubusercontent.com/u/15101928?v=4&s=48" width="48" height="48" alt="yatping"></a>
+<a href="https://github.com/Ichiro786"><img src="https://avatars.githubusercontent.com/u/158778170?v=4&s=48" width="48" height="48" alt="Ichiro786"></a>
 <a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
+<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
+<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
+<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
+<a href="https://github.com/jperla"><img src="https://avatars.githubusercontent.com/u/3724?v=4&s=48" width="48" height="48" alt="jperla"></a>
+<a href="https://github.com/jasontospas"><img src="https://avatars.githubusercontent.com/u/79001000?v=4&s=48" width="48" height="48" alt="jasontospas"></a>
+<a href="https://github.com/al-global-tech"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="al-global-tech"></a>
+<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
+<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
+<a href="https://github.com/brajendrak00068"><img src="https://avatars.githubusercontent.com/u/56827534?v=4&s=48" width="48" height="48" alt="brajendrak00068"></a>
+<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/jtboy80826"><img src="https://avatars.githubusercontent.com/u/243465398?v=4&s=48" width="48" height="48" alt="jtboy80826"></a>
+<a href="https://github.com/maidivh"><img src="https://avatars.githubusercontent.com/u/22905321?v=4&s=48" width="48" height="48" alt="maidivh"></a>
 </p>
 <!-- contributors:end -->
 
@@ -191,6 +195,7 @@ nanoMuse berdiri di atas karya orang lain; [THIRD_PARTY_NOTICES.md](../../THIRD_
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): agen di perangkat yang menjadi dasar aplikasi ponsel, dengan [proot](https://github.com/nano-muse/proot) dan [Alpine Linux](https://alpinelinux.org/) untuk sandbox-nya.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): harness agen tempat aplikasi desktop menjadi plugin-nya.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): operator tangan di desktop adalah porting dari milik mereka, dan penanda di panggung mengikuti ScreenMarker mereka.
+- [Mika](https://github.com/wangzan101/Mika) karya wangzan101 mengilhami layar Android terpisah, pratinjau langsung, pengalihan kendali ke pengguna, dan pemutaran ulang langkah. Kode penyandingan untuk proses debug nirkabel diadaptasi dengan lisensi Apache-2.0.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): operator ponsel, jejak, dan gagasan produknya.
 
 ## Penafian

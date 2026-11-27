@@ -9,5 +9,5 @@ an audit log. ``nanomuse serve`` adds the app. Any OpenAI-compatible model.
 
 from __future__ import annotations
 
-__version__ = "1.0.9"
+__version__ = "1.0.10"
 __all__ = ["__version__"]

@@ -330,8 +330,9 @@ def test_feed_posts_written_for_the_user(server):
     knows, newest first; a post can be removed; a bad model answer leaves the feed as it was."""
     client, service, llm = server
     r = client.get("/api/feed/posts")
-    # the daily routine is there from the start, at 08:00 (contract C5)
+    # The daily routine and local chat follow-ups are available without configuration.
     assert r.json() == {
+        "chat_followups": True,
         "instructions": "",
         "generated_at": None,
         "posts": [],
@@ -2055,9 +2056,16 @@ def test_html_artifacts_are_served_sandboxed(server, settings: Settings):
     for name in ("page.html", "drawing.svg"):
         r = client.get(f"/api/files/{name}")
         assert r.status_code == 200
-        # an opaque origin (no token, no API), scripts and pop-ups allowed: a page the agent
-        # wrote may still load a chart library from a CDN or ask a public API for its data
-        assert r.headers["content-security-policy"] == "sandbox allow-scripts allow-popups"
+        csp = r.headers["content-security-policy"]
+        assert "sandbox;" in csp
+        assert "default-src 'none'" in csp
+        assert "script-src 'none'" in csp
+        assert "connect-src 'none'" in csp
+        assert "form-action 'none'" in csp
+        assert "frame-src 'none'" in csp
+        assert "allow-scripts" not in csp
+        assert "allow-popups" not in csp
+        assert r.headers["referrer-policy"] == "no-referrer"
     (settings.agent.workspace / "notes.md").write_text("# hi", "utf-8")
     assert "content-security-policy" not in client.get("/api/files/notes.md").headers
 
@@ -2670,6 +2678,7 @@ async def test_browser_tool_reports_frames_and_user_takeover(
     import threading
 
     from nanomuse.tools.browser import Browser, BrowserFrame
+    from nanomuse.tools.browser_backends import PlaywrightBackend
 
     html = (
         b"<title>Login</title><h1>Sign in</h1><input id=u placeholder=User>"
@@ -2691,7 +2700,16 @@ async def test_browser_tool_reports_frames_and_user_takeover(
     page = f"http://127.0.0.1:{httpd.server_port}/"
 
     frames: list[BrowserFrame] = []
-    tool = Browser(workspace=tmp_path, on_frame=frames.append)
+    backend = PlaywrightBackend(tmp_path / "browser-profile")
+
+    async def connect_fixture(
+        host: str, port: int
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+        assert host == "127.0.0.1" and port == httpd.server_port
+        return await asyncio.open_connection(host, port)
+
+    monkeypatch.setattr(backend._network_proxy, "_open_public", connect_fixture)
+    tool = Browser(workspace=tmp_path, on_frame=frames.append, backend_factory=lambda: backend)
     url_allowed = tool._url_allowed
 
     async def allow_fixture(url: str) -> bool:
@@ -3364,3 +3382,531 @@ def test_data_export_keeps_pending_scheduled_delivery_rows(server):
             ).fetchone() == ("pending", "delivery fixture")
         finally:
             check.close()
+
+
+def test_feed_followups_are_grounded_ranked_and_remember_choices(server):
+    client, service, llm = server
+    today = datetime.now().astimezone().date()
+
+    def add(title, days, steps):
+        return client.post(
+            "/api/goals",
+            json={
+                "title": title,
+                "due": (today + timedelta(days=days)).isoformat(),
+                "steps": steps,
+            },
+        ).json()["id"]
+
+    def cards():
+        return client.get("/api/upcoming").json()["followups"]
+
+    tomorrow = add("Book a room", 1, [])
+    add("Old plan", -8, [])
+    late = add("Reply to the invitation", -2, [])
+    goal = add("Finish draft", 0, ["Outline", "Proofread"])
+    (first,) = cards()
+    assert first["goal_id"] == goal and first["next_step"] == "Outline"
+    client.patch(f"/api/goals/{goal}", json={"step_index": 1, "step_status": "done"})
+    assert cards() == [{**first, "next_step": "Proofread"}]
+    target = f"/api/feed/followups/{first['id']}"
+    assert client.put(target + "?choice=tomorrow").json() == {"ok": True}
+    assert client.put(target + "?choice=tomorrow").status_code == 200
+    assert cards()[0]["goal_id"] == late
+    # Snooze survives a reload and expires on the next local calendar day.
+    next_day = datetime.now().astimezone() + timedelta(days=1)
+    assert service.feed_posts()["followups_hidden"][first["id"]] == next_day.date().isoformat()
+    late_key = cards()[0]["id"]
+    assert client.put(f"/api/feed/followups/{late_key}?choice=dismiss").status_code == 200
+    assert cards()[0]["goal_id"] == tomorrow
+    assert service.followups(next_day)[0]["goal_id"] == tomorrow  # now due today
+    client.patch(f"/api/goals/{tomorrow}", json={"status": "done"})
+    assert service.followups(next_day)[0]["goal_id"] == goal
+    client.patch(f"/api/goals/{late}", json={"due": today.isoformat()})
+    assert cards()[0]["id"] != late_key and cards()[0]["goal_id"] == late
+    client.put("/api/feed/instructions", json={"followups": False})
+    assert cards() == []
+    client.put("/api/feed/instructions", json={"followups": True})
+    assert cards()[0]["goal_id"] == late
+    client.put("/api/settings", json={"profile": {"proactivity": "off"}})
+    assert cards() == []
+    assert llm.calls == []
+
+
+def test_feed_push_uses_local_time_persisted_budget_and_no_private_titles(server, monkeypatch):
+    _, service, _ = server
+    now = datetime.now().astimezone().replace(hour=10, minute=0)
+    due = now.date().isoformat()
+    g = service.app.goals.create("Private appointment", due=due)
+    sent = []
+    monkeypatch.setattr(type(service.push), "enabled", property(lambda _: True))
+    monkeypatch.setattr(service.push, "subscriptions", [{"endpoint": "test-device"}])
+    monkeypatch.setattr(service.push, "notify", lambda *args, **kwargs: sent.append((args, kwargs)))
+    service._notify_due_followup(now)
+    assert sent == []  # explicit opt-in
+    service.set_feed_instructions(followup_push=True)
+    service._notify_due_followup(now.replace(hour=21))
+    service.profile.quiet_hours = "09:00-11:00"
+    service._notify_due_followup(now)
+    service.profile.quiet_hours = ""
+    service.app.goals.update(g.id, check_in="daily 12:00")
+    service._notify_due_followup(now)
+    assert sent == []  # no duplicate alert for an explicit routine
+    service.app.goals.update(g.id, check_in="")
+    service._notify_due_followup(now)
+    service._notify_due_followup(now)
+    service._notify_feed(service.feed_posts(), now)  # scheduled posts share the Feed alert
+    service._notify_due_followup(now + timedelta(days=1))
+    assert len(sent) == 1 and "Private appointment" not in str(sent)
+    assert service.feed_posts()["feed_notified_on"] == due
+    service.app.goals.update(g.id, due=(now.date() + timedelta(days=1)).isoformat())
+    service._notify_due_followup(now + timedelta(days=1))
+    assert len(sent) == 2
+
+
+def test_automatic_feed_can_stay_silent_and_deduplicates_repeated_titles(server):
+    client, service, llm = server
+    llm.script.append(LLMResponse(content="[]"))
+    assert client.post("/api/feed/posts/refresh").json()["posts"] == []
+    assert service.feed_posts()["generated_at"] and not service.first_feed_day()
+    # A repeated recommendation within a batch or in a subsequent batch is shown once.
+    reply = (
+        '[{"title":"Proofread today","body":"Review the draft."},'
+        '{"title":"PROOFREAD TODAY","body":"Same observation."}]'
+    )
+    for _ in range(2):
+        llm.script.append(LLMResponse(content=reply))
+        posts = client.post("/api/feed/posts/refresh").json()["posts"]
+        assert [p["title"] for p in posts] == ["Proofread today"]
+
+
+def test_feed_hide_still_applies_if_another_goal_takes_priority(server):
+    client, service, _ = server
+    today = datetime.now().astimezone().date()
+    original = service.app.goals.create("Book table", due=(today + timedelta(days=1)).isoformat())
+    key = service.followups()[0]["id"]
+    first = service.app.goals.create("Confirm booking", due=today.isoformat())
+    assert service.followups()[0]["goal_id"] == first.id
+    assert client.put(f"/api/feed/followups/{key}?choice=dismiss").status_code == 200
+    service.app.goals.set_status(first.id, "done")
+    assert service.followups() == []
+    assert service.app.goals.get(original.id).status == "active"
+
+
+def test_scheduled_feed_rechecks_preferences_and_retries_malformed_replies(server, monkeypatch):
+    _, service, llm = server
+    real_ask = service.app.llm.ask_complete
+    service.set_feed_instructions(daily=True)
+    service.app.goals.create("Prepare the review")
+    service.settings.agent.user_profile = "My reviews start with the decision."
+    llm.script.append(LLMResponse(content="service temporarily unavailable"))
+    with pytest.raises(ValueError, match="post list"):
+        asyncio.run(service.write_feed_posts(scheduled=True))
+    assert service.feed_posts()["generated_at"] is None
+
+    async def change_settings(*args, **kwargs):
+        service.set_feed_instructions(daily=False)
+        return await real_ask(*args, **kwargs)
+
+    monkeypatch.setattr(service.app.llm, "ask_complete", change_settings)
+    llm.script.append(
+        LLMResponse(content='[{"title":"Unexpected", "body":"Disabled while generating"}]')
+    )
+    result = asyncio.run(service.write_feed_posts(scheduled=True))
+    assert not result["daily"] and not result["posts"] and result["generated_at"] is None
+
+
+def test_feed_shows_specific_obstacles_and_pending_decisions_without_a_deadline(server):
+    client, service, llm = server
+    goal = service.app.goals.create("Prepare slides", steps=["Check figures"])
+    client.patch(
+        f"/api/goals/{goal.id}",
+        json={"step_index": 1, "step_status": "blocked", "step_note": "Waiting for totals"},
+    )
+    (blocked,) = service.followups()
+    assert (blocked["reason"], blocked["detail"], blocked["note"]) == (
+        "blocked",
+        "Check figures",
+        "Waiting for totals",
+    )
+    service.app.goals.propose(goal.id, "Use the available figures", ["Label preliminary totals"])
+    (proposal,) = service.followups()
+    assert proposal["reason"] == "proposal" and proposal["detail"] == "Use the available figures"
+    client.put(f"/api/feed/followups/{proposal['id']}?choice=dismiss")
+    assert service.app.goals.get(
+        goal.id
+    ).proposal  # dismissing the card does not decide the proposal
+    assert service.followups() == [blocked]
+    client.patch(f"/api/goals/{goal.id}", json={"step_index": 1, "step_status": "pending"})
+    assert service.followups() == []
+    assert llm.calls == []
+
+
+def test_duplicate_generated_during_deletion_cannot_resurrect_the_post(server, monkeypatch):
+    client, service, llm = server
+    reply = LLMResponse(content='[{"title":"Pack the slides","body":"There is a talk tomorrow."}]')
+    llm.script.append(reply)
+    post = client.post("/api/feed/posts/refresh").json()["posts"][0]
+
+    async def regenerate(*args, **kwargs):
+        assert service.delete_feed_post(post["id"])
+        return reply
+
+    monkeypatch.setattr(service.app.llm, "ask_complete", regenerate)
+    assert asyncio.run(service.write_feed_posts())["posts"] == []
+
+
+def _review_post(title="An agenda you can use"):
+    return {
+        "title": title,
+        "form": "brief",
+        "anchor": "S1",
+        "why_now": "The Atlas review is coming up.",
+        "body": "Opening question: which Atlas decision needs an owner?",
+        "area": "planning",
+        "sources": [
+            {"id": "S1", "quote": "Atlas review"},
+            {"id": "S2", "quote": "start with the decision"},
+        ],
+    }
+
+
+def test_preparations_cite_real_records_remember_feedback_and_allow_a_changed_goal(server):
+    client, service, llm = server
+    service.settings.agent.user_profile = "For reviews, start with the decision and its owner."
+    goal = service.app.goals.create("Atlas review", steps=["Draft agenda"])
+
+    def ask(post):
+        llm.script.append(LLMResponse(content=json.dumps([post])))
+        return client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+
+    (first,) = ask(_review_post())
+    assert first["sources"] == [
+        {"kind": "goal", "quote": "Atlas review"},
+        {"kind": "profile", "quote": "start with the decision"},
+    ]
+    assert llm.calls[-1]["tools"] is None or llm.calls[-1]["tools"] == []
+    assert ask(_review_post("A different headline")) == [first]
+    assert client.put(f"/api/feed/posts/{first['id']}/handled").status_code == 200
+    assert client.get("/api/feed/posts").json()["posts"] == []
+    assert service.app.goals.get(goal.id).status == "active"
+    # Following up on a changed plan is legitimate, as is retaining the unsnoozed preference.
+    service.app.goals.update(goal.id, description="New decision requested: timeline")
+    assert len(ask(_review_post())) == 1
+
+
+def test_automatic_preparation_no_evidence_skips_model_and_corrections_cancel_inflight(
+    server, monkeypatch
+):
+    _, service, llm = server
+    assert asyncio.run(service.write_feed_posts(scheduled=True))["posts"] == []
+    assert not llm.calls
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    goal = service.app.goals.create("Atlas review")
+
+    async def cancelled(*args, **kwargs):
+        service.app.goals.set_status(goal.id, "done")
+        return LLMResponse(content=json.dumps([_review_post()]))
+
+    monkeypatch.setattr(service.app.llm, "ask_complete", cancelled)
+    assert asyncio.run(service.write_feed_posts(scheduled=True))["posts"] == []
+
+
+def test_optional_change_review_spends_once_only_on_changed_plans_and_respects_quiet(server):
+    client, service, llm = server
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    goal = service.app.goals.create("Atlas review")
+    llm.script.append(LLMResponse(content="[]"))
+    asyncio.run(service.write_feed_posts(scheduled=True))
+    assert len(llm.calls) == 1
+    assert client.put("/api/feed/instructions", json={"on_change": True}).json()["on_change"]
+    data = service.feed_posts()
+    daily = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+    data["generated_at"] = daily
+    service._save_feed(data)
+
+    def revisit():
+        return asyncio.run(service.write_feed_posts(scheduled=True, changed=True))
+
+    revisit()
+    assert len(llm.calls) == 1
+    service.app.goals.update(goal.id, description="Partner requested a decision on Friday")
+    service.profile.proactivity = "off"
+    revisit()
+    assert len(llm.calls) == 1
+    service.profile.proactivity = "default"
+    llm.script.append(LLMResponse(content=json.dumps([_review_post()])))
+    result = revisit()
+    assert len(result["posts"]) == 1 and result["generated_at"] == daily
+    service.app.goals.update(goal.id, description="The meeting moved again")
+    revisit()
+    assert len(llm.calls) == 2
+
+
+def test_completed_goal_expires_preparation_in_public_feed_but_preserves_legacy_reading(server):
+    client, service, llm = server
+    goal = service.app.goals.create("Atlas review")
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    llm.script.append(LLMResponse(content=json.dumps([_review_post()])))
+    view = client.post("/api/feed/posts/refresh?prepare_only=true").json()
+    assert view["posts"][0]["sources"] and "preparation_history" not in view
+    legacy = {
+        "id": "old",
+        "title": "Reading",
+        "body": "Old post",
+        "ts": "",
+        "area": "fun",
+        "prompt": "",
+    }
+    raw = service.feed_posts()
+    raw["posts"].append(legacy)
+    service._save_feed(raw)
+    service.app.goals.set_status(goal.id, "done")
+    assert client.get("/api/feed/posts").json()["posts"] == [legacy]
+    assert client.put("/api/feed/instructions", json={"daily": False}).json()["posts"] == [legacy]
+
+
+def test_recent_request_finds_related_older_memory_without_a_formal_goal(server):
+    client, service, llm = server
+    memory = service.app.memory
+    memory.add("At Atlas reviews, ask for the rollback owner.", category="preference")
+    for i in range(9):
+        memory.add(f"Trail {i} has a blue marker at the entrance.")
+    service.threads["main"].timeline.add({"type": "user", "text": "Tomorrow is the Atlas review."})
+    data = service._preparation_sources(service.feed_posts())
+    anchor_id = next(k for k, s in data.items() if s.kind == "conversation")
+    source_id = next(k for k, s in data.items() if "rollback owner" in s.text)
+    post = {
+        **_review_post(),
+        "anchor": anchor_id,
+        "sources": [
+            {"id": anchor_id, "quote": "Atlas review"},
+            {"id": source_id, "quote": "rollback owner"},
+        ],
+    }
+    llm.script.append(LLMResponse(content=json.dumps([post])))
+    (ready,) = client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    assert [ref["kind"] for ref in ready["sources"]] == ["conversation", "memory"]
+    assert not {"source_revisions", "anchor_revision", "basis"}.intersection(ready)
+
+
+def test_later_cancellation_withdraws_live_card_but_an_unrelated_cancellation_does_not(server):
+    client, service, llm = server
+    goal = service.app.goals.create("Atlas review")
+    service.settings.agent.user_profile = "For reviews, start with the decision."
+    llm.script.append(LLMResponse(content=json.dumps([_review_post()])))
+    (post,) = client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    timeline = service.threads["main"].timeline
+    timeline.add({"type": "user", "text": "The kitchen delivery was cancelled."})
+    assert client.get("/api/feed/posts").json()["posts"] == [post]
+    timeline.add({"type": "user", "text": "The Atlas review has been cancelled."})
+    assert client.get("/api/feed/posts").json()["posts"] == []
+    assert service.app.goals.get(goal.id).status == "active"
+
+
+def test_explicit_inquiry_needs_no_goal_and_never_sends_the_result(server):
+    client, service, llm = server
+    service.settings.agent.user_profile = "The museum group needs a step-free entrance."
+    service.threads["main"].timeline.add(
+        {"type": "user", "text": "Draft the inquiry for tomorrow's museum visit."}
+    )
+    draft = "Could you tell our group which museum entrance has step-free access?"
+    llm.script.append(LLMResponse(content=json.dumps({"draft": draft})))
+    (card,) = client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    assert card["body"] == draft and card["form"] == "draft"
+    assert len(card["sources"]) == 2 and not llm.calls[0]["tools"]
+    assert not any(e.get("text") == draft for e in service.threads["main"].timeline.events)
+
+
+def test_waiting_card_works_without_model_and_follows_the_changed_date(server):
+    client, service, llm = server
+    now = datetime.now().astimezone()
+    history = service.threads["main"].timeline
+    history.add({"type": "user", "text": "我在等供应商今天发来星桥报价。"})
+    first = client.get("/api/upcoming").json()["waiting_followup"]
+    assert first["subject"] == "星桥报价" and first["due"] == now.date().isoformat()
+    assert not client.get("/api/upcoming").json()["followups"]  # older clients
+    assert not client.post("/api/feed/posts/refresh?prepare_only=true").json()["posts"]
+    client.put(f"/api/feed/followups/{first['id']}?choice=dismiss")
+    assert client.get("/api/upcoming").json()["waiting_followup"] is None
+    history.add({"type": "user", "text": "改到明天。"})
+    assert client.get("/api/upcoming").json()["waiting_followup"] is None
+    second = service.waiting_followup(now + timedelta(days=1))
+    assert second and second["id"] != first["id"] and second["correction"] == "改到明天。"
+    client.put("/api/feed/instructions", json={"followups": False})
+    assert service.waiting_followup(now + timedelta(days=1)) is None
+    client.put("/api/feed/instructions", json={"followups": True})
+    history.add({"type": "user", "text": "星桥报价收到了。"})
+    assert service.waiting_followup(now + timedelta(days=1)) is None and not llm.calls
+
+
+def test_last_day_wait_can_be_snoozed_until_tomorrow(server):
+    client, service, _ = server
+    now = datetime.now().astimezone()
+    service.threads["main"].timeline.add(
+        {
+            "type": "user",
+            "ts": (now - timedelta(days=3)).isoformat(),
+            "text": "I'm waiting for the Atlas quote by today.",
+        }
+    )
+    card = client.get("/api/upcoming").json()["waiting_followup"]
+    assert card and service.waiting_followup(now + timedelta(days=1)) is None
+    client.put(f"/api/feed/followups/{card['id']}?choice=tomorrow").raise_for_status()
+    assert service.waiting_followup(now) is None
+    assert service.waiting_followup(now + timedelta(days=1)) == card
+    assert service.waiting_followup(now + timedelta(days=2)) is None
+
+
+def test_due_reply_starts_a_real_chat_and_a_short_answer_settles_only_that_wait(
+    server, monkeypatch
+):
+    client, service, llm = server
+    main = service.threads["main"]
+    now = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=14, minute=0)
+    earlier = (now - timedelta(hours=1)).isoformat()
+    for item in ("星桥", "海湾"):
+        main.timeline.add(
+            {"type": "user", "text": f"我在等供应商今天发来{item}报价。", "ts": earlier}
+        )
+    service.settings.agent.language = "zh"
+    monkeypatch.setattr(type(service.push), "enabled", property(lambda _: True))
+    service.push.subscriptions = [{"endpoint": "test-device"}]
+    pushes = []
+    monkeypatch.setattr(
+        service.push, "notify", lambda *args, **kwargs: pushes.append((args, kwargs))
+    )
+    assert client.get("/api/feed/posts").json()["chat_followups"] is True
+    assert "chat_outreach" not in service.feed_posts()
+    assert client.put("/api/feed/instructions", json={"followup_push": True}).json()[
+        "chat_followups"
+    ]
+    main.busy = True
+    service._send_chat_followup(now)
+    main.busy = False
+    service.profile.quiet_hours = "13:00-16:00"
+    service._send_chat_followup(now)
+    service.profile.quiet_hours = ""
+    service._send_chat_followup(now.replace(hour=22))
+    service._send_chat_followup(now - timedelta(minutes=55))
+    assert len(main.timeline.events) == 2
+    service._send_chat_followup(now)
+    msg = main.timeline.events[-1]
+    assert msg["type"] == "assistant" and msg["final"] and msg["source"] == "chat_followup"
+    assert "星桥报价" in msg["text"] and "收到了吗" in msg["text"] and not llm.calls
+    assert len(pushes) == 1 and "星桥" not in str(pushes) and pushes[0][1]["url"] == "/?thread=main"
+    service._send_chat_followup(now + timedelta(days=1))  # still unanswered
+    assert main.timeline.events[-1] == msg
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 3
+    # Restore the model context from the durable timeline if the process stopped between writes.
+    main.agent.messages.clear()
+    llm.script.append(LLMResponse(content="记下了。"))
+    client.post("/api/threads/main/send", json={"text": "收到了"}).raise_for_status()
+    wait_idle(service, "main")
+    assert any(
+        m.role.value == "assistant" and m.content == msg["text"] for m in llm.calls[-1]["messages"]
+    )
+    # The real reply can arrive before or after the clock used to exercise the scheduler.
+    main.timeline.update(
+        next(e["id"] for e in reversed(main.timeline.events) if e["type"] == "user"),
+        ts=now.isoformat(),
+    )
+    later = now + timedelta(hours=1)
+    assert service.waiting_followup(later)["subject"] == "海湾报价"
+    service._send_chat_followup(later)
+    assert sum(e.get("source") == "chat_followup" for e in main.timeline.events) == 1
+    persisted = Timeline("main", main.timeline.path)
+    assert persisted.get(msg["id"])["text"] == msg["text"]
+
+
+def test_chat_followup_skips_another_account_and_dismissed_or_settled_wait(server):
+    client, service, _ = server
+    main = service.threads["main"]
+    now = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=15)
+    svc_time = (now - timedelta(hours=1)).isoformat()
+    main.timeline.add(
+        {"type": "user", "text": "I'm waiting for the Atlas quote by today.", "ts": svc_time}
+    )
+    service.set_feed_instructions(chat_followups=False)
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 1
+    assert client.get("/api/feed/posts").json()["chat_followups"] is False
+    service.set_feed_instructions(chat_followups=True)
+    service.sync.state["owners"]["main"] = "other"
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 1
+    service.sync.state["owners"].pop("main")
+    key = service.waiting_followup(now)["id"]
+    prefs = service.feed_posts()
+    prefs["followups_hidden"] = {key: (now + timedelta(days=4)).date().isoformat()}
+    service._save_feed(prefs)
+    service._send_chat_followup(now)
+    assert len(main.timeline.events) == 1
+    main.timeline.add({"type": "user", "text": "I received the Atlas quote.", "ts": svc_time})
+    assert service.waiting_followup(now) is None
+    assert "chat_outreach" not in client.get("/api/feed/posts").json()
+
+
+def test_new_connection_defaults_respect_declines_and_stale_settings(server, tmp_path):
+    client, _, _ = server
+
+    def view():
+        return client.get("/api/feed/context").json()
+
+    def choice(kind):
+        v = view()
+        return {"revision": v["revision"], "enabled": v["on_connect"][kind]}
+
+    assert choice("mail")["enabled"] and choice("calendar")["enabled"]
+    email = {
+        "enabled": True,
+        "address": "fixture",
+        "imap_host": "fixture",
+        "smtp_host": "fixture",
+        "password": "fixture",
+    }
+    client.put(
+        "/api/connections/email", json={**email, "review": choice("mail")}
+    ).raise_for_status()
+    assert view()["mail"]
+    old = choice("mail")
+    client.put(
+        "/api/feed/context",
+        json={
+            "revision": old["revision"],
+            "mail": False,
+            "calendar": False,
+            "resources": [],
+            "local_context": False,
+        },
+    ).raise_for_status()
+    assert client.put("/api/connections/email", json={**email, "review": old}).status_code == 409
+    assert not choice("mail")["enabled"] and not view()["mail"]
+    client.delete("/api/connections/email").raise_for_status()
+    assert not choice("mail")["enabled"]
+    client.put(
+        "/api/connections/email", json={**email, "review": choice("mail")}
+    ).raise_for_status()
+    assert not view()["mail"]
+    link = tmp_path / "busy.ics"
+    link.write_text("BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n")
+    body = {"name": "Desk", "url": str(link)}
+    client.post(
+        "/api/connections/calendar/feeds", json={**body, "review": choice("calendar")}
+    ).raise_for_status()
+    assert view()["calendar"] and not view()["mail"]
+    # An old client adding a link without a review choice cannot extend an old grant.
+    client.post(
+        "/api/connections/calendar/feeds", json={**body, "name": "Archive"}
+    ).raise_for_status()
+    assert not view()["calendar"] and not choice("calendar")["enabled"]
+
+
+def test_existing_unreviewed_connector_keeps_preference_on_upgrade(server):
+    client, _, _ = server
+    client.put(
+        "/api/connections/email", json={"enabled": True, "imap_host": "fixture"}
+    ).raise_for_status()
+    view = client.get("/api/feed/context").json()
+    assert view["available_mail"] and not view["mail"] and not view["on_connect"]["mail"]

@@ -23,7 +23,10 @@ import { createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type { SessionCreateRequest } from '@deepseek-ai/dsh-api-session-controller/types'
+import { grantKey, grantTarget, mainArgument } from './approval-grants.ts'
 import { HubError, type Caller, type IncomingCall } from './hub.ts'
+
+export { grantKey, grantTarget } from './approval-grants.ts'
 
 /** The runtime's TASK_TIMEOUT_S: a task may run this long before the hub gives up on it. */
 export const TASK_TIMEOUT_MS = 15 * 60_000
@@ -108,31 +111,6 @@ export function textOf(content: readonly ContentBlock[] | undefined): string {
 export function preview(name: string, args: string): string {
   const shown = mainArgument(args)
   return shown ? `${name}: ${shown.length > 160 ? `${shown.slice(0, 159)}…` : shown}` : name
-}
-
-/**
- * What a remembered answer on the asking device covers: the tool and its whole main
- * argument, never the cut preview, whose first words two different commands can share.
- */
-export function grantKey(name: string, args: string): string {
-  const shown = mainArgument(args)
-  return shown ? `${name}: ${shown}` : name
-}
-
-function mainArgument(args: string): string {
-  let shown = args.trim()
-  try {
-    const parsed: unknown = JSON.parse(args)
-    if (parsed && typeof parsed === 'object') {
-      const o = parsed as Record<string, unknown>
-      const main = o.command ?? o.cmd ?? o.path ?? o.file_path ?? o.url ?? o.query ?? o.pattern ?? o.task ?? o.prompt
-      const first = Object.values(o).find((v) => typeof v === 'string')
-      shown = typeof main === 'string' ? main : typeof first === 'string' ? first : Object.keys(o).length ? JSON.stringify(o) : ''
-    }
-  } catch {
-    // not JSON (a model mid-call) — show it raw
-  }
-  return shown.replace(/\s+/g, ' ').trim()
 }
 
 export class TaskRunner {
@@ -378,7 +356,12 @@ export class TaskRunner {
       stage: 'approval',
       approval_id: id,
       preview: tool ? preview(tool.name, tool.args) : req.toolName,
-      grant_key: tool ? grantKey(tool.name, tool.args) : req.toolName,
+      ...(tool
+        ? {
+            grant_key: grantKey(tool.name, tool.args),
+            grant_target: grantTarget(tool.name, tool.args),
+          }
+        : {}),
       risk: 'moderate',
       reason: req.displayReason?.en ?? req.reason ?? '',
       device: this.options.deviceName(),

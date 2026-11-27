@@ -337,6 +337,47 @@ test("a failed Host restart restores admission", async () => {
   assert.deepEqual(work.calls, ["gate closed", "busy", "gate open"]);
 });
 
+test("a confirmed Host restart is cancelled and reopens admission when stopping fails", async () => {
+  const work = fakeWork({ answers: [[REPLY]] });
+  work.stopAll = async () => {
+    work.calls.push("stop");
+    throw new Error("stop failed");
+  };
+  let restarted = false;
+  const guard = exitWork({ work, dialog: fakeDialog(true), lines: [] });
+  assert.equal(await guard.requestRestart("restart-host", async () => { restarted = true; }), false);
+  assert.equal(restarted, false);
+  assert.deepEqual(work.calls, ["gate closed", "busy", "stop", "gate open"]);
+});
+
+test("a confirmed Host restart is cancelled and reopens admission when work remains", async () => {
+  const work = fakeWork({ always: () => [REPLY] });
+  let restarted = false;
+  const guard = exitWork({ work, dialog: fakeDialog(true), lines: [] });
+  assert.equal(await guard.requestRestart("restart-host", async () => { restarted = true; }), false);
+  assert.equal(restarted, false);
+  assert.equal(work.stops, 3);
+  assert.equal(work.calls.at(-1), "gate open");
+});
+
+test("a confirmed Host restart is cancelled and reopens admission after a stop deadline", async () => {
+  const c = clock();
+  const gates = [];
+  const work = {
+    busy: async () => [REPLY],
+    setGate: async (open) => { gates.push(open); },
+    stopAll: () => new Promise(() => undefined),
+  };
+  let restarted = false;
+  const guard = exitWork({ work, dialog: fakeDialog(true), c, lines: [], stopTimeoutMs: 15_000 });
+  const pending = guard.requestRestart("restart-host", async () => { restarted = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  c.advance(15_000);
+  assert.equal(await pending, false);
+  assert.equal(restarted, false);
+  assert.deepEqual(gates, [false, true]);
+});
+
 test("a Host that answers nothing is restarted all the same: that is what the restart is for", async () => {
   const work = {
     busy: async () => { throw new Error("ECONNREFUSED"); },

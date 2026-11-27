@@ -161,16 +161,17 @@ interface RowProps {
   main: boolean
   pinned: boolean
   selected: boolean
+  checkInUnread: boolean
   useSessionStatus: UseStatusMap | undefined
   actions: ChatActions
   onMakeMain(): void
 }
 
-function ChatRow({ t, chat, label, main, pinned, selected, useSessionStatus, actions, onMakeMain }: RowProps): ReactNode {
+function ChatRow({ t, chat, label, main, pinned, selected, checkInUnread, useSessionStatus, actions, onMakeMain }: RowProps): ReactNode {
   const status = typeof useSessionStatus === 'function' ? useSessionStatus((map) => map.get(chat.id)) : undefined
   const running = status?.running ?? chat.running
   const waiting = status?.pendingInteraction !== undefined
-  const unread = status?.completionUnread === true
+  const unread = checkInUnread || status?.completionUnread === true
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(label)
@@ -239,7 +240,9 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
   const pinnedSet = new Set(pinned)
   const sync = useSyncList()
   // the rooms' running batches (the feed being written) are the agent's work, not chats of the person's
-  const batches = new Set(useRooms().batches)
+  const rooms = useRooms()
+  const batches = new Set(rooms.batches)
+  const checkIns = new Map(rooms.checkIns.filter(m => m.unread).map(m => [m.sessionId, m.at]))
   // signed in, the column shows this account's chats and the ones never synced (C10); another account's stay, hidden
   const chats = state.ids
     .map((id) => state.byId[id])
@@ -308,7 +311,7 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
       const pa = pinnedSet.has(a.id) ? 1 : 0
       const pb = pinnedSet.has(b.id) ? 1 : 0
       if (pa !== pb) return pb - pa
-      return b.updatedAt - a.updatedAt
+      return Math.max(b.updatedAt, checkIns.get(b.id) ?? 0) - Math.max(a.updatedAt, checkIns.get(a.id) ?? 0)
     })
   const mainMatches = q === '' || t('chMain').toLowerCase().includes(q) || (main?.displayTitle.toLowerCase().includes(q) ?? false)
 
@@ -364,7 +367,7 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
     h('div', { className: 'nm-chats-list' },
       mainMatches
         ? (main
-            ? h(ChatRow, { t, chat: main, label: t('chMain'), main: true, pinned: false, selected: current === main.id, useSessionStatus, actions, onMakeMain: () => undefined })
+            ? h(ChatRow, { t, chat: main, checkInUnread: checkIns.has(main.id), label: t('chMain'), main: true, pinned: false, selected: current === main.id, useSessionStatus, actions, onMakeMain: () => undefined })
             : h('div', { className: 'nm-chat-row nm-main' },
                 h('button', { type: 'button', className: 'nm-chat-open', onClick: openMain }, h('span', { className: 'nm-chat-title' }, t('chMain')))))
         : null,
@@ -375,6 +378,7 @@ export function MuseChats({ t, useSessions, useSessionStatus, useWorkspaces, act
         ? h('div', { className: 'nm-chats-empty' }, q === '' ? t('chEmpty') : t('chNoMatch'))
         : side.map((chat) => h(ChatRow, {
             key: chat.id,
+            checkInUnread: checkIns.has(chat.id),
             t,
             chat,
             label: chat.blank && !sync.sessions.has(chat.id) ? t('chBlank') : chat.displayTitle || t('chBlank'),

@@ -564,6 +564,9 @@ fun ChatScreen(
     // nanoMuse: a retained draft route must also gate its promoted, persisted identity.
     if (nmDisplayedSessionId != sessionId && !io.github.nanomuse.ui.guard.SessionAccessGate(nmDisplayedSessionId, nmConversationVisible)) return
     io.github.nanomuse.ui.chat.ReplyPresenceEffect(nmDisplayedSessionId, nmConversationVisible)
+    // nanoMuse: the replay belongs to the persisted chat, including a draft promoted during this turn.
+    var handsReplay by remember(nmDisplayedSessionId, nmConversationVisible) { mutableStateOf<io.github.nanomuse.ui.hands.ChatReplaySelection?>(null) }
+    handsReplay?.let { replay -> io.github.nanomuse.ui.hands.ChatReplayDialog(replay) { handsReplay = null } }
     // [T-android-larky-longsession-followup] Consume the tail-windowed
     // view instead of the canonical full list. For sessions with ≤300
     // messages this is the SAME reference (zero overhead); for longer
@@ -1738,6 +1741,7 @@ fun ChatScreen(
     }
 
     val performSendOrEnqueue: (String) -> Unit = handler@{ rawText ->
+        if (!viewModel.nmSessionReady) return@handler // nanoMuse: keep the draft while its history loads.
         if (viewModel.tryExecuteInputAsSlashCommand(rawText)) {
             viewModel.setInputText("")
             releaseComposerAfterSend()
@@ -1761,7 +1765,7 @@ fun ChatScreen(
         viewModel.setInputText("")
         releaseComposerAfterSend()
         viewModel.nmMarkPersonTurn() // nanoMuse: the person started this turn (StarPrompt counts those)
-        viewModel.sendMessage(rawText)
+        viewModel.nmSendComposer(rawText) // nanoMuse: explicitly marks a local composer submission.
         noteSendForInputModePref()
         userScrolledAway = false
         coroutineScope.launch {
@@ -3656,6 +3660,7 @@ fun ChatScreen(
                     is FlatChatItem.NanoMuseAvatarShare -> false // nanoMuse
                     is FlatChatItem.NanoMuseAvatarConfirm -> false // nanoMuse
                     is FlatChatItem.NanoMuseAllowance -> false // nanoMuse
+                    is FlatChatItem.HandsReplay -> grayedMap[originalMessageId(messageId)] == true // nanoMuse
                     is FlatChatItem.NanoMuseThumbs -> false // nanoMuse
                     is FlatChatItem.AssistantTyping -> false
                     is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
@@ -4347,6 +4352,10 @@ fun ChatScreen(
                                     )
                                 }
                             }
+                            // nanoMuse: this opens a specific saved screen operation, including older chat history.
+                            is FlatChatItem.HandsReplay -> io.github.nanomuse.ui.hands.ChatReplayButton(
+                                nmDisplayedSessionId, item.runId, onOpen = { handsReplay = it },
+                            )
                             // nanoMuse: the two thumbs under the newest finished reply (and under an older one that was voted on)
                             is FlatChatItem.NanoMuseThumbs -> io.github.nanomuse.ui.feedback.ThumbsRow(
                                 sessionId = viewModel.activeSessionId,
@@ -5749,6 +5758,7 @@ fun ChatScreen(
                         // truth for what "press Enter to send" means.
                         val performEnterSend: () -> Boolean = handler@{
                             if (inputText.isBlank() && attachments.isEmpty()) return@handler false
+                            if (!viewModel.nmSessionReady) return@handler true // nanoMuse: do not clear an unsent draft.
                             // Intercept slash commands so "/compact" et al.
                             // run locally instead of being sent as a chat
                             // turn. Mirrors iOS performSend().
@@ -5768,7 +5778,7 @@ fun ChatScreen(
                             viewModel.setInputText("")
                             releaseComposerAfterSend()
                             viewModel.nmMarkPersonTurn() // nanoMuse: the person started this turn (StarPrompt counts those)
-                            viewModel.sendMessage(toSend)
+                            viewModel.nmSendComposer(toSend) // nanoMuse: local composer submission.
                             noteSendForInputModePref()
                             userScrolledAway = false
                             coroutineScope.launch {
@@ -6921,9 +6931,12 @@ fun ChatScreen(
                     confirmText = stringResource(R.string.chat_clear_dialog_confirm),
                     isDestructive = true,
                     onConfirm = {
-                        viewModel.clearChat()
-                        viewModel.setInputText("")
-                        showClearChatDialog = false
+                        // nanoMuse: match the ViewModel readiness guard before clearing the draft.
+                        if (viewModel.nmSessionReady) {
+                            viewModel.clearChat()
+                            viewModel.setInputText("")
+                            showClearChatDialog = false
+                        }
                     },
                 )
             }

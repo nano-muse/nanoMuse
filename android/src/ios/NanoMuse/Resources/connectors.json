@@ -811,6 +811,21 @@
       }
     },
     {
+      "id": "levea",
+      "name": "Levea",
+      "category": "design",
+      "url": "https://api.livecore.ai/api/v1/misc/mcp",
+      "auth": {
+        "kind": "oauth"
+      },
+      "docs": "https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/mcp-server/README.md",
+      "color": "#7C3AED",
+      "about": {
+        "en": "Edit videos, add captions and export MP4 files.",
+        "zh": "剪辑视频、添加字幕并导出 MP4 文件。"
+      }
+    },
+    {
       "id": "webflow",
       "name": "Webflow",
       "category": "design",

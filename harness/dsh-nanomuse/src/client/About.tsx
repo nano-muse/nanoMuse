@@ -69,7 +69,7 @@ export function useUpdateCheck(): { info: UpdateInfo | null; checking: boolean; 
 /**
  * The version (C2), two lines that are always there: what is installed
  * ("nanoMuse Desktop 0.1.34 · harness 0.1.34"), and what the check found — "Checking…",
- * "Latest 0.1.35 — you have it", "0.1.35 is out" with Update, or "Could not check — Check
+ * "Latest release 0.1.35", "0.1.35 is out" with Update, or "Could not check — Check
  * now". A check runs when the rows appear and nothing is known yet.
  */
 let autoChecked = false
@@ -96,7 +96,7 @@ export function UpdateRow({ t, bundle }: { t: Translate; bundle: string }): Reac
     found = t('vrOut', { version: info.latest })
     action = h('button', { type: 'button', className: 'nm-pill nm-pill-sm', onClick: () => openLink(asset?.url ?? info.page) }, t('vrUpdate'))
   } else {
-    found = t('vrHave', { version: info.latest })
+    found = t('vrPublished', { version: info.latest })
   }
   return h('div', { className: 'nm-row nm-version-row' },
     h('div', { className: 'nm-row-main' },

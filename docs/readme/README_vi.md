@@ -32,7 +32,7 @@
 
 **nanoMuse là một trợ lý cá nhân mã nguồn mở cho mọi thiết bị của bạn.** Một trợ lý duy nhất có tên và hình dáng riêng, cùng loại với [Muse](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) của Meta: nó làm việc thay vì chỉ trả lời câu hỏi, tiếp tục làm khi ứng dụng đã đóng, nhớ bạn, và dừng lại hỏi trước bất cứ việc gì bạn không thể hoàn tác.
 
-*nano* nghĩa là trọn bộ nhưng đủ nhỏ để bạn tự chạy và tự triển khai: ứng dụng điện thoại, ứng dụng máy tính, bảng điều khiển web và relay nối chúng lại đều nằm trong kho này, theo giấy phép GPL-3.0-or-later. **[Miễn phí, mã nguồn mở, phi lợi nhuận. Cùng nhau xây dựng.](../../CONTRIBUTING.md)** Đăng nhập là bạn có một khoản miễn phí để dùng mô hình qua relay của cộng đồng (do người phát triển trả); dùng hết thì [chuyển sang khóa của riêng bạn](../own-key.md). Cùng relay đó chạy được trên máy chủ của bạn, nên dữ liệu không cần rời khỏi nhà bạn. Phiên bản mới nhất: **1.0.9 Tiller**, [ghi chú phát hành](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.9) · [dùng thử trên trình duyệt](https://demo.nanomuse.dev/).
+*nano* nghĩa là trọn bộ nhưng đủ nhỏ để bạn tự chạy và tự triển khai: ứng dụng điện thoại, ứng dụng máy tính, bảng điều khiển web và relay nối chúng lại đều nằm trong kho này, theo giấy phép GPL-3.0-or-later. **[Miễn phí, mã nguồn mở, phi lợi nhuận. Cùng nhau xây dựng.](../../CONTRIBUTING.md)** Đăng nhập là bạn có một khoản miễn phí để dùng mô hình qua relay của cộng đồng (do người phát triển trả); dùng hết thì [chuyển sang khóa của riêng bạn](../own-key.md). Cùng relay đó chạy được trên máy chủ của bạn, nên dữ liệu không cần rời khỏi nhà bạn. Phiên bản mới nhất: **1.0.10 Bridge**, [ghi chú phát hành](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.10) · [dùng thử trên trình duyệt](https://demo.nanomuse.dev/).
 
 > [!NOTE]
 > **nanoMuse không ngừng phát triển**
@@ -59,11 +59,11 @@ Mọi phiên bản: [releases](https://github.com/nano-muse/nanoMuse/releases).
 | | |
 |---|---|
 | **Trình duyệt** | [demo.nanomuse.dev](https://demo.nanomuse.dev/): một nanoMuse trên điện thoại mô phỏng, sau khi đăng nhập. Đây là bản demo; các ứng dụng bên dưới mới là bản thật |
-| **Android** 8.0 trở lên, arm64 | [nanoMuse-1.0.9-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-1.0.9-arm64.apk): mọi phiên bản ký cùng một khóa, cài đè lên bản cũ là được |
+| **Android** 8.0 trở lên, arm64 | [nanoMuse-1.0.10-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-1.0.10-arm64.apk): mọi phiên bản ký cùng một khóa, cài đè lên bản cũ là được |
 | **iPhone / iPad** | [TestFlight](https://testflight.apple.com/join/ZHexbDqc): bản beta đã qua vòng duyệt beta của Apple; cài từ liên kết này · [iOS](../ios.md) |
-| **macOS** 12 trở lên | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-x64.dmg). Chưa được công chứng: lần đầu nhấp chuột phải → *Mở* |
-| **Windows** 10 trở lên | [nanoMuse-Desktop-1.0.9-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-win-x64.exe): bấm *Vẫn chạy* một lần |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.tar.gz) |
+| **macOS** 12 trở lên | [Apple Silicon](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-arm64.dmg) · [Intel](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-x64.dmg). Chưa được công chứng: lần đầu nhấp chuột phải → *Mở* |
+| **Windows** 10 trở lên | [nanoMuse-Desktop-1.0.10-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-win-x64.exe): bấm *Vẫn chạy* một lần |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.tar.gz) |
 | **Docker** | `bash scripts/self-host.sh --local` để có relay của riêng bạn; `docker compose up -d app` để chạy ứng dụng web trên máy chủ của bạn; xem [tự lưu trữ](../self-hosting.md) |
 
 Mọi bản tải đều từ [bản phát hành mới nhất trên GitHub](https://github.com/nano-muse/nanoMuse/releases/latest); cùng các tệp đó có tại [nanomuse.cn/dl](https://nanomuse.cn/dl/) nếu GitHub chậm ở chỗ bạn. Mở ứng dụng, đăng nhập bằng e-mail hoặc số điện thoại Trung Quốc đại lục, và trợ lý đã có sẵn một mô hình để làm việc. Điện thoại, máy tính và web dùng chung một tài khoản và hiển thị cùng những cuộc trò chuyện.
@@ -85,7 +85,7 @@ Mọi bản tải đều từ [bản phát hành mới nhất trên GitHub](http
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Có dáng vẻ riêng.</b><br>Mô tả một dáng vẻ, mô hình ảnh của bạn vẽ ra, mô hình video làm nó chuyển động. Mặc định là một chú rồng nhỏ.</td>
-    <td width="50%" valign="top"><b>Mô hình nào cũng được.</b><br>Hạn mức của relay, khóa của riêng bạn ở một trong hai mươi sáu nhà cung cấp (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek và các nhà cung cấp khác), hoặc gói bạn đã trả tiền: ChatGPT, Claude, Kimi. Nhà cung cấp không có mô hình ảnh hay video thì hai tính năng đó tắt, và ứng dụng nói rõ điều đó.</td>
+    <td width="50%" valign="top"><b>Mô hình nào cũng được.</b><br>Hạn mức của relay, khóa của riêng bạn ở một trong hai mươi tám nhà cung cấp (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek và các nhà cung cấp khác), hoặc gói bạn đã trả tiền: ChatGPT, Claude, Kimi. Nhà cung cấp không có mô hình ảnh hay video thì hai tính năng đó tắt, và ứng dụng nói rõ điều đó.</td>
   </tr>
 </table>
 
@@ -143,28 +143,32 @@ Tất cả những ai có thay đổi đã vào `main`, theo danh sách người
 <a href="https://github.com/Longfellow1"><img src="https://avatars.githubusercontent.com/u/53395614?v=4&s=48" width="48" height="48" alt="Longfellow1"></a>
 <a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
 <a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
-<a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
-<a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
-<a href="https://github.com/fenghaofenghao-ctrl"><img src="https://avatars.githubusercontent.com/u/306929974?v=4&s=48" width="48" height="48" alt="fenghaofenghao-ctrl"></a>
-<a href="https://github.com/Yicheng-1218"><img src="https://avatars.githubusercontent.com/u/72242651?v=4&s=48" width="48" height="48" alt="Yicheng-1218"></a>
-<a href="https://github.com/PovedaAqui"><img src="https://avatars.githubusercontent.com/u/9494679?v=4&s=48" width="48" height="48" alt="PovedaAqui"></a>
+<a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
 <a href="https://github.com/Battleplus"><img src="https://avatars.githubusercontent.com/u/121445871?v=4&s=48" width="48" height="48" alt="Battleplus"></a>
-<a href="https://github.com/Ichiro786"><img src="https://avatars.githubusercontent.com/u/158778170?v=4&s=48" width="48" height="48" alt="Ichiro786"></a>
-<a href="https://github.com/yatping"><img src="https://avatars.githubusercontent.com/u/15101928?v=4&s=48" width="48" height="48" alt="yatping"></a>
-<a href="https://github.com/ZxlDragonDoctor"><img src="https://avatars.githubusercontent.com/u/152901610?v=4&s=48" width="48" height="48" alt="ZxlDragonDoctor"></a>
-<a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/PovedaAqui"><img src="https://avatars.githubusercontent.com/u/9494679?v=4&s=48" width="48" height="48" alt="PovedaAqui"></a>
+<a href="https://github.com/Yicheng-1218"><img src="https://avatars.githubusercontent.com/u/72242651?v=4&s=48" width="48" height="48" alt="Yicheng-1218"></a>
+<a href="https://github.com/fenghaofenghao-ctrl"><img src="https://avatars.githubusercontent.com/u/306929974?v=4&s=48" width="48" height="48" alt="fenghaofenghao-ctrl"></a>
+<a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
+<a href="https://github.com/weare-linkrra"><img src="https://avatars.githubusercontent.com/u/355012752?v=4&s=48" width="48" height="48" alt="weare-linkrra"></a>
 <a href="https://github.com/DennyHo0917"><img src="https://avatars.githubusercontent.com/u/149746199?v=4&s=48" width="48" height="48" alt="DennyHo0917"></a>
-<a href="https://github.com/maidivh"><img src="https://avatars.githubusercontent.com/u/22905321?v=4&s=48" width="48" height="48" alt="maidivh"></a>
-<a href="https://github.com/jtboy80826"><img src="https://avatars.githubusercontent.com/u/243465398?v=4&s=48" width="48" height="48" alt="jtboy80826"></a>
-<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
-<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
-<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
-<a href="https://github.com/jasontospas"><img src="https://avatars.githubusercontent.com/u/79001000?v=4&s=48" width="48" height="48" alt="jasontospas"></a>
-<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
-<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
-<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
+<a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/ZxlDragonDoctor"><img src="https://avatars.githubusercontent.com/u/152901610?v=4&s=48" width="48" height="48" alt="ZxlDragonDoctor"></a>
+<a href="https://github.com/yatping"><img src="https://avatars.githubusercontent.com/u/15101928?v=4&s=48" width="48" height="48" alt="yatping"></a>
+<a href="https://github.com/Ichiro786"><img src="https://avatars.githubusercontent.com/u/158778170?v=4&s=48" width="48" height="48" alt="Ichiro786"></a>
 <a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
+<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
+<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
+<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
+<a href="https://github.com/jperla"><img src="https://avatars.githubusercontent.com/u/3724?v=4&s=48" width="48" height="48" alt="jperla"></a>
+<a href="https://github.com/jasontospas"><img src="https://avatars.githubusercontent.com/u/79001000?v=4&s=48" width="48" height="48" alt="jasontospas"></a>
+<a href="https://github.com/al-global-tech"><img src="https://avatars.githubusercontent.com/u/155616440?v=4&s=48" width="48" height="48" alt="al-global-tech"></a>
+<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
+<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
+<a href="https://github.com/brajendrak00068"><img src="https://avatars.githubusercontent.com/u/56827534?v=4&s=48" width="48" height="48" alt="brajendrak00068"></a>
+<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/jtboy80826"><img src="https://avatars.githubusercontent.com/u/243465398?v=4&s=48" width="48" height="48" alt="jtboy80826"></a>
+<a href="https://github.com/maidivh"><img src="https://avatars.githubusercontent.com/u/22905321?v=4&s=48" width="48" height="48" alt="maidivh"></a>
 </p>
 <!-- contributors:end -->
 
@@ -191,6 +195,7 @@ nanoMuse được xây trên công sức của người khác; điều khoản �
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis): trợ lý chạy ngay trên thiết bị, là nền của ứng dụng điện thoại, với [proot](https://github.com/nano-muse/proot) và [Alpine Linux](https://alpinelinux.org/) làm hộp cát.
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): harness mà ứng dụng máy tính là một plugin.
 - [UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop) (ByteDance): bộ điều khiển đôi tay trên máy tính được chuyển từ mã của họ, và các điểm đánh dấu trên sân khấu theo ScreenMarker của họ.
+- [Mika](https://github.com/wangzan101/Mika) của wangzan101 đã gợi ý cho chúng tôi cách dùng màn hình Android riêng, xem trực tiếp, chuyển quyền thao tác cho người dùng và phát lại các bước. Mã ghép nối để gỡ lỗi không dây được điều chỉnh theo giấy phép Apache-2.0.
 - [MobileGym](https://github.com/Purewhiter/mobilegym), [MemGUI-Bench](https://github.com/lgy0404/MemGUI-Bench), [PhoneHarness](https://github.com/PhoneHarness/PhoneHarness), [CopilotKit/OpenMuse](https://github.com/CopilotKit/OpenMuse), [Open-AutoGLM](https://github.com/zai-org/Open-AutoGLM), [ClawGUI](https://github.com/ZJU-REAL/ClawGUI): bộ điều khiển điện thoại, dấu vết và ý tưởng sản phẩm.
 
 ## Tuyên bố

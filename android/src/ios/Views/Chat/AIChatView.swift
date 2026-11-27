@@ -807,7 +807,7 @@ struct AIChatView: View {
         .alert(AppLocalized("Task Running"), isPresented: $showNewChatStopConfirm) {
             Button(AppLocalized("Stop & New Chat"), role: .destructive) {
                 vm.cancel()
-                NotificationCenter.default.post(name: .newChatRequested, object: nil)
+                NotificationCenter.default.post(name: .newChatRequested, object: "menu") // nanoMuse: offer the destination picker
             }
             Button(AppLocalized("Cancel"), role: .cancel) {}
         } message: {
@@ -1304,6 +1304,12 @@ struct AIChatView: View {
         .observingQuickActions(modifier: quickActionObserver)
         .onChange(of: vm.sessionId) { _ in
             refreshTitlePillSession()
+        }
+        // nanoMuse: refresh the visible history and model context when the assistant checks in.
+        .onReceive(NotificationCenter.default.publisher(for: .nmChatOutreachDelivered)) { note in
+            if let sid = note.object as? String, sid == vm.sessionId {
+                Task { @MainActor in await vm.reloadMessagesFromDB(reason: "assistantOutreach") }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { note in
             guard let sid = vm.sessionId,
@@ -1912,6 +1918,7 @@ struct AIChatView: View {
         switch action { // nanoMuse:
         case .newChat: requestNewChatFromMenu() // nanoMuse:
         case .model: showModelPicker = true // nanoMuse:
+        case .thinking: break // nanoMuse: NanoMuseChatHooks presents the session picker
         case .clearChat: showClearChatConfirm = true // nanoMuse:
         case .terminal: showTerminal = true // nanoMuse:
         case .browser: showBrowserSheet = true // nanoMuse:
@@ -1932,7 +1939,7 @@ struct AIChatView: View {
         if vm.isProcessing {
             showNewChatStopConfirm = true
         } else {
-            NotificationCenter.default.post(name: .newChatRequested, object: nil)
+            NotificationCenter.default.post(name: .newChatRequested, object: "menu") // nanoMuse: offer the destination picker
         }
     }
 
@@ -2020,7 +2027,8 @@ struct AIChatView: View {
         if NanoMuseShellPrefs.museHeader { // nanoMuse: face · name · status line instead of the title stack
             NanoMuseHeaderTitle( // nanoMuse:
                 vm: vm, soulName: soulName, // nanoMuse:
-                modelName: SessionModelDisplay(store: configStore, draftGroupId: vm.initialGroupId).displayName(for: vm.sessionId) // nanoMuse:
+                modelName: SessionModelDisplay(store: configStore, draftGroupId: vm.initialGroupId).displayName(for: vm.sessionId), // nanoMuse:
+                isReadOnly: isReadOnly // nanoMuse: remote transcripts cannot change inference settings
             ) { showModelPicker = true } // nanoMuse: the text column keeps the model picker reachable
             .frame(maxWidth: cap) // nanoMuse:
         } else if #available(iOS 19, *) { // nanoMuse: upstream title unchanged below
@@ -4768,7 +4776,7 @@ struct AIChatView: View {
         // onChange binding, so doing it before send() left send() with empty text
         // → "send() GUARD FAILED" and nothing was sent. send() consumes and clears
         // inputText itself; we re-arm voice listening only AFTER it has run.
-        vm.send()
+        vm.send(fromFeedComposer: true) // nanoMuse: positive provenance for optional preparation from chat
         // [inline-voice] Stay in voice mode after sending — clear the recognized
         // text and re-arm listening for the next utterance (close with ✕).
         if voiceInputActive {

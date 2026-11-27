@@ -20,6 +20,7 @@ from nanomuse.llm import session as llm_session
 from nanomuse.logger import logger
 from nanomuse.prompts import split_quiet
 from nanomuse.schema import ToolCall, ToolResult
+from nanomuse.sentinel.grants import wire_grant_target
 from nanomuse.server.events import MAIN_THREAD, EventBus, Timeline, new_id, now_iso
 from nanomuse.tools.browser import BrowserFrame
 from nanomuse.ui import ApprovalDecision, ApprovalRequest
@@ -557,6 +558,7 @@ class WebUI:
                 "purpose": request.purpose,
                 "target": request.target,
                 "grant_key": request.grant_key,
+                "grant_target": wire_grant_target(request.tool, request.target, request.args),
                 "grant_options": list(request.grant_options),
                 "args": _preview_args(request.args),
                 "status": "pending",

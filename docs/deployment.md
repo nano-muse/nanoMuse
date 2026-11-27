@@ -44,6 +44,10 @@ docker logs muse                          # the URL with the access token
 
 **With a browser.** The `-browser` tags (`:latest-browser`, `:X.Y.Z-browser`, `:edge-browser`; linux/amd64) bundle Chromium and Playwright and start with the browser tool on, so the agent can use websites and you can watch and take over from the phone (see [the app → browser view](app.md#what-is-on-the-screen)). It is about 400 MB larger. `NANOMUSE_BROWSER_ENABLED=1` is what switches the tool on in that image; the same variable works anywhere Playwright and Chromium are installed.
 
+The Dockerfile installs the Playwright driver's `libatomic1` dependency before running
+the browser installer, preventing a build failure for a missing `libatomic.so.1`.
+CI builds both image variants and starts Chromium as the browser image's normal user.
+
 Building by hand:
 
 ```bash

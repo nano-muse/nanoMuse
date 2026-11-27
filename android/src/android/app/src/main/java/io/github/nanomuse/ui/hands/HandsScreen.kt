@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Visibility
@@ -18,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,11 +36,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.MinisApp
 import com.openminis.app.R
+import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.ui.settings.SettingsRow
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsSwitchRow
 import io.github.nanomuse.hands.Hands
+import io.github.nanomuse.hands.HandsDisplayBridge
 import io.github.nanomuse.ui.home.MuseTones
 
 const val ROUTE_HANDS = "nanomuse/hands"
@@ -49,7 +54,16 @@ const val ROUTE_HANDS = "nanomuse/hands"
  * Models), and the plain words on what the hands will and will not do.
  */
 @Composable
-fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsModel: () -> Unit = onOpenProviders) {
+fun HandsScreen(
+    onBack: () -> Unit,
+    onOpenProviders: () -> Unit,
+    onOpenShizuku: () -> Unit,
+    onOpenHandsModel: () -> Unit = onOpenProviders,
+) {
+    var showReplay by rememberSaveable { mutableStateOf(false) }
+    if (showReplay) { HandsReplayScreen { showReplay = false }; return }
+    var showWireless by rememberSaveable { mutableStateOf(false) }
+    if (showWireless) { HandsWirelessSetup(onBack = { showWireless = false }, onOpenShizuku = onOpenShizuku); return }
     val context = LocalContext.current
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
     val config = repo?.config?.collectAsState()?.value
@@ -57,6 +71,8 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
     val enabled by remember(context) { Hands.enabledFlow(context) }.collectAsState(initial = Hands.enabled(context))
     var tick by remember { mutableIntStateOf(0) }
     val active by Hands.active.collectAsState()
+    val shizuku by ShizukuManager.snapshot.collectAsState()
+    val localBridge by HandsDisplayBridge.ready.collectAsState()
 
     // Permissions are granted in other apps; re-read when the user comes back.
     val owner = LocalLifecycleOwner.current
@@ -65,7 +81,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
-    val readiness = remember(tick, config) { Hands.readiness(context) }
+    val readiness = remember(tick, config, shizuku, localBridge) { Hands.readiness(context) }
     val visionEntries = remember(config) { Hands.visionEntries(context) }
 
     SettingsScaffold(title = stringResource(R.string.nm_hands_title), onBack = onBack) {
@@ -83,6 +99,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                 subtitle = when {
                     active -> stringResource(R.string.nm_hands_status_working)
                     enabled && readiness.ready -> stringResource(R.string.nm_hands_status_ready)
+                    enabled && readiness.canStart -> stringResource(R.string.nm_hands_wireless_paired)
                     enabled -> stringResource(R.string.nm_hands_status_missing)
                     else -> stringResource(R.string.nm_hands_status_off)
                 },
@@ -90,6 +107,21 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                 onCheckedChange = { Hands.setEnabled(context, it) },
                 icon = Icons.Outlined.PhoneAndroid,
                 iconColor = if (enabled) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val supportsBackground = readiness.backgroundAndroidOk && readiness.secondaryDisplays
+            SettingsSwitchRow(
+                title = stringResource(R.string.nm_hands_background_screen),
+                subtitle = stringResource(
+                    if (supportsBackground) R.string.nm_hands_background_detail else R.string.nm_hands_background_unsupported,
+                ),
+                checked = readiness.backgroundScreen,
+                enabled = !active && (supportsBackground || readiness.backgroundScreen),
+                onCheckedChange = {
+                    Hands.setBackgroundScreen(context, it)
+                    tick++
+                    if (it && !readiness.backgroundBridgeReady) showWireless = true
+                },
+                icon = Icons.Outlined.Layers,
                 showDivider = active,
             )
             if (active) {
@@ -107,8 +139,26 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
         // C11: with no provider that has a model that sees, the footer is the one sentence that says which would
         SettingsSection(
             header = stringResource(R.string.nm_hands_section_needs),
-            footer = if (visionEntries.isEmpty()) stringResource(R.string.nm_cap_hands_unavailable) else stringResource(R.string.nm_hands_needs_footer),
+            footer = when {
+                visionEntries.isEmpty() -> stringResource(R.string.nm_cap_hands_unavailable)
+                readiness.backgroundScreen -> null
+                else -> stringResource(R.string.nm_hands_needs_footer)
+            },
         ) {
+            if (readiness.backgroundScreen) {
+                SettingsRow(
+                    title = stringResource(R.string.nm_hands_wireless_title),
+                    subtitle = stringResource(
+                        when {
+                            readiness.backgroundBridgeReady -> R.string.nm_hands_status_ready
+                            readiness.wirelessPaired -> R.string.nm_hands_wireless_paired
+                            else -> R.string.nm_hands_wireless_pair
+                        },
+                    ),
+                    icon = Icons.Outlined.Layers,
+                    onClick = { showWireless = true },
+                )
+            }
             NeedRow(
                 icon = Icons.Outlined.Accessibility,
                 title = stringResource(R.string.nm_hands_need_a11y),
@@ -157,10 +207,15 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
             }
         }
 
+        SettingsSection {
+            SettingsRow(title = stringResource(R.string.nm_hands_replay_title), icon = Icons.Outlined.History,
+                onClick = { showReplay = true }, showDivider = false)
+        }
+
         // ── the rules ──
         SettingsSection(header = stringResource(R.string.nm_hands_section_rules)) {
             RuleRow(stringResource(R.string.nm_hands_rule_ladder))
-            RuleRow(stringResource(R.string.nm_hands_rule_secrets))
+            if (!readiness.backgroundScreen) RuleRow(stringResource(R.string.nm_hands_rule_secrets))
             RuleRow(stringResource(R.string.nm_hands_rule_approvals))
             RuleRow(stringResource(R.string.nm_hands_rule_stop))
             RuleRow(stringResource(R.string.nm_hands_rule_screenshots), last = true)

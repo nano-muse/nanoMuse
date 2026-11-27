@@ -57,10 +57,10 @@ android {
         applicationId = "io.github.nanomuse.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 52
-        versionName = "1.0.9"
+        versionCode = 53
+        versionName = "1.0.10"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "io.github.nanomuse.testing.AccessibilityPreservingRunner"
 
         // System prompt prefix required by Anthropic for Claude Code OAuth
         // credentials. Empty in the public mirror (see provider-customization.properties).
@@ -113,6 +113,7 @@ android {
     }
 
     buildFeatures {
+        aidl = true // nanoMuse: a display-only binder for the authorized Shizuku service.
         compose = true
         buildConfig = true
     }
@@ -154,6 +155,27 @@ android {
         checkReleaseBuilds = false
         disable += "NonNullableMutableLiveData"
     }
+}
+
+// nanoMuse: verify the packaged sandbox even when Gradle reuses a cached APK.
+androidComponents.onVariants { variant ->
+    if (variant.buildType == "debug" && providers.gradleProperty("nm.abi").orNull == "x86_64") {
+        return@onVariants
+    }
+    val suffix = variant.name.replaceFirstChar { it.uppercase() }
+    val apkDirectory = variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK)
+    val loader = variant.artifacts.getBuiltArtifactsLoader()
+    val verifier = rootProject.file("../../../scripts/android/verify-sandbox-apk.py")
+    val verifySandbox = tasks.register<Exec>("verify${suffix}SandboxApk") {
+        inputs.dir(apkDirectory)
+        inputs.file(verifier)
+        commandLine("python3", verifier)
+        argumentProviders.add(CommandLineArgumentProvider {
+            val built = checkNotNull(loader.load(apkDirectory.get())) { "Missing APK metadata for $suffix" }
+            listOf(built.elements.single().outputFile)
+        })
+    }
+    tasks.matching { it.name == "assemble$suffix" }.configureEach { dependsOn(verifySandbox) }
 }
 
 // [T-android-downgrade-compat] Room needs an explicit output directory once
@@ -244,6 +266,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    // nanoMuse: parse imported skill frontmatter with safe, bounded YAML construction.
+    implementation("org.yaml:snakeyaml:2.7")
+
     // Core
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
@@ -284,6 +309,8 @@ dependencies {
     implementation(group = "", name = "rclone", ext = "aar")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // nanoMuse: interpret the packaged public-source rules without a WebView or Java access.
+    implementation("org.mozilla:rhino:1.7.15.1")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
 
     // Kotlinx Serialization
@@ -353,4 +380,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     androidTestImplementation("junit:junit:4.13.2")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

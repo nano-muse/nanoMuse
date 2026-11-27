@@ -1,8 +1,6 @@
 package io.github.nanomuse.ui.guard
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -13,7 +11,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.openminis.app.R
-import io.github.nanomuse.guard.AppAccess
 import io.github.nanomuse.guard.SessionAccess
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -85,30 +82,4 @@ fun rememberProtectedBackupAction(): (Boolean, () -> Unit) -> Unit {
     val authenticate = rememberAccessAuthenticator()
     val title = stringResource(R.string.backup_title)
     return { includesChats, action -> SessionAccess.authorizeExport(includesChats, { result -> authenticate(title, result) }, action) }
-}
-
-@Composable
-fun SessionAccessSettings() {
-    var show by remember { mutableStateOf(false) }
-    var seconds by remember { mutableIntStateOf(SessionAccess.timeout) }
-    val authenticate = rememberAccessAuthenticator()
-    val title = stringResource(R.string.nm_session_settings)
-    TextButton(onClick = { show = true }) { Text(title) }
-    if (show) AlertDialog(onDismissRequest = { show = false }, title = { Text(title) }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
-            for (value in AppAccess.TIMEOUTS) Row {
-                RadioButton(selected = seconds == value, onClick = { seconds = value })
-                Text(when (value) {
-                    -1 -> stringResource(R.string.nm_access_on_exit)
-                    0 -> stringResource(R.string.nm_access_never)
-                    else -> stringResource(R.string.nm_access_seconds, value)
-                })
-            }
-        }
-    }, confirmButton = {
-        TextButton(onClick = { authenticate(title) { success ->
-            SessionAccess.configureTimeout(seconds, success)
-            if (success) show = false
-        } }) { Text(stringResource(android.R.string.ok)) }
-    }, dismissButton = { TextButton(onClick = { show = false }) { Text(stringResource(android.R.string.cancel)) } })
 }

@@ -33,7 +33,7 @@ from .client import client_version, platform_from, platform_of
 from .config import ModelSpec, Settings, menu_warnings
 from .controls import Controls
 from .crypto import IdentifierCrypto
-from .db import Database, now
+from .db import SESSION_HUB_RESERVATION_PREFIX, Database, now
 from .geo import Place
 from .identifiers import BadIdentifier, Identifier, parse
 from .nudges import BadNudges
@@ -1148,27 +1148,33 @@ class Cloud:
 
     SESSION_KEY_MAX_S = 90 * 86400
     #: session keys one account may mint an hour: a gateway starts a few containers a day,
-    #: and each key is a hub identity of its own (0.30)
+    #: and each key is a short-lived computer Hub identity of its own (0.30)
     SESSION_KEYS_PER_HOUR = 30
 
     def session_key(self, caller: Caller, device: str, ttl_s: int) -> tuple[str, int]:
         """A key that stops working on its own after `ttl_s` (at most 90 days), for a place
-        that should not hold a standing one — nanoMuse Web's container gets one at start and
-        the gateway keeps nothing. Issued to the account of the key making the request; the
+        that should not hold a standing one. nanoMuse Web gets one at sign-in and the
+        gateway keeps nothing. Issued to the account of the key making the request; the
         requesting key is untouched (the caller revokes it if it has no further use for it).
         A session key cannot mint another: otherwise a key that lapses in an hour could
         hand itself 90 more days, and a container that leaked one would hold the account
-        for as long as it liked. The Hub identity is not fixed here: the container's
-        runtime is a `computer` of the account with an id of its own, and binds it at its
-        first hello like any credential; what a session key can never do is take an id
-        another key holds (`Database.bind_key_to_hub_device`)."""
+        for as long as it liked. It is issued with a server-generated computer reservation.
+        The container runtime replaces that reservation with its own free computer id on
+        first hello, then the credential is fixed to that installation."""
         if caller.via == "session":
             raise CloudError(403, "session_from_session", "A session key cannot issue another session key; use the device's own key")
         if not self.session_key_pace.allow(caller.account_id):
             raise CloudError(429, "rate_limited", f"At most {self.SESSION_KEYS_PER_HOUR} session keys an hour for one account")
         ttl = max(60, min(int(ttl_s), self.SESSION_KEY_MAX_S))
         expires_at = now() + ttl
-        key, _ = self._issue_key(caller.account_id, device or "session", via="session", expires_at=expires_at)
+        key, _ = self._issue_key(
+            caller.account_id,
+            device or "session",
+            via="session",
+            expires_at=expires_at,
+            hub_device_id=SESSION_HUB_RESERVATION_PREFIX + secrets.token_hex(12),
+            hub_device_kind="computer",
+        )
         self.db.add_event(caller.account_id, "sign_in.session", (device or "session")[:60])
         return key, expires_at
 
@@ -1877,27 +1883,30 @@ class Cloud:
         self.settle_invite(caller.account_id)
         return charged
 
-    def settle_video_task(self, task: Any, status: str | None) -> int | None:
+    def settle_video_task(self, task: Any, status: str | None, *, cost_uy: int | None = None) -> int | None:
         """The provider's word on a clip, from the app's poll or from the relay's own check
         (0.24). One accepted task = one clip (`per_clip`), the money priced from the seconds
         asked for when the task was submitted. The row remembers the status, and the first SUCCEEDED charges the clip at the
-        price fixed when it was submitted. Idempotent: `mark_video_charged` flips once, so a
+        reserved price or the provider's reported cost. The ledger write and the task update are atomic, so a
         poll after the relay settled a task (or the other way round) charges nothing more.
         Returns what was charged (micro-yuan), 0 when a SUCCEEDED task's model is gone from
         the menu, None when nothing was charged."""
         task_id = str(task["task_id"])
-        if status and status != task["status"]:
-            self.db.set_video_status(task_id, str(status))
-        if status != "SUCCEEDED" or not self.db.mark_video_charged(task_id):
+        if status != "SUCCEEDED":
+            if status and status != task["status"]:
+                self.db.set_video_status(task_id, str(status))
             return None
         model_id = str(task["model"])
         spec = self.s.model(model_id)
         if spec is None or spec.kind != "video":
             spec = self.s.unlisted_model(model_id, "video")  # a member's own pick
         if spec is None:
-            return 0  # a model gone from the menu since the task was submitted
+            self.db.set_video_status(task_id, "SUCCEEDED")
+            return 0 if self.db.mark_video_charged(task_id) else None
         account_id = str(task["account_id"])
-        self.db.charge(account_id, "video", spec.id, 0, 0, spec.per_clip, task_id[:16], cost_uy=int(task["cost_uy"] or 0))
+        charge = int(task["cost_uy"] or 0) if cost_uy is None else cost_uy
+        if not self.db.charge(account_id, "video", spec.id, 0, 0, spec.per_clip, task_id[:16], cost_uy=charge, video_task_id=task_id):
+            return None
         self.settle_invite(account_id)
         return spec.per_clip
 

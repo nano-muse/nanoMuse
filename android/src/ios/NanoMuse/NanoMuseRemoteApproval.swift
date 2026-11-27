@@ -30,10 +30,9 @@ struct NanoMuseRemoteQuestion: Sendable {
     let preview: String
     let risk: String
     let reason: String
-    /// What a remembered answer covers, as the sender names it (`grant_key`, since 1.0.6:
-    /// the runtime's tool and target, the desktop's tool and whole argument); empty from an
-    /// older sender, whose preview is all there is to remember by.
-    let grantKey: String
+    /// What a remembered answer covers. A legacy event without this complete structure can
+    /// still be allowed once, but can never select or create a remembered answer.
+    let grantTarget: NanoMuseApprovalGrantTarget?
     /// Seconds the other side waits before it takes silence as a no; 0 when it did not say.
     let timeout: Int
 
@@ -43,7 +42,7 @@ struct NanoMuseRemoteQuestion: Sendable {
         preview = ((body["preview"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         risk = (body["risk"] as? String) ?? ""
         reason = ((body["reason"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        grantKey = ((body["grant_key"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        grantTarget = NanoMuseApprovalGrantTarget(wire: body["grant_target"])
         timeout = (body["timeout"] as? Int) ?? (body["timeout"] as? Double).map { Int($0) } ?? 0
     }
 }
@@ -103,10 +102,12 @@ final class NanoMuseRemoteApprovals: ObservableObject {
         /// The chat the task was typed in; "for this chat" grants live under it.
         let sessionId: String
         let risk: Risk
+        /// The exact wire class. Aliases never share a remembered capability.
+        let wireRisk: String
         let preview: String
         let reason: String
-        /// The sender's name for what an answer covers; empty from an older sender.
-        let grantKey: String
+        /// The sender's complete name for what an answer covers; nil from an older sender.
+        let grantTarget: NanoMuseApprovalGrantTarget?
         /// Seconds the other side waits before it takes silence as a no.
         let timeout: Int
         /// For a computer's own question: the scheduled task asking, and the app it acts in.
@@ -119,12 +120,14 @@ final class NanoMuseRemoteApprovals: ObservableObject {
         }
 
         /// A payment is answered one at a time, as on Android; a scheduled task's step has its own answers.
-        var canSession: Bool { risk != .pay && schedule == nil }
-        var canAlways: Bool { risk != .pay && !preview.isEmpty && schedule == nil }
-        /// The same step on the same device; what an "always" covers: the sender's key when
-        /// it gave one (two steps that begin with the same words never share an answer),
-        /// the preview's first 60 characters from an older sender, as before.
-        var target: String { "task:" + (grantKey.isEmpty ? String(preview.prefix(60)) : grantKey) }
+        var canSession: Bool {
+            nanoMuseCanRememberApproval(
+                target: grantTarget, wireRisk: wireRisk, scheduled: schedule != nil
+            )
+        }
+        var canAlways: Bool { canSession }
+        /// The complete step identity. It is never reconstructed from display text.
+        var target: String? { grantTarget.map { "task:\($0.identity)" } }
     }
 
     /// One standing answer: the same step on one device runs without a card.
@@ -138,7 +141,7 @@ final class NanoMuseRemoteApprovals: ObservableObject {
         let grantedAt: Date
 
         static func key(deviceId: String, risk: String, target: String) -> String {
-            "\(deviceId)|\(risk)|\(target)"
+            [deviceId, risk, target].map { "\($0.utf8.count):\($0)" }.joined(separator: "|")
         }
     }
 
@@ -179,8 +182,8 @@ final class NanoMuseRemoteApprovals: ObservableObject {
 
     private var waiters: [String: CheckedContinuation<Decision, Never>] = [:]
     private var timers: [String: Task<Void, Never>] = [:]
-    /// "sessionId|grant key" for the answers that hold until the chat is left.
-    private var sessionGrants: Set<String> = []
+    /// Answers that hold until their chat is cleared or deleted, or the account is left.
+    private var sessionGrants = NanoMuseApprovalSessionGrants()
 
     private static let grantsKey = "nanomuse.remote_approvals.always"
     /// Android's RiskGate waits this long when the other side names no timeout.
@@ -203,14 +206,27 @@ final class NanoMuseRemoteApprovals: ObservableObject {
             deviceName: device.name,
             sessionId: sessionId,
             risk: Risk(wire: question.risk),
+            wireRisk: question.risk.lowercased(),
             preview: preview,
             reason: question.reason,
-            grantKey: question.grantKey,
+            grantTarget: question.grantTarget,
             timeout: question.timeout > 0 ? min(max(question.timeout, 30), 600) : Self.defaultTimeout
         )
-        let key = Grant.key(deviceId: device.id, risk: request.risk.rawValue, target: request.target)
-        if request.canAlways, grants.contains(where: { $0.id == key }) { return .allowed(standing: true) }
-        if request.canSession, sessionGrants.contains("\(sessionId)|\(key)") { return .allowed(standing: true) }
+        let sessionGrant = request.target.map {
+            NanoMuseApprovalSessionGrants.Key(
+                sessionId: sessionId, deviceId: device.id,
+                risk: request.wireRisk, target: $0
+            )
+        }
+        let key = request.target.map {
+            Grant.key(deviceId: device.id, risk: request.wireRisk, target: $0)
+        }
+        if request.canAlways, let key, grants.contains(where: { $0.id == key }) {
+            return .allowed(standing: true)
+        }
+        if request.canSession, let sessionGrant, sessionGrants.allows(sessionGrant) {
+            return .allowed(standing: true)
+        }
 
         queue.append(request)
         timers[id] = Task { @MainActor [weak self] in
@@ -226,12 +242,14 @@ final class NanoMuseRemoteApprovals: ObservableObject {
         case .once, .task:
             return .allowed(standing: false)
         case .session:
-            if request.canSession { sessionGrants.insert("\(sessionId)|\(key)") }
+            if request.canSession, let sessionGrant { sessionGrants.insert(sessionGrant) }
             return .allowed(standing: false)
         case .always:
-            if request.canAlways {
+            if request.canAlways, let key, let target = request.target {
                 grants.removeAll { $0.id == key }
-                grants.append(Grant(deviceId: device.id, deviceName: device.name, risk: request.risk.rawValue, target: request.target, preview: preview, grantedAt: Date()))
+                grants.append(Grant(deviceId: device.id, deviceName: device.name,
+                                    risk: request.wireRisk, target: target,
+                                    preview: preview, grantedAt: Date()))
                 saveGrants()
             }
             return .allowed(standing: false)
@@ -253,9 +271,10 @@ final class NanoMuseRemoteApprovals: ObservableObject {
             deviceName: device.name,
             sessionId: "",
             risk: .other,
+            wireRisk: "scheduled",
             preview: question.preview,
             reason: question.reason,
-            grantKey: "",
+            grantTarget: nil,
             timeout: question.timeout,
             schedule: Request.Schedule(taskTitle: question.taskTitle, app: question.app, canTask: question.canTask)
         )
@@ -298,6 +317,16 @@ final class NanoMuseRemoteApprovals: ObservableObject {
     /// The other side's `approval_result`: decided there, or expired; the card goes without an answer from here.
     func settled(_ id: String) {
         resolve(id, .elsewhere)
+    }
+
+    /// A chat no longer exists or has been cleared, so none of its in-memory answers survive.
+    func resetSessionGrants(for sessionId: String) {
+        sessionGrants.reset(for: sessionId)
+    }
+
+    /// Leaving or replacing an account invalidates every chat-scoped answer.
+    func resetAllSessionGrants() {
+        sessionGrants.resetAll()
     }
 
     /// Takes one "always" back.

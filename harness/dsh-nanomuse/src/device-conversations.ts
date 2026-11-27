@@ -16,6 +16,7 @@ export interface DeviceConversation {
   id: string
   device: string
   name: string
+  draft?: string
   turns: OutgoingTurn[]
 }
 
@@ -37,8 +38,14 @@ export class DeviceConversations {
     return this.read()
   }
 
+  saveDraft(id: string, text: string): Promise<DeviceConversation> {
+    return this.update((rows) => rows.map((row) => row.id === id ? { ...row, draft: text } : row))
+      .then(() => this.find(id))
+  }
+
   create(id: string): Promise<DeviceConversation> {
-    const device = this.requireDevice(id)
+    const device = this.devices().find((row) => row.id === id)
+    if (!device) throw new HubError('not_found', 'The device is no longer on this account')
     const chat: DeviceConversation = { id: randomUUID(), device: id, name: device.name, turns: [] }
     return this.update((rows) => [...rows, chat]).then(() => chat)
   }

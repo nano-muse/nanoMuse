@@ -11,11 +11,18 @@ import org.json.JSONObject
 class RemoteTaskApprovals(
     private val scope: CoroutineScope,
     private val sessionId: String,
+    private val deviceId: String,
     private val name: String,
     private val approve: suspend (String, Boolean) -> Unit,
     private val decide: suspend (JSONObject) -> GateOutcome = { body ->
         val preview = body.optString("preview").ifBlank { body.optString("summary") }
-        RemoteApprovalGate.check(sessionId, name, RemoteApprovalGate.assessment(body, name), "$name: $preview")
+        RemoteApprovalGate.check(
+            sessionId,
+            deviceId,
+            name,
+            RemoteApprovalGate.assessment(body, name),
+            "$name: $preview",
+        )
     },
 ) {
     private val pending = mutableMapOf<String, Job>()

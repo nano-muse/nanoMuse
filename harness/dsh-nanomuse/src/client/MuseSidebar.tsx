@@ -12,6 +12,7 @@
  */
 import { createElement as h, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Translate } from './api.ts'
+import { call, failureText } from './api.ts'
 import { Avatar } from './Avatar.tsx'
 import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { aboutBus } from './About.tsx'
@@ -25,6 +26,18 @@ import { useRooms } from './rooms.ts'
 import { usePrefs } from './prefs.ts'
 import { useWin, win, type RecentDoc } from './win.ts'
 import { useWindowsUpdates, updatePresentation, requestWindowsUpdate } from './windows-updates.ts'
+import { DeviceChatStartDialog } from './DeviceChatStartDialog.tsx'
+import { openDeviceConversation } from './DeviceConversationPanel.tsx'
+import { DEVICES_PANEL } from './panels.ts'
+import type { DeviceConversation } from '../device-conversations.ts'
+import type { LiveDevice } from './live.ts'
+
+const newChatListeners = new Set<() => void>()
+
+/** Let the native title bar's new-chat button open the same destination picker. */
+export function requestNewChatPicker(): void {
+  for (const listener of newChatListeners) listener()
+}
 
 /** The id the harness's Schedules plugin registers its global panel under. */
 const SCHEDULES_PANEL = 'schedules'
@@ -133,7 +146,7 @@ function CornerMenu({ anchor, items, onClose }: { anchor: HTMLElement; items: (M
 }
 
 export function MuseSidebar(props: MuseSidebarProps): ReactNode {
-  const { collapsed, width, t, renderSlot, startSession, toggleSidebar, selectPanel, openSettings: openSettingsHook, openProfile, openSearch, issuesUrl, chatActions, usePanels, usePanelInfo, useShortcuts, useSessions, useSessionStatus, useWorkspaces } = props
+  const { collapsed, width, t, renderSlot, toggleSidebar, selectPanel, openSettings: openSettingsHook, openProfile, openSearch, issuesUrl, chatActions, usePanels, usePanelInfo, useShortcuts, useSessions, useSessionStatus, useWorkspaces } = props
   const live = useLive()
   const update = useWindowsUpdates()
   const updateView = update ? updatePresentation(update, t) : null
@@ -148,10 +161,35 @@ export function MuseSidebar(props: MuseSidebarProps): ReactNode {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null)
   const [docMenu, setDocMenu] = useState<{ anchor: HTMLElement; doc: RecentDoc } | null>(null)
   const [notice, setNotice] = useState<{ id: number; text: string } | null>(null)
+  const [newChatOpen, setNewChatOpen] = useState(false)
+  const [newChatBusy, setNewChatBusy] = useState(false)
   const menuButton = useRef<HTMLButtonElement | null>(null)
   const column = useRef<HTMLDivElement>(null)
   const searchField = useRef<HTMLInputElement | null>(null)
   const settingsSeat = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const open = () => setNewChatOpen(true)
+    newChatListeners.add(open)
+    return () => { newChatListeners.delete(open) }
+  }, [])
+
+  const beginChat = () => setNewChatOpen(true)
+  const startLocalChat = () => {
+    setNewChatOpen(false)
+    chatActions.startSession()
+  }
+  const startDeviceChat = (device: LiveDevice) => {
+    setNewChatBusy(true)
+    void call<DeviceConversation>('devices/conversations', { action: 'create', device: device.id })
+      .then((chat) => {
+        setNewChatOpen(false)
+        openDeviceConversation(chat.id)
+        selectPanel(DEVICES_PANEL)
+      })
+      .catch((error: unknown) => setNotice({ id: Date.now(), text: failureText(t, error) }))
+      .finally(() => setNewChatBusy(false))
+  }
 
   // Settings: the shell's own way when it offers one, else the trigger the
   // settings shell renders into its (visually hidden) seat, else the chord.
@@ -256,7 +294,7 @@ export function MuseSidebar(props: MuseSidebarProps): ReactNode {
         onContextMenu: (event: { preventDefault(): void; currentTarget: HTMLElement }) => { event.preventDefault(); setDocMenu({ anchor: event.currentTarget, doc }) },
       }, h(IconDoc, { size: 20 }), h('span', { className: 'nm-rail-doc-tag' }, docTag(doc.name))))) : null,
     h('div', { className: 'nm-rail-spacer' }),
-    collapsed ? h(RailButton, { label: t('railNew'), onClick: startSession }, h(IconPlus, { size: 21 })) : null,
+    h(RailButton, { label: t('railNew'), onClick: beginChat }, h(IconPlus, { size: 21 })),
     h(RailButton, { label: t('railMore'), expanded: menuAnchor !== null, dot: updateDot, onClick: () => setMenuAnchor((current) => (current ? null : menuButton.current)), buttonRef: (el) => { menuButton.current = el } }, h(IconMenu, { size: 21 })),
     // The settings shell lives in this seat: its trigger is hidden here (the
     // menu opens it), but its dialog and the onboarding steps mount through it.
@@ -280,7 +318,7 @@ export function MuseSidebar(props: MuseSidebarProps): ReactNode {
               h('div', { className: 'nm-col-head' },
                 h('span', null, t('railChats')),
                 h('div', { className: 'nm-col-head-actions' },
-                  h('button', { type: 'button', className: 'nm-icon-btn', title: t('railNew'), 'aria-label': t('railNew'), onClick: startSession }, h(IconPlus, { size: 18 })))),
+                  h('button', { type: 'button', className: 'nm-icon-btn', title: t('railNew'), 'aria-label': t('railNew'), onClick: beginChat }, h(IconPlus, { size: 18 })))),
               renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => { if (collapsed) toggleSidebar() } }))
           : h('div', { className: 'nm-col-body' },
               h(MuseChats, { t, useSessions, useSessionStatus, useWorkspaces, actions: chatActions, searchRef: (el) => { searchField.current = el } })),
@@ -290,6 +328,18 @@ export function MuseSidebar(props: MuseSidebarProps): ReactNode {
   return h('div', { className: 'nm-sidebar', style: { width: wide && !roomMode ? (collapsed ? lastWideWidth.current : width) : RAIL } },
     rail,
     chats,
+    newChatOpen ? h('div', {
+      style: { position: 'fixed', inset: 0, zIndex: 70, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,.38)' },
+      onClick: () => { if (!newChatBusy) setNewChatOpen(false) },
+    }, h('div', { onClick: (event: { stopPropagation(): void }) => event.stopPropagation() },
+      h(DeviceChatStartDialog, {
+        t,
+        busy: newChatBusy,
+        devices: live.hub.devices.filter((device) => device.id !== live.hub.deviceId && device.kind !== 'web'),
+        onLocal: startLocalChat,
+        onDevice: startDeviceChat,
+        onDismiss: () => setNewChatOpen(false),
+      }))) : null,
     menuAnchor ? h(CornerMenu, { anchor: menuAnchor, items: menuItems, onClose: () => setMenuAnchor(null) }) : null,
     docMenu ? h(CornerMenu, { anchor: docMenu.anchor, items: docItems, onClose: () => setDocMenu(null) }) : null,
     notice ? h('div', { style: { position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 60, pointerEvents: 'none' } },

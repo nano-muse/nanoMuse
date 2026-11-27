@@ -4,8 +4,10 @@ pass calls; a second account sees nothing of it."""
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import hashlib
 import json
+import threading
 import time
 
 import pytest
@@ -22,7 +24,14 @@ from nanomuse_cloud.service import Cloud
 
 @pytest.fixture
 def client():
-    settings = Settings(database=":memory:", secret="test-secret", public_base="http://cloud.test", hub_frame_limit=4096)
+    settings = Settings(
+        database=":memory:",
+        secret="test-secret",
+        public_base="http://cloud.test",
+        hub_frame_limit=4096,
+        code_per_identifier_10m=100,
+        code_per_ip_hour=1000,
+    )
     sender = LogSender()
     cloud = Cloud(settings, Database(":memory:"), sender)
     app = create_app(settings, cloud)
@@ -391,11 +400,12 @@ def test_a_call_id_still_waiting_is_not_taken_twice(client):
 
 def test_device_credentials_are_bound_and_older_keys_cannot_claim_them(client):
     """A new client binds at sign-in. Its key cannot announce another installation or
-    kind, and an unbound key from an earlier sign-in (a leaked old key, say) cannot take
-    an identity a later key owns."""
-    legacy = sign_up(client, "bound@example.com")
+    kind, and unbound compatibility keys cannot take an identity a bound key owns,
+    whether the unbound key was issued before or after it."""
+    older_legacy = sign_up(client, "bound@example.com")
     a = sign_up(client, "bound@example.com", device_id="phone-a", device_kind="phone")
     b = sign_up(client, "bound@example.com", device_id="pc-b", device_kind="computer")
+    later_legacy = sign_up(client, "bound@example.com")
 
     for frame in (
         hello("phone", "pc-b", "not B"),
@@ -406,9 +416,10 @@ def test_device_credentials_are_bound_and_older_keys_cannot_claim_them(client):
             err = ws.receive_json()
             assert err["type"] == "error" and err["code"] == "bad_device"
 
-    with connect(client, legacy) as ws:
-        ws.send_json(hello("computer", "pc-b", "old client"))
-        assert ws.receive_json()["code"] == "bad_device"
+    for legacy in (older_legacy, later_legacy):
+        with connect(client, legacy) as ws:
+            ws.send_json(hello("computer", "pc-b", "old client"))
+            assert ws.receive_json()["code"] == "bad_device"
 
     with connect(client, a) as phone, connect(client, b) as pc:
         phone.send_json(hello("phone", "phone-a", "Pixel"))
@@ -430,14 +441,14 @@ def test_old_client_binds_on_first_hello_and_reconnects(client):
 
 def test_a_later_sign_in_on_the_same_installation_takes_the_identity_over(client):
     """A phone that signs in again without signing out (or whose sign-out never reached
-    the relay) keeps its device id: the newer code sign-in proved the account, so its key
-    takes the id from the older one, which stays a valid account key but no longer
-    speaks for the device. The older key cannot take it back."""
+    the relay) keeps its device id when the fresh sign-in binds that id. The older key
+    stays a valid account key but no longer speaks for the device and cannot take it
+    back through the compatibility path."""
     old = sign_up(client, "again@example.com")
     with connect(client, old) as ws:
         ws.send_json(hello("phone", "phone-same", "Pixel"))
         assert ws.receive_json()["device_id"] == "phone-same"
-    new = sign_up(client, "again@example.com")
+    new = sign_up(client, "again@example.com", device_id="phone-same", device_kind="phone")
     with connect(client, new) as ws:
         ws.send_json(hello("phone", "phone-same", "Pixel"))
         assert ws.receive_json()["device_id"] == "phone-same"
@@ -465,11 +476,21 @@ def test_a_revoked_owner_releases_its_device_id(client):
         assert ws.receive_json()["device_id"] == "pc-same"
 
 
-def test_a_session_key_registers_a_free_identity_but_never_takes_one(client):
-    """nanoMuse Web's container runs the runtime, a `computer` of the account with an id of
-    its own: a session key binds that at its first hello like any credential. What it
-    cannot do is take over an id a standing key holds, however new the session key is."""
-    standing = sign_up(client, "web-session@example.com", device_id="pc-mine", device_kind="computer")
+def test_a_session_key_claims_one_free_runtime_computer_identity(client):
+    """The gateway gets a bound reservation before its container has an installation id.
+    The runtime may claim one free computer id, after which only that identity reconnects."""
+    standing = sign_up(
+        client,
+        "web-session@example.com",
+        device_id="pc-mine",
+        device_kind="computer",
+    )
+    phone_key = sign_up(
+        client,
+        "web-session@example.com",
+        device_id="phone-mine",
+        device_kind="phone",
+    )
     r = client.post(
         "/v1/auth/session-key",
         headers={"Authorization": f"Bearer {standing}"},
@@ -478,14 +499,84 @@ def test_a_session_key_registers_a_free_identity_but_never_takes_one(client):
     assert r.status_code == 200
     session = r.json()
     assert set(session) == {"api_key", "expires_at"}
+    issued = client.app.state.cloud.authenticate(session["api_key"])
+    assert issued.via == "session"
+    assert issued.hub_device_kind == "computer"
+    assert issued.hub_device_id.startswith("session-")
+
     with connect(client, session["api_key"]) as ws:
         ws.send_json(hello("computer", "pc-mine", "fake"))
         assert ws.receive_json()["code"] == "bad_device"
     with connect(client, session["api_key"]) as ws:
+        ws.send_json(hello("phone", "phone-mine", "fake"))
+        assert ws.receive_json()["code"] == "bad_device"
+    with connect(client, session["api_key"]) as ws:
+        ws.send_json(hello("phone", "phone-container", "Web"))
+        assert ws.receive_json()["code"] == "bad_device"
+    with connect(client, session["api_key"]) as ws:
         ws.send_json(hello("computer", "pc-container", "Web"))
         assert ws.receive_json()["device_id"] == "pc-container"
+
+    claimed = client.app.state.cloud.authenticate(session["api_key"])
+    assert claimed.hub_device_id == "pc-container"
+    assert claimed.hub_device_kind == "computer"
+    with connect(client, phone_key) as phone, connect(client, session["api_key"]) as runtime:
+        phone.send_json(hello("phone", "phone-mine", "Pixel"))
+        assert phone.receive_json()["device_id"] == "phone-mine"
+        phone.receive_json()
+        runtime.send_json(hello("computer", "pc-container", "Web"))
+        assert runtime.receive_json()["device_id"] == "pc-container"
+        runtime.receive_json()
+        phone.receive_json()
+        phone.send_json(
+            {
+                "type": "call",
+                "id": "web-info",
+                "to": "pc-container",
+                "action": "info",
+                "args": {},
+            }
+        )
+        call = runtime.receive_json()
+        assert call["type"] == "call" and call["id"] == "web-info"
+        runtime.send_json({"type": "result", "id": "web-info", "ok": True, "body": {}})
+        assert phone.receive_json()["type"] == "result"
     with connect(client, session["api_key"]) as ws:
-        ws.send_json(hello("phone", "pc-container", "Web"))
+        ws.send_json(hello("computer", "pc-someone-else", "Web"))
+        assert ws.receive_json()["code"] == "bad_device"
+
+
+def test_an_upgrade_session_key_can_claim_only_a_free_computer_id(client):
+    """A pre-upgrade session key has no reservation. For one compatibility release it
+    may bind once, but cannot take an existing id or announce another device kind."""
+    standing = sign_up(
+        client,
+        "legacy-web-session@example.com",
+        device_id="pc-owned",
+        device_kind="computer",
+    )
+    cloud = client.app.state.cloud
+    owner = cloud.authenticate(standing)
+    legacy, issued = cloud._issue_key(
+        owner.account_id,
+        "Web",
+        via="session",
+        expires_at=int(time.time()) + 3600,
+    )
+    assert issued.hub_device_id == "" and issued.hub_device_kind == ""
+
+    with connect(client, legacy) as ws:
+        ws.send_json(hello("computer", "pc-owned", "Web"))
+        assert ws.receive_json()["code"] == "bad_device"
+    with connect(client, legacy) as ws:
+        ws.send_json(hello("phone", "phone-free", "Web"))
+        assert ws.receive_json()["code"] == "bad_device"
+    for _ in range(2):
+        with connect(client, legacy) as ws:
+            ws.send_json(hello("computer", "pc-legacy-web", "Web"))
+            assert ws.receive_json()["device_id"] == "pc-legacy-web"
+    with connect(client, legacy) as ws:
+        ws.send_json(hello("computer", "pc-other", "Web"))
         assert ws.receive_json()["code"] == "bad_device"
 
 
@@ -509,7 +600,16 @@ def test_forged_hello_cannot_settle_invite_but_spend_threshold_settles_once(clie
     assert cloud.settle_invite(invitee) is False
 
     cloud.db.charge(invitee, "chat", "test", 0, 0, 0, "enough", cost_uy=1)
-    assert cloud.settle_invite(invitee) is True
+    barrier = threading.Barrier(8)
+
+    def settle() -> bool:
+        barrier.wait()
+        return cloud.settle_invite(invitee)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        settled = list(pool.map(lambda _: settle(), range(8)))
+    assert settled.count(True) == 1
+    assert settled.count(False) == 7
     assert cloud.settle_invite(invitee) is False
     bonus = cloud.s.cny_to_uy(cloud.s.invite_bonus_cny)
     assert int(cloud.db.account(inviter)["grant_uy"]) == before_inviter + bonus

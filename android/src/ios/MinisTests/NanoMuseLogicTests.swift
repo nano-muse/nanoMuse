@@ -319,7 +319,13 @@ final class NanoMuseLogicTests: XCTestCase {
         XCTAssertEqual(NanoMuseModelMenu.lanes(relay[0]), ["gui", "chat"])
     }
 
-    func testPublicCloudRetiresMediaWhileSelfHostedRelaysMayAdvertiseIt() {
+    func testHostedMediaRequiresTheCurrentModelAndSelfHostedRelaysMayAdvertiseOtherModels() {
+        XCTAssertEqual(NanoMuseModelMenu.defaultChatModel, "deepseek-v4.1-flash-1017")
+        XCTAssertEqual(NanoMuseModelMenu.defaultGuiModel, "qwen3.5-397b-a17b")
+        XCTAssertTrue(NanoMuseRelayMenu.allows(.image, at: NanoMuseCloud.defaultBase, model: "musesteamer-air-image"))
+        XCTAssertTrue(NanoMuseRelayMenu.allows(.video, at: NanoMuseCloud.defaultBase, model: "ernie-wizshot-me"))
+        XCTAssertFalse(NanoMuseRelayMenu.allows(.video, at: NanoMuseCloud.defaultBase, model: "wan2.2-i2v-flash"))
+        XCTAssertFalse(NanoMuseRelayMenu.allows(.image, at: NanoMuseCloud.defaultBase, model: "ernie-wizshot-me"))
         XCTAssertFalse(NanoMuseRelayMenu.allows(.image, at: "https://cloud.nanomuse.cn/"))
         XCTAssertFalse(NanoMuseRelayMenu.allows(.video, at: NanoMuseCloud.defaultBase))
         XCTAssertTrue(NanoMuseRelayMenu.allows(.image, at: "https://relay.example/v1"))

@@ -32,6 +32,10 @@ class MediaTest {
     @Test fun `public Cloud ignores retired cached media while self hosted relays follow their menu`() {
         val candidates = listOf("Qwen/Qwen3.6-27B-FP8", "qwen-image-3.0", "wan2.2-i2v-flash")
         val oldMenu = listOf("qwen-image-3.0", "wan2.2-i2v-flash")
+        val current = listOf("musesteamer-air-image", "ernie-wizshot-me")
+        assertEquals(current, RelayMediaPolicy.available("https://cloud.nanomuse.cn", oldMenu + current, candidates + current))
+        assertEquals(emptyList<String>(), RelayMediaPolicy.available("https://cloud.nanomuse.cn", emptyList(), current))
+        assertTrue(VideoGen.looksLikeVideoModel("ernie-wizshot-me"))
         assertEquals(
             emptyList<String>(),
             RelayMediaPolicy.available("https://cloud.nanomuse.cn/", oldMenu, candidates),
