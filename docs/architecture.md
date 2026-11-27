@@ -32,6 +32,7 @@ sequenceDiagram
 
 | Area | Files | Notes |
 |---|---|---|
+| Public source follow-ups | `nanomuse/server/watch_discovery.py`, `public_watches.py`, `public_sources.py`, `public_feed.py` | Offline discovery, account choices, change detection and bounded anonymous reads. The web scheduler passes new evidence to `context_watch.py`. The desktop Feed invokes the same readers and watch transitions through a private, short-lived `watch-stdio` worker. Android and iPhone bundle the same offline rules and provider adapters from `android/src/shared/public-watches`. A Go HTTPS reader binds requests to validated public addresses. Each host owns its account binding, scheduler, review and chat delivery. |
 | Composition root | `nanomuse/app.py` | `NanoMuseApp` wires settings → LLM, tools, vault, Sentinel, memory, goals, agent |
 | Agent loop | `nanomuse/agent/core.py` | prompt assembly, context trimming, stuck detection, session persistence, inbox; optional shared [task budgets](runtime-budgets.md), with logged tool-result shortening |
 | Prompts | `nanomuse/prompts.py` | system prompt, language rule and script detection, goal-advance prompt |

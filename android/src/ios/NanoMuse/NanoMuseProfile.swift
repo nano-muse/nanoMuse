@@ -76,7 +76,7 @@ enum NanoMuseRelayMedia {
             let arch = model["architecture"] as? [String: Any]
             let outputs = arch?["output_modalities"] as? [String] ?? []
             let kind = (model["nanomuse"] as? [String: Any])?["kind"] as? String
-            if outputs.contains("image") || kind == "image", let id = model["id"] as? String, !id.isEmpty {
+            if outputs.contains("image") || kind == "image", let id = model["id"] as? String, !id.isEmpty, NanoMuseRelayMenu.allows(.image, at: NanoMuseCloud.baseURL, model: id) {
                 return id
             }
         }

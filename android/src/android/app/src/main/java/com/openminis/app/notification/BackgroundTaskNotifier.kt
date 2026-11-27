@@ -81,6 +81,9 @@ class BackgroundTaskNotifier(
                 } else {
                     context.getString(R.string.notif_task_completed_body)
                 }
+                // nanoMuse: the Feed runner owns its notice, including quiet results. Private goals stay in-app.
+                if (io.github.nanomuse.feed.FeedFlow.isFeedSession(context, sessionId) ||
+                    io.github.nanomuse.goals.GoalFlow.isProtectedSession(context, sessionId)) return@launch
                 postNotification(sessionId, title, body)
             } catch (t: Throwable) {
                 AppLogger.warning(TAG, "notifyTaskCompleted failed: ${t.message}")

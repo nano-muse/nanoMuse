@@ -672,6 +672,8 @@ extension AIChatViewModel {
         toolLoopDetector.reset()
 
         if let sessionId {
+            // nanoMuse: clearing a chat also ends every approval remembered for that chat.
+            NanoMuseRemoteApprovals.shared.resetSessionGrants(for: sessionId)
             Task { await ISHExecutionCoordinator.shared.sessionDidTerminate(sessionId: sessionId) }
             BrowserTabPool.deletePersistedData(for: sessionId)
             BrowserUseOffloadBridge.releasePool(forSession: sessionId)

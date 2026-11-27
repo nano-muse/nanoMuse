@@ -90,6 +90,7 @@ async def test_the_page_and_a_first_sign_in(web):
         assert accounts.live[me["slug"]].key == ""
         assert env["NANOMUSE_CLOUD_BASE_URL"] == "http://relay:8787"
         assert env["NANOMUSE_HUB_NAME"] == "Web" and env["NANOMUSE_ONBOARDED"] == "1"
+        assert "NANOMUSE_HUB_DEVICE_ID" not in env and "NANOMUSE_HUB_KIND" not in env
         assert env["NANOMUSE_SERVER_TOKEN"] == token
         assert "NANOMUSE_LLM_BASE_URL" not in env  # the runtime makes the Cloud its model itself
         assert kept["network"] == "web-net" and kept["image"] == "nanomuse:web"

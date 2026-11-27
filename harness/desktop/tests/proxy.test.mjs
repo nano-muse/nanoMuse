@@ -1,6 +1,6 @@
 // The proxy for the model providers (src/proxy.ts): what the Host's environment gets for a
 // setting — nothing for none, the two HTTP variables (ALL_PROXY too for SOCKS), NO_PROXY with
-// loopback, the default relay and the relay the plugin reported, and NODE_USE_ENV_PROXY so
+// loopback, the default relay and relays from trusted launch configuration, and NODE_USE_ENV_PROXY so
 // Node's fetch reads them. Run after `tsc -p tsconfig.json`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -26,7 +26,7 @@ test("the screen never shows the password", () => {
   assert.equal(maskProxyUrl(""), "");
 });
 
-test("NO_PROXY is loopback, the default relay and the plugin's relays, each once", () => {
+test("NO_PROXY is loopback, the default relay and trusted extra relays, each once", () => {
   assert.deepEqual(noProxyList([]), ["localhost", "127.0.0.1", "::1", DEFAULT_RELAY_HOST]);
   assert.deepEqual(noProxyList(["https://cloud.nanomuse.cn", "https://Relay.Example:8790/", "relay.example", "", "not a host at all??"]), ["localhost", "127.0.0.1", "::1", "cloud.nanomuse.cn", "relay.example"]);
   // a bare 127.0.0.1:8790 (a self-hosted relay next to the app) adds nothing: loopback is there already

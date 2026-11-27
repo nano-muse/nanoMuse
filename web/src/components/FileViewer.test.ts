@@ -1,5 +1,7 @@
+import { createElement } from "react";
+import { create } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
-import { parseIcs } from "./FileViewer";
+import { HtmlBody, parseIcs } from "./FileViewer";
 
 const ICS = [
   "BEGIN:VCALENDAR",
@@ -39,4 +41,21 @@ describe("parseIcs", () => {
   it("is empty for a file without events", () => {
     expect(parseIcs("BEGIN:VCALENDAR\nEND:VCALENDAR\n")).toEqual([]);
   });
+});
+
+it("loads HTML by URL so the response CSP remains attached", () => {
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { location: { href: "http://localhost/" } },
+  });
+  try {
+    const frame = create(createElement(HtmlBody, { path: "reports/page.html" })).root.findByType(
+      "iframe",
+    );
+    expect(frame.props.src).toBe("/api/files/reports/page.html");
+    expect(frame.props.srcDoc).toBeUndefined();
+    expect(frame.props.sandbox).toBe("");
+  } finally {
+    delete (globalThis as { window?: unknown }).window;
+  }
 });

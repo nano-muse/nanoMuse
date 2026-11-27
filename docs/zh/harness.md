@@ -70,7 +70,7 @@
 | 界面形象（[avatar.md](avatar.md)） | 使用 `sidebar.brand.*`、`conversation.hero.brand.mark` 插槽；宿主提供静态图，会话状态决定形象状态，手工作时显示胶囊 | 已完成 |
 | 跨设备形象同步 | `profile.ts` 收到 hub 的 `profile` 帧后获取中继资料；宿主缓存并提供生成形象的静态图 | 已完成 |
 | 形象动画（[avatar.md](avatar.md)） | `Avatar.tsx` 在 44 px 及以上静音循环播放 `assets/` 的小龙状态视频，静态图作封面；生成形象和 emoji 用 CSS 做呼吸、摇摆、跳跃效果，减少动态效果模式下不播放 | 已完成 |
-| 形象工作室，在本机生成形象 | `AvatarStudio.tsx` 提供四个本地化灵感预设或文字描述，使用「模型」中选择的自有图像服务商和 API key 生成候选及状态图；公开托管的 Cloud 不提供媒体生成 | 已完成 |
+| 形象工作室，在本机生成形象 | `AvatarStudio.tsx` 提供四个本地化灵感预设或文字描述，使用「模型」中选择的自有图像服务商和 API key 生成候选及状态图；托管模型支持文生图，参考图姿势编辑需要支持该能力的自有服务商 | 已完成 |
 | 首次运行 | 在 dsh 的 `settings.onboarding` 插槽注册全窗口流程：欢迎、登录、验证码、权限切换卡片（macOS 电脑权限、文件、设备）、就绪 | 已完成 |
 | 窗口（[desktop-muse.md](desktop-muse.md)） | `sidebar`、`sidebar.settings`、`shell.overlay` 插槽及插件包样式：窄栏、主要聊天和旁聊、固定形象、带停止的状态标签、邀请、资料面板、圆角输入条、气泡、权限卡片、带高级分组的设置和应用主题 | 已完成 |
 | 哨兵（[sentinel.md](sentinel.md)） | dsh 审批策略和 `tools/pre-execute` 顺序处理链；将 nanoMuse 风险类别映射为审批预设，保留可见的确认步骤 | 阶段 4 |

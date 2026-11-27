@@ -119,17 +119,20 @@ interface Entry {
   service?: CatalogueEntry
   /** A custom server another device of the account connected: its URL, for Connect here. */
   sharedUrl?: string
+  /** New connection form choice, kept through key entry and browser sign-in. */
+  followOffer?: string
 }
 
 interface Step { text: string; command?: string }
 
 /** What the page is in the middle of: a sign-in in the browser, a key to paste, a URL to add, the vault steps. */
 type Pending =
+  | { kind: 'confirm'; entry: Entry; offer: string }
   | { kind: 'authorize'; entry: Entry; url: string; flow: string; status: FlowView['status']; error: string }
   | { kind: 'key'; entry: Entry; where: string; error: string; busy: boolean }
   /** The service registers no clients by itself: an OAuth app of the person's own, its id pasted here. */
   | { kind: 'client'; entry: Entry; redirectUri: string; developer: string; error: string; busy: boolean }
-  | { kind: 'custom'; url: string; label: string; error: string; busy: boolean }
+  | { kind: 'custom'; offer: string; url: string; label: string; error: string; busy: boolean }
   | { kind: 'steps'; entry: Entry }
 
 /** The service's brand mark on a white tile, or its initial on a tile of its colour. */
@@ -284,21 +287,26 @@ export function makeConnectorsSection(t: Translate) {
       setPending((p) => {
         if (!p) return entry ? { kind: 'authorize', entry, url: '', flow: '', status: 'failed', error: text } : null
         if (p.kind === 'authorize') return { ...p, status: 'failed', error: text }
-        if (p.kind === 'steps') return p
+        if (p.kind === 'steps' || p.kind === 'confirm') return p
         return { ...p, error: text, busy: false }
       })
     }
     // `fresh`: start over with a new client registration at the service (its sign-in page said it no longer knows ours)
     const beginConnect = (entry: Entry, fresh = false) => {
       // a custom server another device connected: the same URL, a credential entered here
-      if (!entry.connect && entry.sharedUrl) { setPending({ kind: 'custom', url: entry.sharedUrl, label: entry.title, error: '', busy: false }); return }
+      if (!entry.connect && entry.sharedUrl) { setPending({ kind: 'custom', offer: rooms.feed.routine.newResourceOffer ?? '', url: entry.sharedUrl, label: entry.title, error: '', busy: false }); return }
       if (!entry.connect) return
       if ('section' in entry.connect) { settingsBus.openSection?.(entry.connect.section); return }
       if ('steps' in entry.connect) { setPending({ kind: 'steps', entry }); return }
+      const offer = rooms.feed.routine.newResourceOffer
+      if (offer && entry.followOffer === undefined) {
+        setPending({ kind: 'confirm', entry, offer })
+        return
+      }
       const service = entry.connect.service
       if (service.auth.kind === 'key') { setPending({ kind: 'key', entry, where: service.auth.where, error: '', busy: false }); return }
       setPending({ kind: 'authorize', entry, url: '', flow: '', status: 'pending', error: '' })
-      connectorsCall<ConnectResult>('connect', { service: service.id, ...(fresh ? { fresh } : {}) }).then((r) => handle(entry, r)).catch((e: unknown) => fail(entry, e))
+      connectorsCall<ConnectResult>('connect', { service: service.id, ...(entry.followOffer ? { followOffer: entry.followOffer } : {}), ...(fresh ? { fresh } : {}) }).then((r) => handle(entry, r)).catch((e: unknown) => fail(entry, e))
     }
     const reconnect = (entry: Entry, fresh = false) => {
       const c = entry.connection
@@ -315,21 +323,21 @@ export function makeConnectorsSection(t: Translate) {
       if (!pending || pending.kind !== 'key') return
       const entry = pending.entry
       setPending({ ...pending, busy: true, error: '' })
-      const body = entry.service ? { service: entry.service.id, key, ...(entry.connection ? { reconnect: entry.connection.id } : {}) } : { url: entry.connection?.url, label: entry.title, key, ...(entry.connection ? { reconnect: entry.connection.id } : {}) }
-      connectorsCall<ConnectResult>('connect', body).then((r) => handle(entry, r)).catch((e: unknown) => fail(null, e))
+      const body = entry.service ? { service: entry.service.id, key, ...(entry.connection ? { reconnect: entry.connection.id } : {}) } : { url: entry.connection?.url ?? entry.sharedUrl, label: entry.title, key, ...(entry.connection ? { reconnect: entry.connection.id } : {}) }
+      connectorsCall<ConnectResult>('connect', { ...body, followOffer: entry.followOffer }).then((r) => handle(entry, r)).catch((e: unknown) => fail(null, e))
     }
     const submitClient = (clientId: string, clientSecret: string) => {
       if (!pending || pending.kind !== 'client') return
       const entry = pending.entry
       setPending({ ...pending, busy: true, error: '' })
-      const body = { ...(entry.service ? { service: entry.service.id } : { url: entry.connection?.url, label: entry.title }), clientId, ...(clientSecret ? { clientSecret } : {}), ...(entry.connection ? { reconnect: entry.connection.id } : {}) }
-      connectorsCall<ConnectResult>('connect', body).then((r) => handle(entry, r)).catch((e: unknown) => fail(null, e))
+      const body = { ...(entry.service ? { service: entry.service.id } : { url: entry.connection?.url ?? entry.sharedUrl, label: entry.title }), clientId, ...(clientSecret ? { clientSecret } : {}), ...(entry.connection ? { reconnect: entry.connection.id } : {}) }
+      connectorsCall<ConnectResult>('connect', { ...body, followOffer: entry.followOffer }).then((r) => handle(entry, r)).catch((e: unknown) => fail(null, e))
     }
-    const submitCustom = (url: string, label: string, key: string, clientId: string, clientSecret: string) => {
+    const submitCustom = (url: string, label: string, key: string, clientId: string, clientSecret: string, followOffer: string) => {
       if (!pending || pending.kind !== 'custom') return
       setPending({ ...pending, url, label, busy: true, error: '' })
-      const entry: Entry = { id: 'custom', mark: h(Mark, { color: '#64748b', name: label || hostOf(url) }), title: label || hostOf(url), sub: url, about: t('cnCustomAbout', { host: hostOf(url) }), on: false, group: 'misc', tools: [] }
-      connectorsCall<ConnectResult>('connect', { url, label, ...(key ? { key } : {}), ...(clientId ? { clientId } : {}), ...(clientSecret ? { clientSecret } : {}) }).then((r) => handle(entry, r)).catch((e: unknown) => fail(null, e))
+      const entry: Entry = { id: 'custom', followOffer, sharedUrl: url, mark: h(Mark, { color: '#64748b', name: label || hostOf(url) }), title: label || hostOf(url), sub: url, about: t('cnCustomAbout', { host: hostOf(url) }), on: false, group: 'misc', tools: [] }
+      connectorsCall<ConnectResult>('connect', { url, label, followOffer, ...(key ? { key } : {}), ...(clientId ? { clientId } : {}), ...(clientSecret ? { clientSecret } : {}) }).then((r) => handle(entry, r)).catch((e: unknown) => fail(null, e))
     }
     const disconnect = (entry: Entry) => {
       if (!entry.connection) return
@@ -350,7 +358,7 @@ export function makeConnectorsSection(t: Translate) {
         .catch((e: unknown) => setHits({ q: text, items: [], busy: false, error: e instanceof Error ? e.message : String(e) }))
     }
     const connectHit = (hit: RegistryHit) => {
-      setPending({ kind: 'custom', url: hit.url, label: hit.title || hit.name, error: '', busy: false })
+      setPending({ kind: 'custom', offer: rooms.feed.routine.newResourceOffer ?? '', url: hit.url, label: hit.title || hit.name, error: '', busy: false })
     }
 
     // the sign-in in the browser: follow the flow until the service answers
@@ -375,7 +383,7 @@ export function makeConnectorsSection(t: Translate) {
     if (current) {
       return h(Fragment, null,
         h(Detail, { t, entry: current, onBack: () => setOpen(null), onConnect: () => beginConnect(current), onReconnect: () => reconnect(current), onDisconnect: () => disconnect(current), onRetry: () => retry(current), onTool: (name: string, enabled: boolean) => setTool(current, name, enabled) }),
-        pending ? h(PendingSheet, { t, pending, onClose: () => setPending(null), onKey: submitKey, onClient: submitClient, onCustom: submitCustom, onRetry: again }) : null)
+        pending ? h(PendingSheet, { t, pending, onClose: () => setPending(null), onKey: submitKey, onClient: submitClient, onCustom: submitCustom, onConfirm: beginConnect, onRetry: again }) : null)
     }
 
     const chips: (Group | 'all')[] = ['all', 'builtin', ...(others.length ? ['preset' as const] : []), ...CATEGORY_ORDER, ...(entries.some((e) => e.group === 'infra') ? ['infra' as const] : [])]
@@ -407,7 +415,7 @@ export function makeConnectorsSection(t: Translate) {
             h('div', { className: 'nm-row-main' }, h('span', { className: 'nm-row-title' }, hit.title || hit.name), h('span', { className: 'nm-row-sub nm-wrap' }, hit.description || hostOf(hit.url)))),
           h('button', { type: 'button', className: 'nm-cn-connect', onClick: () => connectHit(hit) }, t('cnConnect')))) : h('p', { className: 'nm-fine nm-cn-registry-note' }, t('cnRegistryNone'))) : null) : null,
       !q && group === 'all' ? h('div', { className: 'nm-card' },
-        h('button', { type: 'button', className: 'nm-row nm-row-button', onClick: () => setPending({ kind: 'custom', url: '', label: '', error: '', busy: false }) },
+        h('button', { type: 'button', className: 'nm-row nm-row-button', onClick: () => setPending({ kind: 'custom', offer: rooms.feed.routine.newResourceOffer ?? '', url: '', label: '', error: '', busy: false }) },
           h('span', { className: 'nm-row-icon' }, h(IconLink, { size: 18 })),
           h('div', { className: 'nm-row-main' }, h('span', { className: 'nm-row-title' }, t('cnAddUrl')), h('span', { className: 'nm-row-sub nm-wrap' }, t('cnAddUrlSub'))),
           h('span', { className: 'nm-row-chevron' }, h(IconChevronRight, { size: 16 }))),
@@ -419,7 +427,7 @@ export function makeConnectorsSection(t: Translate) {
         seen && catalogue ? `${t('cnBuiltinCount', { n: catalogue.builtin })} ` : '',
         t('cnServicesFine', { n: CATALOGUE.length }), ' ',
         h('a', { href: HARNESS_MCP_DOCS, onClick: (e: Event) => { e.preventDefault(); openLink(HARNESS_MCP_DOCS) } }, t('cnDocs'))),
-      pending ? h(PendingSheet, { t, pending, onClose: () => setPending(null), onKey: submitKey, onClient: submitClient, onCustom: submitCustom, onRetry: again }) : null)
+      pending ? h(PendingSheet, { t, pending, onClose: () => setPending(null), onKey: submitKey, onClient: submitClient, onCustom: submitCustom, onConfirm: beginConnect, onRetry: again }) : null)
   }
 }
 
@@ -512,14 +520,29 @@ function Detail({ t, entry, onBack, onConnect, onReconnect, onDisconnect, onRetr
     h('p', { className: 'nm-fine' }, t('cnDetailFine')))
 }
 
-function PendingSheet({ t, pending, onClose, onKey, onClient, onCustom, onRetry }: { t: Translate; pending: Pending; onClose(): void; onKey(key: string): void; onClient(clientId: string, clientSecret: string): void; onCustom(url: string, label: string, key: string, clientId: string, clientSecret: string): void; onRetry(fresh: boolean): void }): ReactNode {
+function PendingSheet({ t, pending, onClose, onKey, onClient, onCustom, onConfirm, onRetry }: { t: Translate; pending: Pending; onConfirm(entry: Entry): void; onClose(): void; onKey(key: string): void; onClient(clientId: string, clientSecret: string): void; onCustom(url: string, label: string, key: string, clientId: string, clientSecret: string, offer: string): void; onRetry(fresh: boolean): void }): ReactNode {
   switch (pending.kind) {
+    case 'confirm': return h(ConnectWithResource, { t, pending, onClose, onConfirm })
     case 'steps': return h(StepsSheet, { t, entry: pending.entry, onClose })
     case 'authorize': return h(AuthorizeSheet, { t, pending, onClose, onRetry })
     case 'key': return h(KeySheet, { t, pending, onClose, onKey })
     case 'client': return h(ClientSheet, { t, pending, onClose, onClient })
     case 'custom': return h(CustomSheet, { t, pending, onClose, onCustom })
   }
+}
+
+function FollowResourceChoice({ t, checked, onChange }: { t: Translate; checked: boolean; onChange(value: boolean): void }): ReactNode {
+  return h('label', { className: 'nm-feed-routine' },
+    h('input', { type: 'checkbox', checked, onChange: (e: { currentTarget: HTMLInputElement }) => onChange(e.currentTarget.checked) }),
+    h('span', null, t('cnFollowSingleResource')))
+}
+
+function ConnectWithResource({ t, pending, onClose, onConfirm }: { t: Translate; pending: Extract<Pending, { kind: 'confirm' }>; onClose(): void; onConfirm(entry: Entry): void }): ReactNode {
+  const [follow, setFollow] = useState(true)
+  return h(Sheet, { title: t('cnConnectTitle', { name: pending.entry.title }), closeLabel: t('close'), onClose, footer: h(Fragment, null,
+    h('button', { type: 'button', className: 'nm-pill nm-pill-ghost', onClick: onClose }, t('cancel')),
+    h('button', { type: 'button', className: 'nm-pill', onClick: () => onConfirm({ ...pending.entry, followOffer: follow ? pending.offer : '' }) }, t('cnConnect'))) },
+    h('p', { className: 'nm-cn-consent-lead' }, pending.entry.about), h(FollowResourceChoice, { t, checked: follow, onChange: setFollow }))
 }
 
 function AuthorizeSheet({ t, pending, onClose, onRetry }: { t: Translate; pending: Extract<Pending, { kind: 'authorize' }>; onClose(): void; onRetry(fresh: boolean): void }): ReactNode {
@@ -585,7 +608,8 @@ function ClientSheet({ t, pending, onClose, onClient }: { t: Translate; pending:
     h('p', { className: 'nm-fine' }, t('cnClientKept', { name: entry.title })))
 }
 
-function CustomSheet({ t, pending, onClose, onCustom }: { t: Translate; pending: Extract<Pending, { kind: 'custom' }>; onClose(): void; onCustom(url: string, label: string, key: string, clientId: string, clientSecret: string): void }): ReactNode {
+function CustomSheet({ t, pending, onClose, onCustom }: { t: Translate; pending: Extract<Pending, { kind: 'custom' }>; onClose(): void; onCustom(url: string, label: string, key: string, clientId: string, clientSecret: string, offer: string): void }): ReactNode {
+  const [follow, setFollow] = useState(true)
   const [url, setUrl] = useState(pending.url)
   const [label, setLabel] = useState(pending.label)
   const [key, setKey] = useState('')
@@ -593,7 +617,7 @@ function CustomSheet({ t, pending, onClose, onCustom }: { t: Translate; pending:
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
   const valid = /^https?:\/\/\S+$/i.test(url.trim())
-  const submit = () => { if (valid && !pending.busy) onCustom(url.trim(), label.trim(), key.trim(), clientId.trim(), clientSecret.trim()) }
+  const submit = () => { if (valid && !pending.busy) onCustom(url.trim(), label.trim(), key.trim(), clientId.trim(), clientSecret.trim(), follow ? pending.offer : '') }
   const field = (value: string, set: (v: string) => void, placeholder: string, type = 'text') =>
     h('input', { className: 'nm-field nm-cn-field', type, autoComplete: 'off', spellCheck: false, value, placeholder, 'aria-label': placeholder, onChange: (e: { currentTarget: HTMLInputElement }) => set(e.currentTarget.value), onKeyDown: (e: KeyboardEvent) => { if (e.key === 'Enter' && !composing(e)) submit() } })
   return h(Sheet, { title: t('cnCustomTitle'), onClose, closeLabel: t('close'), footer: h(Fragment, null,
@@ -603,6 +627,7 @@ function CustomSheet({ t, pending, onClose, onCustom }: { t: Translate; pending:
     field(url, setUrl, t('cnCustomUrl'), 'url'),
     field(label, setLabel, t('cnCustomLabel')),
     field(key, setKey, t('cnCustomKey'), 'password'),
+    pending.offer ? h(FollowResourceChoice, { t, checked: follow, onChange: setFollow }) : null,
     h('button', { type: 'button', className: 'nm-cn-more', 'aria-expanded': more, onClick: () => setMore(!more) }, more ? t('cnLessOptions') : t('cnMoreOptions')),
     more ? h(Fragment, null,
       h('p', { className: 'nm-fine' }, t('cnClientFine')),

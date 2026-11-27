@@ -13,6 +13,7 @@ import asyncio
 import imaplib
 import re
 import smtplib
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -38,8 +39,10 @@ from nanomuse.logger import logger
 from nanomuse.private import keep_private
 from nanomuse.schema import Message
 from nanomuse.search import WebSearchProvider
+from nanomuse.server.context_sources import ContextSample, preview, resource_preview
 from nanomuse.server.endpoints import Endpoints
 from nanomuse.server.failures import describe_failure
+from nanomuse.server.watch_discovery import WatchCandidate
 from nanomuse.tools import (
     Calendar,
     Contacts,
@@ -49,6 +52,7 @@ from nanomuse.tools import (
     WebSearch,
     playwright_available,
 )
+from nanomuse.tools.mcp_resources import MCPResource, MCPResourceReader
 from nanomuse.vault.vault import PLACEHOLDER_RE, VaultError
 
 if TYPE_CHECKING:
@@ -559,6 +563,7 @@ class Connections:
             server = getattr(t, "server", None)
             if server:
                 live_tools[server] = live_tools.get(server, 0) + 1
+        resource_readers = self._context_readers()
         return {
             "llm": {
                 "provider": s.llm.provider,
@@ -620,7 +625,7 @@ class Connections:
                     "url": m.url,
                     "risk": m.risk.value,
                     "tools": live_tools.get(m.name, 0),
-                    "connected": m.name in live_tools,
+                    "connected": m.name in live_tools or m.name in resource_readers,
                     "from_app": m.name in app_mcp,
                     "builtin": False,
                     # the server's environment: the names, and whether each value is a
@@ -1099,11 +1104,14 @@ class Connections:
         self.data["email"] = email
         self._save()
         apply_app_settings(self.settings, {"email": email})
+        if body.get("review") is not None:
+            self.svc.context_watch.connection_saved("mail", body["review"]["enabled"])
         self._sync_email_tools()
         self._publish()
         return self.view()["email"]
 
     def disconnect_email(self) -> dict[str, Any]:
+        self.svc.context_watch.disconnect_mail()
         self.vault.delete(EMAIL_PASSWORD)
         self.vault.delete(EMAIL_ADDRESS)
         self.data["email"] = {**(self.data.get("email") or {}), "enabled": False}
@@ -1201,6 +1209,8 @@ class Connections:
         if not _link_or_path(url):
             raise ValueError("the link must start with https:// (or be a path to an .ics file)")
         secret = _vault_name(name)
+        if self.vault.get(secret) != url:
+            self.svc.app.calendar.states.pop(name, None)
         self.vault.set(secret, url)
         calendar = self._calendar_data()
         feeds = [f for f in calendar.get("feeds") or [] if f.get("name") != name]
@@ -1208,6 +1218,8 @@ class Connections:
         calendar["feeds"] = feeds
         calendar["enabled"] = True
         self._apply_calendar(calendar)
+        if body.get("review") is not None:
+            self.svc.context_watch.connection_saved("calendar", body["review"]["enabled"])
         status = await self.svc.app.calendar.refresh(force=True)
         state = next((f for f in status["feeds"] if f["name"] == name), None)
         if state and state.get("error"):
@@ -1669,6 +1681,93 @@ class Connections:
         return self.view()["browser"]
 
     # ------------------------------------------------------------------ mcp
+    def _context_readers(self) -> dict[str, MCPResourceReader]:
+        readers: dict[str, MCPResourceReader] = {}
+        base = self.svc.app.mcp
+        for cfg in self.settings.mcp.servers:
+            manager = self._mcp.get(cfg.name, base)
+            if manager is not None and (reader := manager.resource_readers.get(cfg.name)):
+                readers[cfg.name] = reader
+        return readers
+
+    async def context_resources(self) -> list[dict[str, str]]:
+        """Explicit discovery for the resource picker. Private URIs stay inside their session."""
+        limit = asyncio.Semaphore(4)
+
+        async def choices(reader: MCPResourceReader) -> list[dict[str, str]]:
+            try:
+                async with limit:
+                    if self._context_readers().get(reader.name) is not reader:
+                        return []
+                    resources = await reader.listed()
+                if self._context_readers().get(reader.name) is not reader:
+                    return []
+                return [{"id": r.id, "label": preview(r.label, 180)} for r in resources]
+            except Exception:  # optional MCP capability, independent of the other sessions
+                return []
+
+        groups = await asyncio.gather(*(choices(r) for r in self._context_readers().values()))
+        return [row for group in groups for row in group]
+
+    async def context_resource_samples(
+        self, selected: list[str], *, allowed: Callable[[], bool] | None = None
+    ) -> list[ContextSample]:
+        """Read just the selected, still advertised resources in their original session."""
+        wanted = set(selected[:8])
+        if not wanted:
+            return []
+
+        async def read(reader: MCPResourceReader) -> list[ContextSample]:
+            def active() -> bool:
+                return self._context_readers().get(reader.name) is reader and (
+                    allowed is None or allowed()
+                )
+
+            async def sample(resource: MCPResource) -> ContextSample | None:
+                if not active():
+                    return None
+                try:
+                    raw = await reader.read(resource)
+                    if raw is None:
+                        return None
+                    candidates: list[WatchCandidate] = []
+                    references: list[WatchCandidate] = []
+                    text = resource_preview(
+                        self.svc.app.vault.redact(raw), candidates=candidates, references=references
+                    )
+                except Exception:
+                    return None
+                return (
+                    ContextSample(
+                        "mcp",
+                        resource.id,
+                        preview(resource.label, 180),
+                        text,
+                        candidates=tuple(candidates),
+                        references=tuple(references),
+                    )
+                    if active()
+                    else None
+                )
+
+            if not active():
+                return []
+            try:
+                resources = await reader.listed()
+            except Exception:
+                return []
+            samples = await asyncio.gather(*(sample(r) for r in resources if r.id in wanted))
+            return [s for s in samples if s is not None]
+
+        groups = await asyncio.gather(
+            *(
+                read(reader)
+                for reader in self._context_readers().values()
+                if any(key.startswith(reader.prefix) for key in wanted)
+            )
+        )
+        return [row for group in groups for row in group]
+
     async def add_mcp(self, body: dict[str, Any]) -> dict[str, Any]:
         """Connect a server and keep it. The values of its ``env`` go into the vault
         (``MCP_<SERVER>_<KEY>``) and ``app-settings.json`` keeps ``{{vault:NAME}}``
@@ -1686,6 +1785,8 @@ class Connections:
             raise ValueError("the server needs a name")
         if not (cfg.command or cfg.url):
             raise ValueError("give either a command to run or a URL to connect to")
+        review = body.get("review")
+        new_connection = not any(s.name == cfg.name for s in self.settings.mcp.servers)
         env: dict[str, str] = {}
         for key, value in cfg.env.items():
             if not key.strip():
@@ -1716,7 +1817,7 @@ class Connections:
             [cfg], resolve=lambda v: self.vault.resolve(v, strict=False), redact=self.vault.redact
         )
         tools = await manager.connect()
-        if not tools:
+        if not tools and cfg.name not in manager.resource_readers:
             await manager.close()
             self._publish()
             # the server is kept as typed (the Connections page shows it as not connected)
@@ -1727,6 +1828,20 @@ class Connections:
             )
         self._mcp[cfg.name] = manager
         self.svc.app.tools.add(*tools)
+        watch = self.svc.context_watch
+        reader = manager.resource_readers.get(cfg.name)
+        if new_connection and review and review["revision"] == watch.view()["revision"]:
+            selected = None
+            if reader and review["enabled"]:
+                try:
+                    candidates = await reader.listed(single_only=True)
+                except Exception:
+                    candidates = []  # Discovery is optional for an otherwise working server.
+                if len(candidates) == 1:
+                    resource = candidates[0]
+                    selected = (resource.id, preview(resource.label, 180))
+            if self._mcp.get(cfg.name) is manager:
+                watch.mcp_connected(review["revision"], review["enabled"], selected)
         self._publish()
         if cfg.url:
             self._share_connectors()
@@ -1739,6 +1854,8 @@ class Connections:
             return False
         for t in [t for t in self.svc.app.tools if getattr(t, "server", None) == name]:
             self.svc.app.tools.remove(t.name)
+        if self.svc.app.mcp is not None:
+            self.svc.app.mcp.resource_readers.pop(name, None)
         manager = self._mcp.pop(name, None)
         if manager is not None:
             await manager.close()

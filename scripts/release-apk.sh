@@ -8,7 +8,7 @@
 #    (scripts/rebrand.py sets it),
 # 2. makes sure the native artifacts and rclone.aar exist (scripts/android/build-natives.sh),
 # 3. ./gradlew :app:assembleRelease — signed with android/keystore.properties when present,
-# 4. verifies the signature and refuses the debug key unless --allow-debug-key,
+# 4. verifies the arm64 sandbox and signature, refusing the debug key unless --allow-debug-key,
 # 5. writes dist/nanoMuse-<version>-arm64.apk and .sha256,
 # 6. with --publish: tags v<version> (annotated, at --target or HEAD, unless the tag already
 #    exists), pushes the tag, then gh release create v<version> --latest with the APK, the
@@ -18,7 +18,7 @@
 #
 # --publish-only skips 1-5 and publishes the dist/ APK that is already there, for a version
 # whose sources are an older commit (pass --target <commit> so the tag lands on it). The APK
-# is still checked: its badging must say <version>, the .sha256 must match, debug key refused.
+# must pass the sandbox, version, checksum and signing checks before publication.
 #
 # Publishing refuses a commit that is not on origin/main (a release is cut from main, after
 # the release pull request merged) and a working tree with uncommitted changes to tracked
@@ -74,6 +74,7 @@ check_version android/src/ios/Minis.xcodeproj/project.pbxproj "MARKETING_VERSION
 # Signature + badging of one APK; exits on the debug key unless allowed.
 inspect_apk() {
   local apk="$1"
+  python3 "$NM_ROOT/scripts/android/verify-sandbox-apk.py" "$apk"
   echo "== signature"
   local certs
   certs="$("$build_tools/apksigner" verify --print-certs "$apk")"

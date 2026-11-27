@@ -5,7 +5,7 @@ import { access, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { brief, expand, fileGet, filePut, files, open, pngSize, run, screen, shell, windowsOpener } from '../lib/actions.js'
+import { brief, expand, FILE_ENCODED_LIMIT, FILE_LIMIT, fileGet, filePut, files, open, pngSize, run, screen, shell, windowsOpener } from '../lib/actions.js'
 
 const posix = process.platform !== 'win32'
 
@@ -143,6 +143,30 @@ test('files, file.get and file.put: listing, limits and the force rule', async (
     const tooLarge = join(dir, 'too-large.bin')
     await assert.rejects(filePut({ path: tooLarge, data: oversized }), (e) => e.code === 'too_large')
     await assert.rejects(access(tooLarge))
+    assert.equal((await readdir(dir)).some((name) => name.endsWith('.nanomuse-part')), false)
+  })
+})
+
+test('file.put enforces the 8 MiB limit before and after decoding and leaves no part file', async () => {
+  await scratch(async (dir) => {
+    const exact = Buffer.alloc(FILE_LIMIT).toString('base64')
+    assert.equal(exact.length, FILE_ENCODED_LIMIT)
+    assert.equal((await filePut({ path: join(dir, 'exact.bin'), data: exact })).bytes, FILE_LIMIT)
+
+    const encodedTooLarge = join(dir, 'encoded-too-large.bin')
+    await assert.rejects(
+      filePut({ path: encodedTooLarge, data: 'A'.repeat(FILE_ENCODED_LIMIT + 1) }),
+      (e) => e.code === 'too_large',
+    )
+    await assert.rejects(access(encodedTooLarge))
+
+    // FILE_LIMIT + 1 shares its final base64 block with FILE_LIMIT, so only the
+    // post-decode check can distinguish it.
+    const decodedTooLarge = join(dir, 'decoded-too-large.bin')
+    const oversized = Buffer.alloc(FILE_LIMIT + 1).toString('base64')
+    assert.equal(oversized.length, FILE_ENCODED_LIMIT)
+    await assert.rejects(filePut({ path: decodedTooLarge, data: oversized }), (e) => e.code === 'too_large')
+    await assert.rejects(access(decodedTooLarge))
     assert.equal((await readdir(dir)).some((name) => name.endsWith('.nanomuse-part')), false)
   })
 })

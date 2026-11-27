@@ -188,8 +188,8 @@ function publishDesktopPrefs(p: DesktopPrefs): void {
   desktopPrefsCache = p
   for (const l of desktopPrefsListeners) l(p)
 }
-/** What `setPrefs` takes: the switches, the quick-chat key, the proxy and the relay hosts it must never cover. */
-export type DesktopPrefsPatch = Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat' | 'quickChatKey' | 'proxy'> & { relayHosts: string[] }>
+/** What `setPrefs` takes: the switches, the quick-chat key and the provider proxy. */
+export type DesktopPrefsPatch = Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat' | 'quickChatKey' | 'proxy'>>
 export function useDesktopPrefs(): { prefs: DesktopPrefs | undefined; set: (patch: DesktopPrefsPatch) => void } {
   const b = bridge()
   const [prefs, setLocal] = useState<DesktopPrefs | undefined>(desktopPrefsCache)

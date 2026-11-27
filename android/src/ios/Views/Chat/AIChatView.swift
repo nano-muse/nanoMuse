@@ -1305,6 +1305,12 @@ struct AIChatView: View {
         .onChange(of: vm.sessionId) { _ in
             refreshTitlePillSession()
         }
+        // nanoMuse: refresh the visible history and model context when the assistant checks in.
+        .onReceive(NotificationCenter.default.publisher(for: .nmChatOutreachDelivered)) { note in
+            if let sid = note.object as? String, sid == vm.sessionId {
+                Task { @MainActor in await vm.reloadMessagesFromDB(reason: "assistantOutreach") }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { note in
             guard let sid = vm.sessionId,
                   let updatedId = note.object as? String,
@@ -4770,7 +4776,7 @@ struct AIChatView: View {
         // onChange binding, so doing it before send() left send() with empty text
         // → "send() GUARD FAILED" and nothing was sent. send() consumes and clears
         // inputText itself; we re-arm voice listening only AFTER it has run.
-        vm.send()
+        vm.send(fromFeedComposer: true) // nanoMuse: positive provenance for optional preparation from chat
         // [inline-voice] Stay in voice mode after sending — clear the recognized
         // text and re-arm listening for the next utterance (close with ✕).
         if voiceInputActive {

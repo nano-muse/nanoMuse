@@ -69,9 +69,9 @@ hub 传递以下请求：
 
   运行时和 iPhone 发起任务后最多等待 15 分钟，与桌面版和运行时目标的任务时限一致。本地等待超时或收到中继的 `timeout` 后，发起方会使用原始调用 ID 发送 `stop {call}`，另外最多等待 15 秒清理。运行时取消任务时也使用同一个精确调用 ID。这项清理只是尽力执行：断线目标可能收不到，因此调用方保留原始失败信息，不宣称远程工作已经停止。目标自身的任务时限仍然有效。明确指定的调用已结束时，必须返回 `{stopped: false}`，不能转而停止该对话后来的任务。这些规则不改变帧格式，旧客户端仍可使用。
 
-  执行期间，目标通过 `event` 帧的 `body.stage` 告诉调用方应显示什么，使两端能看到相同过程。工具开始时发送 `tool {id, name, summary}`，结束时发送相同 `id` 的 `tool_result {id, name, ok, summary}`；审批使用 `approval {approval_id, preview, risk, reason, device, timeout, grant_key}`，任一端决定后发送 `approval_result {approval_id, status}`。中途文字使用 `text {text, interim}`，生成内容使用 `image`、`file`，错误使用 `error`，最终答案放在 `result` 帧中。
+  执行期间，目标通过 `event` 帧的 `body.stage` 告诉调用方应显示什么，使两端能看到相同过程。工具开始时发送 `tool {id, name, summary}`，结束时发送相同 `id` 的 `tool_result {id, name, ok, summary}`；审批使用 `approval {approval_id, preview, risk, reason, device, timeout, grant_target, grant_key}`，任一端决定后发送 `approval_result {approval_id, status}`。中途文字使用 `text {text, interim}`，生成内容使用 `image`、`file`，错误使用 `error`，最终答案放在 `result` 帧中。
 
-  调用方将 `text` 替换到上一个 `tool` 之后的文字位置，因此目标可以多次发送同一消息逐渐增长的内容，界面也会逐步更新；每条消息只发送一次的目标仍正常显示。1.0.6 起的 `grant_key` 指定发起设备保存授权时的覆盖范围：运行时使用自身授权键，例如工具加目标 `shell:git`；桌面版使用工具加完整主参数。旧发送方没有该字段时，仍以 `preview` 前 60 个字符作为键，可能使开头相同的不同步骤共用一个键。
+  调用方将 `text` 替换到上一个 `tool` 之后的文字位置，因此目标可以多次发送同一消息逐渐增长的内容，界面也会逐步更新；每条消息只发送一次的目标仍正常显示。`grant_target` 指定授权覆盖范围，格式为 `{version:1, tool, resource, action}`。`resource` 是完整的 Sentinel 目标或主参数，`action` 是工具名与完整 canonical 参数的 SHA-256，使用 `sha256:` 前缀；仅用于显示的 `step` 不影响摘要。客户端校验所有字段，并同时按发送设备、风险类别和会话隔离。缺少有效 `grant_target` 的旧事件只能选择「允许一次」，不能命中已有授权，也不显示或建立会话及长期授权。新事件继续携带 `grant_key` 一个版本，供 1.0.6 客户端兼容；新客户端不再把它当作授权依据。发送方无法取得完整 canonical 参数时，会省略两个授权字段，而不是构造范围更宽的目标。
 - **编程助手请求**。`coding.agents`、`coding.sessions`、`coding.session`、`coding.send`、`coding.stop`、`coding.runs` 用于电脑上的 Cursor、Codex、Claude Code 会话。目标电脑的运行时或桌面版从磁盘读取会话，并通过相应助手的 CLI（命令行工具）控制它。`coding.send {agent, text, session_id?, workspace?, wait}` 通过 `event` 帧返回 `started`、`text`、`tool`、`done`、`error`，每条都带运行 ID，供调用方使用 `coding.stop`；最终返回完整执行结果。只有安装相关模块的电脑运行时或桌面版会声明支持这些动作，见 [coding-agents.md](coding-agents.md)。
 
 每台设备决定自己接受哪些远程操作。手机的设置 → nanoMuse Cloud → 设备中，关闭「允许其他设备操作这台手机」后，只回应 `info`，但仍可查看和控制其他设备。运行时关闭远程控制后，`info` 也只返回电脑名称和系统，不返回账号名、主目录、工作目录或 shell 信息，支持动作列表中仅保留 `info`。
@@ -173,7 +173,9 @@ Python 运行时的 `files` 最多返回 2,000 个目录项。如果还有更多
 
 中继 0.27 起，每个凭据绑定唯一 hub 身份，包括固定的 `device.id` 和 `device.kind`。通过 `POST /v1/auth/verify` 或 `/login` 登录时传入 `device_id`、`device_kind`，会在签发凭据时绑定；未传入时，则在首次有效 `hello` 时绑定。同一个凭据可以重连并替换自己的旧 socket，但使用不同 ID 或类型会被 `bad_device` 拒绝。
 
-已经由有效 key 占用的设备 ID，只能由后续验证码或密码登录签发的新 key 接管。例如手机没有先退出就重新登录、运行时保险库被重置，或退出请求未到达中继时，就可能发生接管。旧 key 仍可访问账号，但不能再代表该设备。key 被撤销或失效后会释放 ID。`/v1/auth/session-key` 签发的会话 key 用于 nanoMuse Web 容器，只能注册尚未被占用的 ID，不能接管设备。旧客户端保留原 key，在下次连接时绑定；登录时已提交身份的新客户端会立即绑定。
+后续验证码或密码登录如果明确提交同一个设备 ID，会替换这台设备的旧凭据。旧 key 仍可访问账号，但不能再代表该设备。key 被撤销或失效后会释放 ID。
+
+为兼容旧客户端，中继保留一个版本的过渡：登录时同时省略两个身份字段的凭据，在首次有效 `hello` 时绑定，但只能使用尚未被占用的 ID，不能冒充签发时已经绑定的新设备。`/v1/auth/session-key` 签发的会话 key 会立即绑定到中继生成的 `computer` 预留身份。nanoMuse Web 网关不知道容器运行时将在内部生成的安装 ID，因此运行时首次发送 `computer` 类型的 `hello` 时，可以原子地将预留身份替换为自己的 ID，但该 ID 必须空闲。此后凭据固定到这台可被调用的电脑，不能占用已有手机或电脑的身份。升级前签发且尚未绑定的会话 key 在一个兼容版本内也可按相同的空闲 ID 规则绑定，但只能使用 `computer` 类型。网关无需传入 Hub ID 或类型环境变量。
 
 智能体的名称和形象属于账号，通过中继 `GET` / `PUT /v1/me/profile` 保存。形象可以是龙、带底色的 emoji，或形象工作室绘制的面孔及其小幅静态图。最后一次写入生效；中继用 `profile` 帧通知其他设备获取新的 `rev`。运行时实现在 `nanomuse/hub/profile.py`，Android 实现在 `io.github.nanomuse.cloud.ProfileSync`，写入设备会忽略自己的回传通知。
 

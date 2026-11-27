@@ -48,8 +48,6 @@ export interface DesktopPrefs {
   proxyMasked?: string
   /** The proxy the running Host was started with; differs from `proxy` until a restart. */
   proxyApplied?: string
-  /** The relay hosts the shell keeps off the proxy (the plugin's `config.baseURL`), besides the default relay and loopback. */
-  relayHosts?: string[]
   supports: { openAtLogin: boolean; menuBar: boolean; quickChat: boolean }
 }
 
@@ -87,7 +85,7 @@ export interface HarnessBridge {
   setTheme(theme: 'light' | 'dark'): Promise<void>
   // since 0.1.30 — absent in older shells
   prefs?(): Promise<DesktopPrefs>
-  setPrefs?(patch: Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat' | 'quickChatKey' | 'proxy'> & { relayHosts: string[] }>): Promise<DesktopPrefs>
+  setPrefs?(patch: Partial<Pick<DesktopPrefs, 'openAtLogin' | 'menuBar' | 'quickChat' | 'quickChatKey' | 'proxy'>>): Promise<DesktopPrefs>
   reportBug?(): Promise<{ screenshot: string; url: string }>
   reveal?(path: string): Promise<void>
   onQuickChat?(listener: () => void): () => void

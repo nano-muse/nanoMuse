@@ -1,11 +1,22 @@
 package io.github.nanomuse.ui.feed
 
 import androidx.compose.animation.animateColorAsState
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
+import io.github.nanomuse.feed.ChatCheckIns
+import io.github.nanomuse.feed.CalendarChanges
+import com.openminis.app.offload.CalendarManager
+import io.github.nanomuse.account.AccountData
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,15 +79,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.scheduled.ScheduledTaskStore
 import com.openminis.app.ui.markdown.MarkdownText
 import com.openminis.app.ui.theme.ChatColors
+import io.github.nanomuse.feed.FeedChatEvidence
+import io.github.nanomuse.feed.FeedPreparationRunner
 import io.github.nanomuse.feed.FeedFlow
 import io.github.nanomuse.feed.FeedPost
 import io.github.nanomuse.feed.FeedStore
 import io.github.nanomuse.ui.home.MuseTones
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -100,11 +116,37 @@ private val likeRed = Color(0xFFE0245E)
 fun FeedTab(
     header: @Composable () -> Unit,
     onDiscuss: (FeedPost) -> Unit,
+    onOpenGoal: (io.github.nanomuse.goals.Goal) -> Unit,
     onEditRoutine: (String) -> Unit,
     bottomInset: Dp = 0.dp,
 ) {
     val context = LocalContext.current
-    val posts by FeedStore.posts.collectAsState()
+    val savedPosts by FeedStore.posts.collectAsState()
+    val protected by io.github.nanomuse.guard.SessionAccess.protected.collectAsState()
+    val goalStore = remember(context) { io.github.nanomuse.goals.GoalStore.get(context) }
+    val goals by goalStore.goals.collectAsState()
+    val chatRevision by FeedChatEvidence.revision.collectAsState()
+    val locked by io.github.nanomuse.guard.AppAccess.locked.collectAsState()
+    var livePairs by remember(chatRevision, protected, locked, savedPosts) { mutableStateOf(emptySet<String>()) }
+    LaunchedEffect(chatRevision, protected, locked, savedPosts) {
+        if (!locked && FeedChatEvidence.enabled(context) && savedPosts.any { it.chatBased }) {
+            val app = context.applicationContext as MinisApp
+            FeedChatEvidence.changes(app).collectLatest {
+                livePairs = emptySet()
+                livePairs = try {
+                    FeedPreparationRunner.visibleChatCards(app)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    emptySet()
+                }
+            }
+        }
+    }
+    val posts = remember(savedPosts, protected, goals, livePairs) {
+        val byId = goals.associateBy { it.id }
+        savedPosts.filter { it.visibleWith(protected, byId[it.goalId]) && (!it.chatBased || it.preparation in livePairs) }
+    }
     val introAck by FeedFlow.introAcknowledged.collectAsState()
     val generating by FeedFlow.generating.collectAsState()
     val settingsOpen by FeedUi.settingsOpen.collectAsState()
@@ -114,6 +156,8 @@ fun FeedTab(
     // The routine needs a model; retry quietly whenever the tab shows.
     LaunchedEffect(Unit) { runCatching { FeedFlow.ensureRoutine(context) } }
 
+    LaunchedEffect(posts, infoPost) { if (infoPost != null && infoPost !in posts) infoPost = null }
+    val deadline = currentGoalDeadline()
     val days = remember(posts) { posts.groupBy { it.day }.toList() }
 
     LazyColumn(
@@ -122,11 +166,12 @@ fun FeedTab(
         contentPadding = PaddingValues(bottom = 28.dp + bottomInset),
     ) {
         item(key = "header") { header() }
+        deadline?.let { item(key = "deadline") { GoalDeadlineCard(it, onOpenGoal) } }
 
         if (days.isEmpty()) {
             item(key = "today-title") { DayTitle(dayLabel(todayKey(), System.currentTimeMillis())) }
             if (!introAck) item(key = "intro") { IntroCard(onEdit = { editPrefs = true }, onAck = { FeedFlow.acknowledgeIntro(context) }) }
-            item(key = "empty") { EmptyState(generating = generating, onWriteNow = { FeedFlow.generateNow(context) }) }
+            if (deadline == null) item(key = "empty") { EmptyState(generating = generating, onWriteNow = { FeedFlow.generateNow(context) }) }
         } else {
             days.forEachIndexed { i, (day, dayPosts) ->
                 item(key = "day-$day") { DayTitle(dayLabel(day, dayPosts.first().createdAt)) }
@@ -138,7 +183,7 @@ fun FeedTab(
                     PostCard(
                         post = post,
                         onLike = { FeedStore.setLiked(post, !post.liked) },
-                        onDiscuss = { onDiscuss(post) },
+                        onDiscuss = { if (post.visibleWith(io.github.nanomuse.guard.SessionAccess.protected.value, goalStore.get(post.goalId))) onDiscuss(post) },
                         onInfo = { infoPost = post },
                         modifier = Modifier.animateItem(), // new posts settle in, removed ones fade out
                     )
@@ -154,7 +199,7 @@ fun FeedTab(
         )
     }
 
-    infoPost?.let { post ->
+    infoPost?.takeIf { it in posts }?.let { post ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { infoPost = null },
@@ -166,6 +211,15 @@ fun FeedTab(
                 Spacer(Modifier.height(12.dp))
                 InfoRow(stringResource(R.string.nm_feed_info_type), typeLabel(post.type))
                 InfoRow(stringResource(R.string.nm_feed_info_written), DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(post.createdAt)))
+                val goal = goalStore.get(post.goalId)
+                if (goal != null && !goal.isProtectedBy(protected)) {
+                    TextButton(onClick = {
+                        if (!goal.isProtectedBy(io.github.nanomuse.guard.SessionAccess.protected.value)) {
+                            infoPost = null
+                            onOpenGoal(goal)
+                        }
+                    }) { Text(goal.title) }
+                }
                 if (post.source.isNotEmpty()) InfoRow(stringResource(R.string.nm_feed_info_source), post.source.joinToString("\n"))
                 InfoRow(stringResource(R.string.nm_feed_info_file), "minis-global/nanomuse/feed/${post.day}/${"%02d".format(Locale.ROOT, post.index)}.md")
                 Spacer(Modifier.height(16.dp))
@@ -201,7 +255,7 @@ private fun DayTitle(text: String) {
 
 /** White card frame shared by every card on the page. */
 @Composable
-private fun FeedCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun FeedCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = MuseTones.surface,
@@ -241,12 +295,20 @@ private fun PostCard(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(4.dp))
-                    MarkdownText(
-                        markdown = post.body,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp),
-                    )
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        MarkdownText(
+                            markdown = post.body,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp),
+                        )
+                    }
                 }
+            }
+            if (post.preparation.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.nm_feed_info_source) + " · " + post.source.joinToString(" · ") { it.substringBefore(" · ") },
+                    style = MaterialTheme.typography.labelSmall, color = ChatColors.secondaryText,
+                )
             }
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -434,7 +496,7 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
     val generating by FeedFlow.generating.collectAsState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ChatColors.background) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text(stringResource(R.string.nm_feed_settings_title), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.nm_feed_intro_desc), fontSize = 13.sp, lineHeight = 18.sp, color = ChatColors.secondaryText)
@@ -469,6 +531,60 @@ private fun FeedSettingsSheet(onDismiss: () -> Unit, onEditRoutine: (String) -> 
                         }
                         Switch(checked = task?.enabled == true, enabled = task != null, onCheckedChange = { FeedFlow.setEnabled(context, it) })
                     }
+                    HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
+                    val chatRevision by FeedChatEvidence.revision.collectAsState()
+                    val chatEnabled = remember(context, chatRevision) { FeedChatEvidence.enabled(context) }
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.nm_feed_use_recent_chats), fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text(stringResource(R.string.nm_feed_recent_chats_hint), fontSize = 12.sp, color = ChatColors.secondaryText)
+                        }
+                        Switch(checked = chatEnabled, onCheckedChange = { FeedChatEvidence.enable(context, it) })
+                    }
+                    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+                    fun offerNotifications() {
+                        if (Build.VERSION.SDK_INT >= 33 && !NotificationManagerCompat.from(context).areNotificationsEnabled())
+                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    var checkIns by remember(context, chatRevision) { mutableStateOf(ChatCheckIns.enabled(context)) }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.nm_chat_checkin_setting), fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Switch(checked = checkIns, onCheckedChange = { on ->
+                            ChatCheckIns.configure(context, on)
+                            checkIns = ChatCheckIns.enabled(context)
+                            if (checkIns) offerNotifications()
+                        })
+                    }
+                    HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
+                    val owner = AccountData.key(context)
+                    var calendarOn by remember(owner, chatRevision) { mutableStateOf(CalendarChanges.scope(context) != null) }
+                    var requestedOwner by remember { mutableStateOf<String?>(null) }
+                    fun configureCalendar(on: Boolean) {
+                        CalendarChanges.configure(context, on)
+                        calendarOn = CalendarChanges.scope(context) != null
+                        if (calendarOn) offerNotifications()
+                    }
+                    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                        if (granted && requestedOwner == AccountData.key(context)) {
+                            configureCalendar(true)
+                        }
+                        requestedOwner = null
+                    }
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.nm_calendar_checkin_setting), fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        Switch(checked = calendarOn, onCheckedChange = { on ->
+                            if (on && !CalendarManager.hasPermission(context)) {
+                                requestedOwner = owner
+                                calendarPermission.launch(Manifest.permission.READ_CALENDAR)
+                            } else {
+                                configureCalendar(on)
+                            }
+                        })
+                    }
+                    HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
+                    PublicWatchSettings()
+                    HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
+                    GoalDeadlineSettings()
                     HorizontalDivider(color = MuseTones.hairline, modifier = Modifier.padding(horizontal = 14.dp))
                     Row(
                         Modifier

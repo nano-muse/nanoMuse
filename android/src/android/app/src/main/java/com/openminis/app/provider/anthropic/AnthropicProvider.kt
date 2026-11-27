@@ -1,5 +1,6 @@
 package com.openminis.app.provider.anthropic
 
+import io.github.nanomuse.net.await // nanoMuse
 import android.util.Base64
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.AgentToolDefinition
@@ -94,11 +95,11 @@ class AnthropicProvider(
     ): LLMResponse = withContext(Dispatchers.IO) {
         val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = false, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         val request = buildRequest(body.toString(), body)
-        val response = client.newCall(request).execute()
-        val responseBody = response.body?.string() ?: ""
-
-        if (!response.isSuccessful) {
-            throw mapHttpError(response.code, responseBody)
+        // nanoMuse: cancelling a vision decision closes this call even while its body is being read.
+        val responseBody = client.newCall(request).await { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw mapHttpError(response.code, text)
+            text
         }
 
         val json = JSONObject(responseBody)

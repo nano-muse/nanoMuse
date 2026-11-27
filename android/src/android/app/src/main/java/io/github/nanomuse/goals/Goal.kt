@@ -54,8 +54,21 @@ data class Goal(
     val lastCheckedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = createdAt,
+    val due: java.time.LocalDate? = null,
+    val snoozedUntil: java.time.LocalDate? = null,
+    val deadlineDismissed: Boolean = false,
+    /** The conversation which created this goal. Older goals only recorded their own conversation. */
+    val sourceSessionId: String? = null,
 ) {
+    fun isProtectedBy(sessions: Set<String>): Boolean = sessionId in sessions || sourceSessionId in sessions
+
+    fun withDue(date: java.time.LocalDate?): Goal =
+        if (date == due) this else copy(due = date, snoozedUntil = null, deadlineDismissed = false)
+
     fun toJson(): JSONObject = JSONObject().apply {
+        due?.let { put("due", it.toString()) }
+        snoozedUntil?.let { put("snoozedUntil", it.toString()) }
+        if (deadlineDismissed) put("deadlineDismissed", true)
         put("id", id)
         put("title", title)
         put("why", why)
@@ -67,6 +80,7 @@ data class Goal(
         put("progress", progress)
         put("status", status.name)
         if (sessionId != null) put("sessionId", sessionId)
+        if (sourceSessionId != null) put("sourceSessionId", sourceSessionId)
         if (taskId != null) put("taskId", taskId)
         if (lastNote != null) put("lastNote", lastNote)
         if (lastCheckedAt != null) put("lastCheckedAt", lastCheckedAt)
@@ -89,11 +103,15 @@ data class Goal(
             progress = o.optInt("progress", 0).coerceIn(0, 100),
             status = runCatching { GoalStatus.valueOf(o.optString("status", "ACTIVE")) }.getOrDefault(GoalStatus.ACTIVE),
             sessionId = o.stringOrNull("sessionId"),
+            sourceSessionId = o.stringOrNull("sourceSessionId"),
             taskId = o.stringOrNull("taskId"),
             lastNote = o.stringOrNull("lastNote"),
             lastCheckedAt = if (o.has("lastCheckedAt")) o.optLong("lastCheckedAt") else null,
             createdAt = o.optLong("createdAt", System.currentTimeMillis()),
             updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+            due = GoalDeadlines.parse(o.stringOrNull("due")),
+            snoozedUntil = GoalDeadlines.parse(o.stringOrNull("snoozedUntil")),
+            deadlineDismissed = o.optBoolean("deadlineDismissed"),
         )
     }
 }

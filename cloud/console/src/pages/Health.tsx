@@ -4,9 +4,9 @@ import { bytes, fmt, when } from "../lib/format";
 import { useData } from "../lib/hooks";
 import { useT } from "../lib/i18n";
 import type { Health } from "../lib/types";
-import { Gauge } from "../ui/charts";
 import { Grid, Kpi, Note, Panel } from "../ui/primitives";
 import { Who } from "../ui/who";
+import { GatePanel } from "./GatePanel";
 import { Loaded, Updated } from "./common";
 
 export function HealthPage() {
@@ -32,15 +32,7 @@ export function HealthPage() {
             )}
           </Note>
           <Grid cols={3}>
-            <Panel title={T.he.gate} sub={`${T.g.limit} ${h.chat_upstream.limit} · ${T.g.retries} ${h.chat_upstream.retries}`}>
-              <div className="kpi">
-                <div className={`v ${h.chat_upstream.waiting > 0 ? "text-bad" : ""}`}>
-                  {h.chat_upstream.active} <span className="text-[14px] font-normal text-ink-3">/ {h.chat_upstream.limit}</span>
-                </div>
-                <div className="sub">{T.lv.queued(h.chat_upstream.waiting)}</div>
-              </div>
-              <Gauge active={h.chat_upstream.active} limit={h.chat_upstream.limit} waiting={h.chat_upstream.waiting} className="mt-3" />
-            </Panel>
+            <GatePanel gate={h.chat_upstream} models={Object.entries(h.model_gates ?? {})} retries={h.chat_upstream.retries} />
             <Panel title={T.he.inFlight} sub={T.lv.inFlightSub(h.in_flight.accounts, h.in_flight.limit)}>
               <div className="kpi">
                 <div className="v">{h.in_flight.requests}</div>

@@ -126,10 +126,10 @@ export interface StageInput {
  * models page for one's own key until one is configured or skipped; the permissions where
  * the system gates them; then Meet. Welcome's second door ("Use your own API key instead",
  * as on the phone) leads to the models page with no account; Skip there, with no key saved,
- * is Welcome again.
+ * continues to the permissions or Meet page.
  */
 export function stageOf(s: StageInput): Stage {
-  if (!s.signedIn && !s.hasModel) return s.sourceChosen === 'own' && !s.modelsSkipped ? 'models' : 'welcome'
+  if (!s.signedIn && !s.hasModel && s.sourceChosen !== 'own') return 'welcome'
   if (s.signedIn && s.freshAccount && !s.passwordSeen) return 'password'
   if (s.sourceChosen === null) return 'source'
   if (s.sourceChosen === 'own' && !s.hasModel && !s.modelsSkipped) return 'models'

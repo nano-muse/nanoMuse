@@ -5,17 +5,18 @@ import { useMemo } from "react";
 import { clock, compact, fmt, ms, pct } from "../lib/format";
 import { useData, useNow } from "../lib/hooks";
 import { nameOf, useT } from "../lib/i18n";
-import type { Live, LiveSummary } from "../lib/types";
-import { Bars, Gauge, Legend, Lines, statusColor } from "../ui/charts";
+import type { Live, LiveSummary, UpstreamGate } from "../lib/types";
+import { Bars, Legend, Lines, statusColor } from "../ui/charts";
 import { Grid, Kpi, Note, Panel, Pill, cx } from "../ui/primitives";
 import { Flags, PlatformPill, StatusPill } from "../ui/who";
+import { GatePanel } from "./GatePanel";
 import { Loaded, Updated } from "./common";
 
 type Verdict = "smooth" | "busy" | "saturated";
-const verdictOf = (s: LiveSummary, gate: { active: number; waiting: number; limit: number }): Verdict => {
-  if (gate.waiting > 0 && gate.active >= gate.limit) return "saturated";
+const verdictOf = (s: LiveSummary, gates: UpstreamGate[]): Verdict => {
+  if (gates.some((gate) => gate.waiting > 0 && gate.active >= gate.limit)) return "saturated";
   if (s.waited_share > 0.25 || s.p95_wait_ms > 2000) return "saturated";
-  if (s.waited_share > 0.05 || s.p95_wait_ms > 500 || gate.active >= gate.limit * 0.75) return "busy";
+  if (s.waited_share > 0.05 || s.p95_wait_ms > 500 || gates.some((gate) => gate.active >= gate.limit * 0.75)) return "busy";
   return "smooth";
 };
 
@@ -59,7 +60,8 @@ export function LivePage() {
     <Loaded q={q}>
       {() => {
         const d = view!;
-        const verdict = verdictOf(d.last_10m, d.gate);
+        const modelGates = Object.entries(d.model_gates ?? {});
+        const verdict = verdictOf(d.last_10m, modelGates.length ? modelGates.map(([, gate]) => gate) : [d.gate]);
         const labels = d.minutes.map((m) => clock(m.t));
         const now = nowS * 1000;
         const drift = Math.max(0, Math.round((now - q.at) / 1000));
@@ -76,15 +78,7 @@ export function LivePage() {
               <div className="mt-1 text-[12px] opacity-80">{T.lv.verdictHow}</div>
             </Note>
             <Grid cols={3}>
-              <Panel title={T.lv.gate} sub={T.lv.gateSub(d.gate.limit)}>
-                <div className="kpi">
-                  <div className={cx("v", d.gate.waiting > 0 ? "text-bad" : d.gate.active >= d.gate.limit * 0.75 ? "text-warn" : "")}>
-                    {d.gate.active} <span className="text-[14px] font-normal text-ink-3">/ {d.gate.limit}</span>
-                  </div>
-                  <div className="sub">{d.gate.waiting > 0 ? T.lv.queued(d.gate.waiting) : T.lv.activeOf(d.gate.active, d.gate.limit)}</div>
-                </div>
-                <Gauge active={d.gate.active} limit={d.gate.limit} waiting={d.gate.waiting} className="mt-3" />
-              </Panel>
+              <GatePanel gate={d.gate} models={modelGates} />
               <Panel title={T.lv.inFlight} sub={T.lv.inFlightSub(d.in_flight.accounts, d.in_flight.limit)}>
                 <div className="kpi">
                   <div className="v">{d.in_flight.requests}</div>
@@ -107,8 +101,10 @@ export function LivePage() {
                   <div className="sub">{T.g.devices} · {T.g.online}</div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-ink-2">
-                  <span>{T.lv.concurrency}</span>
-                  <span className="text-right">{d.settings.chat_concurrency}</span>
+                  {!modelGates.length && <>
+                    <span>{T.lv.concurrency}</span>
+                    <span className="text-right">{d.settings.chat_concurrency}</span>
+                  </>}
                   <span>{T.lv.maxInFlight}</span>
                   <span className="text-right">{d.settings.max_in_flight}</span>
                   <span>{T.lv.timeout}</span>

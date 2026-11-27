@@ -127,7 +127,8 @@ enum NanoMuseSlotResolver {
     /// then Cloud, then the first provider that can. Nil when nothing on the phone can.
     static func resolve(slot: NanoMuseSlot, chosen: NanoMuseSlotChoice?, chatProviderId: String?, providers: [NanoMuseSlotProvider]) -> NanoMuseSlotChoice? {
         if let chosen, let p = providers.first(where: { $0.id == chosen.providerId }), p.has(slot) {
-            if !chosen.model.isEmpty { return chosen }
+            let relayMedia = p.isCloud && (slot == .image || slot == .video)
+            if !chosen.model.isEmpty && (!relayMedia || p.models[slot]?.contains(chosen.model) == true) { return chosen }
             if let model = p.defaultModel(for: slot) { return NanoMuseSlotChoice(providerId: p.id, model: model) }
         }
         let cloud = providers.first { $0.isCloud && $0.has(slot) }
@@ -296,8 +297,11 @@ enum NanoMuseRelayMenu {
         return ids
     }
 
-    /// Public Cloud retired account-funded media; a self-hosted relay may advertise its own.
-    static func allows(_ slot: NanoMuseSlot, at baseURL: String) -> Bool {
+    static let hostedImage = "musesteamer-air-image"
+    static let hostedVideo = "ernie-wizshot-me"
+
+    /// Current official media must also be present in the relay menu.
+    static func allows(_ slot: NanoMuseSlot, at baseURL: String, model: String? = nil) -> Bool {
         guard slot == .image || slot == .video else { return true }
         guard let url = URLComponents(string: baseURL),
               let official = URLComponents(string: NanoMuseCloud.defaultBase),
@@ -308,6 +312,8 @@ enum NanoMuseRelayMenu {
         return scheme != official.scheme?.lowercased()
             || host != official.host?.lowercased()
             || port != officialPort
+            || (slot == .image && model == hostedImage)
+            || (slot == .video && model == hostedVideo)
     }
 }
 
@@ -345,10 +351,9 @@ enum NanoMuseModelSlots {
         var names: [String: String] = [:]
         if !menu.isEmpty {
             for slot in NanoMuseSlot.allCases {
-                models[slot] = NanoMuseRelayMenu.allows(slot, at: NanoMuseCloud.baseURL)
-                    ? NanoMuseRelayMenu.models(for: slot, in: menu)
-                    : []
-                if let top = NanoMuseRelayMenu.recommended(for: slot, in: menu) { defaults[slot.defaultsKey] = top }
+                let ids = NanoMuseRelayMenu.models(for: slot, in: menu).filter { NanoMuseRelayMenu.allows(slot, at: NanoMuseCloud.baseURL, model: $0) }
+                models[slot] = ids
+                if let top = NanoMuseRelayMenu.recommended(for: slot, in: menu), ids.contains(top) { defaults[slot.defaultsKey] = top }
             }
             for m in menu {
                 if let id = m["id"] as? String, let name = m["name"] as? String, !name.isEmpty, name != id { names[id] = name }
@@ -361,13 +366,7 @@ enum NanoMuseModelSlots {
             models[.image] = entries.filter { NanoMuseImageGen.drawsNatively($0.model.id) || ($0.model.modalityOverride ?? $0.model.capabilities.supportedModalities) == [.textInput, .imageOutput] }.map(\.model.id)
             models[.video] = entries.filter { NanoMuseVideoGen.looksLikeVideoModel($0.model.id) }.map(\.model.id)
             names = displayNames(entries)
-        }
-        // A phone upgrading from a release that offered hosted media can still have the old
-        // menu cached while offline. The public service has retired those routes permanently;
-        // never reconstruct them from stale local entries. A custom self-hosted relay remains
-        // governed by its live menu above.
-        for slot in [NanoMuseSlot.image, .video] {
-            if !NanoMuseRelayMenu.allows(slot, at: NanoMuseCloud.baseURL) {
+            for slot in [NanoMuseSlot.image, .video] where !NanoMuseRelayMenu.allows(slot, at: NanoMuseCloud.baseURL) {
                 models[slot] = []
             }
         }

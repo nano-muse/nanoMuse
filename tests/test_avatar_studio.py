@@ -412,6 +412,30 @@ def test_a_plain_openai_provider_has_stills_only() -> None:
     assert not ep.clips
 
 
+def test_hosted_media_uses_current_menu_without_submitting_voice_free_avatar_clips(
+    studio_server,
+) -> None:
+    _, service, _ = studio_server
+    service.hub.cloud.base_url = "https://cloud.nanomuse.cn"
+    service.settings.llm.base_url = "https://cloud.nanomuse.cn/v1"
+    service.settings.llm.image_model = "qwen-image-3.0"
+    service.settings.llm.video_model = "wan2.2-i2v-flash"
+    service.hub.models = [
+        {"id": "qwen-image-3.0", "nanomuse": {"kind": "image"}},
+        {"id": "wan2.2-i2v-flash", "nanomuse": {"kind": "video"}},
+    ]
+    assert service.avatar.endpoint() is None
+    service.hub.models.extend(
+        [
+            {"id": "musesteamer-air-image", "nanomuse": {"kind": "image"}},
+            {"id": "ernie-wizshot-me", "nanomuse": {"kind": "video"}},
+        ]
+    )
+    ep = service.avatar.endpoint()
+    assert ep is not None and ep.image_model == "musesteamer-air-image"
+    assert ep.video_model == "ernie-wizshot-me" and not ep.clips
+
+
 def test_a_relaying_host_names_where_the_video_api_lives() -> None:
     # the showcase gateway: the chat model behind an address nobody recognises, and the video
     # API at the same address (`[llm] video_base_url`) — clips, through that host

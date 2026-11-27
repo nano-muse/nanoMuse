@@ -50,8 +50,7 @@ update*) and offers the download.
    app ships with). Four models are set, not one, and they live on one page, **Settings →
    Models** (the card at the top of Settings opens it): **Chat**, the model that talks with
    you; **Operating the screen**, the one that looks at the screen; **Making pictures** and
-   **Making clips**. The hosted account recommends the same multimodal
-   `Qwen/Qwen3.6-27B-FP8` for the first two jobs and does not generate pictures or clips.
+   **Making clips**. The hosted chat model is `deepseek-v4.1-flash-1017` and the hands use `qwen3.5-397b-a17b`. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video.
    Each row shows `<provider> · <model>` and opens a picker: the *nanoMuse Cloud* group first
    when signed in only on rows its live menu covers, then one group per provider of your own
    with only the models that fit the row. A group shows eight models until you tap *Show N more* (the catalogue's default
@@ -62,7 +61,7 @@ update*) and offers the download.
    chat's own `•••` menu, is the default for new chats and moves the main chat
    (*Applies to the main chat and to new chats; a side chat keeps its model.*); a side
    chat already open keeps its model. The other three pickers
-   open with *Automatic* (*Currently nanoMuse Cloud · Qwen/Qwen3.6-27B-FP8* for screen
+   open with *Automatic* (*Currently nanoMuse Cloud · qwen3.5-397b-a17b* for screen
    operation, for example), which forgets a choice
    made there and lets the row follow the order below again. Signed in, the page opens with
    one switch, *Use nanoMuse Cloud models*: off, the account leaves every picker and the
@@ -98,7 +97,7 @@ The other model choices stay as they are. The page is the place to change it lat
 first provider of your own. The screen, pictures and clips follow the chat provider when it is
 a provider of your own with that capability (its catalogue default); else the relay's model
 when signed in and its live menu offers that job; else the first provider of your own that
-can. The hosted Cloud menu offers chat and screen operation, not media generation. A choice
+can. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video. A choice
 always wins, and nanoMuse Cloud never steps in front of a provider you chose. When a model of your own fails,
 nothing falls back on its own: the error card gets *Use nanoMuse Cloud this time* (signed in
 only) for a chat or screen turn, which runs that one turn on the relay's chat model and
@@ -116,6 +115,16 @@ server that issued it. Everything the app does with the account (sign-in, the hu
 usage, the model menu) goes to that address.
 
 ## What the phone does
+
+Give a goal a deadline when creating it, or edit the date in Goals. The Feed shows one approaching or recently missed deadline with its next unchecked step. Mark the step done, open the goal, bring the card back tomorrow or dismiss that deadline. These cards work offline. Feed settings also offer a separate local notification, off by default. With notifications allowed, it can point you back to the Feed during the day without putting the goal title on the lock screen. Android controls alarm delivery.
+
+The daily Feed can also prepare a draft, checklist, brief or question. An active goal or a concrete upcoming commitment in a recent diary entry can give it a subject. A separate related note or preference supplies a detail. For example, a note about tomorrow’s factory visit and a preference for printed checklists can become a packing list. Open the card to check its sources. The scheduled run can add one preparation per day. Select the text to copy it or choose Discuss. The preparation call has no tools.
+
+In Feed settings, turn on *Use recent chats for Feed* to include commitments you type on this phone. For example, mention that you promised to send the museum a visit request on Friday and save a separate preference about step-free access. The Feed can use both to prepare an inquiry. If you change the date, cancel, or say you already sent it, it checks the updated chat before showing the card. The switch starts with new sends in chats where memory is enabled. Protected chats are excluded. A dated commitment can still surface in the week it is due when you mentioned it the previous week.
+
+Chat check-ins are on by default. They work locally with new commitments you type in unlocked, memory-enabled chats. Turning them off in Feed settings saves that choice for this account, including across updates. Using those chats for model-assisted Feed preparation is a separate choice. On the day it is due, nanoMuse can ask how it is going and offer help in the chat where you made the commitment. You can answer there. It checks locally, after at least an hour since the commitment or its latest change. It can send one message per account on this phone per day between 09:00 and 20:00. If Android notifications are enabled, tapping the notification opens that chat. If you are busy, return to the home screen and answer in the same chat later. Battery restrictions can delay the background check.
+
+With *Message me when busy times in my visible phone calendars change or overlap* enabled in Feed settings, Android can follow your calendar even when you have never mentioned an event in chat. Allow calendar read access. On this phone it first records the busy times in the next 48 hours without sending a message. If a new overlap appears or a previously observed one-off event moves, it can ask you about the actual times in your main chat. It uses visible calendars, skips all-day, free, cancelled and declined events, and does not read titles, notes or guests. Calendar and chat check-ins share the same daily limit. The main chat must already exist, have chat lock turned off and have been idle for at least 15 minutes. Android schedules the next check about 30 minutes later during delivery hours and can delay it to save power. Turning the calendar option off clears the saved times.
 
 Shell progress updates preserve text beyond a shorter rewrite. Terminal color and title codes are removed before those updates, so they cannot leave escape fragments in the output.
 
@@ -200,7 +209,7 @@ turn counts its own wait.
 | | |
 | --- | --- |
 | **The agent, on the phone** | A sandboxed Alpine Linux, a real shell, files, a browser, MCP servers, skills in the Agent Skills format, memory, scheduled tasks; approvals before deleting, sending or paying. The model is the account's or your own; with your own key the chat itself goes from the phone to that provider and never through the project's relay, and from 1.0.7 the finished turn is added to your account's record afterwards (the model's id and the turn, never the key) so your other devices have it ([cloud.md](cloud.md#the-record)). |
-| **Hands** (`hands/`) | With *Hands* on and the accessibility service enabled, the agent looks at the phone's screen and taps, types and swipes in its apps: the last rung after APIs, fetches and the browser. A stage over the app shows where it is about to tap and a capsule with the step and **Stop**; a glow breathes along the screen's edges (blue working, amber waiting; 2.4 s in, 2.4 s out, like every working light on every client since round 9: nothing runs round the rim or slides down the screen, and the capsule's ring and bars breathe at the same pace; everything holds still under the system's reduce-motion setting); when a tap would send, post or delete, the capsule itself asks (**Allow** / **Deny**, the same request the chat card and the notification show), so you are not pulled back into nanoMuse (money is confirmed with the screen lock in the chat card; the capsule offers *Open* for that one); the capsule only ever answers its own request, never a shell or browser card of another conversation, and **Stop** while a card is waiting denies it and ends the run at once. Passwords and codes are always yours to type. The same action a third time on a screen that did not change gets a line in the history so the model changes tack, and a sixth ends the run as *infeasible* with the action named (`HandsLoopWatch`, the floor the runtime has too), instead of one model call per step until the thirty-minute limit. Every step's screenshot is written next to the run's trace under the session's `attachments/hands/<run>/`; the ten newest runs keep all of theirs, an older run keeps its trace and the last screen (the one the chat shows), and past 200 runs the oldest is removed (`HandsTraces`). [gui.md](gui.md) is the design record; the app's own hands are in `io.github.nanomuse.hands`. |
+| **Hands** (`hands/`) | With *Hands* on and the accessibility service enabled, the agent looks at the phone's screen and taps, types and swipes in its apps: the last rung after APIs, fetches and the browser. In the default foreground mode, a stage over the app shows where it is about to tap and a capsule with the step and **Stop**; a glow breathes along the screen's edges (blue working, amber waiting; 2.4 s in, 2.4 s out, like every working light on every client since round 9: nothing runs round the rim or slides down the screen, and the capsule's ring and bars breathe at the same pace; everything holds still under the system's reduce-motion setting); when a tap would send, post or delete, the capsule itself asks (**Allow** / **Deny**, the same request the chat card and the notification show), so you are not pulled back into nanoMuse (money is confirmed with the screen lock in the chat card; the capsule offers *Open* for that one); the capsule only ever answers its own request, never a shell or browser card of another conversation, and **Stop** while a card is waiting denies it and ends the run at once. Passwords and codes are always yours to type. The same action a third time on a screen that did not change gets a line in the history so the model changes tack, and a sixth ends the run as *infeasible* with the action named (`HandsLoopWatch`, the floor the runtime has too), instead of one model call per step until the thirty-minute limit. Every step's screenshot is written next to the run's trace under the session's `attachments/hands/<run>/`; the ten newest runs keep all of theirs, an older run keeps its trace and the last screen (the one the chat shows), and past 200 runs the oldest is removed (`HandsTraces`). [gui.md](gui.md) is the design record; the app's own hands are in `io.github.nanomuse.hands`. |
 | **Reach** (`reach/`) | Your computers, from the phone: "say it on the phone, it gets done there" (a shell command, a file, the computer's screen, or a whole task for the nanoMuse running there). The way in is the hub (next row): install nanoMuse Desktop on the computer and sign in with the same account, and it is under *Account → Devices* within seconds, on any network, the only way since 0.1.24 (the local-network host script is gone). *Settings → Computers* lists the account's computers and says which account the phone uses, since a missing computer has nearly always signed in with another one. Approvals are decided on the phone before anything is sent. [every-device.md](every-device.md). |
 | **The hub** (`hub/`) | Every signed-in device of the account meets on the relay's hub: the phone sees your computers, asks them to do things, gets their approvals as cards, and can be asked by them. A foreground service keeps it reachable in the background (Android 13+ asks for the notification permission for that). [hub.md](hub.md). |
 | **Coding agents** (`ui/coding/`) | The Cursor, Codex and Claude Code sessions on your computers, seen and steered from the phone. [coding-agents.md](coding-agents.md). |
@@ -251,6 +260,10 @@ original canvas. Message bubbles, text, accent colors and other screens keep the
 colors. Background images, gradients and theme imports are not included.
 
 Under **Settings → Appearance**, the font-size labels for **Chat Input**, **Message Text** and **App Base** follow the app's language.
+
+## Public sources on this phone
+
+Open the Feed settings to follow a public source on this phone. Android checks when the app is open and when a scheduled job gets network access. A new issue, paper or feed entry can start a conversation, including when your computer is off. [Public sources and reminder settings](app.md#following-public-sources-over-time)
 
 ## Your own key
 
@@ -510,6 +523,8 @@ keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
 and put its four values in `android/keystore.properties` (git-ignored: `storeFile`,
 `storePassword`, `keyAlias`, `keyPassword`).
 
+The arm64 build checks the finished APK for the PRoot executable, its loaders and the Alpine root filesystem. If the check reports a missing file, run `bash scripts/android/build-natives.sh` from the repository root and assemble the APK again.
+
 The chat-only emulator build (`-Pnm.abi=x86_64`) excludes cached arm64 proot and Alpine root filesystem assets. Switching back to the default arm64 build includes those assets again; no cache deletion is needed.
 
 ### Windows with WSL {#windows-wsl}
@@ -675,7 +690,9 @@ Drawn faces and personal clips retain their existing priority. Renaming the agen
 
 ## App lock
 
-Android can require the device screen lock before showing the app. Enable it in Settings, choose when it locks again, and authenticate to save changes. Unlocks last only in this process. Both layouts, incoming shares and safe-mode diagnostics use the same gate. Native diagnostic windows close if the app re-locks, and returning from the export file picker requires access again before any diagnostic data is written. This protects access in the app, not encryption of stored data. Background tasks continue.
+Open **Settings → App and chat locks** and turn on **App lock** to require the device screen lock when opening nanoMuse. Once enabled, you can choose how long nanoMuse can stay in the background before you need to unlock it again. Confirm changes with your device screen lock.
+
+Unlocks last only in this process. Both layouts, incoming shares and safe-mode diagnostics use the same gate. Native diagnostic windows close if the app re-locks, and returning from the export file picker requires access again before any diagnostic data is written. This protects access in the app, not encryption of stored data. Background tasks continue.
 
 A pending diagnostic export requires its activity to be resumed and the app to be unlocked at the same time. Unlocking another window while the export window is paused does not release that export.
 
@@ -683,18 +700,39 @@ Native provider-import and permission-repair dialogs also close when app access 
 
 ## Protected conversations {#session-lock}
 
-The conversation menu can protect an individual chat with the device screen lock. Authentication is required to protect it, remove protection, export or duplicate a locked chat, or regenerate its title from message content. A duplicate inherits protection and must be unlocked separately. Protecting a new conversation saves it first; cancelling authentication leaves the draft unchanged. Settings controls the re-lock interval, including locking when leaving the chat. Both layouts, notifications and deep links use the gate. Protected previews and body-search matches are hidden.
+Choose **Protect conversation** in a chat's menu to protect just that chat. This works even when App lock is off. Under **Settings → App and chat locks**, choose how long protected chats stay unlocked. For example, five minutes means five minutes from the time you unlocked that chat. You can also have it lock as soon as you leave. Switching to another Muse tab counts as leaving.
+
+Authentication is required to protect a chat, remove protection, export or duplicate a locked chat, or regenerate its title from message content. A duplicate inherits protection and must be unlocked separately. Protecting a new conversation saves it first; cancelling authentication leaves the draft unchanged. Both layouts, notifications and deep links use the gate. Protected previews and body-search matches are hidden.
 
 Interactive backups ask for confirmation when they include locked conversations. This approval applies only to the backup and does not unlock every chat. Scheduled backups, sync and background work keep their existing behavior. Protection metadata survives restarts locally, while unlocks do not; neither is shared through conversation sync or backups. This does not encrypt chat storage.
-
-Selecting another Muse tab counts as leaving the protected conversation for the On exit setting, even while the chat remains retained in the background.
-
 
 ## Connector OAuth sign-in {#connector-oauth}
 
 Token exchange and refresh request JSON responses. An OAuth error is treated as a failed sign-in even when the server returns HTTP 200. Failure messages show a fixed error code, without the provider response body or credentials. Invalid refresh responses leave the saved tokens unchanged.
 
 For `incorrect_client_credentials` or `invalid_client`, check the OAuth app client ID and, if the provider requires one, its client secret. For `redirect_uri_mismatch`, compare the provider registration with the callback address shown in the app. For `bad_verification_code` or `invalid_grant`, start sign-in again. A client secret is not required for every connector. GitHub documents its [JSON response negotiation](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) and [token error codes](https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors).
+
+## Background screen {#hands-background-screen}
+
+In **Settings → Hands**, turn on **Let the agent use the screen** and select **Background screen**. This optional mode runs one compatible app on a separate Android display while you use another app on the phone. It requires Android 14 or later, support for apps on secondary displays, the accessibility service, permission to display the floating controls and a vision model. Keep the phone awake and unlocked. Before opening the app, nanoMuse checks that Android gave the display its own input focus, kept ordinary keyboard input on the main screen and disabled the background keyboard. If the phone cannot provide these settings, the run ends.
+
+To connect the built-in helper without installing Shizuku, follow the six-step wireless setup in **Settings → Hands → Background screen setup**: turn on Developer options, USB debugging, the accessibility service (optional for pairing, required for screen tasks) and Wireless debugging over Wi-Fi. When you reach the pairing step and open **Pair device with pairing code** in Android Settings, nanoMuse watches for the pairing dialog in the background for ten minutes. With the accessibility service on, nanoMuse reads the six-digit code and port directly from the system pairing dialog and finishes pairing and connecting automatically without leaving Settings, without logging the code. If accessibility is off or blocked on the settings screen, a high-priority notification with an inline reply lets you type the six digits over the dialog; manual entry in the setup page remains available as a collapsed fallback. After pairing, nanoMuse connects automatically by trying the cached port, the `service.adb.tls.port` property, local mDNS results and a loopback port scan before asking for a manual connection port. The code is temporary and the private key stays in Android Keystore.
+
+After an app restart, a new task in the named app reconnects using your saved pairing across the same local port sources. If Android cannot find the port, reopen Wireless debugging and enter its connection port in **Background screen setup**. Pair again if you removed nanoMuse from Android's paired devices. To revoke access, forget nanoMuse in Android's Wireless debugging settings and clear the pairing in Hands. A stopped task needs a new request. See [Android's wireless debugging guide](https://developer.android.com/tools/adb#wireless).
+
+If several screen commands fail before an app opens, ask nanoMuse to run `nanomuse-hands status` and expand its tool result in the chat. A JSON response means the shell reached the screen operator and can report which permissions are ready. On startup, an existing Alpine sandbox can restore missing files for its bundled shell from the APK while preserving installed packages and workspace files.
+
+Choose the target by its exact package name or unique installed label with `nanomuse-hands run --app "<app>" --task "<task>"`. Use `nanomuse-hands apps` to list the choices. nanoMuse declines to open a target already visible on another display, including the main screen. Apps that require a shared task or decline to open on the separate display cannot run in this mode. The installed app shares its account and data with normal use, so changes you approve can appear on your phone.
+
+The operator stays in the named app. Home and switching to another app are unavailable. Background mode does not show the foreground mode's top capsule or tap animation. Starting a run automatically opens a secure, read-only view of the separate screen at the lower right. Drag its picture to move it; release to snap it to the nearest corner. The window keeps **Stop**, **Pause** and **Take over on phone** within reach, but taps in its picture do not control the app. Notifications, audio and links that open other apps still follow the target app's and Android's settings. If the task reaches a protected screen or a password, the assistant stops taking steps. When Android can identify the original app task, **Take over on phone** remains available for one minute. Tapping it brings the same open page to your phone and ends the run. Stop or let the offer expire to keep your current app in front.
+
+When an app replaces its startup window, the assistant takes a fresh screenshot. For dialogs with a system shadow, the assistant checks where the window image fits on its private display. If several positions match or there is too little detail, it asks you to take over.
+
+The floating screen refreshes about once a second. While a new screenshot is still loading, it keeps the previous safe frame instead of replacing it with a waiting message. The virtual screen takes its aspect ratio and density from the phone within a bounded image size. A password, code, protected window, locked phone or revoked permission still clears the current frame instead of leaving an old picture visible. **Pause** lets an action already underway finish. **Resume** takes a new observation before deciding what to do. Approval and handover prompts temporarily replace the picture, while **Stop** remains available throughout.
+
+The originating chat also shows the live background run as a tool pill, even when **Show the agent's steps** is off. It reports only the phase, step number, action kind and app name. Model reasoning, screen words, target labels and typed values are not published there. Stopping from that chat stops only the screen run owned by the same conversation, so it cannot end a later run from another chat. After the run, the normal **View screen replay** entry remains and the temporary progress line is not saved.
+
+Use **View screen replay** in the original chat to open that run, or choose one in **Settings → Hands → Screen history** to play its steps, move between them or see where a tap or swipe occurred. History uses the screenshots already retained with that conversation. Older runs may have only their last picture. The viewer shows the recorded actions for those steps.
 
 ## Continuing screen tasks {#hands-continuity}
 

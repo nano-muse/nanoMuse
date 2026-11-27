@@ -10,9 +10,9 @@ Risk: looking at the screen is safe but exposes private data (what is on someone
 is theirs), so it taints the session like reading mail does. Acting is *moderate* — tapping
 around is reversible — until what the finger is on says payment, transfer, send, delete,
 order: then the call is *sensitive* with a warning, which means the Sentinel asks every time
-and no standing approval covers it (``gui.sensitive_words``). Since no element tree names
-what is under the finger, every tap carries a ``label`` — the words of the button or field
-as read from the screenshot — and that is what is assessed and logged.
+and no standing approval covers it (``gui.sensitive_words``). Every tap carries a model
+``label`` for the audit log, but risk comes only from the device-reported element under the
+finger. If there is no such element, the Sentinel asks conservatively.
 """
 
 from __future__ import annotations
@@ -186,17 +186,23 @@ class PhoneAct(BaseTool):
         words = list(self.gui.sensitive_words)
         risk, warnings, egress = RiskLevel.MODERATE, [], False
         hit: list[str] = []
-        # the sensitive words are looked for in the model's `label` and, when the device
-        # reported elements with bounds, in the words of the element under the finger; a
-        # screen without elements (a WebView, Flutter, a game) changes nothing here
+        # A label is the model's claim, useful for the audit summary but not evidence about
+        # the target. Only the element bounds and words reported by the device can make a
+        # pointed action moderate. With no trustworthy hit, ask before putting a finger down.
         trusted = trusted_node_words(screen, _point(args, "x", "y")) if action in POINTED else None
-        evidence = " / ".join(
-            part for part in (label, trusted or "") if part and not self._is_app_name(part)
-        )
-        if action in (*POINTED, "enter") and evidence:
-            hit = [w for w in words if w.lower() in evidence.lower()]
+        if action in POINTED:
+            if trusted is None:
+                risk, egress = RiskLevel.SENSITIVE, True
+                warnings.append(
+                    "the device reported no element under the finger; the target cannot be "
+                    "verified from the screen"
+                )
+            elif not self._is_app_name(trusted):
+                hit = [w for w in words if w.lower() in trusted.lower()]
+        elif action == "enter" and label:
+            hit = [w for w in words if w.lower() in label.lower()]
         if action in POINTED and not label:
-            warnings.append("a tap with no `label`: nothing says what is under the finger")
+            warnings.append("a tap with no `label`: the action has no useful audit description")
         if action == "type" and args.get("submit"):
             # the send button only shows once there is text, so nothing yet says whether this
             # is a search box or a chat: submitting blind is a step the user gets to see

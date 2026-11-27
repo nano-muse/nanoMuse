@@ -9,9 +9,9 @@ import { useFocusTrap } from "./useFocusTrap";
 /**
  * In-app viewer for what the agent made: pages, images, documents, code, data.
  *
- * HTML is rendered from fetched text in a sandboxed iframe without `allow-same-origin`,
- * so an artifact's script runs in an opaque origin: it cannot read the access token or
- * call the API. Images and PDFs load by URL (the server does not run them).
+ * HTML is loaded by URL in a sandboxed iframe, so the server's Content Security Policy
+ * remains attached and the artifact has an opaque origin. The sandbox deliberately grants
+ * no script, form or pop-up capability. Images and PDFs load by URL too.
  */
 export function FileViewer({ path, onClose }: { path: string | null; onClose: () => void }) {
   const t = useT();
@@ -101,15 +101,12 @@ function useFileText(path: string): { text: string | null; error: string | null 
   return { text, error };
 }
 
-function HtmlBody({ path }: { path: string }) {
-  const { text, error } = useFileText(path);
-  if (error) return <Failed error={error} />;
-  if (text === null) return <Loading />;
+export function HtmlBody({ path }: { path: string }) {
   return (
     <iframe
       title={path}
-      srcDoc={text}
-      sandbox="allow-scripts allow-popups allow-forms allow-modals"
+      src={fileUrl(path)}
+      sandbox=""
       referrerPolicy="no-referrer"
       className="h-full w-full bg-white"
     />

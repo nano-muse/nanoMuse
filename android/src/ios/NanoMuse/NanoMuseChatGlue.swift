@@ -76,7 +76,7 @@ extension AIChatViewModel {
         var parts: [String] = []
         if let user = NanoMuseSystemFiles.userPromptFragment() { parts.append(user) }
         if let goal = NanoMuseGoalFlow.systemAddendum(session: key) { parts.append(goal) }
-        if let feed = NanoMuseFeedFlow.systemAddendum(session: key) { parts.append(feed) }
+        if let feed = NanoMuseFeedFlow.systemAddendum(session: key, memoryEnabled: memoryEnabled) { parts.append(feed) }
         if let addenda = NanoMuseSessionAddenda.forPrompt(session: key) { parts.append(addenda) }
         if let naming = NanoMuseFirstConversation.shared.systemAddendum(session: key) { parts.append(naming) }
         guard !parts.isEmpty else { return "" }

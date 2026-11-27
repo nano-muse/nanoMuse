@@ -42,18 +42,27 @@ class GoalStore private constructor(context: Context) {
         save()
     }
 
+    @Synchronized
+    fun update(id: String, transform: (Goal) -> Goal) {
+        val current = get(id) ?: return
+        val changed = transform(current)
+        if (changed != current) upsert(changed)
+    }
+
     /** A `nanomuse-goal-update` block from the goal's session. */
-    fun applyUpdate(goalId: String, progress: Int?, status: String?, note: String?) {
+    @Synchronized
+    fun applyUpdate(goalId: String, progress: Int?, status: String?, note: String?, completedSteps: Set<Int> = emptySet()) {
         val goal = get(goalId) ?: return
         val newStatus = when (status?.lowercase()) {
             "done", "completed" -> GoalStatus.DONE
             "paused" -> GoalStatus.PAUSED
-            else -> if (goal.status == GoalStatus.DONE) GoalStatus.ACTIVE else goal.status
+            else -> goal.status
         }
         upsert(
             goal.copy(
                 progress = (progress ?: goal.progress).coerceIn(0, 100),
                 status = newStatus,
+                steps = goal.steps.mapIndexed { i, step -> if (i + 1 in completedSteps) step.copy(done = true) else step },
                 lastNote = note?.takeIf { it.isNotBlank() } ?: goal.lastNote,
                 lastCheckedAt = System.currentTimeMillis(),
             ),

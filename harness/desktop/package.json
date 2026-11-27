@@ -1,7 +1,7 @@
 {
   "name": "nanomuse-desktop",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "nanoMuse Desktop: the nanoMuse desktop built on DeepSeek Harness. The harness's web app in a window of our own, with nanoMuse's account, face, Hands and Reach as plugins and the runtime for the hands bundled.",
   "homepage": "https://nanomuse.cn/",
   "license": "GPL-3.0-or-later",
@@ -23,7 +23,7 @@
   "devDependencies": {
     "@types/node": "^22.20.4",
     "builder-util-runtime": "9.7.0",
-    "electron": "44.7.0",
+    "electron": "44.11.6",
     "electron-builder": "^26.18.0",
     "typescript": "^5.6.0"
   },

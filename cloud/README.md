@@ -16,15 +16,14 @@ its base URL.
   `nm_…` API key. One phone/e-mail is one account with one starter grant; a
   second device signing in with the same number gets a second key, not a second
   grant. `POST /v1/auth/session-key` (0.13) turns a key into one that lapses on
-  its own (`ttl_s`, 90 days at most) — what nanoMuse Web starts a person's
-  container with, so the gateway keeps no standing key of theirs; it shows in
-  `/v1/me/sessions` with `expires_at` and `via: "session"`.
+  its own (`ttl_s`, 90 days at most). Its Hub credential receives a
+  server-generated computer reservation at issue. The nanoMuse Web container's
+  first `computer` hello may replace that reservation only with an unused id,
+  then the credential is fixed to that id. The gateway needs no installation id
+  and keeps no standing key; the session appears in `/v1/me/sessions` with
+  `expires_at` and `via: "session"`.
 - **OpenAI-shaped chat proxy.** `GET /v1/models` and `POST /v1/chat/completions`
-  (streaming or not) go to the upstream with the relay's key. The hosted menu contains
-  only `Qwen/Qwen3.6-27B-FP8`, including its image-input support for chat and GUI
-  operation. Image and video generation require a provider and API key configured by
-  the person on their device. A streamed turn that waits for one of the relay's
-  `CHAT_CONCURRENCY` slots, or for a slow provider's first bytes, hears about it: chunks
+  (streaming or not) go to the upstream with the relay's key. The managed Baidu Qianfan menu offers separate models for chat, screen operation, text-to-image and character video. The relay routes saved IDs from earlier apps to the current model for the task. Accounts retain their login and balance. A streamed turn that waits for a slot in its provider queue, or for a slow provider's first bytes, hears about it: chunks
   with `choices: []` and a `nanomuse: {phase: queued | working, ahead, waited_ms}` field
   while it queues, SSE comment lines while the provider thinks (0.31; shapes every
   client already skips; details in [docs/cloud.md](../docs/cloud.md#protocol)).
@@ -90,7 +89,9 @@ Errors carry a stable `code` the app can turn into a sentence:
 | 403 | `account_disabled` | the operator switched the account off: its keys answer `401 bad_key`, `POST /v1/auth/verify` answers this, and `/v1/auth/login` answers it only to the right password (a wrong one is `401 bad_credentials` as for any account). `POST /v1/auth/code` answers the same `204` as for anyone, counts towards the same limits and sends nothing, so a request there learns neither that the number has an account nor that it is off |
 | 403 | `session_from_session` | `POST /v1/auth/session-key` was called with a session key; only a device's standing key may mint one, so a leaked short-lived key cannot renew itself |
 | 404 | `model_not_offered` | not on the chat menu |
-| 410 | `hosted_media_retired` | this relay no longer pays for image or video generation; configure an image/video provider and API key in the client |
+| 400 | `image_edit_unsupported` | the model accepts text-to-image requests; use a provider with reference-image editing for an edit |
+| 400 | `wizshot_materials_required` | the request needs character video inputs. Open `error.open` on this relay for the video form |
+| 410 | `hosted_media_retired` | media generation is disabled on this relay |
 | 400 | `no_secrets_in_profile` | a profile `connectors` entry carried a key named like a credential; nothing was stored |
 | 400 | `too_many_connectors` | the write would leave more than 64 connectors on the account |
 | 429 | `allowance_exhausted` | the account's pool is spent; the body also carries `left`, `grant`, `region`, `ways` (the ways on in order for that person), `guidance` (0.21: every provider for the region with what each covers, the plans an app can sign in with), `invite_url`, `invite_bonus_cny`, `own_key_docs`, `openrouter_url` |
@@ -172,8 +173,9 @@ for the full list. The ones that matter:
 
 | variable | default | |
 |---|---|---|
-| `UPSTREAM_BASE` / `UPSTREAM_KEY` | Model Studio compatible-mode | where chat goes |
-| `CHAT_DEFAULTS` | `{"enable_thinking": false}` | merged into chat requests for fields the app did not set; for Qwen behind vLLM use `{"chat_template_kwargs":{"enable_thinking":false}}` |
+| `UPSTREAM_BASE` / `UPSTREAM_KEY` | provider-specific | the hosted relay uses `https://qianfan.baidubce.com/v2`; self-hosters can choose their existing OpenAI-compatible endpoint and its key |
+| `QIANFAN_API_KEY` | empty | Baidu Qianfan API key. An existing Baidu key stored in `DASHSCOPE_API_KEY` can be used as a fallback on the Qianfan endpoint |
+| `CHAT_DEFAULTS` | endpoint-specific | optional defaults for chat requests. Use the reasoning parameters that the selected provider accepts |
 | `SIGNUP_OPEN` | `1` | anyone may sign in; `0` = members only (a private relay). *Runtime setting* — see below |
 | `ALLOWED_IDENTIFIERS` | empty | comma-separated numbers / addresses of the **members**: no spend limit |
 | `REVIEW_ADDRESSES`, `REVIEW_CODE` | empty (off) | an app store reviewer's sign-in: for these e-mail addresses no code is sent and the six-digit `REVIEW_CODE` signs in — see *For App Store review* below |
@@ -199,7 +201,8 @@ for the full list. The ones that matter:
 | `PER_MINUTE_REQUESTS` | 30 | per account — what stops a runaway loop |
 | `MAX_IN_FLIGHT` | 4 | requests of one account under way at the same time (0 = off); each holds a reservation against the allowance while it runs — see *Money* |
 | `UPSTREAM_TIMEOUT_S` | 180 | how long one call to the provider may take (connecting has 20 s of its own); a reservation that outlives it by two minutes is dropped |
-| `CHAT_CONCURRENCY` | 12 | chat requests at the provider at once across all accounts (0 = off); the rest wait at the relay, so a burst does not overload one shared deployment |
+| `CHAT_CONCURRENCY` | 12 | simultaneous chat and screen requests across all accounts within one relay process when they use the shared queue (0 disables the limit) |
+| `CHAT_MODEL_CONCURRENCY` | unset | optional Qianfan JSON object assigning a positive integer limit to each of its two upstream models. With both limits set, each model has its own queue. Other providers keep the shared queue |
 | `CHAT_RETRIES` | 2 | retries after an upstream 429 or 5xx received before any chat output starts (0 = off; capped at 5) |
 | `CALLS_KEEP_DAYS` | 90 | how long the per-call telemetry rows (`calls`: timings, outcome, shape, platform; never content) are kept before the hourly sweep removes them (0.28) |
 | `EVENTS_KEEP_DAYS` | 365 | how long the timelines' lines (`events`: sign-ins, devices joining, errors, refusals; never content) are kept before the hourly sweep removes them; the `account.deleted` lines and the ledger are never swept (0.29) |
@@ -220,8 +223,8 @@ for the full list. The ones that matter:
 | `CODE_PER_IDENTIFIER_10M`, `CODE_PER_IP_HOUR` | 3, 10 | codes one number or address may request per ten minutes, and one network address per hour; past either the request is answered `429 code_too_often` |
 | `CODE_SENDER` | `log` | `log`, `smtp`, `aliyun` or `both` (SMS for phones, mail for addresses) |
 | `ALIYUN_SMS_API` | `dypns` | `dypns` (号码认证服务 `SendSmsVerifyCode`) or `dysms` (短信服务 `SendSms`) |
-| `CLOUD_MODELS` | `Qwen/Qwen3.6-27B-FP8` | JSON list to replace the hosted menu and lanes (`for`, `recommended_for`); media kinds take effect only on a self-hosted relay with `CLOUD_MEDIA_ENABLED=1` |
-| `CLOUD_MEDIA_ENABLED` | `0` | self-hosters may set `1` to run the historical native media proxy with their own provider account; project-hosted nanoMuse Cloud leaves it off |
+| `CLOUD_MODELS` | endpoint-specific | custom model menu and lanes for independently configured upstreams |
+| `CLOUD_MEDIA_ENABLED` | endpoint-specific | enables hosted Qianfan picture and character-video generation, or the legacy DashScope media proxy for compatible self-hosted configurations |
 | `CLOUD_MODEL_ALIASES` | built-in aliases only | JSON object mapping old or saved model ids to ids in `CLOUD_MODELS`, useful when changing provider |
 | `CLOUD_ANY_MODEL_MEMBERS` | `1` | members may name any model of the provider's for its kind (chat, image, video) — see below; `0` = the menu only |
 | `CLOUD_CATALOG` | `1` | list the usable models under the operator's key after the menu in a member's `/v1/models`, read from the provider's own `/models` (0.10) — see below; `0` = the menu only, a member types an id |
@@ -240,19 +243,27 @@ for the full list. The ones that matter:
 | `ADMIN_EMAIL` | empty | where a threshold rule's *notify* goes (0.22, *Controls*), through the `SMTP_*` settings; empty = the rule writes its audit line and the log says there was nobody to tell |
 | `NANOMUSE_CLOUD_BASE` | `PUBLIC_BASE`, else `http://127.0.0.1:8787` | read by the admin CLI only (`nanomuse-cloud admin …`, below): the address of the relay it talks to when `--base` is not given; the relay itself does not read it |
 
-The hosted menu contains one model: `Qwen/Qwen3.6-27B-FP8`. It serves both
-chat and the hands and accepts image input, so screenshots and pictures in a
-conversation continue to work. It does not generate pictures or video.
-`/v1/images/*`, video submission/upload routes, and media estimates answer
-`410 hosted_media_retired` before any upstream call or allowance charge.
+The project-hosted relay uses a fixed Baidu Qianfan menu.
+
+| Task | Model |
+|---|---|
+| Chat and attachments | `deepseek-v4.1-flash-1017` |
+| Operating the screen | `qwen3.5-397b-a17b` |
+| Picture from text | `musesteamer-air-image` |
+| Character video | `ernie-wizshot-me` |
+
+Use `UPSTREAM_BASE=https://qianfan.baidubce.com/v2` and provide `QIANFAN_API_KEY` to the relay process. Set `CLOUD_MEDIA_ENABLED=1` for pictures and clips. When changing from a custom menu, remove the old `CLOUD_MODELS`, `CLOUD_MODEL_ALIASES` and provider-specific `CHAT_DEFAULTS` overrides. Existing clients keep their Cloud credentials. Cached IDs for the retired chat model resolve to the current chat or screen model according to the request.
+
+For separate Qianfan queues, set `CHAT_MODEL_CONCURRENCY='{"deepseek-v4.1-flash-1017":60,"qwen3.5-397b-a17b":60}'`. This example lets 60 chat calls and 60 screen-operation calls run simultaneously. When all chat slots are occupied, a screen request can still use a free Qwen slot. The relay selects the queue after resolving the upstream model, so older client IDs use the same slots as current IDs. Use both upstream IDs exactly as shown. Removing this setting restores the shared `CHAT_CONCURRENCY` limit.
+
+These limits count active requests in one relay process. Other relay processes and clients that call the provider directly have separate local counts. The provider's own quotas still apply. `PER_MINUTE_REQUESTS` counts requests per account over a minute, and `MAX_IN_FLIGHT` caps the number that account can have underway across models.
 
 **Lanes (0.17).** Every chat model says what it is `for` — `chat`, `gui` or
 both — and `recommended_for` names the lane(s) it is the default pick in; both
 ride in each entry's `nanomuse` block of `/v1/models`, and the apps' two
 pickers (the chat model, the hands model) filter on them and take the
 recommended one of each lane as the default. Picture and clip models are for
-neither (`"for": []`; their `kind` says what they do). On the shipped menu
-`Qwen/Qwen3.6-27B-FP8` is `for: ["chat", "gui"]` and recommended for both. In
+neither (`"for": []`; their `kind` says what they do). In Qianfan mode the two chat entries have separate lanes. In
 `CLOUD_MODELS` the fields are `"for"` and `"recommended_for"` (lists of lane
 names; `for` left out means `["chat"]`; a `recommended_for` needs
 `"recommended": true`); the relay logs a line at start when a lane has no
@@ -263,14 +274,11 @@ untouched, and reasoning tokens are counted as completion tokens whichever
 way the provider reports them (`completion_tokens_details.reasoning_tokens`
 inside the figure, or DashScope's `output_tokens_details` apart from it).
 
-Any OpenAI-compatible upstream works for chat. The legacy image and video
-endpoints assume DashScope and are disabled by default; a self-hosted relay
-can opt in with `CLOUD_MEDIA_ENABLED=1` and its own provider key. Video is
-then relayed under DashScope's own paths
-(`/api/v1/services/aigc/video-generation/video-synthesis`, `/api/v1/tasks/{id}`,
-`/api/v1/uploads`), so the app's video code only needs to point its host at
-the relay; a task can be polled by the account that created it only, and the
-relay polls on the account's behalf when the app does not (*Money*, below).
+The [hosted image form](https://cloud.nanomuse.cn/app/?image=generate) and `POST /v1/images/generations` accept one text prompt. The API returns one image in `data[0].b64_json`. Android, iPhone and desktop 1.0.10 users can use this page and the character-video form with their existing Cloud accounts. Reference-image editing requires a provider that supports it.
+
+A signed-in user can open the [Cloud video form](https://cloud.nanomuse.cn/app/?video=wizshot) to generate a short silent character performance. It needs authorized HTTPS links for a portrait, a WAV containing 10 to 60 seconds of speech, and optionally a shot image (short edge at least 720 pixels). A missing shot image defaults to the portrait. The form requests a four-second performance. `POST /v1/videos/generations` returns `output.task_id`. Reuse that ID at `GET /api/v1/tasks/{id}` until it succeeds, then download the video before its URL expires. Released apps that supply only a prompt or an initial frame need the form for Cloud video. The relay verifies task ownership.
+
+Self-hosters can retain a different OpenAI-compatible upstream and its key. With a DashScope native media service and `CLOUD_MEDIA_ENABLED=1`, they can also retain the original image editing, video synthesis and upload routes.
 
 ### Runtime settings (0.15)
 
@@ -431,17 +439,7 @@ above it) and stored in the ledger next to the token count; a chat is priced
 at the hour its reply comes in, with the provider's `cached_tokens` at the
 cached rate, and the ledger line's `extra` says when either applied. A non-member account has one pool for
 its lifetime — `ALLOWANCE_CNY` (¥10 by default, adjustable at runtime), grown by invites (both
-sides) and the operator's credit. On the hosted service only chat/vision/GUI
-requests spend this pool; picture and clip generation returns
-`hosted_media_retired` before budget or upstream work.
-Members — the identifiers in `ALLOWED_IDENTIFIERS`, or any account the
-operator marks on the admin page — have no limit, and (with
-`CLOUD_ANY_MODEL_MEMBERS=1`, the default) may name **any model the provider has
-under the operator's key**, not only the menu's: the id goes upstream as typed,
-as long as it is a chat model at `/v1/chat/completions`. Disabling hosted media
-also applies to members. A self-hosted operator that sets
-`CLOUD_MEDIA_ENABLED=1` restores the historical typed image/video behavior
-under that operator's own key. `/v1/models`
+sides) and the operator's credit. The managed service meters all four tasks against the same allowance. Members can use the same fixed menu without an allowance limit. Independently configured upstreams can use `CLOUD_ANY_MODEL_MEMBERS` to expose additional models under their own key and `CLOUD_MEDIA_ENABLED` to enable media. `/v1/models`
 says `nanomuse.any_model` for the account, `/v1/me` the same under `account`,
 and `GET /v1/models/<id>?kind=chat` checks a typed id (the answer's `listed` is
 false and `priced_as` names the menu model whose prices stand in for it in the
@@ -732,8 +730,7 @@ sources). Every answer is cached by URL and refreshed in the background, so a
 page the operator has seen opens at once; the period (7 to 365 days), the
 language and the theme are remembered; every filter, tab and open drawer lives
 in the hash. The navigation is in three groups. **Insight**: *Overview*;
-*Live* (`GET /v1/admin/live`, every 3 s): the provider gate (`CHAT_CONCURRENCY`
-slots in use, how many wait), the requests under way with their phase (queued,
+*Live* (`GET /v1/admin/live`, every 3 s): provider slots in use and requests waiting (the API also lists each configured queue in `model_gates`), the requests under way with their phase (queued,
 awaiting the first token, streaming) and age, the last hour by minute with
 outcomes, latency percentiles and output tokens, the newest finished calls,
 and a verdict (smooth, busy, saturated) from the last ten minutes' queue share

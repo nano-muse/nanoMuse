@@ -136,6 +136,7 @@ export class ProtectedExit {
       return false;
     }
     this.phase = "handoff";
+    let leaveGateClosed = false;
     try {
       await this.attempt(this.options.work.setGate(false), "closing the gate");
       let items = await this.busyNow();
@@ -148,30 +149,36 @@ export class ProtectedExit {
           this.options.log(`${intent}: the question failed (${String(exc)}); keeping the work running`);
         }
         if (!confirmed) {
-          await this.attempt(this.options.work.setGate(true), "opening the gate");
-          this.options.log(`${intent}: the person keeps running; the gate is open and the work goes on`);
+          this.options.log(`${intent}: the person keeps running; reopening the gate so the work goes on`);
           return false;
         }
-        for (let round = 0; round < STOP_ROUNDS; round++) {
-          if (round > 0) this.options.log(`${intent}: work still on after round ${round}; stopping again`);
-          await this.attempt(this.withDeadline(this.options.work.stopAll()), "the stop");
-          items = await this.busyNow();
-          if (items.length === 0) break;
+        try {
+          for (let round = 0; round < STOP_ROUNDS; round++) {
+            if (round > 0) this.options.log(`${intent}: work still on after round ${round}; stopping again`);
+            await this.strictDeadline(this.options.work.stopAll(true));
+            items = await this.options.work.busy(true);
+            if (items.length === 0) break;
+          }
+          if (items.length > 0) throw new Error(`work remains after the stop (${items.map((i) => i.kind).join(", ")})`);
+        } catch (exc) {
+          this.options.log(`${intent}: ${String(exc)}; restart cancelled`);
+          return false;
         }
-        if (items.length > 0) this.options.log(`${intent}: work still on after the stop (${items.map((i) => i.kind).join(", ")}); the restart stops the Host, which ends it`);
       }
       if (exits) this.approved = "user";
       try {
         await restart();
       } catch (exc) {
         this.options.log(`${intent}: ${String(exc)}; the gate opens again`);
-        this.approved = "none";
-        await this.attempt(this.options.work.setGate(true), "opening the gate");
         return false;
       }
-      if (!exits) await this.attempt(this.options.work.setGate(true), "opening the gate");
+      leaveGateClosed = exits;
       return true;
     } finally {
+      if (!leaveGateClosed) {
+        this.approved = "none";
+        await this.attempt(this.options.work.setGate(true), "opening the gate");
+      }
       this.phase = "idle";
     }
   }

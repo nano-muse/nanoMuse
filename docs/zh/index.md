@@ -29,16 +29,16 @@ hero:
 | | |
 |---|---|
 | **浏览器** | 打开 [demo.nanomuse.dev](https://demo.nanomuse.dev/) 并登录，即可在模拟手机上体验 nanoMuse。页面提供可点击的中英文任务示例。此页面用于演示，日常使用请安装下面的 App |
-| **Android** 8.0 及以上，arm64 | [nanoMuse-1.0.9-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-1.0.9-arm64.apk) · [安装说明](android.md) |
+| **Android** 8.0 及以上，arm64 | [nanoMuse-1.0.10-arm64.apk](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-1.0.10-arm64.apk) · [安装说明](android.md) |
 | **iPhone / iPad** | 通过 [TestFlight](https://testflight.apple.com/join/ZHexbDqc) 安装。TestFlight 是 Apple 分发测试版 App 的工具，此版本已通过 Apple 的测试版审核 · [iOS 使用说明](ios.md) |
-| **macOS** 12 及以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-arm64.dmg) · [Intel 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-mac-x64.dmg) · [桌面版使用说明](desktop.md) |
-| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.9-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-win-x64.exe) |
-| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.9/nanoMuse-Desktop-1.0.9-linux-x64.tar.gz) |
+| **macOS** 12 及以上 | [Apple 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-arm64.dmg) · [Intel 芯片](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-mac-x64.dmg) · [桌面版使用说明](desktop.md) |
+| **Windows** 10 以上 | [nanoMuse-Desktop-1.0.10-win-x64.exe](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-win-x64.exe) |
+| **Linux** x64 | [AppImage](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.AppImage) · [.deb](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.deb) · [tar.gz](https://github.com/nano-muse/nanoMuse/releases/download/v1.0.10/nanoMuse-Desktop-1.0.10-linux-x64.tar.gz) |
 | **Docker** | 用 `bash scripts/self-host.sh --local` 部署自己的中继，用 `docker compose up -d app` 运行网页版。Docker 用容器封装程序及其运行环境 · [部署说明](self-hosting.md) |
 
 全部安装包都在[最新版本下载页](https://github.com/nano-muse/nanoMuse/releases/latest)。如果 GitHub 下载缓慢，可以从 [nanomuse.cn/dl](https://nanomuse.cn/dl/) 下载相同的文件。
 
-[1.0.9 Tiller 更新内容](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.9) · [各客户端的功能对照](parity.md) · [参与贡献与后续计划](roadmap.md) · [中继保存的数据](privacy.md) · [手机数据的保存与归属](sync.md)
+[1.0.10 Bridge 更新内容](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.10) · [各客户端的功能对照](parity.md) · [参与贡献与后续计划](roadmap.md) · [中继保存的数据](privacy.md) · [手机数据的保存与归属](sync.md)
 
 ## 宣传片 {#the-film}
 

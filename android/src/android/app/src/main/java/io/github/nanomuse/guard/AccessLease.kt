@@ -2,6 +2,10 @@ package io.github.nanomuse.guard
 
 /** Monotonic, process-local authentication lease, shared by app and session access. */
 class AccessLease(private val clock: () -> Long) {
+    companion object {
+        const val BACKGROUND_GRACE_SECONDS = 15
+    }
+
     private var unlockedAt: Long? = null
     private var backgroundedAt: Long? = null
     fun authenticate(success: Boolean) { if (success) unlockedAt = clock() }
@@ -14,7 +18,7 @@ class AccessLease(private val clock: () -> Long) {
     fun foreground(timeoutSeconds: Int) {
         val leftAt = backgroundedAt ?: return
         backgroundedAt = null
-        val threshold = if (timeoutSeconds == -1) 15_000L else timeoutSeconds * 1000L
-        if (timeoutSeconds != 0 && clock() - leftAt >= threshold) lock()
+        val seconds = if (timeoutSeconds == -1) BACKGROUND_GRACE_SECONDS else timeoutSeconds
+        if (seconds != 0 && clock() - leftAt >= seconds * 1000L) lock()
     }
 }

@@ -82,7 +82,7 @@ extension NanoMuseImageGen {
     /// The relay's image model for the next picture: the one picked, else the first its menu lists.
     @MainActor
     static func relayImageModel() async throws -> String {
-        if let model = relayModel { return model }
+        if let model = relayModel, NanoMuseModelSlots.cloudProvider()?.models[.image]?.contains(model) == true { return model }
         return try await NanoMuseRelayMedia.imageModel()
     }
     /// The catalogue's `defaults.image` for Bailian (¥0.18 a picture; the Pro tier draws the

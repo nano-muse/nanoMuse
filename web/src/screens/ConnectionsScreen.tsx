@@ -43,7 +43,7 @@ import { OWN_KEY_DOCS, takePresetHint } from "../components/AllowanceWays";
 import { PageBar } from "../components/BackBar";
 import { ChatGptSignIn } from "../components/ChatGptSignIn";
 import { CloudCard } from "../components/CloudCard";
-import { Card, inputCls, primaryBtn, secondaryBtn } from "../components/Form";
+import { Card, inputCls, primaryBtn, secondaryBtn, Toggle } from "../components/Form";
 import { ModelPicker } from "../components/ModelPicker";
 import { getLocale, useT } from "../i18n";
 import type { ModelGroup } from "../model-list";
@@ -2039,6 +2039,31 @@ const MAIL_PRESETS: Array<{
   },
 ];
 
+// Load the active account's choice when the connection form opens. Older runtimes and
+// accounts in transition can still connect a source without enrolling it for review.
+function useReviewOnConnect(source: "mail" | "calendar" | "mcp", open: boolean) {
+  const [choice, setChoice] = useState<{ revision: string; enabled: boolean } | null>();
+  const [attempt, retry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setChoice(undefined);
+    if (open) {
+      api.contextWatch().then((view) => {
+        if (active) setChoice(view.on_connect ? {
+          revision: view.revision, enabled: view.on_connect[source],
+        } : null);
+      }).catch(() => { if (active) setChoice(null); });
+    }
+    return () => { active = false; };
+  }, [source, open, attempt]);
+  return {
+    choice: choice ?? undefined,
+    loading: open && choice === undefined,
+    setEnabled: (enabled: boolean) => setChoice(current => current && { ...current, enabled }),
+    reload: () => retry(n => n + 1),
+  };
+}
+
 export function EmailCard({
   data,
   onChange,
@@ -2052,6 +2077,7 @@ export function EmailCard({
   const t = useT();
   const e = data.email;
   const [open, setOpen] = useState(!!compact);
+  const review = useReviewOnConnect("mail", open);
   const [address, setAddress] = useState(e.address);
   const [password, setPassword] = useState("");
   const [imap, setImap] = useState(e.imap_host);
@@ -2085,6 +2111,7 @@ export function EmailCard({
     try {
       await api.setEmail({
         enabled: true,
+        review: review.choice,
         address: address.trim(),
         password: password || undefined,
         imap_host: imap.trim(),
@@ -2101,6 +2128,7 @@ export function EmailCard({
     } catch (err) {
       toast((err as Error).message);
     } finally {
+      review.reload();
       setBusy(null);
     }
   };
@@ -2115,6 +2143,7 @@ export function EmailCard({
     } catch (err) {
       toast((err as Error).message);
     } finally {
+      review.reload();
       setBusy(null);
     }
   };
@@ -2233,11 +2262,14 @@ export function EmailCard({
         />{" "}
         {t("STARTTLS for SMTP (off for port 465)")}
       </label>
+      {review.choice && <Toggle label={t("Follow up on important new email")}
+        hint={t("Your model can review new inbox excerpts in the background and message you in your main chat.")}
+        checked={review.choice.enabled} onChange={review.setEnabled} disabled={busy !== null} />}
       <div className="flex gap-2 pt-1">
         <button
           type="button"
           disabled={
-            busy !== null ||
+            busy !== null || review.loading ||
             !address.trim() ||
             !imap.trim() ||
             !smtp.trim() ||
@@ -2325,6 +2357,7 @@ export function CalendarCard({
   const c = data.calendar;
   const [open, setOpen] = useState(!!compact);
   const [adding, setAdding] = useState(false);
+  const review = useReviewOnConnect("calendar", (open || !!compact) && adding);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [hint, setHint] = useState<string | null>(null);
@@ -2342,7 +2375,7 @@ export function CalendarCard({
     setBusy("add");
     setTest(null);
     try {
-      const view = await api.addCalendarFeed(name.trim(), url.trim());
+      const view = await api.addCalendarFeed(name.trim(), url.trim(), review.choice);
       if (view.error) {
         toast(
           t("Added, but it could not be read: {error}", { error: view.error }),
@@ -2358,6 +2391,7 @@ export function CalendarCard({
     } catch (e) {
       toast((e as Error).message);
     } finally {
+      review.reload();
       setBusy(null);
     }
   };
@@ -2535,10 +2569,13 @@ export function CalendarCard({
               autoComplete="off"
             />
           </Field>
+          {review.choice && <Toggle label={t("Follow up on changes in my connected calendars")}
+            hint={t("Your model can review upcoming events across these calendar feeds and message you about changes.")}
+            checked={review.choice.enabled} onChange={review.setEnabled} disabled={busy !== null} />}
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={busy === "add" || !name.trim() || !url.trim()}
+              disabled={busy === "add" || review.loading || !name.trim() || !url.trim()}
               onClick={() => void add()}
               className={primaryBtn}
             >
@@ -3370,6 +3407,7 @@ function MCPCard({
   const t = useT();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const review = useReviewOnConnect("mcp", open && adding);
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [url, setUrl] = useState("");
@@ -3382,6 +3420,7 @@ function MCPCard({
     try {
       const parts = command.trim().split(/\s+/).filter(Boolean);
       await api.addMCP({
+        review: newServer ? review.choice : undefined,
         name: name.trim(),
         command: parts[0] ?? null,
         args: parts.slice(1),
@@ -3399,6 +3438,7 @@ function MCPCard({
     } catch (e) {
       toast((e as Error).message);
     } finally {
+      review.reload();
       setBusy(null);
     }
   };
@@ -3419,6 +3459,8 @@ function MCPCard({
   // what the account's other devices connected and this one has not (contract C3): shown
   // with the server's own sign-in as the action — the key never travels
   const elsewhere = (data.shared ?? []).filter((c) => c.enabled && !c.here);
+  const newServer = !data.mcp.some(server => server.name === name.trim());
+
   const prefill = (c: SharedConnector) => {
     setName(c.id);
     setUrl(c.url);
@@ -3602,11 +3644,14 @@ function MCPCard({
               ))}
             </div>
           </Field>
+          {newServer && review.choice && <Toggle label={t("Follow the new server’s only text resource")}
+            hint={t("If it offers exactly one readable resource, your model can review changes and message you. With several resources, choose what to follow in Feed.")}
+            checked={review.choice.enabled} onChange={review.setEnabled} disabled={busy !== null} />}
           <div className="flex gap-2">
             <button
               type="button"
               disabled={
-                busy === "add" ||
+                busy === "add" || review.loading ||
                 !name.trim() ||
                 !(command.trim() || url.trim())
               }

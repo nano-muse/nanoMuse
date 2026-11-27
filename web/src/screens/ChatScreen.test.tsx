@@ -15,7 +15,7 @@ import { Composer, WorkingLine } from "./ChatScreen";
 
 const store = vi.hoisted(() => ({
   state: {
-    draft: null,
+    draft: null as string | null,
     draftFiles: null,
     settings: { skills: { enabled: false } },
     hub: null,
@@ -46,6 +46,22 @@ describe("Composer stop disc", () => {
     const d = discs(r);
     expect(d.stop).toBeDefined();
     expect(d.send).toBeUndefined();
+  });
+
+  it("keeps the main chat's unsent words when a Feed draft arrives", () => {
+    const drafts = new Map([["main", "My note"], ["other", "Unrelated"]]);
+    store.state.draft = "Draft from the Feed";
+    let r!: ReactTestRenderer;
+    try {
+      act(() => {
+        r = create(<Composer name="Muse" thread="main" drafts={drafts} busy={false} waiting={false} onSend={vi.fn()} />);
+      });
+      expect(r.root.findByType("textarea").props.value).toBe("My note\n\nDraft from the Feed");
+      expect(drafts.get("other")).toBe("Unrelated");
+    } finally {
+      store.state.draft = null;
+      act(() => r.unmount());
+    }
   });
 
   it("keeps no stop disc without an onStop", () => {

@@ -213,7 +213,9 @@ class ReachOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     /** The card for an action on the computer. Grants are kept apart from the phone's. */
     private fun approve(sessionId: String?, c: Computers.Computer, assessment: RiskAssessment, preview: String): Gate {
-        val outcome = runBlocking { RemoteApprovalGate.check(sessionId, c.name, assessment, preview) }
+        val outcome = runBlocking {
+            RemoteApprovalGate.check(sessionId, c.hubId, c.name, assessment, preview)
+        }
         return when (outcome) {
             is GateOutcome.Allowed -> Gate(notice = outcome.notice)
             is GateOutcome.Denied -> Gate(denied = outcome.message)

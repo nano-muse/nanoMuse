@@ -202,7 +202,7 @@ object SessionActivityTracker {
      * state flows rather than tracking a derived flag.
      */
     private fun shouldRunService(): Boolean =
-        _activeSessions.value.isNotEmpty() || _presentSessions.value.isNotEmpty()
+        _activeSessions.value.isNotEmpty() || _presentSessions.value.isNotEmpty() || feedPreparationStop != null // nanoMuse
 
     /**
      * T50: per-session stream-cancel callbacks. Each ChatViewModel
@@ -216,6 +216,20 @@ object SessionActivityTracker {
      * the session is "active" but has no canceller.
      */
     private val streamCancellers = mutableMapOf<String, () -> Unit>()
+
+    // nanoMuse: keep a tool-free Feed request alive without marking a chat unread or sending a
+    // chat-completion notice. The Feed allows at most one such request. Called on Main.
+    @Volatile private var feedPreparationStop: (() -> Unit)? = null
+
+    fun setFeedPreparation(onStop: (() -> Unit)?) {
+        val wasIdle = !shouldRunService()
+        feedPreparationStop = onStop
+        when {
+            !shouldRunService() -> stopService()
+            wasIdle -> startServiceIfNeeded()
+            else -> updateService()
+        }
+    }
 
     /**
      * T180-bg-notif: per-session "task is finishing — was it cancelled?"
@@ -473,7 +487,7 @@ object SessionActivityTracker {
      * so iterating the live map would ConcurrentModificationException.
      */
     fun cancelAllActiveStreams() {
-        val snapshot = synchronized(streamCancellers) { streamCancellers.values.toList() }
+        val snapshot = synchronized(streamCancellers) { streamCancellers.values.toList() } + listOfNotNull(feedPreparationStop) // nanoMuse
         Log.d(TAG, "cancelAllActiveStreams: dispatching to ${snapshot.size} session(s)")
         for (cancel in snapshot) {
             try {
@@ -590,7 +604,7 @@ object SessionActivityTracker {
      */
     private fun sessionCountForNotification(): Int =
         if (_activeSessions.value.isNotEmpty()) _activeSessions.value.size
-        else _presentSessions.value.size
+        else maxOf(_presentSessions.value.size, if (feedPreparationStop != null) 1 else 0) // nanoMuse
 
     /**
      * Tool status fallback: when nothing is streaming, expose "In session"
@@ -623,6 +637,8 @@ object SessionActivityTracker {
                     if (activeCount == 1) "1 task running" else "$activeCount tasks running"
                 }
             }
+            feedPreparationStop != null -> // nanoMuse: no personal record in the status notification
+                ctx?.getString(com.openminis.app.R.string.nm_feed_routine_label) ?: "Feed"
             _presentSessions.value.isNotEmpty() ->
                 ctx?.getString(com.openminis.app.R.string.notif_in_session) ?: "In session"
             else -> "Idle"

@@ -203,6 +203,7 @@ data class QueuedPrompt(
     val id: String,
     val text: String,
     val attachments: List<InputAttachment> = emptyList(),
+    val feedScope: String? = null, // nanoMuse: opt-in receipt for locally authored queued text.
 )
 
 /**
@@ -271,6 +272,8 @@ data class AssistantBlock(
      * Null for non-Gemini providers and thinking-off Gemini calls.
      */
     val thoughtSignature: String? = null,
+    val handsRunId: String? = null, // nanoMuse: validated local screen-run receipt for the replay entry.
+    @Transient val handsProgress: String? = null, // nanoMuse: live, display-safe status; never persisted.
 ) {
     val isText: Boolean get() = kind == "text"
 }

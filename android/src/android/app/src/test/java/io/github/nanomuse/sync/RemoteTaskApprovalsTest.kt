@@ -15,7 +15,7 @@ class RemoteTaskApprovalsTest {
     @Test fun `the existing gate decides and a duplicate card is answered only once`() = runTest {
         val replies = mutableListOf<Pair<String, Boolean>>()
         var decisions = 0
-        val approvals = RemoteTaskApprovals(this, "session", "Desk", { id, allow -> replies += id to allow }, {
+        val approvals = RemoteTaskApprovals(this, "session", "device", "Desk", { id, allow -> replies += id to allow }, {
             decisions++; GateOutcome.Allowed("standing grant")
         })
         approvals.event(event()); approvals.event(event())
@@ -29,7 +29,7 @@ class RemoteTaskApprovalsTest {
     @Test fun `a remote decision withdraws the local card without sending another answer`() = runTest {
         var withdrawn = false
         var replies = 0
-        val approvals = RemoteTaskApprovals(this, "session", "Desk", { _, _ -> replies++ }, {
+        val approvals = RemoteTaskApprovals(this, "session", "device", "Desk", { _, _ -> replies++ }, {
             try { awaitCancellation() } finally { withdrawn = true }
         })
         approvals.event(event()); runCurrent()
@@ -41,7 +41,7 @@ class RemoteTaskApprovalsTest {
 
     @Test fun `closed calls cannot show late approval cards`() = runTest {
         var decisions = 0
-        val approvals = RemoteTaskApprovals(this, "session", "Desk", { _, _ -> }, { decisions++; GateOutcome.Denied("no") })
+        val approvals = RemoteTaskApprovals(this, "session", "device", "Desk", { _, _ -> }, { decisions++; GateOutcome.Denied("no") })
         approvals.close()
         approvals.event(event()); runCurrent()
         assertEquals(0, decisions)

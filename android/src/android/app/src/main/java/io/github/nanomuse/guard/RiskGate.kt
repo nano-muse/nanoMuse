@@ -27,6 +27,8 @@ data class RiskRequest(
     val assessment: RiskAssessment,
     /** The command, or "Tap “Pay now”". Shown verbatim in the card's preview box. */
     val preview: String,
+    /** Complete stable action text for cross-device grant identity; null when unavailable. */
+    val canonicalAction: String? = null,
     /** For browser requests: the page the tap lands on. */
     val pageUrl: String? = null,
     /** For browser requests: the element's own text. */
@@ -44,8 +46,8 @@ data class RiskRequest(
      * confirms with the phone's screen lock ([needsCredential]), and the first time is always
      * asked because the grant can only come from the card.
      */
-    val canSession: Boolean get() = assessment.warnings.isEmpty() && assessment.riskClass != RiskClass.MONEY && kind != GuardKind.DEVICE && kind != GuardKind.SCHEDULED
-    val canAlways: Boolean get() = assessment.warnings.isEmpty() && !assessment.target.isNullOrBlank()
+    val canSession: Boolean get() = assessment.rememberable && assessment.warnings.isEmpty() && assessment.riskClass != RiskClass.MONEY && kind != GuardKind.DEVICE && kind != GuardKind.SCHEDULED
+    val canAlways: Boolean get() = assessment.rememberable && assessment.warnings.isEmpty() && !assessment.target.isNullOrBlank()
     val canRemember: Boolean get() = canSession || canAlways
     val needsCredential: Boolean get() = assessment.riskClass == RiskClass.MONEY
 }
@@ -192,7 +194,13 @@ object RiskGate {
     /** Decides for a shell command: grants first, then the card. */
     suspend fun checkShell(sessionId: String, command: String): GateOutcome {
         val a = ShellGuard.assess(command)
-        return check(sessionId, GuardKind.SHELL, a, preview = command.trim())
+        return check(
+            sessionId,
+            GuardKind.SHELL,
+            a,
+            preview = command.trim(),
+            canonicalAction = command.trim(),
+        )
     }
 
     suspend fun check(
@@ -202,6 +210,7 @@ object RiskGate {
         preview: String,
         pageUrl: String? = null,
         elementText: String? = null,
+        canonicalAction: String? = null,
     ): GateOutcome {
         // what the record hears of this (ClientEvents, docs/cloud.md "Client events"): the tool's
         // kind, the risk's tier and the phone's own class, never the command or the page
@@ -217,7 +226,7 @@ object RiskGate {
                 if (assessment.riskClass == RiskClass.INSTALL) INSTALL_NOTICE else null,
             )
         }
-        if (assessment.warnings.isEmpty() && Grants.allows(assessment.riskClass, assessment.target, sessionId)) {
+        if (assessment.rememberable && assessment.warnings.isEmpty() && Grants.allows(assessment.riskClass, assessment.target, sessionId)) {
             AppLogger.info(TAG, "covered by a grant: ${Grants.key(assessment.riskClass, assessment.target)}")
             val grant = if (Grants.allows(assessment.riskClass, assessment.target, null)) "always" else "conversation"
             ClientEvents.sentinelDecision(sessionId, about + mapOf("decision" to "allow", "policy" to "ask", "grant" to grant, "by" to "grant"))
@@ -232,6 +241,7 @@ object RiskGate {
             kind = kind,
             assessment = assessment,
             preview = preview,
+            canonicalAction = canonicalAction,
             pageUrl = pageUrl,
             elementText = elementText,
         )

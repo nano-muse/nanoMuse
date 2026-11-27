@@ -268,6 +268,13 @@ test('shared connectors carry what and where, never how', () => {
 })
 
 test('the chat and hands defaults follow the relay lane recommendation, with old menus supported', () => {
+  const unmarked = [
+    { id: 'fallback', kind: 'chat', for: ['chat', 'gui'] },
+    { id: 'qwen3.5-397b-a17b', kind: 'chat', for: ['gui'] },
+    { id: 'deepseek-v4.1-flash-1017', kind: 'chat', for: ['chat'] },
+  ]
+  assert.equal(pickChatModel(unmarked)?.id, 'deepseek-v4.1-flash-1017')
+  assert.equal(pickHandsModel(unmarked)?.id, 'qwen3.5-397b-a17b')
   const current = [
     { id: 'Qwen/Qwen3.6-27B-FP8', kind: 'chat', recommended: true, recommendedFor: ['chat', 'gui'], inputModalities: ['text', 'image'], for: ['chat', 'gui'] },
   ]

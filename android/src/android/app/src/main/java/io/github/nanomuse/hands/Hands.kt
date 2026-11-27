@@ -2,6 +2,7 @@ package io.github.nanomuse.hands
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import com.openminis.app.MinisApp
@@ -10,6 +11,8 @@ import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.offload.ShizukuManager
+import io.github.nanomuse.hands.pairing.HandsWireless
 import io.github.nanomuse.cloud.NanoMuseCloud
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +20,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+internal fun interface HandsStopTarget {
+    fun requestStop(reason: String)
+}
 
 /**
  * The screen as a hand (0.1.12). Off by default; when the user switches it on and the three
@@ -30,14 +37,27 @@ import kotlinx.coroutines.flow.asStateFlow
 object Hands {
     private const val PREFS = "nanomuse"
     private const val KEY_ENABLED = "hands.enabled"
+    private const val KEY_BACKGROUND = "hands.background_screen"
     private const val KEY_MODEL = "hands.model_entry"
     const val DEEP_LINK = "minis://settings/hands"
     const val MIN_SDK = Build.VERSION_CODES.R
+    const val BACKGROUND_MIN_SDK = Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+    const val BACKGROUND_MIN_SHIZUKU = 13
 
     private fun prefs(context: Context): SharedPreferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun enabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
-    fun setEnabled(context: Context, on: Boolean) { prefs(context).edit().putBoolean(KEY_ENABLED, on).apply() }
+    fun setEnabled(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ENABLED, on).apply()
+        if (!on) stopCurrent("Operating the screen was switched off.")
+    }
+
+    fun backgroundScreen(context: Context): Boolean = prefs(context).getBoolean(KEY_BACKGROUND, false)
+
+    @Synchronized
+    fun setBackgroundScreen(context: Context, on: Boolean) {
+        if (!active.value) prefs(context).edit().putBoolean(KEY_BACKGROUND, on).apply()
+    }
 
     /** The switch as a flow: the current value, then every change, wherever it is made. */
     fun enabledFlow(context: Context): Flow<Boolean> = callbackFlow {
@@ -64,8 +84,27 @@ object Hands {
         val serviceOn: Boolean,
         val overlayOk: Boolean,
         val model: ScreenModel?,
+        val backgroundScreen: Boolean,
+        val backgroundAndroidOk: Boolean,
+        val secondaryDisplays: Boolean,
+        val shizukuReady: Boolean,
+        val backgroundBridgeReady: Boolean = shizukuReady,
+        val wirelessPaired: Boolean = false,
     ) {
-        val ready: Boolean get() = androidOk && serviceOn && overlayOk && model != null
+        private val requirementsMet get() = androidOk && serviceOn && overlayOk && model != null &&
+            (!backgroundScreen || (backgroundAndroidOk && secondaryDisplays))
+        val ready: Boolean get() = requirementsMet && (!backgroundScreen || backgroundBridgeReady)
+        val canStart: Boolean get() = ready || (requirementsMet && backgroundScreen && wirelessPaired)
+
+        fun missing(): List<String> = buildList {
+            if (backgroundScreen && !backgroundAndroidOk) add("background screen requires Android 14 or newer")
+            else if (!androidOk) add("Android 11 or newer is required")
+            if (!serviceOn) add("the accessibility service is off")
+            if (!overlayOk) add("nanoMuse may not draw over other apps")
+            if (model == null) add("no model that can see pictures is configured")
+            if (backgroundScreen && !secondaryDisplays) add("this device does not support activities on secondary displays")
+            if (backgroundScreen && !backgroundBridgeReady) add("authorize the background screen connection in Screen Operation settings")
+        }
     }
 
     fun readiness(context: Context): Readiness = Readiness(
@@ -73,10 +112,16 @@ object Hands {
         serviceOn = MinisAccessibilityService.getInstance() != null,
         overlayOk = Settings.canDrawOverlays(context),
         model = screenModel(context),
+        backgroundScreen = backgroundScreen(context),
+        backgroundAndroidOk = Build.VERSION.SDK_INT >= BACKGROUND_MIN_SDK,
+        secondaryDisplays = context.packageManager.hasSystemFeature(PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS),
+        shizukuReady = ShizukuManager.snapshot.value.let { it.state == ShizukuManager.State.READY && it.version >= BACKGROUND_MIN_SHIZUKU },
+        backgroundBridgeReady = HandsDisplayHost.isReady(),
+        wirelessPaired = HandsWireless.hasIdentity(context),
     )
 
     /** Usable right now: switched on and every prerequisite in place. */
-    fun usable(context: Context): Boolean = enabled(context) && readiness(context).ready
+    fun usable(context: Context): Boolean = enabled(context) && readiness(context).canStart
 
     // ── the screen model ───────────────────────────────────────────────────
 
@@ -188,15 +233,42 @@ object Hands {
     /**
      * Takes the hands for a run: true when they were free, false when another run holds them.
      * One atomic step, so two `nanomuse-hands run` arriving together cannot both start; the
-     * run that gets them hands them back in [HandsOperator.run]'s finish.
+     * native handler releases them after validation, execution and cleanup.
      */
-    internal fun claim(): Boolean = _active.compareAndSet(expect = false, update = true)
+    @Synchronized internal fun claim(): Boolean = _active.compareAndSet(expect = false, update = true)
 
-    /** The run in progress, so Stop can reach it from anywhere. */
-    @Volatile internal var current: HandsOperator? = null
+    private data class CurrentRun(
+        val target: HandsStopTarget,
+        val sessionId: String?,
+        val runId: String,
+    )
 
-    /** Ends the run in progress after the action in flight; a no-op when none. */
-    fun stopCurrent(reason: String = "stopped from the app") { current?.requestStop(reason) }
+    /** The owner is attached immediately after [claim], before validation or model work begins. */
+    @Volatile private var current: CurrentRun? = null
+
+    @Synchronized
+    internal fun attachCurrent(target: HandsStopTarget, sessionId: String?, runId: String) {
+        check(active.value) { "Attach a screen run only after claiming the hands." }
+        current = CurrentRun(target, sessionId, runId)
+    }
+
+    /** An old run finishing cannot detach a newer owner. */
+    @Synchronized
+    internal fun releaseCurrent(target: HandsStopTarget) {
+        if (current?.target === target) current = null
+    }
+
+    /** Ends whichever run owns the screen; used by the overlay and the settings page. */
+    fun stopCurrent(reason: String = "stopped from the app") {
+        current?.target?.requestStop(reason)
+    }
+
+    /** Chat Stop is scoped to that chat and cannot stop another session's screen run. */
+    fun stopCurrentForSession(sessionId: String, reason: String = "stopped from this chat"): Boolean {
+        val run = current?.takeIf { it.sessionId == sessionId } ?: return false
+        run.target.requestStop(reason)
+        return true
+    }
 
     // ── what the agent is told ─────────────────────────────────────────────
 
@@ -213,21 +285,25 @@ object Hands {
             append("Most everyday apps here (12306, 微信, 支付宝, 美团, 淘宝, 京东…) have no API. Climb in this order and say which rung you are on before you start: ")
             append("(1) a skill, a CLI or an MCP server; (2) the page fetched with the user's login or `browser_use`; (3) the phone's own screen, last. ")
             append("A task is rarely all screen: find the number with a command, the button with the screen, and ask before it is pressed.\n")
-            if (on && r.ready) {
-                append("The screen is available: `nanomuse-hands run --task \"<one clear task, with every detail the hands need>\" [--app \"<app name>\"]` ")
-                append("(screen model: ${r.model?.label}). It looks at screenshots — never the accessibility tree — and taps, types and swipes; a capsule with Stop shows the user what it does. ")
-                append("It never types passwords, codes or card numbers: for a login or a code it hands the phone to the user and waits. Taps that pay, send, post or delete go through the same approval card as the shell and the browser. ")
+            if (on && r.canStart) {
+                val appArgument = if (r.backgroundScreen) "--app \"<app name or package>\"" else "[--app \"<app name>\"]"
+                append("The screen is available: `nanomuse-hands run --task \"<one clear task, with every detail the hands need>\" $appArgument` ")
+                append("(screen model: ${r.model?.label}). It looks at screenshots, never the accessibility tree, and taps, types and swipes. ")
+                if (r.backgroundScreen) {
+                    append("A secure floating screen opens automatically with Stop, pause and phone handover; the originating chat shows safe live progress. ")
+                    append("Background screen is selected. Use an exact package name or a unique installed app label from `nanomuse-hands apps`. Stay in that app and never go Home. If the user needs to act in the app, they can take over the open task using the floating screen. Relay the needs_user result and wait. Never switch to the main screen or ask for a password, code or card number. ")
+                } else {
+                    append("A capsule with Stop shows the user what it does. ")
+                    append("It never types passwords, codes or card numbers: for a login or a code it hands the phone to the user and waits. ")
+                }
+                append("Taps that pay, send, post or delete go through the same approval card as the shell and the browser. ")
                 append("It returns JSON: `outcome` is done (with `answer`), stopped (the user tapped Stop — do not restart it), needs_user (`question` — relay it and wait), infeasible or failed (with `message`); `last_screen` is a picture you can show with `![screen](<last_screen>)`. ")
                 append("Keep the complete JSON result: do not pipe nanomuse-hands run through head or tail. Save it to a file or parse named fields with jq, preserving ok, outcome, steps, last_screen and the answer, message or question. ")
                 append("Tell the user in one line that you are about to use the screen and which app, then run it; give one task per run, and never a payment as the task. `nanomuse-hands apps` lists the installed apps; `nanomuse-hands status` says what is set up.")
             } else if (on) {
-                val missing = buildList {
-                    if (!r.androidOk) add("Android 11 or newer")
-                    if (!r.serviceOn) add("the accessibility service is off")
-                    if (!r.overlayOk) add("no permission to draw over other apps")
-                    if (r.model == null) add("no model that can see pictures")
-                }.joinToString(", ")
-                append("The screen is switched on but not usable yet ($missing). If a task needs it, say so in one line and give the link [Hands]($DEEP_LINK) — it opens the setting; do not try android-a11y-cli instead.")
+                val missing = r.missing().joinToString(", ")
+                val selectedScreen = if (r.backgroundScreen) "The background screen" else "The screen"
+                append("$selectedScreen is switched on but not usable yet ($missing). If a task needs it, say so in one line and give the link [Hands]($DEEP_LINK) — it opens the setting; do not try android-a11y-cli instead.")
             } else {
                 append("Operating the phone's screen is switched off (the default). If a task can only be done on the screen, say so in one line and give the link [Hands]($DEEP_LINK) so the user can switch it on; do not try android-a11y-cli instead, and do not pretend.")
             }

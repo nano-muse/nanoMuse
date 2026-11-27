@@ -82,6 +82,7 @@ import io.github.nanomuse.goals.Goal
 import io.github.nanomuse.goals.GoalCategory
 import io.github.nanomuse.goals.GoalFlow
 import io.github.nanomuse.goals.GoalStatus
+import io.github.nanomuse.ui.home.MuseTones
 import io.github.nanomuse.goals.GoalStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -327,8 +328,7 @@ private fun GoalRow(goal: Goal, onOpenSession: (String) -> Unit) {
         buildString {
             val note = goal.lastNote?.takeIf { it.isNotBlank() }
             if (note != null) append(note)
-            else if (goal.steps.isNotEmpty()) append(goal.steps.first().text)
-            else append(goal.why)
+            else append(goal.steps.firstOrNull { !it.done && it.text.isNotBlank() }?.text ?: goal.why)
         }
     }
     val cadence = remember(goal, goal.lastCheckedAt) {
@@ -371,6 +371,10 @@ private fun GoalRow(goal: Goal, onOpenSession: (String) -> Unit) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            goal.due?.let {
+                val date = it.format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM))
+                Text(stringResource(R.string.nm_deadline_date) + " · " + date, fontSize = 12.sp, color = MuseTones.action)
+            }
             if (subtitle.isNotBlank()) {
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -396,6 +400,19 @@ private fun GoalRow(goal: Goal, onOpenSession: (String) -> Unit) {
                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.nm_more), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.nm_deadline_date)) }, onClick = {
+                    menu = false
+                    val current = goal.due ?: java.time.LocalDate.now()
+                    val dialog = android.app.DatePickerDialog(context, { _, year, month, day ->
+                        GoalStore.get(context).update(goal.id) { it.withDue(java.time.LocalDate.of(year, month + 1, day)) }
+                    }, current.year, current.monthValue - 1, current.dayOfMonth)
+                    if (goal.due != null) {
+                        dialog.setButton(android.content.DialogInterface.BUTTON_NEUTRAL, context.getString(R.string.nm_deadline_clear)) { _, _ ->
+                            GoalStore.get(context).update(goal.id) { it.withDue(null) }
+                        }
+                    }
+                    dialog.show()
+                })
                 if (goal.sessionId != null) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.nm_goal_open_chat)) }, onClick = { menu = false; onOpenSession(goal.sessionId) })
                 }
