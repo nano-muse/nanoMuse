@@ -35,6 +35,11 @@ from tests.goal_eval_tasks import (
 RECORDING = json.loads((FIXTURES / "tasks_v1_recording.json").read_text(encoding="utf-8"))
 
 
+def test_unavailable_tickets_with_unrelated_bullets_are_unknown() -> None:
+    observed = ticket_observations("无法查询。\n- 稍后再试。")
+    assert "TKT-C1" not in observed
+
+
 @pytest.mark.parametrize("case", DATA["cases"], ids=lambda c: c["id"])
 async def test_replay(case: dict, tmp_path: Path) -> None:
     recording = RECORDING["cases"][case["id"]]
@@ -243,6 +248,29 @@ def test_every_criterion_has_independent_cases() -> None:
         for definition in definitions:
             results = {r["expected"] for r in CRITERION_CASES if r["criterion"] == definition["id"]}
             assert {"met", "not_met"} <= results, definition["id"]
+
+
+def test_exp_c2_tier1_subtotals_mismatch_triggers_contradicted(tmp_path: Path) -> None:
+    """Document EXP-C2 behavior: EXP-C2 is tier 1 and checks both category subtotals and total.
+
+    When category subtotals are wrong (even if the grand total in report or answer is 300),
+    EXP-C2 evaluates to not_met, which triggers tier1_failed and sets overall status to contradicted.
+    This test characterises the behavior for maintainer review.
+    """
+    world = World("P1", tmp_path)
+    before = world.snapshot()
+    (world.workspace / "report.csv").write_text(
+        "类别,金额（元）\n交通,90\n办公,150\n餐饮,60\n总计,300\n", encoding="utf-8"
+    )
+    obs = observations(world, before, "总额300元")
+    assert obs["EXP-C1"] is True
+    assert obs["EXP-C2"] is False
+    assert obs["EXP-C4"] == 300
+    res = assess(DATA["cases"][0], obs)
+    assert res["criteria"]["EXP-C2"] == "not_met"
+    assert res["criteria"]["EXP-C4"] == "met"
+    assert res["status"] == "contradicted"
+    assert res.get("tier1_failed") == ["EXP-C2"]
 
 
 def test_recording_resolves_symlink_paths(tmp_path: Path) -> None:
