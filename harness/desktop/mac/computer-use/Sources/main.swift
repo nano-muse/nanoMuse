@@ -51,26 +51,31 @@ if arguments.contains("--version") {
     exit(0)
 }
 
-// The note a `down` leaves next to the shell's token file, so the button it never lifted can
-// be lifted by the helper that comes after it (Input.swift, `Mouse.releaseStuck`).
-func markerPath() -> URL? {
-    guard let tokenFile = argument("--token-file") else { return nil }
-    return URL(fileURLWithPath: tokenFile).deletingLastPathComponent().appendingPathComponent("mouse-held")
+// Only one process may read and update the marker for this helper directory.
+guard let tokenPath = argument("--token-file") else {
+    FileHandle.standardError.write(Data("nanoMuse Computer Use: --token-file <path> is required\n".utf8))
+    exit(2)
 }
-Mouse.marker = markerPath()
-
-// `--release`: lift a button a killed helper left down, then leave. The shell calls this when
-// the helper it had is gone; it needs no token and no listener.
-if arguments.contains("--release") {
-    Mouse.releaseStuck()
-    exit(0)
+let marker = URL(fileURLWithPath: tokenPath).deletingLastPathComponent().appendingPathComponent("mouse-held")
+let mouseButtons: MouseButtons
+do {
+    mouseButtons = try MouseButtons(marker: marker)
+} catch {
+    FileHandle.standardError.write(Data("nanoMuse Computer Use: mouse marker unavailable: \(error)\n".utf8))
+    exit(1)
 }
-
-// Buttons and keys a previous helper left down go up before this one starts serving.
-Mouse.releaseStuck()
+let queue = mouseButtons.queue
+let released = queue.sync { () -> Bool in
+    do { try Mouse.recover(); return true }
+    catch {
+        FileHandle.standardError.write(Data("nanoMuse Computer Use: mouse release pending: \(error)\n".utf8))
+        return false
+    }
+}
+if arguments.contains("--release") { exit(released ? 0 : 1) }
 
 var token = ""
-if let tokenFile = argument("--token-file"), let text = try? String(contentsOfFile: tokenFile, encoding: .utf8) {
+if let text = try? String(contentsOfFile: tokenPath, encoding: .utf8) {
     token = text.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 if token.isEmpty {
@@ -79,7 +84,6 @@ if token.isEmpty {
 }
 
 let service = Service(token: token, version: bundleVersion)
-let queue = DispatchQueue(label: "io.github.nanomuse.desktop.computer-use.http")
 func makeServer() -> HTTPServer {
     do {
         return try HTTPServer(queue: queue) { request in service.handle(request) }
@@ -104,6 +108,7 @@ server.onReady = { port in
     fflush(stdout)
 }
 server.onFailure = { message in
+    service.stopInput()
     FileHandle.standardError.write(Data("nanoMuse Computer Use: \(message)\n".utf8))
     exit(1)
 }
@@ -113,13 +118,12 @@ server.start()
 // Kept in a global so the timer lives as long as the process.
 let parentWatch: DispatchSourceTimer? = {
     guard let text = argument("--parent-pid"), let parent = Int32(text), parent > 1 else { return nil }
-    let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+    let timer = DispatchSource.makeTimerSource(queue: queue)
     timer.schedule(deadline: .now() + 2, repeating: 2)
     timer.setEventHandler {
         if kill(parent, 0) != 0 && errno == ESRCH {
             // nothing of ours stays down when we go: the system would hold it for every app
-            Mouse.releaseAll()
-            Keyboard.releaseAll()
+            service.stopInput()
             exit(0)
         }
     }
@@ -132,10 +136,9 @@ let parentWatch: DispatchSourceTimer? = {
 // Held in a global: a source that goes away stops delivering.
 let signalSources: [DispatchSourceSignal] = [SIGTERM, SIGINT, SIGHUP].map { number in
     signal(number, SIG_IGN)
-    let source = DispatchSource.makeSignalSource(signal: number, queue: DispatchQueue.global(qos: .utility))
+    let source = DispatchSource.makeSignalSource(signal: number, queue: queue)
     source.setEventHandler {
-        Mouse.releaseAll()
-        Keyboard.releaseAll()
+        service.stopInput()
         exit(0)
     }
     source.resume()

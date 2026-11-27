@@ -248,6 +248,8 @@ macOS 将权限归给 LaunchServices 启动的「责任进程」及其所有子�
 
 采用 ScreenCaptureKit 是因为 macOS 26、27 即使已授予录屏，`CGDisplayCreateImage` 仍可能不返回图片。0.1.39 会记录 `helper screenshot failed (no screenshot: noImage)`，再以黑色或过时的 `desktopCapturer` 画面替代。应用现在在启动时拉起辅助程序以读取、申请权限，退出时停止它；主应用消失后，辅助程序也会自行退出。它没有窗口或 Dock 图标，在活动监视器中名为 *nanoMuse Computer Use*。
 
+如果辅助程序在点击或拖动中退出，下次启动时会检查上次按下的鼠标键。该键仍按下时，辅助程序会将它松开。如果之前关闭了辅助功能权限，重新开启后，下次操作会再次尝试松键。
+
 首次授权按以下操作，只需在尚未授权的 Mac 上完成一次，已在 macOS 27.0.1、Apple 芯片上验证：
 
 1. 先从磁盘映像将 nanoMuse 拖入「应用程序」，再从该目录打开，原因见下文隔离标记。进入设置 → 电脑操作 → 权限，或等到首次使用手时，应用会先说明申请内容和原因。

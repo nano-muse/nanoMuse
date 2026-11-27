@@ -12,6 +12,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Fixed recovery from interrupted Mac clicks and drags, including failed mouse releases and shutdown during a gesture. For #960.
+
 ### Android
 
 ### iOS

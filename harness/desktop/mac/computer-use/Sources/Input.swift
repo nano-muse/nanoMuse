@@ -11,6 +11,11 @@ enum Input {
     }
 
     static func perform(_ body: [String: Any]) throws {
+        try mouseButtons.checkCanPerform()
+        try Mouse.recover()
+        // Retry a failed up once before returning from this action. If it still
+        // cannot be posted, the marker survives for the next action or launch.
+        defer { try? Mouse.recover() }
         let kind = body["action"] as? String ?? ""
         let start = point(body, "x", "y")
         let end = point(body, "x2", "y2")
@@ -24,20 +29,20 @@ enum Input {
             Mouse.move(to: at)
         case "click", "left_click":
             let at = try needsPoint()
-            Mouse.click(at: at, button: .left)
+            try Mouse.click(at: at, button: .left)
         case "double_click", "left_double":
             let at = try needsPoint()
-            Mouse.click(at: at, button: .left, count: 2)
+            try Mouse.click(at: at, button: .left, count: 2)
         case "right_click", "right_single":
             let at = try needsPoint()
-            Mouse.click(at: at, button: .right)
+            try Mouse.click(at: at, button: .right)
         case "middle_click":
             let at = try needsPoint()
-            Mouse.click(at: at, button: .center)
+            try Mouse.click(at: at, button: .center)
         case "drag", "left_click_drag":
             let from = try needsPoint()
             guard let to = end else { throw Failure.message("drag needs x2 and y2") }
-            Mouse.drag(from: from, to: to)
+            try Mouse.drag(from: from, to: to)
         case "scroll":
             // `dy` in points, positive = down (the runtime's dialect)
             let dy = Service.number(body["dy"]) ?? 300
@@ -100,64 +105,17 @@ func pause(ms: Int) {
 }
 
 enum Mouse {
-    /// Where a `down` parks the fact that a button is still down (the shell's computer-use
-    /// directory), so a helper that never gets to post the `up` — killed, its shell gone —
-    /// leaves a note the next one can clear. Input.swift has no file paths of its own.
-    static var marker: URL?
-
-    /// The buttons this process put down and has not lifted yet.
-    private static var held: [CGMouseButton] = []
-
-    /// The marker says one line of button numbers: `0` left, `1` right, `2` center.
-    private static func note(_ button: CGMouseButton, down: Bool) {
-        if down {
-            if !held.contains(where: { $0.rawValue == button.rawValue }) {
-                held.append(button)
-            }
-        } else {
-            held.removeAll { $0.rawValue == button.rawValue }
-        }
-        guard let marker = marker else { return }
-        do {
-            if held.isEmpty {
-                try? FileManager.default.removeItem(at: marker)
-            } else {
-                let line = held.map { "\($0.rawValue)" }.joined(separator: ",") + "\n"
-                try Data(line.utf8).write(to: marker, options: .atomic)
-            }
-        } catch {
-            // the note is a courtesy; a click never fails because a file could not be written
-        }
-    }
-
-    /// Every button this process put down goes up, at the pointer's own place — called before
-    /// the process ends, so a crash or a force quit cannot leave the system holding a button.
-    static func releaseAll() {
-        guard !held.isEmpty else { return }
-        let at = CGEvent(source: nil)?.location ?? .zero
-        for button in held.reversed() {
-            post(upType(button), at: at, button: button)
-            pause(ms: 20)
-        }
-        held.removeAll()
-        if let marker = marker {
-            try? FileManager.default.removeItem(at: marker)
-        }
-    }
-
-    /// The note a previous helper left: those buttons go up now, and the note goes away.
-    /// A helper that was killed mid-drag would otherwise leave the system holding the button —
-    /// every drag and every hover in every app stops working until someone presses ESC.
-    static func releaseStuck() {
-        guard let marker = marker, let text = try? String(contentsOf: marker, encoding: .utf8) else { return }
-        let at = CGEvent(source: nil)?.location ?? .zero
-        for field in text.split(separator: ",", omittingEmptySubsequences: true) {
-            guard let raw = UInt32(field.trimmingCharacters(in: .whitespacesAndNewlines)),
-                  raw <= 2, let button = CGMouseButton(rawValue: raw) else { continue }
-            post(upType(button), at: at, button: button)
-            pause(ms: 20)
-        }
-        try? FileManager.default.removeItem(at: marker)
+    /// Startup, a failed prior release or orderly shutdown. All action posts
+    /// and marker transitions use the same queue, including signals and quit.
+    static func recover() throws {
+        try mouseButtons.recover(isDown: { raw in
+            guard CGPreflightPostEventAccess(), let button = CGMouseButton(rawValue: raw) else { return nil }
+            return CGEventSource.buttonState(.combinedSessionState, button: button)
+        }, postUp: { raw in
+            guard let button = CGMouseButton(rawValue: raw),
+                  let at = CGEvent(source: nil)?.location else { return false }
+            return post(upType(button), at: at, button: button)
+        })
     }
 
     private static func upType(_ button: CGMouseButton) -> CGEventType {
@@ -168,8 +126,10 @@ enum Mouse {
         }
     }
 
-    private static func post(_ type: CGEventType, at point: CGPoint, button: CGMouseButton, clicks: Int64 = 1) {
-        guard let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: button) else { return }
+    @discardableResult
+    private static func post(_ type: CGEventType, at point: CGPoint, button: CGMouseButton, clicks: Int64 = 1) -> Bool {
+        guard CGPreflightPostEventAccess(),
+              let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: button) else { return false }
         if type != .mouseMoved {
             // a double click is two clicks whose events say so; apps count by this field
             event.setIntegerValueField(.mouseEventClickState, value: clicks)
@@ -179,6 +139,7 @@ enum Mouse {
             event.flags = Keyboard.heldFlags
         }
         event.post(tap: .cghidEventTap)
+        return true
     }
 
     static func move(to point: CGPoint) {
@@ -186,7 +147,7 @@ enum Mouse {
         pause(ms: 30)
     }
 
-    static func click(at point: CGPoint, button: CGMouseButton, count: Int = 1) {
+    static func click(at point: CGPoint, button: CGMouseButton, count: Int = 1) throws {
         move(to: point)
         pause(ms: 100)
         let down: CGEventType
@@ -203,20 +164,17 @@ enum Mouse {
             up = .otherMouseUp
         }
         for index in 1...max(1, count) {
-            post(down, at: point, button: button, clicks: Int64(index))
-            note(button, down: true)
+            try mouseButtons.press(button.rawValue) { post(down, at: point, button: button, clicks: Int64(index)) }
             pause(ms: 40)
-            post(up, at: point, button: button, clicks: Int64(index))
-            note(button, down: false)
+            try mouseButtons.release(button.rawValue) { post(up, at: point, button: button, clicks: Int64(index)) }
             pause(ms: index < count ? 80 : 40)
         }
     }
 
-    static func drag(from: CGPoint, to: CGPoint) {
+    static func drag(from: CGPoint, to: CGPoint) throws {
         move(to: from)
         pause(ms: 100)
-        post(.leftMouseDown, at: from, button: .left)
-        note(.left, down: true)
+        try mouseButtons.press(CGMouseButton.left.rawValue) { post(.leftMouseDown, at: from, button: .left) }
         pause(ms: 60)
         let steps = 12
         for index in 1...steps {
@@ -225,8 +183,7 @@ enum Mouse {
             post(.leftMouseDragged, at: p, button: .left)
             pause(ms: 15)
         }
-        post(.leftMouseUp, at: to, button: .left)
-        note(.left, down: false)
+        try mouseButtons.release(CGMouseButton.left.rawValue) { post(.leftMouseUp, at: to, button: .left) }
         pause(ms: 40)
     }
 
