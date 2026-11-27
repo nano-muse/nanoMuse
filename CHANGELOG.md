@@ -18,7 +18,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
-- Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery.
+- Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
 
 ### Android
 
