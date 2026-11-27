@@ -13,6 +13,58 @@ import org.junit.Test
 
 class AssistantBubbleGroupingTest {
 
+    @Test fun whitespaceBetweenToolsDoesNotAddRowsOrChangeCopiedMarkdown() {
+        val before = "    indented example"
+        val after = "Last line  \nnext line"
+        val blocks = listOf(
+            AssistantBlock("before", "text", content = before),
+            AssistantBlock("tool1", "tool_use"),
+            AssistantBlock("separator", "text", content = "\n \t"),
+            AssistantBlock("tool2", "tool_use"),
+            AssistantBlock("after", "text", content = after),
+        )
+        for (streaming in listOf(true, false)) {
+            val message = ChatMessage("reply", "assistant", "", isStreaming = streaming, toolBlocks = blocks)
+            val rows = buildFlatChatItems(listOf(message), showSteps = true)
+            val text = rows.filterIsInstance<FlatChatItem.AssistantMarkdownBlock>()
+            val tools = rows.filterIsInstance<FlatChatItem.AssistantToolUse>()
+            assertEquals(listOf("tool1", "tool2"), tools.map { it.block.id })
+            assertEquals(listOf(before, after), text.map { it.rawText })
+            assertTrue(text.all { it.messageMarkdown == "$before\n\n$after" })
+            assertEquals(streaming, text.last().isStreaming)
+        }
+    }
+
+    @Test fun whitespaceDoesNotReplaceTypingOrLeaveFeedbackWhenStepsAreHidden() {
+        val separator = "\r\n \t\u00a0"
+        val message = ChatMessage(
+            "reply", "assistant", separator, isStreaming = true,
+            toolBlocks = listOf(
+                AssistantBlock("blank", "text", content = separator),
+                AssistantBlock("tool", "tool_use"),
+            ),
+        )
+        val live = buildFlatChatItems(listOf(message), showSteps = false)
+        assertTrue(live.any { it is FlatChatItem.AssistantTyping })
+        assertTrue(live.none { it is FlatChatItem.AssistantMarkdownBlock })
+        assertTrue(buildFlatChatItems(listOf(message.copy(isStreaming = false)), showSteps = false).isEmpty())
+        val finished = buildFlatChatItems(listOf(message.copy(isStreaming = false)), showSteps = true)
+        assertTrue(finished.none { it is FlatChatItem.NanoMuseThumbs })
+    }
+
+    @Test fun legacyReplyUsesItsOriginalTextWhenThereAreNoVisibleTextBlocks() {
+        val saved = "  Kept  \nverbatim  "
+        val message = ChatMessage(
+            "reply", "assistant", saved,
+            toolBlocks = listOf(AssistantBlock("empty", "text", content = "\n")),
+        )
+        val rows = buildFlatChatItems(listOf(message))
+        assertEquals(saved, rows.filterIsInstance<FlatChatItem.AssistantLegacyContent>().single().content)
+        assertTrue(rows.none { it is FlatChatItem.AssistantMarkdownBlock })
+        val blankLegacy = buildFlatChatItems(listOf(message.copy(content = "\n", toolBlocks = emptyList())))
+        assertTrue(blankLegacy.none { it is FlatChatItem.AssistantLegacyContent || it is FlatChatItem.NanoMuseThumbs })
+    }
+
     @Test fun liveBackgroundScreenProgressStaysVisibleWhenStepsAreHidden() {
         val block = AssistantBlock(
             id = "call",

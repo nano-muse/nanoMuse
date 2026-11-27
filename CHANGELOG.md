@@ -25,6 +25,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Removed empty chat bubbles between Android tool steps during streaming and when reopening conversations.
 - Fixed a crash when a chat message could not be saved during send setup, and kept the unsent draft available.
 - Added a selectable, copyable details view for chat errors and preserved longer Gemini diagnostics.
 - Fixed manual Read aloud when automatic reply narration was off.
