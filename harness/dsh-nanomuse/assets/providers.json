@@ -518,7 +518,7 @@
       "name": "MartLLM",
       "name_zh": "MartLLM",
       "protocol": "openai",
-      "base_url": "https://api.martllm.com/v1",
+      "base_url": "https://api.uberllm.dev/v1",
       "key_url": "https://martllm.com/signup",
       "auth": ["key"],
       "regions": ["global"],

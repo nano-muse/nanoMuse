@@ -71,7 +71,7 @@ test('AtmoRouter is offered for own-key chat without unverified media capabiliti
 test('MartLLM is offered for own-key chat without unverified media capabilities', () => {
   const provider = catalogue.find((p) => p.id === 'uberllm')
   assert.ok(provider)
-  assert.equal(baseUrlFor(provider, 'global'), 'https://api.martllm.com/v1')
+  assert.equal(baseUrlFor(provider, 'global'), 'https://api.uberllm.dev/v1')
   assert.equal(provider.defaults.chat, 'openai/gpt-5.4-mini')
   assert.deepEqual(capabilitiesForAuth(provider, 'key'), ['chat'])
   assert.ok(waysOn(catalogue, 'global').rest.some((p) => p.id === 'uberllm'))

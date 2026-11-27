@@ -92,6 +92,7 @@ def test_uberllm_uses_openai_chat_without_advertising_unverified_capabilities():
     cat = catalogue.load()
     provider = cat.get("uberllm")
     assert provider is not None
+    assert provider.name == "MartLLM"
     assert provider.auth == ["key"]
     assert provider.key_url == "https://martllm.com/signup"
     assert provider.capabilities == ["chat"]
@@ -100,9 +101,10 @@ def test_uberllm_uses_openai_chat_without_advertising_unverified_capabilities():
     for capability in ("vision", "image", "video"):
         assert provider not in cat.providers_for(capability, "global")
     assert check_provider("uberllm") == "uberllm"
+    # Existing profiles can resolve the saved key by provider ID without storing a URL.
     assert resolve_provider("uberllm", None) == (
         "openai",
-        "https://api.martllm.com/v1",
+        "https://api.uberllm.dev/v1",
     )
     settings = LLMSettings(provider="uberllm")
     assert settings.protocol == "openai"
