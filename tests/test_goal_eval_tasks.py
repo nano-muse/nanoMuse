@@ -35,6 +35,11 @@ from tests.goal_eval_tasks import (
 RECORDING = json.loads((FIXTURES / "tasks_v1_recording.json").read_text(encoding="utf-8"))
 
 
+def test_unavailable_tickets_with_unrelated_bullets_are_unknown() -> None:
+    observed = ticket_observations("无法查询。\n- 稍后再试。")
+    assert "TKT-C1" not in observed
+
+
 @pytest.mark.parametrize("case", DATA["cases"], ids=lambda c: c["id"])
 async def test_replay(case: dict, tmp_path: Path) -> None:
     recording = RECORDING["cases"][case["id"]]

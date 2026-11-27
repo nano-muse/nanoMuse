@@ -574,7 +574,10 @@ def ticket_observations(answer: str) -> dict[str, Any]:
     no_trains = any(x in answer for x in rules["no_eligible_markers"])
     result: dict[str, Any] = {"TKT-C2": no_trains}
     # Trains named only in prose are not a list, even beside a no-trains phrase.
-    if not ambiguous and (lines or (no_trains and not re.search(train, answer))):
+    if not ambiguous and (
+        any(re.search(train, line) for line in lines)
+        or (no_trains and not re.search(train, answer))
+    ):
         result["TKT-C1"] = ",".join(sorted(ids))
     return result
 
