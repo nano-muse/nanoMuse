@@ -17,7 +17,7 @@ from nanomuse.computer import hands as hands_mod
 from nanomuse.computer.link import ComputerLink
 from nanomuse.config import GUISettings, HandsSettings, Settings
 from nanomuse.llm import MockLLM
-from nanomuse.phone.link import STOP_MARKER, DeviceStopped, PhoneLink
+from nanomuse.phone.link import STOP_MARKER, DeviceError, DeviceStopped, PhoneLink
 from nanomuse.phone.operator import COMPUTER, PhoneOperator, parse_step, to_computer_action
 from nanomuse.phone.screen import Screen
 from nanomuse.schema import Function, LLMResponse, RiskLevel, ToolCall
@@ -77,6 +77,7 @@ def fake_screen(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     def capture(max_width: int = 1600) -> dict[str, Any]:
         return dict(screens[0] if len(screens) == 1 else screens.pop(0))
 
+    monkeypatch.setattr("nanomuse.computer.link.mac_frontmost_pid", lambda: 501)
     monkeypatch.setattr("nanomuse.computer.link.capture", capture)
     monkeypatch.setattr("nanomuse.computer.link.active_window", lambda: ("firefox", "Firefox"))
     monkeypatch.setattr("nanomuse.computer.link.screen_size", lambda: (1920, 1080))
@@ -176,6 +177,32 @@ def test_computer_dialect_prompt(settings: Settings, fake_screen) -> None:
 
 
 # ----------------------------------------------------------------------------- the link
+async def test_mac_keyboard_requires_stable_foreground_through_the_last_observation(
+    settings: Settings, fake_screen, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    link = make_link(settings)
+    hands: FakeHands = link._backend  # type: ignore[assignment]
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    pid = 501
+    monkeypatch.setattr("nanomuse.computer.link.mac_frontmost_pid", lambda: pid)
+    with pytest.raises(DeviceError, match="last screen observation"):
+        await link.act({"action": "key", "keys": ["return"]})
+    await link.screen()
+    pid = 502
+    with pytest.raises(DeviceError, match="last screen observation"):
+        await link.act({"action": "type", "text": "draft", "clear": True, "submit": True})
+    assert not hands.calls
+    changed = iter([501, 502])
+    monkeypatch.setattr("nanomuse.computer.link.mac_frontmost_pid", lambda: next(changed))
+    await link.screen()
+    monkeypatch.setattr("nanomuse.computer.link.mac_frontmost_pid", lambda: pid)
+    with pytest.raises(DeviceError, match="last screen observation"):
+        await link.act({"action": "key", "keys": ["return"]})
+    await link.screen()
+    await link.act({"action": "type", "text": "draft"})
+    assert hands.calls == [("type", "draft")]
+
+
 async def test_link_acts_looks_again_and_reports_steps(settings: Settings, fake_screen) -> None:
     events: list[dict[str, Any]] = []
     link = make_link(settings, events)
@@ -389,7 +416,8 @@ async def test_computer_tools_execute(settings: Settings, fake_screen) -> None:
     r = await act.execute(action="click", x=99999, y=10, label="x")
     assert not r.ok and "outside" in (r.error or "")
     r = await act.execute(action="click", x=10, y=10, label="File")
-    assert r.ok and r.output.startswith("Done. Screen now:") and r.images
+    assert r.ok and r.output.startswith("Input sent.") and r.images
+    assert "screenshot is identical" in r.output
     r = await act.execute(action="key", keys="ctrl+l")
     assert r.ok and ("key", ("ctrl", "l")) in hands.calls
     r = await act.execute(action="dance")

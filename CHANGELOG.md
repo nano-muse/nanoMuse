@@ -16,6 +16,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.
+
 ### Android
 
 ### iOS

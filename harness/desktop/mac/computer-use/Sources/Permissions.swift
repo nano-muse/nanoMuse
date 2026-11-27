@@ -62,7 +62,7 @@ enum Permissions {
     }
 
     static func accessibilityGranted() -> Bool {
-        AXIsProcessTrusted()
+        AXIsProcessTrusted() && CGPreflightPostEventAccess()
     }
 
     /// The system's own request: its dialog the first time, and this app on the pane's list.
@@ -79,7 +79,9 @@ enum Permissions {
                 _ = CGRequestScreenCaptureAccess()
             } else {
                 let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                _ = AXIsProcessTrustedWithOptions(options)
+                if AXIsProcessTrustedWithOptions(options) && !CGPreflightPostEventAccess() {
+                    _ = CGRequestPostEventAccess()
+                }
             }
         }
         forgetProbe()

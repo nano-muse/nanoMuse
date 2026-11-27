@@ -176,7 +176,7 @@ final class Service {
 
     private func execute(_ body: [String: Any]) -> HTTPResponse {
         guard Permissions.accessibilityGranted() else {
-            return Service.failure(403, "accessibility_denied", "Accessibility is off for nanoMuse Computer Use")
+            return Service.failure(403, "accessibility_denied", "macOS has not granted nanoMuse Computer Use permission to send input. Check Accessibility for the helper in System Settings.")
         }
         do {
             try Input.perform(body)

@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import base64
 import struct
+import sys
 import zlib
 from collections.abc import Iterator
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -95,9 +97,9 @@ class FakeMac:
     def post_scroll(self, pid: int, x: float, y: float, dy: float, dx: float = 0.0) -> None:
         self.events.append(("scroll", pid, x, y, dy, dx))
 
-    def ax_press(self, x: float, y: float) -> bool:
+    def ax_press(self, pid: int, x: float, y: float) -> bool:
         if (x, y) in self.ax_hits:
-            self.events.append(("ax", x, y))
+            self.events.append(("ax", pid, x, y))
             return True
         return False
 
@@ -182,6 +184,46 @@ def test_event_sequences() -> None:
     assert mw.unicode_chunks("a😀b") == ["a😀b"]
 
 
+def test_ax_press_only_uses_elements_owned_by_the_selected_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pressed: list[int] = []
+    ax = SimpleNamespace(
+        AXIsProcessTrusted=lambda: True,
+        AXUIElementCreateSystemWide=lambda: None,
+        AXUIElementCopyElementAtPosition=lambda *_: (0, 123),
+        AXUIElementGetPid=lambda *_: (0, NOTES.pid),
+        AXUIElementCopyActionNames=lambda *_: (0, ["AXPress"]),
+        AXUIElementPerformAction=lambda element, _: pressed.append(element) or 0,
+    )
+    monkeypatch.setitem(sys.modules, "ApplicationServices", ax)
+    adapter = object.__new__(mw.QuartzAdapter)
+    assert not adapter.ax_press(SAFARI.pid, 15, 25)
+    assert not pressed
+    assert adapter.ax_press(NOTES.pid, 15, 25)
+    assert pressed == [123]
+
+
+async def test_window_capture_grant_does_not_authorize_posting_input(
+    settings: Settings, fake_screen
+) -> None:
+    pytest.importorskip("PIL")
+    mac = FakeMac()
+    mac.is_trusted = False
+    link = make_link(settings, mac)
+    link.set_target("Safari")
+    assert (await link.screen()).app == "com.apple.Safari"
+    with pytest.raises(DeviceError, match="permission to send input"):
+        await link.act({"action": "type", "text": "hello"})
+    with pytest.raises(DeviceError, match="No current window"):
+        await link.act({"action": "click", "x": 10, "y": 10})
+    assert not mac.events
+    mac.is_trusted = True
+    await link.screen()
+    await link.act({"action": "type", "text": "hello"})
+    assert mac.events == [("text", SAFARI.pid, "hello")]
+
+
 def test_the_window_hands_post_to_the_process() -> None:
     mac = FakeMac()
     hands = mw.MacWindowHands(mac, sleep=lambda _s: None)
@@ -231,9 +273,14 @@ def test_the_window_hands_post_to_the_process() -> None:
     mac.events.clear()
     mac.ax_hits.add((500, 350))
     hands.click(800, 600)
-    assert mac.events == [("ax", 500, 350)] and "accessibility" in hands.notes[-1]
-    # the big window went away: the small one is the next best; then none
+    assert mac.events == [("ax", 500, 500, 350)] and "accessibility" in hands.notes[-1]
+    # The window closes between capture and input, while a second window from the same
+    # process is still open. Input must not silently address the other window.
+    mac.events.clear()
     mac.window_list.remove(SAFARI)
+    with pytest.raises(mw.WindowUnavailable, match="changed or closed"):
+        hands.key(["return"])
+    assert not mac.events
     assert hands.look("Safari")[1].window is SAFARI_SMALL
     mac.window_list.remove(SAFARI_SMALL)
     with pytest.raises(mw.WindowUnavailable, match="no window"):
@@ -287,11 +334,16 @@ async def test_the_link_works_in_a_window_and_falls_back_to_the_screen(
     assert act["window"]["app"] == "Safari" and act["app"] == "Safari" and act["title"] == "Apple"
     assert act["fx"] == round(500 / 1920, 4)
     # the window goes away: the next look shows the whole screen with a note, and the
-    # action after it goes to the system mouse
+    # next action cannot go to the system mouse until the target is cleared
     mac.window_list.remove(SAFARI)
     mac.window_list.remove(SAFARI_SMALL)
     screen = await link.screen()
     assert screen.app == "firefox" and "no window" in screen.note and "whole screen" in screen.note
+    with pytest.raises(DeviceError, match="No current window"):
+        await link.act({"action": "click", "x": 10, "y": 10, "label": "File"})
+    assert not hands.calls
+    link.set_target("")
+    await link.screen()
     await link.act({"action": "click", "x": 10, "y": 10, "label": "File"})
     assert hands.calls[-1][:3] == ("click", 10.0, 10.0)
     assert [e for e in events if e["event"] == "act"][-1]["mode"] == "screen"
@@ -303,7 +355,7 @@ async def test_the_link_works_in_a_window_and_falls_back_to_the_screen(
     assert not link.in_window_mode()
 
 
-async def test_auto_mode_parks_the_hands_on_the_screen_when_the_quartz_layer_breaks(
+async def test_auto_mode_keeps_the_screen_read_only_when_the_window_layer_breaks(
     settings: Settings, fake_screen
 ) -> None:
     pytest.importorskip("PIL")
@@ -323,7 +375,7 @@ async def test_auto_mode_parks_the_hands_on_the_screen_when_the_quartz_layer_bre
     link.set_target("Safari")
     assert (await link.screen()).app == "com.apple.Safari"
     # pyobjc itself fails (not "the window went away"): one note, then the screen for the
-    # rest of this target — and the actions go to the system mouse
+    # rest of this target, with input still scoped to the selected window
     mac.broken = True
     screen = await link.screen()
     assert screen.app == "firefox" and "window mode failed" in screen.note
@@ -332,11 +384,14 @@ async def test_auto_mode_parks_the_hands_on_the_screen_when_the_quartz_layer_bre
     assert "window mode failed" in link.status()["window"]["reason"]
     screen = await link.screen()
     assert screen.app == "firefox" and not screen.note
-    await link.act({"action": "click", "x": 10, "y": 10, "label": "File"})
+    with pytest.raises(DeviceError, match="No current window"):
+        await link.act({"action": "click", "x": 10, "y": 10, "label": "File"})
     hands: FakeHands = link._backend  # type: ignore[assignment]
-    assert hands.calls[-1][:3] == ("click", 10.0, 10.0)
-    # a new target gives window mode another chance
+    assert not hands.calls
+    # An explicit reselection retries the window, including the same application.
     mac.broken = False
+    link.set_target("Safari")
+    assert (await link.screen()).app == "com.apple.Safari"
     link.set_target("Notes")
     assert link.in_window_mode()
     assert (await link.screen()).app == "com.apple.Notes"
