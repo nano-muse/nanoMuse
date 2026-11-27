@@ -6,15 +6,28 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Added separate concurrency limits for hosted chat and screen operation so a full chat queue can leave screen-operation slots available.
+- Corrected Cloud chat billing for empty and failed provider responses, including streams.
+- Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
+
 ### Runtime
+
+- Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
+- Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
 
 ### Web
 
 ### Desktop
 
+- Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
 - Fixed recovery from interrupted Mac clicks and drags, including failed mouse releases and shutdown during a gesture. For #960.
 
 ### Android
+
+- Fixed a crash when a chat message could not be saved during send setup, and kept the unsent draft available.
+- Added a selectable, copyable details view for chat errors and preserved longer Gemini diagnostics.
+- Fixed manual Read aloud when automatic reply narration was off.
+- Updated the Codex OAuth catalogue and its GPT-6.2 fallback, identified saved or built-in menus after a failed refresh, and added the Codex image tool variants GPT Image 2.5 Sunburst and Flare.
 
 ### iOS
 

@@ -17,6 +17,7 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.chat.ChatViewModel
 import com.openminis.app.provider.openai.OpenAIProvider
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +76,59 @@ class SessionRestoreInstrumentedTest {
             })[ChatViewModel::class.java])
         }
         return vm.get()
+    }
+
+    @Test fun firstSendAfterChatRemovalPreservesDraftWithoutCallingProvider() {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        val store = ViewModelStore()
+        try {
+            val sid = "tracked-${UUID.randomUUID()}"
+            val dao = db.chatDao()
+            runBlocking { dao.insertSession(ChatSessionEntity(sid, modelId = "fixture", createdAt = 0, updatedAt = 0)) }
+            val vm = newModel(sid, ChatRepository(dao), store)
+            awaitRestore(vm)
+            runBlocking { dao.deleteSession(sid) }
+            instrumentation.runOnMainSync {
+                ChatViewModel::class.java.getDeclaredField("currentProvider").apply { isAccessible = true }
+                    .set(vm, OpenAIProvider("fixture", basePath = "http://127.0.0.1:1/v1"))
+                vm.sendMessage("keep this draft")
+            }
+            runBlocking {
+                withTimeout(10_000) {
+                    vm.error.first { it != null }
+                    vm.isStreaming.first { !it }
+                }
+                assertTrue(dao.loadMessages(sid).isEmpty())
+            }
+            assertEquals("keep this draft", vm.inputText.value)
+            assertFalse(vm.isStreaming.value)
+        } finally {
+            instrumentation.runOnMainSync { store.clear() }
+            db.close()
+        }
+    }
+
+    @Test fun failedPreviewWriteRollsBackMessageBeforeRetry() {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val sid = "draft-${UUID.randomUUID()}"
+            val dao = db.chatDao()
+            val repo = ChatRepository(dao)
+            runBlocking {
+                dao.insertSession(ChatSessionEntity(sid, modelId = "fixture", createdAt = 0, updatedAt = 0))
+                db.openHelper.writableDatabase.execSQL(
+                    "CREATE TRIGGER reject_preview BEFORE UPDATE ON sessions BEGIN SELECT RAISE(ABORT, 'test'); END",
+                )
+                val failure = runCatching { repo.appendMessage(sid, "user", text("one")) }.exceptionOrNull()
+                assertTrue(failure is android.database.SQLException)
+                assertTrue(dao.loadMessages(sid).isEmpty())
+                db.openHelper.writableDatabase.execSQL("DROP TRIGGER reject_preview")
+                val saved = repo.appendMessage(sid, "user", text("one"))
+                assertEquals(listOf(saved), dao.loadMessages(sid))
+            }
+        } finally {
+            db.close()
+        }
     }
 
     @Test fun clearDuringAPausedReloadCannotReintroduceTheOldTranscript() {

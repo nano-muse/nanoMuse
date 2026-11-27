@@ -456,6 +456,14 @@ internal fun BoundsTrackedBlock(
 @Composable
 internal fun InlineErrorBanner(error: String, onRetry: (() -> Unit)? = null) {
     val clipboard = LocalClipboardManager.current
+    // nanoMuse: keep a compact preview, and make the full error visible and copyable.
+    var showDetails by remember(error) { mutableStateOf(false) }
+    val details = stringResource(R.string.nm_reach_details)
+    if (showDetails) {
+        ContentDetailsDialog(content = error, title = details, onCopy = {
+            clipboard.setText(androidx.compose.ui.text.AnnotatedString(error))
+        }, onDismiss = { showDetails = false })
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -463,7 +471,8 @@ internal fun InlineErrorBanner(error: String, onRetry: (() -> Unit)? = null) {
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFFFF3B30).copy(alpha = 0.12f))
             .combinedClickable(
-                onClick = {},
+                onClickLabel = details,
+                onClick = { showDetails = true },
                 onLongClick = {
                     clipboard.setText(androidx.compose.ui.text.AnnotatedString(error))
                 },
@@ -479,7 +488,7 @@ internal fun InlineErrorBanner(error: String, onRetry: (() -> Unit)? = null) {
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = error,
+            text = error.take(1024), // nanoMuse: only the full viewer lays out a large diagnostic
             color = Color(0xFFFF3B30),
             fontSize = 12.sp,
             lineHeight = 16.sp,
@@ -487,6 +496,7 @@ internal fun InlineErrorBanner(error: String, onRetry: (() -> Unit)? = null) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        Text(details, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
         if (onRetry != null) {
             Spacer(modifier = Modifier.width(8.dp))
             Row(
@@ -1069,7 +1079,8 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
         // native TextView (selectable, scrollable) renders arbitrarily large
         // thinking text without the Compose `Text` measure freeze.
         if (overHardCap && showFullContent) {
-            ThinkingFullContentDialog(
+            ContentDetailsDialog( // nanoMuse: reuse the selectable full-text viewer
+                title = "Deep Thinking",
                 content = block.content,
                 onDismiss = { showFullContent = false },
             )
@@ -1084,7 +1095,7 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
  * Compose `Text`, and stays selectable.
  */
 @Composable
-private fun ThinkingFullContentDialog(content: String, onDismiss: () -> Unit) {
+private fun ContentDetailsDialog(content: String, title: String, onCopy: (() -> Unit)? = null, onDismiss: () -> Unit) { // nanoMuse: also used by provider errors
     val textColor = MaterialTheme.colorScheme.onSurface
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
@@ -1099,12 +1110,15 @@ private fun ThinkingFullContentDialog(content: String, onDismiss: () -> Unit) {
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "Deep Thinking",
+                        text = title,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF015CFB),
                     )
                     Spacer(modifier = Modifier.weight(1f))
+                    if (onCopy != null) MinisTextButton(onClick = onCopy) {
+                        Text(stringResource(R.string.common_copy))
+                    }
                     MinisTextButton(onClick = onDismiss) {
                         Text(text = stringResource(android.R.string.ok))
                     }

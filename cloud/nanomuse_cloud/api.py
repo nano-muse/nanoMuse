@@ -141,7 +141,7 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from . import __version__, provenance
+from . import __version__, provenance, qianfan_media
 from . import client as client_info
 from .analytics import (
     Analytics,
@@ -154,7 +154,7 @@ from .analytics import (
     request_shape,
 )
 from .catalog import Catalog
-from .config import ModelSpec, Settings
+from .config import QIANFAN_CHAT, QIANFAN_GUI, ModelSpec, Settings
 from .controls import ControlError
 from .geo import Geo, collect_ips, group_places
 from .github_stats import GitHubCollector
@@ -291,6 +291,26 @@ async def _prepend(head: str | None, rest: AsyncIterator[str]) -> AsyncIterator[
         yield line
 
 
+def _generated_text(message: object) -> str:
+    """Generated output that can earn a charge, excluding role, finish and usage metadata."""
+    if not isinstance(message, dict):
+        return ""
+    parts = [message.get(k) for k in ("reasoning_content", "reasoning", "refusal")]
+    content = message.get("content")
+    if isinstance(content, list):
+        parts.extend(p.get("text") or p.get("refusal") for p in content if isinstance(p, dict))
+    else:
+        parts.append(content)
+    functions = [message.get("function_call")]
+    calls = message.get("tool_calls")
+    if isinstance(calls, list):
+        functions.extend(c.get("function") for c in calls if isinstance(c, dict))
+    for fn in functions:
+        if isinstance(fn, dict):
+            parts.extend((fn.get("name"), fn.get("arguments")))
+    return "".join(p for p in parts if isinstance(p, str))
+
+
 def _broken_status(e: httpx.HTTPError) -> str:
     """How a transport failure is kept in `calls`: a timeout of any kind apart from the rest
     (a connection refused, a stream cut), since the two point at different remedies."""
@@ -355,6 +375,39 @@ def apply_chat_defaults(body: dict, defaults: dict) -> None:
     effort = body.get("reasoning_effort")
     if thinking_requested(body) is False and isinstance(effort, str) and effort.strip().lower() != "none":
         body["reasoning_effort"] = "none"
+
+
+def legacy_hands_request(messages: object) -> bool:
+    """Identify the shipped operator prompt on clients predating the trajectory header."""
+    if not isinstance(messages, list) or not messages:
+        return False
+    first = messages[0]
+    if not isinstance(first, dict) or first.get("role") != "system":
+        return False
+    content = first.get("content")
+    if not isinstance(content, str):
+        return False
+    if content.startswith("You are the hands of "):
+        return ", a personal agent, on the user's own Android phone." in content[:512]
+    return (
+        content.startswith("# Tools\n\nYou may call one or more functions to assist with the user query.")
+        and "1) Thought: one concise sentence explaining the next move" in content
+        and "with action=terminate" in content
+    )
+
+
+def qianfan_chat_options(body: dict, model: str) -> None:
+    """Translate saved client reasoning choices into the selected Baidu model's dialect."""
+    enabled = bool(thinking_requested(body))
+    for name in ("enable_thinking", "chat_template_kwargs", "thinking"):
+        body.pop(name, None)
+    effort = body.pop("reasoning_effort", None)
+    if model == QIANFAN_CHAT:
+        body["thinking"] = {"type": "enabled" if enabled else "disabled"}
+        if enabled and effort in ("low", "medium", "high", "max", "xhigh"):
+            body["reasoning_effort"] = "max" if effort in ("max", "xhigh") else "high"
+    else:
+        body["enable_thinking"] = enabled
 
 
 def upstream_body(raw: bytes | str) -> dict | None:
@@ -481,11 +534,19 @@ def create_app(
     settings = settings or Settings()
     cloud = cloud or Cloud(settings)
 
+    timeout = httpx.Timeout(settings.upstream_timeout_s, connect=20.0)
     http = httpx.AsyncClient(
-        timeout=httpx.Timeout(settings.upstream_timeout_s, connect=20.0),
+        timeout=timeout,
         transport=upstream_transport,
         follow_redirects=False,
     )
+
+    chat_http = http
+    if settings.chat_model_concurrency and upstream_transport is None:
+        # A full screen/chat pool must not compete with media downloads for httpx's
+        # default 100 connections. Injected transports manage their own connections.
+        total = sum(settings.chat_model_concurrency.values())
+        chat_http = httpx.AsyncClient(timeout=timeout, limits=httpx.Limits(max_connections=total, max_keepalive_connections=min(20, total)))
 
     # where an address is (geo.py) — the file is fetched in the background on start
     geo = Geo(settings.geoip_path, settings.geoip_url, settings.geoip_v6_url, enabled=settings.geoip_enabled)
@@ -619,6 +680,8 @@ def create_app(
             # waited for, so no cancellation lands after the database is closed
             await asyncio.gather(rules_task, video_task, analytics_task, return_exceptions=True)
             await collector.stop()
+            if chat_http is not http:
+                await chat_http.aclose()
             await http.aclose()
 
     app = FastAPI(title="nanoMuse Cloud", version=__version__, docs_url=None, redoc_url=None, lifespan=lifespan)
@@ -714,6 +777,8 @@ def create_app(
         return {"Authorization": f"Bearer {settings.upstream_key}", "Content-Type": "application/json"}
 
     def dashscope_headers() -> dict[str, str]:
+        if settings.qianfan_enabled:
+            raise CloudError(503, "upstream_unconfigured", "DashScope media is unavailable on this relay")
         key = settings.dashscope_key or settings.upstream_key
         if not key:
             raise CloudError(503, "upstream_unconfigured", "nanoMuse Cloud has no media model key configured")
@@ -1173,6 +1238,7 @@ def create_app(
     )
     app.state.catalog = catalog
 
+    @app.get("/v1/models/", include_in_schema=False)
     @app.get("/v1/models")
     async def models(caller: Caller = Depends(caller_dep)) -> dict:
         """The menu — and, for a member who may name any model, the usable models under the
@@ -1208,7 +1274,7 @@ def create_app(
         out["nanomuse"]["catalog"] = {"models": added, "error": catalog.error, "probing": catalog.probing}
         return out
 
-    @app.get("/v1/models/{model_id}")
+    @app.get("/v1/models/{model_id:path}")
     async def model(model_id: str, kind: str = "", caller: Caller = Depends(caller_dep)) -> dict:
         """One model: the menu's by id; for a member, also one the menu does not carry,
         given the `kind` it is for (`?kind=chat`) — how an app checks a typed id."""
@@ -1229,7 +1295,21 @@ def create_app(
 
     # -- chat -----------------------------------------------------------------------------
 
-    chat_gate = UpstreamGate(settings.chat_concurrency)
+    shared_gate = UpstreamGate(settings.chat_concurrency)
+    model_gates = {model: UpstreamGate(limit) for model, limit in settings.chat_model_concurrency.items()}
+
+    def model_gate_snapshot() -> dict[str, dict[str, int]]:
+        return {model: gate.snapshot() for model, gate in model_gates.items()}
+
+    def chat_gate_snapshot() -> dict[str, int]:
+        if not model_gates:
+            return shared_gate.snapshot()
+        return {
+            "active": sum(gate.active for gate in model_gates.values()),
+            "waiting": sum(gate.waiting for gate in model_gates.values()),
+            "limit": sum(gate.limit for gate in model_gates.values()),
+        }
+
     chat_retry_limit = max(0, min(settings.chat_retries, 5))
 
     def chat_retryable(status: int) -> bool:
@@ -1243,7 +1323,7 @@ def create_app(
     # the way it ended, its shape; never its words. The live page reads the meter, the
     # drill-downs read the rows.
     meter = LiveMeter()
-    analytics = Analytics(cloud, meter, lambda: getattr(app.state, "hub", None), chat_gate.snapshot)
+    analytics = Analytics(cloud, meter, lambda: getattr(app.state, "hub", None), chat_gate_snapshot)
     app.state.analytics = analytics
     app.state.meter = meter
 
@@ -1333,14 +1413,16 @@ def create_app(
 
         task.add_done_callback(recorded)
 
-    async def chat_post(url: str, headers: dict[str, str], payload: bytes, call: InFlightCall) -> tuple[httpx.Response, int]:
+    async def chat_post(
+        url: str, headers: dict[str, str], payload: bytes, call: InFlightCall, gate: UpstreamGate
+    ) -> tuple[httpx.Response, int]:
         """One non-streaming turn, queued globally and retried before an answer exists;
         answers the response and how many times it was retried."""
-        async with chat_gate.slot():
+        async with gate.slot():
             meter.slot(call)
             attempt = 0
             while True:
-                r = await http.post(url, headers=headers, content=payload)
+                r = await chat_http.post(url, headers=headers, content=payload)
                 if not chat_retryable(r.status_code) or attempt >= chat_retry_limit:
                     return r, attempt
                 await chat_retry_pause(attempt, r.status_code)
@@ -1349,7 +1431,11 @@ def create_app(
     @app.post("/v1/chat/completions")
     async def chat(request: Request, caller: Caller = Depends(caller_dep)) -> Response:
         body = await _json(request)
+        where = provenance.from_headers(request.headers)
         spec = cloud.model_for(str(body.get("model", "")), "chat", caller)
+        if settings.qianfan_enabled and spec.id == QIANFAN_CHAT and (where["trajectory"] or legacy_hands_request(body.get("messages"))):
+            spec = cloud.model_for(QIANFAN_GUI, "chat", caller)
+        gate = model_gates[spec.upstream] if model_gates else shared_gate
         # a relay without a key answers before anything is held: a hold taken here and never
         # settled would count against the account's in-flight limit until it timed out
         headers = upstream_headers()
@@ -1359,7 +1445,6 @@ def create_app(
         call = meter.start(caller.account_id, spec.id, who.platform, stream, request_shape(body))
         call.family = client_info.ua_family(who.ua)
         # 0.31: who started the turn and where it sits (provenance.py), from the app's headers
-        where = provenance.from_headers(request.headers)
         call.run = where["run"]
         # 0.28 `apps_only`: the allowance is for nanoMuse; a pool worker, an SDK or another
         # app on a nanoMuse key is told where to go instead. Members are on the operator's
@@ -1382,6 +1467,8 @@ def create_app(
             raise
         body["model"] = spec.upstream
         apply_chat_defaults(body, settings.chat_defaults)
+        if settings.qianfan_enabled:
+            qianfan_chat_options(body, spec.id)
         if stream:
             opts = body.get("stream_options") if isinstance(body.get("stream_options"), dict) else {}
             opts["include_usage"] = True
@@ -1419,7 +1506,7 @@ def create_app(
             retries = 0
             try:
                 try:
-                    r, retries = await chat_post(url, headers, request_body, call)
+                    r, retries = await chat_post(url, headers, request_body, call, gate)
                 except httpx.HTTPError as e:
                     log.warning("upstream error: %s", e)
                     record_call(call, _broken_status(e), type(e).__name__, retries=retries, request_id=request_id)
@@ -1441,10 +1528,19 @@ def create_app(
                 except ValueError as e:
                     record_call(call, "broken", "unreadable reply", retries=retries, request_id=request_id)
                     raise CloudError(502, "upstream", "The model provider sent an unreadable reply") from e
+                if not isinstance(obj, dict) or obj.get("error") is not None:
+                    record_call(call, "upstream_error", "invalid completion", retries=retries, request_id=request_id)
+                    raise CloudError(502, "upstream", "The model provider returned a failed completion")
+                generated = ""
+                if isinstance(choices := obj.get("choices"), list):
+                    generated = "".join(_generated_text(c.get("message")) for c in choices if isinstance(c, dict))
+                if not generated.strip():
+                    record_call(call, "broken", "empty completion", retries=retries, request_id=request_id)
+                    raise CloudError(502, "upstream", "The model provider returned an empty reply")
                 usage = usage_from_json(obj)
                 text = _reply_text(obj)
                 if usage is None:
-                    usage = Usage(fallback_prompt_tokens, estimate_tokens(text))
+                    usage = Usage(fallback_prompt_tokens, estimate_tokens(generated))
                 charged = cloud.charge_chat(caller, spec, usage.prompt, usage.completion, request_id, cached_tokens=usage.cached)
             finally:
                 cloud.settle(caller, request_id)
@@ -1470,22 +1566,16 @@ def create_app(
 
         async def gen() -> AsyncIterator[bytes]:
             usage: Usage | None = None
-            text_len = 0
-            # the assistant's words: the estimate when the provider sends no usage, and the
-            # kept turn of a contributing account; the whole message, for the record
-            reply: list[str] = []
+            generated_parts: list[str] = []
+            has_output = False
             assembler = StreamAssembler()
-            # A request the provider refused, or dropped before a single token, costs the
-            # account nothing; a stream that broke off midway is charged for what arrived.
-            failed = False
-            accepted = False
             # how it ended, for the telemetry row: set at every exit; still None in `finally`
             # when the generator was closed under us, which is the client going away
             status: str | None = None
             detail = ""
             called: list[str] = []
             attempt = 0
-            ticket = chat_gate.ticket()
+            ticket = gate.ticket()
             started = time.monotonic()
             try:
                 # 0.31: while the request waits for a provider slot, the app hears how many are
@@ -1506,7 +1596,7 @@ def create_app(
                     # skips) every KEEPALIVE_TICK seconds until they come: a busy endpoint takes
                     # a minute and more over a 12k-token prompt, longer than idle lines live
                     opening = asyncio.ensure_future(
-                        http.send(http.build_request("POST", url, headers=headers, content=request_body), stream=True)
+                        chat_http.send(chat_http.build_request("POST", url, headers=headers, content=request_body), stream=True)
                     )
                     try:
                         while True:
@@ -1526,7 +1616,6 @@ def create_app(
                             else:
                                 event_kind = upstream_event_kind(r.status_code, raw)
                                 cloud.note(caller.account_id, event_kind, upstream_detail("chat", r.status_code, spec.id, raw))
-                                failed = True
                                 status = "content_rejected" if event_kind == "content.rejected" else "upstream_error"
                                 detail = str(r.status_code)
                                 err = relay_error_body(r.status_code, raw)
@@ -1536,7 +1625,6 @@ def create_app(
                                 yield b"data: [DONE]\n\n"
                                 return
                         else:
-                            accepted = True
                             lines = r.aiter_lines()
                             # the first line the same way: the headers may come well before it
                             first = asyncio.ensure_future(anext(lines, None))
@@ -1550,60 +1638,76 @@ def create_app(
                                 first.cancel()
                                 raise
                             head = first.result()
+                            done_marker = False
                             async for line in _prepend(head, lines):
                                 if line.startswith("data:"):
                                     payload = line[5:].strip()
-                                    if payload and payload != "[DONE]":
-                                        meter.first(call)
-                                        try:
-                                            obj = json.loads(payload)
-                                        except ValueError:
-                                            obj = None
-                                        if isinstance(obj, dict):
-                                            u = usage_from_json(obj)
-                                            if u is not None:
-                                                usage = u
-                                            assembler.feed(obj)
-                                            for ch in obj.get("choices") or []:
-                                                d = ch.get("delta") if isinstance(ch, dict) else None
-                                                if isinstance(d, dict) and isinstance(d.get("content"), str):
-                                                    text_len += len(d["content"])
-                                                    reply.append(d["content"])
-                                                    call.tokens_out += 1
-                                            called.extend(delta_tool_names(obj))
-                                            obj["model"] = spec.id
-                                            payload = dumps(obj)
-                                    yield f"data: {payload}\n\n".encode()
-                                elif line == "":
-                                    continue
-                                else:
+                                    if payload == "[DONE]":
+                                        done_marker = True
+                                        break
+                                    if not payload:
+                                        continue
+                                    try:
+                                        obj = json.loads(payload)
+                                    except ValueError as e:
+                                        raise CloudError(502, "upstream", "The model provider sent an unreadable reply") from e
+                                    if not isinstance(obj, dict) or obj.get("error") is not None:
+                                        raise CloudError(502, "upstream", "The model provider returned a failed completion")
+                                    choices = obj.get("choices", [])
+                                    if not isinstance(choices, list):
+                                        raise CloudError(502, "upstream", "The model provider sent an unreadable reply")
+                                    meter.first(call)
+                                    u = usage_from_json(obj)
+                                    if u is not None:
+                                        usage = u
+                                    assembler.feed(obj)
+                                    for ch in choices:
+                                        piece = _generated_text(ch.get("delta")) if isinstance(ch, dict) else ""
+                                        if piece:
+                                            generated_parts.append(piece)
+                                            has_output |= bool(piece.strip())
+                                            call.tokens_out += 1
+                                    called.extend(delta_tool_names(obj))
+                                    obj["model"] = spec.id
+                                    yield f"data: {dumps(obj)}\n\n".encode()
+                                elif line.startswith((":", "event:", "id:", "retry:")):
                                     yield (line + "\n").encode()
+                            if not has_output:
+                                raise CloudError(502, "upstream", "The model provider returned an empty reply")
+                            if not done_marker and not assembler.finish_reason:
+                                raise CloudError(502, "upstream", "The model provider stopped before finishing its reply")
                             status = "ok"
+                            yield b"data: [DONE]\n\n"
                             return
                     finally:
                         await r.aclose()
                     await chat_retry_pause(attempt, retry_status)
                     attempt += 1
                     call.retries = attempt
-            except httpx.HTTPError as e:
-                log.warning("upstream stream error: %s %s", type(e).__name__, e)
-                cloud.note(caller.account_id, "upstream.error", f"chat stream broke {spec.id}: {type(e).__name__}")
-                failed = usage is None and text_len == 0
-                status, detail = _broken_status(e), type(e).__name__
-                err = {"error": {"message": "The model provider stopped answering", "type": "nanomuse_cloud", "code": "upstream"}}
+            except (httpx.HTTPError, CloudError) as e:
+                log.warning("upstream stream error: %s", type(e).__name__)
+                if isinstance(e, CloudError):
+                    status, detail, message = "upstream_error", e.message, e.message
+                else:
+                    status, detail, message = _broken_status(e), type(e).__name__, "The model provider stopped answering"
+                cloud.note(caller.account_id, "upstream.error", f"chat stream broke {spec.id}: {detail}")
+                cloud.db.daily_add("error", "upstream")
+                err = {"error": {"message": message, "type": "nanomuse_cloud", "code": "upstream"}}
                 yield f"data: {dumps(err)}\n\n".encode()
                 yield b"data: [DONE]\n\n"
             finally:
-                if accepted and not failed:
+                if not has_output:
+                    usage = None
+                else:
                     if usage is None:
-                        usage = Usage(fallback_prompt_tokens, estimate_tokens("".join(reply)))
+                        usage = Usage(fallback_prompt_tokens, estimate_tokens("".join(generated_parts)))
                     cloud.charge_chat(caller, spec, usage.prompt, usage.completion, request_id, cached_tokens=usage.cached)
                     if sample_meta is not None:
                         cloud.keep_sample(
                             caller,
                             spec.id,
                             sample_messages,
-                            "".join(reply),
+                            "".join(assembler.content),
                             usage.prompt,
                             usage.completion,
                             sample_meta,
@@ -1731,7 +1835,11 @@ def create_app(
             caller, minimum=spec.per_image, cost_uy=spec.image_cost_uy(size), request_id=request_id, place=client_place(request)
         )
         try:
-            png = await _dashscope_image(spec.upstream, [{"text": prompt}], params)
+            if settings.qianfan_enabled:
+                async with image_gate:
+                    png = await qianfan_media.image(http, settings.upstream_base.rstrip("/"), upstream_headers(), prompt, size)
+            else:
+                png = await _dashscope_image(spec.upstream, [{"text": prompt}], params)
             charged = cloud.charge_image(caller, spec, 1, request_id, size=size)
         finally:
             cloud.settle(caller, request_id)
@@ -1751,6 +1859,12 @@ def create_app(
         image: UploadFile = File(...),
     ) -> Response:
         spec = cloud.model_for(model, "image", caller)
+        if settings.qianfan_enabled:
+            raise CloudError(
+                400,
+                "image_edit_unsupported",
+                "This hosted image model generates pictures from text. Choose an editing provider for an existing picture.",
+            )
         if n != 1:
             raise CloudError(400, "bad_request", "nanoMuse Cloud draws one picture per request")
         # read one byte past the cap rather than the whole picture first: larger than the
@@ -1831,10 +1945,23 @@ def create_app(
             return "1080P" if short >= 1080 else "720P" if short >= 720 else "480P"
         return None
 
+    @app.post("/v1/videos/generations")
     @app.post("/api/v1" + VIDEO_PATH)
     async def video_synthesis(request: Request, caller: Caller = Depends(caller_dep)) -> Response:
         body = await _json(request)
         spec = cloud.model_for(str(body.get("model", "")), "video", caller)
+        if settings.qianfan_enabled:
+            payload, reserve_seconds = qianfan_media.video_payload(body)
+            headers = upstream_headers()
+            clip_cost = spec.video_cost_uy(reserve_seconds, "1080P")
+            request_id = uuid.uuid4().hex[:16]
+            cloud.check_budget(caller, minimum=spec.per_clip, cost_uy=clip_cost, request_id=request_id, place=client_place(request))
+            try:
+                task_id = await qianfan_media.create_video(http, settings.upstream_base.rstrip("/"), headers, payload)
+                cloud.db.insert_video_task(task_id, caller.account_id, spec.id, cost_uy=clip_cost)
+            finally:
+                cloud.settle(caller, request_id)
+            return JSONResponse({"output": {"task_id": task_id, "task_status": "PENDING"}})
         # A probe (no input) costs nothing upstream and is not priced here either.
         probe = not body.get("input")
         clip_cost = 0 if probe else spec.video_cost_uy(_clip_seconds(body, spec), _clip_resolution(body))
@@ -1867,6 +1994,17 @@ def create_app(
             cloud.settle(caller, request_id)
         return _dashscope_reply(r)
 
+    async def check_wizshot(task) -> dict:
+        output, duration, resolution = await qianfan_media.video_status(
+            http, settings.upstream_base.rstrip("/"), upstream_headers(), str(task["task_id"])
+        )
+        spec = settings.model(str(task["model"]))
+        # The hold was an upper bound. Never bill more than that bound, or charge
+        # for an estimated duration when the provider did not report usage.
+        actual = spec.video_cost_uy(duration, resolution) if duration is not None and spec is not None else 0
+        cloud.settle_video_task(task, output["task_status"], cost_uy=min(int(task["cost_uy"]), actual))
+        return output
+
     @app.get("/api/v1/tasks/{task_id}")
     async def video_task(task_id: str, caller: Caller = Depends(caller_dep)) -> Response:
         # Polling is a media route too: after hosted media is retired it must not reach the
@@ -1876,6 +2014,10 @@ def create_app(
         task = cloud.db.video_task(task_id)
         if task is None or task["account_id"] != caller.account_id:
             raise CloudError(404, "no_task", "No such task")
+        if settings.qianfan_enabled:
+            if task["model"] != qianfan_media.QIANFAN_VIDEO:
+                raise CloudError(410, "video_provider_changed", "This task belonged to the previous video provider")
+            return JSONResponse({"output": await check_wizshot(task)})
         try:
             r = await http.get(settings.dashscope_base.rstrip("/") + f"/tasks/{task_id}", headers=dashscope_headers())
         except httpx.HTTPError as e:
@@ -1904,6 +2046,19 @@ def create_app(
         done = 0
         for task in cloud.db.video_tasks_to_settle(limit):
             task_id = str(task["task_id"])
+            if settings.qianfan_enabled:
+                if task["model"] != qianfan_media.QIANFAN_VIDEO:
+                    cloud.settle_video_task(task, "UNKNOWN")
+                else:
+                    try:
+                        await check_wizshot(task)
+                    except CloudError as e:
+                        if e.code != "no_task":
+                            continue
+                        cloud.settle_video_task(task, "UNKNOWN")
+                cloud.db.note_video_check(task_id)
+                done += 1
+                continue
             try:
                 r = await http.get(settings.dashscope_base.rstrip("/") + f"/tasks/{task_id}", headers=dashscope_headers())
             except httpx.HTTPError as e:
@@ -1932,6 +2087,8 @@ def create_app(
         if request.query_params.get("action") != "getPolicy":
             raise CloudError(400, "bad_request", "action=getPolicy is the only upload call the relay makes")
         spec = cloud.model_for(request.query_params.get("model", ""), "video", caller)
+        if settings.qianfan_enabled:
+            raise CloudError(400, "wizshot_materials_required", qianfan_media.VIDEO_INPUT_HELP, {"open": "/app/?video=wizshot"})
         cloud.check_budget(caller, minimum=spec.per_clip, cost_uy=spec.video_cost_uy(spec.clip_seconds), place=client_place(request))
         try:
             r = await http.get(
@@ -2047,7 +2204,8 @@ def create_app(
             "version": __version__,
             "time": t,
             "in_flight": {"requests": sum(in_flight.values()), "accounts": len(in_flight), "limit": cloud.in_flight.limit},
-            "chat_upstream": {**chat_gate.snapshot(), "retries": chat_retry_limit},
+            "chat_upstream": {**chat_gate_snapshot(), "retries": chat_retry_limit},
+            "model_gates": model_gate_snapshot(),
             "hub": hub.stats() if hub is not None else None,
             "last_hour": {
                 "requests": requests_hour,
@@ -2600,7 +2758,7 @@ def create_app(
         requests under way with their phase and age, the hub, per-minute throughput and
         latency for the last hour, the last ten minutes and the hour in summary, the newest
         calls. Memory only; the page polls it every few seconds."""
-        return analytics.live()
+        return {**analytics.live(), "model_gates": model_gate_snapshot()}
 
     @app.get("/v1/admin/analytics/usage", dependencies=[Depends(admin_dep)])
     async def admin_analytics_usage(days: int = 30) -> dict:

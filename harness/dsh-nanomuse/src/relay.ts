@@ -17,7 +17,7 @@ export const RELAY_TIMEOUT_MS = 30_000
 export const RELAY_IMAGE_TIMEOUT_MS = 180_000
 
 /** A `fetch` init that may name its own budget; the wrapped fetch takes it off before the call. */
-export type TimedInit = RequestInit & { timeoutMs?: number }
+export type TimedInit = RequestInit & { timeoutMs?: number; operation?: string }
 export type TimedFetch = (input: string | URL | Request, init?: TimedInit) => Promise<Response>
 
 /**
@@ -26,10 +26,15 @@ export type TimedFetch = (input: string | URL | Request, init?: TimedInit) => Pr
  */
 export function withTimeout(fetchImpl: typeof fetch, defaultMs: number): TimedFetch {
   return (input, init) => {
-    const { timeoutMs, ...rest } = init ?? {}
-    const deadline = AbortSignal.timeout(timeoutMs ?? defaultMs)
+    const { timeoutMs = defaultMs, operation, ...rest } = init ?? {}
+    const deadline = AbortSignal.timeout(timeoutMs)
     const signal = rest.signal ? AbortSignal.any([rest.signal, deadline]) : deadline
-    return fetchImpl(input, { ...rest, signal })
+    return fetchImpl(input, { ...rest, signal }).catch((error: unknown) => {
+      if (operation && deadline.aborted && error === deadline.reason && signal.reason === error) {
+        throw new DOMException(`${operation} timed out after ${timeoutMs} ms`, 'TimeoutError')
+      }
+      throw error
+    })
   }
 }
 
@@ -486,7 +491,7 @@ export class Relay {
    * older relay, which has no such route.
    */
   async config(signal?: AbortSignal): Promise<Record<string, unknown>> {
-    const res = await this.fetchImpl(`${this.origin}/v1/config`, { signal: signal ?? null })
+    const res = await this.fetchImpl(`${this.origin}/v1/config`, { operation: 'Relay.config', signal: signal ?? null })
     if (!res.ok) return {}
     const body = (await res.json().catch(() => ({}))) as unknown
     return body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
@@ -544,14 +549,14 @@ export class Relay {
 
   /** Who the key belongs to and what is left of the allowance. */
   async me(apiKey: string, signal?: AbortSignal): Promise<Account> {
-    const res = await this.fetchImpl(`${this.origin}/v1/me`, { headers: this.auth(apiKey), signal: signal ?? null })
+    const res = await this.fetchImpl(`${this.origin}/v1/me`, { operation: 'Relay.me', headers: this.auth(apiKey), signal: signal ?? null })
     if (!res.ok) await fail(res)
     return toAccount((await res.json()) as Record<string, unknown>)
   }
 
   /** The models the relay offers this key. */
   async models(apiKey: string, signal?: AbortSignal): Promise<RelayModel[]> {
-    const res = await this.fetchImpl(`${this.origin}/v1/models`, { headers: this.auth(apiKey), signal: signal ?? null })
+    const res = await this.fetchImpl(`${this.origin}/v1/models`, { operation: 'Relay.models', headers: this.auth(apiKey), signal: signal ?? null })
     if (!res.ok) await fail(res)
     const body = (await res.json()) as { data?: Record<string, unknown>[] }
     return (body.data ?? []).map((m) => {
@@ -584,6 +589,7 @@ export class Relay {
    */
   async profile(apiKey: string, withFace: boolean, signal?: AbortSignal): Promise<RelayProfile> {
     const res = await this.fetchImpl(`${this.origin}/v1/me/profile?face=${withFace ? 'true' : 'false'}`, {
+      operation: 'Relay.profile',
       headers: this.auth(apiKey),
       signal: signal ?? null,
     })

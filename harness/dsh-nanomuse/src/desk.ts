@@ -695,9 +695,9 @@ export function modelFor(m: { kind: string; for?: string[] }): ('chat' | 'gui')[
 }
 
 /** The current hosted fallback; a relay's lane-specific recommendation wins. */
-export const DEFAULT_CHAT_MODEL = 'Qwen/Qwen3.6-27B-FP8'
+export const DEFAULT_CHAT_MODEL = 'deepseek-v4.1-flash-1017'
 /** The current hosted fallback for the hands. */
-export const DEFAULT_HANDS_MODEL = 'Qwen/Qwen3.6-27B-FP8'
+export const DEFAULT_HANDS_MODEL = 'qwen3.5-397b-a17b'
 const LEGACY_CHAT_MODEL = 'deepseek-v4.1-flash'
 const LEGACY_HANDS_MODEL = 'qwen3.8-27b'
 

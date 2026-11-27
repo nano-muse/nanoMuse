@@ -5,7 +5,7 @@
 // 120 s deadline had failed it). Run after `tsc -p tsconfig.json`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ADDRESS, CAP_MS, HostStartWatch, maskToken, SLOW_MS, TAIL_LINES, waitedText } from "../out/host-start.js";
+import { ADDRESS, CAP_MS, HostStartWatch, maskToken, shouldRestartHost, SLOW_MS, TAIL_LINES, waitedText } from "../out/host-start.js";
 
 /** Fake timers and a fake clock: `advance(ms)` runs what is due, in order. */
 function clock() {
@@ -194,4 +194,10 @@ test("the words for a wait, in both languages", () => {
   assert.equal(waitedText(45_000, false), "45 s");
   assert.equal(waitedText(45_000, true), "45 秒");
   assert.equal(maskToken("dsh web: http://127.0.0.1:1/?token=abc more"), "dsh web: http://127.0.0.1:1/?token=… more");
+});
+
+test("a host that stayed ready earns another automatic restart", () => {
+  assert.equal(shouldRestartHost(false, 0), true);
+  assert.equal(shouldRestartHost(true, 599_999), false);
+  assert.equal(shouldRestartHost(true, 600_000), true);
 });

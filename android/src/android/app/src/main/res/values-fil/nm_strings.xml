@@ -1459,4 +1459,6 @@
     <string name="nm_hands_wireless_notify_problem">Bumalik sa nanoMuse upang makita kung paano magpatuloy.</string>
     <string name="nm_hands_wireless_repair">Ipares muli</string>
     <string name="nm_hands_wireless_repair_sub">Ulitin ang pagpapares kung binura ng Android ang mga nakapares na device o nag-expire ang pahintulot</string>
+    <string name="nm_codex_catalogue_fallback">Hindi ma-refresh ang listahan ng mga modelo ng Codex. Ipinapakita ang mga naka-save o built-in na modelo.</string>
+    <string name="nm_chat_setup_failed">Hindi maihanda ang mensahe. Tingnan kung nariyan pa ang pag-uusap at kung may libreng espasyo ang device.</string>
 </resources>

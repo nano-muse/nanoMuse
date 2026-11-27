@@ -221,9 +221,15 @@ export interface HubStats {
   /** Sockets closed before their hello: an address opening too many, an account with too many open (relay 0.30). */
   refused_connections?: number;
 }
+export interface UpstreamGate {
+  active: number;
+  waiting: number;
+  limit: number;
+}
 export interface Live {
   time: number;
-  gate: { active: number; waiting: number; limit: number };
+  gate: UpstreamGate;
+  model_gates?: Record<string, UpstreamGate>;
   in_flight: { requests: number; accounts: number; limit: number };
   running: RunningCall[];
   hub: HubStats | null;
@@ -858,7 +864,8 @@ export interface Health {
   version: string;
   time: number;
   in_flight: { requests: number; accounts: number; limit: number };
-  chat_upstream: { active: number; waiting: number; limit: number; retries: number };
+  chat_upstream: UpstreamGate & { retries: number };
+  model_gates?: Record<string, UpstreamGate>;
   hub: HubStats | null;
   last_hour: { requests: number; upstream_errors: number; content_rejected: number; budget_refused: number; sign_ins: number; sign_in_failures: number };
   db: { size_bytes: number; writable: boolean };

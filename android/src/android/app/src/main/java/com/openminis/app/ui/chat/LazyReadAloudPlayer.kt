@@ -23,8 +23,9 @@ internal class LazyReadAloudPlayer(context: Context) {
     /** Speak [text] as one utterance, stopping anything already in flight. */
     fun speak(text: String) {
         if (text.isBlank()) return
+        // nanoMuse: an explicit selection uses its own playback gate.
         val p = player ?: synchronized(this) {
-            player ?: ReadAloudPlayer(appContext).also { player = it }
+            player ?: ReadAloudPlayer(appContext, manualSelection = true).also { player = it }
         }
         p.speak(text)
     }

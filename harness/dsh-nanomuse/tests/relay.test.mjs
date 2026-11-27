@@ -211,7 +211,7 @@ test('every call has a deadline: a relay that never answers is given up; a calle
     })
   const relay = new Relay('https://relay.test', hang, 20)
   const started = Date.now()
-  await assert.rejects(relay.config(), (error) => error.name === 'TimeoutError')
+  await assert.rejects(relay.config(), { name: 'TimeoutError', message: 'Relay.config timed out after 20 ms' })
   assert.ok(Date.now() - started < 2000)
 
   const controller = new AbortController()
@@ -226,4 +226,5 @@ test('every call has a deadline: a relay that never answers is given up; a calle
   await new Promise((r) => setTimeout(r, 60))
   assert.equal(settled, false)
   assert.equal(seen.at(-1).timeoutMs, undefined, 'the budget is taken off the init before fetch sees it')
+  assert.equal('operation' in seen[0], false)
 })

@@ -510,7 +510,9 @@ class GeminiProvider(
     private fun mapHttpError(statusCode: Int, body: String): LLMError {
         if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey()
         if (statusCode == 429) return LLMError.RateLimited()
-        val message = "Gemini API error $statusCode: ${body.take(200)}"
+        // nanoMuse: keep the service's diagnostic visible in chat, including details beyond the preview.
+        val diagnostic = if (body.length <= 32_768) body else body.take(32_768) + "…"
+        val message = "Gemini API error $statusCode: $diagnostic"
         val transientCodes = setOf(500, 502, 503, 504, 529)
         if (statusCode in transientCodes) return LLMError.TransientError(message)
         return LLMError.ProviderError(message)

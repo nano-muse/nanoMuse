@@ -68,14 +68,14 @@ object AvatarMotion {
     }
 
     /** True when a video model is set and the user has not turned the animation off. */
-    fun enabled(context: Context): Boolean = MediaModels.animateAvatar(context) && MediaModels.videoEndpoint(context) != null
+    fun enabled(context: Context): Boolean = MediaModels.animateAvatar(context) && MediaModels.videoEndpoint(context)?.let { it.studioUrl == null } == true
 
     /**
      * Draws the missing clips (all of them with [force]). No-op without a face or a video model.
      * Returns false when nothing was started.
      */
     fun animateAll(context: Context, force: Boolean = false): Boolean {
-        val ep = MediaModels.videoEndpoint(context) ?: return false
+        val ep = MediaModels.videoEndpoint(context)?.takeIf { it.studioUrl == null } ?: return false
         if (!AvatarStore.baseFile().exists()) return false
         val todo = animated.filter { force || !clipFile(it).exists() }
         if (todo.isEmpty()) return false

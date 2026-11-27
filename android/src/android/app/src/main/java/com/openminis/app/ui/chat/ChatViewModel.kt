@@ -6880,7 +6880,12 @@ class ChatViewModel(
         val headlessJob = viewModelScope.launch { // nanoMuse: retain the parent job that owns setup and streaming.
             streamJob = coroutineContext[Job] // nanoMuse: Stop during the setup (session, attachments, the user row) cancels it too, not only the agent loop launched below (#340)
             var streamLaunched = false
-            var userRowShown = false // nanoMuse: set once the person's line is on screen; a Stop before that gives the composer its text back (#340)
+            var userRowSaved = false // nanoMuse: the database commit is the retry boundary.
+            fun restoreUnsentDraft() {
+                if (userRowSaved || headless != null) return
+                if (_inputText.value.isEmpty()) _inputText.value = text
+                if (_attachments.value.isEmpty()) _attachments.value = currentAttachments
+            }
             try {
             // Ensure session exists in DB (creates on first message for draft sessions)
             val activeSessionId = ensureSession()
@@ -6895,12 +6900,6 @@ class ChatViewModel(
             // BEFORE persisting, so the stored message carries a mediaRef per
             // paste instead of one huge text part.
             val pasted = buildPastedParts(trimmed, activeSessionId)
-            if (pasted != null) {
-                // Safe to clear now: the content is on disk and the parts JSON
-                // below references it, so nothing depends on the buffer any more.
-                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
-            }
-
             // Save user message — text + persisted mediaRef parts so images survive
             // a session reload (T128). Non-image attachments still only contribute
             // their name (rendered as a file tile) and are not persisted.
@@ -6911,6 +6910,8 @@ class ChatViewModel(
                 bodyPartsJson = pasted?.partsJson,
             )
             val persistedUser = chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            userRowSaved = true // nanoMuse: errors after this point must not re-stage the same message.
+            if (pasted != null) _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
             io.github.nanomuse.feed.FeedChatEvidence.recorded(context, feedScope, persistedUser, _memoryEnabled.value) // nanoMuse: keeps only the row reference.
             headless?.saved(persistedUser.id) // nanoMuse: publish identity only after persistence.
             io.github.nanomuse.sync.ConversationSync.sent(activeSessionId) // nanoMuse: the person's line reaches the other devices at send (C8), then "working" (C9)
@@ -6939,7 +6940,6 @@ class ChatViewModel(
                 attachmentUris = prepared.nonImageUris + (pasted?.uiUris ?: emptyList()),
             )
             _messages.value = _messages.value + userMsg
-            userRowShown = true // nanoMuse: (#340)
             val imageParts = prepared.imageParts
 
             // T132: build the user contentParts in iOS order — caption first
@@ -7105,11 +7105,13 @@ class ChatViewModel(
                 headless?.requestStop() // nanoMuse: setup cancellation belongs to this receipt.
                 // nanoMuse: Stop before the user row is on screen means the message was not sent; the
                 // composer gets its text and attachments back instead of losing them (#340)
-                if (!streamLaunched && !userRowShown) {
-                    if (_inputText.value.isEmpty()) _inputText.value = text
-                    if (_attachments.value.isEmpty()) _attachments.value = currentAttachments
-                }
+                if (!streamLaunched) restoreUnsentDraft()
                 throw e
+            } catch (e: Exception) {
+                // nanoMuse: a missing chat or a failed draft write must not escape the UI coroutine.
+                AppLogger.error(TAG_STREAM, "send setup failed: ${e.javaClass.simpleName}")
+                restoreUnsentDraft()
+                _error.value = context.getString(R.string.nm_chat_setup_failed)
             } finally {
                 if (!streamLaunched) {
                     headless?.fail() // nanoMuse: setup ended without an executable turn.

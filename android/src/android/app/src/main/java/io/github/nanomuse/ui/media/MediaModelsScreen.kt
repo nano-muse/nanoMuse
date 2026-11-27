@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -221,7 +222,11 @@ fun MediaModelsScreen(
                     },
                 )
             }
-            if (videoInst != null) {
+            val studio = MediaModels.videoEndpoint(context)?.studioUrl
+            if (studio != null) {
+                val uriHandler = LocalUriHandler.current
+                SettingsRow(title = videoModel, subtitle = studio, onClick = { uriHandler.openUri(studio) })
+            } else if (videoInst != null) {
                 ModelList(
                     header = stringResource(R.string.nm_media_models_on, videoInst.label),
                     // the key's answer plus the entries the person listed on the provider (#508)

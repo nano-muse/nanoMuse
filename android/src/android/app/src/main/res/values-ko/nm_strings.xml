@@ -1455,4 +1455,6 @@
     <string name="nm_hands_wireless_notify_problem">nanoMuse로 돌아가 해결 방법을 확인하세요.</string>
     <string name="nm_hands_wireless_repair">다시 페어링</string>
     <string name="nm_hands_wireless_repair_sub">시스템에서 페어링 기기가 삭제되었거나 인증이 만료된 경우 다시 진행합니다</string>
+    <string name="nm_codex_catalogue_fallback">Codex 모델 목록을 새로 고치지 못했습니다. 저장된 모델 또는 기본 제공 모델을 표시합니다.</string>
+    <string name="nm_chat_setup_failed">메시지를 준비할 수 없습니다. 대화가 아직 존재하고 기기에 여유 공간이 있는지 확인하세요.</string>
 </resources>

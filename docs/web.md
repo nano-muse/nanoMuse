@@ -87,9 +87,8 @@ tile as before.
 Models contract (0.1.41), one card each under the chat model. The value is
 `provider · model` as the runtime resolves it (`GET /api/connections` →
 `image` / `video`: the slot as set and its `effective_*`): an explicit choice,
-else the chat provider's own media model when it has one, else the first
-provider of yours that covers the job, else the one sentence and an *Add a
-provider* button. The hosted nanoMuse Cloud account is not a media provider.
+else the chat provider's own media model when it has one, then a signed-in relay that offers the job, then the first provider of yours that covers it, else the one sentence and an *Add a
+provider* button. Version 1.0.10 uses the [Cloud web tools](cloud.md) for hosted pictures and character video.
 The picker offers *Automatic* first, *The chat model's provider* when it has
 the capability (its key serves, nothing to paste), and under *Add a provider*
 every catalogue provider with the capability for your region, plus *Other

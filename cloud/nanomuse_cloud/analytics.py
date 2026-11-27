@@ -636,9 +636,10 @@ class Analytics:
         t = int(time.time())
         hub = self.hub_getter()
         in_flight = self.cloud.in_flight.snapshot()
+        gate = self.gate_getter()
         return {
             "time": t,
-            "gate": self.gate_getter(),
+            "gate": gate,
             "in_flight": {"requests": sum(in_flight.values()), "accounts": len(in_flight), "limit": self.cloud.in_flight.limit},
             "running": self.meter.running(),
             "hub": hub.stats() if hub is not None else None,
@@ -649,7 +650,7 @@ class Analytics:
             "since_start": {"started_at": self.meter.started_at, "counts": dict(self.meter.counts)},
             "models": [m.id for m in self.cloud.offered_models()],
             "settings": {
-                "chat_concurrency": self.s.chat_concurrency,
+                "chat_concurrency": gate["limit"],
                 "max_in_flight": self.s.max_in_flight,
                 "upstream_timeout_s": self.s.upstream_timeout_s,
                 "chat_retries": self.s.chat_retries,
