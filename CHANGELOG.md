@@ -25,12 +25,6 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
-- Removed empty chat bubbles between Android tool steps during streaming and when reopening conversations.
-- Fixed a crash when a chat message could not be saved during send setup, and kept the unsent draft available.
-- Added a selectable, copyable details view for chat errors and preserved longer Gemini diagnostics.
-- Fixed manual Read aloud when automatic reply narration was off.
-- Updated the Codex OAuth catalogue and its GPT-6.2 fallback, identified saved or built-in menus after a failed refresh, and added the Codex image tool variants GPT Image 2.5 Sunburst and Flare.
-
 ### iOS
 
 ### Project
@@ -43,6 +37,8 @@ commitments and changed sources. The release also tightens browser, account, loc
 cross-device approval boundaries. The relay is 0.32.0; 1.0.9 clients remain compatible.
 
 - Fixed Android builds that could produce an arm64 APK without the PRoot executable needed for shell commands and screen tasks. Existing sandboxes also recovered missing files for the bundled Alpine shell without resetting the workspace.
+
+- Refreshed the Android package as build 54 on 2026-11-28 without changing the displayed 1.0.10 version. It removed empty bubbles between tool steps, kept drafts after send setup failures, made chat errors copyable, restored manual Read aloud when automatic narration was off, and updated hosted, Codex and image model choices.
 
 - Replaced the manual Android wireless debugging pairing form with a six-step guided background screen setup that watches system switches live, reads the six-digit pairing code automatically through the accessibility service when enabled, falls back to heads-up inline-reply notifications, and connects automatically across cached, property, mDNS and loopback-scanned ports.
 
