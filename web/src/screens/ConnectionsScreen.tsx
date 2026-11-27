@@ -1794,6 +1794,7 @@ export function SearchCard({
   const [testing, setTesting] = useState(false);
 
   useEffect(() => {
+    if (s.provider !== provider) setKey("");
     setProvider(s.provider);
     setBaseUrl(s.base_url);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1876,7 +1877,10 @@ export function SearchCard({
             <button
               key={p.id}
               type="button"
-              onClick={() => setProvider(p.id as typeof provider)}
+              onClick={() => {
+                if (p.id !== provider) setKey("");
+                setProvider(p.id as typeof provider);
+              }}
               className={chip(provider === p.id)}
             >
               {p.label}
