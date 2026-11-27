@@ -12,6 +12,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
+
 ### Web
 
 ### Desktop

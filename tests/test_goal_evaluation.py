@@ -23,12 +23,14 @@ from nanomuse.goals.evaluation import (
     Ledger,
     Run,
     Scalar,
+    canonical,
     collect_file,
     contract_from_dict,
     decide,
     evaluate,
     fingerprint,
     observation,
+    validate_result,
 )
 
 NOW = 10000
@@ -535,6 +537,511 @@ class GoalEvaluationTests(unittest.TestCase):
         for counters in ({"stalled_runs": True}, {"unknown_runs": -1}):
             with self.subTest(counters=counters), self.assertRaises(ValueError):
                 decide(result, **counters)
+
+    def test_ledger_and_previous_v0_backward_compatibility(self) -> None:
+        legacy_hash = "7325c04b5752ffe3b4d58fa7484dc3bea51fcfef8359e1d2cc6e4527080522ef"
+        legacy_input = (
+            '{"contract":{"criteria":[{"collectors":["collector.v1"],"id":"C1",'
+            '"invariant":false,"max_age":3600,"metric":"status","op":"eq",'
+            '"subject":"file:///report.txt","target":"ok","unit":"state"}],'
+            '"goal_id":"goal-v0","revision":1},"evidence":[{"allowed":true,"attempt":1,'
+            '"call_id":"call-1","collected_at":100,"collector":"collector.v1",'
+            '"criterion_id":"C1","goal_id":"goal-v0","id":"ev-1","metric":"status",'
+            '"observed_at":100,"ok":true,'
+            '"payload_digest":"e2ea734a83b7eb3c6886301222e7fd1bfc00d6e4a836c1ed7f7d7fcd95f58c99",'
+            '"revision":1,"run_id":"run-v0","subject":"file:///report.txt","unit":"state",'
+            '"value":"ok"}],"now":100,"previous":null,'
+            '"run":{"attempt":1,"id":"run-v0","state":"completed"}}'
+        )
+        legacy_result_raw = (
+            '{"at":100,"attempt":1,"constraint_met":[],"constraint_required":0,'
+            '"contract_hash":"7325c04b5752ffe3b4d58fa7484dc3bea51fcfef8359e1d2cc6e4527080522ef",'
+            '"criteria":{"C1":"met"},"delta":null,"evaluator_version":"goal-eval.v2",'
+            '"evidence":{"C1":["ev-1"]},"goal_id":"goal-v0",'
+            '"id":"ad5e4a7184c2e1706744594c87bf15abcfbff0f83f87dacf03fe032f52536abd",'
+            '"lost":[],"met":["C1"],"observed_values":{"C1":"ok"},"outcome_met":["C1"],'
+            '"outcome_required":1,"progress":"unknown","rejected":{},"required":1,'
+            '"revision":1,"run_id":"run-v0","run_state":"completed","schema_version":2,'
+            '"status":"verified","violated":[]}'
+        )
+        legacy_result = json.loads(legacy_result_raw)
+
+        c1 = Criterion(
+            id="C1",
+            subject="file:///report.txt",
+            metric="status",
+            op="eq",
+            target="ok",
+            unit="state",
+            collectors=("collector.v1",),
+        )
+        c1_explicit = replace(c1, tier=2)
+        contract = Contract("goal-v0", 1, (c1,))
+        contract_explicit = Contract("goal-v0", 1, (c1_explicit,))
+        contract_tier1 = Contract("goal-v0", 1, (replace(c1, tier=1),))
+        run = Run("run-v0", 1, "completed")
+        ev1 = observation(
+            id="ev-1",
+            goal_id=contract.goal_id,
+            revision=contract.revision,
+            run_id=run.id,
+            attempt=run.attempt,
+            call_id="call-1",
+            criterion_id=c1.id,
+            collector="collector.v1",
+            observed_at=100,
+            collected_at=100,
+            subject=c1.subject,
+            metric=c1.metric,
+            value="ok",
+            unit=c1.unit,
+        )
+
+        # Fresh evaluation of default tier=2 and explicit tier=2 is byte-for-byte identical.
+        fresh = evaluate(contract, run, [ev1], now=100)
+        fresh_explicit = evaluate(contract_explicit, run, [ev1], now=100)
+        self.assertEqual(fresh["contract_hash"], legacy_hash)
+        self.assertEqual(canonical(fresh), legacy_result_raw)
+        self.assertEqual(canonical(fresh_explicit), legacy_result_raw)
+
+        # Tier 1 changes contract identity.
+        tier1_res = evaluate(contract_tier1, run, [ev1], now=100)
+        self.assertNotEqual(tier1_res["contract_hash"], legacy_hash)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_db = Path(tmp_dir) / "ledger_legacy.db"
+            ledger = Ledger(tmp_db)
+            with ledger.conn:
+                ledger.conn.execute(
+                    "INSERT INTO evaluations VALUES (?,?,?,?,?)",
+                    (legacy_hash, run.id, run.attempt, legacy_input, legacy_result_raw),
+                )
+
+            recorded = ledger.record(contract, run, [ev1], now=100)
+            self.assertEqual(canonical(recorded), legacy_result_raw)
+            recorded_explicit = ledger.record(contract_explicit, run, [ev1], now=100)
+            self.assertEqual(canonical(recorded_explicit), legacy_result_raw)
+            row_count = ledger.conn.execute("SELECT COUNT(*) FROM evaluations").fetchone()[0]
+            self.assertEqual(row_count, 1)
+
+            # Float tier=2.0 must not bypass validation via legacy cache lookup.
+            invalid_float_contract = Contract("goal-v0", 1, (replace(c1, tier=2.0),))  # type: ignore[arg-type]
+            with self.assertRaises(ValueError):
+                ledger.record(invalid_float_contract, run, [ev1], now=100)
+
+            next_eval = evaluate(contract, run, [ev1], now=200, previous=legacy_result)
+            self.assertEqual(next_eval["status"], "verified")
+            ledger.close()
+
+    def test_invalid_criterion_tier_rejected(self) -> None:
+        for bad_tier in (0, 3, True, False, "1", None):
+            with self.subTest(bad_tier=bad_tier):
+                c = replace(self.criterion, tier=bad_tier)  # type: ignore[arg-type]
+                with self.assertRaises(ValueError):
+                    Contract("g_1", 1, (c,)).validate()
+                payload = {
+                    "goal_id": "g_1",
+                    "revision": 1,
+                    "criteria": [
+                        {
+                            "id": "c1",
+                            "subject": "s",
+                            "metric": "m",
+                            "op": "eq",
+                            "target": "ok",
+                            "unit": "u",
+                            "collectors": ["collector.v1"],
+                            "tier": bad_tier,
+                        }
+                    ],
+                }
+                with self.assertRaises(ValueError):
+                    contract_from_dict(payload)
+
+    def test_truth_table_tier1_vs_tier2(self) -> None:
+        # Construct base criteria: outcome c_t1 (tier 1), outcome c_t2 (tier 2), invariant c_inv
+        c_t1 = Criterion(
+            id="amount",
+            subject="report://total",
+            metric="total",
+            op="eq",
+            target=300,
+            unit="yuan",
+            collectors=("fixture.v1",),
+            tier=1,
+        )
+        c_t2 = Criterion(
+            id="format",
+            subject="report://format",
+            metric="valid",
+            op="eq",
+            target=True,
+            unit="boolean",
+            collectors=("fixture.v1",),
+            tier=2,
+        )
+        c_inv = Criterion(
+            id="guard",
+            subject="report://guard",
+            metric="clean",
+            op="eq",
+            target=True,
+            unit="boolean",
+            collectors=("fixture.v1",),
+            invariant=True,
+            tier=2,
+        )
+        contract = Contract("g_truth", 1, (c_t1, c_t2, c_inv))
+        run = Run("r_truth")
+
+        def ev(
+            cid: str, val: Any, eid: str | None = None, observed_at: int = NOW, **kw: Any
+        ) -> Evidence:
+            c = next(x for x in (c_t1, c_t2, c_inv) if x.id == cid)
+            actual_eid = eid if eid is not None else f"e_{cid}"
+            return observation(
+                id=actual_eid,
+                goal_id=contract.goal_id,
+                revision=contract.revision,
+                run_id=run.id,
+                attempt=run.attempt,
+                call_id=f"call_{actual_eid}",
+                criterion_id=cid,
+                collector=c.collectors[0],
+                observed_at=observed_at,
+                collected_at=observed_at,
+                subject=c.subject,
+                metric=c.metric,
+                value=val,
+                unit=c.unit,
+                **kw,
+            )
+
+        # 1. tier=1 + 有效证据 not_met (总额写错) -> 单项 not_met，整例 contradicted，含 tier1_failed，decide() 返回 ("replan", "review_plan")
+        res1 = evaluate(
+            contract,
+            run,
+            [ev("amount", 200), ev("format", True), ev("guard", True)],
+            now=NOW,
+        )
+        self.assertEqual(res1["criteria"]["amount"], "not_met")
+        self.assertEqual(res1["status"], "contradicted")
+        self.assertEqual(res1.get("tier1_failed"), ["amount"])
+        self.assertEqual(decide(res1), ("replan", "review_plan"))
+
+        # 2. tier=1 + 缺失证据 (没写总额) -> 单项 unknown，tier1_failed 不存在，整例保持 partial (不升级为 contradicted)
+        res2_missing = evaluate(contract, run, [ev("format", True), ev("guard", True)], now=NOW)
+        self.assertEqual(res2_missing["criteria"]["amount"], "unknown")
+        self.assertNotIn("tier1_failed", res2_missing)
+        self.assertEqual(res2_missing["status"], "partial")
+
+        # 2b. tier=1 + 过期证据 (没有效总额) -> 单项 unknown，tier1_failed 不存在，整例保持 partial
+        res2_expired = evaluate(
+            contract,
+            run,
+            [
+                ev("amount", 300, observed_at=NOW - 5000),
+                ev("format", True),
+                ev("guard", True),
+            ],
+            now=NOW,
+        )
+        self.assertEqual(res2_expired["criteria"]["amount"], "unknown")
+        self.assertNotIn("tier1_failed", res2_expired)
+        self.assertEqual(res2_expired["status"], "partial")
+
+        # 2c. tier=1 + 被拒证据 -> 单项 unknown，tier1_failed 不存在，整例保持 partial
+        res2_rejected = evaluate(
+            contract,
+            run,
+            [ev("amount", 200, ok=False), ev("format", True), ev("guard", True)],
+            now=NOW,
+        )
+        self.assertEqual(res2_rejected["criteria"]["amount"], "unknown")
+        self.assertNotIn("tier1_failed", res2_rejected)
+        self.assertEqual(res2_rejected["status"], "partial")
+
+        # 3. tier=1 + 互相冲突证据 (给出两个不同总额) -> 单项 conflict，整例 contradicted，不含 tier1_failed
+        res3 = evaluate(
+            contract,
+            run,
+            [
+                ev("amount", 300, eid="e1"),
+                ev("amount", 400, eid="e2"),
+                ev("format", True),
+                ev("guard", True),
+            ],
+            now=NOW,
+        )
+        self.assertEqual(res3["criteria"]["amount"], "conflict")
+        self.assertEqual(res3["status"], "contradicted")
+        self.assertNotIn("tier1_failed", res3)
+
+        # 4. tier=2 + 有效证据 not_met -> 单项 not_met，整例保持 partial
+        res4 = evaluate(
+            contract,
+            run,
+            [ev("amount", 300), ev("format", False), ev("guard", True)],
+            now=NOW,
+        )
+        self.assertEqual(res4["criteria"]["format"], "not_met")
+        self.assertEqual(res4["status"], "partial")
+        self.assertNotIn("tier1_failed", res4)
+
+        # 5. invariant=True 失败走 violated、之前 met 本次 not_met 走 lost，均不混入 tier1_failed
+        # 5a. invariant failure -> violated, not tier1_failed
+        res5a = evaluate(
+            contract,
+            run,
+            [ev("amount", 300), ev("format", True), ev("guard", False)],
+            now=NOW,
+        )
+        self.assertEqual(res5a["violated"], ["guard"])
+        self.assertNotIn("tier1_failed", res5a)
+        self.assertEqual(res5a["status"], "contradicted")
+
+        # 5b. prior met -> now not_met -> lost, not tier1_failed (even for tier 1 criterion)
+        prior_res = evaluate(
+            contract,
+            run,
+            [ev("amount", 300), ev("format", True), ev("guard", True)],
+            now=NOW,
+        )
+        self.assertEqual(prior_res["status"], "verified")
+        res5b = evaluate(
+            contract,
+            run,
+            [ev("amount", 200), ev("format", True), ev("guard", True)],
+            now=NOW + 1,
+            previous=prior_res,
+        )
+        self.assertEqual(res5b["lost"], ["amount"])
+        self.assertNotIn("tier1_failed", res5b)
+        self.assertEqual(res5b["status"], "contradicted")
+
+    def test_tier1_failed_validation_and_invariant_routing(self) -> None:
+        c_t1 = Criterion(
+            id="amount",
+            subject="report://total",
+            metric="total",
+            op="eq",
+            target=300,
+            unit="yuan",
+            collectors=("fixture.v1",),
+            tier=1,
+        )
+        c_t2 = Criterion(
+            id="format",
+            subject="report://format",
+            metric="valid",
+            op="eq",
+            target=True,
+            unit="boolean",
+            collectors=("fixture.v1",),
+            tier=2,
+        )
+        c_inv = Criterion(
+            id="guard",
+            subject="report://guard",
+            metric="clean",
+            op="eq",
+            target=True,
+            unit="boolean",
+            collectors=("fixture.v1",),
+            invariant=True,
+            tier=1,
+        )
+        contract = Contract("g_val", 1, (c_t1, c_t2, c_inv))
+        run = Run("r_val")
+
+        def ev(cid: str, val: Any, observed_at: int = NOW) -> Evidence:
+            c = next(x for x in contract.criteria if x.id == cid)
+            return observation(
+                id=f"ev_{cid}_{observed_at}",
+                goal_id=contract.goal_id,
+                revision=contract.revision,
+                run_id=run.id,
+                attempt=run.attempt,
+                call_id=f"call_{cid}_{observed_at}",
+                criterion_id=cid,
+                collector=c.collectors[0],
+                observed_at=observed_at,
+                collected_at=observed_at,
+                subject=c.subject,
+                metric=c.metric,
+                value=val,
+                unit=c.unit,
+            )
+
+        # Invariant with tier=1 routes to violated, not tier1_failed.
+        inv_fail = evaluate(
+            contract,
+            run,
+            [ev("amount", 300), ev("format", True), ev("guard", False)],
+            now=NOW,
+        )
+        self.assertEqual(inv_fail["violated"], ["guard"])
+        self.assertNotIn("tier1_failed", inv_fail)
+        self.assertEqual(inv_fail["status"], "contradicted")
+
+        # Tampering lost snapshot by duplicating lost id into tier1_failed must fail validation.
+        prior_met = evaluate(
+            contract,
+            run,
+            [ev("amount", 300), ev("format", True), ev("guard", True)],
+            now=NOW,
+        )
+        regressed = evaluate(
+            contract,
+            run,
+            [ev("amount", 200, observed_at=NOW + 1), ev("format", True, observed_at=NOW + 1)],
+            now=NOW + 1,
+            previous=prior_met,
+        )
+        tampered_lost = {**regressed, "tier1_failed": ["amount"]}
+        tampered_lost["id"] = fingerprint({k: v for k, v in tampered_lost.items() if k != "id"})
+        with self.assertRaises(ValueError):
+            validate_result(tampered_lost)
+        with self.assertRaises(ValueError):
+            decide(tampered_lost)
+
+        # Stripping tier1_failed from a tier-1 baseline snapshot must fail evaluate(previous=...).
+        t1_fail = evaluate(
+            contract,
+            run,
+            [ev("amount", 200), ev("format", True), ev("guard", True)],
+            now=NOW,
+        )
+        tampered_stripped = {k: v for k, v in t1_fail.items() if k != "tier1_failed"}
+        tampered_stripped["status"] = "partial"
+        tampered_stripped["id"] = fingerprint(
+            {k: v for k, v in tampered_stripped.items() if k != "id"}
+        )
+        with self.assertRaises(ValueError):
+            evaluate(
+                contract,
+                run,
+                [ev("amount", 300, observed_at=NOW + 1)],
+                now=NOW + 1,
+                previous=tampered_stripped,
+            )
+
+        # Moving a first-run tier-1 failure (progress="unknown") into lost must fail previous check.
+        tampered_moved_lost = {
+            **{k: v for k, v in t1_fail.items() if k != "tier1_failed"},
+            "lost": ["amount"],
+        }
+        tampered_moved_lost["id"] = fingerprint(
+            {k: v for k, v in tampered_moved_lost.items() if k != "id"}
+        )
+        with self.assertRaises(ValueError):
+            evaluate(
+                contract,
+                run,
+                [ev("amount", 300, observed_at=NOW + 1)],
+                now=NOW + 1,
+                previous=tampered_moved_lost,
+            )
+
+        # Ledger readback must enforce the same contract/tier/lost checks as fresh/baseline eval.
+        ev_fail = [ev("amount", 200), ev("format", True), ev("guard", True)]
+        ev_t2_fail = [ev("amount", 300), ev("format", False), ev("guard", True)]
+        contract_hash = t1_fail["contract_hash"]
+
+        for idx, (evs, tampered_patch) in enumerate(
+            [
+                # (a) strip tier1_failed -> partial on tier-1 failure
+                (
+                    ev_fail,
+                    {
+                        **{k: v for k, v in t1_fail.items() if k != "tier1_failed"},
+                        "status": "partial",
+                    },
+                ),
+                # (b) inject tier-2 criterion into tier1_failed
+                (
+                    ev_t2_fail,
+                    {
+                        **evaluate(contract, run, ev_t2_fail, now=NOW),
+                        "status": "contradicted",
+                        "tier1_failed": ["format"],
+                    },
+                ),
+                # (c) move tier-1 failure into lost on first run (previous=None)
+                (ev_fail, tampered_moved_lost),
+            ]
+        ):
+            with self.subTest(ledger_tamper=idx), tempfile.TemporaryDirectory() as tmp_dir:
+                sub_run = Run(f"r_tamper_{idx}")
+                db_path = Path(tmp_dir) / "ledger.db"
+                ledger = Ledger(db_path)
+                sub_evs = [
+                    observation(
+                        id=x.id,
+                        goal_id=x.goal_id,
+                        revision=x.revision,
+                        run_id=sub_run.id,
+                        attempt=sub_run.attempt,
+                        call_id=x.call_id,
+                        criterion_id=x.criterion_id,
+                        collector=x.collector,
+                        observed_at=x.observed_at,
+                        collected_at=x.collected_at,
+                        subject=x.subject,
+                        metric=x.metric,
+                        value=x.value,
+                        unit=x.unit,
+                    )
+                    for x in evs
+                ]
+                real_saved = ledger.record(contract, sub_run, sub_evs, now=NOW)
+                bad_payload = {
+                    **tampered_patch,
+                    "run_id": sub_run.id,
+                    "evidence": real_saved["evidence"],
+                    "contract_hash": contract_hash,
+                }
+                bad_payload["id"] = fingerprint({k: v for k, v in bad_payload.items() if k != "id"})
+                with ledger.conn:
+                    ledger.conn.execute(
+                        "UPDATE evaluations SET result=? "
+                        "WHERE contract_hash=? AND run_id=? AND attempt=?",
+                        (canonical(bad_payload), contract_hash, sub_run.id, sub_run.attempt),
+                    )
+                with self.assertRaises(ValueError):
+                    ledger.record(contract, sub_run, sub_evs, now=NOW)
+                ledger.close()
+
+        # Ledger readback with non-list evidence type in previous must reject just like evaluate().
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ledger = Ledger(Path(tmp_dir) / "ledger_prev_type.db")
+            run_two = Run("r_prev_type", 2)
+            ev_two = [
+                observation(
+                    id="e2_amount",
+                    goal_id=contract.goal_id,
+                    revision=contract.revision,
+                    run_id=run_two.id,
+                    attempt=run_two.attempt,
+                    call_id="call2_amount",
+                    criterion_id="amount",
+                    collector=c_t1.collectors[0],
+                    observed_at=NOW + 2,
+                    collected_at=NOW + 2,
+                    subject=c_t1.subject,
+                    metric=c_t1.metric,
+                    value=300,
+                    unit=c_t1.unit,
+                )
+            ]
+            ledger.record(contract, run_two, ev_two, now=NOW + 2, previous=prior_met)
+            bad_prev = {
+                **prior_met,
+                "evidence": {k: tuple(v) for k, v in prior_met["evidence"].items()},
+            }
+            with self.assertRaises(ValueError):
+                ledger.record(contract, run_two, ev_two, now=NOW + 2, previous=bad_prev)
+            ledger.close()
 
 
 class UpstreamCharacterizationTests(unittest.TestCase):
