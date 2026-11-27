@@ -1459,4 +1459,6 @@
     <string name="nm_hands_wireless_notify_problem">Nasıl devam edeceğinizi görmek için nanoMuse uygulamasına dönün.</string>
     <string name="nm_hands_wireless_repair">Yeniden eşle</string>
     <string name="nm_hands_wireless_repair_sub">Android eşlenen cihazları temizlediyse veya yetki sona erdiyse yeniden eşleyin</string>
+    <string name="nm_codex_catalogue_fallback">Codex model listesi yenilenemedi. Kayıtlı veya yerleşik modeller gösteriliyor.</string>
+    <string name="nm_chat_setup_failed">Mesaj hazırlanamadı. Sohbetin hâlâ var olduğunu ve cihazda boş alan bulunduğunu kontrol edin.</string>
 </resources>

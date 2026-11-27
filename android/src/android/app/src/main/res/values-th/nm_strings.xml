@@ -1455,4 +1455,6 @@
     <string name="nm_hands_wireless_notify_problem">กลับไปที่ nanoMuse เพื่อดูวิธีดำเนินการต่อ</string>
     <string name="nm_hands_wireless_repair">จับคู่ใหม่</string>
     <string name="nm_hands_wireless_repair_sub">จับคู่ใหม่อีกครั้งหากระบบล้างรายการอุปกรณ์ที่จับคู่หรือสิทธิ์หมดอายุ</string>
+    <string name="nm_codex_catalogue_fallback">รีเฟรชรายการโมเดล Codex ไม่สำเร็จ กำลังแสดงโมเดลที่บันทึกไว้หรือโมเดลในตัว</string>
+    <string name="nm_chat_setup_failed">ไม่สามารถเตรียมข้อความได้ ตรวจสอบว่ายังมีการสนทนานี้อยู่และอุปกรณ์มีพื้นที่ว่าง</string>
 </resources>

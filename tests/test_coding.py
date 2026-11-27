@@ -276,6 +276,27 @@ def coding_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 # ----------------------------------------------------------------------------- reading
+def test_legacy_dsh_session_list_and_transcript(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NANOMUSE_CODING_HOME", str(tmp_path))
+    sid = "session-legacy"
+    path = tmp_path / ".dsh" / "sessions" / "project" / sid / "session.jsonl"
+    _jsonl(
+        path,
+        [
+            {"type": "session", "id": sid},
+            {"type": "session/title", "data": {"title": "Earlier work"}},
+            {"type": "user/message", "data": {"source": {"kind": "user"}, "content": "Question"}},
+            {"type": "assistant/message", "data": {"message": {"content": "Answer"}}},
+        ],
+    )
+    assert [session.title for session in agents.sessions("dsh", limit=10)] == ["Earlier work"]
+    detail = agents.read_session("dsh", sid)
+    assert detail is not None
+    assert [message["text"] for message in detail.transcript] == ["Question", "Answer"]
+
+
 def test_sessions_are_read_from_each_agents_store(coding_home: Path, tmp_path: Path) -> None:
     ws = str(tmp_path / "proj" / "app")
     rows = agents.sessions(limit=10)

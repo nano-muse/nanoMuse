@@ -1459,4 +1459,6 @@
     <string name="nm_hands_wireless_notify_problem">Kehre zu nanoMuse zurück, um das Problem zu beheben.</string>
     <string name="nm_hands_wireless_repair">Neu koppeln</string>
     <string name="nm_hands_wireless_repair_sub">Erneut koppeln, wenn Android gekoppelte Geräte gelöscht hat oder die Berechtigung abgelaufen ist</string>
+    <string name="nm_codex_catalogue_fallback">Die Codex-Modellliste konnte nicht aktualisiert werden. Gespeicherte oder integrierte Modelle werden angezeigt.</string>
+    <string name="nm_chat_setup_failed">Die Nachricht konnte nicht vorbereitet werden. Prüfe, ob die Unterhaltung noch existiert und auf dem Gerät Speicherplatz frei ist.</string>
 </resources>

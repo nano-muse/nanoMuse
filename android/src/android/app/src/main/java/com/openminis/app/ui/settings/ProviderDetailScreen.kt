@@ -554,6 +554,8 @@ fun ProviderDetailScreen(
         SettingsSection(
             header = stringResource(R.string.provider_detail_models_count_header, entries.size),
         ) {
+            // nanoMuse: distinguish the last live account menu or local fallback from a fresh listing.
+            io.github.nanomuse.ui.models.CodexCatalogueNotice(instance, providerRepository.codexCatalogues, Modifier.padding(horizontal = 16.dp))
             // Refresh action sits as the first row, mirroring the iOS
             // tap-to-refresh affordance in the section header area.
             SettingsRow(

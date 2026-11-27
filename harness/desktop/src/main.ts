@@ -17,7 +17,7 @@ import { editContextMenu, installWindowPermissions } from "./window-permissions"
 import { readPrivateJson, writePrivateJson } from "./private-json";
 import { BUNDLE, ensureProfile, PROFILE } from "./profile";
 import { maskProxyUrl, proxyEnv, trustedRelayHosts, validProxyUrl } from "./proxy";
-import { HostStartWatch, maskToken, waitedText, type WaitState } from "./host-start";
+import { HostStartWatch, maskToken, shouldRestartHost, waitedText, type WaitState } from "./host-start";
 import { chooseHostPort } from "./host-port";
 import { closedDuringLoad } from "./load-close";
 import { rotateLogIfNeeded } from "./log-rotate";
@@ -120,7 +120,7 @@ let mainWindow: BrowserWindow | null = null;
 let hostUrl: string | null = null;
 let quitting = false;
 let sessionEnding = false;
-let restarts = 0;
+let hostRetried = false;
 /** The proxy the running Host was started with ("" for none): the Network row offers a restart while it differs from the setting. */
 let hostProxy = "";
 
@@ -326,7 +326,7 @@ function startHost(): Promise<string> {
           onCap: (state) => void askKeepWaiting(watch, state),
         });
         startWatch = watch;
-        let ready = false;
+        let readyAt: number | undefined;
         proc.stdout?.setEncoding("utf8");
         proc.stdout?.on("data", (chunk: string) => {
           watch.stdout(chunk);
@@ -348,12 +348,14 @@ function startHost(): Promise<string> {
           glibCriticals = 0;
           child = null;
           watch.exited(code, signal);
-          if (ready && !quitting && !restartingHost) void hostStopped();
+          if (readyAt !== undefined && !quitting && !restartingHost) {
+            void hostStopped(shouldRestartHost(hostRetried, performance.now() - readyAt));
+          }
         });
         void watch.done.then((outcome) => {
           if (startWatch === watch) startWatch = null;
           if (outcome.kind === "ready") {
-            ready = true;
+            readyAt = performance.now();
             const waited = watch.state().waitedMs;
             if (waited > 30_000) log(`host: ready after ${waitedText(waited, false)}`);
             resolve(outcome.url);
@@ -470,7 +472,7 @@ async function restartHost(): Promise<void> {
     log("host: restarting at the person's request");
     try {
       await stopHost();
-      restarts = 0;
+      hostRetried = false;
       await boot();
     } catch (exc) {
       log(`restart failed: ${String(exc)}`);
@@ -603,10 +605,10 @@ async function reportStartupFailure(exc: unknown): Promise<void> {
 }
 
 /** The Host died under a running window: offer a restart (once by itself, then by hand). */
-async function hostStopped(): Promise<void> {
+async function hostStopped(tryRestart: boolean): Promise<void> {
   if (quitting) return;
-  if (restarts === 0) {
-    restarts += 1;
+  if (tryRestart) {
+    hostRetried = true;
     log("host stopped; starting it again");
     try {
       await boot();
@@ -626,7 +628,7 @@ async function hostStopped(): Promise<void> {
     noLink: true,
   });
   if (response === 0) {
-    restarts = 0;
+    hostRetried = false;
     try {
       await boot();
     } catch (exc) {
@@ -635,7 +637,7 @@ async function hostStopped(): Promise<void> {
     }
   } else if (response === 1) {
     clipboard.writeText(details(T.stopped));
-    void hostStopped();
+    void hostStopped(false);
   } else {
     app.quit();
   }

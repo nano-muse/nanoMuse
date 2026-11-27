@@ -32,7 +32,7 @@ nanoMuse 不会向这些助手安装插件，也不会把它们的模型请求�
 | Cursor | `~/.cursor/projects/<workspace-slug>/agent-transcripts/<id>/<id>.jsonl`；CLI 聊天另有 `~/.cursor/chats/<hash>/<id>/meta.json`，其中记录 `cwd`（工作目录） | `cursor-agent -p --output-format stream-json --stream-partial-output --force [--resume <id>] [--workspace <dir>] "<text>"` |
 | Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl` | `codex exec [resume <id>] --json --skip-git-repo-check -c sandbox_mode="workspace-write" [-C <dir>] "<text>"` |
 | Claude Code | `~/.claude/projects/<workspace-slug>/<id>.jsonl` | `claude -p --output-format stream-json --verbose --permission-mode acceptEdits [--resume <id>] "<text>"` |
-| dsh（DeepSeek Harness） | `~/.dsh/sessions/<workspace-slug>/<id>/session.v4.jsonl.zstd` | `dsh --profile headless --json [--session-id <id>] "<text>"` |
+| dsh（DeepSeek Harness） | `~/.dsh/sessions/<workspace-slug>/<id>/session.v4.jsonl.zstd`，旧版会话读取同目录的纯文本 `session.jsonl` | `dsh --profile headless --json [--session-id <id>] "<text>"` |
 
 读取记录时，无法解析的行会跳过，目录不存在则视为该助手没有会话。`~` 通常指用户主目录；如果设置了 `NANOMUSE_CODING_HOME`，则改用它指定的目录。这适用于将宿主机 CLI 目录挂载到其他位置的容器，也用于测试。
 

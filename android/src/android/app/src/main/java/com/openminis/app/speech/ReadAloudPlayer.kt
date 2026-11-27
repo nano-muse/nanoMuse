@@ -61,7 +61,8 @@ import kotlin.coroutines.resume
  *
  * Not thread-safe beyond the channel; call from the main thread.
  */
-class ReadAloudPlayer(context: Context) {
+// nanoMuse: selection playback and automatic replies have separate enable policies.
+class ReadAloudPlayer(context: Context, private val manualSelection: Boolean = false) {
 
     private val appContext = context.applicationContext
     private val system = TextToSpeechManager().also { it.init(appContext) }
@@ -213,7 +214,8 @@ class ReadAloudPlayer(context: Context) {
         // isEnabled && !isMuted` gates production. Dropping here rather than at
         // playback keeps a long mute from piling up a backlog that would all
         // blurt out on un-mute.
-        if (!VoiceOutputState.canPlay) return
+        // nanoMuse: keep the same selection/reply policy when resuming after capture.
+        if (!VoiceOutputState.permitsPlayback(manualSelection)) return
         // [T-android-tts-scope-align] Mic-capture suppression, from iOS
         // canSpeakNow (feedDynamicTTS logs "DROP — read-replies off
         // (capturing)"): while the VAD/recognizer is actively capturing,

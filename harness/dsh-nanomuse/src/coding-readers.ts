@@ -962,7 +962,7 @@ function dshContentText(content: unknown): string {
 }
 
 async function dshSession(file: string, full: boolean): Promise<CodingSession | undefined> {
-  const lines = await readZstdLines(file)
+  const lines = basename(file) === 'session.jsonl' ? await readLines(file) : await readZstdLines(file)
   const st = await statOf(file)
   if (!st) return undefined
   const dirId = basename(resolve(file, '..'))
@@ -1046,9 +1046,14 @@ async function dshSessions(limit: number, workspace: string | undefined, env: No
       // a session directory holds session.v4.jsonl.zstd; older stores may keep session.jsonl
       const sdir = join(pdir, name)
       if (!(await isDir(sdir))) continue
-      const f = join(sdir, DSH_SESSION_FILE)
-      const st = (await statOf(f)) ?? (await statOf(join(sdir, 'session.jsonl')))
-      if (st) files.push([st.mtime, (await statOf(f)) ? f : join(sdir, 'session.jsonl')])
+      for (const filename of [DSH_SESSION_FILE, 'session.jsonl']) {
+        const file = join(sdir, filename)
+        const st = await statOf(file)
+        if (st) {
+          files.push([st.mtime, file])
+          break
+        }
+      }
     }
   }
   files.sort((a, b) => b[0] - a[0])
