@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 const helper = fileURLToPath(new URL("../mac/computer-use/", import.meta.url));
 
 test("mouse releases survive failures, restarts and shutdown during gestures", (t) => {
+  if (process.platform === "win32") return t.skip("The helper uses POSIX file locks");
   const available = spawnSync("swiftc", ["--version"]);
   if (available.error?.code === "ENOENT" && process.platform !== "darwin") {
     return t.skip("Swift compiler unavailable");
