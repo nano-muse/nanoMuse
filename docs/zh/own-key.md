@@ -48,6 +48,7 @@ Android、iPhone 和桌面版都在 设置 → 模型 配置；网页控制台�
 | TrustedRouter | ● | | | | 海外 | [trustedrouter.com](https://trustedrouter.com/console/api-keys) |
 
 | Synap | ● | | | | 海外 | [synap402.com](https://synap402.com/account.html#keys) |
+| LLMTR | ● | | | | 海外 | [llmtr.com](https://llmtr.com/dashboard/keys) |
 | Ollama / LM Studio / vLLM（本机） | ● | | | | 都可以 | 不需要 key |
 
 视频一栏只有百炼，是因为 nanoMuse 当前接入的是百炼视频 API（程序调用服务的接口）。其他厂商的视频模型使用各自的任务接口，本轮尚未接入。图片方面，OpenRouter 使用 Image API，例如 `openai/gpt-image-2`；Gemini 使用 `gemini-2.5-flash-image`。
@@ -81,6 +82,7 @@ Android、iPhone 和桌面版都在 设置 → 模型 配置；网页控制台�
 - **TrustedRouter**。 从 [trustedrouter.com/console/api-keys](https://trustedrouter.com/console/api-keys) 获取 key，按量计费，一把 key 访问多家模型厂商（[文档](https://trustedrouter.com/docs)）。地址为 `https://api.trustedrouter.com/v1`。模型 id 带厂商名，以 `https://api.trustedrouter.com/v1/models` 为准（公开，不需要 key），默认是 `deepseek/deepseek-v4-flash`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
 
 - **Synap**。 从 [synap402.com/account.html#keys](https://synap402.com/account.html#keys) 获取 key，按量计费，提供开放权重模型（Qwen3 Coder、Qwen3.5、GLM、DeepSeek V4、gpt-oss、Gemma 等），按 token 计的价格见公开的 `https://synap402.com/v1/models` 列表（[当前价格](https://synap402.com/pricing.html)）。地址为 `https://synap402.com/v1`。默认模型是 `qwen3-coder-30b`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
+- **LLMTR**。 从 [llmtr.com/dashboard/keys](https://llmtr.com/dashboard/keys) 获取 key，预付费，一把 key 访问多家模型厂商。地址为 `https://llmtr.com/v1`。模型 id 带厂商名，以 `https://llmtr.com/v1/models` 为准（公开，不需要 key），默认是 `qwen/qwen3.8-flash`，也可选列表内其他 id。此处只通过 OpenAI 格式提供对话。
 
 **将 key 填入 nanoMuse**。
 
