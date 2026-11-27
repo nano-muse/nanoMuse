@@ -195,7 +195,7 @@ class MacAdapter(Protocol):
         ...
 
     def post_scroll(self, pid: int, x: float, y: float, dy: float, dx: float = 0.0) -> None: ...
-    def ax_press(self, x: float, y: float) -> bool:
+    def ax_press(self, pid: int, x: float, y: float) -> bool:
         """Press the accessible element under the point; False when there is none or
         Accessibility is not granted."""
         ...
@@ -378,10 +378,21 @@ class MacWindowHands:
     def _frame(self) -> WindowFrame:
         if self.frame is None:
             raise WindowUnavailable("no window has been looked at yet (call look first)")
+        if not self.adapter.trusted():
+            raise WindowUnavailable(
+                "macOS has not granted the process controlling this window permission to send "
+                "input. Check Accessibility for nanoMuse Desktop (or the terminal that started "
+                "the runtime), then take a fresh look before trying again."
+            )
+        if self.frame.window not in self.adapter.windows():
+            raise WindowUnavailable(
+                "The selected window changed or closed after the last screenshot. "
+                "Look at the window again before sending input."
+            )
         return self.frame
 
-    def _point(self, x: float, y: float) -> tuple[float, float]:
-        frame = self._frame()
+    @staticmethod
+    def _point(frame: WindowFrame, x: float, y: float) -> tuple[float, float]:
         if not frame.contains(x, y):
             raise WindowUnavailable(
                 f"({x:g},{y:g}) is outside the {frame.image_width}×{frame.image_height} window picture"
@@ -391,11 +402,11 @@ class MacWindowHands:
     # ------------------------------------------------------------------ the verbs
     def click(self, x: float, y: float, button: str = "left", clicks: int = 1) -> None:
         frame = self._frame()
-        sx, sy = self._point(x, y)
+        sx, sy = self._point(frame, x, y)
         self.last_point = (sx, sy)
         if button == "left" and clicks == 1 and self.use_ax:
             try:
-                if self.adapter.ax_press(sx, sy):
+                if self.adapter.ax_press(frame.window.pid, sx, sy):
                     self.notes.append("pressed through accessibility")
                     return
             except Exception as exc:  # noqa: BLE001 — AX is a shortcut, never a stop
@@ -407,20 +418,20 @@ class MacWindowHands:
 
     def move(self, x: float, y: float) -> None:
         frame = self._frame()
-        sx, sy = self._point(x, y)
+        sx, sy = self._point(frame, x, y)
         self.last_point = (sx, sy)
         self._post_mouse(frame.window.pid, mouse_sequence("move", sx, sy))
 
     def drag(self, x: float, y: float, x2: float, y2: float) -> None:
         frame = self._frame()
-        sx, sy = self._point(x, y)
-        ex, ey = self._point(x2, y2)
+        sx, sy = self._point(frame, x, y)
+        ex, ey = self._point(frame, x2, y2)
         self.last_point = (ex, ey)
         self._post_mouse(frame.window.pid, mouse_sequence("drag", sx, sy, ex, ey))
 
     def scroll(self, x: float, y: float, dy: float) -> None:
         frame = self._frame()
-        sx, sy = self._point(x, y)
+        sx, sy = self._point(frame, x, y)
         self.last_point = (sx, sy)
         # the dialect counts pixels, positive = down; a scroll wheel event counts pixels
         # too, with positive = up (the content moves down)
@@ -616,7 +627,7 @@ class QuartzAdapter:
         q.CGEventSetLocation(ev, (x, y))
         q.CGEventPostToPid(pid, ev)
 
-    def ax_press(self, x: float, y: float) -> bool:
+    def ax_press(self, pid: int, x: float, y: float) -> bool:
         try:
             import ApplicationServices as ax  # type: ignore[import-not-found]
         except ImportError:
@@ -627,6 +638,9 @@ class QuartzAdapter:
         err, element = ax.AXUIElementCopyElementAtPosition(system, x, y, None)
         if err != 0 or element is None:
             return False
+        err, owner = ax.AXUIElementGetPid(element, None)
+        if err != 0 or owner != pid:
+            return False
         err, actions = ax.AXUIElementCopyActionNames(element, None)
         if err != 0 or not actions or "AXPress" not in list(actions):
             return False
@@ -636,7 +650,7 @@ class QuartzAdapter:
         try:
             import ApplicationServices as ax  # type: ignore[import-not-found]
 
-            return bool(ax.AXIsProcessTrusted())
+            return bool(ax.AXIsProcessTrusted() and self.q.CGPreflightPostEventAccess())
         except Exception:  # noqa: BLE001
             return False
 
@@ -712,8 +726,8 @@ class OperatorWindowAdapter:
     def post_scroll(self, pid: int, x: float, y: float, dy: float, dx: float = 0.0) -> None:
         self.events.post_scroll(pid, x, y, dy, dx)
 
-    def ax_press(self, x: float, y: float) -> bool:
-        return self.events.ax_press(x, y)
+    def ax_press(self, pid: int, x: float, y: float) -> bool:
+        return self.events.ax_press(pid, x, y)
 
     def trusted(self) -> bool:
         return self.events.trusted()

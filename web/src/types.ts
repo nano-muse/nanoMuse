@@ -1143,6 +1143,7 @@ export interface ConnectionsData {
       | "you"
       | "parallel"
       | "keenable"
+      | "specstream"
       | "searxng";
     /** SearXNG instance */
     base_url: string;

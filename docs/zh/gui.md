@@ -270,7 +270,7 @@ macOS 将权限归给 LaunchServices 启动的进程。辅助 App 通过 `open` 
 
 **macOS 窗口模式**也使用同一辅助 App，见 [every-device.md](every-device.md#window-mode-macos)。运行时调用 `GET /windows` 获取窗口 ID、进程、应用、bundle ID、标题和以点计的位置尺寸；调用 `POST /window {id}` 获取该窗口独立像素，使用 `SCContentFilter(desktopIndependentWindow:)`，不含阴影或光标，并返回窗口位置，使图片像素能映射到屏幕点。
 
-在桌面 App 下，Mac 运行时不自行截取窗口；窗口模式的鼠标键盘事件仍由运行时通过 `CGEventPostToPid` 发往目标进程，因此辅助功能中还需要「nanoMuse」条目授权。辅助 App 没有录屏权限时返回 `403`，窗口消失时返回 `404`，原因原样传回，下次观察再试。辅助 App 完全不存在时，对该目标使用全屏并在观察中说明。未打包辅助 App 的构建则保留运行时的 `CGWindowListCreateImage` 路径，并记录 `window mode: the runtime captures windows itself …`。
+在桌面 App 下，Mac 运行时不自行截取窗口；窗口模式的鼠标键盘事件仍由运行时通过 `CGEventPostToPid` 发往目标进程，因此辅助功能中还需要「nanoMuse」条目授权。辅助 App 没有录屏权限时返回 `403`，窗口消失时返回 `404`，原因原样传回，下次观察再试。辅助 App 不可用时，观察结果可能会显示整个屏幕和原因。输入暂停，直到目标窗口恢复或清除目标。发送输入的进程会先检查辅助功能和事件发送权限。未打包辅助 App 的构建则保留运行时的 `CGWindowListCreateImage` 路径，并记录 `window mode: the runtime captures windows itself …`。
 
 Linux 操作器仅支持 **X11（Xorg）**。实际坐标是 X 根窗口像素；HiDPI 下为逻辑尺寸乘缩放系数，例如 1920×1080、缩放 2 对应 3840×2160。`/info` 会说明，截图再按前述规则缩放给模型。
 

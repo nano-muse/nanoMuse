@@ -12,6 +12,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Added SpecStream as an optional web search provider with a user-supplied key. Switching providers clears the previous credential, and DuckDuckGo remains the default.
 - Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
 - Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
 
@@ -19,6 +20,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.
 - Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
 - Fixed recovery from interrupted Mac clicks and drags, including failed mouse releases and shutdown during a gesture. For #960.
 
