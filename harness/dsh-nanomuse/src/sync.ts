@@ -165,13 +165,13 @@ export class SyncRelay {
   }
 
   async state(apiKey: string): Promise<SyncRelayState> {
-    const res = await this.fetchImpl(`${this.origin}/v1/sync/state`, { headers: this.auth(apiKey) })
+    const res = await this.fetchImpl(`${this.origin}/v1/sync/state`, { operation: 'SyncRelay.state', headers: this.auth(apiKey) })
     if (!res.ok) await fail(res)
     return toState(await res.json())
   }
 
   async setEnabled(apiKey: string, enabled: boolean): Promise<SyncRelayState> {
-    const res = await this.fetchImpl(`${this.origin}/v1/sync/state`, { method: 'PUT', headers: { ...this.auth(apiKey), ...JSON_HEADERS }, body: JSON.stringify({ enabled }) })
+    const res = await this.fetchImpl(`${this.origin}/v1/sync/state`, { operation: 'SyncRelay.setEnabled', method: 'PUT', headers: { ...this.auth(apiKey), ...JSON_HEADERS }, body: JSON.stringify({ enabled }) })
     if (!res.ok) await fail(res)
     return toState(await res.json())
   }
@@ -182,7 +182,7 @@ export class SyncRelay {
    */
   async changes(apiKey: string, since: number, limit = PAGE, scope: 'all' | 'main' = 'all', tail = 0): Promise<SyncChanges> {
     const query = `since=${since}&limit=${limit}${scope === 'main' ? '&scope=main' : ''}${tail > 0 && since === 0 ? `&tail=${tail}` : ''}`
-    const res = await this.fetchImpl(`${this.origin}/v1/sync/changes?${query}`, { headers: this.auth(apiKey) })
+    const res = await this.fetchImpl(`${this.origin}/v1/sync/changes?${query}`, { operation: 'SyncRelay.changes', headers: this.auth(apiKey) })
     if (!res.ok) await fail(res)
     const body = (await res.json()) as Record<string, unknown>
     return {
@@ -205,6 +205,7 @@ export class SyncRelay {
       body.detail = step.detail.slice(0, DETAIL_CAP)
     }
     const res = await this.fetchImpl(`${this.origin}/v1/sync/working`, {
+      operation: 'SyncRelay.working',
       method: 'POST',
       headers: { ...this.auth(apiKey), ...JSON_HEADERS },
       body: JSON.stringify(body),
@@ -214,6 +215,7 @@ export class SyncRelay {
 
   async push(apiKey: string, device: string, conversations: Record<string, unknown>[], messages: Record<string, unknown>[]): Promise<PushResult> {
     const res = await this.fetchImpl(`${this.origin}/v1/sync/changes`, {
+      operation: 'SyncRelay.push',
       method: 'POST',
       headers: { ...this.auth(apiKey), ...JSON_HEADERS },
       body: JSON.stringify({ device, conversations, messages }),
@@ -228,13 +230,13 @@ export class SyncRelay {
   }
 
   async deleteConversation(apiKey: string, cid: string, device: string): Promise<void> {
-    const res = await this.fetchImpl(`${this.origin}/v1/sync/conversations/${encodeURIComponent(cid)}`, { method: 'DELETE', headers: { ...this.auth(apiKey), 'x-nanomuse-device': device } })
+    const res = await this.fetchImpl(`${this.origin}/v1/sync/conversations/${encodeURIComponent(cid)}`, { operation: 'SyncRelay.deleteConversation', method: 'DELETE', headers: { ...this.auth(apiKey), 'x-nanomuse-device': device } })
     if (!res.ok && res.status !== 404) await fail(res)
   }
 
   /** "Delete synced conversations": the store emptied, the switch kept. */
   async wipe(apiKey: string): Promise<SyncRelayState> {
-    const res = await this.fetchImpl(`${this.origin}/v1/sync/changes`, { method: 'DELETE', headers: this.auth(apiKey) })
+    const res = await this.fetchImpl(`${this.origin}/v1/sync/changes`, { operation: 'SyncRelay.wipe', method: 'DELETE', headers: this.auth(apiKey) })
     if (!res.ok) await fail(res)
     return toState(await res.json())
   }

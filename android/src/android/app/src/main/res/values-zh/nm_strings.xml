@@ -1432,4 +1432,6 @@
     <string name="nm_hands_wireless_notify_problem">请回到 nanoMuse 查看如何处理。</string>
     <string name="nm_hands_wireless_repair">重新配对</string>
     <string name="nm_hands_wireless_repair_sub">如果系统清除了已配对设备或授权失效，可重新配对一次</string>
+    <string name="nm_codex_catalogue_fallback">未能刷新 Codex 模型列表，当前显示已保存或内置的模型。</string>
+    <string name="nm_chat_setup_failed">未能准备这条消息。请检查对话是否仍然存在，以及设备是否有可用存储空间。</string>
 </resources>

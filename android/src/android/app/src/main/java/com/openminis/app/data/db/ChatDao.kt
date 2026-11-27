@@ -183,6 +183,16 @@ interface ChatDao {
         read()
     }
 
+    // nanoMuse: a failed append must leave no row that a retry could send twice.
+    @Transaction
+    suspend fun appendWithPreview(message: MessageEntity, preview: String?): MessageEntity {
+        val ordered = message.copy(sortOrder = nextSortOrder(message.sessionId))
+        insertMessage(ordered)
+        if (preview == null) touchSession(ordered.sessionId, ordered.createdAt)
+        else updateLastMessage(ordered.sessionId, preview, ordered.createdAt)
+        return ordered
+    }
+
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     suspend fun loadMessages(sessionId: String): List<MessageEntity>
 

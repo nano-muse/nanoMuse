@@ -12,11 +12,22 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Added SpecStream as an optional web search provider with a user-supplied key. Switching providers clears the previous credential, and DuckDuckGo remains the default.
+- Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
+- Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
+
 ### Web
 
 ### Desktop
 
+- Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
+
 ### Android
+
+- Fixed a crash when a chat message could not be saved during send setup, and kept the unsent draft available.
+- Added a selectable, copyable details view for chat errors and preserved longer Gemini diagnostics.
+- Fixed manual Read aloud when automatic reply narration was off.
+- Updated the Codex OAuth catalogue and its GPT-6.2 fallback, identified saved or built-in menus after a failed refresh, and added the Codex image tool variants GPT Image 2.5 Sunburst and Flare.
 
 ### iOS
 

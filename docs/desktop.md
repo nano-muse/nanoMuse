@@ -40,6 +40,8 @@ Levea is listed under **Design** in Connectors. Connect with its OAuth sign-in t
 
 On Linux and macOS, **Settings → General → About** shows the installed version and the latest published release. A local test build can be newer than the published release.
 
+If the desktop host exits after startup, the app tries to restart it once. After ten minutes of running, the host can restart automatically again. Two exits in quick succession open the recovery dialog. Timeout errors from sync, account and model refresh requests include the operation name and wait time.
+
 ## Following public sources
 
 In Feed settings, *Public sources* lists accounts, projects, researchers, topics and websites nanoMuse can check for you. For example, mentioning a repository you maintain can start a watch for issues there. Repeated references can suggest a source for confirmation. A site can advertise its own RSS or Atom feed. You can follow, pause or dismiss individual sources. The first read establishes a baseline. With desktop running, daily preparation and chat check-ins enabled, a relevant new item can start a conversation in your main chat. Read the [source coverage](app.md#following-public-sources-over-time) for the research identifiers, polling intervals and limits.

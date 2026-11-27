@@ -1455,4 +1455,6 @@
     <string name="nm_hands_wireless_notify_problem">nanoMuse に戻って対処方法を確認してください。</string>
     <string name="nm_hands_wireless_repair">再ペア設定</string>
     <string name="nm_hands_wireless_repair_sub">端末側でペア設定が削除された場合や認証が切れた場合にやり直します</string>
+    <string name="nm_codex_catalogue_fallback">Codex のモデル一覧を更新できませんでした。保存済みまたは内蔵のモデルを表示しています。</string>
+    <string name="nm_chat_setup_failed">メッセージを準備できませんでした。会話がまだ存在し、端末に空き容量があるか確認してください。</string>
 </resources>

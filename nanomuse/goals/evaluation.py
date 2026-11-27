@@ -49,6 +49,7 @@ class Criterion:
     collectors: tuple[str, ...]
     max_age: int = 3600
     invariant: bool = False
+    tier: int = 2
 
 
 @dataclass(frozen=True)
@@ -81,10 +82,26 @@ class Contract:
                 or type(c.invariant) is not bool
             ):
                 raise ValueError("criterion needs identity, source and positive freshness")
+            if type(c.tier) is not int or c.tier not in (1, 2):
+                raise ValueError("criterion tier must be 1 or 2")
             if c.op not in ("eq", "gte") or not _scalar(c.target):
                 raise ValueError("unsupported predicate or target")
             if c.op == "gte" and type(c.target) not in (int, float):
                 raise ValueError("gte requires a finite numeric target")
+
+
+def _contract_dict(contract: Contract) -> dict[str, Any]:
+    raw = asdict(contract)
+    criteria_list = []
+    for c, c_dict in zip(contract.criteria, raw["criteria"], strict=True):
+        cd = dict(c_dict)
+        if type(c.tier) is int and c.tier == 2:
+            cd.pop("tier", None)
+        else:
+            cd["tier"] = c.tier
+        criteria_list.append(cd)
+    raw["criteria"] = tuple(criteria_list)
+    return raw
 
 
 @dataclass(frozen=True)
@@ -245,7 +262,21 @@ def validate_result(result: dict[str, Any]) -> None:
             raise ValueError("invalid evaluation binding")
         if any(states.get(k) != "not_met" for k in result["lost"] + result["violated"]):
             raise ValueError("invalid regression or violation")
-        contradicted = bool(result["lost"] or result["violated"] or "conflict" in states.values())
+        tier1_failed = result.get("tier1_failed", [])
+        if "tier1_failed" in result:
+            if (
+                type(result["tier1_failed"]) is not list
+                or not tier1_failed
+                or tier1_failed != sorted(set(tier1_failed))
+                or not all(_identity(k) for k in tier1_failed)
+                or any(states.get(k) != "not_met" for k in tier1_failed)
+                or bool(set(tier1_failed).intersection(result["violated"]))
+                or bool(set(tier1_failed).intersection(result["lost"]))
+            ):
+                raise ValueError("invalid tier-1 failure references")
+        contradicted = bool(
+            result["lost"] or result["violated"] or tier1_failed or "conflict" in states.values()
+        )
         expected = (
             "contradicted"
             if contradicted
@@ -273,6 +304,48 @@ def validate_result(result: dict[str, Any]) -> None:
         raise ValueError("invalid evaluation schema") from exc
 
 
+def _validate_result_for_contract(
+    contract: Contract,
+    result: dict[str, Any],
+) -> None:
+    if set(result["criteria"]) != {c.id for c in contract.criteria}:
+        raise ValueError("baseline criteria mismatch")
+    if result["goal_id"] != contract.goal_id or result["revision"] != contract.revision:
+        raise ValueError("baseline goal binding mismatch")
+    for invariant, prefix in ((False, "outcome"), (True, "constraint")):
+        partition = [c.id for c in contract.criteria if c.invariant == invariant]
+        if result[f"{prefix}_required"] != len(partition) or result[f"{prefix}_met"] != sorted(
+            cid for cid in partition if result["criteria"][cid] == "met"
+        ):
+            raise ValueError("baseline outcome/constraint partition mismatch")
+    criteria_by_id = {c.id: c for c in contract.criteria}
+    for criterion in contract.criteria:
+        if criterion.id in result["observed_values"]:
+            matched = _matches(criterion, result["observed_values"][criterion.id])
+            if matched is None or matched != (result["criteria"][criterion.id] == "met"):
+                raise ValueError("baseline observed value does not match its criterion state")
+    if (
+        any(not criteria_by_id[cid].invariant for cid in result["lost"])
+        and result["progress"] != "regressed"
+    ):
+        raise ValueError("baseline lost outcome requires regressed progress")
+    expected_violated = [
+        c.id for c in contract.criteria if c.invariant and result["criteria"][c.id] == "not_met"
+    ]
+    if result["violated"] != expected_violated:
+        raise ValueError("baseline constraint violation mismatch")
+    expected_tier1 = sorted(
+        c.id
+        for c in contract.criteria
+        if c.tier == 1
+        and not c.invariant
+        and c.id not in result["lost"]
+        and result["criteria"][c.id] == "not_met"
+    )
+    if result.get("tier1_failed", []) != expected_tier1:
+        raise ValueError("baseline tier-1 failure mismatch")
+
+
 def evaluate(
     contract: Contract,
     run: Run,
@@ -291,26 +364,12 @@ def evaluate(
         raise ValueError("invalid run")
     if not _integer(now):
         raise ValueError("clock must be nonnegative integer seconds")
-    contract_hash = fingerprint(asdict(contract))
+    contract_hash = fingerprint(_contract_dict(contract))
     if previous is not None:
         validate_result(previous)
         if previous["contract_hash"] != contract_hash or previous["at"] > now:
             raise ValueError("baseline must be earlier and from the identical contract")
-        if set(previous["criteria"]) != {c.id for c in contract.criteria}:
-            raise ValueError("baseline criteria mismatch")
-        if previous["goal_id"] != contract.goal_id or previous["revision"] != contract.revision:
-            raise ValueError("baseline goal binding mismatch")
-        for invariant, prefix in ((False, "outcome"), (True, "constraint")):
-            partition = [c.id for c in contract.criteria if c.invariant == invariant]
-            if previous[f"{prefix}_required"] != len(partition) or previous[
-                f"{prefix}_met"
-            ] != sorted(cid for cid in partition if previous["criteria"][cid] == "met"):
-                raise ValueError("baseline outcome/constraint partition mismatch")
-        for criterion in contract.criteria:
-            if criterion.id in previous["observed_values"]:
-                matched = _matches(criterion, previous["observed_values"][criterion.id])
-                if matched is None or matched != (previous["criteria"][criterion.id] == "met"):
-                    raise ValueError("baseline observed value does not match its criterion state")
+        _validate_result_for_contract(contract, previous)
     # Reject unusable records before collision checks so a different scope/source
     # cannot suppress valid observations by copying their id.
     by_id: dict[str, Evidence] = {}
@@ -386,7 +445,12 @@ def evaluate(
     prior_outcomes = previous["outcome_met"] if previous else []
     lost = sorted(prior_met & {k for k, v in states.items() if v == "not_met"})
     violated = [c.id for c in contract.criteria if c.invariant and states[c.id] == "not_met"]
-    contradicted = bool(lost or violated or "conflict" in states.values())
+    tier1_failed = sorted(
+        c.id
+        for c in contract.criteria
+        if c.tier == 1 and not c.invariant and c.id not in lost and states[c.id] == "not_met"
+    )
+    contradicted = bool(lost or violated or tier1_failed or "conflict" in states.values())
     status: Verdict
     if contradicted:
         status = "contradicted"
@@ -456,6 +520,8 @@ def evaluate(
         "evidence": used,
         "rejected": rejected,
     }
+    if tier1_failed:
+        result["tier1_failed"] = tier1_failed
     result["id"] = fingerprint(result)
     return result
 
@@ -512,16 +578,19 @@ class Ledger:
         now: int,
         previous: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        contract.validate()
+        contract_dict = _contract_dict(contract)
         inputs = canonical(
             {
-                "contract": asdict(contract),
+                "contract": contract_dict,
                 "run": asdict(run),
                 "evidence": [asdict(e) for e in evidence],
                 "now": now,
                 "previous": previous,
             }
         )
-        key = (fingerprint(asdict(contract)), run.id, run.attempt)
+        contract_hash = fingerprint(contract_dict)
+        key = (contract_hash, run.id, run.attempt)
         with self.conn:
             row = self.conn.execute(
                 "SELECT input, result FROM evaluations WHERE contract_hash=? AND run_id=? AND attempt=?",
@@ -530,8 +599,29 @@ class Ledger:
             if row:
                 if row[0] != inputs:
                     raise ValueError("attempt already recorded with different inputs")
+                if previous is not None:
+                    validate_result(previous)
                 saved = json.loads(row[1])
                 validate_result(saved)
+                if (
+                    saved["contract_hash"] != contract_hash
+                    or saved["run_id"] != run.id
+                    or saved["attempt"] != run.attempt
+                    or saved["at"] != now
+                    or saved["run_state"] != run.state
+                ):
+                    raise ValueError("recorded result binding mismatch")
+                _validate_result_for_contract(contract, saved)
+                expected_lost = (
+                    sorted(
+                        set(previous["met"])
+                        & {k for k, v in saved["criteria"].items() if v == "not_met"}
+                    )
+                    if previous is not None
+                    else []
+                )
+                if saved["lost"] != expected_lost:
+                    raise ValueError("recorded regression mismatch")
                 return saved
             result = evaluate(contract, run, evidence, now=now, previous=previous)
             self.conn.execute(

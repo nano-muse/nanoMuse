@@ -113,6 +113,22 @@ async function fixtureHome(home) {
 
 const SESSION_KEYS = ['agent', 'id', 'title', 'workspace', 'path', 'created_at', 'updated_at', 'messages', 'status', 'last_user', 'last_assistant', 'source', 'resumable']
 
+test('dsh lists legacy plain JSONL sessions and opens their transcript', async () => {
+  await scratch(async (home) => {
+    const id = 'session-legacy'
+    const file = join(home, '.dsh', 'sessions', 'project', id, 'session.jsonl')
+    await write(file, [
+      { type: 'session', id },
+      { type: 'session/title', data: { title: 'Earlier work' } },
+      { type: 'user/message', data: { source: { kind: 'user' }, content: 'Question' } },
+      { type: 'assistant/message', data: { message: { content: 'Answer' } } },
+    ])
+    const env = { NANOMUSE_CODING_HOME: home }
+    assert.deepEqual((await sessions('dsh', 10, undefined, env)).map(s => s.title), ['Earlier work'])
+    assert.deepEqual((await readSession('dsh', id, env)).transcript.map(m => m.text), ['Question', 'Answer'])
+  })
+})
+
 test('Codex uses the saved desktop name, then index, then real user message', async () => {
   await scratch(async (home) => {
     const root = join(home, '.codex')

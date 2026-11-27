@@ -115,7 +115,7 @@ hub 自动重连时，设备触发器会保留上次观察到的在线状态。�
 
 **按含义召回**通过兼容 OpenAI 的 `/embeddings` 查找语义相关记忆。选「自动」时，有向量接口就用聊天模型接口，没有则只按关键词；也可明确开启、关闭或指定另一接口。例如 DeepSeek 没有此接口时，可搭配 Ollama `qwen3-embedding:0.6b`。key 名为 `EMBEDDINGS_API_KEY`，模型留空采用接口默认。「测试」先调用一次，成功后立即为全部记忆建立索引，并显示数量。
 
-**网页搜索**支持无需配置但可能受抓取限速影响的 DuckDuckGo；带 key 的 Brave Search、Tavily、Serply；可不带 key 的 You.com，未带时每天 100 次；Parallel，不带 key 免费但限额较低；Keenable，不带 key 每小时 1,000 次；以及指定 URL 的 SearXNG。搜索 key 存为 `SEARCH_API_KEY`。「测试」显示服务商、结果数和耗时，搜索失败时会说明并退回 DuckDuckGo。
+**网页搜索**支持无需配置但可能受抓取限速影响的 DuckDuckGo；带 key 的 Brave Search、Tavily、Serply、SpecStream；可不带 key 的 You.com，未带时每天 100 次；Parallel，不带 key 免费但限额较低；Keenable，不带 key 每小时 1,000 次；以及指定 URL 的 SearXNG。搜索 key 存为 `SEARCH_API_KEY`。「测试」显示服务商、结果数和耗时，搜索失败时会说明并退回 DuckDuckGo。
 
 **邮件**提供常见服务商预设，填写地址、应用专用密码和 IMAP / SMTP 收发服务器，凭据名为 `EMAIL_ADDRESS`、`EMAIL_PASSWORD`。「连接」验证两种协议均能登录，「断开」移除凭据与工具。**日历**可填私密 `.ics` 链接或文件、工作时间并「重新读取」，链接存为 `CALENDAR_<NAME>`。今日日程显示在动态，起草日程通过「加入日历」添加。**联系人**支持 `.vcf` 上传、文件路径或链接，链接存为 `CONTACTS_<NAME>`，可查看数量并搜索；「我的联系人」由智能体根据聊天补充。
 
@@ -261,7 +261,7 @@ Android 和 iPhone 都能自己检查这些公开来源，电脑关机也可以�
 | POST | `/api/connections/endpoints/{id}/models` | 重新请求并保存接口模型。成功返回条目及 `source: "live"`；失败沿用原列表，并返回 `"kept"` 和 `error`。 |
 | PUT | `/api/connections/embeddings` `{mode, model, base_url, api_key}` | 配置语义记忆检索。`mode` 为 auto/on/off；`base_url: ""` 使用聊天模型接口；`model: ""` 使用接口默认；`api_key` 提供时存为 `EMBEDDINGS_API_KEY`，`""` 沿用模型 key，省略不改。立即重建向量化客户端。 |
 | POST | `/api/connections/embeddings/test` | 测试一次向量化调用，成功后为全部记忆索引。返回 `{ok, model, dims, indexed, ms}` 或 `{ok: false, error}`。 |
-| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 设置搜索服务，`provider` 支持 duckduckgo/brave/tavily/serply/you/parallel/keenable/searxng。`api_key` 提供时存为 `SEARCH_API_KEY`，`""` 移除，省略保留；`base_url` 指定 SearXNG 实例。下次搜索生效。 |
+| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 设置搜索服务，`provider` 支持 duckduckgo/brave/tavily/serply/you/parallel/keenable/specstream/searxng。`api_key` 提供时存为 `SEARCH_API_KEY`，`""` 移除，省略时保留同一服务商的 key。切换服务商后需要重新填写对应的 key。`base_url` 指定 SearXNG 实例。下次搜索生效。 |
 | POST | `/api/connections/search/test` | 仅测试当前搜索服务，不启用回退。返回 `{ok, provider, results, first, ms}` 或 `{ok: false, error}`。 |
 | PUT / DELETE | `/api/connections/email` | 保存 `{address, password, imap_host, imap_port, smtp_host, smtp_port, smtp_starttls, enabled}`，地址和密码放入保险库；或断开并移除凭据。 |
 | POST | `/api/connections/email/test` | 分别验证 IMAP 和 SMTP 登录，返回 `{ok, inbox}` 或 `{ok: false, error}`。 |

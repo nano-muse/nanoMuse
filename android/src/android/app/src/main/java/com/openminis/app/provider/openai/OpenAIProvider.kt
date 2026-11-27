@@ -181,7 +181,7 @@ class OpenAIProvider private constructor(
          * identifier could be rejected even when a newer model catalogue
          * advertised the model as available.
          */
-        internal const val CODEX_CLIENT_VERSION = "0.162.1"
+        internal const val CODEX_CLIENT_VERSION = "0.171.0"
 
         /**
          * [T-android-stale-conn-retry-hang] Streaming time-to-first-byte
@@ -401,7 +401,8 @@ class OpenAIProvider private constructor(
      * Only meaningful on the Codex OAuth path; everything else (the GPT-5.x
      * Codex models and their existing OAuth flow) is untouched by this gate.
      */
-    private val isCodexImageModel: Boolean get() = isOAuth && model.id == "gpt-image-2"
+    // nanoMuse: the OAuth catalogue and routing share the supported image-tool IDs.
+    internal val isCodexImageModel: Boolean get() = isOAuth && OpenAIModelsApi.codexImageModels.any { it.id == model.id }
 
     private suspend fun getToken(): String {
         oauthTokenProvider?.let { return it() }
@@ -670,7 +671,7 @@ class OpenAIProvider private constructor(
             // normal Responses tool shape.
             com.openminis.app.logging.AppLogger.info(
                 "OpenAIProvider",
-                "[ModelUseRoute] gpt-image-2 → route=codex-backend " +
+                "[ModelUseRoute] ${model.id} → route=codex-backend " +
                     "url=chatgpt.com/backend-api/codex/responses isOAuth=$isOAuth " +
                     "hasAccountId=${codexAccountId != null}",
             )
@@ -2624,7 +2625,7 @@ class OpenAIProvider private constructor(
      * instruction. The <prompt> is the latest user text — plain string content
      * or the concatenated text parts of the last user message.
      */
-    private fun buildCodexImageBody(messages: List<LLMMessage>): JSONObject {
+    internal fun buildCodexImageBody(messages: List<LLMMessage>): JSONObject { // nanoMuse: covered by catalogue wire tests
         val lastUser = messages.lastOrNull { it.role == LLMMessage.Role.USER }
         val prompt = lastUser?.let { m ->
             m.content.takeIf { it.isNotBlank() }
@@ -2639,7 +2640,11 @@ class OpenAIProvider private constructor(
                 put("content", "Use the image generation tool to create: $prompt")
             }))
             put("store", false)
-            put("tools", JSONArray().put(JSONObject().put("type", "image_generation")))
+            // nanoMuse: the original image tool uses its default. Variants specify the selected image model.
+            put("tools", JSONArray().put(JSONObject().apply {
+                put("type", "image_generation")
+                if (model.id != "gpt-image-2") put("model", model.id)
+            }))
             put("reasoning", JSONObject().put("effort", "low"))
             put("include", JSONArray())
             put("tool_choice", "auto")

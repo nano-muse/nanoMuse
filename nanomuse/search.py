@@ -2,7 +2,7 @@
 
 DuckDuckGo needs no key and is the default, but it is scraped, not served: it rate-limits
 and breaks now and then. When that matters, pick a provider with an API — Brave, Tavily or
-Serply with a key, You.com with or without one (keyless, 100 searches a day), Keenable
+Serply or SpecStream with a key, You.com with or without one (keyless, 100 searches a day), Keenable
 with or without one (keyless, 1,000 searches an hour), Parallel's
 Search MCP with or without one, or a SearXNG instance you run yourself — in ``[connectors.search]`` or from *Connections →
 Web search*. Whatever is picked, a failed search falls back to DuckDuckGo once, with a
@@ -71,6 +71,14 @@ PROVIDERS: dict[str, dict[str, Any]] = {
         "optional_key": True,
         "host": "api.keenable.ai",
         "keys_url": "https://keenable.ai/console",
+    },
+    # SpecStream: the fast tier with page passages, so a result's snippet is the part of its page
+    # that answers the query. A key from specstream.ai/workspace, sent as a Bearer token.
+    "specstream": {
+        "label": "SpecStream",
+        "needs_key": True,
+        "host": "api.specstream.ai",
+        "keys_url": "https://specstream.ai/workspace",
     },
     "searxng": {"label": "SearXNG", "needs_key": False, "host": ""},
 }
@@ -239,6 +247,8 @@ class WebSearchProvider:
             return await self._parallel(query, max_results)
         if self.name == "keenable":
             return await self._keenable(query, max_results)
+        if self.name == "specstream":
+            return await self._specstream(query, max_results, region)
         if self.name == "searxng":
             return await self._searxng(query, max_results, region)
         return await self._ddg(query, max_results, region)
@@ -456,6 +466,59 @@ class WebSearchProvider:
             )
             for r in rows[:max_results]
         ]
+
+    async def _specstream(self, query: str, max_results: int, region: str) -> list[SearchResult]:
+        """SpecStream: ``GET /v1/web-search`` at ``api.specstream.ai`` with a Bearer key, on the
+        fast tier with ``passages=true``. A source's ``highlights`` are the passages of its page
+        closest to the query; they make the snippet, and the page summary stands in without them."""
+        country, lang = _region(region)
+        params: dict[str, Any] = {
+            "q": query,
+            "num": min(max_results, 20),
+            "speed": "fast",
+            "passages": "true",
+        }
+        if country:
+            params["country"] = country
+        if lang:
+            params["language"] = lang
+        api_key = self.api_key()
+        async with _client() as client:
+            resp = await client.get(
+                "https://api.specstream.ai/v1/web-search",
+                params=params,
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": "nanoMuse",
+                },
+            )
+        if resp.status_code == 402:
+            raise SearchError("credit or spending limit reached (HTTP 402)")
+        if resp.status_code == 503:
+            raise SearchError("SpecStream is busy or rate limited (HTTP 503)")
+        _raise_for(resp)
+        data = resp.json().get("data") or {}
+        passages: dict[str, list[str]] = {}
+        for passage in data.get("passages") or []:
+            if isinstance(passage, dict) and isinstance(passage.get("text"), str):
+                passages.setdefault(passage.get("url", ""), []).append(passage["text"])
+        results = []
+        for r in data.get("sources") or []:
+            if not isinstance(r, dict):
+                continue
+            excerpts = r.get("highlights") or passages.get(r.get("url", ""), [])
+            text = " ".join(h for h in excerpts if isinstance(h, str))
+            results.append(
+                SearchResult(
+                    title=r.get("title") or "",
+                    url=r.get("url") or "",
+                    snippet=" ".join((text or r.get("snippet") or "").split())[:400],
+                )
+            )
+            if len(results) >= max_results:
+                break
+        return results
 
     async def _searxng(self, query: str, max_results: int, region: str) -> list[SearchResult]:
         country, lang = _region(region)

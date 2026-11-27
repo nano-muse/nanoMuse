@@ -881,6 +881,9 @@ class Connections:
         if body.get("provider") is not None:
             if body["provider"] not in SEARCH_PROVIDERS:
                 raise ValueError("provider must be one of " + ", ".join(SEARCH_PROVIDERS))
+            if body["provider"] != self.settings.connectors.search.provider:
+                # A credential saved for the previous host must not be sent to this one.
+                web["api_key"] = ""
             web["provider"] = body["provider"]
         if body.get("base_url") is not None:
             web["base_url"] = str(body["base_url"]).strip().rstrip("/")

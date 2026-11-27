@@ -1460,4 +1460,6 @@
     <string name="nm_hands_wireless_notify_problem">Revenez dans nanoMuse pour voir la suite.</string>
     <string name="nm_hands_wireless_repair">Associer à nouveau</string>
     <string name="nm_hands_wireless_repair_sub">Relancez l\'association si Android a effacé les appareils associés ou si l\'autorisation a expiré</string>
+    <string name="nm_codex_catalogue_fallback">Impossible d’actualiser la liste des modèles Codex. Les modèles enregistrés ou intégrés sont affichés.</string>
+    <string name="nm_chat_setup_failed">Impossible de préparer ce message. Vérifiez que la conversation existe toujours et que l’appareil dispose d’espace libre.</string>
 </resources>

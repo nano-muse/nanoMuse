@@ -299,7 +299,8 @@ class TextToSpeechManager : TextToSpeech.OnInitListener {
      * Stops all speech immediately.
      */
     fun stop() {
-        tts?.stop()
+        // nanoMuse: pending speech is cleared below even while the system engine is binding.
+        if (isInitialized) tts?.stop()
         isPaused = false
         pendingTexts.clear()
         pausedAtIndex = 0
