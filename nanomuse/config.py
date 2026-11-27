@@ -896,7 +896,10 @@ def _apply_env_overrides(raw: dict[str, Any]) -> None:
         ("NANOMUSE_SEARCH_BASE_URL", "base_url"),
     ):
         if val := os.environ.get(env):
-            raw.setdefault("connectors", {}).setdefault("search", {})[key] = val
+            search = raw.setdefault("connectors", {}).setdefault("search", {})
+            if key == "provider" and val != search.get("provider", "duckduckgo"):
+                search.pop("api_key", None)
+            search[key] = val
     server = raw.setdefault("server", {})
     if val := os.environ.get("NANOMUSE_SERVER_HOST"):
         server["host"] = val
@@ -1042,6 +1045,8 @@ def apply_app_settings(settings: Settings, data: dict[str, Any]) -> None:
             "specstream",
             "searxng",
         ):
+            if web.provider != search["provider"]:
+                web.api_key = ""
             web.provider = search["provider"]
         for key in ("api_key", "base_url"):
             if key in search and search[key] is not None:

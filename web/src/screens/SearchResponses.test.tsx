@@ -5,7 +5,7 @@ import { api } from "../api";
 import { setLocaleSetting } from "../i18n";
 import type { CodingAgent, CodingSession, ConnectionsData, Contact } from "../types";
 import { NewChatSheet } from "./CodingScreen";
-import { ContactsCard } from "./ConnectionsScreen";
+import { ContactsCard, SearchCard } from "./ConnectionsScreen";
 
 vi.mock("../store", () => ({ useStore: () => ({ toast: () => {} }) }));
 vi.mock("../components/Sheet", () => ({ Sheet: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
@@ -73,6 +73,27 @@ describe("contact search responses", () => {
     await query("");
     await act(async () => { late.resolve({ count: 1, people: [contact("late-result")] }); });
     expect(text()).not.toContain("late-result");
+  });
+});
+
+describe("web search credentials", () => {
+  it("clears an unsaved key when a different provider is selected or settings refresh", async () => {
+    const providers = ["brave", "specstream"].map((id) => ({ id, label: id, needs_key: true, keys_url: "" }));
+    const savedSearch: ConnectionsData["search"] = {
+      provider: "brave", base_url: "", key_source: "vault", configured: true, from_app: true, providers,
+    };
+    const card = (search: ConnectionsData["search"]) => <SearchCard data={{ search } as ConnectionsData} onChange={() => {}} />;
+    await act(async () => { screen = create(card(savedSearch)); });
+    act(() => { screen!.root.findByType("button").props.onClick(); });
+    const key = () => screen!.root.findByProps({ type: "password" });
+    act(() => { key().props.onChange({ target: { value: "draft-for-brave" } }); });
+    act(() => {
+      screen!.root.findAllByType("button").find((button) => button.props.children === "specstream")!.props.onClick();
+    });
+    expect(key().props.value).toBe("");
+    act(() => { key().props.onChange({ target: { value: "draft-for-specstream" } }); });
+    await act(async () => { screen!.update(card({ ...savedSearch })); });
+    expect(key().props.value).toBe("");
   });
 });
 

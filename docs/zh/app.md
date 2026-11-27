@@ -261,7 +261,7 @@ Android 和 iPhone 都能自己检查这些公开来源，电脑关机也可以�
 | POST | `/api/connections/endpoints/{id}/models` | 重新请求并保存接口模型。成功返回条目及 `source: "live"`；失败沿用原列表，并返回 `"kept"` 和 `error`。 |
 | PUT | `/api/connections/embeddings` `{mode, model, base_url, api_key}` | 配置语义记忆检索。`mode` 为 auto/on/off；`base_url: ""` 使用聊天模型接口；`model: ""` 使用接口默认；`api_key` 提供时存为 `EMBEDDINGS_API_KEY`，`""` 沿用模型 key，省略不改。立即重建向量化客户端。 |
 | POST | `/api/connections/embeddings/test` | 测试一次向量化调用，成功后为全部记忆索引。返回 `{ok, model, dims, indexed, ms}` 或 `{ok: false, error}`。 |
-| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 设置搜索服务，`provider` 支持 duckduckgo/brave/tavily/serply/you/parallel/keenable/specstream/searxng。`api_key` 提供时存为 `SEARCH_API_KEY`，`""` 移除，省略保留；`base_url` 指定 SearXNG 实例。下次搜索生效。 |
+| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 设置搜索服务，`provider` 支持 duckduckgo/brave/tavily/serply/you/parallel/keenable/specstream/searxng。`api_key` 提供时存为 `SEARCH_API_KEY`，`""` 移除，省略时保留同一服务商的 key。切换服务商后需要重新填写对应的 key。`base_url` 指定 SearXNG 实例。下次搜索生效。 |
 | POST | `/api/connections/search/test` | 仅测试当前搜索服务，不启用回退。返回 `{ok, provider, results, first, ms}` 或 `{ok: false, error}`。 |
 | PUT / DELETE | `/api/connections/email` | 保存 `{address, password, imap_host, imap_port, smtp_host, smtp_port, smtp_starttls, enabled}`，地址和密码放入保险库；或断开并移除凭据。 |
 | POST | `/api/connections/email/test` | 分别验证 IMAP 和 SMTP 登录，返回 `{ok, inbox}` 或 `{ok: false, error}`。 |

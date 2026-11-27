@@ -379,7 +379,7 @@ url  = "{{vault:CONTACTS_NEXTCLOUD}}"   # a link, kept in the vault: nanomuse va
 
 ### 网页搜索 {#web-search}
 
-此处设置 `web_search` 使用的服务商。默认 DuckDuckGo 无需配置，但通过抓取网页获取结果，可能限流或偶尔失效。需要 API 服务时，可选带 key 的 [Brave Search](https://brave.com/search/api/)、[Tavily](https://app.tavily.com/)、[Serply](https://serply.io/)（Google 结果）、[SpecStream](https://specstream.ai/search-api)；也可选支持无 key 使用的 [You.com](https://you.com/platform/api-keys)、[Parallel](https://docs.parallel.ai/integrations/mcp/search-mcp)、[Keenable](https://docs.keenable.ai/api-reference)，或自己部署 [SearXNG](https://docs.searxng.org/)，并在 `search.formats` 中启用 `json`。
+此处设置 `web_search` 使用的服务商。默认 DuckDuckGo 无需配置，但通过抓取网页获取结果，可能限流或偶尔失效。需要 API 服务时，可选带 key 的 [Brave Search](https://brave.com/search/api/)、[Tavily](https://app.tavily.com/)、[Serply](https://serply.io/)（Google 结果）、[SpecStream](https://specstream.ai/docs/search-api)；也可选支持无 key 使用的 [You.com](https://you.com/platform/api-keys)、[Parallel](https://docs.parallel.ai/integrations/mcp/search-mcp)、[Keenable](https://docs.keenable.ai/api-reference)，或自己部署 [SearXNG](https://docs.searxng.org/)，并在 `search.formats` 中启用 `json`。
 
 手机的连接 → 网页搜索提供相同选择，key 以 `SEARCH_API_KEY` 存入保险库，点击「测试」会实际搜索一次。
 
@@ -397,7 +397,7 @@ Parallel 每次搜索调用一次 [Search MCP](https://docs.parallel.ai/integrat
 
 Keenable 不带 key 时访问 `api.keenable.ai/v1/search/public`，每个地址每小时可搜索 1,000 次，无需账号。超限后会说明原因，由 DuckDuckGo 补查一次。[keenable.ai/console](https://keenable.ai/console) 提供的 key 以 `X-API-Key` 发送到同一主机的 `/v1/search`，解除每小时限制，所以哨兵始终显示 `api.keenable.ai`。每个请求都包含无 key 接口要求的 `X-Keenable-Title: nanoMuse`，用于标识调用应用；除此之外只发送查询和结果数量。摘要取页面正文开头，并整理为一行。
 
-SpecStream 把查询发到 `api.specstream.ai/v1/web-search`，在 [specstream.ai/workspace](https://specstream.ai/workspace) 拿到的 key 以 Bearer token 发送，使用 fast 档并返回页面段落：每条结果的摘要是它页面里最贴近查询的段落，拼成一行；没有段落时用页面摘要。`region` 以 `country` 和 `language` 传入。key 没有余额时会说明原因，由 DuckDuckGo 补查一次。
+SpecStream 把查询发到 `api.specstream.ai/v1/web-search`，在 [specstream.ai/workspace](https://specstream.ai/workspace) 拿到的 key 以 Bearer token 发送，使用 fast 档并返回页面段落：每条结果的摘要是它页面里最贴近查询的段落，拼成一行；没有段落时用页面摘要。`region` 以 `country` 和 `language` 传入。账号余额不足或达到消费上限时会说明原因。开启回退时，由 DuckDuckGo 补查一次。
 
 无论选择哪家，搜索因 key 过期、限流或服务不可用而失败时，默认会由 DuckDuckGo 再查一次，并在结果顶部注明，方便任务继续。这意味着查询会同时到达所选服务商和 DuckDuckGo；不希望这样时，在 `[connectors.search]` 中设置 `fallback = false`。`nanomuse doctor` 会指出服务商缺少的必要配置。
 

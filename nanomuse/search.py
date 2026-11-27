@@ -482,25 +482,33 @@ class WebSearchProvider:
             params["country"] = country
         if lang:
             params["language"] = lang
+        api_key = self.api_key()
         async with _client() as client:
             resp = await client.get(
                 "https://api.specstream.ai/v1/web-search",
                 params=params,
                 headers={
                     "Accept": "application/json",
-                    "Authorization": f"Bearer {self.api_key()}",
+                    "Authorization": f"Bearer {api_key}",
                     "User-Agent": "nanoMuse",
                 },
             )
         if resp.status_code == 402:
-            raise SearchError("the SpecStream account has no credit left (HTTP 402)")
+            raise SearchError("credit or spending limit reached (HTTP 402)")
+        if resp.status_code == 503:
+            raise SearchError("SpecStream is busy or rate limited (HTTP 503)")
         _raise_for(resp)
-        rows = (resp.json().get("data") or {}).get("sources") or []
+        data = resp.json().get("data") or {}
+        passages: dict[str, list[str]] = {}
+        for passage in data.get("passages") or []:
+            if isinstance(passage, dict) and isinstance(passage.get("text"), str):
+                passages.setdefault(passage.get("url", ""), []).append(passage["text"])
         results = []
-        for r in rows[:max_results]:
+        for r in data.get("sources") or []:
             if not isinstance(r, dict):
                 continue
-            text = " ".join(h for h in r.get("highlights") or [] if isinstance(h, str))
+            excerpts = r.get("highlights") or passages.get(r.get("url", ""), [])
+            text = " ".join(h for h in excerpts if isinstance(h, str))
             results.append(
                 SearchResult(
                     title=r.get("title") or "",
@@ -508,6 +516,8 @@ class WebSearchProvider:
                     snippet=" ".join((text or r.get("snippet") or "").split())[:400],
                 )
             )
+            if len(results) >= max_results:
+                break
         return results
 
     async def _searxng(self, query: str, max_results: int, region: str) -> list[SearchResult]:

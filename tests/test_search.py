@@ -562,8 +562,7 @@ async def test_specstream_failures_fall_back_with_a_reason(wire: Wire, ddg):
     wire.body = {"error": {"code": "insufficient_credit", "message": "add credit"}}
     results, note = await p.search("nanomuse", 2, "")
     assert note == (
-        "SpecStream failed (the SpecStream account has no credit left (HTTP 402));"
-        " results from DuckDuckGo"
+        "SpecStream failed (credit or spending limit reached (HTTP 402)); results from DuckDuckGo"
     )
     assert [r.title for r in results] == ["nanoMuse", "Muse"] and len(ddg) == 1
     wire.status = 401
@@ -572,6 +571,24 @@ async def test_specstream_failures_fall_back_with_a_reason(wire: Wire, ddg):
     wire.status = 429
     _, note = await p.search("nanomuse", 2, "")
     assert note == "SpecStream failed (rate limited (HTTP 429)); results from DuckDuckGo"
+    wire.status = 503
+    _, note = await p.search("nanomuse", 2, "")
+    assert "503" in note and "DuckDuckGo" in note
+
+
+async def test_specstream_matches_passages_to_their_source(wire: Wire):
+    wire.body = {
+        "data": {
+            "sources": [
+                {"url": "https://example.com/b", "snippet": "summary"},
+                {"url": "https://example.com/a"},
+            ],
+            "passages": [{"url": "https://example.com/a", "text": "A relevant passage"}],
+        },
+    }
+    provider = WebSearchProvider(SearchSettings(provider="specstream", api_key="ss-key"))
+    results, _ = await provider.search("nanoMuse", 2)
+    assert [r.snippet for r in results] == ["summary", "A relevant passage"]
 
 
 async def test_specstream_without_a_key_sends_nothing(wire: Wire, ddg):
@@ -591,8 +608,10 @@ async def test_specstream_goes_through_the_sentinel_as_its_host(wire: Wire):
 
 
 def test_specstream_is_saved(settings: Settings):
+    settings.connectors.search = SearchSettings(provider="brave", api_key="previous-key")
     apply_app_settings(settings, {"search": {"provider": "specstream"}})
     assert settings.connectors.search.provider == "specstream"
+    assert not settings.connectors.search.api_key
 
 
 async def test_searxng(wire: Wire, ddg):
@@ -735,6 +754,12 @@ def test_settings_layering(settings: Settings, monkeypatch: pytest.MonkeyPatch):
     loaded = load_settings(None)
     assert loaded.connectors.search.provider == "brave"
     assert loaded.connectors.search.api_key == "env-key"
+    monkeypatch.delenv("NANOMUSE_SEARCH_API_KEY")
+    config = settings.data_dir / "config.toml"
+    config.write_text('[connectors.search]\nprovider = "tavily"\napi_key = "tavily-key"\n')
+    loaded = load_settings(config)
+    assert loaded.connectors.search.provider == "brave"
+    assert not loaded.connectors.search.api_key
 
 
 def test_connections_search(settings: Settings, wire: Wire, ddg):
@@ -810,6 +835,20 @@ def test_connections_search(settings: Settings, wire: Wire, ddg):
         r = client.post("/api/connections/search/test").json()
         assert r["ok"] and r["provider"] == "Brave Search" and r["results"] == 1
         assert wire.requests[-1].headers["X-Subscription-Token"] == "brv-key"
+
+        # Changing providers without entering a key cannot reuse an existing vault secret.
+        previous_requests = len(wire.requests)
+        view = client.put("/api/connections/search", json={"provider": "specstream"}).json()
+        assert view["key_source"] == "none" and not view["configured"]
+        assert not client.post("/api/connections/search/test").json()["ok"]
+        assert len(wire.requests) == previous_requests
+        saved = load_app_settings(settings.data_dir)
+        assert saved["search"]["api_key"] == ""
+        inherited = Settings()
+        inherited.connectors.search = SearchSettings(provider="brave", api_key="old-brave-key")
+        apply_app_settings(inherited, saved)
+        assert inherited.connectors.search.provider == "specstream"
+        assert not inherited.connectors.search.api_key
 
         # removing the key
         r = client.put("/api/connections/search", json={"api_key": ""}).json()
