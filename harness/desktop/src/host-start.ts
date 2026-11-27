@@ -23,6 +23,11 @@ export const TAIL_LINES = 8;
 /** The line dsh-web-app prints once the web app is served (with the one-time token). */
 export const ADDRESS = /dsh web: (http:\/\/127\.0\.0\.1:\d+\/\?token=\S+)/;
 
+/** Consecutive early exits require a manual restart. A stable host earns a fresh attempt. */
+export function shouldRestartHost(alreadyRetried: boolean, readyForMs: number): boolean {
+  return !alreadyRetried || readyForMs >= 10 * 60_000;
+}
+
 export type StartOutcome =
   | { kind: "ready"; url: string }
   | { kind: "exited"; code: number | null; signal: string | null }

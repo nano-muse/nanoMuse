@@ -13,10 +13,13 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
+- Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
 
 ### Web
 
 ### Desktop
+
+- Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
 
 ### Android
 
