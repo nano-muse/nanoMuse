@@ -54,7 +54,7 @@ When the desktop follows a coding run on another computer, its tool count uses t
 | Cursor | `~/.cursor/projects/<workspace-slug>/agent-transcripts/<id>/<id>.jsonl`; CLI chats also `~/.cursor/chats/<hash>/<id>/meta.json` (the `cwd`) | `cursor-agent -p --output-format stream-json --stream-partial-output --force [--resume <id>] [--workspace <dir>] "<text>"` |
 | Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl` | `codex exec [resume <id>] --json --skip-git-repo-check -c sandbox_mode="workspace-write" [-C <dir>] "<text>"` |
 | Claude Code | `~/.claude/projects/<workspace-slug>/<id>.jsonl` | `claude -p --output-format stream-json --verbose --permission-mode acceptEdits [--resume <id>] "<text>"` |
-| dsh (DeepSeek Harness) | `~/.dsh/sessions/<workspace-slug>/<id>/session.v4.jsonl.zstd` | `dsh --profile headless --json [--session-id <id>] "<text>"` |
+| dsh (DeepSeek Harness) | `~/.dsh/sessions/<workspace-slug>/<id>/session.v4.jsonl.zstd` or an older plain-text `session.jsonl` in the same directory | `dsh --profile headless --json [--session-id <id>] "<text>"` |
 
 Reading is best effort: a line that does not parse is skipped, a missing
 directory is an agent with no sessions. The `~` is the user's home unless

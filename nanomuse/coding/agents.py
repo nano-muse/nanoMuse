@@ -832,7 +832,7 @@ def _dsh_text_of(content: Any) -> str:
 
 
 def _dsh_session(f: Path, full: bool) -> Session | None:
-    lines = _read_zstd_lines(f)
+    lines = _read_lines(f) if f.name == "session.jsonl" else _read_zstd_lines(f)
     try:
         st = f.stat()
     except OSError:

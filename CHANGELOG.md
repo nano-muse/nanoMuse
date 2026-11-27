@@ -12,6 +12,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
+
 ### Web
 
 ### Desktop
