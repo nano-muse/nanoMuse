@@ -138,6 +138,8 @@ Replace the relay address and AppImage path, then register or sign in on that re
 
 ## What it is
 
+The desktop window keeps navigation within the local Host and bundled pages. Web links outside the Host open in your browser. Local file URLs outside the shell's resources directory are blocked, including encoded paths that lead to a parent directory.
+
 Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
 right-click an editable field to cut, copy, paste or select all. The Edit menu and the
 usual keyboard shortcuts also work. Page scripts cannot read the clipboard; pasting
