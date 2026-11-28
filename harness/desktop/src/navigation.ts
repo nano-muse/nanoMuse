@@ -5,6 +5,8 @@
  * http(s), and dropped otherwise. Pure functions, so the tests can drive them without Electron.
  */
 
+import { posix } from "node:path";
+
 /** The only links that leave the app: http(s) with a host. */
 export const EXTERNAL_URL = /^https?:\/\/[^/]/;
 
@@ -22,11 +24,37 @@ export function sameOrigin(url: string, hostUrl: string | null): boolean {
   }
 }
 
+function normalizedFilePath(parsed: URL): string | null {
+  if (parsed.protocol !== "file:") return null;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(parsed.pathname);
+  } catch {
+    return null;
+  }
+  if (decoded.includes("\0")) return null;
+  // Normalize dot-segments after decoding percent-escapes and backslashes so a
+  // `file:` URL carrying `..`, `%2e%2e`, `%2f` or `%5c` cannot escape ownResources.
+  return posix.normalize(decoded.replace(/\\/g, "/"));
+}
+
 /** Whether `url` is one of the shell's own pages: a `file:` URL under `ownResources` (a directory path). */
 export function ownPage(url: string, ownResourcesHref: string): boolean {
-  if (!url.startsWith("file:")) return false;
-  const base = ownResourcesHref.endsWith("/") ? ownResourcesHref : `${ownResourcesHref}/`;
-  return url.startsWith(base);
+  let target: URL;
+  let base: URL;
+  try {
+    target = new URL(url);
+    base = new URL(ownResourcesHref);
+  } catch {
+    return false;
+  }
+  if (target.protocol !== "file:" || base.protocol !== "file:") return false;
+  if (target.host.toLowerCase() !== base.host.toLowerCase()) return false;
+  const targetPath = normalizedFilePath(target);
+  const basePath = normalizedFilePath(base);
+  if (!targetPath || !basePath) return false;
+  const root = basePath.endsWith("/") ? basePath : `${basePath}/`;
+  return targetPath.startsWith(root) && targetPath.length > root.length;
 }
 
 export type NavigationVerdict = "allow" | "external" | "deny";
