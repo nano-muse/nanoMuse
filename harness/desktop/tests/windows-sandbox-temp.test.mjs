@@ -57,7 +57,7 @@ test("failure of every candidate preserves the environment and explains the bloc
 test("relative paths are refused and duplicate Windows paths are not probed again", async () => {
   const calls = [];
   const { options } = setup({
-    inheritedRoot: "relative", fallbackRoots: ["D:\\Temp", "d:/temp/", "C:\\Temp"],
+    inheritedRoot: "relative", fallbackRoots: ["\\Temp", "D:\\Temp", "d:/temp/", "C:\\Temp"],
     probe: async (...args) => { calls.push(args); return { ok: false, stage: "create", code: "EACCES" }; },
   });
   await windowsSandboxTempEnvironment(options);

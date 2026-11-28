@@ -65,7 +65,7 @@ export async function windowsSandboxTempEnvironment(options: TempOptions): Promi
   const visited = new Set<string>();
   for (const [index, root] of [inheritedRoot, ...fallbackRoots].entries()) {
     // A relative TEMP would depend on the child's working directory and is not a stable root.
-    if (!win32.isAbsolute(root)) {
+    if (!win32.isAbsolute(root) || /^[\\/]$/.test(win32.parse(root).root)) {
       log(`sandbox TEMP: rejected ${JSON.stringify(root)} (path is not absolute)`);
       continue;
     }
