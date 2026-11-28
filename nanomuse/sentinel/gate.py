@@ -275,7 +275,9 @@ class Sentinel:
         return bool(verdict.approved)
 
     # ------------------------------------------------------------------ main entry
-    async def guard(self, call: ToolCall, tool: BaseTool) -> ToolResult:
+    async def guard(
+        self, call: ToolCall, tool: BaseTool, *, retry_identity: str | None = None
+    ) -> ToolResult:
         args = call.arguments
         if "__raw__" in args:
             # The arguments never parsed (cut off in transit): there is nothing to assess,
@@ -306,8 +308,12 @@ class Sentinel:
             async with self._sensitive_locks.setdefault(
                 (conversation_key, call_hash), asyncio.Lock()
             ):
-                return await self._guard_assessed(tool, args, assessment, call_hash)
-        return await self._guard_assessed(tool, args, assessment, None)
+                return await self._guard_assessed(
+                    tool, args, assessment, call_hash, retry_identity=retry_identity
+                )
+        return await self._guard_assessed(
+            tool, args, assessment, None, retry_identity=retry_identity
+        )
 
     async def _guard_assessed(
         self,
@@ -315,6 +321,8 @@ class Sentinel:
         args: dict[str, Any],
         assessment: CallAssessment,
         call_hash: str | None,
+        *,
+        retry_identity: str | None = None,
     ) -> ToolResult:
         target = assessment.target if assessment.target is not None else assessment.egress_target
         key = grant_key(tool.name, target)
@@ -339,6 +347,10 @@ class Sentinel:
             # who settled a question the policy raised: the policy itself (none raised), auto
             # mode, a standing permission, the person, or nobody in time
             settled_by = "policy"
+
+            if retry_identity is not None and not assessment.permits_retry(retry_identity):
+                decision = Decision.DENY
+                reasons.append("automatic retry target or eligibility changed")
 
             if decision == Decision.ASK:
                 grant = (
@@ -417,6 +429,17 @@ class Sentinel:
                         reasons.append(
                             f"user declined{': ' + verdict.reason if verdict.reason else ''}"
                         )
+
+        # Approval can suspend this call. Recheck immediately before execution so a
+        # retry cannot follow a changed target or become an outward/sensitive action.
+        if retry_identity is not None and decision != Decision.DENY:
+            try:
+                retry_allowed = tool.assess(args).permits_retry(retry_identity)
+            except Exception:  # noqa: BLE001 - an uncertain retry must not execute
+                retry_allowed = False
+            if not retry_allowed:
+                decision = Decision.DENY
+                reasons.append("automatic retry target or eligibility changed while waiting")
 
         if self.reviewer is not None:
             self.reviewer.observe(

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from nanomuse.agent import MuseAgent
 from nanomuse.config import Settings
 from nanomuse.goals import GoalStore
 from nanomuse.llm import MockLLM
+from nanomuse.llm import budget as task_budget
 from nanomuse.memory import MemoryStore
 from nanomuse.schema import Function, LLMResponse, RiskLevel, Role, ToolCall, ToolResult
 from nanomuse.sentinel import AuditLog, Sentinel
@@ -25,6 +30,7 @@ class FlakySandboxFiles(Files):
 
     fail_times: int = 0
     calls_made: int = 0
+    on_failure: Callable[[], None] | None = None
 
     async def execute(
         self,
@@ -37,6 +43,8 @@ class FlakySandboxFiles(Files):
         if action in ("write", "append"):
             self.calls_made += 1
             if self.calls_made <= self.fail_times:
+                if self.on_failure is not None:
+                    self.on_failure()
                 return ToolResult.fail(f"transient write failure #{self.calls_made}")
         return await super().execute(
             action=action, path=path, content=content, pattern=pattern, **extra
@@ -210,3 +218,175 @@ async def test_high_risk_sensitive_tool_never_retries(settings: Settings) -> Non
         if e.get("event") == "tool_call" and e.get("tool") == "send_email"
     ]
     assert len(events) == 1
+
+
+@pytest.mark.parametrize("kind", ["file", "parent", "dangling", "hardlink", "fifo"])
+async def test_linked_or_special_file_writes_never_retry(settings: Settings, kind: str) -> None:
+    ws = settings.agent.workspace
+    target = ws / "report.md"
+    other = ws / "other.md"
+    other.write_text("keep", encoding="utf-8")
+    try:
+        if kind == "parent":
+            folder = ws / "actual"
+            folder.mkdir()
+            (ws / "linked").symlink_to(folder, target_is_directory=True)
+            target = ws / "linked" / "report.md"
+        elif kind in ("file", "dangling"):
+            target.symlink_to(other if kind == "file" else ws / "missing.md")
+        elif kind == "hardlink":
+            os.link(other, target)
+        elif hasattr(os, "mkfifo"):
+            os.mkfifo(target)
+        else:
+            pytest.skip("FIFOs are unavailable on this platform")
+    except OSError as exc:
+        pytest.skip(f"link creation unavailable: {exc}")
+    files = FlakySandboxFiles(workspace=ws, fail_times=10)
+    script = [
+        LLMResponse(tool_calls=[_tc("files", action="write", path=str(target), content="new")]),
+        LLMResponse(content="Write failed."),
+    ]
+    agent, _, _, _ = _make_agent(settings, script, [files])
+    await agent.run("write report")
+    assert files.calls_made == 1
+    assert other.read_text(encoding="utf-8") == "keep"
+
+
+@pytest.mark.parametrize("change", ["file", "parent", "missing", "in_place"])
+async def test_retry_does_not_overwrite_a_replacement_target(
+    settings: Settings, change: str
+) -> None:
+    ws = settings.agent.workspace
+    folder = ws / "reports"
+    folder.mkdir()
+    target = folder / "report.md"
+    if change != "missing":
+        target.write_text("original", encoding="utf-8")
+
+    def replace() -> None:
+        if change == "parent":
+            folder.rename(ws / "previous-reports")
+            folder.mkdir()
+        elif change == "file":
+            target.rename(folder / "previous.md")
+        target.write_text("another writer", encoding="utf-8")
+
+    files = FlakySandboxFiles(workspace=ws, fail_times=1, on_failure=replace)
+    script = [
+        LLMResponse(tool_calls=[_tc("files", action="write", path=str(target), content="new")]),
+        LLMResponse(content="Write failed."),
+    ]
+    agent, _, _, _ = _make_agent(settings, script, [files])
+    await agent.run("write report")
+    assert files.calls_made == 1
+    assert target.read_text(encoding="utf-8") == "another writer"
+
+
+@pytest.mark.parametrize("change", ["replace", "symlink"])
+async def test_retry_rechecks_target_after_approval(settings: Settings, change: str) -> None:
+    ws = settings.agent.workspace
+    target = ws / "report.md"
+    target.write_text("original", encoding="utf-8")
+    other = ws / "other.md"
+    other.write_text("keep", encoding="utf-8")
+    if change == "symlink":
+        probe = ws / "probe"
+        try:
+            probe.symlink_to(other)
+            probe.unlink()
+        except OSError as exc:
+            pytest.skip(f"symlink creation unavailable: {exc}")
+
+    class ReplacingUI(RecordingUI):
+        async def ask_approval(self, request: ApprovalRequest) -> ApprovalDecision:
+            decision = await super().ask_approval(request)
+            if len(self.approvals) == 2:
+                target.rename(ws / "previous.md")
+                if change == "symlink":
+                    target.symlink_to(other)
+                else:
+                    target.write_text("keep", encoding="utf-8")
+            return decision
+
+    settings.sentinel.mode = "strict"
+    ui = ReplacingUI()
+    files = FlakySandboxFiles(workspace=ws, fail_times=1)
+    script = [
+        LLMResponse(tool_calls=[_tc("files", action="write", path=str(target), content="new")]),
+        LLMResponse(content="Write failed."),
+    ]
+    agent, _, _, audit = _make_agent(settings, script, [files], ui)
+    await agent.run("write report")
+    assert len(ui.approvals) == 2
+    assert files.calls_made == 1
+    assert target.read_text(encoding="utf-8") == "keep"
+    events = [e for e in _read_audit(audit.path) if e.get("tool") == "files"]
+    assert [e["decision"] for e in events] == ["allow", "deny"]
+
+
+async def test_blocked_workspace_write_never_retries(settings: Settings) -> None:
+    settings.sentinel.deny_tools = ["files"]
+    files = FlakySandboxFiles(workspace=settings.agent.workspace, fail_times=1)
+    agent, _, _, audit = _make_agent(
+        settings,
+        [
+            LLMResponse(tool_calls=[_tc("files", action="write", path="x.md", content="x")]),
+            LLMResponse(content="Blocked."),
+        ],
+        [files],
+    )
+    await agent.run("write x")
+    assert files.calls_made == 0
+    assert len([e for e in _read_audit(audit.path) if e.get("tool") == "files"]) == 1
+
+
+async def test_retry_obeys_task_budget(settings: Settings) -> None:
+    settings.agent.budget.max_seconds = 600
+
+    def exhaust_budget() -> None:
+        budget = task_budget.current()
+        assert budget is not None
+        budget.started -= 601
+
+    files = FlakySandboxFiles(
+        workspace=settings.agent.workspace, fail_times=1, on_failure=exhaust_budget
+    )
+    agent, _, _, _ = _make_agent(
+        settings,
+        [LLMResponse(tool_calls=[_tc("files", action="write", path="x.md", content="x")])],
+        [files],
+    )
+    await agent.run("write x")
+    assert files.calls_made == 1
+    assert agent.last_budget["stopped"] == "time"
+
+
+async def test_budget_stop_reports_previous_retries(settings: Settings) -> None:
+    settings.agent.budget.max_seconds = 600
+
+    def exhaust_budget() -> None:
+        budget = task_budget.current()
+        assert budget is not None
+        budget.started -= 601
+
+    files = FlakySandboxFiles(workspace=settings.agent.workspace, fail_times=1)
+    later = FlakySandboxFiles(
+        name="later_files",
+        workspace=settings.agent.workspace,
+        fail_times=1,
+        on_failure=exhaust_budget,
+    )
+    agent, _, ui, _ = _make_agent(
+        settings,
+        [
+            LLMResponse(tool_calls=[_tc("files", action="write", path="x.md", content="x")]),
+            LLMResponse(tool_calls=[_tc("later_files", action="write", path="y.md", content="y")]),
+        ],
+        [files, later],
+    )
+    final = await agent.run("write two reports")
+    assert agent.last_budget["stopped"] == "time"
+    assert files.calls_made == 2 and later.calls_made == 1
+    assert final.count("[Retry summary]") == 1
+    assert [text for kind, text in ui.events if kind == "assistant"][-1] == final

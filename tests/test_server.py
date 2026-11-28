@@ -208,6 +208,47 @@ def test_terminate_only_reply_after_a_text_reply_is_still_shown(server):
     wait_idle(service)
     texts = [e["text"] for e in events_of(client, kind="assistant")]
     assert texts == ["Sure — anything else?", "Bye!"]
+
+
+@pytest.mark.parametrize("ending", ["text", "terminate", "text_and_terminate"])
+def test_retry_summary_updates_the_reply_once(server, ending):
+    from test_sandbox_retry import FlakySandboxFiles
+
+    client, service, llm = server
+    files = FlakySandboxFiles(workspace=service.settings.agent.workspace, fail_times=1)
+    service.app.tools.add(files)
+    last = LLMResponse(content="Report written.")
+    if ending != "text":
+        last.tool_calls = [tc("terminate", status="success", summary="Report written.")]
+    if ending == "terminate":
+        last.content = None
+    llm.script.extend(
+        [
+            LLMResponse(tool_calls=[tc("files", action="write", path="report.md", content="ok")]),
+            last,
+        ]
+    )
+    client.post("/api/threads/main/send", json={"text": "write report"})
+    wait_idle(service)
+    replies = events_of(client, kind="assistant")
+    assert len(replies) == 1
+    assert replies[0]["text"].startswith("Report written.\n\n[Retry summary]")
+    assert replies[0]["text"].count("[Retry summary]") == 1
+    assert replies[0]["final"] is True
+    assert files.calls_made == 2
+
+    client.portal.call(
+        service._finish_run, service.threads["main"], None, replies[0]["text"], False
+    )
+    replies = events_of(client, kind="assistant")
+    assert len(replies) == 1
+    assert replies[0]["text"].count("[Retry summary]") == 1
+
+    # The next ordinary reply must not inherit or repeat the previous turn's note.
+    llm.script.append(LLMResponse(content="Next reply."))
+    client.post("/api/threads/main/send", json={"text": "thanks"})
+    wait_idle(service)
+    assert [e["text"] for e in events_of(client, kind="assistant")][1:] == ["Next reply."]
     assert events_of(client, kind="assistant")[-1]["final"] is True
 
 
