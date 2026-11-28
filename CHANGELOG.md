@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Attached reconnecting Hub sockets before closing the replaced connection so single-device and concurrent reconnects stay tracked online for presence, call replies and sign-out disconnects, and committed account deletion or disabling before dropping active Hub sockets.
+- Cleaned up interrupted Hub reconnects and ignored late calls and results from stopped or replaced sockets without disrupting the current connection.
 - Added separate concurrency limits for hosted chat and screen operation so a full chat queue can leave screen-operation slots available.
 - Corrected Cloud chat billing for empty and failed provider responses, including streams.
 - Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
@@ -13,7 +15,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - Added LLMTR to the own-key catalogue: a prepaid OpenAI-compatible gateway at `https://llmtr.com/v1`, a key from [llmtr.com/dashboard/keys](https://llmtr.com/dashboard/keys); one key reaches models from several labs. Model ids carry the vendor's name as its public `/v1/models` list names them; the default model is `qwen/qwen3.8-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
-
+- Granted Windows private-file ACLs by the current process user's SID (falling back to domain-qualified username) so private writes to the vault, config and tokens no longer lock the owner out when the computer or domain name matches `USERNAME`.
 - Added SpecStream as an optional web search provider with a user-supplied key. Switching providers clears the previous credential, and DuckDuckGo remains the default.
 - Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
 - Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
@@ -22,8 +24,11 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Parsed CRLF-delimited and multi-line SSE responses in MCP connectors so servers sending `\r\n\r\n` event frames list and filter their tools reliably.
+- Parsed and normalized `file:` URLs in the Electron navigation guard so encoded dot-segments, backslashes or remote `file://` hosts cannot escape the shell's resources directory.
 - Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.
 - Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
+- Fixed recovery from interrupted Mac clicks and drags, including failed mouse releases and shutdown during a gesture. For #960.
 
 ### Android
 

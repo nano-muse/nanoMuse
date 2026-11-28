@@ -435,8 +435,10 @@ class Hub:
             await self._close(ws, 4008, "too_many_connections")
             return
 
-        await self._attach(conn)
         try:
+            # _attach registers conn before awaiting the replaced socket's close.
+            # Cancellation during that close must still stop and detach conn.
+            await self._attach(conn)
             await conn.send(
                 {
                     "type": "welcome",
@@ -458,6 +460,10 @@ class Hub:
                     # is JSON text (docs/hub.md); below it is answered with bad_frame and the
                     # socket stays open — it still counts towards the flood limit.
                     raw = None
+                # receive_text may resume after another task stopped or replaced this
+                # socket. Buffered input must not act under the replacement's identity.
+                if conn.closed or self.online.get(conn.account_id, {}).get(conn.device_id) is not conn:
+                    break
                 size = len(raw.encode("utf-8")) if raw is not None else 0
                 if raw is not None and size > self.frame_limit:
                     await conn.send({"type": "error", "code": "too_large", "message": f"Frames are capped at {self.frame_limit} bytes"})
@@ -548,13 +554,6 @@ class Hub:
         )
 
     async def _attach(self, conn: Connection) -> None:
-        account = self.online.setdefault(conn.account_id, {})
-        old = account.get(conn.device_id)
-        if old is not None:
-            old.stop()
-            await self._close(old.ws, 4003, "replaced by a newer connection")
-        account[conn.device_id] = conn
-        conn.start()
         if conn.kind != "web":
             self.db.upsert_device(
                 conn.account_id,
@@ -567,9 +566,19 @@ class Hub:
                 conn.llm_provider,
                 conn.llm_model,
             )
+        # Register the replacement before awaiting old.ws.close(): closing the old socket
+        # lets its serve() task run _detach(old) during the await, which would otherwise
+        # still see old in self.online, pop the account dict and orphan conn outside it.
+        account = self.online.setdefault(conn.account_id, {})
+        old = account.get(conn.device_id)
+        account[conn.device_id] = conn
+        conn.start()
         # the id and the account masked like every other line; the device's name is the
         # person's own words and stays out of the log
         log.info("hub: %s %s connected; account %s has %d online", conn.kind, conn.device_id[:12], conn.account_id[:8], len(account))
+        if old is not None:
+            old.stop()
+            await self._close(old.ws, 4003, "replaced by a newer connection")
 
     async def _detach(self, conn: Connection) -> None:
         conn.stop()

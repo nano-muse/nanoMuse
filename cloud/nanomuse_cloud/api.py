@@ -1128,8 +1128,8 @@ def create_app(
 
     @app.post("/v1/auth/delete", status_code=204)
     async def delete_account(caller: Caller = Depends(caller_dep)) -> Response:
-        await _forget_account_live_state(caller.account_id)
         cloud.delete_account(caller)
+        await _forget_account_live_state(caller.account_id)
         return Response(status_code=204)
 
     # -- conversation sync (0.19, sync.py): the same chats on every device of the account -----------
@@ -2392,12 +2392,12 @@ def create_app(
         body = await _json(request)
         account_id = cloud.admin_resolve(str(body.get("account_id", "")), str(body.get("identifier", "")))
         disable = bool(body.get("disable", False))
-        hub = getattr(app.state, "hub", None)
-        if disable and hub is not None:
-            await hub.drop_account(account_id)
         out = cloud.admin_invite_abuse(
             account_id, disable=disable, delete_unused=bool(body.get("delete_unused", False)), actor=_actor(request)
         )
+        hub = getattr(app.state, "hub", None)
+        if disable and hub is not None:
+            await hub.drop_account(account_id)
         # the deleted invitees' sockets and live notes go with their rows, as on any deletion
         for invitee_id in out.pop("deleted_ids", []):
             await _forget_account_live_state(invitee_id)
@@ -2832,8 +2832,8 @@ def create_app(
     async def admin_delete(request: Request) -> Response:
         body = await _json(request)
         account_id = cloud.admin_resolve(str(body.get("account_id", "")), str(body.get("identifier", "")))
-        await _forget_account_live_state(account_id)
         cloud.admin_delete(account_id, actor=_actor(request))
+        await _forget_account_live_state(account_id)
         return Response(status_code=204)
 
     # -- helpers ------------------------------------------------------------------------------------

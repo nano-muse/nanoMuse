@@ -27,6 +27,12 @@ async function serve(mode) {
     if (msg.method === 'tools/list') {
       // the second page comes as SSE, to cover both framings
       if (msg.params?.cursor === 'two') { res.writeHead(200, { 'content-type': 'text/event-stream' }); return res.end(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { tools: [{ name: 'c', description: 'third' }] } })}\n\n`) }
+      if (mode === 'sse-crlf') {
+        res.writeHead(200, { 'content-type': 'text/event-stream' })
+        const notice = JSON.stringify({ jsonrpc: '2.0', method: 'notifications/progress', params: { progress: 1 } })
+        const reply = JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { tools: [{ name: 'crlf_tool', description: 'from crlf sse' }] } })
+        return res.end(`event: message\r\ndata: ${notice}\r\n\r\nevent: message\r\ndata: ${reply}\r\n\r\n`)
+      }
       return json(200, { jsonrpc: '2.0', id: msg.id, result: { tools: [{ name: 'a', description: 'first' }, { name: 'b', description: 'second' }], nextCursor: 'two' } })
     }
     return json(200, { jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'no' } })
@@ -79,6 +85,35 @@ test('probeAuth: an open server, one that wants the authorization flow, one that
     assert.equal(wantsKey.hint, 'Bring a key')
   } finally {
     await Promise.all([open.close(), oauth.close(), key.close()])
+  }
+})
+
+test('filterToolsList: handles CRLF SSE and multi-line SSE data payloads', () => {
+  const answer = JSON.stringify({ jsonrpc: '2.0', id: 3, result: { tools: [{ name: 'keep' }, { name: 'hide' }] } })
+  const notice = JSON.stringify({ jsonrpc: '2.0', method: 'notifications/progress', params: {} })
+  const off = new Set(['hide'])
+
+  const crlf = `event: message\r\ndata: ${notice}\r\n\r\nevent: message\r\ndata: ${answer}\r\n\r\n`
+  const filteredCrlf = filterToolsList(crlf, 'text/event-stream', off)
+  const blocks = filteredCrlf.split('\r\n\r\n')
+  assert.equal(blocks[0], `event: message\r\ndata: ${notice}`)
+  assert.ok(blocks[1].startsWith('event: message\r\ndata: '))
+  assert.deepEqual(JSON.parse(blocks[1].split('\r\n')[1].slice(6)).result.tools, [{ name: 'keep' }])
+
+  const pretty = JSON.stringify({ jsonrpc: '2.0', id: 4, result: { tools: [{ name: 'keep' }, { name: 'hide' }] } }, null, 2)
+  const multiline = `event: message\n${pretty.split('\n').map((l) => `data: ${l}`).join('\n')}\n\n`
+  const filteredMulti = filterToolsList(multiline, 'text/event-stream', off)
+  assert.ok(filteredMulti.startsWith('event: message\ndata: '))
+  assert.deepEqual(JSON.parse(filteredMulti.split('\n')[1].slice(6)).result.tools, [{ name: 'keep' }])
+})
+
+test('listTools: parses CRLF SSE responses preceded by a notification', async () => {
+  const s = await serve('sse-crlf')
+  try {
+    const tools = await listTools(s.url, {})
+    assert.deepEqual(tools, [{ name: 'crlf_tool', description: 'from crlf sse' }])
+  } finally {
+    await s.close()
   }
 })
 
