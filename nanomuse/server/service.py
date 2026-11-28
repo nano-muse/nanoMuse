@@ -1457,7 +1457,29 @@ class MuseService:
         already, and flagged ``final`` so clients can tell it from the step narration
         before it. Background runs push it once, here, not per step."""
         event: dict[str, Any] | None = None
+        note = thread.agent.last_retry_summary
+        shown = self.ui.last_assistant_text.get(thread.id)
+        shown_body = shown.removesuffix(note).rstrip() if note and shown else shown
+        final_body = final.removesuffix(note).strip() if note and final.endswith(note) else None
+        if final_body is not None:
+            final = f"{final_body}\n\n{note}" if final_body else note
+        eid = self.ui.last_assistant_event.get(thread.id)
+        existing = self.ui.get_timeline(thread.id).get(eid) if eid else None
         if (
+            note
+            and shown
+            and eid
+            and existing
+            and (thread.id in self.ui.reply_shown or final_body == shown_body)
+        ):
+            # The model's reply was already streamed before retries were summarised.
+            # Update that bubble, including text+terminate responses, rather than
+            # duplicating the full answer or losing the note behind reply_shown.
+            text = f"{shown_body}\n\n{note}"
+            self.ui.patch(thread.id, eid, text=text, final=True)
+            self.ui.last_assistant_text[thread.id] = text
+            event = existing
+        elif (
             final
             and thread.id not in self.ui.reply_shown
             and final != self.ui.last_assistant_text.get(thread.id)
@@ -1468,6 +1490,8 @@ class MuseService:
             if thread.id in self.ui.model_once:
                 event["model_used"] = self.ui.model_once[thread.id]
             event = self.ui.emit(event)
+            self.ui.last_assistant_text[thread.id] = final
+            self.ui.last_assistant_event[thread.id] = event["id"]
         else:
             eid = self.ui.last_assistant_event.get(thread.id)
             if eid and (existing := self.ui.get_timeline(thread.id).get(eid)):

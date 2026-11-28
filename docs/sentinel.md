@@ -80,6 +80,21 @@ after loading a conversation, but do not restore these approval fingerprints.
 
 `auto` still honours `deny_tools`, deny rules, step 5 and step 6. The taint rule holds in every mode: once a conversation has read mail, a calendar, contacts or another private source, a call that would send data to a host outside `egress_allowlist` asks, and `auto` does not turn that question into an allow. It is what `nanomuse daemon`, `--auto` and the app's "Hands-off" setting use, and background goal passes too, which is why a dangerous command or a tainted send in an unattended run turns into a card in the Feed instead of just running. `nanomuse daemon` has nobody at the keyboard: a step that still asks there is declined with a note, and the model goes on with what it can.
 
+## Bounded workspace write retries
+
+The Python runtime retries a failed `files.write` at most twice (after short pauses of
+200 ms and 500 ms) when its target is an ordinary file inside the workspace, or is still
+absent. Every attempt passes through Sentinel and the current task budget. The tool
+result and reply report the retry count and outcome. This does not add retries to the
+phones' native agent loops.
+
+Append operations, links in the target or its workspace parents, hardlinked files,
+special files, outward actions and sensitive calls are excluded. The target and parent
+directory identities and the target's file metadata must still match before a retry and
+after any approval wait. If a failed attempt created a previously absent file or changed
+an existing file, automatic retry stops. A denied call is never retried. These are filesystem
+checks, not isolation from another process changing the workspace during a write.
+
 ## Approvals
 
 When the decision is *ask*, the UI (console, or an approval card in the app) shows the tool, the summarised call, what you asked for that led to it (the *purpose*), the exact arguments, the risk level and the reasons. You can deny, or allow with a scope:

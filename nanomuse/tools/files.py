@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import json
 import os
+import stat
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
@@ -230,6 +232,50 @@ class Files(BaseTool):
         ws = self.workspace.resolve()
         return path == ws or ws in path.parents
 
+    def _write_retry_identity(self, path: str) -> str | None:
+        """Inspect the original path before resolve() erases links in any component.
+
+        A missing target can be retried only while it stays missing. If a failed write
+        created it, its ownership is uncertain; leave another attempt to the agent.
+        """
+        root = self.workspace.absolute()
+        target = Path(os.path.expanduser(path.strip()))
+        if not target.is_absolute():
+            target = root / target
+        if ".." in target.parts:
+            return None
+        try:
+            relative = target.relative_to(root)
+            if not relative.parts:
+                return None
+            identity: list[tuple[str | int, ...]] = []
+            cursor = root
+            for part in ("", *relative.parts):
+                if part:
+                    cursor /= part
+                try:
+                    info = cursor.lstat()
+                except FileNotFoundError:
+                    identity.append(("missing",))
+                    continue
+                # Windows junctions/reparse points also redirect a path without being
+                # POSIX symbolic links. An unavailable file identity is not retryable.
+                reparse = getattr(info, "st_file_attributes", 0) & 0x400
+                if stat.S_ISLNK(info.st_mode) or reparse or not info.st_ino:
+                    return None
+                if cursor == target:
+                    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                        return None
+                    # An in-place edit may be another writer or a partial failed
+                    # write. Either way, do not automatically overwrite new state.
+                    identity.append((info.st_size, info.st_mtime_ns, info.st_ctime_ns))
+                elif not stat.S_ISDIR(info.st_mode):
+                    return None
+                identity.append((str(cursor), info.st_dev, info.st_ino))
+            return json.dumps([str(target), identity])
+        except (OSError, ValueError):
+            return None
+
     def assess(self, args: dict[str, Any]) -> CallAssessment:
         action = args.get("action", "")
         path = args.get("path") or "."
@@ -245,8 +291,12 @@ class Files(BaseTool):
             inside = False  # a path that cannot be resolved does not get the workspace's trust
         if action in ("write", "append"):
             risk = RiskLevel.MODERATE if inside else RiskLevel.SENSITIVE
+            identity = self._write_retry_identity(path) if action == "write" and inside else None
             return CallAssessment(
-                risk=risk, summary=summary + f" ({len(args.get('content') or '')} chars)"
+                risk=risk,
+                idempotent_sandbox_write=identity is not None,
+                retry_identity=identity,
+                summary=summary + f" ({len(args.get('content') or '')} chars)",
             )
         # reads
         return CallAssessment(

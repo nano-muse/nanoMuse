@@ -18,6 +18,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Granted Windows private-file ACLs by the current process user's SID (falling back to domain-qualified username) so private writes to the vault, config and tokens no longer lock the owner out when the computer or domain name matches `USERNAME`.
 - Added SpecStream as an optional web search provider with a user-supplied key. Switching providers clears the previous credential, and DuckDuckGo remains the default.
 - Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
+- Retried failed idempotent workspace writes up to two times through the Sentinel, stopped when target identities changed, and showed the retry note once in the reply. Links and uncertain new files were excluded. For #511.
 - Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
 
 ### Web

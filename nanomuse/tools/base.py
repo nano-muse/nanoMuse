@@ -43,8 +43,24 @@ class CallAssessment(BaseModel):
     target: str | None = None
     # One-line, human-readable description shown in approval prompts / audit log.
     summary: str = ""
+    # True only for idempotent writes inside the workspace/sandbox that may be
+    # retried up to a small bound on transient execution failure.
+    idempotent_sandbox_write: bool = False
+    # Stable identity of the target and its parent directories, not just its spelling.
+    # A retry cannot follow a replacement file or a path that changed after failure.
+    retry_identity: str | None = None
     # Extra warnings ("command contains rm -rf", ...).
     warnings: list[str] = Field(default_factory=list)
+
+    def permits_retry(self, identity: str | None) -> bool:
+        return bool(
+            identity
+            and self.idempotent_sandbox_write
+            and self.retry_identity == identity
+            and self.risk != RiskLevel.SENSITIVE
+            and not self.egress
+            and not self.warnings
+        )
 
 
 def with_step(parameters: dict[str, Any]) -> dict[str, Any]:
