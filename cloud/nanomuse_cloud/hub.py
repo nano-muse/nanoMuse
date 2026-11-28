@@ -435,8 +435,10 @@ class Hub:
             await self._close(ws, 4008, "too_many_connections")
             return
 
-        await self._attach(conn)
         try:
+            # _attach registers conn before awaiting the replaced socket's close.
+            # Cancellation during that close must still stop and detach conn.
+            await self._attach(conn)
             await conn.send(
                 {
                     "type": "welcome",
@@ -458,6 +460,10 @@ class Hub:
                     # is JSON text (docs/hub.md); below it is answered with bad_frame and the
                     # socket stays open — it still counts towards the flood limit.
                     raw = None
+                # receive_text may resume after another task stopped or replaced this
+                # socket. Buffered input must not act under the replacement's identity.
+                if conn.closed or self.online.get(conn.account_id, {}).get(conn.device_id) is not conn:
+                    break
                 size = len(raw.encode("utf-8")) if raw is not None else 0
                 if raw is not None and size > self.frame_limit:
                     await conn.send({"type": "error", "code": "too_large", "message": f"Frames are capped at {self.frame_limit} bytes"})

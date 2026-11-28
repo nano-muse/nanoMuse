@@ -50,6 +50,10 @@ When a device reconnects, its new socket replaces the old one before the relay
 closes the old socket. Cleanup from an earlier connection cannot remove the
 replacement from the online device list. Deleting or disabling an account takes
 effect before its live sockets close, so they cannot reconnect during cleanup.
+If reconnect setup is cancelled while the old socket closes, the interrupted
+connection is removed without disturbing a newer replacement.
+Frames arriving from a stopped or replaced socket are discarded, including late
+calls and results; the current connection can continue normally.
 
 ## What you can say
 
