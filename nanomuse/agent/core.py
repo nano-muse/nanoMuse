@@ -40,6 +40,7 @@ from nanomuse.tools.base import BaseTool, CallAssessment, ToolCollection
 from nanomuse.ui import UI
 
 MAX_SANDBOX_WRITE_RETRIES = 2
+SANDBOX_WRITE_RETRY_DELAYS = (0.2, 0.5)
 
 
 def _format_retry_summary(retries: list[dict[str, Any]]) -> str:
@@ -850,6 +851,19 @@ class MuseAgent:
             if not fresh_assessment.permits_retry(identity):
                 break
             budget = task_budget.current()
+            if budget is not None:
+                budget.check()
+            delay = SANDBOX_WRITE_RETRY_DELAYS[
+                min(retry_num - 1, len(SANDBOX_WRITE_RETRY_DELAYS) - 1)
+            ]
+            if delay > 0:
+                await asyncio.sleep(delay)
+            try:
+                fresh_assessment = tool.assess(call.arguments)
+            except Exception:  # noqa: BLE001
+                break
+            if not fresh_assessment.permits_retry(identity):
+                break
             if budget is not None:
                 budget.check()
             self.ui.warn(f"Retrying {summary} ({retry_num}/{MAX_SANDBOX_WRITE_RETRIES})")

@@ -82,10 +82,11 @@ after loading a conversation, but do not restore these approval fingerprints.
 
 ## Bounded workspace write retries
 
-The Python runtime retries a failed `files.write` at most twice when its target is an
-ordinary file inside the workspace, or is still absent. Every attempt passes through
-Sentinel and the current task budget. The tool result and reply report the retry count
-and outcome. This does not add retries to the phones' native agent loops.
+The Python runtime retries a failed `files.write` at most twice (after short pauses of
+200 ms and 500 ms) when its target is an ordinary file inside the workspace, or is still
+absent. Every attempt passes through Sentinel and the current task budget. The tool
+result and reply report the retry count and outcome. This does not add retries to the
+phones' native agent loops.
 
 Append operations, links in the target or its workspace parents, hardlinked files,
 special files, outward actions and sensitive calls are excluded. The target and parent

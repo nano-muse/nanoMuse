@@ -390,3 +390,31 @@ async def test_budget_stop_reports_previous_retries(settings: Settings) -> None:
     assert files.calls_made == 2 and later.calls_made == 1
     assert final.count("[Retry summary]") == 1
     assert [text for kind, text in ui.events if kind == "assistant"][-1] == final
+
+
+async def test_sandbox_write_retries_use_short_backoff(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import nanomuse.agent.core as agent_core
+
+    delays: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        delays.append(seconds)
+
+    monkeypatch.setattr(agent_core.asyncio, "sleep", fake_sleep)
+
+    files = FlakySandboxFiles(workspace=settings.agent.workspace, fail_times=2)
+    agent, _, _, _ = _make_agent(
+        settings,
+        [
+            LLMResponse(tool_calls=[_tc("files", action="write", path="locked.md", content="ok")]),
+            LLMResponse(content="Saved after brief lock cleared."),
+        ],
+        [files],
+    )
+    final = await agent.run("write locked.md")
+    assert files.calls_made == 3
+    assert delays == [0.2, 0.5]
+    assert "retried 2 time(s)" in final
+    assert "succeeded" in final
