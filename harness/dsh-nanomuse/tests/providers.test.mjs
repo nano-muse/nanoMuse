@@ -68,7 +68,7 @@ test('AtmoRouter is offered for own-key chat without unverified media capabiliti
   }
 })
 
-test('UberLLM is offered for own-key chat without unverified media capabilities', () => {
+test('MartLLM is offered for own-key chat without unverified media capabilities', () => {
   const provider = catalogue.find((p) => p.id === 'uberllm')
   assert.ok(provider)
   assert.equal(baseUrlFor(provider, 'global'), 'https://api.uberllm.dev/v1')

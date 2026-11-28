@@ -78,6 +78,8 @@ env NANOMUSE_CLOUD_URL='https://relay.example' \
 
 ## 桌面版包含什么 {#what-it-is}
 
+桌面窗口只允许打开本机 Host 和应用内置页面，其他网页链接会在浏览器中打开。本地文件链接若指向外壳资源目录之外，即使通过编码路径跳转到上级目录，也会被阻止。
+
 首次启动时，先选一个示例任务，再连接模型或跳过，最后开始对话。选中的任务会填入主要聊天的空输入框；已有草稿会保留。模型页可以登录 nanoMuse Cloud、登录 ChatGPT，或添加服务商 key。新建的 Cloud 账号可以设置密码，macOS 还会询问手需要的权限。
 
 Windows 上，ChatGPT 登录及登录状态检查支持通过可识别的 Node `.cmd` 脚本启动运行时，包括受支持的 npm 格式。其他批处理程序会被拒绝；请使用运行时的可执行文件，或受支持的 Node 启动脚本。
@@ -251,6 +253,8 @@ macOS 将权限归给 LaunchServices 启动的「责任进程」及其所有子�
 辅助程序为数百行 Swift，源码在 `harness/desktop/mac/computer-use/`，通过每次启动更换 token 的本机 HTTP 服务报告权限、申请权限、截图和输入。申请使用系统对话框 `CGRequestScreenCaptureAccess`、`AXIsProcessTrustedWithOptions`。macOS 14+ 通过 ScreenCaptureKit 截图，依次为 `SCShareableContent`、主显示器、`SCContentFilter`、`SCScreenshotManager.captureImage`，以显示器像素尺寸捕获并包含光标；macOS 12、13 使用 `CGDisplayCreateImage`。不使用曾在 0.1.36 出现黑帧和无帧问题的 Chromium `desktopCapturer`。输入使用 `CGEvent`，直接发送字符，因此中文也不需要剪贴板。
 
 采用 ScreenCaptureKit 是因为 macOS 26、27 即使已授予录屏，`CGDisplayCreateImage` 仍可能不返回图片。0.1.39 会记录 `helper screenshot failed (no screenshot: noImage)`，再以黑色或过时的 `desktopCapturer` 画面替代。应用现在在启动时拉起辅助程序以读取、申请权限，退出时停止它；主应用消失后，辅助程序也会自行退出。它没有窗口或 Dock 图标，在活动监视器中名为 *nanoMuse Computer Use*。
+
+如果辅助程序在点击或拖动中退出，下次启动时会检查上次按下的鼠标键。该键仍按下时，辅助程序会将它松开。如果之前关闭了辅助功能权限，重新开启后，下次操作会再次尝试松键。
 
 首次授权按以下操作，只需在尚未授权的 Mac 上完成一次，已在 macOS 27.0.1、Apple 芯片上验证：
 
