@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Attached reconnecting Hub sockets before closing the replaced connection so single-device and concurrent reconnects stay tracked online for presence, call replies and sign-out disconnects, and committed account deletion or disabling before dropping active Hub sockets.
+- Cleaned up interrupted Hub reconnects and ignored late calls and results from stopped or replaced sockets without disrupting the current connection.
 - Added separate concurrency limits for hosted chat and screen operation so a full chat queue can leave screen-operation slots available.
 - Corrected Cloud chat billing for empty and failed provider responses, including streams.
 - Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
