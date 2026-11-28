@@ -9,10 +9,10 @@ from nanomuse.llm import catalogue
 from nanomuse.llm.factory import create_llm
 
 
-def test_the_packaged_file_is_read_once_and_has_the_twenty_eight_providers():
+def test_the_packaged_file_is_read_once_and_has_the_twenty_nine_providers():
     cat = catalogue.load()
     assert cat.source.endswith("providers.json")
-    assert len(cat.providers) == 28
+    assert len(cat.providers) == 29
     assert cat.get("bailian").capabilities == ["chat", "vision", "image", "video"]
     assert cat.get("nowhere") is None
     # the same object on every call
@@ -162,6 +162,31 @@ def test_synap_uses_openai_chat_without_advertising_unverified_capabilities():
     assert LLMSettings(provider="synap", model="gpt-oss-20b").model == "gpt-oss-20b"
 
 
+def test_llmtr_uses_openai_chat_without_advertising_unverified_capabilities():
+    cat = catalogue.load()
+    provider = cat.get("llmtr")
+    assert provider is not None
+    assert provider.auth == ["key"]
+    assert provider.key_url == "https://llmtr.com/dashboard/keys"
+    assert provider.capabilities == ["chat"]
+    assert provider.defaults == {"chat": "qwen/qwen3.8-flash"}
+    assert provider in cat.providers_for("chat", "global")
+    for capability in ("vision", "image", "video"):
+        assert provider not in cat.providers_for(capability, "global")
+    assert check_provider("llmtr") == "llmtr"
+    assert resolve_provider("llmtr", None) == (
+        "openai",
+        "https://llmtr.com/v1",
+    )
+    settings = LLMSettings(provider="llmtr")
+    assert settings.protocol == "openai"
+    assert settings.endpoint == provider.base_url
+    assert settings.model == "qwen/qwen3.8-flash"
+    assert LLMSettings(provider="llmtr", model="mistral/devstral-medium-latest").model == (
+        "mistral/devstral-medium-latest"
+    )
+
+
 def test_providers_for_a_capability_in_a_region_keeps_the_catalogue_order():
     cat = catalogue.load()
     assert [p.id for p in cat.providers_for("image", "cn")] == [
@@ -207,6 +232,7 @@ def test_by_base_url_finds_the_entry_for_a_host_or_nothing():
     assert cat.by_base_url("https://gateway.example.ai/v1") is None
     assert cat.by_base_url("https://gateway.example.dev/v1") is None
     assert cat.by_base_url("https://eu.openrouter.ai/api/v1").id == "openrouter"
+    assert cat.by_base_url("https://llmtr.com/v1").id == "llmtr"
     assert cat.by_base_url("") is None
     # two editions on one host are told apart by the whole address, the host is only the fallback
     assert cat.by_base_url("https://opencode.ai/zen/v1").id == "opencode-zen"

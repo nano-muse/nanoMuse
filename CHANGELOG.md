@@ -14,6 +14,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Added LLMTR to the own-key catalogue: a prepaid OpenAI-compatible gateway at `https://llmtr.com/v1`, a key from [llmtr.com/dashboard/keys](https://llmtr.com/dashboard/keys); one key reaches models from several labs. Model ids carry the vendor's name as its public `/v1/models` list names them; the default model is `qwen/qwen3.8-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
 - Granted Windows private-file ACLs by the current process user's SID (falling back to domain-qualified username) so private writes to the vault, config and tokens no longer lock the owner out when the computer or domain name matches `USERNAME`.
 - Added SpecStream as an optional web search provider with a user-supplied key. Switching providers clears the previous credential, and DuckDuckGo remains the default.
 - Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.

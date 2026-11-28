@@ -71,6 +71,7 @@ short videos.
 | TrustedRouter | ● | | | | outside mainland China | [trustedrouter.com](https://trustedrouter.com/console/api-keys) |
 
 | Synap | ● | | | | outside mainland China | [synap402.com](https://synap402.com/account.html#keys) |
+| LLMTR | ● | | | | outside mainland China | [llmtr.com](https://llmtr.com/dashboard/keys) |
 | Ollama / LM Studio / vLLM (on your machine) | ● | | | | both | no key |
 
 Only Bailian has a dot under *Clips* because nanoMuse's clip generation speaks
@@ -113,6 +114,7 @@ or paste it into a chat.**
 - **TrustedRouter.** A key from [trustedrouter.com/console/api-keys](https://trustedrouter.com/console/api-keys); pay as you go, and one key reaches models from several labs ([docs](https://trustedrouter.com/docs)). Base URL `https://api.trustedrouter.com/v1`. Model ids carry the vendor's name, as `https://api.trustedrouter.com/v1/models` lists them (public, no key needed); the default model is `deepseek/deepseek-v4-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
 
 - **Synap.** A key from [synap402.com/account.html#keys](https://synap402.com/account.html#keys); pay as you go, for open-weight models (Qwen3 Coder, Qwen3.5, GLM, DeepSeek V4, gpt-oss, Gemma and others), with per-token prices in the public `https://synap402.com/v1/models` list ([current prices](https://synap402.com/pricing.html)). Base URL `https://synap402.com/v1`. The default model is `qwen3-coder-30b`; any id from that list can be set instead. Chat only here, on the OpenAI shape.
+- **LLMTR.** A key from [llmtr.com/dashboard/keys](https://llmtr.com/dashboard/keys); prepaid, and one key reaches models from several labs. Base URL `https://llmtr.com/v1`. Model ids carry the vendor's name, as `https://llmtr.com/v1/models` lists them (public, no key needed); the default model is `qwen/qwen3.8-flash`, and any id from that list can be set instead. Chat only here, on the OpenAI shape.
 
 **Paste it into nanoMuse.**
 

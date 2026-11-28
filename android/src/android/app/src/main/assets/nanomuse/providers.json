@@ -565,6 +565,23 @@
       "verified": "2026-11"
     },
     {
+      "id": "llmtr",
+      "name": "LLMTR",
+      "name_zh": "LLMTR",
+      "protocol": "openai",
+      "base_url": "https://llmtr.com/v1",
+      "key_url": "https://llmtr.com/dashboard/keys",
+      "auth": ["key"],
+      "regions": ["global"],
+      "capabilities": ["chat"],
+      "defaults": {
+        "chat": "qwen/qwen3.8-flash"
+      },
+      "note": "A prepaid OpenAI-compatible gateway with one key for models from several labs (Qwen, Mistral, DeepSeek, Claude, GPT, Gemini and others). Model ids carry the vendor's name, as its public /v1/models list names them. Chat only here, on the OpenAI shape: the default model is qwen/qwen3.8-flash, and any id from that list can be set instead.",
+      "note_zh": "预付费的 OpenAI 兼容网关，一把 key 用多个厂商的模型（Qwen、Mistral、DeepSeek、Claude、GPT、Gemini 等）。模型 id 带厂商名，以它公开的 /v1/models 列表为准。这里只有对话，走 OpenAI 格式：默认模型是 qwen/qwen3.8-flash，也可以改填这个列表里的任意模型 id。",
+      "verified": "2026-11"
+    },
+    {
       "id": "ollama",
       "name": "Ollama",
       "name_zh": "Ollama（本机）",
