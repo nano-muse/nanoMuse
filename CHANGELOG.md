@@ -31,6 +31,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Project
 
+- Renamed UberLLM to MartLLM in the own-key catalogue and kept saved keys on their original API host.
+
 ## [1.0.10] - 2026-11-25 · Bridge
 
 Bridge: Android background screen work now has guided local pairing, a secure floating preview
