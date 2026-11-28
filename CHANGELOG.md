@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Attached reconnecting Hub sockets before closing the replaced connection so single-device and concurrent reconnects stay tracked online for presence, call replies and sign-out disconnects, and committed account deletion or disabling before dropping active Hub sockets.
+- Cleaned up interrupted Hub reconnects and ignored late calls and results from stopped or replaced sockets without disrupting the current connection.
 - Added separate concurrency limits for hosted chat and screen operation so a full chat queue can leave screen-operation slots available.
 - Corrected Cloud chat billing for empty and failed provider responses, including streams.
 - Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
@@ -21,6 +23,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Desktop
 
 - Recovered Windows sandbox commands when the inherited temporary directory rejected Low integrity labels, using a checked app-specific directory without changing Windows settings or sandbox restrictions. For #981.
+- Parsed CRLF-delimited and multi-line SSE responses in MCP connectors so servers sending `\r\n\r\n` event frames list and filter their tools reliably.
 - Parsed and normalized `file:` URLs in the Electron navigation guard so encoded dot-segments, backslashes or remote `file://` hosts cannot escape the shell's resources directory.
 - Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.
 - Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
