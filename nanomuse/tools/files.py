@@ -245,8 +245,25 @@ class Files(BaseTool):
             inside = False  # a path that cannot be resolved does not get the workspace's trust
         if action in ("write", "append"):
             risk = RiskLevel.MODERATE if inside else RiskLevel.SENSITIVE
+            idempotent_sandbox_write = False
+            if action == "write" and inside:
+                try:
+                    # Only regular, non-hardlinked files inside the workspace are safe
+                    # to treat as idempotent sandbox writes (FIFOs or external hard links
+                    # can duplicate side effects or mutate files outside the workspace).
+                    if resolved.exists():
+                        st = resolved.stat()
+                        idempotent_sandbox_write = (
+                            resolved.is_file() and not resolved.is_symlink() and st.st_nlink <= 1
+                        )
+                    else:
+                        idempotent_sandbox_write = True
+                except OSError:
+                    idempotent_sandbox_write = False
             return CallAssessment(
-                risk=risk, summary=summary + f" ({len(args.get('content') or '')} chars)"
+                risk=risk,
+                idempotent_sandbox_write=idempotent_sandbox_write,
+                summary=summary + f" ({len(args.get('content') or '')} chars)",
             )
         # reads
         return CallAssessment(

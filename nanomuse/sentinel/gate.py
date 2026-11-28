@@ -452,6 +452,7 @@ class Sentinel:
                 f"Sentinel blocked '{tool.name}': {why}. Do not retry the same call; "
                 "explain the situation to the user or choose a different approach."
             )
+            result.blocked = True
             self.audit.record(
                 "tool_call",
                 tool=tool.name,
@@ -491,6 +492,7 @@ class Sentinel:
                     "model), never a command or a script. Do without the secret, or ask the "
                     "person to use a connector that has it."
                 )
+                result.blocked = True
                 self.audit.record(
                     "tool_call",
                     tool=tool.name,

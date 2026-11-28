@@ -30,6 +30,19 @@ from nanomuse.skills import SkillLibrary
 from nanomuse.tools.base import ToolCollection
 from nanomuse.ui import UI
 
+MAX_SANDBOX_WRITE_RETRIES = 2
+
+
+def _format_retry_summary(retries: list[dict[str, Any]]) -> str:
+    parts = []
+    for entry in retries:
+        outcome = "succeeded" if entry["ok"] else f"failed: {entry['last_error']}"
+        parts.append(
+            f"{entry['summary']} (retried {entry['retries']} time(s) after "
+            f"'{entry['first_error']}'; {outcome})"
+        )
+    return "[Retry summary] " + "; ".join(parts)
+
 
 class Incoming:
     """A user message on its way to the agent: the text, what was attached to it, the
@@ -619,6 +632,7 @@ class MuseAgent:
         final: str | None = None
         step = 0
         empty_replies = 0
+        turn_retries: list[dict[str, Any]] = []
         task_token = self.sentinel.begin_task(
             purpose or user_input, conversation=self.conversation_id, execution_llm=self.llm
         )
@@ -700,6 +714,7 @@ class MuseAgent:
                     if budget is not None:
                         budget.check()
                     tool = self.tools.get(call.name)
+                    assessment = None
                     if tool is None:
                         summary = f"{call.name}(?)"
                     elif "__raw__" in call.arguments:
@@ -707,7 +722,8 @@ class MuseAgent:
                         summary = f"{call.name}: arguments cut off ({len(raw)} chars)"
                     else:
                         try:
-                            summary = tool.assess(call.arguments).summary
+                            assessment = tool.assess(call.arguments)
+                            summary = assessment.summary
                         except Exception as exc:  # noqa: BLE001
                             # the gate's assess will fail the same way, as a tool result
                             summary = f"{call.name}: bad arguments ({type(exc).__name__})"
@@ -717,7 +733,11 @@ class MuseAgent:
                             f"unknown tool '{call.name}'. Available tools: {', '.join(t.name for t in self.tools)}"
                         )
                     else:
-                        result = await self.sentinel.guard(call, tool)
+                        result, retry_info = await self._execute_with_bounded_retry(
+                            call, tool, assessment, summary
+                        )
+                        if retry_info is not None:
+                            turn_retries.append(retry_info)
                     self.ui.on_tool_result(call, result)
                     tool_message = Message.tool(result.for_model(), call.id, call.name)
                     tool_message.meta["tool_ok"] = result.ok  # read by the task ledger
@@ -768,11 +788,76 @@ class MuseAgent:
             self.state = AgentState.ERROR
             raise
         finally:
+            text = final or ""
+            if turn_retries:
+                note = _format_retry_summary(turn_retries)
+                text = f"{text}\n\n{note}" if text else note
+                final = text
+                if self.messages and self.messages[-1].role == Role.ASSISTANT:
+                    existing = self.messages[-1].content or ""
+                    self.messages[-1].content = f"{existing}\n\n{note}" if existing else note
             llm_session.end_turn(turn_token)
             llm_session.leave(session_token)
             self.sentinel.end_task(task_token)
             self._save_session()
-        return final or ""
+        return text
+
+    async def _execute_with_bounded_retry(
+        self,
+        call: Any,
+        tool: Any,
+        assessment: Any,
+        summary: str,
+    ) -> tuple[ToolResult, dict[str, Any] | None]:
+        """Retry only idempotent in-sandbox writes up to MAX_SANDBOX_WRITE_RETRIES,
+        rechecking eligibility and routing every attempt through Sentinel."""
+        result = await self.sentinel.guard(call, tool)
+
+        def _eligible(current_assessment: Any) -> bool:
+            return (
+                current_assessment is not None
+                and current_assessment.idempotent_sandbox_write
+                and current_assessment.risk != RiskLevel.SENSITIVE
+            )
+
+        if result.ok or result.blocked or not _eligible(assessment):
+            return result, None
+
+        first_error = result.error or "unknown error"
+        retries = 0
+        for retry_num in range(1, MAX_SANDBOX_WRITE_RETRIES + 1):
+            try:
+                fresh_assessment = tool.assess(call.arguments)
+            except Exception:  # noqa: BLE001
+                break
+            if not _eligible(fresh_assessment):
+                break
+            budget = task_budget.current()
+            if budget is not None:
+                budget.check()
+            self.ui.warn(f"Retrying {summary} ({retry_num}/{MAX_SANDBOX_WRITE_RETRIES})")
+            result = await self.sentinel.guard(call, tool)
+            retries = retry_num
+            if result.ok or result.blocked:
+                break
+
+        if retries == 0:
+            return result, None
+
+        note = f"[retried {retries} time(s) inside sandbox; initial error: {first_error}]"
+        if result.ok:
+            result.output = f"{result.output}\n{note}" if result.output else note
+        elif result.error:
+            result.error = f"{result.error} {note}"
+        else:
+            result.error = note
+        return result, {
+            "summary": summary,
+            "retries": retries,
+            "ok": result.ok,
+            "first_error": first_error,
+            "last_error": result.error or "",
+        }
 
     # ------------------------------------------------------------------ session persistence
     def reset(self) -> None:

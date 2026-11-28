@@ -43,6 +43,9 @@ class CallAssessment(BaseModel):
     target: str | None = None
     # One-line, human-readable description shown in approval prompts / audit log.
     summary: str = ""
+    # True only for idempotent writes inside the workspace/sandbox that may be
+    # retried up to a small bound on transient execution failure.
+    idempotent_sandbox_write: bool = False
     # Extra warnings ("command contains rm -rf", ...).
     warnings: list[str] = Field(default_factory=list)
 
