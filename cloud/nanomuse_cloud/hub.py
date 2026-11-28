@@ -548,13 +548,6 @@ class Hub:
         )
 
     async def _attach(self, conn: Connection) -> None:
-        account = self.online.setdefault(conn.account_id, {})
-        old = account.get(conn.device_id)
-        if old is not None:
-            old.stop()
-            await self._close(old.ws, 4003, "replaced by a newer connection")
-        account[conn.device_id] = conn
-        conn.start()
         if conn.kind != "web":
             self.db.upsert_device(
                 conn.account_id,
@@ -567,9 +560,19 @@ class Hub:
                 conn.llm_provider,
                 conn.llm_model,
             )
+        # Register the replacement before awaiting old.ws.close(): closing the old socket
+        # lets its serve() task run _detach(old) during the await, which would otherwise
+        # still see old in self.online, pop the account dict and orphan conn outside it.
+        account = self.online.setdefault(conn.account_id, {})
+        old = account.get(conn.device_id)
+        account[conn.device_id] = conn
+        conn.start()
         # the id and the account masked like every other line; the device's name is the
         # person's own words and stays out of the log
         log.info("hub: %s %s connected; account %s has %d online", conn.kind, conn.device_id[:12], conn.account_id[:8], len(account))
+        if old is not None:
+            old.stop()
+            await self._close(old.ws, 4003, "replaced by a newer connection")
 
     async def _detach(self, conn: Connection) -> None:
         conn.stop()

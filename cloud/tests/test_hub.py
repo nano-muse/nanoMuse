@@ -629,11 +629,126 @@ def test_reconnect_replaces_the_older_socket(client):
         with connect(client, key) as second:
             second.send_json(hello("computer", "pc-1", "desk"))
             w = second.receive_json()
-            assert [d["id"] for d in w["devices"]] == ["pc-1"]
+            assert [(d["id"], d["online"]) for d in w["devices"]] == [("pc-1", True)]
             second.send_json({"type": "devices"})
             frames = [second.receive_json(), second.receive_json()]
             assert all(f["type"] == "devices" for f in frames)
-            assert all(len(f["devices"]) == 1 for f in frames)
+            assert all([(d["id"], d["online"]) for d in f["devices"]] == [("pc-1", True)] for f in frames)
+
+
+def test_reconnect_keeps_replacement_online_when_old_socket_detaches_during_close():
+    """Closing the previous socket yields to the event loop. If its serve() task runs
+    _detach(old) before _attach(new) resumes, the replacement must stay registered in
+    hub.online so presence, call replies and later sign-out/account drops still reach it."""
+    from nanomuse_cloud.hub import Hub
+    from nanomuse_cloud.identifiers import parse
+
+    class _FakeWS:
+        def __init__(self) -> None:
+            self.closed = asyncio.Event()
+            self.close_codes: list[tuple[int, str]] = []
+            self.sent: list[str] = []
+
+        async def send_text(self, text: str) -> None:
+            self.sent.append(text)
+
+        async def close(self, code: int = 1000, reason: str = "") -> None:
+            self.close_codes.append((code, reason))
+            self.closed.set()
+            await asyncio.sleep(0)
+
+    async def scenario() -> None:
+        settings = Settings(database=":memory:", secret="test-secret", public_base="http://cloud.test")
+        sender = LogSender()
+        cloud = Cloud(settings, Database(":memory:"), sender)
+        ident = parse("reconnect@example.com")
+        cloud.request_code(ident, "127.0.0.1")
+        _, code = sender.sent[-1]
+        api_key = cloud.sign_in(ident, code, "desk")[0]
+        caller = cloud.authenticate(api_key)
+        hub = Hub(cloud)
+
+        ws1, ws2 = _FakeWS(), _FakeWS()
+        c1 = Connection(ws=ws1, account_id=caller.account_id, key_hash=caller.key_hash, device_id="pc-1", name="desk", kind="computer")
+        c2 = Connection(ws=ws2, account_id=caller.account_id, key_hash=caller.key_hash, device_id="pc-1", name="desk", kind="computer")
+
+        await hub._attach(c1)
+
+        async def old_serve_cleanup() -> None:
+            await ws1.closed.wait()
+            await hub._detach(c1)
+
+        cleanup = asyncio.create_task(old_serve_cleanup())
+        await asyncio.sleep(0)
+        await hub._attach(c2)
+        await cleanup
+
+        assert hub.online.get(caller.account_id, {}).get("pc-1") is c2
+        assert [(d["id"], d["online"]) for d in hub.devices(caller.account_id)] == [("pc-1", True)]
+        assert ws1.close_codes == [(4003, "replaced by a newer connection")]
+
+        cloud.sign_out(caller)
+        assert await hub.drop_signed_out(caller.account_id) == 1
+        assert ws2.close_codes == [(4001, "bad_key")]
+        assert hub.online == {}
+
+    asyncio.run(scenario())
+
+
+def test_concurrent_reconnects_leave_only_the_newest_socket_online():
+    """Two reconnects arriving while the previous socket is still closing must serialize
+    cleanly so only the newest connection stays live in hub.online."""
+    from nanomuse_cloud.hub import Hub
+    from nanomuse_cloud.identifiers import parse
+
+    class _SlowCloseWS:
+        def __init__(self, gate: asyncio.Event | None = None) -> None:
+            self.gate = gate
+            self.close_started = asyncio.Event()
+            self.close_codes: list[tuple[int, str]] = []
+
+        async def send_text(self, text: str) -> None:
+            pass
+
+        async def close(self, code: int = 1000, reason: str = "") -> None:
+            self.close_codes.append((code, reason))
+            self.close_started.set()
+            if self.gate is not None:
+                await self.gate.wait()
+
+    async def scenario() -> None:
+        settings = Settings(database=":memory:", secret="test-secret", public_base="http://cloud.test")
+        sender = LogSender()
+        cloud = Cloud(settings, Database(":memory:"), sender)
+        ident = parse("concurrent@example.com")
+        cloud.request_code(ident, "127.0.0.1")
+        _, code = sender.sent[-1]
+        api_key = cloud.sign_in(ident, code, "desk")[0]
+        caller = cloud.authenticate(api_key)
+        hub = Hub(cloud)
+
+        gate = asyncio.Event()
+        ws1, ws2, ws3 = _SlowCloseWS(gate), _SlowCloseWS(), _SlowCloseWS()
+        c1 = Connection(ws=ws1, account_id=caller.account_id, key_hash=caller.key_hash, device_id="pc-1", name="desk", kind="computer")
+        c2 = Connection(ws=ws2, account_id=caller.account_id, key_hash=caller.key_hash, device_id="pc-1", name="desk", kind="computer")
+        c3 = Connection(ws=ws3, account_id=caller.account_id, key_hash=caller.key_hash, device_id="pc-1", name="desk", kind="computer")
+
+        await hub._attach(c1)
+        attach2 = asyncio.create_task(hub._attach(c2))
+        await ws1.close_started.wait()
+        await hub._attach(c3)
+        gate.set()
+        await attach2
+        await hub._detach(c1)
+        await hub._detach(c2)
+
+        assert hub.online.get(caller.account_id, {}).get("pc-1") is c3
+        assert c1.closed and c2.closed and not c3.closed
+        assert ws1.close_codes == [(4003, "replaced by a newer connection")]
+        assert ws2.close_codes == [(4003, "replaced by a newer connection")]
+        await hub._detach(c3)
+
+    asyncio.run(scenario())
 
 
 def test_a_sign_out_closes_the_hub_socket_of_the_key_it_revoked(client):
