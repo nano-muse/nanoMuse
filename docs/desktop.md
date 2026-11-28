@@ -138,6 +138,8 @@ Replace the relay address and AppImage path, then register or sign in on that re
 
 ## What it is
 
+The desktop window keeps navigation within the local Host and bundled pages. Web links outside the Host open in your browser. Local file URLs outside the shell's resources directory are blocked, including encoded paths that lead to a parent directory.
+
 Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
 right-click an editable field to cut, copy, paste or select all. The Edit menu and the
 usual keyboard shortcuts also work. Page scripts cannot read the clipboard; pasting
@@ -624,6 +626,8 @@ noImage)` and then covered with a `desktopCapturer` frame that was black or stal
 starts the helper at launch (to read the grants and to ask for the missing ones) and
 quits it when it quits; the helper also leaves on its own when the app is gone. It has no
 window and no Dock icon; Activity Monitor lists it as *nanoMuse Computer Use*.
+
+If the helper quits during a click or drag, its next launch checks the recorded mouse button. It releases the button if it is still down. If Accessibility permission was removed, restore it so the next action can finish the release.
 
 What you do, once, on a Mac that has not granted anything yet (checked on macOS 27.0.1,
 Apple silicon):
