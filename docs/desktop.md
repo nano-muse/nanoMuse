@@ -616,6 +616,8 @@ starts the helper at launch (to read the grants and to ask for the missing ones)
 quits it when it quits; the helper also leaves on its own when the app is gone. It has no
 window and no Dock icon; Activity Monitor lists it as *nanoMuse Computer Use*.
 
+If the helper quits during a click or drag, its next launch checks the recorded mouse button. It releases the button if it is still down. If Accessibility permission was removed, restore it so the next action can finish the release.
+
 What you do, once, on a Mac that has not granted anything yet (checked on macOS 27.0.1,
 Apple silicon):
 

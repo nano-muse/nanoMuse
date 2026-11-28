@@ -22,6 +22,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.
 - Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
+- Fixed recovery from interrupted Mac clicks and drags, including failed mouse releases and shutdown during a gesture. For #960.
 
 ### Android
 

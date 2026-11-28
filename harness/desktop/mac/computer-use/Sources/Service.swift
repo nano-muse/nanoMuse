@@ -47,14 +47,22 @@ final class Service {
         case ("POST", "/execute"):
             return execute(body)
         case ("POST", "/quit"):
-            // the answer goes out first; then the run loop ends — with nothing left held down
-            Keyboard.releaseAll()
+            // Finish the current gesture and refuse any new input while the reply is flushed.
+            stopInput()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 exit(0)
             }
             return HTTPResponse(status: 200, body: ["ok": true])
         default:
             return Service.failure(404, "not_found", "no route \(request.method) \(request.path)")
+        }
+    }
+
+    func stopInput() {
+        mouseButtons.stop {
+            do { try Mouse.recover() }
+            catch { FileHandle.standardError.write(Data("nanoMuse Computer Use: mouse release pending: \(error)\n".utf8)) }
+            Keyboard.releaseAll()
         }
     }
 
