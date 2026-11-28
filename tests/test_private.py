@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import os
 import stat
 import subprocess
@@ -12,6 +13,22 @@ import pytest
 
 from nanomuse import private
 from nanomuse.private import keep_private
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the process token is a Windows API")
+def test_windows_token_sid_matches_current_process_user(monkeypatch: pytest.MonkeyPatch) -> None:
+    identity = subprocess.run(
+        ["whoami", "/user", "/fo", "csv", "/nh"],
+        capture_output=True,
+        check=True,
+    ).stdout.decode("mbcs")
+    sid = next(csv.reader(identity.strip().splitlines()))[-1]
+    assert sid.startswith("S-1-")
+    # The real API must succeed; a qualified-name fallback cannot satisfy this test.
+    monkeypatch.setenv("USERNAME", "not-the-current-user")
+    monkeypatch.setenv("USERDOMAIN", "not-the-current-domain")
+    assert private._windows_user_sid() == sid
+    assert private._windows_principal() == f"*{sid}"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the mode is the POSIX side's test")

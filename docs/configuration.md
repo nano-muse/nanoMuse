@@ -16,6 +16,11 @@ A key the runtime has no setting for (a misspelt `modle`, a key from another ver
 
 Calendar drafts with the same day and title receive numbered filenames such as `calendar/<date>-<title>-2.ics`; earlier drafts stay intact.
 
+On Windows, private runtime files such as saved configuration, credentials and calendar
+caches receive access permissions for the current process user's SID, avoiding ambiguous
+account names. If the process token cannot be read, nanoMuse uses `USERDOMAIN\USERNAME`,
+or `USERNAME` when no domain is available. POSIX systems continue to use mode `0600`.
+
 ## Environment overrides
 
 These win over the file. They cover the settings people change most often and what Docker needs.
