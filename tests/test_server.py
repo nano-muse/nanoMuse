@@ -211,15 +211,16 @@ def test_terminate_only_reply_after_a_text_reply_is_still_shown(server):
 
 
 @pytest.mark.parametrize("ending", ["text", "terminate", "text_and_terminate"])
-def test_retry_summary_updates_the_reply_once(server, ending):
+@pytest.mark.parametrize("answer", ["Report written.", "\n Report written. \n\n"])
+def test_retry_summary_updates_the_reply_once(server, ending, answer):
     from test_sandbox_retry import FlakySandboxFiles
 
     client, service, llm = server
     files = FlakySandboxFiles(workspace=service.settings.agent.workspace, fail_times=1)
     service.app.tools.add(files)
-    last = LLMResponse(content="Report written.")
+    last = LLMResponse(content=answer)
     if ending != "text":
-        last.tool_calls = [tc("terminate", status="success", summary="Report written.")]
+        last.tool_calls = [tc("terminate", status="success", summary=answer)]
     if ending == "terminate":
         last.content = None
     llm.script.extend(
@@ -238,7 +239,11 @@ def test_retry_summary_updates_the_reply_once(server, ending):
     assert files.calls_made == 2
 
     client.portal.call(
-        service._finish_run, service.threads["main"], None, replies[0]["text"], False
+        service._finish_run,
+        service.threads["main"],
+        None,
+        f"{answer}\n\n{service.threads['main'].agent.last_retry_summary}".strip(),
+        False,
     )
     replies = events_of(client, kind="assistant")
     assert len(replies) == 1
