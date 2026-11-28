@@ -16,6 +16,8 @@ nanoMuse 从一个 TOML 配置文件读取设置。TOML 是一种用键和值、
 
 日期和标题相同的日历草稿会用序号区分，例如 `calendar/<date>-<title>-2.ics`，不会覆盖已有草稿。
 
+Windows 上保存的运行时配置、凭据和日历缓存等私有文件，会按当前进程用户的 SID（安全标识符）设置访问权限，避免账号名称有歧义时授权给错误账号。无法读取进程令牌时，使用 `USERDOMAIN\USERNAME`；没有域信息时才使用 `USERNAME`。POSIX 系统仍使用 `0600` 权限。
+
 ## 环境变量覆盖 {#environment-overrides}
 
 以下环境变量优先于配置文件，涵盖常用设置和 Docker 所需设置。运行时指执行 nanoMuse 任务的程序，容器则是打包并隔离该程序运行环境的方式。
