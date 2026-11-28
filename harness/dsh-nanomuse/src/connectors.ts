@@ -897,8 +897,13 @@ function mcpHeaders(extra: Record<string, string> = {}): Record<string, string> 
 /** One JSON-RPC response out of a Streamable HTTP answer, JSON or SSE. */
 function firstMessage(text: string, contentType: string): { result?: unknown; error?: { message?: string } } | undefined {
   if (contentType.includes('text/event-stream')) {
-    for (const block of text.split(/\n\n/)) {
-      const data = block.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('\n')
+    for (const block of text.split(/\r\n\r\n|\n\n|\r\r/)) {
+      const data = block
+        .split(/\r\n|\n|\r/)
+        .filter((l) => l.startsWith('data:'))
+        .map((l) => l.replace(/^data: ?/, ''))
+        .join('\n')
+        .trim()
       if (!data) continue
       try {
         const parsed = JSON.parse(data) as { id?: unknown; result?: unknown; error?: { message?: string } }
@@ -955,7 +960,7 @@ async function listTools(url: string, auth: Record<string, string>): Promise<Too
 
 /** A `tools/list` answer without the switched-off tools, in whichever framing it came. */
 function filterToolsList(text: string, contentType: string, disabled: Set<string>): string {
-  const strip = (data: string): string => {
+  const strip = (data: string): string | undefined => {
     try {
       const parsed = JSON.parse(data) as { result?: { tools?: { name?: string }[] } }
       if (parsed?.result?.tools) {
@@ -965,10 +970,34 @@ function filterToolsList(text: string, contentType: string, disabled: Set<string
     } catch {
       // leave it
     }
-    return data
+    return undefined
   }
-  if (!contentType.includes('text/event-stream')) return strip(text)
-  return text.split('\n').map((line) => (line.startsWith('data:') ? `data: ${strip(line.slice(5).trim())}` : line)).join('\n')
+  if (!contentType.includes('text/event-stream')) return strip(text) ?? text
+  const parts = text.split(/(\r\n\r\n|\n\n|\r\r)/)
+  for (let i = 0; i < parts.length; i += 2) {
+    const block = parts[i]!
+    if (!block) continue
+    const eol = block.includes('\r\n') ? '\r\n' : block.includes('\n') ? '\n' : block.includes('\r') ? '\r' : '\n'
+    const lines = block.split(/\r\n|\n|\r/)
+    const dataLines = lines.filter((l) => l.startsWith('data:'))
+    if (!dataLines.length) continue
+    const filtered = strip(dataLines.map((l) => l.replace(/^data: ?/, '')).join('\n'))
+    if (filtered === undefined) continue
+    const rebuilt: string[] = []
+    let inserted = false
+    for (const line of lines) {
+      if (line.startsWith('data:')) {
+        if (!inserted) {
+          rebuilt.push(`data: ${filtered}`)
+          inserted = true
+        }
+      } else {
+        rebuilt.push(line)
+      }
+    }
+    parts[i] = rebuilt.join(eol)
+  }
+  return parts.join('')
 }
 
 // ---- small things ---------------------------------------------------------------------------------

@@ -6,6 +6,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Cloud
 
+- Attached reconnecting Hub sockets before closing the replaced connection so single-device and concurrent reconnects stay tracked online for presence, call replies and sign-out disconnects, and committed account deletion or disabling before dropping active Hub sockets.
+- Cleaned up interrupted Hub reconnects and ignored late calls and results from stopped or replaced sockets without disrupting the current connection.
 - Added separate concurrency limits for hosted chat and screen operation so a full chat queue can leave screen-operation slots available.
 - Corrected Cloud chat billing for empty and failed provider responses, including streams.
 - Switched hosted chat, screen operation and picture generation to Baidu Qianfan, retained existing Cloud accounts and saved model choices, and added a Cloud page for short character videos with a portrait and reference audio.
@@ -13,6 +15,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 ### Runtime
 
 - Retried failed idempotent workspace writes up to two times through the Sentinel, stopped when target identities changed, and showed the retry note once in the reply. Links and uncertain new files were excluded. For #511.
+- Granted Windows private-file ACLs by the current process user's SID (falling back to domain-qualified username) so private writes to the vault, config and tokens no longer lock the owner out when the computer or domain name matches `USERNAME`.
 - Added SpecStream as an optional web search provider with a user-supplied key. Switching providers clears the previous credential, and DuckDuckGo remains the default.
 - Added criterion tiers (tier 1 and default tier 2) to the goal evaluator so a failing tier-1 outcome criterion with valid evidence marks the run contradicted instead of partial while keeping legacy contract hashes compatible. For #947.
 - Restored titles, previews and messages for older plain-text DeepSeek Harness sessions on desktop and in the runtime.
@@ -21,20 +24,19 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Parsed CRLF-delimited and multi-line SSE responses in MCP connectors so servers sending `\r\n\r\n` event frames list and filter their tools reliably.
+- Parsed and normalized `file:` URLs in the Electron navigation guard so encoded dot-segments, backslashes or remote `file://` hosts cannot escape the shell's resources directory.
 - Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.
 - Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
+- Fixed recovery from interrupted Mac clicks and drags, including failed mouse releases and shutdown during a gesture. For #960.
 
 ### Android
-
-- Removed empty chat bubbles between Android tool steps during streaming and when reopening conversations.
-- Fixed a crash when a chat message could not be saved during send setup, and kept the unsent draft available.
-- Added a selectable, copyable details view for chat errors and preserved longer Gemini diagnostics.
-- Fixed manual Read aloud when automatic reply narration was off.
-- Updated the Codex OAuth catalogue and its GPT-6.2 fallback, identified saved or built-in menus after a failed refresh, and added the Codex image tool variants GPT Image 2.5 Sunburst and Flare.
 
 ### iOS
 
 ### Project
+
+- Renamed UberLLM to MartLLM in the own-key catalogue and kept saved keys on their original API host.
 
 ## [1.0.10] - 2026-11-25 · Bridge
 
@@ -44,6 +46,8 @@ commitments and changed sources. The release also tightens browser, account, loc
 cross-device approval boundaries. The relay is 0.32.0; 1.0.9 clients remain compatible.
 
 - Fixed Android builds that could produce an arm64 APK without the PRoot executable needed for shell commands and screen tasks. Existing sandboxes also recovered missing files for the bundled Alpine shell without resetting the workspace.
+
+- Refreshed the Android package as build 54 on 2026-11-28 without changing the displayed 1.0.10 version. It removed empty bubbles between tool steps, kept drafts after send setup failures, made chat errors copyable, restored manual Read aloud when automatic narration was off, and updated hosted, Codex and image model choices.
 
 - Replaced the manual Android wireless debugging pairing form with a six-step guided background screen setup that watches system switches live, reads the six-digit pairing code automatically through the accessibility service when enabled, falls back to heads-up inline-reply notifications, and connects automatically across cached, property, mDNS and loopback-scanned ports.
 

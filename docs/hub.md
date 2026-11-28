@@ -46,6 +46,15 @@ network (0.1.13–0.1.23) is gone, so a computer that is missing from the phone'
 list has, nearly always, signed in with another account; *Settings → Computers*
 on the phone shows which account the phone uses.
 
+When a device reconnects, its new socket replaces the old one before the relay
+closes the old socket. Cleanup from an earlier connection cannot remove the
+replacement from the online device list. Deleting or disabling an account takes
+effect before its live sockets close, so they cannot reconnect during cleanup.
+If reconnect setup is cancelled while the old socket closes, the interrupted
+connection is removed without disturbing a newer replacement.
+Frames arriving from a stopped or replaced socket are discarded, including late
+calls and results; the current connection can continue normally.
+
 ## What you can say
 
 On the phone, in any chat:

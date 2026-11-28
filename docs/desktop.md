@@ -38,6 +38,8 @@ desktop, and it installs over the old one (same application id).
 
 Levea is listed under **Design** in Connectors. Connect with its OAuth sign-in to edit videos, add captions and export MP4 files. Its tools follow the same approval rules as other MCP connectors.
 
+MCP connectors accept tool lists in JSON or server-sent events (SSE), including CRLF event separators and JSON split across multiple data lines. Disabled tools are removed from the list advertised to the agent in either format.
+
 On Linux and macOS, **Settings → General → About** shows the installed version and the latest published release. A local test build can be newer than the published release.
 
 If the desktop host exits after startup, the app tries to restart it once. After ten minutes of running, the host can restart automatically again. Two exits in quick succession open the recovery dialog. Timeout errors from sync, account and model refresh requests include the operation name and wait time.
@@ -137,6 +139,8 @@ env NANOMUSE_CLOUD_URL='https://relay.example' \
 Replace the relay address and AppImage path, then register or sign in on that relay. Use the same command and data directory on later launches; a normal AppImage launch does not inherit these variables. The separate-account and profile-override rules above also apply.
 
 ## What it is
+
+The desktop window keeps navigation within the local Host and bundled pages. Web links outside the Host open in your browser. Local file URLs outside the shell's resources directory are blocked, including encoded paths that lead to a parent directory.
 
 Copy buttons can put text on the clipboard. Right-click selected text to copy it, or
 right-click an editable field to cut, copy, paste or select all. The Edit menu and the
@@ -615,6 +619,8 @@ noImage)` and then covered with a `desktopCapturer` frame that was black or stal
 starts the helper at launch (to read the grants and to ask for the missing ones) and
 quits it when it quits; the helper also leaves on its own when the app is gone. It has no
 window and no Dock icon; Activity Monitor lists it as *nanoMuse Computer Use*.
+
+If the helper quits during a click or drag, its next launch checks the recorded mouse button. It releases the button if it is still down. If Accessibility permission was removed, restore it so the next action can finish the release.
 
 What you do, once, on a Mac that has not granted anything yet (checked on macOS 27.0.1,
 Apple silicon):
