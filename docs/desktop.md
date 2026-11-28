@@ -38,6 +38,8 @@ desktop, and it installs over the old one (same application id).
 
 Levea is listed under **Design** in Connectors. Connect with its OAuth sign-in to edit videos, add captions and export MP4 files. Its tools follow the same approval rules as other MCP connectors.
 
+MCP connectors accept tool lists in JSON or server-sent events (SSE), including CRLF event separators and JSON split across multiple data lines. Disabled tools are removed from the list advertised to the agent in either format.
+
 On Linux and macOS, **Settings → General → About** shows the installed version and the latest published release. A local test build can be newer than the published release.
 
 If the desktop host exits after startup, the app tries to restart it once. After ten minutes of running, the host can restart automatically again. Two exits in quick succession open the recovery dialog. Timeout errors from sync, account and model refresh requests include the operation name and wait time.

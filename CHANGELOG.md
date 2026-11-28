@@ -20,6 +20,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Parsed CRLF-delimited and multi-line SSE responses in MCP connectors so servers sending `\r\n\r\n` event frames list and filter their tools reliably.
 - Parsed and normalized `file:` URLs in the Electron navigation guard so encoded dot-segments, backslashes or remote `file://` hosts cannot escape the shell's resources directory.
 - Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.
 - Restored automatic desktop host recovery after ten minutes of stable operation. Repeated early exits still offered manual recovery. Sync, account and model refresh timeouts identified the operation that timed out.
