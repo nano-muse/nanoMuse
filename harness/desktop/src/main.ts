@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { nextScreenshotPath } from "./screenshot-path.js";
 import { GLOW_HIDE_MS, GLOW_SETTLE_MS, type Leak, LeakLog, leakIsEvidence, leakIsReal, pointerAction, REARM_DELAYS_MS, staleInstance } from "./glow";
@@ -25,6 +25,7 @@ import { HostWork } from "./host-work";
 import { ProtectedExit, type ExitDialog, type ExitIntent, type WorkItem, type WorkSource } from "./protected-exit";
 import { WindowsUpdates, RestartNsisUpdater } from "./windows-updates";
 import { windowsNetworkCost } from "./windows-network-cost";
+import { windowsSandboxTempEnvironment } from "./windows-sandbox-temp";
 
 /**
  * nanoMuse Desktop — the nanoMuse desktop, built on DeepSeek Harness.
@@ -276,10 +277,14 @@ function startHost(): Promise<string> {
   mkdirSync(home, { recursive: true });
   ensureProfile(home, dshDir, log);
   return new Promise<string>((resolve, reject) => {
-    Promise.all([hostPort(home), ensureOperator()])
-      .then(([port, operatorServer]) => {
+    const fallbackTemps = [join(app.getPath("userData"), "sandbox-temp")];
+    if (process.env.LOCALAPPDATA) fallbackTemps.unshift(join(process.env.LOCALAPPDATA, "nanoMuse", "sandbox-temp"));
+    Promise.all([hostPort(home), ensureOperator(), windowsSandboxTempEnvironment({
+      platform: process.platform, env: process.env, inheritedRoot: tmpdir(), fallbackRoots: fallbackTemps, log,
+    })])
+      .then(([port, operatorServer, hostEnv]) => {
         const env: NodeJS.ProcessEnv = {
-          ...process.env,
+          ...hostEnv,
           ELECTRON_RUN_AS_NODE: "1",
           DSH_HOME: home,
           // One secret per launch, shared by the bundle and the runtime's `nanomuse mcp`

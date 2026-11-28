@@ -23,6 +23,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Recovered Windows sandbox commands when the inherited temporary directory rejected Low integrity labels, using a checked app-specific directory without changing Windows settings or sandbox restrictions. For #981.
 - Parsed CRLF-delimited and multi-line SSE responses in MCP connectors so servers sending `\r\n\r\n` event frames list and filter their tools reliably.
 - Parsed and normalized `file:` URLs in the Electron navigation guard so encoded dot-segments, backslashes or remote `file://` hosts cannot escape the shell's resources directory.
 - Paused Mac input when its selected window was unavailable, its input permission was missing or the foreground app changed before typing. Desktop Hands also reported when the next screenshot was identical after input.

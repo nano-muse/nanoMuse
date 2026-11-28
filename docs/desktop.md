@@ -573,6 +573,15 @@ console instead of failing during DLL initialization with `0xC0000142`, includin
 temporary sandbox directory has been cleaned and recreated. The trampoline does not weaken the
 ACL policy and is not used for full-access commands.
 
+Before starting the Windows host, nanoMuse checks whether a fresh child of the inherited
+temporary directory accepts the sandbox's Low integrity label. If that fails, it tries an
+app-specific directory under local app data, then the desktop's user-data directory. Only
+the host's `TEMP`, `TMP` and `TMPDIR` change; Windows account settings, existing files and
+sandbox restrictions stay unchanged. `desktop.log` records each rejected path, the failed
+stage and error code. If no candidate works, sandbox commands remain blocked: choose a
+writable Windows temporary directory that supports Low integrity labels, fully quit
+nanoMuse, then restart it. Closing the window alone can leave the host running.
+
 A first start can be slow, on Windows in particular. The Host prints its address only once
 every plugin of the profile has been loaded, and a fresh install has some 20 000 files under
 `resources/dsh/node_modules` that the system reads for the first time; Windows Defender's
